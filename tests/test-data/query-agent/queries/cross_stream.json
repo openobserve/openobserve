@@ -1244,6 +1244,11 @@
         "results": [
           [
             "manual",
+            "ZONE-3",
+            "1"
+          ],
+          [
+            "manual",
             "ZONE-2",
             "1"
           ],
@@ -1260,11 +1265,6 @@
           [
             "manual",
             "ZONE-1",
-            "1"
-          ],
-          [
-            "manual",
-            "ZONE-3",
             "1"
           ]
         ],
@@ -1522,11 +1522,16 @@
         "results": [
           [
             "lane-monitor",
-            "US-CENTRAL",
+            "AP-EAST",
             "4"
           ],
           [
             "batch-sync",
+            "US-CENTRAL",
+            "4"
+          ],
+          [
+            "lane-monitor",
             "US-CENTRAL",
             "4"
           ],
@@ -1536,13 +1541,8 @@
             "4"
           ],
           [
-            "lane-monitor",
+            "temp-regulator",
             "AP-EAST",
-            "4"
-          ],
-          [
-            "lane-monitor",
-            "AP-SOUTH",
             "2"
           ],
           [
@@ -1552,6 +1552,16 @@
           ],
           [
             "batch-sync",
+            "SA-EAST",
+            "2"
+          ],
+          [
+            "lane-monitor",
+            "AP-SOUTH",
+            "2"
+          ],
+          [
+            "batch-sync",
             "EU-CENTRAL",
             "2"
           ],
@@ -1562,22 +1572,12 @@
           ],
           [
             "track-router",
-            "US-CENTRAL",
-            "2"
-          ],
-          [
-            "temp-regulator",
             "AP-EAST",
             "2"
           ],
           [
             "track-router",
-            "AP-EAST",
-            "2"
-          ],
-          [
-            "batch-sync",
-            "SA-EAST",
+            "US-CENTRAL",
             "2"
           ]
         ],
@@ -1622,14 +1622,14 @@
             "ZONE-2",
             "PL-004",
             "190.0",
-            "45.3",
+            "88.1",
             "1"
           ],
           [
             "ZONE-2",
             "PL-004",
             "190.0",
-            "88.1",
+            "45.3",
             "1"
           ],
           [
@@ -1650,14 +1650,14 @@
             "ZONE-3",
             "PL-001",
             "555.0",
-            "67.9",
+            "72.8",
             "3"
           ],
           [
             "ZONE-3",
             "PL-001",
             "555.0",
-            "72.8",
+            "67.9",
             "3"
           ],
           [
@@ -1715,9 +1715,9 @@
             "0.0"
           ],
           [
-            "zone-controller",
-            "12.0",
-            "12.0",
+            "track-router",
+            "230.0",
+            "230.0",
             "0.0"
           ],
           [
@@ -1727,9 +1727,9 @@
             "0.0"
           ],
           [
-            "track-router",
-            "230.0",
-            "230.0",
+            "zone-controller",
+            "12.0",
+            "12.0",
             "0.0"
           ],
           [
@@ -2028,6 +2028,34 @@
         ],
         "results": [
           [
+            "warehouse-south",
+            "warehouse-east",
+            "false",
+            "None",
+            "1"
+          ],
+          [
+            "warehouse-central",
+            "warehouse-north",
+            "None",
+            "true",
+            "1"
+          ],
+          [
+            "warehouse-east",
+            "warehouse-south",
+            "false",
+            "None",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "warehouse-west",
+            "None",
+            "false",
+            "1"
+          ],
+          [
             "warehouse-central",
             "warehouse-west",
             "None",
@@ -2067,34 +2095,6 @@
             "warehouse-central",
             "true",
             "true",
-            "1"
-          ],
-          [
-            "warehouse-north",
-            "warehouse-west",
-            "None",
-            "false",
-            "1"
-          ],
-          [
-            "warehouse-south",
-            "warehouse-east",
-            "false",
-            "None",
-            "1"
-          ],
-          [
-            "warehouse-central",
-            "warehouse-north",
-            "None",
-            "true",
-            "1"
-          ],
-          [
-            "warehouse-east",
-            "warehouse-south",
-            "false",
-            "None",
             "1"
           ]
         ],
@@ -2500,11 +2500,6 @@
         ],
         "results": [
           [
-            "EU-CENTRAL",
-            "2",
-            "0"
-          ],
-          [
             "SA-EAST",
             "2",
             "2"
@@ -2518,6 +2513,11 @@
             "US-CENTRAL",
             "2",
             "1"
+          ],
+          [
+            "EU-CENTRAL",
+            "2",
+            "0"
           ],
           [
             "AP-SOUTH",
@@ -2684,18 +2684,18 @@
             "12.5"
           ],
           [
-            "ZONE-3",
-            "2",
-            "1",
-            "610.0",
-            "99.0"
-          ],
-          [
             "ZONE-1",
             "2",
             "2",
             "610.0",
             "33.0"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "1",
+            "610.0",
+            "99.0"
           ],
           [
             "ZONE-4",
@@ -2992,13 +2992,6 @@
         ],
         "results": [
           [
-            "low",
-            "allow",
-            "2",
-            "12.0",
-            "956.0"
-          ],
-          [
             "critical",
             "allow",
             "2",
@@ -3021,9 +3014,23 @@
           ],
           [
             "low",
+            "allow",
+            "2",
+            "12.0",
+            "956.0"
+          ],
+          [
+            "low",
             "block",
             "1",
             "12.0",
+            "230.0"
+          ],
+          [
+            "high",
+            "block",
+            "1",
+            "1900.0",
             "230.0"
           ],
           [
@@ -3032,13 +3039,6 @@
             "1",
             "15.0",
             "45.0"
-          ],
-          [
-            "high",
-            "block",
-            "1",
-            "1900.0",
-            "230.0"
           ],
           [
             "medium",
@@ -3285,18 +3285,18 @@
             "1"
           ],
           [
-            "denied",
-            "pass",
-            "2",
-            "2",
-            "1"
-          ],
-          [
             "pass",
             "fail",
             "2",
             "1",
             "2"
+          ],
+          [
+            "denied",
+            "pass",
+            "2",
+            "2",
+            "1"
           ],
           [
             "pass",
@@ -3346,8 +3346,13 @@
         ],
         "results": [
           [
-            "PL-007",
-            "['PL-003']",
+            "PL-004",
+            "['PL-008']",
+            "1"
+          ],
+          [
+            "PL-002",
+            "['PL-006']",
             "1"
           ],
           [
@@ -3361,18 +3366,13 @@
             "1"
           ],
           [
-            "PL-004",
-            "['PL-008']",
-            "1"
-          ],
-          [
-            "PL-002",
-            "['PL-006']",
-            "1"
-          ],
-          [
             "PL-008",
             "['PL-004']",
+            "1"
+          ],
+          [
+            "PL-007",
+            "['PL-003']",
             "1"
           ]
         ],
@@ -3417,22 +3417,13 @@
             "2200000.0"
           ],
           [
-            "Tablet",
-            "Tablet",
-            "itemPage",
+            "Computer",
+            "Mobile",
+            "searchPage",
             "itemPage",
             "1",
-            "2500000.0",
-            "2500000.0"
-          ],
-          [
-            "Mobile",
-            "Mobile",
-            "itemPage",
-            "cartPage",
-            "1",
-            "1800000.0",
-            "900000.0"
+            "1200000.0",
+            "1800000.0"
           ],
           [
             "Tablet",
@@ -3447,18 +3438,18 @@
             "Mobile",
             "Mobile",
             "itemPage",
+            "cartPage",
+            "1",
+            "1800000.0",
+            "900000.0"
+          ],
+          [
+            "Mobile",
+            "Mobile",
+            "itemPage",
             "itemPage",
             "1",
             "1800000.0",
-            "1800000.0"
-          ],
-          [
-            "Computer",
-            "Mobile",
-            "searchPage",
-            "itemPage",
-            "1",
-            "1200000.0",
             "1800000.0"
           ],
           [
@@ -3468,6 +3459,15 @@
             "itemPage",
             "1",
             "3200000.0",
+            "2500000.0"
+          ],
+          [
+            "Tablet",
+            "Tablet",
+            "itemPage",
+            "itemPage",
+            "1",
+            "2500000.0",
             "2500000.0"
           ],
           [
