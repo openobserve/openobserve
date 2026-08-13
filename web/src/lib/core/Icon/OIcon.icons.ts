@@ -239,7 +239,6 @@ import HomeIcon from "~icons/mdi/home-outline";
 import OrganizationIcon from "~icons/octicon/organization-16";
 import Graph1Icon from "~icons/material-symbols/graph-1";
 import Graph2Icon from "~icons/material-symbols/graph-2";
-import Graph3Icon from "~icons/material-symbols/graph-3";
 import HubIcon from "~icons/material-symbols/hub-outline";
 import ImageIcon from "~icons/material-symbols/image-outline";
 import InsightsIcon from "~icons/material-symbols/insights";
@@ -278,7 +277,6 @@ import SwapVertIcon from "~icons/material-symbols/swap-vert";
 import SyncIcon from "~icons/material-symbols/sync-outline";
 import SyncDisabledIcon from "~icons/material-symbols/sync-disabled";
 import SyncProblemIcon from "~icons/material-symbols/sync-problem-outline";
-import SyncAltIcon from "~icons/material-symbols/sync-alt";
 import TableViewIcon from "~icons/material-symbols/table-view-outline";
 import TagIcon from "~icons/material-symbols/tag";
 import TaskAltIcon from "~icons/material-symbols/task-alt";
@@ -492,7 +490,6 @@ export const iconRegistry = {
   "git-branch": ForkRight,
   "graph-1": Graph1Icon,
   "graph-2": Graph2Icon,
-  "graph-3": Graph3Icon,
   flame: Whatshot,
   whatshot: Whatshot,
   "brain-circuit": PsychologyIcon,
@@ -649,7 +646,6 @@ export const iconRegistry = {
   sync: SyncIcon,
   "sync-disabled": SyncDisabledIcon,
   "sync-problem": SyncProblemIcon,
-  "sync-alt": SyncAltIcon,
   "table-view": TableViewIcon,
   tag: TagIcon,
   "task-alt": TaskAltIcon,

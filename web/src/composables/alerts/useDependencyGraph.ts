@@ -356,7 +356,12 @@ export function useDependencyGraph() {
         // v2 list (no folder = every folder). The v1 GET /api/{org}/alerts is not
         // registered in all builds (404), and only v2's item DTO carries the
         // destinations/template fields we cross-reference.
-        alertsService.listByFolderId(1, 100000, "name", false, "", org),
+        // NB: this route does NOT paginate — the service never forwards page_num/
+        // page_size, so it returns the org's full alert list. That's intentional: a
+        // complete graph needs every alert. The leading 1/0 are placeholder args for
+        // the shared signature, not a real bound; the per-org cache above keeps this
+        // full fetch from repeating on every popover open.
+        alertsService.listByFolderId(1, 0, "name", false, "", org),
         destinationService.list({
           page_num: 1,
           page_size: 100000,
