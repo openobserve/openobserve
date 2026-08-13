@@ -412,9 +412,15 @@ pub async fn create_location(
         // reads as a broken deployment rather than an unavailable feature.
         #[cfg(not(feature = "enterprise"))]
         synthetics_locations::KIND_PRIVATE => {
+            // `validation:` is load-bearing, not decoration: `location_error_response`
+            // keys the HTTP status off this prefix, and without it an unsupported
+            // `kind` is reported as a 500 — a caller error dressed up as a server
+            // fault. Same status as the unknown-`kind` arm below, which is the same
+            // class of mistake.
             return Err(anyhow::anyhow!(
-                "private locations require enterprise: they are served by agents deployed inside \
-                 your network. Use a public location backed by a Lambda probe instead."
+                "validation: private locations require enterprise — they are served by agents \
+                 deployed inside your network. Use a public location backed by a Lambda probe \
+                 instead."
             ));
         }
         #[cfg(feature = "enterprise")]

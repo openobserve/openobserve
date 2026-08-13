@@ -974,12 +974,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
             log::error!("Failed to start anomaly detection scheduler: {e}");
         }
     }
-    #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_scheduler() {
+        // Ungated: synthetics is OSS, and without this an OSS build accepts a
+        // check, stores it, and never runs it — the routes would be registered
+        // and the workers would not exist.
+        //
         // `init` carries its own super-cluster arbitration: in a super cluster
         // it starts the scheduler/dispatcher/reaper only in the cluster holding
         // the job-cluster claim, the same key `scheduler::run` below elects on.
         openobserve_synthetics::init().await;
+        // The staleness watcher stays enterprise — it reports on private
+        // locations, whose agents are the enterprise half.
+        #[cfg(feature = "enterprise")]
         if config::get_config().synthetics.enabled {
             // Deliberately NOT behind that gate. It reports on
             // `synthetics_agents`, which never replicates (spec §3) because an
