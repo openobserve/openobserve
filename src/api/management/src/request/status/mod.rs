@@ -210,6 +210,11 @@ struct ConfigResponse<'a> {
     online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
     synthetics_enabled: bool,
+    /// Whether private locations — pools served by long-running agents deployed
+    /// inside the customer's network — are available. Enterprise only, so the
+    /// UI hides the private-locations views, the agent-setup drawer and the
+    /// public/private selector on this rather than on `synthetics_enabled`.
+    synthetics_private_locations_enabled: bool,
     /// Chrome Web Store URL of the OpenObserve Recorder extension
     /// (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
     /// links its install button here.
@@ -373,13 +378,15 @@ pub async fn zo_config() -> impl IntoResponse {
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
-    // The keys live in the OSS config now, but the reported values are
-    // deliberately unchanged here: an OSS build still reports `false`, which is
-    // what hides the UI. Splitting the flag so OSS reports the truth is its own
-    // step, together with the UI gating that has to land with it.
-    let synthetics_enabled = enterprise_value!(false, cfg.synthetics.enabled);
-    let synthetics_recorder_extension_url =
-        enterprise_value!("", &cfg.synthetics.recorder_extension_url);
+    // Read straight from the config in every build: synthetics is OSS now, and
+    // reporting `false` here is what hid the whole feature from the UI.
+    let synthetics_enabled = cfg.synthetics.enabled;
+    // The private-agent path is the part that stays enterprise, so it gets its
+    // own flag. Gating the UI on this rather than on `synthetics_enabled` is
+    // what lets an OSS build show synthetics without offering a location it
+    // cannot serve.
+    let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
+    let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
@@ -494,6 +501,7 @@ pub async fn zo_config() -> impl IntoResponse {
         online_evals_enabled,
         anomaly_detection_enabled,
         synthetics_enabled,
+        synthetics_private_locations_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,

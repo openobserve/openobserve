@@ -62,6 +62,13 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
+
+// Private locations are served by agents deployed inside the customer's network,
+// the one enterprise part of synthetics. Gated on its own /config flag so an OSS
+// build still offers public, Lambda-served locations.
+const privateLocationsEnabled = computed(() =>
+  Boolean(store.state.zoConfig?.synthetics_private_locations_enabled),
+);
 const { t } = useI18nTyped();
 
 const typeConfigCards: Record<ProtocolCheckType, Component> = {
@@ -391,7 +398,7 @@ async function saveCheck() {
           :folders="folders"
           :folders-loading="foldersLoading"
           :validation-errors="validationErrors"
-          allow-private-locations
+          :allow-private-locations="privateLocationsEnabled"
           class="w-full!"
           @refresh:destinations="fetchDestinations"
           @update:check="onConfigureUpdate"
@@ -436,6 +443,7 @@ async function saveCheck() {
       <!-- Private agent setup drawer; a freshly registered location appears via
            the locations card's Refresh button. -->
       <AgentSetupDrawer
+        v-if="privateLocationsEnabled"
         v-model:open="showAgentSetup"
         :token="agentSetup?.token"
         :org="agentSetup?.org"

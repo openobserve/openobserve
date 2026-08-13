@@ -28,6 +28,19 @@ const syntheticsRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// Private locations are served by agents deployed inside the customer's network,
+// which is the one enterprise part of synthetics — so the detail page needs the
+// narrower flag as well. Same `=== false` stance as above: /config is fetched
+// without await, so redirecting on "not yet known" would bounce a bookmarked
+// link on a cold load.
+const privateLocationRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.synthetics_private_locations_enabled === false) {
+    next("/");
+    return;
+  }
+  syntheticsRouteGuard(to, from, next);
+};
+
 // Workflows routes are gated on the backend /config flag `workflows_enabled`
 // (enterprise O2_WORKFLOWS_ENABLED). The enterprise/cloud build check is already
 // implicit — this whole block only runs for those builds.
@@ -207,7 +220,7 @@ const useEnterpriseRoutes = () => {
         component: () => import("@/views/synthetics/PrivateLocationDetail.vue"),
         meta: { title: "Private Location" },
         beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
+          privateLocationRouteGuard(to, from, next);
         },
       },
       {

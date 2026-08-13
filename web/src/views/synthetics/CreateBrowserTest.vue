@@ -71,6 +71,13 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
+
+// Private locations are served by agents deployed inside the customer's network,
+// the one enterprise part of synthetics. Gated on its own /config flag so an OSS
+// build still offers public, Lambda-served locations.
+const privateLocationsEnabled = computed(() =>
+  Boolean(store.state.zoConfig?.synthetics_private_locations_enabled),
+);
 const { t } = useI18nTyped();
 // Shared with CheckConfigure so a drag on either page carries to the other.
 const { variablesSplitter } = useCheckWizardUi();
@@ -1129,7 +1136,7 @@ function onClearResults() {
               :folders="folders"
               :folders-loading="foldersLoading"
               :validation-errors="validationErrors"
-              allow-private-locations
+              :allow-private-locations="privateLocationsEnabled"
               class="border-border-default w-full! border-t"
               @refresh:destinations="fetchDestinations"
               @update:check="onConfigureUpdate"
@@ -1143,6 +1150,7 @@ function onClearResults() {
         <!-- Private browser-agent setup drawer; locations reload on close so a
            freshly registered location becomes selectable without leaving. -->
         <AgentSetupDrawer
+          v-if="privateLocationsEnabled"
           v-model:open="showAgentSetup"
           agent-type="browser"
           :token="agentSetup?.token"

@@ -373,14 +373,12 @@ export default defineComponent({
       );
     });
 
-    // Backend `/config` flag `synthetics_enabled` — controlled by enterprise
-    // `O2_SYNTHETICS_ENABLED`. Reactive so the menu picks it up regardless of
-    // whether the config response arrived before or after mount.
+    // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
+    // no longer an enterprise build check: synthetics ships in OSS, and only the
+    // private-agent path behind it is enterprise. Reactive so the menu picks it
+    // up regardless of whether the config response arrived before or after mount.
     const isSyntheticsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        Boolean(store.state.zoConfig?.synthetics_enabled)
-      );
+      return Boolean(store.state.zoConfig?.synthetics_enabled);
     });
 
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
