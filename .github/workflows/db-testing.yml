@@ -98,6 +98,7 @@ jobs:
 
       - name: Setup Python
         uses: actions/setup-python@v7
+        id: setup-python
         with:
           python-version: "3.11.6"
 
@@ -145,7 +146,7 @@ jobs:
           # during `rye self install`. That download is flaky and intermittently
           # fails with exit 1, after which the next step ("Pin cpython") dies with
           # "rye: command not found" (exit 127).
-          RYE_TOOLCHAIN: ${{ env.pythonLocation }}/bin/python
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: false
           working-directory: "tests/db-testing/"
