@@ -96,6 +96,26 @@ export interface FocusChain {
   alerts: DepNode[];
 }
 
+/** The subset of each list-API row that the graph reads (rows carry more). */
+export interface AlertRow {
+  alert_id?: string;
+  id?: string;
+  name: string;
+  destinations?: string[];
+  template?: string | null;
+  enabled?: boolean;
+  folder_id?: string;
+}
+export interface DestinationRow {
+  name: string;
+  type?: string;
+  template?: string | null;
+}
+export interface TemplateRow {
+  name: string;
+  type?: string;
+}
+
 // Resolve one entity's dependency chain from the full graph, traversed
 // DIRECTIONALLY so a shared template pulls in only the focused branch (never
 // sibling destinations). Pure + exported so the panel stays thin and testable.
@@ -226,7 +246,11 @@ export function useDependencyGraph() {
   const error = ref<string | null>(null);
 
   // Pure builder — separated from the fetch so it can be unit-tested with fixtures.
-  const buildGraph = (alerts: any[], destinations: any[], templates: any[]): DepGraph => {
+  const buildGraph = (
+    alerts: AlertRow[],
+    destinations: DestinationRow[],
+    templates: TemplateRow[],
+  ): DepGraph => {
     const nodes = new Map<string, DepNode>();
     const edges: DepEdge[] = [];
 

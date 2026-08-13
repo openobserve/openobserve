@@ -15,12 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  "Where used" panel for the View-dependencies popover. The focused entity is the
-  title (set by the wrapper); this body shows EVERY related entity, grouped by kind
-  (Templates · Destinations · Alerts) with each a clickable row that can Open it or
-  request a Delete (the wrapper owns the ConfirmDialog — a modal can't live inside
-  the popover). A single search filters all groups; the alerts group pages so
-  thousands stay responsive. Data via useDependencyGraph + buildFocusChain.
+  "Where used" panel: every entity related to the focus, grouped by kind, with one
+  search box and a paged alerts group. Rows only emit open/requestDelete — the
+  wrapper acts. Data via useDependencyGraph + buildFocusChain.
 -->
 <template>
   <div class="flex h-full min-h-0 flex-col text-left" data-test="dependency-usage-panel">
@@ -217,8 +214,11 @@ const refresh = async () => {
 };
 
 onMounted(refresh);
+// Watch a stable identity string, NOT the focus object: the list pages pass an
+// inline object literal, so a bare `() => props.focus` would fire (wiping the
+// user's search/page) on any parent re-render, not only a real focus change.
 watch(
-  () => props.focus,
+  () => `${props.focus.kind}:${props.focus.name ?? ""}:${props.focus.alertId ?? ""}`,
   () => {
     search.value = "";
     page.value = 0;
@@ -254,8 +254,10 @@ const openEntity = (n: DepNode) => {
   // kind, so when the clicked node matches it we're already on that route — a
   // router.push there won't remount the page and the editor would never open.
   // Hand it to the host page instead, which opens its native editor exactly as
-  // the row's own edit action does. Alerts (and every cross-kind target) live on
-  // a different route, so navigating there mounts them and opens the editor.
+  // the row's own edit action does. Everything else navigates by route: a
+  // template/destination opened from another page lands on its editor; an alert
+  // opens its detail page (the alert editor has SLO/anomaly special-casing that a
+  // raw route push must not bypass — the detail page is the safe landing spot).
   if (n.kind === props.focus.kind && (n.kind === "template" || n.kind === "destination")) {
     emit("open", n);
     return;

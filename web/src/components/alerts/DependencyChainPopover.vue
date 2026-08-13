@@ -15,16 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  "View dependencies" trigger: a small graph icon (added ALONGSIDE a row's
-  existing actions — never replacing them) that opens a compact popover anchored
-  to it, showing that row's dependency chain (DependencyUsagePanel). On-demand and
-  subtle — no page, no drawer, no row expansion.
-
-  Delete lives HERE (not in the panel) because a modal ConfirmDialog can't render
-  inside the popover without dismissing it. The panel emits `requestDelete`; this
-  wrapper closes the popover, opens the same ConfirmDialog the list pages use, and
-  performs the delete (a backend 409 "used by" surfaces as a toast). Used from the
-  Templates, Notification Destinations and Alerts list action columns.
+  "View dependencies" trigger + popover for one list row's dependency chain.
+  Delete/open are confirmed/performed HERE, not in the panel: a modal ConfirmDialog
+  can't live inside the popover, so the panel only emits the request.
 -->
 <template>
   <OPopover v-model:open="open" side="bottom" align="end" :side-offset="4" content-class="p-0">

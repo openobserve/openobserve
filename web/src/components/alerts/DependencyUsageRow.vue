@@ -15,12 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  One clickable entity row inside DependencyUsagePanel: kind icon + name, an
-  optional "N alerts" count (for destinations), and Open / Delete. The row is
-  purely presentational for actions — it only EMITS `open` / `delete`; the
-  DependencyChainPopover wrapper owns the real modal ConfirmDialog (a modal can't
-  render inside the popover without dismissing it). Every kind (template /
-  destination / alert) uses this row, so the same actions are available for all.
+  One clickable entity row in DependencyUsagePanel (kind icon + name + optional
+  usage count) for any kind. Presentational: emits open/delete only; the wrapper
+  confirms and acts.
 -->
 <template>
   <div
