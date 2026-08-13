@@ -16,8 +16,8 @@
  *   UI_ONLY   — has UI markers, no API markers       → stays
  *   REVIEW    — no markers matched                   → human confirm
  *
- * The signal set mirrors the migration inventory's method. It is intentionally
- * conservative: a spec is only PURE_API when NOT A SINGLE UI marker appears, so
+ * Classification is marker-based and intentionally conservative: a spec is only
+ * PURE_API when NOT A SINGLE UI marker appears, so
  * the guard never nags a genuine UI test. False "REVIEW" is preferred to a false
  * "PURE_API". Detection is line-based over comment-stripped source.
  *
@@ -79,6 +79,9 @@ const API_MARKERS = [
   /\bauthedRequest\b/,
   /\bgetAuthHeaders\b/,
   /\brequest\.(get|post|put|delete|patch)\b/,
+  /\bfetch\s*\(/, // raw fetch()
+  /\baxios\b/,
+  /\bXMLHttpRequest\b/,
   /\/_json\b/,
   /\/_search\b/,
   /\/_bulk\b/,

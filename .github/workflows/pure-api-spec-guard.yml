@@ -36,10 +36,17 @@ jobs:
         run: |
           git fetch --no-tags origin "$BASE"
           # Added (A) or renamed (R) files under playwright-tests; --name-only
-          # yields the destination path for renames. classify-specs.js filters
+          # yields the destination path for renames. Run the diff as its OWN
+          # command (not via process substitution) so a failure to resolve
+          # origin/$BASE...HEAD is fatal — otherwise the guard would fail-open
+          # (empty list → "nothing to check" → exit 0). classify-specs.js filters
           # to *.spec.js and skips anything that no longer exists.
-          mapfile -t files < <(git diff --name-only --diff-filter=AR \
-            "origin/$BASE...HEAD" -- tests/ui-testing/playwright-tests/)
+          if ! git diff --name-only --diff-filter=AR "origin/$BASE...HEAD" \
+              -- tests/ui-testing/playwright-tests/ > added.txt; then
+            echo "::error::git diff could not resolve origin/$BASE...HEAD"
+            exit 1
+          fi
+          mapfile -t files < added.txt
           if [ ${#files[@]} -eq 0 ]; then
             echo "No added/renamed specs under playwright-tests/ — nothing to check."
             exit 0
