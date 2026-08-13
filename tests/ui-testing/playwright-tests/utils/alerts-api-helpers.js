@@ -1,13 +1,13 @@
 // Copyright 2026 OpenObserve Inc.
 
 /**
- * Shared API helpers for the Alerts 4.0 (multi-alert) specs.
+ * Shared API helpers for the Alerts 4.0 (multi-alert) UI specs.
  *
- * The `-api`, `-ui` and `-regression` specs all drive the same v1/v2 alert
- * endpoints, seed the same fixtures, and build the same canonical payloads.
- * This module is the single source of truth for that plumbing so the three
- * specs stay in lockstep. It deliberately contains NO test/expect calls —
- * assertions belong in the spec files.
+ * The remaining UI specs (`-ui`, `priority-tags`) use this to seed fixtures and
+ * build canonical payloads via the API before asserting on the render surface.
+ * The pure-API contract/regression coverage moved to pytest
+ * (tests/api-testing/tests/alerts/); this module deliberately contains NO
+ * test/expect calls — assertions belong in the spec files.
  */
 
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
