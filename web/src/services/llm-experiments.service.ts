@@ -364,6 +364,17 @@ const llmExperimentsService = {
     const response = await http().post(`${base(orgId)}/${experimentId}/retry`);
     return normalizeExperiment(response.data);
   },
+
+  async clone(
+    orgId: string,
+    experimentId: string,
+    name?: string,
+  ): Promise<LlmExperiment> {
+    const response = await http().post(`${base(orgId)}/${experimentId}/clone`, {
+      ...(name ? { name } : {}),
+    });
+    return normalizeExperiment(response.data);
+  },
 };
 
 export default llmExperimentsService;

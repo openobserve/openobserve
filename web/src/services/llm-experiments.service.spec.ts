@@ -219,18 +219,42 @@ describe("llmExperimentsService", () => {
           created_by: "owner@example.com",
           created_at: 1_800_000_000_000,
         },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: "experiment-clone",
+          org_id: "acme",
+          ...payload,
+          name: "Copy",
+          scorers: [{ id: "scorer-1", version: 4 }],
+          status: "pending",
+          status_reason: null,
+          deadline_at: 1_800_259_200_000,
+          completed_at: null,
+          lifecycle_version: 0,
+          retry_count: 0,
+          created_by: "owner@example.com",
+          created_at: 1_800_172_800_000,
+        },
       });
 
     const cancelled = await llmExperimentsService.cancel("acme", "experiment-1");
     const retried = await llmExperimentsService.retry("acme", "experiment-2");
+    const cloned = await llmExperimentsService.clone("acme", "experiment-1", "Copy");
 
     expect(post).toHaveBeenNthCalledWith(1, "/api/acme/experiments/experiment-1/cancel");
     expect(post).toHaveBeenNthCalledWith(2, "/api/acme/experiments/experiment-2/retry");
+    expect(post).toHaveBeenNthCalledWith(
+      3,
+      "/api/acme/experiments/experiment-1/clone",
+      { name: "Copy" },
+    );
     expect(cancelled).toMatchObject({
       status: "cancelled",
       statusReason: "user_cancelled",
       lifecycleVersion: 1,
     });
     expect(retried).toMatchObject({ status: "running", retryCount: 1, completedAt: null });
+    expect(cloned).toMatchObject({ id: "experiment-clone", status: "pending", name: "Copy" });
   });
 });
