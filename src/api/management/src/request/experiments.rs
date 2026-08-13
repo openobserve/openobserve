@@ -21,7 +21,8 @@ use crate::{
     models::experiments::{
         CreateExperimentRequestBody, CreateExperimentResponseBody, ExperimentDetailResponseBody,
         ExperimentPreviewQuery, ExperimentPreviewResponseBody, ExperimentResponseBody,
-        ExperimentResultsResponseBody, ListExperimentsResponseBody,
+        ExperimentResultsResponseBody, ListExperimentsResponseBody, PinnedExperimentScorerBody,
+        experiment_result_summary,
     },
 };
 
@@ -189,14 +190,35 @@ pub async fn get_experiment(
     }
     let results =
         match openobserve_core::llm_evaluations::experiment_runner::results(&experiment).await {
-            Ok(results) => ExperimentResultsResponseBody {
-                executions: results
+            Ok(results) => {
+                let executions = results
                     .executions
                     .into_iter()
                     .filter_map(|record| serde_json::to_value(record).ok())
-                    .collect(),
-                scores: results.scores,
-            },
+                    .collect::<Vec<_>>();
+                let scores = results.scores;
+                let scorers = experiment
+                    .scorers
+                    .iter()
+                    .cloned()
+                    .map(PinnedExperimentScorerBody::from)
+                    .collect::<Vec<_>>();
+                let (task_progress, scoring_progress, skip_summary, score_summaries) =
+                    experiment_result_summary(
+                        &preview.applicability.clone().into(),
+                        &scorers,
+                        &executions,
+                        &scores,
+                    );
+                ExperimentResultsResponseBody {
+                    executions,
+                    scores,
+                    task_progress,
+                    scoring_progress,
+                    skip_summary,
+                    score_summaries,
+                }
+            }
             Err(error) => {
                 log::error!("[Experiment] failed to load results for {experiment_id}: {error}");
                 return MetaHttpResponse::internal_error("Failed to load Experiment results");
