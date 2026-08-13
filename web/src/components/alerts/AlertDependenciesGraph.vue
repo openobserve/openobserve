@@ -697,8 +697,11 @@ const nodeBorderClass = (n: DepNode) => {
   return "border-border-default";
 };
 
+// The only bare-click affordance is expanding a destination (page mode). A plain
+// click never navigates — the hover "Open" button is the single redirect path,
+// so templates/alerts don't silently jump away when you click to inspect them.
 const isBodyClickable = (n: DepNode) =>
-  !n.missing && (n.kind !== "destination" || n.usageCount > 0);
+  n.kind === "destination" && !props.focus && n.usageCount > 0;
 
 const toggleExpand = (destId: string) => {
   const next = new Set(expanded.value);
@@ -707,14 +710,7 @@ const toggleExpand = (destId: string) => {
 };
 
 const onBodyClick = (n: DepNode) => {
-  if (n.missing) return;
-  // In a focused popup every destination is already expanded, so a body click
-  // opens the entity rather than collapsing the chain.
-  if (n.kind === "destination" && !props.focus) {
-    if (n.usageCount > 0) toggleExpand(n.id);
-    return;
-  }
-  openEntity(n);
+  if (isBodyClickable(n)) toggleExpand(n.id);
 };
 
 const openEntity = (n: DepNode) => {
