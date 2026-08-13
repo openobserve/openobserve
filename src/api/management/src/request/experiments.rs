@@ -20,9 +20,10 @@ use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::experiments::{
         CloneExperimentRequestBody, CreateExperimentRequestBody, CreateExperimentResponseBody,
-        ExperimentDetailResponseBody, ExperimentPreviewQuery, ExperimentPreviewResponseBody,
-        ExperimentResponseBody, ExperimentResultsResponseBody, ListExperimentsResponseBody,
-        PinnedExperimentScorerBody, experiment_result_summary,
+        ExperimentDetailQuery, ExperimentDetailResponseBody, ExperimentPreviewQuery,
+        ExperimentPreviewResponseBody, ExperimentResponseBody, ExperimentResultPaginationBody,
+        ExperimentResultsResponseBody, ListExperimentsResponseBody, PinnedExperimentScorerBody,
+        experiment_aggregate_summary, experiment_result_slots, experiment_result_summary,
     },
 };
 
@@ -159,7 +160,7 @@ pub async fn list_experiments(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("experiment_id" = String, Path, description = "Experiment ID"),
-        ExperimentPreviewQuery,
+        ExperimentDetailQuery,
     ),
     responses(
         (status = 200, body = inline(ExperimentDetailResponseBody)),
@@ -168,7 +169,7 @@ pub async fn list_experiments(
 )]
 pub async fn get_experiment(
     Path((org_id, experiment_id)): Path<(String, String)>,
-    Query(query): Query<ExperimentPreviewQuery>,
+    Query(query): Query<ExperimentDetailQuery>,
 ) -> Response {
     let experiment = match experiments::get(&org_id, &experiment_id).await {
         Ok(experiment) => experiment,
@@ -188,42 +189,78 @@ pub async fn get_experiment(
         log::error!("[Experiment] failed to initialize score stream for {experiment_id}: {error}");
         return MetaHttpResponse::internal_error("Failed to load Experiment results");
     }
-    let results =
-        match openobserve_core::llm_evaluations::experiment_runner::results(&experiment).await {
-            Ok(results) => {
-                let executions = results
-                    .executions
-                    .into_iter()
-                    .filter_map(|record| serde_json::to_value(record).ok())
-                    .collect::<Vec<_>>();
-                let scores = results.scores;
-                let scorers = experiment
-                    .scorers
-                    .iter()
-                    .cloned()
-                    .map(PinnedExperimentScorerBody::from)
-                    .collect::<Vec<_>>();
-                let (task_progress, scoring_progress, skip_summary, score_summaries) =
-                    experiment_result_summary(
-                        &preview.applicability.clone().into(),
-                        &scorers,
-                        &executions,
-                        &scores,
-                    );
-                ExperimentResultsResponseBody {
-                    executions,
-                    scores,
-                    task_progress,
-                    scoring_progress,
-                    skip_summary,
-                    score_summaries,
-                }
+    let result_page = query.result_page.unwrap_or(1);
+    let result_page_size = query
+        .result_page_size
+        .unwrap_or(openobserve_core::llm_evaluations::experiment_runner::DEFAULT_RESULT_PAGE_SIZE);
+    if result_page == 0
+        || result_page_size == 0
+        || result_page_size
+            > openobserve_core::llm_evaluations::experiment_runner::MAX_RESULT_PAGE_SIZE
+    {
+        return MetaHttpResponse::bad_request("Invalid Experiment result pagination");
+    }
+    let results = match openobserve_core::llm_evaluations::experiment_runner::results_page(
+        &experiment,
+        result_page,
+        result_page_size,
+    )
+    .await
+    {
+        Ok(results) => {
+            let executions = results
+                .executions
+                .into_iter()
+                .filter_map(|record| serde_json::to_value(record).ok())
+                .collect::<Vec<_>>();
+            let scores = results.scores;
+            let summary_executions = results
+                .summary_executions
+                .into_iter()
+                .filter_map(|record| serde_json::to_value(record).ok())
+                .collect::<Vec<_>>();
+            let summary_scores = results.summary_scores;
+            let scorers = experiment
+                .scorers
+                .iter()
+                .cloned()
+                .map(PinnedExperimentScorerBody::from)
+                .collect::<Vec<_>>();
+            let (task_progress, scoring_progress, skip_summary, score_summaries) =
+                experiment_result_summary(
+                    &preview.applicability.clone().into(),
+                    &scorers,
+                    &summary_executions,
+                    &summary_scores,
+                );
+            let aggregate_summary = experiment_aggregate_summary(
+                &summary_executions,
+                &task_progress,
+                &scoring_progress,
+            );
+            let slots = experiment_result_slots(results.slots, &executions, &scores, &scorers);
+            ExperimentResultsResponseBody {
+                executions,
+                scores,
+                slots,
+                pagination: ExperimentResultPaginationBody {
+                    page: results.page,
+                    page_size: results.page_size,
+                    total_slots: results.total_slots,
+                    has_more: results.has_more,
+                },
+                task_progress,
+                scoring_progress,
+                skip_summary,
+                score_summaries,
+                aggregate_summary,
             }
-            Err(error) => {
-                log::error!("[Experiment] failed to load results for {experiment_id}: {error}");
-                return MetaHttpResponse::internal_error("Failed to load Experiment results");
-            }
-        };
+        }
+        Err(error) => {
+            log::error!("[Experiment] failed to load results for {experiment_id}: {error}");
+            return MetaHttpResponse::internal_error("Failed to load Experiment results");
+        }
+    };
     MetaHttpResponse::json(ExperimentDetailResponseBody {
         experiment: experiment.into(),
         preview: preview.into(),

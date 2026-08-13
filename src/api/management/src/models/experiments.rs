@@ -233,6 +233,14 @@ pub struct ExperimentPreviewQuery {
     pub sample_size: Option<usize>,
 }
 
+#[derive(Debug, Clone, Deserialize, IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentDetailQuery {
+    pub sample_size: Option<usize>,
+    pub result_page: Option<usize>,
+    pub result_page_size: Option<usize>,
+}
+
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PinnedExperimentScorerBody {
@@ -439,10 +447,45 @@ pub struct ExperimentDetailResponseBody {
 pub struct ExperimentResultsResponseBody {
     pub executions: Vec<Value>,
     pub scores: Vec<Value>,
+    pub slots: Vec<ExperimentResultSlotBody>,
+    pub pagination: ExperimentResultPaginationBody,
     pub task_progress: ExperimentProgressBody,
     pub scoring_progress: ExperimentProgressBody,
     pub skip_summary: ExperimentSkipSummaryBody,
     pub score_summaries: Vec<ExperimentScoreSummaryBody>,
+    pub aggregate_summary: ExperimentAggregateSummaryBody,
+}
+
+#[derive(Debug, Clone, Default, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentResultPaginationBody {
+    pub page: usize,
+    pub page_size: usize,
+    pub total_slots: usize,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentResultSlotBody {
+    pub row_id: String,
+    pub logical_id: String,
+    pub trial_index: u32,
+    pub input: Value,
+    pub expected_output: Option<Value>,
+    pub task_status: String,
+    pub execution: Option<Value>,
+    pub scores: Vec<ExperimentResultScoreBody>,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentResultScoreBody {
+    pub scorer_id: String,
+    pub scorer_version: i32,
+    /// `pending` and `in_progress` are explicit placeholders without evidence.
+    pub status: String,
+    pub score: Option<Value>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
@@ -469,9 +512,23 @@ pub struct ExperimentScoreSummaryBody {
     pub scorer_id: String,
     pub scorer_version: i32,
     pub sample_count: u64,
+    pub error_count: u64,
+    pub pending_count: u64,
     pub no_reference_count: u64,
     pub no_trace_count: u64,
     pub skipped_count: u64,
+    /// Type-aware aggregate: numeric mean, boolean counts, or categorical counts.
+    pub value: Option<Value>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentAggregateSummaryBody {
+    pub p50_latency_ms: Option<u64>,
+    pub total_cost: f64,
+    pub incomplete: bool,
+    pub incomplete_task_slots: u64,
+    pub incomplete_score_dimensions: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
@@ -522,6 +579,205 @@ where
         }
         None => Ok(None),
     }
+}
+
+pub fn experiment_result_slots(
+    slots: Vec<ExperimentSlot>,
+    executions: &[Value],
+    scores: &[Value],
+    scorers: &[PinnedExperimentScorerBody],
+) -> Vec<ExperimentResultSlotBody> {
+    let executions = executions
+        .iter()
+        .filter_map(|record| {
+            let row_id = record.get("row_id")?.as_str()?.to_string();
+            let trial_index = record.get("trial_index")?.as_u64()?;
+            Some(((row_id, trial_index), record.clone()))
+        })
+        .collect::<HashMap<_, _>>();
+    let scores = scores
+        .iter()
+        .filter_map(|score| {
+            let row_id = score.get("row_id")?.as_str()?.to_string();
+            let trial_index = score.get("trial_index")?.as_u64()?;
+            let scorer_id = score.get("scorer_id")?.as_str()?.to_string();
+            let scorer_version = score
+                .get("scorer_version")
+                .and_then(|value| value.as_i64().or_else(|| value.as_str()?.parse().ok()))?;
+            Some((
+                (row_id, trial_index, scorer_id, scorer_version),
+                score.clone(),
+            ))
+        })
+        .collect::<HashMap<_, _>>();
+
+    slots
+        .into_iter()
+        .map(|slot| {
+            let coordinate = (slot.row_id.clone(), u64::from(slot.trial_index));
+            let execution = executions.get(&coordinate).cloned();
+            let task_status = execution
+                .as_ref()
+                .and_then(|record| record.get("status"))
+                .and_then(Value::as_str)
+                .map(|status| {
+                    if status == "pending" {
+                        "in_progress"
+                    } else {
+                        status
+                    }
+                })
+                .unwrap_or("pending")
+                .to_string();
+            let score_bodies = scorers
+                .iter()
+                .map(|scorer| {
+                    let score = scores
+                        .get(&(
+                            slot.row_id.clone(),
+                            u64::from(slot.trial_index),
+                            scorer.id.clone(),
+                            i64::from(scorer.version),
+                        ))
+                        .cloned();
+                    let status = score
+                        .as_ref()
+                        .and_then(|record| record.get("status"))
+                        .and_then(Value::as_str)
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| {
+                            if execution.is_none() || task_status == "pending" {
+                                "pending".to_string()
+                            } else {
+                                "in_progress".to_string()
+                            }
+                        });
+                    ExperimentResultScoreBody {
+                        scorer_id: scorer.id.clone(),
+                        scorer_version: scorer.version,
+                        status,
+                        score,
+                    }
+                })
+                .collect();
+            ExperimentResultSlotBody {
+                row_id: slot.row_id,
+                logical_id: slot.logical_id,
+                trial_index: slot.trial_index,
+                input: slot.input,
+                expected_output: slot.expected_output,
+                task_status,
+                execution,
+                scores: score_bodies,
+            }
+        })
+        .collect()
+}
+
+pub fn experiment_aggregate_summary(
+    executions: &[Value],
+    task_progress: &ExperimentProgressBody,
+    scoring_progress: &ExperimentProgressBody,
+) -> ExperimentAggregateSummaryBody {
+    let mut latencies = executions
+        .iter()
+        .filter_map(|record| record.get("latency_ms").and_then(Value::as_u64))
+        .collect::<Vec<_>>();
+    latencies.sort_unstable();
+    let p50_latency_ms = if latencies.is_empty() {
+        None
+    } else {
+        Some(latencies[(latencies.len() - 1) / 2])
+    };
+    let total_cost = executions
+        .iter()
+        .filter_map(|record| record.get("cost").and_then(Value::as_f64))
+        .sum();
+    let incomplete_task_slots = task_progress.total.saturating_sub(task_progress.completed);
+    let incomplete_score_dimensions = scoring_progress
+        .total
+        .saturating_sub(scoring_progress.completed);
+    ExperimentAggregateSummaryBody {
+        p50_latency_ms,
+        total_cost,
+        incomplete: incomplete_task_slots > 0 || incomplete_score_dimensions > 0,
+        incomplete_task_slots,
+        incomplete_score_dimensions,
+    }
+}
+
+fn aggregate_score_values(
+    scores: &[&ExperimentScoreEvidence],
+    raw_scores: &[Value],
+) -> Option<Value> {
+    let identities = scores
+        .iter()
+        .map(|score| {
+            (
+                score.slot.clone(),
+                score.scorer_id.clone(),
+                score.scorer_version,
+            )
+        })
+        .collect::<HashSet<_>>();
+    let matching = raw_scores
+        .iter()
+        .filter(|score| {
+            let Some(row_id) = score.get("row_id").and_then(Value::as_str) else {
+                return false;
+            };
+            let Some(trial_index) = score.get("trial_index").and_then(Value::as_u64) else {
+                return false;
+            };
+            let scorer_id = score
+                .get("scorer_id")
+                .and_then(Value::as_str)
+                .map(ToString::to_string);
+            let scorer_version = score.get("scorer_version").and_then(|value| {
+                value
+                    .as_i64()
+                    .and_then(|value| i32::try_from(value).ok())
+                    .or_else(|| value.as_str()?.parse().ok())
+            });
+            identities.contains(&(
+                EvidenceSlotKey {
+                    row_id: row_id.to_string(),
+                    trial_index,
+                },
+                scorer_id,
+                scorer_version,
+            ))
+        })
+        .collect::<Vec<_>>();
+    let numeric = matching
+        .iter()
+        .filter_map(|score| score.get("value_numeric").and_then(Value::as_f64))
+        .collect::<Vec<_>>();
+    if !numeric.is_empty() {
+        return Some(serde_json::json!({
+            "kind": "numeric",
+            "mean": numeric.iter().sum::<f64>() / numeric.len() as f64,
+        }));
+    }
+    let booleans = matching
+        .iter()
+        .filter_map(|score| score.get("value_boolean").and_then(Value::as_bool))
+        .collect::<Vec<_>>();
+    if !booleans.is_empty() {
+        return Some(serde_json::json!({
+            "kind": "boolean",
+            "trueCount": booleans.iter().filter(|value| **value).count(),
+            "falseCount": booleans.iter().filter(|value| !**value).count(),
+        }));
+    }
+    let mut counts = BTreeMap::<String, u64>::new();
+    for category in matching
+        .iter()
+        .filter_map(|score| score.get("value_categorical").and_then(Value::as_str))
+    {
+        *counts.entry(category.to_string()).or_default() += 1;
+    }
+    (!counts.is_empty()).then(|| serde_json::json!({ "kind": "categorical", "counts": counts }))
 }
 
 /// Derive deterministic API progress from the latest durable execution and
@@ -581,11 +837,6 @@ pub fn experiment_result_summary(
         .filter(|slot| !fully_skipped.contains(slot))
         .cloned()
         .collect::<HashSet<_>>();
-    let successful_scores = score_evidence
-        .iter()
-        .filter(|score| score.status == LlmScoreStatus::Success)
-        .collect::<Vec<_>>();
-
     let no_reference_dimensions = applicability
         .scorer_applicability
         .iter()
@@ -605,7 +856,18 @@ pub fn experiment_result_summary(
         skipped: applicability.fully_skipped_slot_count,
     };
     let scoring_progress = ExperimentProgressBody {
-        completed: u64::try_from(successful_scores.len()).unwrap_or(u64::MAX),
+        completed: u64::try_from(
+            score_evidence
+                .iter()
+                .filter(|score| {
+                    matches!(
+                        score.status,
+                        LlmScoreStatus::Success | LlmScoreStatus::Error
+                    )
+                })
+                .count(),
+        )
+        .unwrap_or(u64::MAX),
         total: applicability
             .eligible_scoring_dimension_count
             .saturating_sub(no_trace_dimensions),
@@ -657,13 +919,41 @@ pub fn experiment_result_summary(
             };
             let no_reference_count = skip_count(ExperimentSkipReason::NoReference);
             let no_trace_count = skip_count(ExperimentSkipReason::NoTrace);
+            let scorer_scores = score_evidence
+                .iter()
+                .filter(|score| {
+                    score.scorer_id.as_deref() == Some(scorer.id.as_str())
+                        && score.scorer_version == Some(scorer.version)
+                })
+                .collect::<Vec<_>>();
+            let error_count = u64::try_from(
+                scorer_scores
+                    .iter()
+                    .filter(|score| score.status == LlmScoreStatus::Error)
+                    .count(),
+            )
+            .unwrap_or(u64::MAX);
+            let expected = applicability
+                .scorer_applicability
+                .iter()
+                .find(|item| item.scorer_id == scorer.id && item.scorer_version == scorer.version)
+                .map(|item| item.eligible_slot_count)
+                .unwrap_or_default();
             ExperimentScoreSummaryBody {
                 scorer_id: scorer.id.clone(),
                 scorer_version: scorer.version,
                 sample_count,
+                error_count,
+                pending_count: expected.saturating_sub(
+                    sample_count
+                        .saturating_add(no_reference_count)
+                        .saturating_add(no_trace_count)
+                        .saturating_add(error_count),
+                ),
                 no_reference_count,
                 no_trace_count,
                 skipped_count: no_reference_count.saturating_add(no_trace_count),
+                value: aggregate_score_values(&scorer_scores, scores),
             }
         })
         .collect();
@@ -843,5 +1133,73 @@ mod tests {
         let (_, _, skips, _) = experiment_result_summary(&applicability, &[], &executions, &scores);
 
         assert_eq!(skips.partially_skipped_slots, 2);
+    }
+
+    #[test]
+    fn result_slots_preserve_pinned_order_and_render_missing_evidence_as_placeholders() {
+        let slots = vec![
+            ExperimentSlot {
+                row_id: "row-b".to_string(),
+                logical_id: "case-1".to_string(),
+                trial_index: 0,
+                input: serde_json::json!({"question": "first"}),
+                expected_output: None,
+            },
+            ExperimentSlot {
+                row_id: "row-a".to_string(),
+                logical_id: "case-2".to_string(),
+                trial_index: 0,
+                input: serde_json::json!({"question": "second"}),
+                expected_output: None,
+            },
+        ];
+        let executions = vec![serde_json::json!({
+            "row_id": "row-a", "trial_index": 0, "status": "ok"
+        })];
+        let scorers = vec![PinnedExperimentScorerBody {
+            id: "quality".to_string(),
+            version: 2,
+        }];
+
+        let rows = experiment_result_slots(slots, &executions, &[], &scorers);
+
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.row_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["row-b", "row-a"]
+        );
+        assert_eq!(rows[0].task_status, "pending");
+        assert_eq!(rows[0].scores[0].status, "pending");
+        assert_eq!(rows[1].task_status, "ok");
+        assert_eq!(rows[1].scores[0].status, "in_progress");
+    }
+
+    #[test]
+    fn aggregate_summary_reports_lower_median_cost_and_incomplete_counts() {
+        let executions = vec![
+            serde_json::json!({"latency_ms": 30, "cost": 0.3}),
+            serde_json::json!({"latency_ms": 10, "cost": 0.1}),
+            serde_json::json!({"latency_ms": 20, "cost": 0.2}),
+            serde_json::json!({"latency_ms": 40}),
+        ];
+        let task = ExperimentProgressBody {
+            completed: 3,
+            total: 5,
+            skipped: 0,
+        };
+        let scoring = ExperimentProgressBody {
+            completed: 7,
+            total: 8,
+            skipped: 1,
+        };
+
+        let summary = experiment_aggregate_summary(&executions, &task, &scoring);
+
+        assert_eq!(summary.p50_latency_ms, Some(20));
+        assert!((summary.total_cost - 0.6).abs() < f64::EPSILON);
+        assert!(summary.incomplete);
+        assert_eq!(summary.incomplete_task_slots, 2);
+        assert_eq!(summary.incomplete_score_dimensions, 1);
     }
 }
