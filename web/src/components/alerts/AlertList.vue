@@ -26,23 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="shield-alert-outline"
     >
       <template #actions>
-        <!-- Import button -->
-        <OButton
-          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
-          variant="outline"
-          size="sm"
-          @click="importAlert"
-          data-test="alert-import"
-          icon-left="upload-file"
-        >
-          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-          <OTooltip
-            v-if="isCompactToolbar"
-            :content="t('dashboard.import')"
-            side="bottom"
-            shortcut-id="alertsImport"
-          />
-        </OButton>
         <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
         <OButton
           data-test="alert-list-add-alert-btn"
@@ -64,6 +47,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           >{{ t(`alerts.add`) }}</OButton
         >
+      </template>
+
+      <!-- Secondary: inline on desktop, behind "More" < md. -->
+      <template #actions-overflow>
+        <!-- Import button -->
+        <OButton
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="outline"
+          size="sm"
+          @click="importAlert"
+          data-test="alert-import"
+          icon-left="upload-file"
+        >
+          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
+          <OTooltip
+            v-if="isCompactToolbar"
+            :content="t('dashboard.import')"
+            side="bottom"
+            shortcut-id="alertsImport"
+          />
+        </OButton>
       </template>
 
       <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
