@@ -132,22 +132,6 @@ const emit = defineEmits<{
  */
 const anchorStepId = ref<string | null>(null);
 
-/**
- * Steps added during this editing session that still need the author.
- *
- * They are marked with the same 4px left border the list already uses for validation
- * errors, rather than a badge or a colour of their own: the list should have ONE way of
- * saying "look at this row". Scoped to steps created here so rows that were already in
- * the journey are never marked, and cleared by the step naming an element (below) so a
- * long editing session does not end up striped top to bottom.
- */
-const newStepIds = ref<Set<string>>(new Set());
-
-/** Remember a step the author just created, so its row carries the marker. */
-function markStepAsNew(id: string) {
-  newStepIds.value = new Set(newStepIds.value).add(id);
-}
-
 /** How many prefix steps have reported a result, for the restore banner. */
 const restoredCount = computed(() => recorder.stepResults.size);
 
@@ -739,10 +723,13 @@ const suggestions = computed(() =>
 
 function onSuggestionAction(kind: JourneySuggestionActionKind) {
   if (kind !== "add-assertion") return;
-  emit("update:modelValue", [
-    ...props.modelValue,
-    createSuggestedAssertionStep(t("synthetics.journey.assertionSuggestedName")),
-  ]);
+  const step = createSuggestedAssertionStep(t("synthetics.journey.assertionSuggestedName"));
+  emit("update:modelValue", [...props.modelValue, step]);
+  // The suggested step is a stub — it names an assertion kind and no element, so the
+  // author has to finish it. Revealed like `addStep`'s step for that reason; without
+  // it, clicking the chip on a long journey appended a row below the fold and looked
+  // like nothing had happened.
+  revealStep(step.id);
 }
 
 // ── Expand / collapse ─────────────────────────────────────────────────────
@@ -801,7 +788,6 @@ function handleInsertBelow(row: BrowserStep) {
   const next = [...props.modelValue];
   next.splice(idx + 1, 0, step);
   emit("update:modelValue", next);
-  markStepAsNew(step.id);
   revealStep(step.id);
 }
 function handleRowReorder(reordered: BrowserStep[]) {
@@ -822,7 +808,6 @@ function addStep() {
     locator: { candidates: [] },
   };
   emit("update:modelValue", [...props.modelValue, step]);
-  markStepAsNew(step.id);
   revealStep(step.id);
 }
 
@@ -885,16 +870,9 @@ function getRowStatusColor(row: BrowserStep): string | undefined {
   // row that carries no highlight — every rule except these two local ones
   // reaches the journey only as a field error.
   const hasFieldErr = fieldErrorStepIds.value.has(row.id);
-  // Errors always win: "this is broken" outranks "this is new", and a row that is
-  // both is a row the author has to fix.
   if (hasFirstStepErr || hasSelectorErr || hasFieldErr) return "var(--color-status-error-text)";
-  // A step created here that still names no element. Outlasts the reveal flash on
-  // purpose — a marker that blinks for a moment cannot help someone who scrolls back
-  // to find what they just added — and stops as soon as the step is complete.
-  if (newStepIds.value.has(row.id) && stepIsMissingTarget(row))
-    return "var(--color-status-info-text)";
-  // Transient "this is the one you just added", for rows that arrive complete (a
-  // duplicate). Lowest priority; it clears itself a moment later anyway.
+  // Transient "this is the one you just added". It clears itself a moment later; the
+  // list says nothing lasting about a row's age, only about whether it is broken.
   if (flashStepId.value === row.id) return "var(--color-status-info-text)";
   return undefined;
 }
