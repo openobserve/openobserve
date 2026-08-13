@@ -640,6 +640,9 @@ mod tests {
     /// while triaging the storm it is causing.
     #[test]
     fn orphan_detection_enabled_is_read_per_pass_not_captured_at_boot() {
+        let _guard = crate::CONFIG_SWAP_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let saved = config::CONFIG.load_full();
 
         let install = |on: bool| {

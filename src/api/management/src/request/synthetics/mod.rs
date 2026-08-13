@@ -111,7 +111,7 @@ pub async fn list_runs(
     {
         let page = q.page.unwrap_or(0).max(0);
         let page_size = q.page_size.unwrap_or(20).clamp(1, 200);
-        match o2_enterprise::enterprise::synthetics::service::list_runs(
+        match openobserve_synthetics::service::list_runs(
             &org_id,
             &id,
             q.start_time,
@@ -160,9 +160,7 @@ pub async fn get_run_detail(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::get_run_detail(&org_id, &id, &run_id)
-            .await
-        {
+        match openobserve_synthetics::service::get_run_detail(&org_id, &id, &run_id).await {
             Ok(Some(run)) => MetaHttpResponse::json(run),
             Ok(None) => MetaHttpResponse::not_found("run not found"),
             Err(e) => {
@@ -352,9 +350,7 @@ pub async fn list_synthetics(
     let params: config::meta::synthetics::ListSyntheticsParams = query.into();
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::list_synthetics(&org_id, &params)
-            .await
-        {
+        match openobserve_synthetics::service::list_synthetics(&org_id, &params).await {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
                 tracing::error!("[synthetics] list_synthetics: {e}");
@@ -411,11 +407,7 @@ pub async fn create_synthetic(
             .unwrap_or_else(|| config::meta::folder::DEFAULT_FOLDER.to_string());
 
         let created_by = user_email.user_id.as_str();
-        match o2_enterprise::enterprise::synthetics::service::create_synthetic(
-            &org_id, body, created_by,
-        )
-        .await
-        {
+        match openobserve_synthetics::service::create_synthetic(&org_id, body, created_by).await {
             Ok(check) => MetaHttpResponse::json(check),
             Err(e) => {
                 let msg = e.to_string();
@@ -475,7 +467,7 @@ pub async fn get_synthetic(
         {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::synthetics::service::get_synthetic(&org_id, &id).await {
+        match openobserve_synthetics::service::get_synthetic(&org_id, &id).await {
             Ok(Some(check)) => MetaHttpResponse::json(check),
             Ok(None) => MetaHttpResponse::not_found("check not found"),
             Err(e) => {
@@ -535,9 +527,7 @@ pub async fn update_synthetic(
         {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::synthetics::service::update_synthetic(&org_id, &id, body)
-            .await
-        {
+        match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
             Ok(check) => MetaHttpResponse::json(check),
             Err(e) => {
                 let msg = e.to_string();
@@ -601,7 +591,7 @@ pub async fn delete_synthetic(
         {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::synthetics::service::delete_synthetic(&org_id, &id).await {
+        match openobserve_synthetics::service::delete_synthetic(&org_id, &id).await {
             Ok(true) => MetaHttpResponse::ok("check deleted"),
             Ok(false) => MetaHttpResponse::not_found("check not found"),
             Err(e) => {
@@ -643,7 +633,7 @@ pub async fn delete_synthetics_bulk(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::delete_synthetics_bulk(
+        match openobserve_synthetics::service::delete_synthetics_bulk(
             &org_id,
             &body.ids,
             _folder_query.folder.as_deref(),
@@ -713,7 +703,7 @@ pub async fn move_synthetics(
                 return MetaHttpResponse::forbidden("Forbidden");
             }
         }
-        match o2_enterprise::enterprise::synthetics::service::move_synthetics(
+        match openobserve_synthetics::service::move_synthetics(
             &org_id,
             &body.synthetic_ids,
             &body.dst_folder_id,
@@ -781,11 +771,7 @@ pub async fn set_synthetic_enabled(
             Some(v) => v,
             None => return MetaHttpResponse::bad_request("missing boolean field 'enabled'"),
         };
-        match o2_enterprise::enterprise::synthetics::service::set_synthetic_enabled(
-            &org_id, &id, enabled,
-        )
-        .await
-        {
+        match openobserve_synthetics::service::set_synthetic_enabled(&org_id, &id, enabled).await {
             Ok(true) => MetaHttpResponse::ok(if enabled {
                 "check enabled"
             } else {
@@ -845,8 +831,7 @@ pub async fn run_synthetic_now(
         {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::synthetics::service::run_synthetic_now(&org_id, &id).await
-        {
+        match openobserve_synthetics::service::run_synthetic_now(&org_id, &id).await {
             Ok(()) => (StatusCode::ACCEPTED, "").into_response(),
             Err(e) => {
                 let msg = e.to_string();
@@ -1338,9 +1323,7 @@ pub async fn create_location(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::synthetics::service::{
-            CreateLocationRequest, create_location,
-        };
+        use openobserve_synthetics::service::{CreateLocationRequest, create_location};
 
         let is_root = db::user::is_root_user(&user_email.user_id);
 
@@ -1463,7 +1446,7 @@ pub struct SetAgentTokenEnabledRequest {
 pub async fn list_agent_tokens(Path(org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::list_agent_tokens(&org_id).await {
+        match openobserve_synthetics::service::list_agent_tokens(&org_id).await {
             Ok(tokens) => MetaHttpResponse::json(serde_json::json!({ "tokens": tokens })),
             Err(e) => {
                 tracing::error!("[synthetics] list_agent_tokens: {e}");
@@ -1502,7 +1485,7 @@ pub async fn create_agent_token(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::create_agent_token(
+        match openobserve_synthetics::service::create_agent_token(
             &org_id,
             &body.name,
             &user_email.user_id,
@@ -1554,7 +1537,7 @@ pub async fn rotate_agent_token(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::rotate_agent_token(
+        match openobserve_synthetics::service::rotate_agent_token(
             &org_id,
             body.name,
             &user_email.user_id,
@@ -1606,12 +1589,8 @@ pub async fn set_agent_token_enabled(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::set_agent_token_enabled(
-            &org_id,
-            &name,
-            body.enabled,
-        )
-        .await
+        match openobserve_synthetics::service::set_agent_token_enabled(&org_id, &name, body.enabled)
+            .await
         {
             Ok(()) => {
                 let state = if body.enabled { "enabled" } else { "disabled" };
@@ -1656,7 +1635,7 @@ pub async fn set_agent_token_enabled(
 pub async fn get_location(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::location_detail(&org_id, &id).await {
+        match openobserve_synthetics::service::location_detail(&org_id, &id).await {
             Ok(detail) => MetaHttpResponse::json(detail),
             Err(e) => {
                 let msg = e.to_string();
@@ -1704,17 +1683,13 @@ pub async fn update_location(
     {
         let is_root = db::user::is_root_user(&user_email.user_id);
         let req = match serde_json::from_value::<
-            o2_enterprise::enterprise::synthetics::service::UpdateLocationRequest,
+            openobserve_synthetics::service::UpdateLocationRequest,
         >(body)
         {
             Ok(r) => r,
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         };
-        match o2_enterprise::enterprise::synthetics::service::update_location(
-            &org_id, is_root, &id, req,
-        )
-        .await
-        {
+        match openobserve_synthetics::service::update_location(&org_id, is_root, &id, req).await {
             Ok(loc) => MetaHttpResponse::json(loc),
             Err(e) => location_error_response(e),
         }
@@ -1752,9 +1727,7 @@ pub async fn delete_location(
     #[cfg(feature = "enterprise")]
     {
         let is_root = db::user::is_root_user(&user_email.user_id);
-        match o2_enterprise::enterprise::synthetics::service::delete_location(&org_id, is_root, &id)
-            .await
-        {
+        match openobserve_synthetics::service::delete_location(&org_id, is_root, &id).await {
             Ok(()) => MetaHttpResponse::json(serde_json::json!({"deleted": true})),
             Err(e) => location_error_response(e),
         }
@@ -1784,8 +1757,7 @@ pub async fn delete_location(
 pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::synthetics::service::list_locations_for_org(&_org_id).await
-        {
+        match openobserve_synthetics::service::list_locations_for_org(&_org_id).await {
             Ok(capabilities) => MetaHttpResponse::json(capabilities),
             Err(e) => {
                 tracing::error!("[synthetics] list_locations: {e}");

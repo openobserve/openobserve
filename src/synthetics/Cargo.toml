@@ -14,7 +14,7 @@ default = []
 # through it, and the private-agent code over there must therefore NOT depend on
 # this crate — cargo rejects the package cycle outright, `optional` and feature
 # gating included. Anything both sides need lives in `config` or `infra`.
-enterprise = ["dep:o2_enterprise"]
+enterprise = ["dep:o2_enterprise", "dep:o2_openfga"]
 
 [dependencies]
 anyhow.workspace = true
@@ -26,6 +26,7 @@ dashmap.workspace = true
 infra.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
 reqwest.workspace = true
 sea-orm.workspace = true
 serde.workspace = true

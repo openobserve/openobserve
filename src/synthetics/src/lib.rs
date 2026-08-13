@@ -32,11 +32,22 @@
 //! `openobserve-core` would have broken that — `super_cluster_queue` depends on
 //! core — and demoted a compile-time impossibility to a lint.
 
+/// Serialises the tests that swap the process-global `config::CONFIG`.
+///
+/// Two of them pin the same property from opposite ends of the crate — that the
+/// synthetics config is read at point of use, not captured at boot — and both
+/// have to install a config to prove it. Without this they race, and the loser
+/// reads the winner's value. Poisoning is ignored so one failed test does not
+/// cascade into `PoisonError`s.
+#[cfg(test)]
+pub(crate) static CONFIG_SWAP_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 pub mod alerting;
 pub mod dispatcher;
 pub mod job_api;
 pub mod reaper;
 pub mod scheduler;
+pub mod service;
 
 /// One row per execution — the record the UI's run list and run detail read.
 pub const RESULTS_STREAM: &str = "synthetics_results";

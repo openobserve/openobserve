@@ -1112,6 +1112,29 @@ pub fn list_capabilities() -> SyntheticsCapabilities {
     SyntheticsCapabilities { browsers, devices }
 }
 
+/// Lowercases and hyphenates a string for use inside an identifier.
+///
+/// Lives here rather than beside its callers because both sides need it and
+/// neither may depend on the other: the OSS `create_location` derives a private
+/// location's pool name with it, and the enterprise agent register path derives
+/// the same slug when it upserts a deploy-declared location. They must agree
+/// exactly, or an agent registers into a pool no job is ever queued to.
+pub fn slugify(s: &str) -> String {
+    s.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
 /// Lookup viewport for a device id from env config. Returns `None` for unknown
 /// devices.
 pub fn device_viewport(device_id: &str) -> Option<(u32, u32)> {
