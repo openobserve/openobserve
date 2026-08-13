@@ -358,6 +358,74 @@ export function ownershipPath(dimensions: Record<string, string>): string {
 }
 
 /**
+ * Orders rules the way the engine consults them — most specific first.
+ *
+ * Mirrors `resolve_owner`'s comparator in `config::meta::oncall::routing`,
+ * term for term:
+ *
+ *   1. depth — how many dimensions the rule pins
+ *   2. exactness — at equal depth, a literal beats a `*` wildcard
+ *   3. literal characters — the longer pinned prefix wins
+ *   4. the path itself, ascending, so the order is stable
+ *
+ * Worth stating why this is duplicated rather than asked for: the endpoint
+ * returns rules in storage order, and every term here is a pure function of
+ * the rule's own dimensions — no roster, no traffic, nothing this side cannot
+ * see. Precedence that actually BIT somebody is still the server's to report
+ * (`shadowed_by`, and the simulator's `lost_because`); this only decides which
+ * row is drawn first.
+ *
+ * Sorting on the rendered path instead would be wrong in a way that looks
+ * right: `k8s-namespace=payments` is the longer STRING, yet
+ * `service=payments-api` outranks it on literal characters.
+ */
+export function compareRulePrecedence(
+  a: { dimensions: Record<string, string> },
+  b: { dimensions: Record<string, string> },
+): number {
+  const depth = Object.keys(b.dimensions ?? {}).length - Object.keys(a.dimensions ?? {}).length;
+  if (depth) return depth;
+
+  const exact = exactDimensions(b) - exactDimensions(a);
+  if (exact) return exact;
+
+  const literal = literalChars(b) - literalChars(a);
+  if (literal) return literal;
+
+  const pathA = ownershipPath(a.dimensions);
+  const pathB = ownershipPath(b.dimensions);
+  return pathA < pathB ? -1 : pathA > pathB ? 1 : 0;
+}
+
+/** Dimensions pinned to a literal value rather than a `*` wildcard. */
+function exactDimensions(rule: { dimensions: Record<string, string> }): number {
+  return Object.values(rule.dimensions ?? {}).filter((value) => !value.endsWith("*")).length;
+}
+
+/** Total literal characters pinned, not counting a wildcard's `*`. */
+function literalChars(rule: { dimensions: Record<string, string> }): number {
+  return Object.values(rule.dimensions ?? {}).reduce(
+    (total, value) => total + value.replace(/\*+$/, "").length,
+    0,
+  );
+}
+
+/**
+ * The same pairs, spaced to be read rather than parsed:
+ * `service = disputes-api · k8s-namespace = payments-edge`.
+ *
+ * Distinct from `ownershipPath` on purpose. That one mirrors the server's
+ * storage key and must stay character-exact; this one is prose, and the two
+ * would drift into each other if a single function tried to be both.
+ */
+export function dimensionsSentence(dimensions: Record<string, string>): string {
+  return Object.keys(dimensions ?? {})
+    .sort()
+    .map((name) => `${name} = ${dimensions[name]}`)
+    .join(" · ");
+}
+
+/**
  * Channels a page can actually be delivered on today.
  *
  * The `Channel` type carries every channel the design calls for so the stored

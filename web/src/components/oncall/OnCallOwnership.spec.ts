@@ -26,33 +26,42 @@ vi.mock("@/services/alerts", () => ({
 }));
 vi.mock("@/services/oncall", () => ({
   default: {
-    listOwnershipRules: vi.fn(),
+    ownershipStats: vi.fn(),
     createOwnershipRule: vi.fn(),
     deleteOwnershipRule: vi.fn(),
     previewRouting: vi.fn(),
+    unroutedSignals: vi.fn(),
+    dismissUnroutedSignal: vi.fn(),
+    testPage: vi.fn(),
   },
 }));
 
 const service = vi.mocked(oncallService);
+const ORG = store.state.selectedOrganization.identifier;
 
+/// The three sections are stubbed so this file is about the WIRING between
+/// them and the API. Each one has its own spec for what it renders.
 const stubs = {
-  OTable: {
-    name: "OTable",
-    props: ["data", "columns"],
-    template: "<div><slot name='empty' /></div>",
+  OnCallRoutingSimulator: {
+    name: "OnCallRoutingSimulator",
+    props: ["preview", "teamId", "teamName", "teams", "aliases", "loading", "sending"],
+    template: "<div />",
   },
-  OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
-  ODimensionChip: { name: "ODimensionChip", props: ["name", "value"], template: "<span />" },
-  OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
-  OIcon: { name: "OIcon", template: "<i />" },
-  OTag: { name: "OTag", template: "<span><slot /></span>" },
-  ConfirmDialog: { name: "ConfirmDialog", template: "<div />" },
+  OnCallOwnershipRules: {
+    name: "OnCallOwnershipRules",
+    props: ["rules", "aliases", "loading"],
+    template: "<div />",
+  },
+  OnCallUnroutedQueue: {
+    name: "OnCallUnroutedQueue",
+    props: ["signals", "teamName", "loading", "claiming"],
+    template: "<div />",
+  },
+  ODialog: { name: "ODialog", props: ["open", "primaryDisabled"], template: "<div><slot /></div>" },
+  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue"], template: "<div />" },
   OButton: {
     name: "OButton",
     props: ["disabled"],
-    // No `@click="$emit('click')"`: the parent's handler already falls through
-    // to the native button, and re-emitting fires it twice.
     template: `<button :disabled="disabled"><slot /></button>`,
   },
   OInput: {
@@ -82,7 +91,13 @@ function render() {
   });
 }
 
-async function typePair(wrapper: ReturnType<typeof render>, name: string, value: string) {
+type Wrapper = ReturnType<typeof render>;
+
+const simulator = (w: Wrapper) => w.findComponent({ name: "OnCallRoutingSimulator" });
+const rulesPanel = (w: Wrapper) => w.findComponent({ name: "OnCallOwnershipRules" });
+const unrouted = (w: Wrapper) => w.findComponent({ name: "OnCallUnroutedQueue" });
+
+async function typePair(wrapper: Wrapper, name: string, value: string) {
   // The name is chosen from the org's field vocabulary, not typed, so a rule
   // cannot be written against a dimension nothing emits.
   await wrapper
@@ -92,41 +107,32 @@ async function typePair(wrapper: ReturnType<typeof render>, name: string, value:
   await wrapper.find('[data-test="oncall-ownership-add-dimension"]').trigger("click");
 }
 
-/// Rules render through OTable now, so read them off the table rather than
-/// the page text.
-function ruleRows(wrapper: ReturnType<typeof render>) {
-  return wrapper.findComponent({ name: "OTable" }).props("data") as any[];
-}
-
 describe("OnCallOwnership", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    service.listOwnershipRules.mockResolvedValue({ data: [] } as any);
+    service.ownershipStats.mockResolvedValue({ data: { rules: [], total: 0 } } as any);
+    service.unroutedSignals.mockResolvedValue({ data: [] } as any);
     service.createOwnershipRule.mockResolvedValue({ data: {} } as any);
   });
 
-  it("lists a team's rules in canonical path form", async () => {
-    service.listOwnershipRules.mockResolvedValue({
-      data: [
-        {
-          id: "r1",
-          org_id: "default",
-          team_id: "team_1",
-          // Deliberately reversed: the path must sort, not echo insertion order.
-          dimensions: { "k8s-namespace": "payments", "k8s-cluster": "prod" },
-          created_at: 0,
-          updated_at: 0,
-        },
-      ],
+  /// Scoped to this team: the org-wide stats endpoint would otherwise show
+  /// another team's rules on this team's screen.
+  it("asks for only this team's rules", async () => {
+    render();
+    await flushPromises();
+    expect(service.ownershipStats).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      team_id: "team_1",
+    });
+  });
+
+  it("hands the fetched rules to the table", async () => {
+    service.ownershipStats.mockResolvedValue({
+      data: { total: 1, rules: [{ rule_id: "r1", path: "service=api", health: "active" }] },
     } as any);
     const wrapper = render();
     await flushPromises();
-    const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
-    const match = columns.find((c) => c.id === "match");
-    // Sorted, not echoing insertion order: the path IS the precedence key.
-    expect(match.accessorFn(ruleRows(wrapper)[0])).toBe(
-      "k8s-cluster=prod/k8s-namespace=payments",
-    );
+    expect(rulesPanel(wrapper).props("rules")).toHaveLength(1);
   });
 
   // The server lowercases rule values to match what the dimension extractor
@@ -145,11 +151,11 @@ describe("OnCallOwnership", () => {
     await flushPromises();
     await typePair(wrapper, "k8s-cluster", "PROD");
     await typePair(wrapper, "k8s-namespace", "Payments");
-    await wrapper.find('[data-test="oncall-ownership-save"]').trigger("click");
+    await wrapper.findComponent({ name: "ODialog" }).vm.$emit("click:primary");
     await flushPromises();
 
     expect(service.createOwnershipRule).toHaveBeenCalledWith({
-      org_identifier: store.state.selectedOrganization.identifier,
+      org_identifier: ORG,
       data: {
         team_id: "team_1",
         dimensions: { "k8s-cluster": "prod", "k8s-namespace": "payments" },
@@ -168,68 +174,117 @@ describe("OnCallOwnership", () => {
       .vm.$emit("update:modelValue", "k8s-cluster");
     await wrapper.find('[data-test="oncall-ownership-dimension-value"]').setValue("staging");
 
-    const addButton = wrapper.find('[data-test="oncall-ownership-add-dimension"]');
-    expect(addButton.attributes("disabled")).toBeDefined();
+    expect(
+      wrapper.find('[data-test="oncall-ownership-add-dimension"]').attributes("disabled"),
+    ).toBeDefined();
   });
 
   it("cannot save a rule with no dimensions", async () => {
     const wrapper = render();
     await flushPromises();
-    expect(
-      wrapper.find('[data-test="oncall-ownership-save"]').attributes("disabled"),
-    ).toBeDefined();
+    expect(wrapper.findComponent({ name: "ODialog" }).props("primaryDisabled")).toBe(true);
 
     await typePair(wrapper, "k8s-cluster", "prod");
-    expect(
-      wrapper.find('[data-test="oncall-ownership-save"]').attributes("disabled"),
-    ).toBeUndefined();
+    expect(wrapper.findComponent({ name: "ODialog" }).props("primaryDisabled")).toBe(false);
   });
 
-  it("names the winning team and the reason when routing is tested", async () => {
+  it("passes the routing preview back down to the simulator", async () => {
     service.previewRouting.mockResolvedValue({
-      data: {
-        decision: { kind: "ownership" },
-        team_id: "team_2",
-        reason: "routed to team_2 by ownership rule k8s-cluster=prod",
-      },
+      data: { decision: { kind: "ownership" }, team_id: "team_2", reason: "routed" },
     } as any);
     const wrapper = render();
     await flushPromises();
 
-    await wrapper.find('[data-test="oncall-routing-test-name"]').setValue("k8s-cluster");
-    await wrapper.find('[data-test="oncall-routing-test-value"]').setValue("prod");
-    await wrapper.find('[data-test="oncall-routing-test-add"]').trigger("click");
-    await wrapper.find('[data-test="oncall-routing-test-run"]').trigger("click");
+    simulator(wrapper).vm.$emit("run", { dimensions: { service: "api" }, priority: "P1" });
     await flushPromises();
 
-    const result = wrapper.find('[data-test="oncall-routing-test-result"]');
-    expect(result.exists()).toBe(true);
-    // The team's NAME, not the raw id — an id tells a reader nothing.
-    expect(result.text()).toContain("Payments");
-    expect(result.text()).toContain("by ownership rule k8s-cluster=prod");
+    expect(service.previewRouting).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      data: { dimensions: { service: "api" } },
+    });
+    expect(simulator(wrapper).props("preview")).toMatchObject({ team_id: "team_2" });
   });
 
-  // An unrouted result is the one worth surfacing loudly: it means an alert
-  // matching these dimensions would page nobody.
-  it("says nobody would be paged when routing finds no owner", async () => {
-    service.previewRouting.mockResolvedValue({
-      data: {
-        decision: { kind: "unrouted" },
-        team_id: null,
-        reason: "no ownership rule matches this signal, so no team was paged",
-      },
-    } as any);
+  /// The API takes a number; the simulator speaks in "P1".
+  it("sends a real test page with the priority as a number", async () => {
+    service.testPage.mockResolvedValue({ data: { reached_anyone: true, recipients: ["a@o2.ai"] } } as any);
     const wrapper = render();
     await flushPromises();
 
-    await wrapper.find('[data-test="oncall-routing-test-name"]').setValue("k8s-cluster");
-    await wrapper.find('[data-test="oncall-routing-test-value"]').setValue("staging");
-    await wrapper.find('[data-test="oncall-routing-test-add"]').trigger("click");
-    await wrapper.find('[data-test="oncall-routing-test-run"]').trigger("click");
+    simulator(wrapper).vm.$emit("send-test", { team_id: "team_2", priority: "P3" });
     await flushPromises();
 
-    const result = wrapper.find('[data-test="oncall-routing-test-result"]');
-    expect(result.text()).toContain("Nobody");
-    expect(result.text()).toContain("no team was paged");
+    expect(service.testPage).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      team_id: "team_2",
+      priority: 3,
+    });
+  });
+
+  /// Claiming IS writing an ownership rule for the dimensions that went
+  /// unmatched — there is no separate claim endpoint.
+  it("claims an unrouted path by writing a rule for its exact dimensions", async () => {
+    const signal = { id: "s1", dimensions: { service: "disputes-api" } };
+    service.unroutedSignals.mockResolvedValue({ data: [signal] } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    unrouted(wrapper).vm.$emit("claim", signal);
+    await flushPromises();
+
+    expect(service.createOwnershipRule).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      data: { team_id: "team_1", dimensions: { service: "disputes-api" } },
+    });
+    // Both lists move: the rule appears and the signal stops being unrouted.
+    expect(service.ownershipStats).toHaveBeenCalledTimes(2);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+  });
+
+  /// One already-covered path must not abandon the rest of the queue.
+  it("keeps claiming after one path fails", async () => {
+    service.unroutedSignals.mockResolvedValue({
+      data: [
+        { id: "s1", dimensions: { service: "a" } },
+        { id: "s2", dimensions: { service: "b" } },
+      ],
+    } as any);
+    service.createOwnershipRule
+      .mockRejectedValueOnce(new Error("duplicate"))
+      .mockResolvedValueOnce({ data: {} } as any);
+
+    const wrapper = render();
+    await flushPromises();
+    unrouted(wrapper).vm.$emit("claim-all");
+    await flushPromises();
+    await wrapper.findAllComponents({ name: "ConfirmDialog" })[1].vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(service.createOwnershipRule).toHaveBeenCalledTimes(2);
+  });
+
+  it("deletes a rule by its rule id", async () => {
+    service.deleteOwnershipRule.mockResolvedValue({ data: {} } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    rulesPanel(wrapper).vm.$emit("remove", { rule_id: "r9" });
+    await wrapper.vm.$nextTick();
+    await wrapper.findAllComponents({ name: "ConfirmDialog" })[0].vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(service.deleteOwnershipRule).toHaveBeenCalledWith({
+      org_identifier: ORG,
+      rule_id: "r9",
+    });
+  });
+
+  /// A team with no unrouted traffic and a server without the endpoint look
+  /// identical from here, and neither deserves an error.
+  it("survives an unrouted endpoint that is not there", async () => {
+    service.unroutedSignals.mockRejectedValue(new Error("404"));
+    const wrapper = render();
+    await flushPromises();
+    expect(unrouted(wrapper).props("signals")).toEqual([]);
   });
 });

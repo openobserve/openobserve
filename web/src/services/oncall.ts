@@ -15,6 +15,7 @@
 import http from "./http";
 import type {
   OwnershipRule,
+  OwnershipStats,
   ResolvedSegment,
   TeamLoad,
   TeamOverview,
@@ -248,6 +249,29 @@ const oncall = {
       `/api/${org_identifier}/oncall/ownership`,
       team_id ? { params: { team_id } } : undefined,
     ),
+
+  /// The same rules, plus what each one actually caught: pages in the window,
+  /// when it last matched, and whether a more specific rule now takes its
+  /// traffic. The shadowing analysis compares every rule against every other,
+  /// so it belongs on the server — a client seeing one team's rules cannot
+  /// know that another team's rule outranks it.
+  ownershipStats: ({
+    org_identifier,
+    team_id,
+    days,
+  }: {
+    org_identifier: string;
+    team_id?: string;
+    days?: number;
+  }) => {
+    const params: Record<string, string | number> = {};
+    if (team_id) params.team_id = team_id;
+    if (days !== undefined) params.days = days;
+    return http().get<OwnershipStats>(
+      `/api/${org_identifier}/oncall/ownership/stats`,
+      Object.keys(params).length ? { params } : undefined,
+    );
+  },
 
   createOwnershipRule: ({
     org_identifier,

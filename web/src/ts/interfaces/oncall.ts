@@ -534,10 +534,77 @@ export interface OwnershipRule {
 
 export type RoutingDecisionKind = "explicit" | "ownership" | "unrouted";
 
+/** A rule that also matched but did not win, and the server's reason it lost. */
+export interface AlsoMatchedRule {
+  rule_id: string;
+  team_id: string;
+  team_name?: string | null;
+  path: string;
+  /** True when losing changes nothing — the winner routes to the same team. */
+  same_team: boolean;
+  /** A finished sentence explaining the precedence. Render it, never restate it. */
+  lost_because: string;
+}
+
 export interface RoutingPreview {
   decision: { kind: RoutingDecisionKind } & Record<string, unknown>;
   team_id: string | null;
   reason: string;
+  /** True when nothing matched and the org's fallback team caught it. */
+  landed_on_default?: boolean;
+  /** Server-written caveats about this route. Finished sentences. */
+  notes?: string[];
+  /** Every priority's shape on the team this resolves to, silent ones included. */
+  ladder?: TeamRungSummary[];
+  repeat_count?: number;
+  final_action?: string;
+  /** Who holds it this instant, and whether a page to them would land. */
+  current_responder?: PreviewRecipient | null;
+  /** False when the winning team has nobody on call right now. */
+  covered_now?: boolean;
+  /** The rules that matched and lost. Empty when the win was uncontested. */
+  also_matched?: AlsoMatchedRule[];
+}
+
+/** `active` — it catches pages. `shadowed` — a more specific rule takes them
+ *  first. `never_used` — it has matched nothing since it was written. */
+export type OwnershipRuleHealth = "active" | "shadowed" | "never_used";
+
+/** A rule that outranks another, from the server's shadowing analysis. */
+export interface ShadowingRule {
+  rule_id: string;
+  team_id: string;
+  team_name?: string | null;
+  path: string;
+  /** What it takes and why. A finished sentence. */
+  outcome: string;
+}
+
+/** One ownership rule with the traffic it actually caught. */
+export interface OwnershipRuleStats {
+  rule_id: string;
+  team_id: string;
+  team_name?: string | null;
+  /** `k8s-namespace=payments` — the rule as the engine reads it. */
+  path: string;
+  dimensions: Record<string, string>;
+  created_at: number;
+  pages_caught: number;
+  /** Micros. Null when the rule has never matched. */
+  last_matched_at?: number | null;
+  health: OwnershipRuleHealth;
+  /** The server's own verdict sentence. Render it rather than composing one. */
+  health_summary: string;
+  shadowed_by: ShadowingRule[];
+}
+
+export interface OwnershipStats {
+  /** Micros — the window `pages_caught` is counted over. */
+  from: number;
+  to: number;
+  days: number;
+  total: number;
+  rules: OwnershipRuleStats[];
 }
 
 /** Did the transport take it. `failed` is a recorded fact, not an absence. */

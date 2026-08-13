@@ -22,7 +22,19 @@ import {
   MICROS_PER_WEEK,
 } from "@/ts/interfaces/oncall";
 import {
+  CHANNEL_WAKES,
+  PRIORITY_TONE,
+  colorIndexFor,
+  compareRulePrecedence,
+  describeRestrictions,
+  describeTarget,
+  formatInZone,
+  formatMinuteOfDay,
+  groupBySubject,
   isEscalating,
+  isRotationValid,
+  isSnoozed,
+  isStaffed,
   isUnresolved,
   memberAt,
   nextHandover,
@@ -30,27 +42,16 @@ import {
   ownershipPath,
   priorityLabel,
   priorityTagVariant,
-  stateTagVariant,
-  upcomingShifts,
-  isSnoozed,
-  groupBySubject,
-  isStaffed,
-  describeTarget,
-  shiftBands,
-  describeRestrictions,
-  formatInZone,
-  formatMinuteOfDay,
-  isRotationValid,
+  priorityTone,
   resolveHolder,
+  resolveLadder,
   resolveNextHolder,
   rotationAppliesAt,
-  windowContains,
-  CHANNEL_WAKES,
-  PRIORITY_TONE,
-  priorityTone,
-  colorIndexFor,
   routingReasonOf,
-  resolveLadder,
+  shiftBands,
+  stateTagVariant,
+  upcomingShifts,
+  windowContains,
 } from "@/utils/oncall";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -969,3 +970,50 @@ describe("resolveLadder", () => {
   });
 });
 
+describe("compareRulePrecedence", () => {
+  const rule = (dimensions: Record<string, string>) => ({ dimensions });
+  const order = (...rules: { dimensions: Record<string, string> }[]) =>
+    [...rules].sort(compareRulePrecedence).map((r) => ownershipPath(r.dimensions));
+
+  /// The bug this exists to prevent: `k8s-namespace=payments` is the longer
+  /// STRING, so sorting on rendered text ranks it first — but the server
+  /// resolves the service rule as the winner, on literal characters.
+  it("ranks by pinned literal characters, not by rendered path length", () => {
+    expect(
+      order(rule({ "k8s-namespace": "payments" }), rule({ service: "payments-api" })),
+    ).toEqual(["service=payments-api", "k8s-namespace=payments"]);
+  });
+
+  it("puts the deeper rule first, however short its values", () => {
+    expect(
+      order(
+        rule({ service: "payments-api-gateway" }),
+        rule({ service: "a", "k8s-namespace": "b" }),
+      )[0],
+    ).toBe("k8s-namespace=b/service=a");
+  });
+
+  // `host=db-01` is a statement about one host, `host=db-*` about a family,
+  // and the narrower claim is the one whose author meant it.
+  it("puts an exact match ahead of a wildcard at the same depth", () => {
+    expect(order(rule({ host: "db-*" }), rule({ host: "db-01" }))).toEqual([
+      "host=db-01",
+      "host=db-*",
+    ]);
+  });
+
+  it("prefers the longer prefix between two wildcards", () => {
+    expect(order(rule({ host: "db-*" }), rule({ host: "db-prod-*" }))).toEqual([
+      "host=db-prod-*",
+      "host=db-*",
+    ]);
+  });
+
+  /// Equally specific rules must not reorder between renders.
+  it("breaks a dead tie on the path, so the order is stable", () => {
+    expect(order(rule({ service: "beta" }), rule({ service: "alpha" }))).toEqual([
+      "service=alpha",
+      "service=beta",
+    ]);
+  });
+});
