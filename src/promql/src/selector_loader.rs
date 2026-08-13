@@ -125,7 +125,7 @@ pub(super) async fn selector_load_data_from_datafusion(
         }
     };
 
-    df_group = apply_matchers(df_group, &schema, &selector.matchers)?;
+    df_group = apply_matchers(df_group, &selector.matchers)?;
 
     match apply_label_selector(df_group, &schema, &label_selector) {
         Some(dataframe) => df_group = dataframe,

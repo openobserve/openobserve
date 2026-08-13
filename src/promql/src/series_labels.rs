@@ -25,7 +25,7 @@ use config::{
 };
 use datafusion::{
     arrow::{
-        array::{Array, StringArray, UInt64Array},
+        array::{Array, StringArray, StringViewArray, UInt64Array},
         datatypes::DataType,
     },
     error::{DataFusionError, Result},
@@ -82,6 +82,27 @@ struct LabelInterner {
     values: Option<HashMap<String, Arc<Label>>>,
     window_lookups: usize,
     window_hits: usize,
+}
+
+enum LabelColumn<'a> {
+    Utf8(&'a StringArray),
+    Utf8View(&'a StringViewArray),
+}
+
+impl LabelColumn<'_> {
+    fn is_null(&self, row: usize) -> bool {
+        match self {
+            Self::Utf8(values) => values.is_null(row),
+            Self::Utf8View(values) => values.is_null(row),
+        }
+    }
+
+    fn value(&self, row: usize) -> &str {
+        match self {
+            Self::Utf8(values) => values.value(row),
+            Self::Utf8View(values) => values.value(row),
+        }
+    }
 }
 
 impl LabelInterner {
@@ -315,7 +336,10 @@ pub(super) async fn load_labels(
             .fields()
             .iter()
             .enumerate()
-            .filter(|(_, field)| field.name() != HASH_LABEL && field.data_type() == &DataType::Utf8)
+            .filter(|(_, field)| {
+                field.name() != HASH_LABEL
+                    && matches!(field.data_type(), DataType::Utf8 | DataType::Utf8View)
+            })
             .map(|(index, field)| (index, field.name().clone()))
             .collect::<Vec<_>>(),
     );
@@ -364,14 +388,25 @@ pub(super) async fn load_labels(
                 let cols = label_columns
                     .iter()
                     .map(|(index, name)| {
-                        columns
-                            .get(*index)
-                            .and_then(|column| column.as_any().downcast_ref::<StringArray>())
-                            .ok_or_else(|| {
-                                DataFusionError::Execution(format!(
-                                    "label column {name} is missing or is not Utf8"
-                                ))
-                            })
+                        let column = columns.get(*index).ok_or_else(|| {
+                            DataFusionError::Execution(format!("label column {name} is missing"))
+                        })?;
+                        match column.data_type() {
+                            DataType::Utf8 => column
+                                .as_any()
+                                .downcast_ref::<StringArray>()
+                                .map(LabelColumn::Utf8),
+                            DataType::Utf8View => column
+                                .as_any()
+                                .downcast_ref::<StringViewArray>()
+                                .map(LabelColumn::Utf8View),
+                            _ => None,
+                        }
+                        .ok_or_else(|| {
+                            DataFusionError::Execution(format!(
+                                "label column {name} is not Utf8 or Utf8View"
+                            ))
+                        })
                     })
                     .collect::<Result<Vec<_>>>()?;
 
@@ -441,7 +476,7 @@ pub(super) async fn load_labels(
 mod tests {
     use datafusion::{
         arrow::{
-            array::{Float64Array, Int64Array, StringArray, UInt64Array},
+            array::{Float64Array, Int64Array, StringArray, StringViewArray, UInt64Array},
             datatypes::{Field, Schema},
             record_batch::RecordBatch,
         },
@@ -541,6 +576,43 @@ mod tests {
         assert_eq!(labels_33[0].name, "instance");
         assert_eq!(labels_33[1].name, "region");
         assert!(metrics[&44].labels.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_load_labels_supports_utf8_view() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new("instance", DataType::Utf8View, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(UInt64Array::from(vec![11, 22])),
+                Arc::new(StringViewArray::from(vec![Some("api"), None])),
+            ],
+        )
+        .unwrap();
+        let ctx = SessionContext::new_with_config(
+            SessionConfig::new()
+                .with_target_partitions(1)
+                .with_batch_size(2),
+        );
+        let df = ctx.read_batch(batch).unwrap();
+        let metrics = vec![HashMap::from([
+            (11, RangeValue::default()),
+            (22, RangeValue::default()),
+        ])];
+
+        let metrics = load_labels("test", &DataType::UInt64, df, false, None, None, metrics)
+            .await
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+        assert_eq!(metrics[&11].labels[0].name, "instance");
+        assert_eq!(metrics[&11].labels[0].value, "api");
+        assert!(metrics[&22].labels.is_empty());
     }
 
     #[test]
