@@ -372,6 +372,12 @@
       "action": "New report",
       "actionDesc": "Schedule a dashboard delivery"
     },
+    "noVariables": {
+      "title": "No variables yet",
+      "description": "Add a variable to make this dashboard interactive — filter panels by namespace, pod, and more.",
+      "action": "Add variable",
+      "actionDesc": "Create a dashboard variable"
+    },
     "noQueries": {
       "title": "No running queries",
       "description": "There are no active queries right now. Long-running queries will appear here while they run."
@@ -437,7 +443,8 @@
       "pipelineHistory": "pipeline history",
       "regexPatterns": "regex patterns",
       "monitors": "monitors",
-      "modelPricing": "model pricing definitions"
+      "modelPricing": "model pricing definitions",
+      "variables": "variables"
     },
     "demo": {
       "pageTitle": "Empty states — full set for review",

@@ -47,7 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </DashboardHeader>
-      <div ref="tableWrapper" data-test="dashboard-variable-settings-drag">
+      <div
+        ref="tableWrapper"
+        class="min-h-0 flex-1 overflow-y-auto"
+        data-test="dashboard-variable-settings-drag"
+      >
         <OTable
           data-test="dashboard-variables-table"
           :data="dashboardVariablesList"
@@ -61,7 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
         >
           <template #empty>
-            <NoData />
+            <OEmptyState
+              size="hero"
+              preset="no-variables"
+              @action="() => addVariables()"
+            />
           </template>
 
           <template #cell-drag>
@@ -228,7 +236,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
 import DashboardHeader from "./common/DashboardHeader.vue";
-import NoData from "../../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -244,7 +252,7 @@ export default defineComponent({
   name: "VariableSettings",
   components: {
     AddSettingVariable,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     DashboardHeader,
     VariablesDependenciesGraph,
