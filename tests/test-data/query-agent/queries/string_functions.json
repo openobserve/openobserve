@@ -368,7 +368,7 @@
           [
             "CC-DELTA",
             "SORT-M3",
-            "manual, auto",
+            "auto, manual",
             "3"
           ],
           [
@@ -902,9 +902,9 @@
         ],
         "results": [
           [
-            "ZONE-2",
+            "ZONE-4",
             "auto",
-            "SORT-ZONE-2",
+            "SORT-ZONE-4",
             "29",
             "2"
           ],
@@ -916,13 +916,6 @@
             "2"
           ],
           [
-            "ZONE-4",
-            "auto",
-            "SORT-ZONE-4",
-            "29",
-            "2"
-          ],
-          [
             "ZONE-1",
             "auto",
             "SORT-ZONE-1",
@@ -930,18 +923,11 @@
             "2"
           ],
           [
-            "ZONE-4",
-            "hybrid",
-            "SORT-ZONE-4",
-            "58",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "hybrid",
-            "SORT-ZONE-3",
+            "ZONE-2",
+            "auto",
+            "SORT-ZONE-2",
             "29",
-            "1"
+            "2"
           ],
           [
             "ZONE-2",
@@ -958,9 +944,9 @@
             "1"
           ],
           [
-            "ZONE-3",
-            "manual",
-            "SORT-ZONE-3",
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
             "58",
             "1"
           ],
@@ -969,6 +955,20 @@
             "hybrid",
             "SORT-ZONE-4",
             "29",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "SORT-ZONE-3",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "58",
             "1"
           ]
         ],
@@ -1119,6 +1119,27 @@
             "50.0"
           ],
           [
+            "AP-SOUTH-ZONE-2-AUT",
+            "1",
+            "0",
+            "0",
+            "500.0"
+          ],
+          [
+            "AP-EAST-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "50.0"
+          ],
+          [
+            "EU-NORTH-ZONE-1-MAN",
+            "1",
+            "0",
+            "0",
+            "60.0"
+          ],
+          [
             "US-CENTRAL-ZONE-3-HYB",
             "1",
             "0",
@@ -1152,27 +1173,6 @@
             "0",
             "0",
             "155.0"
-          ],
-          [
-            "EU-NORTH-ZONE-1-MAN",
-            "1",
-            "0",
-            "0",
-            "60.0"
-          ],
-          [
-            "AP-SOUTH-ZONE-2-AUT",
-            "1",
-            "0",
-            "0",
-            "500.0"
-          ],
-          [
-            "AP-EAST-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "50.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1434,20 +1434,20 @@
         ],
         "results": [
           [
-            "searchPage",
-            "E003"
-          ],
-          [
-            "itemPage",
-            "E005"
+            "checkoutPage",
+            "E006"
           ],
           [
             "cartPage",
             "E004"
           ],
           [
-            "checkoutPage",
-            "E006"
+            "itemPage",
+            "E005"
+          ],
+          [
+            "searchPage",
+            "E003"
           ]
         ],
         "results_mode": "rowsort"
@@ -2060,12 +2060,16 @@
         ],
         "results": [
           [
+            "TimeoutException:",
+            "2"
+          ],
+          [
             "ResourceExhaustedException:",
             "2"
           ],
           [
-            "TimeoutException:",
-            "2"
+            "SecurityException:",
+            "1"
           ],
           [
             "DataIntegrityException:",
@@ -2073,10 +2077,6 @@
           ],
           [
             "NullPointerException",
-            "1"
-          ],
-          [
-            "SecurityException:",
             "1"
           ]
         ],
@@ -2128,11 +2128,11 @@
         ],
         "results": [
           [
-            "sorter-engine/rk-warehouse-008 (internal)",
+            "temp-regulator/rk-warehouse-006 (inbound)",
             "2"
           ],
           [
-            "temp-regulator/rk-warehouse-006 (inbound)",
+            "sorter-engine/rk-warehouse-008 (internal)",
             "2"
           ],
           [
@@ -2241,13 +2241,13 @@
             "2"
           ],
           [
-            "WAREHOUSE-EAST",
-            "internal",
+            "WAREHOUSE-SOUTH",
+            "inbound",
             "1"
           ],
           [
-            "WAREHOUSE-SOUTH",
-            "inbound",
+            "WAREHOUSE-EAST",
+            "internal",
             "1"
           ],
           [
@@ -2305,12 +2305,12 @@
         ],
         "results": [
           [
-            "BS-2026-C3",
+            "BS-2025-D4",
             "BS-2",
             "2"
           ],
           [
-            "BS-2025-D4",
+            "BS-2026-C3",
             "BS-2",
             "2"
           ],
@@ -3358,6 +3358,12 @@
             "2"
           ],
           [
+            "CONVEYOR-DRIVER",
+            "inbound",
+            "51",
+            "1"
+          ],
+          [
             "SCAN-HUB",
             "outbound",
             "58",
@@ -3367,12 +3373,6 @@
             "BATCH-SYNC",
             "inbound",
             "65",
-            "1"
-          ],
-          [
-            "CONVEYOR-DRIVER",
-            "inbound",
-            "51",
             "1"
           ]
         ],
@@ -3395,17 +3395,17 @@
         ],
         "results": [
           [
+            "BS-2026-A1",
+            "BS-2",
+            "2"
+          ],
+          [
             "BS-2026-B2",
             "BS-2",
             "2"
           ],
           [
             "BS-2025-D4",
-            "BS-2",
-            "2"
-          ],
-          [
-            "BS-2026-A1",
             "BS-2",
             "2"
           ],
@@ -3441,11 +3441,11 @@
             "2"
           ],
           [
-            "charge-checker/rk-warehouse-007 (outbound)",
+            "conveyor-driver/rk-warehouse-009 (inbound)",
             "1"
           ],
           [
-            "conveyor-driver/rk-warehouse-009 (inbound)",
+            "charge-checker/rk-warehouse-007 (outbound)",
             "1"
           ],
           [
@@ -3471,11 +3471,11 @@
         ],
         "results": [
           [
-            "shop.example.com/item/1007",
+            "shop.example.com/item/1002",
             "2"
           ],
           [
-            "shop.example.com/item/1002",
+            "shop.example.com/item/1007",
             "2"
           ],
           [
@@ -3610,11 +3610,6 @@
             "2"
           ],
           [
-            "WAREHOUSE-NORTH",
-            "inbound",
-            "1"
-          ],
-          [
             "WAREHOUSE-CENTRAL",
             "internal",
             "1"
@@ -3622,6 +3617,11 @@
           [
             "WAREHOUSE-WEST",
             "outbound",
+            "1"
+          ],
+          [
+            "WAREHOUSE-NORTH",
+            "inbound",
             "1"
           ]
         ],
@@ -3739,9 +3739,9 @@
             "2"
           ],
           [
-            "Android 13",
-            "axios/1.6.0 (Node.js; warehouse-ui)",
-            "35",
+            "iOS 18.1",
+            "Mozilla/5.0 WarehouseScanner/1.0",
+            "32",
             "1"
           ],
           [
@@ -3751,9 +3751,9 @@
             "1"
           ],
           [
-            "iOS 18.1",
-            "Mozilla/5.0 WarehouseScanner/1.0",
-            "32",
+            "Android 13",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "35",
             "1"
           ]
         ],
@@ -3788,14 +3788,19 @@
         ],
         "results": [
           [
+            "192.168.1.10",
+            "sess_002",
+            "2"
+          ],
+          [
             "192.168.2.23",
             "sess_002",
             "2"
           ],
           [
-            "192.168.1.10",
-            "sess_002",
-            "2"
+            "192.168.1.11",
+            "sess_001",
+            "1"
           ],
           [
             "192.168.2.24",
@@ -3804,11 +3809,6 @@
           ],
           [
             "192.168.2.22",
-            "sess_001",
-            "1"
-          ],
-          [
-            "192.168.1.11",
             "sess_001",
             "1"
           ]
@@ -3869,12 +3869,16 @@
         ],
         "results": [
           [
+            "updateBatch",
+            "2"
+          ],
+          [
             "syncZone",
             "2"
           ],
           [
-            "updateBatch",
-            "2"
+            "deleteRecord",
+            "1"
           ],
           [
             "retryScan",
@@ -3882,10 +3886,6 @@
           ],
           [
             "searchItems",
-            "1"
-          ],
-          [
-            "deleteRecord",
             "1"
           ]
         ],
@@ -3918,15 +3918,15 @@
             "2"
           ],
           [
+            "updateBatch",
+            "1"
+          ],
+          [
             "scanPallet",
             "1"
           ],
           [
             "mergeBatch",
-            "1"
-          ],
-          [
-            "updateBatch",
             "1"
           ]
         ],
