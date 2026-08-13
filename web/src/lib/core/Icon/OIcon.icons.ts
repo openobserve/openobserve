@@ -277,6 +277,7 @@ import SwapVertIcon from "~icons/material-symbols/swap-vert";
 import SyncIcon from "~icons/material-symbols/sync-outline";
 import SyncDisabledIcon from "~icons/material-symbols/sync-disabled";
 import SyncProblemIcon from "~icons/material-symbols/sync-problem-outline";
+import SyncAltIcon from "~icons/material-symbols/sync-alt";
 import TableViewIcon from "~icons/material-symbols/table-view-outline";
 import TagIcon from "~icons/material-symbols/tag";
 import TaskAltIcon from "~icons/material-symbols/task-alt";
@@ -646,6 +647,7 @@ export const iconRegistry = {
   sync: SyncIcon,
   "sync-disabled": SyncDisabledIcon,
   "sync-problem": SyncProblemIcon,
+  "sync-alt": SyncAltIcon,
   "table-view": TableViewIcon,
   tag: TagIcon,
   "task-alt": TaskAltIcon,

@@ -26,11 +26,11 @@ const OPopoverStub = {
   // Render BOTH the trigger and the content so we can drive open state.
   template: `<div class="opopover-stub"><slot name="trigger" /><slot /></div>`,
 };
-const PanelStub = {
-  name: "DependencyChainPanel",
+const GraphStub = {
+  name: "DependencyChainGraph",
   props: { focus: { type: Object, default: null } },
   emits: ["deleted", "close"],
-  template: `<div class="panel-stub" :data-focus="focus ? focus.name : ''" />`,
+  template: `<div class="graph-stub" :data-focus="focus ? focus.name : ''" />`,
 };
 
 function mountPopover(focus: Record<string, unknown>): VueWrapper {
@@ -40,7 +40,7 @@ function mountPopover(focus: Record<string, unknown>): VueWrapper {
       plugins: [i18n],
       stubs: {
         OPopover: OPopoverStub,
-        DependencyChainPanel: PanelStub,
+        DependencyChainGraph: GraphStub,
         OButton: { template: `<button v-bind="$attrs"><slot /></button>` },
         OIcon: { template: "<i />" },
         OTooltip: { template: "<span />" },
@@ -57,11 +57,11 @@ describe("DependencyChainPopover", () => {
     wrapper = mountPopover({ kind: "destination", name: "slack" });
     expect(wrapper.find('[data-test="view-dependencies-slack"]').exists()).toBe(true);
     // Closed by default -> panel not mounted (no eager fetch).
-    expect(wrapper.findComponent(PanelStub).exists()).toBe(false);
+    expect(wrapper.findComponent(GraphStub).exists()).toBe(false);
 
     (wrapper.vm as any).open = true;
     await nextTick();
-    const panel = wrapper.findComponent(PanelStub);
+    const panel = wrapper.findComponent(GraphStub);
     expect(panel.exists()).toBe(true);
     expect(panel.props("focus")).toMatchObject({ kind: "destination", name: "slack" });
   });
@@ -70,7 +70,7 @@ describe("DependencyChainPopover", () => {
     wrapper = mountPopover({ kind: "template", name: "tpl-x" });
     (wrapper.vm as any).open = true;
     await nextTick();
-    const panel = wrapper.findComponent(PanelStub);
+    const panel = wrapper.findComponent(GraphStub);
 
     await panel.vm.$emit("deleted");
     expect(wrapper.emitted("deleted")).toBeTruthy();

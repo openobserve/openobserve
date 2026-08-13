@@ -307,8 +307,8 @@ const columns: OTableColumnDef[] = [
     header: t("alert_templates.actions"),
     isAction: true,
     pinned: "right",
-    size: 150,
-    meta: { align: "center", actionCount: 4 },
+    size: 190,
+    meta: { align: "center", actionCount: 5 },
   },
 ];
 const showTemplateEditor = ref(false);

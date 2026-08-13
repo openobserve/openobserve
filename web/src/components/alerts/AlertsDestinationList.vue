@@ -401,8 +401,8 @@ export default defineComponent({
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
-        size: 120,
-        meta: { align: "center", actionCount: 3 },
+        size: 160,
+        meta: { align: "center", actionCount: 4 },
       },
     ];
     const destinations: Ref<DestinationPayload[]> = ref([]);

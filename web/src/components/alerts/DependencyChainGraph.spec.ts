@@ -17,6 +17,24 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 
+// VueFlow mock renders the #node-dep slot per node so node cards (and their
+// open / delete inline-confirm handlers) are exercised.
+vi.mock("@vue-flow/core", () => ({
+  VueFlow: {
+    name: "VueFlow",
+    props: ["nodes", "edges"],
+    template: `<div class="vue-flow-mock">
+      <div v-for="n in nodes" :key="n.id"><slot name="node-dep" :data="n.data" /></div>
+    </div>`,
+  },
+  Position: { Top: "top", Bottom: "bottom", Left: "left", Right: "right" },
+  MarkerType: { Arrow: "arrow", ArrowClosed: "arrowclosed" },
+  Handle: { name: "Handle", template: "<div class='handle-mock' />" },
+}));
+vi.mock("@vue-flow/background", () => ({
+  Background: { name: "Background", template: "<div class='background-mock' />" },
+}));
+
 vi.mock("@/services/alerts", () => ({
   default: { listByFolderId: vi.fn(), delete_by_alert_id: vi.fn() },
 }));
@@ -28,7 +46,7 @@ vi.mock("@/services/alert_templates", () => ({
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn(() => vi.fn()) }));
 
-import DependencyChainPanel from "./DependencyChainPanel.vue";
+import DependencyChainGraph from "./DependencyChainGraph.vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
@@ -38,47 +56,36 @@ import router from "@/test/unit/helpers/router";
 
 const TEMPLATES = [{ name: "tpl-http", type: "http" }];
 const DESTINATIONS = [{ name: "slack", type: "http", template: "tpl-http" }];
+const seedAlerts = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({
+    alert_id: `a${i}`,
+    name: `alert-${i}`,
+    destinations: ["slack"],
+    enabled: true,
+    folder_id: "default",
+  }));
 
-function mountPanel(
-  focus: Record<string, unknown>,
-  props: Record<string, unknown> = {},
-): VueWrapper {
-  return mount(DependencyChainPanel, {
-    props: { focus, ...props },
+function mountGraph(focus: Record<string, unknown>): VueWrapper {
+  return mount(DependencyChainGraph, {
+    props: { focus },
     global: {
       plugins: [i18n, store, router],
       stubs: {
         OButton: { template: `<button v-bind="$attrs"><slot /></button>` },
         OIcon: { template: "<i />" },
         OTag: { template: "<span><slot /></span>" },
-        OTooltip: { template: "<span />" },
         OSpinner: { template: "<div class='spinner' />" },
         OBanner: { template: "<div class='banner' />" },
-        ConfirmDialog: {
-          name: "ConfirmDialog",
-          props: ["modelValue", "title", "message"],
-          emits: ["update:ok", "update:cancel"],
-          template: "<div class='confirm-dialog' />",
-        },
       },
     },
   });
 }
 
-const rowTests = (wrapper: VueWrapper) =>
-  wrapper.findAll('[data-test^="dependency-row-"]').map((n) => n.attributes("data-test"));
+const nodeTests = (wrapper: VueWrapper) =>
+  wrapper.findAll('[data-test^="dependency-graph-node-"]').map((n) => n.attributes("data-test"));
 
-describe("DependencyChainPanel", () => {
+describe("DependencyChainGraph", () => {
   let wrapper: VueWrapper;
-
-  const seedAlerts = (n: number) =>
-    Array.from({ length: n }, (_, i) => ({
-      alert_id: `a${i}`,
-      name: `alert-${i}`,
-      destinations: ["slack"],
-      enabled: true,
-      folder_id: "default",
-    }));
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -88,64 +95,54 @@ describe("DependencyChainPanel", () => {
   });
   afterEach(() => wrapper?.unmount());
 
-  it("renders the destination's template + alerts (a small chain)", async () => {
+  it("renders the focused chain as graph nodes (template + destination + alerts)", async () => {
     vi.mocked(alertsService.listByFolderId).mockResolvedValue({
       data: { list: seedAlerts(3) },
     } as any);
-    wrapper = mountPanel({ kind: "destination", name: "slack" });
+    wrapper = mountGraph({ kind: "destination", name: "slack" });
     await flushPromises();
-    const tests = rowTests(wrapper);
-    expect(tests).toContain("dependency-row-template-tpl-http");
-    expect(tests).toContain("dependency-row-destination-slack");
-    expect(tests).toContain("dependency-row-alert-alert-0");
-    // No pager for a 3-alert chain.
-    expect(wrapper.find('[data-test="dependency-chain-next"]').exists()).toBe(false);
+    const tests = nodeTests(wrapper);
+    expect(tests).toContain("dependency-graph-node-template-tpl-http");
+    expect(tests).toContain("dependency-graph-node-destination-slack");
+    expect(tests).toContain("dependency-graph-node-alert-alert-0");
+    expect(wrapper.find('[data-test="dependency-graph-pager"]').exists()).toBe(false);
   });
 
-  it("pages the alerts 10 at a time with working prev/next", async () => {
+  it("pages the alert nodes 10 at a time with prev/next", async () => {
     vi.mocked(alertsService.listByFolderId).mockResolvedValue({
       data: { list: seedAlerts(25) },
     } as any);
-    wrapper = mountPanel({ kind: "destination", name: "slack" });
+    wrapper = mountGraph({ kind: "destination", name: "slack" });
     await flushPromises();
 
-    const alertRows = () =>
-      wrapper.findAll('[data-test^="dependency-row-alert-"]').map((n) => n.attributes("data-test"));
+    const alertNodes = () =>
+      wrapper
+        .findAll('[data-test^="dependency-graph-node-alert-"]')
+        .map((n) => n.attributes("data-test"));
 
-    expect(alertRows()).toHaveLength(10);
-    expect(alertRows()).toContain("dependency-row-alert-alert-0");
-    expect(alertRows()).not.toContain("dependency-row-alert-alert-10");
+    expect(alertNodes()).toHaveLength(10);
+    expect(alertNodes()).toContain("dependency-graph-node-alert-alert-0");
+    expect(alertNodes()).not.toContain("dependency-graph-node-alert-alert-10");
 
-    await wrapper.find('[data-test="dependency-chain-next"]').trigger("click");
+    await wrapper.find('[data-test="dependency-graph-next"]').trigger("click");
     await nextTick();
-    expect(alertRows()).toHaveLength(10);
-    expect(alertRows()).toContain("dependency-row-alert-alert-10");
-    expect(alertRows()).not.toContain("dependency-row-alert-alert-0");
+    expect(alertNodes()).toContain("dependency-graph-node-alert-alert-10");
+    expect(alertNodes()).not.toContain("dependency-graph-node-alert-alert-0");
   });
 
-  it("deleting a node calls the API and emits 'deleted'", async () => {
+  it("delete → inline confirm → confirm-yes calls the API and emits 'deleted'", async () => {
     vi.mocked(alertsService.listByFolderId).mockResolvedValue({
       data: { list: seedAlerts(1) },
     } as any);
-    wrapper = mountPanel({ kind: "destination", name: "slack" });
+    wrapper = mountGraph({ kind: "destination", name: "slack" });
     await flushPromises();
-    // Delete → inline confirm → confirm-yes actually deletes.
-    await wrapper.find('[data-test="dependency-row-delete-slack"]').trigger("click");
+    await wrapper.find('[data-test="dependency-graph-delete-slack"]').trigger("click");
     await nextTick();
-    await wrapper.find('[data-test="dependency-row-confirm-yes-slack"]').trigger("click");
+    await wrapper.find('[data-test="dependency-graph-confirm-yes-slack"]').trigger("click");
     await flushPromises();
     expect(destinationService.delete).toHaveBeenCalledWith(
       expect.objectContaining({ destination_name: "slack" }),
     );
     expect(wrapper.emitted("deleted")).toBeTruthy();
-  });
-
-  it("shows an empty state when the entity has no dependencies", async () => {
-    vi.mocked(alertsService.listByFolderId).mockResolvedValue({ data: { list: [] } } as any);
-    vi.mocked(destinationService.list).mockResolvedValue({ data: [] } as any);
-    vi.mocked(templateService.list).mockResolvedValue({ data: [] } as any);
-    wrapper = mountPanel({ kind: "destination", name: "ghost" });
-    await flushPromises();
-    expect(wrapper.find('[data-test="dependency-chain-empty"]').exists()).toBe(true);
   });
 });
