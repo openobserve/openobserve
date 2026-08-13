@@ -125,13 +125,17 @@
             class="text-text-secondary mt-2 flex flex-wrap gap-3 text-xs"
             data-test="ai-experiment-aggregate-summary"
           >
-            <span>P50 {{ selectedDetail.results.aggregateSummary.p50LatencyMs ?? "—" }} ms</span>
-            <span>${{ selectedDetail.results.aggregateSummary.totalCost.toFixed(4) }}</span>
-            <span v-if="selectedDetail.results.aggregateSummary.incomplete">Incomplete</span>
+            <span>{{
+              aggregateLatencyLabel(selectedDetail.results.aggregateSummary.p50LatencyMs)
+            }}</span>
+            <span>{{ aggregateCostLabel(selectedDetail.results.aggregateSummary.totalCost) }}</span>
+            <span v-if="selectedDetail.results.aggregateSummary.incomplete">{{
+              raw("Incomplete")
+            }}</span>
           </div>
           <div v-if="pendingDetail" class="mt-3" data-test="ai-experiment-new-results-banner">
             <OButton size="sm" variant="outline" @click="acceptNewResults">
-              Show new results
+              {{ raw("Show new results") }}
             </OButton>
           </div>
           <div
@@ -147,60 +151,46 @@
                 :variant="resultStatusFilter === filter ? 'primary' : 'outline'"
                 @click="resultStatusFilter = filter"
               >
-                {{ filter }}
+                {{ raw(filter) }}
               </OButton>
             </div>
             <div
-              v-for="slot in unresolvedResultSlots"
-              :key="`pending:${slot.rowId}:${slot.trialIndex}`"
+              v-for="slot in filteredResultSlots"
+              :key="`${slot.rowId}:${slot.trialIndex}`"
               class="border-border-default bg-code-bg rounded-default border p-3"
-              data-test="ai-experiment-result-placeholder"
+              data-test="ai-experiment-result-slot"
             >
               <div class="flex items-center justify-between gap-2">
                 <span class="text-text-primary text-sm font-medium">
                   {{ slot.logicalId }} ·
                   {{ t("aiObservability.experiments.trial", { index: slot.trialIndex + 1 }) }}
                 </span>
-                <OTag size="sm">{{ slot.taskStatus }}</OTag>
-              </div>
-              <ul class="text-text-secondary mt-2 space-y-1 text-xs">
-                <li v-for="score in slot.scores" :key="`${score.scorerId}:${score.scorerVersion}`">
-                  {{ score.scorerId }}: {{ score.status }}
-                </li>
-              </ul>
-            </div>
-            <div
-              v-for="execution in filteredExecutions"
-              :key="`${execution.rowId}:${execution.trialIndex}`"
-              class="border-border-default bg-code-bg rounded-default border p-3"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-text-primary text-sm font-medium">
-                  {{ execution.itemLogicalId }} ·
-                  {{ t("aiObservability.experiments.trial", { index: execution.trialIndex + 1 }) }}
-                </span>
-                <OTag size="sm">
-                  {{ execution.skipReason ?? execution.status }}
-                </OTag>
+                <OTag size="sm">{{ slotStatusLabel(slot) }}</OTag>
               </div>
               <pre
-                v-if="execution.output !== null"
+                v-if="slot.execution?.output !== null && slot.execution?.output !== undefined"
                 class="text-text-primary mt-2 text-xs whitespace-pre-wrap"
                 data-test="ai-experiment-output"
-                >{{ formatValue(execution.output) }}</pre>
-              <p v-if="execution.errorMessage" class="text-negative mt-2 text-xs">
-                {{ execution.errorMessage }}
+                >{{ formatValue(slot.execution.output) }}</pre>
+              <p v-if="slot.execution?.errorMessage" class="text-negative mt-2 text-xs">
+                {{ slot.execution.errorMessage }}
               </p>
               <OButton
-                v-if="execution.traceId"
+                v-if="slot.execution?.traceId"
                 class="mt-2"
                 size="sm"
                 variant="outline"
                 data-test="ai-experiment-trace-link"
-                @click="openTrace(execution)"
+                @click="openTrace(slot.execution)"
               >
                 {{ t("aiObservability.experiments.viewTrace") }}
               </OButton>
+              <ul class="text-text-secondary mt-2 space-y-1 text-xs">
+                <li v-for="score in slot.scores" :key="`${score.scorerId}:${score.scorerVersion}`">
+                  {{ resultScoreLabel(score.scorerId, score.scorerVersion, score.status) }}
+                  <span v-if="score.score"> · {{ scoreLabel(score.score) }}</span>
+                </li>
+              </ul>
             </div>
             <div
               v-if="selectedDetail.results.pagination"
@@ -212,29 +202,18 @@
                 variant="outline"
                 :disabled="currentResultPage <= 1"
                 @click="loadResultPage(currentResultPage - 1)"
-                >Previous</OButton
+                >{{ raw("Previous") }}</OButton
               >
-              <span class="text-text-secondary text-xs">Page {{ currentResultPage }}</span>
+              <span class="text-text-secondary text-xs">{{
+                resultPageLabel(currentResultPage)
+              }}</span>
               <OButton
                 size="sm"
                 variant="outline"
                 :disabled="!selectedDetail.results.pagination.hasMore"
                 @click="loadResultPage(currentResultPage + 1)"
-                >Next</OButton
+                >{{ raw("Next") }}</OButton
               >
-            </div>
-            <div v-if="selectedDetail.results.scores.length" data-test="ai-experiment-scores">
-              <h4 class="text-text-primary text-sm font-medium">
-                {{ t("aiObservability.experiments.scoresTitle") }}
-              </h4>
-              <ul class="mt-2 space-y-1 text-xs">
-                <li
-                  v-for="(score, index) in selectedDetail.results.scores"
-                  :key="String(score.id ?? index)"
-                >
-                  {{ scoreLabel(score) }}
-                </li>
-              </ul>
             </div>
             <ul
               v-if="selectedDetail.results.scoreSummaries?.length"
@@ -255,8 +234,12 @@
                   })
                 }}
                 <span v-if="summary.value"> · {{ formatValue(summary.value) }}</span>
-                <span v-if="summary.pendingCount"> · {{ summary.pendingCount }} pending</span>
-                <span v-if="summary.errorCount"> · {{ summary.errorCount }} errors</span>
+                <span v-if="summary.pendingCount">{{
+                  summaryCountLabel(summary.pendingCount, "pending")
+                }}</span>
+                <span v-if="summary.errorCount">{{
+                  summaryCountLabel(summary.errorCount, "errors")
+                }}</span>
               </li>
             </ul>
           </div>
@@ -388,6 +371,7 @@ import llmExperimentsService, {
   type ExperimentDetail,
   type ExperimentExecution,
   type ExperimentPreview,
+  type ExperimentResultSlot,
   type LlmExperiment,
 } from "@/services/llm-experiments.service";
 import { createPreviewRequestGate, withPreviewScorers } from "./experimentPreview";
@@ -396,6 +380,11 @@ import {
   createExperimentLifecycleActions,
   type ExperimentLifecycleAction,
 } from "./experimentLifecycleActions";
+import {
+  experimentResultSlotStatus,
+  filterExperimentResultSlots,
+  type ExperimentResultStatusFilter,
+} from "./experimentResults";
 
 defineOptions({ name: "AIExperimentsPage" });
 
@@ -417,7 +406,7 @@ const preview = ref<ExperimentPreview | null>(null);
 const selectedDetail = ref<ExperimentDetail | null>(null);
 const pendingDetail = ref<ExperimentDetail | null>(null);
 const currentResultPage = ref(1);
-const resultStatusFilter = ref("all");
+const resultStatusFilter = ref<ExperimentResultStatusFilter>("all");
 const resultStatusFilters = ["all", "ok", "no_reference", "no_trace", "error"] as const;
 const completedScorePolls = ref(0);
 const MAX_COMPLETED_SCORE_POLLS = 12;
@@ -558,23 +547,27 @@ async function loadDetail(experimentId: string, syncUrl = true) {
   }
 }
 
-const filteredExecutions = computed(() => {
-  const rows = selectedDetail.value?.results.executions ?? [];
-  if (resultStatusFilter.value === "all") return rows;
-  if (["no_reference", "no_trace"].includes(resultStatusFilter.value)) {
-    return rows.filter((row) => row.skipReason === resultStatusFilter.value);
-  }
-  return rows.filter((row) => row.status === resultStatusFilter.value);
+const resultSlots = computed<ExperimentResultSlot[]>(() => {
+  const slots = selectedDetail.value?.results.slots;
+  if (slots?.length) return slots;
+  return (selectedDetail.value?.results.executions ?? []).map((execution) => ({
+    rowId: execution.rowId,
+    logicalId: execution.itemLogicalId,
+    trialIndex: execution.trialIndex,
+    input: null,
+    expectedOutput: null,
+    taskStatus: execution.status === "pending" ? "in_progress" : execution.status,
+    execution,
+    scores: [],
+  }));
 });
 
-const unresolvedResultSlots = computed(() =>
-  (selectedDetail.value?.results.slots ?? []).filter(
-    (slot) =>
-      !slot.execution ||
-      slot.taskStatus === "pending" ||
-      slot.taskStatus === "in_progress" ||
-      slot.scores.some((score) => ["pending", "in_progress"].includes(score.status)),
-  ),
+function slotStatusLabel(slot: ExperimentResultSlot) {
+  return experimentResultSlotStatus(slot);
+}
+
+const filteredResultSlots = computed(() =>
+  filterExperimentResultSlots(resultSlots.value, resultStatusFilter.value),
 );
 
 async function loadResultPage(page: number) {
@@ -660,6 +653,26 @@ watch(() => route.query.selected, selectDetailFromRoute);
 
 function formatValue(value: unknown) {
   return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+
+function aggregateLatencyLabel(value: number | null) {
+  return raw(`P50 ${value ?? "—"} ms`);
+}
+
+function aggregateCostLabel(value: number) {
+  return raw(`$${value.toFixed(4)}`);
+}
+
+function resultScoreLabel(scorerId: string, scorerVersion: number, status: string) {
+  return raw(`${scorerId} · v${scorerVersion}: ${status}`);
+}
+
+function resultPageLabel(page: number) {
+  return raw(`Page ${page}`);
+}
+
+function summaryCountLabel(count: number, label: string) {
+  return raw(` · ${count} ${label}`);
 }
 
 function scoreLabel(score: Record<string, unknown>) {

@@ -200,6 +200,21 @@ export interface ExperimentResultQuery {
   resultPageSize?: number;
 }
 
+const TASK_RESULT_STATUSES = ["pending", "in_progress", "ok", "skipped", "error"] as const;
+const SCORE_RESULT_STATUSES = ["pending", "in_progress", "success", "skipped", "error"] as const;
+
+function normalizeTaskResultStatus(input: unknown): ExperimentResultSlot["taskStatus"] {
+  return TASK_RESULT_STATUSES.includes(input as (typeof TASK_RESULT_STATUSES)[number])
+    ? (input as ExperimentResultSlot["taskStatus"])
+    : "error";
+}
+
+function normalizeScoreResultStatus(input: unknown): ExperimentResultScore["status"] {
+  return SCORE_RESULT_STATUSES.includes(input as (typeof SCORE_RESULT_STATUSES)[number])
+    ? (input as ExperimentResultScore["status"])
+    : "error";
+}
+
 export interface CreateExperimentResult extends ExperimentDetail {
   created: boolean;
 }
@@ -317,12 +332,12 @@ function normalizeResults(input: any): ExperimentResults {
       trialIndex: Number(value(slot, "trialIndex", "trial_index", 0)),
       input: slot.input,
       expectedOutput: value(slot, "expectedOutput", "expected_output", null),
-      taskStatus: value(slot, "taskStatus", "task_status", "pending"),
+      taskStatus: normalizeTaskResultStatus(value(slot, "taskStatus", "task_status", "pending")),
       execution: slot.execution ? normalizeExecution(slot.execution) : null,
       scores: (slot.scores ?? []).map((score: any) => ({
         scorerId: value(score, "scorerId", "scorer_id", ""),
         scorerVersion: Number(value(score, "scorerVersion", "scorer_version", 0)),
-        status: score.status ?? "pending",
+        status: normalizeScoreResultStatus(score.status ?? "pending"),
         score: score.score ?? null,
       })),
     })),
