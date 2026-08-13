@@ -262,6 +262,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
+import { aiExperimentsRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIDatasetsPage" });
 
@@ -377,10 +378,7 @@ const columns = computed<OTableColumnDef[]>(() => [
 ]);
 
 function openExperiments(row: LlmDataset) {
-  router.push({
-    name: "aiExperiments",
-    query: { org_identifier: orgId.value, dataset: row.id },
-  });
+  router.push(aiExperimentsRoute(orgId.value, { datasetId: row.id }));
 }
 
 async function refresh() {

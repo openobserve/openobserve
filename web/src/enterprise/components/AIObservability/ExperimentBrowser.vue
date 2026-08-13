@@ -103,7 +103,7 @@
               :disabled="comparisonDisabled(experiment)"
               :title="
                 comparisonDisabled(experiment)
-                  ? t('aiObservability.experiments.crossDatasetComparison')
+                  ? t('aiObservability.experiments.comparisonReasons.different_dataset')
                   : undefined
               "
               :aria-label="t('aiObservability.experiments.selectForComparison')"
@@ -154,8 +154,11 @@ import {
   experimentEvidence,
   groupExperiments,
   readExperimentBaselines,
+  type ComparisonIneligibilityReason,
+  type ExperimentScoreSummary,
   writeExperimentBaselines,
 } from "@/enterprise/views/AIObservability/experimentDiscovery";
+import { aiExperimentsRoute } from "@/enterprise/views/AIObservability/experimentRoutes";
 
 const props = withDefaults(
   defineProps<{
@@ -212,7 +215,7 @@ const selectedExperiments = computed(() =>
 const comparison = computed(() => comparisonEligibility(selectedExperiments.value));
 const comparisonReason = computed(() =>
   selectedIds.value.length || rejectedComparisonReason.value
-    ? rejectedComparisonReason.value || comparison.value.reason
+    ? rejectedComparisonReason.value || translateComparisonReason(comparison.value.reason)
     : "",
 );
 
@@ -272,8 +275,36 @@ function progressLabel(experiment: LlmExperiment) {
 function scoreLabel(experiment: LlmExperiment) {
   const scores = evidence(experiment).scores;
   return scores.length
-    ? raw(scores.map((score) => `${score.name}: ${score.value.toFixed(3)}`).join(" · "))
+    ? raw(scores.map(formatScoreSummary).join(" · "))
     : t("aiObservability.experiments.noScores");
+}
+
+function formatScoreSummary(score: ExperimentScoreSummary): string {
+  if (score.kind === "numeric") {
+    return t("aiObservability.experiments.numericScoreSummary", {
+      name: score.name,
+      value: score.value.toFixed(3),
+      count: score.sampleCount,
+    });
+  }
+  if (score.kind === "boolean") {
+    return t("aiObservability.experiments.booleanScoreSummary", {
+      name: score.name,
+      trueCount: score.trueCount,
+      falseCount: score.falseCount,
+      count: score.sampleCount,
+    });
+  }
+  return t("aiObservability.experiments.categoricalScoreSummary", {
+    name: score.name,
+    values: score.values.map(({ value, count }) => `${value} × ${count}`).join(", "),
+    count: score.sampleCount,
+  });
+}
+
+function translateComparisonReason(reason: ComparisonIneligibilityReason | null) {
+  if (!reason) return "";
+  return t(`aiObservability.experiments.comparisonReasons.${reason}`);
 }
 
 function costLabel(experiment: LlmExperiment) {
@@ -305,7 +336,7 @@ function toggleComparison(experiment: LlmExperiment) {
   if (selectedIds.value.includes(experiment.id)) {
     selectedIds.value = selectedIds.value.filter((id) => id !== experiment.id);
   } else if (comparisonDisabled(experiment)) {
-    rejectedComparisonReason.value = t("aiObservability.experiments.crossDatasetComparison");
+    rejectedComparisonReason.value = translateComparisonReason("different_dataset");
     return;
   } else if (selectedIds.value.length < 2) {
     const baselineId = baselineByDataset.value[experiment.datasetId];
@@ -329,14 +360,13 @@ function openComparison() {
     selectedExperiments.value[0];
   const candidate = selectedExperiments.value.find(({ id }) => id !== baseline.id);
   if (!candidate) return;
-  router.push({
-    name: "aiExperiments",
-    query: {
-      ...route.query,
-      dataset: datasetId,
-      baseline: baseline.id,
-      candidate: candidate.id,
-    },
-  });
+  router.push(
+    aiExperimentsRoute(props.orgId, {
+      query: route.query,
+      datasetId,
+      baselineId: baseline.id,
+      candidateId: candidate.id,
+    }),
+  );
 }
 </script>
