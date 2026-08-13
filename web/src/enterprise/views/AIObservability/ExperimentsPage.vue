@@ -98,6 +98,12 @@
               {{
                 t("aiObservability.experiments.taskProgress", selectedDetail.results.taskProgress)
               }}
+              <progress
+                class="ml-2"
+                :value="selectedDetail.results.taskProgress.completed"
+                :max="Math.max(1, selectedDetail.results.taskProgress.total)"
+                data-test="ai-experiment-task-progress"
+              />
             </span>
             <span v-if="selectedDetail.results.scoringProgress">
               {{
@@ -106,15 +112,65 @@
                   selectedDetail.results.scoringProgress,
                 )
               }}
+              <progress
+                class="ml-2"
+                :value="selectedDetail.results.scoringProgress.completed"
+                :max="Math.max(1, selectedDetail.results.scoringProgress.total)"
+                data-test="ai-experiment-scoring-progress"
+              />
             </span>
           </div>
           <div
-            v-if="selectedDetail.results.executions.length"
+            v-if="selectedDetail.results.aggregateSummary"
+            class="text-text-secondary mt-2 flex flex-wrap gap-3 text-xs"
+            data-test="ai-experiment-aggregate-summary"
+          >
+            <span>P50 {{ selectedDetail.results.aggregateSummary.p50LatencyMs ?? "—" }} ms</span>
+            <span>${{ selectedDetail.results.aggregateSummary.totalCost.toFixed(4) }}</span>
+            <span v-if="selectedDetail.results.aggregateSummary.incomplete">Incomplete</span>
+          </div>
+          <div v-if="pendingDetail" class="mt-3" data-test="ai-experiment-new-results-banner">
+            <OButton size="sm" variant="outline" @click="acceptNewResults">
+              Show new results
+            </OButton>
+          </div>
+          <div
+            v-if="selectedDetail.results.slots?.length || selectedDetail.results.executions.length"
             class="mt-4 space-y-3"
             data-test="ai-experiment-results"
           >
+            <div class="flex flex-wrap gap-2" data-test="ai-experiment-status-filters">
+              <OButton
+                v-for="filter in resultStatusFilters"
+                :key="filter"
+                size="sm"
+                :variant="resultStatusFilter === filter ? 'primary' : 'outline'"
+                @click="resultStatusFilter = filter"
+              >
+                {{ filter }}
+              </OButton>
+            </div>
             <div
-              v-for="execution in selectedDetail.results.executions"
+              v-for="slot in unresolvedResultSlots"
+              :key="`pending:${slot.rowId}:${slot.trialIndex}`"
+              class="border-border-default bg-code-bg rounded-default border p-3"
+              data-test="ai-experiment-result-placeholder"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-text-primary text-sm font-medium">
+                  {{ slot.logicalId }} ·
+                  {{ t("aiObservability.experiments.trial", { index: slot.trialIndex + 1 }) }}
+                </span>
+                <OTag size="sm">{{ slot.taskStatus }}</OTag>
+              </div>
+              <ul class="text-text-secondary mt-2 space-y-1 text-xs">
+                <li v-for="score in slot.scores" :key="`${score.scorerId}:${score.scorerVersion}`">
+                  {{ score.scorerId }}: {{ score.status }}
+                </li>
+              </ul>
+            </div>
+            <div
+              v-for="execution in filteredExecutions"
               :key="`${execution.rowId}:${execution.trialIndex}`"
               class="border-border-default bg-code-bg rounded-default border p-3"
             >
@@ -145,6 +201,27 @@
               >
                 {{ t("aiObservability.experiments.viewTrace") }}
               </OButton>
+            </div>
+            <div
+              v-if="selectedDetail.results.pagination"
+              class="flex items-center gap-2"
+              data-test="ai-experiment-result-pagination"
+            >
+              <OButton
+                size="sm"
+                variant="outline"
+                :disabled="currentResultPage <= 1"
+                @click="loadResultPage(currentResultPage - 1)"
+                >Previous</OButton
+              >
+              <span class="text-text-secondary text-xs">Page {{ currentResultPage }}</span>
+              <OButton
+                size="sm"
+                variant="outline"
+                :disabled="!selectedDetail.results.pagination.hasMore"
+                @click="loadResultPage(currentResultPage + 1)"
+                >Next</OButton
+              >
             </div>
             <div v-if="selectedDetail.results.scores.length" data-test="ai-experiment-scores">
               <h4 class="text-text-primary text-sm font-medium">
@@ -177,6 +254,9 @@
                     noTrace: summary.noTraceCount,
                   })
                 }}
+                <span v-if="summary.value"> · {{ formatValue(summary.value) }}</span>
+                <span v-if="summary.pendingCount"> · {{ summary.pendingCount }} pending</span>
+                <span v-if="summary.errorCount"> · {{ summary.errorCount }} errors</span>
               </li>
             </ul>
           </div>
@@ -335,6 +415,10 @@ const controllingExperiment = ref(false);
 const showCreate = ref(false);
 const preview = ref<ExperimentPreview | null>(null);
 const selectedDetail = ref<ExperimentDetail | null>(null);
+const pendingDetail = ref<ExperimentDetail | null>(null);
+const currentResultPage = ref(1);
+const resultStatusFilter = ref("all");
+const resultStatusFilters = ["all", "ok", "no_reference", "no_trace", "error"] as const;
 const completedScorePolls = ref(0);
 const MAX_COMPLETED_SCORE_POLLS = 12;
 const nextIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
@@ -461,7 +545,9 @@ async function createDraft() {
 
 async function loadDetail(experimentId: string, syncUrl = true) {
   try {
-    selectedDetail.value = await llmExperimentsService.get(orgId.value, experimentId);
+    selectedDetail.value = await llmExperimentsService.get(orgId.value, experimentId, {
+      resultPage: currentResultPage.value,
+    });
     experimentDetails.value = { ...experimentDetails.value, [experimentId]: selectedDetail.value };
     if (syncUrl && String(route.query.selected ?? "") !== experimentId) {
       router.push({ query: { ...route.query, selected: experimentId } });
@@ -470,6 +556,49 @@ async function loadDetail(experimentId: string, syncUrl = true) {
   } catch {
     toast({ variant: "error", message: t("aiObservability.experiments.loadError") });
   }
+}
+
+const filteredExecutions = computed(() => {
+  const rows = selectedDetail.value?.results.executions ?? [];
+  if (resultStatusFilter.value === "all") return rows;
+  if (["no_reference", "no_trace"].includes(resultStatusFilter.value)) {
+    return rows.filter((row) => row.skipReason === resultStatusFilter.value);
+  }
+  return rows.filter((row) => row.status === resultStatusFilter.value);
+});
+
+const unresolvedResultSlots = computed(() =>
+  (selectedDetail.value?.results.slots ?? []).filter(
+    (slot) =>
+      !slot.execution ||
+      slot.taskStatus === "pending" ||
+      slot.taskStatus === "in_progress" ||
+      slot.scores.some((score) => ["pending", "in_progress"].includes(score.status)),
+  ),
+);
+
+async function loadResultPage(page: number) {
+  const detail = selectedDetail.value;
+  if (!detail || page < 1) return;
+  currentResultPage.value = page;
+  pendingDetail.value = null;
+  await loadDetail(detail.experiment.id, false);
+}
+
+function resultEvidenceKeys(detail: ExperimentDetail) {
+  return new Set(
+    detail.results.executions.map((row) => `${row.rowId}:${row.trialIndex}:${row.timestamp}`),
+  );
+}
+
+function acceptNewResults() {
+  if (!pendingDetail.value) return;
+  selectedDetail.value = pendingDetail.value;
+  experimentDetails.value = {
+    ...experimentDetails.value,
+    [pendingDetail.value.experiment.id]: pendingDetail.value,
+  };
+  pendingDetail.value = null;
 }
 
 function applyLifecycleUpdate(experiment: LlmExperiment) {
@@ -572,7 +701,30 @@ const detailPoller = globalThis.setInterval(async () => {
     return;
   if (detail.experiment.status === "completed") completedScorePolls.value += 1;
   try {
-    selectedDetail.value = await llmExperimentsService.get(orgId.value, detail.experiment.id);
+    const refreshedDetail = await llmExperimentsService.get(orgId.value, detail.experiment.id, {
+      resultPage: currentResultPage.value,
+    });
+    const visibleEvidence = resultEvidenceKeys(detail);
+    const hasNewEvidence = [...resultEvidenceKeys(refreshedDetail)].some(
+      (key) => !visibleEvidence.has(key),
+    );
+    if (hasNewEvidence) {
+      pendingDetail.value = refreshedDetail;
+      selectedDetail.value = {
+        ...detail,
+        experiment: refreshedDetail.experiment,
+        results: {
+          ...detail.results,
+          taskProgress: refreshedDetail.results.taskProgress,
+          scoringProgress: refreshedDetail.results.scoringProgress,
+          skipSummary: refreshedDetail.results.skipSummary,
+          scoreSummaries: refreshedDetail.results.scoreSummaries,
+          aggregateSummary: refreshedDetail.results.aggregateSummary,
+        },
+      };
+      return;
+    }
+    selectedDetail.value = refreshedDetail;
     experimentDetails.value = {
       ...experimentDetails.value,
       [detail.experiment.id]: selectedDetail.value,

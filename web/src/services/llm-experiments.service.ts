@@ -116,7 +116,7 @@ export interface ExperimentExecution {
   itemLogicalId: string;
   rowId: string;
   trialIndex: number;
-  status: "ok" | "error" | "skipped";
+  status: "pending" | "ok" | "error" | "skipped";
   skipReason?: "no_reference" | "no_trace" | null;
   output: unknown | null;
   errorMessage: string | null;
@@ -131,10 +131,41 @@ export interface ExperimentExecution {
 export interface ExperimentResults {
   executions: ExperimentExecution[];
   scores: Record<string, unknown>[];
+  slots?: ExperimentResultSlot[];
+  pagination?: ExperimentResultPagination;
   taskProgress?: ExperimentProgress;
   scoringProgress?: ExperimentProgress;
   skipSummary?: ExperimentSkipSummary;
   scoreSummaries?: ExperimentScoreSummary[];
+  aggregateSummary?: ExperimentAggregateSummary;
+}
+
+export interface ExperimentResultScore {
+  scorerId: string;
+  scorerVersion: number;
+  status: "pending" | "in_progress" | "success" | "skipped" | "error";
+  score: Record<string, unknown> | null;
+}
+
+export interface ExperimentResultSlot extends ExperimentSlot {
+  taskStatus: "pending" | "in_progress" | "ok" | "skipped" | "error";
+  execution: ExperimentExecution | null;
+  scores: ExperimentResultScore[];
+}
+
+export interface ExperimentResultPagination {
+  page: number;
+  pageSize: number;
+  totalSlots: number;
+  hasMore: boolean;
+}
+
+export interface ExperimentAggregateSummary {
+  p50LatencyMs: number | null;
+  totalCost: number;
+  incomplete: boolean;
+  incompleteTaskSlots: number;
+  incompleteScoreDimensions: number;
 }
 
 export interface ExperimentProgress {
@@ -155,9 +186,18 @@ export interface ExperimentScoreSummary {
   scorerId: string;
   scorerVersion: number;
   sampleCount: number;
+  errorCount: number;
+  pendingCount: number;
   noReferenceCount: number;
   noTraceCount: number;
   skippedCount: number;
+  value: Record<string, unknown> | null;
+}
+
+export interface ExperimentResultQuery {
+  sampleSize?: number;
+  resultPage?: number;
+  resultPageSize?: number;
 }
 
 export interface CreateExperimentResult extends ExperimentDetail {
@@ -266,24 +306,32 @@ function normalizeResults(input: any): ExperimentResults {
   const taskProgress = value<any>(input, "taskProgress", "task_progress", {});
   const scoringProgress = value<any>(input, "scoringProgress", "scoring_progress", {});
   const skipSummary = value<any>(input, "skipSummary", "skip_summary", {});
+  const pagination = value<any>(input, "pagination", "pagination", {});
+  const aggregateSummary = value<any>(input, "aggregateSummary", "aggregate_summary", {});
   return {
-    executions: (input?.executions ?? []).map((record: any) => ({
-      experimentId: value(record, "experimentId", "experiment_id", ""),
-      itemLogicalId: value(record, "itemLogicalId", "item_logical_id", ""),
-      rowId: value(record, "rowId", "row_id", ""),
-      trialIndex: Number(value(record, "trialIndex", "trial_index", 0)),
-      status: record.status,
-      skipReason: value(record, "skipReason", "skip_reason", null),
-      output: record.output ?? null,
-      errorMessage: value(record, "errorMessage", "error_message", null),
-      latencyMs: value(record, "latencyMs", "latency_ms", null),
-      tokensIn: value(record, "tokensIn", "tokens_in", null),
-      tokensOut: value(record, "tokensOut", "tokens_out", null),
-      cost: record.cost ?? null,
-      traceId: value(record, "traceId", "trace_id", null),
-      timestamp: Number(record._timestamp ?? record.timestamp ?? 0),
-    })),
+    executions: (input?.executions ?? []).map(normalizeExecution),
     scores: Array.isArray(input?.scores) ? input.scores : [],
+    slots: value<any[]>(input, "slots", "slots", []).map((slot) => ({
+      rowId: value(slot, "rowId", "row_id", ""),
+      logicalId: value(slot, "logicalId", "logical_id", ""),
+      trialIndex: Number(value(slot, "trialIndex", "trial_index", 0)),
+      input: slot.input,
+      expectedOutput: value(slot, "expectedOutput", "expected_output", null),
+      taskStatus: value(slot, "taskStatus", "task_status", "pending"),
+      execution: slot.execution ? normalizeExecution(slot.execution) : null,
+      scores: (slot.scores ?? []).map((score: any) => ({
+        scorerId: value(score, "scorerId", "scorer_id", ""),
+        scorerVersion: Number(value(score, "scorerVersion", "scorer_version", 0)),
+        status: score.status ?? "pending",
+        score: score.score ?? null,
+      })),
+    })),
+    pagination: {
+      page: Number(pagination.page ?? 1),
+      pageSize: Number(value(pagination, "pageSize", "page_size", 50)),
+      totalSlots: Number(value(pagination, "totalSlots", "total_slots", 0)),
+      hasMore: Boolean(value(pagination, "hasMore", "has_more", false)),
+    },
     taskProgress: normalizeProgress(taskProgress),
     scoringProgress: normalizeProgress(scoringProgress),
     skipSummary: {
@@ -301,10 +349,43 @@ function normalizeResults(input: any): ExperimentResults {
       scorerId: value(summary, "scorerId", "scorer_id", ""),
       scorerVersion: Number(value(summary, "scorerVersion", "scorer_version", 0)),
       sampleCount: Number(value(summary, "sampleCount", "sample_count", 0)),
+      errorCount: Number(value(summary, "errorCount", "error_count", 0)),
+      pendingCount: Number(value(summary, "pendingCount", "pending_count", 0)),
       noReferenceCount: Number(value(summary, "noReferenceCount", "no_reference_count", 0)),
       noTraceCount: Number(value(summary, "noTraceCount", "no_trace_count", 0)),
       skippedCount: Number(value(summary, "skippedCount", "skipped_count", 0)),
+      value: summary.value ?? null,
     })),
+    aggregateSummary: {
+      p50LatencyMs: value(aggregateSummary, "p50LatencyMs", "p50_latency_ms", null),
+      totalCost: Number(value(aggregateSummary, "totalCost", "total_cost", 0)),
+      incomplete: Boolean(aggregateSummary.incomplete ?? false),
+      incompleteTaskSlots: Number(
+        value(aggregateSummary, "incompleteTaskSlots", "incomplete_task_slots", 0),
+      ),
+      incompleteScoreDimensions: Number(
+        value(aggregateSummary, "incompleteScoreDimensions", "incomplete_score_dimensions", 0),
+      ),
+    },
+  };
+}
+
+function normalizeExecution(record: any): ExperimentExecution {
+  return {
+    experimentId: value(record, "experimentId", "experiment_id", ""),
+    itemLogicalId: value(record, "itemLogicalId", "item_logical_id", ""),
+    rowId: value(record, "rowId", "row_id", ""),
+    trialIndex: Number(value(record, "trialIndex", "trial_index", 0)),
+    status: record.status,
+    skipReason: value(record, "skipReason", "skip_reason", null),
+    output: record.output ?? null,
+    errorMessage: value(record, "errorMessage", "error_message", null),
+    latencyMs: value(record, "latencyMs", "latency_ms", null),
+    tokensIn: value(record, "tokensIn", "tokens_in", null),
+    tokensOut: value(record, "tokensOut", "tokens_out", null),
+    cost: record.cost ?? null,
+    traceId: value(record, "traceId", "trace_id", null),
+    timestamp: Number(record._timestamp ?? record.timestamp ?? 0),
   };
 }
 
@@ -344,9 +425,21 @@ const llmExperimentsService = {
     };
   },
 
-  async get(orgId: string, experimentId: string, sampleSize = 5): Promise<ExperimentDetail> {
+  async get(
+    orgId: string,
+    experimentId: string,
+    options: number | ExperimentResultQuery = 5,
+  ): Promise<ExperimentDetail> {
+    const params =
+      typeof options === "number"
+        ? { sampleSize: options }
+        : {
+            sampleSize: options.sampleSize ?? 5,
+            resultPage: options.resultPage ?? 1,
+            resultPageSize: options.resultPageSize ?? 50,
+          };
     const response = await http().get(`${base(orgId)}/${experimentId}`, {
-      params: { sampleSize },
+      params,
     });
     return {
       experiment: normalizeExperiment(response.data?.experiment),
@@ -365,11 +458,7 @@ const llmExperimentsService = {
     return normalizeExperiment(response.data);
   },
 
-  async clone(
-    orgId: string,
-    experimentId: string,
-    name?: string,
-  ): Promise<LlmExperiment> {
+  async clone(orgId: string, experimentId: string, name?: string): Promise<LlmExperiment> {
     const response = await http().post(`${base(orgId)}/${experimentId}/clone`, {
       ...(name ? { name } : {}),
     });
