@@ -77,6 +77,7 @@ const activeSection = computed<string>(() => {
   )
     return "queues";
   if (route.name === "aiDatasets") return "datasets";
+  if (route.name === "aiExperiments") return "experiments";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";
     return tab;
@@ -142,6 +143,14 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
     to: { name: "aiDatasets", query: orgQuery.value },
     dataTest: "ai-secondary-nav-datasets",
     group: "Annotate",
+  },
+  {
+    key: "experiments",
+    label: t("aiObservability.nav.experiments"),
+    icon: "science",
+    to: { name: "aiExperiments", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-experiments",
+    group: "Evaluate",
   },
   {
     key: "quality",

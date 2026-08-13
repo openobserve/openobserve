@@ -673,13 +673,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_score_writer(
             |org_id, records| {
                 Box::pin(async move {
-                    if records.is_empty() {
-                        return Ok(());
-                    }
-
                     openobserve_core::self_reporting::llm_scores_schema::ensure_llm_scores_stream_initialized(&org_id)
                         .await
                         .map_err(|e| anyhow::anyhow!(e))?;
+                    if records.is_empty() {
+                        return Ok(());
+                    }
 
                     let req = proto::cluster_rpc::IngestionRequest {
                         org_id: org_id.clone(),
@@ -699,6 +698,36 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             resp.message
                         )),
                         Err(e) => Err(anyhow::anyhow!(e)),
+                    }
+                })
+            },
+        );
+
+        o2_enterprise::enterprise::llm_evaluations::experiment_runner::register_execution_record_writer(
+            |org_id, records| {
+                Box::pin(async move {
+                    openobserve_core::self_reporting::llm_experiment_schema::ensure_llm_experiment_stream_initialized(&org_id)
+                        .await
+                        .map_err(|error| anyhow::anyhow!(error))?;
+                    if records.is_empty() {
+                        return Ok(());
+                    }
+                    let req = proto::cluster_rpc::IngestionRequest {
+                        org_id: org_id.clone(),
+                        stream_name: config::meta::self_reporting::llm_experiments::LLM_EXPERIMENT_STREAM.to_string(),
+                        stream_type: config::meta::stream::StreamType::Logs.to_string(),
+                        data: Some(proto::cluster_rpc::IngestionData::from(records)),
+                        ingestion_type: Some(proto::cluster_rpc::IngestionType::Json.into()),
+                        metadata: None,
+                    };
+                    match openobserve_core::ingestion::ingestion_service::ingest(req).await {
+                        Ok(response) if response.status_code == 200 => Ok(()),
+                        Ok(response) => Err(anyhow::anyhow!(
+                            "_llm_experiment ingestion failed with status {}: {}",
+                            response.status_code,
+                            response.message
+                        )),
+                        Err(error) => Err(anyhow::anyhow!(error)),
                     }
                 })
             },
@@ -845,8 +874,33 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_experiment_task_runner(
+            |pointer| {
+                Box::pin(async move {
+                    o2_enterprise::enterprise::llm_evaluations::experiment_runner::run_scorer_task(pointer).await
+                })
+            },
+        );
+
+        o2_enterprise::enterprise::llm_evaluations::provider::register_provider_cost_calculator(
+            |org_id, model, input_tokens, output_tokens, timestamp| {
+                let entries = db::model_pricing::get_org_pricing_entries(org_id);
+                let definition =
+                    db::model_pricing::find_pricing_sync_at(&entries, model, Some(timestamp))?;
+                let usage = std::collections::HashMap::from([
+                    ("input".to_string(), input_tokens),
+                    ("output".to_string(), output_tokens),
+                ]);
+                db::model_pricing::calculate_cost_from_definition(&definition, &usage)
+                    .cost
+                    .get("total")
+                    .copied()
+            },
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::start_eval_scheduler();
+        o2_enterprise::enterprise::llm_evaluations::experiment_runner::start();
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {

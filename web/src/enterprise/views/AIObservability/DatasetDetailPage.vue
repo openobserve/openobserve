@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-expectedOutput="{ row }">
-          <span class="text-text-body line-clamp-2">{{ row.expectedOutput }}</span>
+          <span class="text-text-body line-clamp-2">{{ row.expectedOutput ?? "—" }}</span>
         </template>
 
         <template #cell-source="{ row }">
@@ -209,16 +209,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="flex flex-col gap-1.5">
-            <span
-              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
-            >
-              {{ t("aiObservability.datasets.detail.addItem.expectedLabel") }}
+            <span class="inline-flex items-center gap-1">
+              <span
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+              >
+                {{ t("aiObservability.datasets.detail.addItem.expectedLabel") }}
+              </span>
+              <span class="text-text-secondary text-2xs font-normal">
+                {{ t("common.optional") }}
+              </span>
             </span>
             <OFormTextarea
               name="expectedOutput"
               :placeholder="t('aiObservability.datasets.detail.addItem.expectedPlaceholder')"
               :rows="4"
-              required
               data-test="ai-dataset-detail-item-expected"
             />
             <span v-if="editingItemId" class="text-text-secondary text-2xs">
@@ -452,7 +456,11 @@ function openAddItem() {
 
 function openEditItem(row: LlmDatasetItem) {
   editingItemId.value = row.id;
-  itemForm.reset({ input: row.input, expectedOutput: row.expectedOutput, tags: [...row.tags] });
+  itemForm.reset({
+    input: row.input,
+    expectedOutput: row.expectedOutput ?? "",
+    tags: [...row.tags],
+  });
   itemOpen.value = true;
 }
 
@@ -467,9 +475,9 @@ async function saveItem(values: DatasetItemForm) {
     // into a string by an edit that only changed the answer.
     input: editing && input === editing.input ? editing.rawInput : input,
     expectedOutput:
-      editing && expectedOutput === editing.expectedOutput
-        ? editing.rawExpectedOutput
-        : expectedOutput,
+      editing && expectedOutput === (editing.expectedOutput ?? "")
+        ? (editing.rawExpectedOutput ?? undefined)
+        : expectedOutput || undefined,
     // The update endpoint replaces the whole row, so metadata has to be re-sent
     // or an edit silently wipes the item's subset-filter dimensions.
     metadata: editing?.metadata ?? null,

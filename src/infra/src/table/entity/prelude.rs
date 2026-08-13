@@ -14,7 +14,7 @@ pub use super::{
     llm_annotation_queue_items::Entity as LlmAnnotationQueueItems,
     llm_annotation_queues::Entity as LlmAnnotationQueues,
     llm_dataset_items::Entity as LlmDatasetItems, llm_datasets::Entity as LlmDatasets,
-    org_ingestion_tokens::Entity as OrgIngestionTokens,
+    llm_experiments::Entity as LlmExperiments, org_ingestion_tokens::Entity as OrgIngestionTokens,
     org_storage_providers::Entity as OrgStorageProviders, org_users::Entity as OrgUsers,
     organizations::Entity as Organizations, pipeline_last_errors::Entity as PipelineLastErrors,
     re_pattern_stream_map::Entity as RePatternStreamMap, re_patterns::Entity as RePatterns,

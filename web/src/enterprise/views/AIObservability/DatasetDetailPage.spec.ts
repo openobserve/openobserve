@@ -181,6 +181,22 @@ describe("DatasetDetailPage item writes", () => {
       tags: [],
     });
   });
+
+  it("adds a reference-free item without rewriting absence to an empty string", async () => {
+    const wrapper = await mountPage();
+    const state = (wrapper.vm as any).$.setupState;
+
+    state.openAddItem();
+    await state.saveItem({ input: "q", expectedOutput: "   ", tags: [] });
+    await flushPromises();
+
+    expect(mockAddItem).toHaveBeenCalledWith("test-org", "dataset-1", {
+      input: "q",
+      expectedOutput: undefined,
+      metadata: null,
+      tags: [],
+    });
+  });
 });
 
 describe("DatasetDetailPage item detail", () => {
