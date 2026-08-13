@@ -7,9 +7,9 @@
 # points the app at it. No shared cluster, no secrets, and every run is fully isolated (so the
 # Android and iOS jobs run in PARALLEL — each has its own instance).
 #   · RUM ingestion is OSS, so a plain OpenObserve accepts the data.
-#   · The apps read their RUM target from a build-time-overridable config (committed default = dev
-#     cluster; CI regenerates it): rum.config.json (RN), BuildConfig (android-native),
-#     GeneratedConfig.swift (ios-native). See docs/CI-NOTES.md.
+#   · The apps read their RUM target from a build-time-overridable config (committed default =
+#     placeholder; CI regenerates it): inline @gen consts in App.tsx (RN, via gen-config.js),
+#     BuildConfig (android-native), GeneratedConfig.swift (ios-native). See docs/CI-NOTES.md.
 #   · Emulator networking: Android reaches the host at 10.0.2.2; the iOS simulator shares the host,
 #     so it uses localhost. The suite's API/UI checks (on the host) always use localhost.
 #
@@ -72,7 +72,10 @@ on:
   #   - cron: "0 2 * * 1" # Mondays 02:00 UTC — weekly safety net
 
 concurrency:
-  group: mobile-sdk-e2e-${{ github.event.pull_request.number || github.ref }}
+  # PR pushes supersede each other (share the PR-number group); every non-PR run (each SDK-release
+  # dispatch / manual run) gets its OWN group via run_id, so a second SDK release can't cancel the
+  # first's in-flight device gate.
+  group: mobile-sdk-e2e-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -98,8 +101,6 @@ env:
   # Placeholder so config.js (which requires OO_URL) loads during preflight `--list`; the device
   # jobs override this via $GITHUB_ENV with their own on-runner instance.
   OO_URL: http://localhost:5080
-  # OpenObserve to run on the runner. Pin these once the first run is green.
-  OO_IMAGE: public.ecr.aws/zinclabs/openobserve:latest
 
 jobs:
   # -------------------------------------------------------------------------------------------
@@ -359,14 +360,22 @@ jobs:
       # Test the LATEST SDK on a release event: the mobile-sdk-release dispatch carries {sdk, version};
       # a manual run can also override via the sdk/sdk_version inputs. Unset → committed pin (reproducible).
       - name: Resolve SDK version override
+        # Untrusted dispatch payload / manual inputs arrive via env (NEVER interpolated into the
+        # script body) to avoid shell injection, and the version is format-validated before use.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CP_SDK: ${{ github.event.client_payload.sdk }}
+          CP_VER: ${{ github.event.client_payload.version }}
+          IN_SDK: ${{ inputs.sdk }}
+          IN_VER: ${{ inputs.sdk_version }}
         run: |
           SDK=''; VER=''
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            SDK='${{ github.event.client_payload.sdk }}'; VER='${{ github.event.client_payload.version }}'
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            SDK='${{ inputs.sdk }}'; VER='${{ inputs.sdk_version }}'
-          fi
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then SDK="$CP_SDK"; VER="$CP_VER";
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then SDK="$IN_SDK"; VER="$IN_VER"; fi
           [ -z "$VER" ] && { echo "no SDK override — using committed pins"; exit 0; }
+          if ! printf '%s' "$VER" | grep -qE '^[0-9A-Za-z][0-9A-Za-z.-]*$'; then
+            echo "::error::Refusing unsafe SDK version '$VER' (expected e.g. 0.1.1)"; exit 1
+          fi
           case "$SDK" in
             ios) echo "O2_IOS_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
             android) echo "O2_ANDROID_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
@@ -436,7 +445,7 @@ jobs:
           # The dashboard UI-login tests (crashed-session, masking) drive a real browser.
           npx playwright install --with-deps chromium
 
-      # RN app: npm ci runs postinstall → patch-sdk + gen-config (writes rum.config.json from O2_RUM_*).
+      # RN app: npm ci runs postinstall → patch-sdk + gen-config (seds App.tsx @gen consts from O2_RUM_*).
       - name: Build RN-Android APK
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
@@ -513,14 +522,22 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Resolve SDK version override
+        # Untrusted dispatch payload / manual inputs arrive via env (NEVER interpolated into the
+        # script body) to avoid shell injection, and the version is format-validated before use.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CP_SDK: ${{ github.event.client_payload.sdk }}
+          CP_VER: ${{ github.event.client_payload.version }}
+          IN_SDK: ${{ inputs.sdk }}
+          IN_VER: ${{ inputs.sdk_version }}
         run: |
           SDK=''; VER=''
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            SDK='${{ github.event.client_payload.sdk }}'; VER='${{ github.event.client_payload.version }}'
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            SDK='${{ inputs.sdk }}'; VER='${{ inputs.sdk_version }}'
-          fi
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then SDK="$CP_SDK"; VER="$CP_VER";
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then SDK="$IN_SDK"; VER="$IN_VER"; fi
           [ -z "$VER" ] && { echo "no SDK override — using committed pins"; exit 0; }
+          if ! printf '%s' "$VER" | grep -qE '^[0-9A-Za-z][0-9A-Za-z.-]*$'; then
+            echo "::error::Refusing unsafe SDK version '$VER' (expected e.g. 0.1.1)"; exit 1
+          fi
           case "$SDK" in
             ios) echo "O2_IOS_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
             android) echo "O2_ANDROID_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
@@ -598,7 +615,7 @@ jobs:
           xcrun simctl boot "$UDID" || true
           echo "IOS_SIM_UDID=$UDID" >> "$GITHUB_ENV"
 
-      # RN iOS: npm ci runs gen-config (rum.config.json → localhost). Allow cleartext to localhost
+      # RN iOS: npm ci runs gen-config (seds App.tsx @gen consts → localhost). Allow cleartext to localhost
       # for App Transport Security (CI-only plist tweak; committed source stays HTTPS).
       # The iOS app builds (CocoaPods + Xcode Release compile of React Native) are the long pole of
       # this job (~20min cold). Cache the pods and the Xcode build products so warm runs are minutes.

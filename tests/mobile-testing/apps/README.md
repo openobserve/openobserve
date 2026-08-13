@@ -26,6 +26,6 @@ postinstall script rewrites it to `:openobserve_mobile-react-native` and runs th
 under test. Rotate the token via the dashboard's "Reset RUM Token".
 
 ## Adding a native fixture
-For the Android-native / iOS-native tracks, add sibling apps here (`android-native/`, `ios-native/`)
-using the respective OpenObserve native SDKs with the same triggers, then point new Maestro flows at
-their app ids. The API + UI verification layers are unchanged.
+For the Android-native / iOS-native tracks, add sibling apps here (`o2-native-android/`,
+`o2-native-ios/`) using the respective OpenObserve native SDKs with the same triggers, then point new
+Maestro flows at their app ids. The API + UI verification layers are unchanged.

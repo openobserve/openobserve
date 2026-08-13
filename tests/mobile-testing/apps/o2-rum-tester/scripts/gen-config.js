@@ -22,7 +22,9 @@ for (const [key, val] of Object.entries(map)) {
   if (!val) continue; // unset → leave the committed default
   const re = new RegExp(`(const RUM_[A-Z]+ = ')[^']*('; // @gen:${key})`);
   if (re.test(src)) {
-    src = src.replace(re, `$1${val}$2`);
+    // Function replacer, NOT a `$1${val}$2` string — a literal `$` in val would otherwise be read
+    // as a replacement directive and corrupt App.tsx.
+    src = src.replace(re, (_m, p1, p2) => p1 + val + p2);
     changed.push(`${key}=${val}`);
   }
 }

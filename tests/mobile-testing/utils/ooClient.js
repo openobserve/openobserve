@@ -28,21 +28,33 @@ async function search(sql, startMs, endMs = Date.now() + 5 * 60 * 1000, size = 2
   return json.hits || [];
 }
 
+// A wrong token/org gives 401/403 that will NEVER self-heal — surface it immediately rather than
+// retrying for the whole window and reporting it as "no rows". (404/400/5xx stay retryable: the
+// _rumdata stream may simply not exist yet before the first upload.)
+const isAuthError = (e) => /_search (401|403)\b/.test((e && e.message) || '');
+
 /**
  * Poll a query until it returns at least `minHits` rows (or times out).
  * RUM ingestion is asynchronous, so we retry rather than assert instantly.
  */
 async function pollSearch(sql, startMs, { minHits = 1, tries = 15, delayMs = 4000 } = {}) {
   let last = [];
+  let lastErr = null;
+  let gotResponse = false;
   for (let i = 0; i < tries; i++) {
     try {
       last = await search(sql, startMs);
+      gotResponse = true;
       if (last.length >= minHits) return last;
     } catch (e) {
-      // Transient network drop / 429 against the internal instance — retry.
+      lastErr = e;
+      if (isAuthError(e)) throw e; // non-retryable — fail fast with the real cause
+      // else transient (network drop / 429 / 5xx / stream-not-ready) — retry.
     }
     await new Promise((r) => setTimeout(r, delayMs));
   }
+  // Every attempt errored (never a valid response) → surface the cause instead of a silent [].
+  if (!gotResponse && lastErr) throw lastErr;
   return last;
 }
 
@@ -52,15 +64,21 @@ async function pollSearch(sql, startMs, { minHits = 1, tries = 15, delayMs = 400
  */
 async function pollUntil(queryFn, predicate, { tries = 20, delayMs = 5000 } = {}) {
   let last = [];
+  let lastErr = null;
+  let gotResponse = false;
   for (let i = 0; i < tries; i++) {
     try {
       last = await queryFn();
+      gotResponse = true;
       if (predicate(last)) return last;
     } catch (e) {
-      // Transient network drop / 429 — retry.
+      lastErr = e;
+      if (isAuthError(e)) throw e;
+      // else transient — retry.
     }
     await new Promise((r) => setTimeout(r, delayMs));
   }
+  if (!gotResponse && lastErr) throw lastErr;
   return last;
 }
 

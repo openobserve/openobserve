@@ -14,11 +14,11 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // Build-time overridable RUM target: CI sets these env vars to point at a local instance;
-        // with none set they fall back to the dev-cluster defaults (identical to before).
-        buildConfigField("String", "OO_HOST", "\"${System.getenv("O2_RUM_HOST") ?: "https://api.introspect.internal.zinclabs.dev"}\"")
-        buildConfigField("String", "OO_ORG", "\"${System.getenv("O2_RUM_ORG") ?: "3H4eDirnysdrcO60XNNKT1wJyQs"}\"")
-        buildConfigField("String", "OO_TOKEN", "\"${System.getenv("O2_RUM_TOKEN") ?: "rum6sEgOCu3A1VO2NeI"}\"")
+        // Build-time overridable RUM target: CI sets these env vars to point at a local instance.
+        // With none set they fall back to PLACEHOLDERS — set O2_RUM_HOST/ORG/TOKEN for a real target.
+        buildConfigField("String", "OO_HOST", "\"${System.getenv("O2_RUM_HOST") ?: "https://openobserve.example.com"}\"")
+        buildConfigField("String", "OO_ORG", "\"${System.getenv("O2_RUM_ORG") ?: "REPLACE_ME"}\"")
+        buildConfigField("String", "OO_TOKEN", "\"${System.getenv("O2_RUM_TOKEN") ?: "REPLACE_ME"}\"")
         buildConfigField("String", "OO_ENV", "\"${System.getenv("O2_RUM_ENV") ?: "production"}\"")
     }
 

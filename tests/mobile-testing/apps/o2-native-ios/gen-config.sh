@@ -5,9 +5,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-HOST="${O2_RUM_HOST:-https://api.introspect.internal.zinclabs.dev}"
-ORG="${O2_RUM_ORG:-3H4eDirnysdrcO60XNNKT1wJyQs}"
-TOKEN="${O2_RUM_TOKEN:-rum6sEgOCu3A1VO2NeI}"
+HOST="${O2_RUM_HOST:-https://openobserve.example.com}"
+ORG="${O2_RUM_ORG:-REPLACE_ME}"
+TOKEN="${O2_RUM_TOKEN:-REPLACE_ME}"
 ENV="${O2_RUM_ENV:-production}"
 
 cat > Sources/GeneratedConfig.swift <<EOF

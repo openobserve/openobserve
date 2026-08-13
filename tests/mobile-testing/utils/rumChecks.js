@@ -184,7 +184,10 @@ function bgFgSuite({ name, tags, service, viewA, viewB, drive, device = '' }) {
         );
 
         const matched = rows.filter((r) => hasA(r) || hasB(r));
-        expect(matched.length, 'both views recorded').toBeGreaterThan(0);
+        // Assert BOTH views explicitly — a bare `matched.length > 0` would pass on just the pre-bg
+        // view if the post-foreground view never ingests, i.e. the exact bg-upload regression under test.
+        expect(matched.some(hasA), `${viewA} (pre-background) recorded`).toBeTruthy();
+        expect(matched.some(hasB), `${viewB} (post-foreground) recorded`).toBeTruthy();
         expect(
           new Set(matched.map((r) => r.session_id)).size,
           `${viewA} (pre-bg) and ${viewB} (post-fg) are the same session`,

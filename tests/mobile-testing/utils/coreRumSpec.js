@@ -46,9 +46,11 @@ function coreRumSuite({ name, tags, flows, service, expectedSource, viewSubstrin
         expect(rows.some((r) => r.type === 'action'), 'an action was recorded').toBeTruthy();
         expect(
           rows.some(
-            (r) => (r.error_message || '').toLowerCase().includes('handled') && r.error_is_crash === false,
+            // !== true (not === false) so an SDK that emits null/undefined for a handled error's
+            // is_crash still counts as "not a crash".
+            (r) => (r.error_message || '').toLowerCase().includes('handled') && r.error_is_crash !== true,
           ),
-          'handled error recorded (is_crash=false)',
+          'handled error recorded (is_crash not true)',
         ).toBeTruthy();
 
         const crash = rows.find((r) => r.error_is_crash === true);

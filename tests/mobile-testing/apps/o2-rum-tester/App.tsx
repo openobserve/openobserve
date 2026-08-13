@@ -33,13 +33,14 @@ import {
 } from '@openobserve/mobile-react-native-session-replay';
 
 // Build-time RUM target as INLINE constants. CI text-substitutes these literals
-// (scripts/gen-config.js seds them from O2_RUM_* env); the committed values point at the dev
-// cluster so local dev is unchanged. NB: do NOT move these into an imported JSON module — a
+// (scripts/gen-config.js seds them from O2_RUM_* env). The committed values are PLACEHOLDERS —
+// set O2_RUM_HOST/ORG/TOKEN/ENV (see docs/CI-NOTES.md and .env.example) before building for a real
+// target; CI mints its own token per run. NB: do NOT move these into an imported JSON module — a
 // `import x from './x.json'` here silently breaks RUM upload in the Hermes release build
-// (verified: JSON-import → 0 uploads; inline consts → uploads work). See docs/CI-NOTES.md.
-const RUM_HOST = 'https://api.introspect.internal.zinclabs.dev'; // @gen:host
-const RUM_ORG = '3H4eDirnysdrcO60XNNKT1wJyQs'; // @gen:org  (vamsi_org)
-const RUM_TOKEN = 'rum6sEgOCu3A1VO2NeI'; // @gen:token
+// (verified: JSON-import → 0 uploads; inline consts → uploads work).
+const RUM_HOST = 'https://openobserve.example.com'; // @gen:host
+const RUM_ORG = 'REPLACE_ME'; // @gen:org
+const RUM_TOKEN = 'REPLACE_ME'; // @gen:token
 const RUM_ENV = 'production'; // @gen:env
 const RUM_INTAKE = `${RUM_HOST}/rum/v1/${RUM_ORG}`;
 

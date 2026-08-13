@@ -91,7 +91,11 @@ class RumDashboardPage {
 
   /** No PII string leaked into the session-replay DOM (masking guard). */
   async expectNoPiiInReplay(piiStrings) {
-    await this.page.waitForTimeout(4000); // let the replay player render before scanning
+    // Don't scan a blank page: wait for the session view to actually hydrate first (the Breadcrumbs
+    // tab is the stable "detail loaded" signal, same as expectSessionViewable). Otherwise a not-yet-
+    // rendered replay would let the PII check pass vacuously.
+    await expect(this.page.getByRole('button', { name: 'Breadcrumbs' })).toBeVisible({ timeout: 30000 });
+    await this.page.waitForTimeout(2000); // brief settle for the replay surface to paint
     for (const pii of piiStrings) {
       await expect(this.page.getByText(pii, { exact: false })).toHaveCount(0);
     }

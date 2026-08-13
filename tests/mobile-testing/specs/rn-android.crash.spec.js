@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { runFlow } = require('../utils/maestro');
-const { q } = require('../utils/ooClient');
+const { pollUntil, search } = require('../utils/ooClient');
 const { RumDashboardPage } = require('../pages/rumDashboardPage');
 const cfg = require('../utils/config');
 
@@ -14,11 +14,21 @@ test.describe('RN Android · Crash reporting', () => {
       // 1. DRIVE — Maestro triggers the crash and relaunches to flush the report.
       runFlow('react-native/crash.yaml');
 
-      // 2. API — the crash event landed in _rumdata.
-      const errors = await q.errors(cfg.RN_SERVICE, start, { tries: 20, delayMs: 5000 });
-      const crash = errors.find((e) =>
-        (e.error_message || '').includes('intentional uncaught crash'),
+      // 2. API — the crash event landed in _rumdata. Poll until the CRASH row specifically appears:
+      // a handled/network error may ingest first, so returning on the first error row (minHits:1)
+      // could see `crash === undefined` and false-fail this @P0.
+      const isCrash = (e) => (e.error_message || '').includes('intentional uncaught crash');
+      const errors = await pollUntil(
+        () =>
+          search(
+            `SELECT session_id, error_message, error_is_crash, _timestamp FROM ${cfg.RUM_STREAM} ` +
+              `WHERE service='${cfg.RN_SERVICE}' AND type='error' ORDER BY _timestamp DESC`,
+            start,
+          ),
+        (rows) => rows.some(isCrash),
+        { tries: 20, delayMs: 5000 },
       );
+      const crash = errors.find(isCrash);
       expect(crash, 'crash event ingested to _rumdata').toBeTruthy();
       const sessionId = crash.session_id;
 
