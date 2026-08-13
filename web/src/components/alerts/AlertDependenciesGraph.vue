@@ -688,14 +688,16 @@ const nodeBgClass = (n: DepNode) =>
     ? "bg-[color-mix(in_srgb,var(--color-text-muted)_10%,var(--color-surface-base))]"
     : n.kind === "destination"
       ? "bg-[color-mix(in_srgb,var(--color-info)_12%,var(--color-surface-base))]"
-      : "bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface-base))]";
+      : "bg-[color-mix(in_srgb,var(--color-status-positive)_14%,var(--color-surface-base))]";
 
 const nodeBorderClass = (n: DepNode) => {
   if (n.missing) return "border-status-negative!";
   if (n.orphan) return "border-status-warning!";
   if (n.kind === "alert" && n.enabled === false) return "border-border-default opacity-60";
   if (n.kind === "destination") return "border-info!";
-  if (n.kind === "alert") return "border-accent!";
+  // Green (status-positive) instead of the brand accent — accent goes to a dull
+  // grey-blue in dark mode; the green token reads as green in both themes.
+  if (n.kind === "alert") return "border-status-positive!";
   return "border-border-default";
 };
 
