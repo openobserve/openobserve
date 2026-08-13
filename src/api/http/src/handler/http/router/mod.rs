@@ -1114,6 +1114,10 @@ pub fn service_routes() -> Router {
                     get(experiments::get_experiment),
                 )
                 .route(
+                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
+                    get(experiments::get_experiment_row),
+                )
+                .route(
                     "/{org_id}/experiments/{experiment_id}/cancel",
                     post(experiments::cancel_experiment),
                 )
@@ -1700,6 +1704,19 @@ mod tests {
                 .unwrap_or_else(|| panic!("missing OpenAPI path {path}"));
             assert!(action.post.is_some(), "{path} must publish POST metadata");
         }
+    }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn experiment_row_detail_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}")
+            .expect("missing Experiment row-detail OpenAPI path");
+
+        assert!(path.get.is_some());
     }
 
     // ── tmp/code.md B4 — the query-function catalog route ─────────────────────
