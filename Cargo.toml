@@ -279,6 +279,7 @@ members = [
     "src/node",
     "src/transform",
     "src/super_cluster_queue",
+    "src/synthetics",
     "src/search",
     "src/cipher",
     "src/db",
@@ -333,6 +334,8 @@ openobserve-node = { path = "src/node" }
 common = { path = "src/common" }
 transform = { path = "src/transform" }
 super_cluster_queue = { path = "src/super_cluster_queue" }
+# Deliberately NOT a dependency of super_cluster_queue — see src/synthetics/src/lib.rs.
+openobserve-synthetics = { path = "src/synthetics" }
 search = { path = "src/search" }
 openobserve-cipher = { path = "src/cipher" }
 db = { path = "src/db" }
