@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   One entity row inside the inline DependencyChainPanel: kind icon + name, an
   optional count badge (destinations' alert counts), unused/broken flags, and
-  Open / Delete actions. Presentational — the panel owns the behaviour.
+  Open / Delete actions. Delete uses an INLINE confirm (not a modal dialog) so it
+  works inside the dependency popover without dismissing it.
 -->
 <template>
   <div
@@ -37,7 +38,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       t("alert_dependencies.missingTag")
     }}</OTag>
 
-    <div class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+    <!-- Inline delete confirm — a compact "Delete? ✓ ✕" instead of a modal. -->
+    <div
+      v-if="confirming"
+      class="flex shrink-0 items-center gap-1"
+      data-test="dependency-row-confirm"
+    >
+      <span class="text-text-secondary text-2xs">{{ t("alert_dependencies.confirmDelete") }}</span>
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        :data-test="`dependency-row-confirm-yes-${node.name}`"
+        @click="
+          confirming = false;
+          emit('delete', node);
+        "
+      >
+        <OIcon name="check" size="sm" class="text-status-negative" />
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        :data-test="`dependency-row-confirm-no-${node.name}`"
+        @click="confirming = false"
+      >
+        <OIcon name="close" size="sm" />
+      </OButton>
+    </div>
+
+    <div v-else class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
       <OButton
         v-if="!node.missing"
         variant="ghost"
@@ -53,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-sm"
         :data-test="`dependency-row-delete-${node.name}`"
-        @click="emit('delete', node)"
+        @click="confirming = true"
       >
         <OIcon name="delete" size="sm" class="text-status-negative" />
         <OTooltip side="top" :content="t('alert_dependencies.actionDelete')" />
@@ -63,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -78,6 +107,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const confirming = ref(false);
 
 const kindIcon = computed(() =>
   props.node.kind === "template"

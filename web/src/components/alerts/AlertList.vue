@@ -86,8 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :columns="columns"
               show-index
               row-key="alert_id"
-              expansion="single"
-              v-model:expanded-ids="dependencyExpandedIds"
               :loading="loading"
               pagination="client"
               :page-size="pageSize"
@@ -504,6 +502,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     aria-hidden="true"
                     @click.stop="showDeleteDialogFn({ row })"
                   />
+                  <DependencyChainPopover
+                    :focus="{ kind: 'alert', alertId: row.alert_id, name: row.name }"
+                    @deleted="onDependencyDeleted"
+                  />
                   <ODropdown>
                     <template #trigger>
                       <OButton
@@ -672,14 +674,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </div>
               </template>
-
-              <template #expansion="{ row }">
-                <DependencyChainPanel
-                  :focus="{ kind: 'alert', alertId: row.alert_id, name: row.name }"
-                  @deleted="onDependencyDeleted"
-                  @close="dependencyExpandedIds = []"
-                />
-              </template>
             </OTable>
           </div>
         </div>
@@ -831,7 +825,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
-import DependencyChainPanel from "./DependencyChainPanel.vue";
+import DependencyChainPopover from "./DependencyChainPopover.vue";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -869,7 +863,7 @@ export default defineComponent({
     ImportAlert,
     FolderList,
     MoveAcrossFolders,
-    DependencyChainPanel,
+    DependencyChainPopover,
     OToggleGroup,
     OToggleGroupItem,
     OInput,
@@ -2624,11 +2618,8 @@ export default defineComponent({
       activeFolderToMove.value = activeFolderId.value;
     };
 
-    // Inline dependency chain: expanding a row (the native chevron) reveals this
-    // alert's destinations + their templates.
-    const dependencyExpandedIds = ref<string[]>([]);
-    // A delete inside the panel — reload the current folder's alerts so the table
-    // drops the removed row.
+    // A delete inside the dependency popover — reload the current folder's alerts
+    // so the table drops the removed row.
     const onDependencyDeleted = () => getAlertsFn(store, activeFolderId.value);
 
     const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
@@ -3087,7 +3078,6 @@ export default defineComponent({
       t,
       store,
       router,
-      dependencyExpandedIds,
       onDependencyDeleted,
       columns,
       recencyLevel,

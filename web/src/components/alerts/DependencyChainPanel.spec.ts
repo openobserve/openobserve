@@ -129,9 +129,10 @@ describe("DependencyChainPanel", () => {
     } as any);
     wrapper = mountPanel({ kind: "destination", name: "slack" });
     await flushPromises();
-    // Delete the destination via the row action, then confirm.
+    // Delete → inline confirm → confirm-yes actually deletes.
     await wrapper.find('[data-test="dependency-row-delete-slack"]').trigger("click");
-    await (wrapper.vm as any).performDelete();
+    await nextTick();
+    await wrapper.find('[data-test="dependency-row-confirm-yes-slack"]').trigger("click");
     await flushPromises();
     expect(destinationService.delete).toHaveBeenCalledWith(
       expect.objectContaining({ destination_name: "slack" }),

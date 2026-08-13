@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Data is fetched via useDependencyGraph and reduced with buildFocusChain.
 -->
 <template>
-  <div class="px-page-edge py-3 text-left" data-test="dependency-chain-panel">
+  <div class="p-2 text-left" data-test="dependency-chain-panel">
     <div
       v-if="loading"
       class="text-text-secondary flex items-center gap-2 py-2 text-sm"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="n.id"
             :node="n"
             @open="openEntity"
-            @delete="requestDelete"
+            @delete="performDelete"
           />
         </div>
       </section>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :node="n"
             :count="n.alerts.length"
             @open="openEntity"
-            @delete="requestDelete"
+            @delete="performDelete"
           />
         </div>
       </section>
@@ -124,19 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="n.id"
             :node="n"
             @open="openEntity"
-            @delete="requestDelete"
+            @delete="performDelete"
           />
         </div>
       </section>
     </div>
-
-    <ConfirmDialog
-      v-model="confirmDelete.visible"
-      :title="t('alert_dependencies.deleteTitle', { name: confirmDelete.node?.name || '' })"
-      :message="t('alert_dependencies.deleteMessage')"
-      @update:ok="performDelete"
-      @update:cancel="cancelDelete"
-    />
   </div>
 </template>
 
@@ -149,7 +141,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import ConfirmDialog from "../ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
@@ -174,10 +165,6 @@ const router = useRouter();
 const { graph, loading, error, loadGraph } = useDependencyGraph();
 
 const alertPage = ref(0);
-const confirmDelete = ref<{ visible: boolean; node: DepNode | null }>({
-  visible: false,
-  node: null,
-});
 
 const org = () => store.state.selectedOrganization.identifier;
 
@@ -227,16 +214,8 @@ const openEntity = (n: DepNode) => {
   }
 };
 
-const requestDelete = (n: DepNode) => {
-  confirmDelete.value = { visible: true, node: n };
-};
-const cancelDelete = () => {
-  confirmDelete.value = { visible: false, node: null };
-};
-const performDelete = async () => {
-  const n = confirmDelete.value.node;
-  confirmDelete.value = { visible: false, node: null };
-  if (!n) return;
+// The row already confirmed inline (DependencyRow), so this deletes straight away.
+const performDelete = async (n: DepNode) => {
   const org_identifier = org();
   try {
     if (n.kind === "destination") {

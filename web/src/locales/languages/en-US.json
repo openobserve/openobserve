@@ -6313,6 +6313,7 @@
     "expandHint": "Click a destination to show its alerts",
     "actionOpen": "Open",
     "actionDelete": "Delete",
+    "confirmDelete": "Delete?",
     "viewDependencies": "View dependencies",
     "dialogTitle": "Dependencies · {name}",
     "rearrange": "Re-arrange",

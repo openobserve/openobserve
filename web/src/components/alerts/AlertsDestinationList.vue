@@ -69,8 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="visibleRows"
           :columns="columns"
           row-key="name"
-          expansion="single"
-          v-model:expanded-ids="dependencyExpandedIds"
           :loading="loading"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
@@ -238,15 +236,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
+              <DependencyChainPopover
+                :focus="{ kind: 'destination', name: row.name }"
+                @deleted="getDestinations"
+              />
             </div>
-          </template>
-
-          <template #expansion="{ row }">
-            <DependencyChainPanel
-              :focus="{ kind: 'destination', name: row.name }"
-              @deleted="getDestinations"
-              @close="dependencyExpandedIds = []"
-            />
           </template>
         </OTable>
       </div>
@@ -302,7 +296,7 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
-import DependencyChainPanel from "./DependencyChainPanel.vue";
+import DependencyChainPopover from "./DependencyChainPopover.vue";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -340,7 +334,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OPageLayout,
-    DependencyChainPanel,
+    DependencyChainPopover,
   },
   setup() {
     const store = useStore();
@@ -659,10 +653,6 @@ export default defineComponent({
       });
     };
 
-    // Inline dependency chain: expanding a row (the native chevron) reveals this
-    // destination's template + alerts. Controlled so the panel can self-collapse.
-    const dependencyExpandedIds = ref<string[]>([]);
-
     // True when the row's template name matches the canonical `prebuilt_<type>`
     // for its detected prebuilt type — i.e. the user kept the default rather
     // than picking a custom template. Used to show a "Default" badge.
@@ -852,7 +842,6 @@ export default defineComponent({
       exportDestination,
       showImportDestination,
       importDestination,
-      dependencyExpandedIds,
       store,
       getActions,
       getTemplates,
