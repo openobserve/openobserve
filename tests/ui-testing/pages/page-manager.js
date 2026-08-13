@@ -28,6 +28,7 @@ import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDra
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
+import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -151,6 +152,7 @@ class PageManager {
     this.alertsPage = new AlertsPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
+    this.compositeAlertsPage = new CompositeAlertsPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);

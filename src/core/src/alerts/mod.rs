@@ -42,6 +42,7 @@ use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
 pub mod alert;
 pub mod backfill;
+pub mod composite;
 #[cfg(feature = "enterprise")]
 pub mod deduplication;
 pub mod derived_streams;

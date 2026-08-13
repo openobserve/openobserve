@@ -605,7 +605,7 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, SqliteScheduler};
 
     #[test]
     fn test_sqlite_scheduler_new() {
@@ -615,5 +615,33 @@ mod tests {
     #[test]
     fn test_sqlite_scheduler_default() {
         let _scheduler = SqliteScheduler::default();
+    }
+
+    #[test]
+    fn sqlite_claim_epoch_is_created_incremented_and_returned_by_claim() {
+        assert!(PULL_QUERY.contains("claim_epoch = claim_epoch + 1"));
+        assert!(PULL_QUERY.contains("RETURNING"));
+    }
+
+    #[test]
+    fn sqlite_composite_keepalive_and_completion_are_epoch_fenced() {
+        for (operation, query) in [
+            ("keep alive", KEEP_ALIVE_CLAIM_QUERY),
+            ("completion", COMPLETE_CLAIM_QUERY),
+        ] {
+            let compact = query.split_whitespace().collect::<Vec<_>>().join(" ");
+            assert!(
+                compact.contains("id = $"),
+                "{operation} must match the job ID"
+            );
+            assert!(
+                compact.contains("claim_epoch = $"),
+                "{operation} must match the captured epoch"
+            );
+            assert!(
+                compact.contains("status = $"),
+                "{operation} must require Processing status"
+            );
+        }
     }
 }

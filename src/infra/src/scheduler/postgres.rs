@@ -936,7 +936,10 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
 
 #[cfg(test)]
 mod tests {
-    use super::{PULL_QUERY, PULL_QUERY_BY_MODULE, PostgresScheduler, WATCH_TIMEOUT_QUERY};
+    use super::{
+        COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, PULL_QUERY_BY_MODULE,
+        PostgresScheduler, WATCH_TIMEOUT_QUERY,
+    };
 
     #[test]
     fn test_postgres_scheduler_new() {
@@ -956,5 +959,35 @@ mod tests {
         assert!(PULL_QUERY_BY_MODULE.contains("FOR UPDATE SKIP LOCKED"));
         assert!(WATCH_TIMEOUT_QUERY.contains("ORDER BY id"));
         assert!(WATCH_TIMEOUT_QUERY.contains("FOR UPDATE SKIP LOCKED"));
+    }
+
+    #[test]
+    fn postgres_claim_epoch_is_created_incremented_and_returned_by_claim() {
+        assert!(PULL_QUERY.contains("claim_epoch = claim_epoch + 1"));
+        assert!(PULL_QUERY_BY_MODULE.contains("claim_epoch = claim_epoch + 1"));
+        assert!(PULL_QUERY.contains("RETURNING"));
+        assert!(PULL_QUERY_BY_MODULE.contains("RETURNING"));
+    }
+
+    #[test]
+    fn postgres_composite_keepalive_and_completion_are_epoch_fenced() {
+        for (operation, query) in [
+            ("keep alive", KEEP_ALIVE_CLAIM_QUERY),
+            ("completion", COMPLETE_CLAIM_QUERY),
+        ] {
+            let compact = query.split_whitespace().collect::<Vec<_>>().join(" ");
+            assert!(
+                compact.contains("id = $"),
+                "{operation} must match the job ID"
+            );
+            assert!(
+                compact.contains("claim_epoch = $"),
+                "{operation} must match the captured epoch"
+            );
+            assert!(
+                compact.contains("status = $"),
+                "{operation} must require Processing status"
+            );
+        }
     }
 }

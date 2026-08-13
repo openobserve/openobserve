@@ -634,6 +634,38 @@ mod tests {
     }
 
     #[test]
+    fn slo_alert_list_discriminator_precedes_realtime_and_scheduled() {
+        use config::meta::{
+            alerts::Operator,
+            slo::condition::{SloAlertKind, SloCondition},
+        };
+
+        for is_real_time in [false, true] {
+            let mut alert = meta_alerts::Alert::default();
+            alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+            alert.is_real_time = is_real_time;
+            alert.query_condition.slo_condition = Some(SloCondition {
+                slo_id: "3H0eMU7B6x12345678901234567".to_string(),
+                kind: SloAlertKind::ErrorBudget,
+                operator: Operator::GreaterThan,
+                critical: 10.0,
+                warning: None,
+                long_window_secs: None,
+                short_window_secs: None,
+                multi_alert: false,
+            });
+
+            let item = ListAlertsResponseBodyItem::try_from((
+                meta_folders::Folder::default(),
+                alert,
+                None,
+            ))
+            .unwrap();
+            assert_eq!(item.alert_type, "slo");
+        }
+    }
+
+    #[test]
     fn test_list_alerts_body_try_from_empty_vec_ok() {
         let result = ListAlertsResponseBody::try_from(vec![]);
         assert!(result.is_ok());

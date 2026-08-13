@@ -685,6 +685,16 @@ mod tests {
     }
 
     #[test]
+    fn alert_type_filter_composite_has_a_stable_wire_discriminator() {
+        let encoded = serde_json::to_string(&AlertTypeFilter::Composite).unwrap();
+        assert_eq!(encoded, r#""composite""#);
+        assert_eq!(
+            serde_json::from_str::<AlertTypeFilter>(&encoded).unwrap(),
+            AlertTypeFilter::Composite
+        );
+    }
+
+    #[test]
     fn test_list_alerts_params_in_folder() {
         let params = ListAlertsParams::new("test_org").in_folder("test_folder");
 

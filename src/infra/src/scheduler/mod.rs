@@ -245,7 +245,15 @@ pub fn get_scheduler_max_retries() -> (bool, i32) {
 
 #[cfg(test)]
 mod tests {
+    use std::future::Future;
+
     use super::*;
+
+    fn assert_bool_result_future<F>(_: F)
+    where
+        F: Future<Output = Result<bool>>,
+    {
+    }
 
     #[test]
     fn test_triggers_key_value() {
@@ -255,6 +263,21 @@ mod tests {
     #[test]
     fn test_triggers_key_starts_with_slash() {
         assert!(TRIGGERS_KEY.starts_with('/'));
+    }
+
+    #[test]
+    fn scheduler_trait_exposes_claim_scoped_keep_alive_and_completion() {
+        let scheduler = sqlite::SqliteScheduler::new();
+        let claim = Trigger {
+            id: 17,
+            claim_epoch: 3,
+            module: TriggerModule::CompositeAlert,
+            status: TriggerStatus::Processing,
+            ..Default::default()
+        };
+
+        assert_bool_result_future(scheduler.keep_alive_claim(&claim, 60, 300));
+        assert_bool_result_future(scheduler.complete_claim(claim));
     }
 
     #[test]

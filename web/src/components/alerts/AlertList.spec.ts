@@ -35,6 +35,9 @@ vi.mock("@/services/alerts", () => ({
     getHistory: vi.fn(),
     export_by_id: vi.fn(),
     retrain_by_id: vi.fn(),
+    bulkDelete: vi.fn(),
+    bulkToggleState: vi.fn(),
+    getCompositeReferences: vi.fn(),
   },
 }));
 vi.mock("@/services/alert_templates", () => ({
@@ -129,6 +132,9 @@ type AlertV2 = {
   stream_type: string;
   enabled: boolean;
   condition: any;
+  child_count?: number;
+  referenced_by_composite_count?: number;
+  expression_summary?: string;
   description?: string;
   owner?: string;
   trigger_condition?: {
@@ -304,6 +310,14 @@ beforeEach(() => {
 
   (alertsSvc.retrain_by_id as any) = vi.fn().mockImplementation(async () => {
     return Promise.resolve({ data: { code: 200 } } as any);
+  });
+
+  (alertsSvc.bulkDelete as any) = vi.fn().mockResolvedValue({
+    data: { successful: [], unsuccessful: [] },
+  });
+  (alertsSvc.bulkToggleState as any) = vi.fn().mockResolvedValue({ data: {} });
+  (alertsSvc.getCompositeReferences as any) = vi.fn().mockResolvedValue({
+    data: { references: [], hidden_reference_count: 0 },
   });
 
   (alertsSvc.create_by_alert_id as any) = vi
@@ -1275,5 +1289,101 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(wrapper.vm.formatGroupCount(3, false)).toBe("3");
     expect(wrapper.vm.formatGroupCount(3, true)).toBe("\u22653");
     expect(wrapper.vm.formatGroupCount(0, undefined)).toBe("0");
+  });
+
+  describe("composite alert list integration", () => {
+    it("maps a composite without query fields to its badge, expression, and counts", async () => {
+      alertsDB = [
+        {
+          ...makeAlert(1),
+          alert_id: "composite-1",
+          alert_type: "composite",
+          name: "Checkout degraded",
+          is_real_time: false,
+          stream_name: undefined,
+          stream_type: "",
+          condition: null,
+          child_count: 3,
+          referenced_by_composite_count: 2,
+          expression_summary: "High error rate AND High latency",
+        },
+      ];
+      const wrapper: any = await mountAlertList();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      await flushPromises();
+
+      const row = wrapper.vm.filteredResults[0];
+      expect(row.alert_type).toBe("Composite");
+      expect(row.conditions).toBe("High error rate AND High latency");
+      expect(row.child_count).toBe(3);
+      expect(row.referenced_by_composite_count).toBe(2);
+      expect(wrapper.find('[data-test="alert-list-composite-badge-composite-1"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="alert-list-child-count-composite-1"]').text()).toContain(
+        "3",
+      );
+      expect(
+        wrapper.find('[data-test="alert-list-reference-count-composite-1"]').text(),
+      ).toContain("2");
+    });
+
+    it("exposes Composite as a distinct list filter", async () => {
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+
+      expect(wrapper.vm.tabs).toEqual(
+        expect.arrayContaining([expect.objectContaining({ value: "composite" })]),
+      );
+      const tabs = wrapper.findComponent({ name: "AppTabs" });
+      await tabs.vm.$emit("update:active-tab", "composite");
+      await flushPromises();
+
+      expect(AlertService.listByFolderId).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        "composite",
+      );
+    });
+
+    it("keeps mixed bulk-delete successes while opening reference conflicts", async () => {
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+      wrapper.vm.filteredResults[0].selected = true;
+      wrapper.vm.filteredResults[1].selected = true;
+      await wrapper.vm.$nextTick();
+      const selectedIds = wrapper.vm.selectedAlerts.map((alert: AlertV2) => alert.alert_id);
+      alertsSvc.bulkDelete.mockResolvedValueOnce({
+        data: {
+          successful: [{ alert_id: wrapper.vm.filteredResults[0].alert_id }],
+          unsuccessful: [
+            {
+              alert_id: wrapper.vm.filteredResults[1].alert_id,
+              code: "child_referenced",
+              references: [{ alert_id: "parent-1", name: "Checkout degraded" }],
+              hidden_reference_count: 1,
+            },
+          ],
+        },
+      });
+
+      await wrapper.vm.bulkDeleteAlerts();
+      await flushPromises();
+
+      expect(alertsSvc.bulkDelete).toHaveBeenCalledWith(
+        expect.any(String),
+        { ids: selectedIds },
+        "default",
+      );
+      expect(wrapper.find('[data-test="alerts-composite-reference-conflict"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alerts-composite-reference-parent-parent-1"]').exists()).toBe(true);
+    });
   });
 });

@@ -351,4 +351,23 @@ mod tests {
     fn test_get_text_type_returns_text() {
         assert_eq!(get_text_type(), "text");
     }
+
+    #[test]
+    fn composite_alert_migration_is_registered_after_existing_migrations() {
+        let names: Vec<String> = Migrator::migrations()
+            .into_iter()
+            .map(|migration| migration.name().to_string())
+            .collect();
+        assert_eq!(
+            names.last().map(String::as_str),
+            Some("m20260812_000001_create_composite_alerts")
+        );
+        assert_eq!(
+            names
+                .iter()
+                .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")
+                .count(),
+            1
+        );
+    }
 }
