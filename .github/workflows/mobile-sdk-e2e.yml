@@ -174,7 +174,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: mobile-e2e-linux-oo
+          shared-key: mobile-e2e-linux-oo-v2
       - name: Install Protoc
         run: bash ./.github/protoc.sh
       - uses: actions/setup-node@v4
@@ -411,7 +411,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: mobile-e2e-macos-oo
+          shared-key: mobile-e2e-macos-oo-v2
       - name: Install Protoc (macOS)
         run: brew install protobuf || true
       - name: Build OpenObserve from source (binary + embedded web UI)
