@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Loads and attaches labels for series returned by the sample scan.
+
 use std::sync::Arc;
 
 use config::{
@@ -39,8 +41,8 @@ use hashbrown::{HashMap, HashSet};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
+    PartitionedMetrics,
     label_cache::{self, CacheMisses},
-    selector_loader::PartitionedMetrics,
 };
 
 type TokioLabelsResult = tokio::task::JoinHandle<Result<HashMap<u64, RangeValue>>>;
@@ -484,6 +486,7 @@ mod tests {
     };
 
     use super::*;
+    use crate::load_series::load_samples_from_datafusion;
 
     fn timestamps(count: usize, gap_micros: i64) -> HashSet<i64> {
         (0..count)
@@ -704,14 +707,10 @@ mod tests {
         )
         .unwrap();
         let sample_df = ctx.read_batch(sample_batch).unwrap();
-        let (metrics, _) = super::super::selector_loader::load_samples_from_datafusion(
-            "test",
-            &DataType::UInt64,
-            sample_df,
-            false,
-        )
-        .await
-        .unwrap();
+        let (metrics, _) =
+            load_samples_from_datafusion("test", &DataType::UInt64, sample_df, false)
+                .await
+                .unwrap();
         let label_df = ctx.read_batch(label_batch).unwrap();
 
         let metrics = load_labels(

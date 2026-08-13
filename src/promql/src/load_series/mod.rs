@@ -13,6 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Loads PromQL series samples, exemplars, and labels from DataFusion.
+
+mod label_cache;
+mod load_labels;
+
 use std::sync::Arc;
 
 use config::{
@@ -42,10 +47,8 @@ use futures::TryStreamExt;
 use hashbrown::{HashMap, HashSet};
 use promql_parser::parser::VectorSelector;
 
-use super::{
-    series_labels::load_series_labels,
-    utils::{apply_label_selector, apply_matchers},
-};
+use self::load_labels::load_series_labels;
+use super::utils::{apply_label_selector, apply_matchers};
 
 pub(super) type PartitionedMetrics = Vec<HashMap<u64, RangeValue>>;
 
