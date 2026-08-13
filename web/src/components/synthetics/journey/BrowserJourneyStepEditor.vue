@@ -434,15 +434,16 @@ const hasAdvancedChanges = computed(
            interaction, not a tuning knob on the same one — and until it had a
            control, a recorded right or double click was stored and replayed
            faithfully while the editor showed the author a plain click. -->
-      <OSelect
-        v-if="isClickStep"
-        v-model="clickTypeComputed"
-        :label="t('synthetics.journey.clickTypeLabel')"
-        :options="clickTypeSelectOptions"
-        :helpText="t('synthetics.journey.clickTypeHelp')"
-        width="md"
-        data-test="synthetics-journey-step-click-type-select"
-      />
+      <div v-if="isClickStep" class="flex w-full gap-2">
+        <OSelect
+          v-model="clickTypeComputed"
+          :label="t('synthetics.journey.clickTypeLabel')"
+          :options="clickTypeSelectOptions"
+          :helpText="t('synthetics.journey.clickTypeHelp')"
+          class="basis-1/3"
+          data-test="synthetics-journey-step-click-type-select"
+        />
+      </div>
 
       <!-- Value (action-specific label) -->
       <OInput
