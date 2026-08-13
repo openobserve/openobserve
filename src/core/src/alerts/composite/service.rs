@@ -8,7 +8,9 @@
 use std::collections::{HashMap, HashSet};
 
 use config::meta::{
-    alerts::composite::{CompositeError, canonical_expression, collect_references, parse_expr},
+    alerts::composite::{
+        CompositeError, canonical_expression, collect_references, parse_expr, validate_children,
+    },
     triggers::{Trigger, TriggerModule, TriggerStatus},
 };
 use infra::{
@@ -241,6 +243,7 @@ async fn persist(
     let parsed = parse_expr(&request.expression)
         .map_err(|error| CompositeServiceError::InvalidExpression(error.to_string()))?;
     let references = collect_references(&parsed).map_err(map_expression_error)?;
+    validate_children(&references).map_err(map_expression_error)?;
     let expression = canonical_expression(&parsed);
     let id = request.id.clone().expect("service assigns an ID");
     let graph_guard = composite_graph_lock::lock(&request.org)
@@ -439,6 +442,7 @@ pub async fn validate_composite_graph(
 ) -> Result<String, CompositeServiceError> {
     let parsed = parse_expr(expression).map_err(map_expression_error)?;
     let references = collect_references(&parsed).map_err(map_expression_error)?;
+    validate_children(&references).map_err(map_expression_error)?;
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let resolved = resolve_children(db, org, &references).await?;
     let mut graph = alert_composites::load_graph(db, org).await?;
