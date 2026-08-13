@@ -236,6 +236,16 @@ const destinationsSvc = vi.mocked(DestinationService);
 beforeEach(() => {
   vi.clearAllMocks();
 
+  // Reset the shared router singleton before mounting. The component's
+  // immediate watcher on query.action (and the activeTab init read of
+  // query.tab) run during mount(), before mountAlertList can blank the query —
+  // so a leftover action/tab from an earlier test (e.g. "when action=add"
+  // pushes {action:"add"}) would asynchronously re-open the add/import dialog
+  // and hide the list (and its AppTabs), breaking every later assertion.
+  router.currentRoute.value.query = {};
+  router.currentRoute.value.params = {};
+  router.currentRoute.value.name = "alertList";
+
   // align store shape expected by component watchers
   // ensure foldersByType has 'alerts' key and alerts map exists
   (store.state as any).organizationData.foldersByType = [

@@ -65,6 +65,8 @@ pub enum CompositeServiceError {
     TooDeep,
     #[error("composite alert not found")]
     NotFound,
+    #[error("composite target folder does not exist")]
+    FolderNotFound,
     #[error("child alert is referenced by composite alerts")]
     ChildReferenced(Vec<composite_entity::Model>),
     #[error("composite graph lock unavailable: {0}")]
@@ -86,8 +88,23 @@ pub async fn create_composite(
     if request.id.is_some() {
         return Err(CompositeServiceError::ClientSuppliedId);
     }
+    ensure_folder_exists(&request.org, &request.folder_id).await?;
     request.id = Some(Ksuid::new(None, None).to_string());
     persist(request, false).await
+}
+
+/// Composite resources are folder-scoped exactly like alerts: the target folder
+/// must exist (the ordinary alert path creates the default folder on demand).
+async fn ensure_folder_exists(
+    org: &str,
+    folder_id: &str,
+) -> Result<(), CompositeServiceError> {
+    use config::meta::folder::FolderType;
+    match infra::table::folders::exists(org, folder_id, FolderType::Alerts).await {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(CompositeServiceError::FolderNotFound),
+        Err(error) => Err(CompositeServiceError::Scheduler(error.into())),
+    }
 }
 
 pub async fn update_composite(
@@ -318,7 +335,9 @@ async fn persist_under_lock(
         )
         .collect();
     let saved = if update {
-        alert_composites::update_with_children(db, model, children).await?
+        alert_composites::update_with_children(db, model, children)
+            .await
+            .map_err(map_update_error)?
     } else {
         alert_composites::create_with_children(db, model, children).await?
     };
@@ -433,6 +452,174 @@ pub async fn get_composite(
     Ok(alert_composites::get_by_id(db, org, id).await?)
 }
 
+/// Resolve a set of child IDs into evaluator inputs over their current rollup
+/// states — one batched definition read and one batched state read. Fails on a
+/// missing/corrupt child rather than fabricating a truth value.
+async fn resolve_child_inputs(
+    db: &DatabaseConnection,
+    org: &str,
+    child_ids: &[String],
+    stale_k: i64,
+    sweep_secs: i64,
+) -> Result<Vec<super::CompositeStateInput>, anyhow::Error> {
+    use config::meta::alerts::composite::alert_stale_deadline_micros;
+
+    let resolved = alert_composites::resolve_many(db, org, child_ids).await?;
+    let states = infra::table::alert_states::get_rollups(child_ids)
+        .await?
+        .into_iter()
+        .map(|state| (state.alert_id.clone(), state))
+        .collect::<HashMap<_, _>>();
+
+    let mut inputs = Vec::with_capacity(child_ids.len());
+    for id in child_ids {
+        let state = states.get(id);
+        let (name, alert_type, enabled, cadence_seconds, stale_deadline) = match resolved.get(id) {
+            Some(alert_composites::Resolution::Alert(model)) => {
+                let alert: config::meta::alerts::alert::Alert = model.clone().try_into()?;
+                if alert.is_real_time {
+                    anyhow::bail!("composite child is not eligible");
+                }
+                let stale_deadline = state
+                    .and_then(|state| state.level_at)
+                    .map(|level_at| {
+                        alert_stale_deadline_micros(
+                            level_at,
+                            &alert.trigger_condition,
+                            alert.tz_offset,
+                            stale_k,
+                        )
+                    })
+                    .transpose()?;
+                (
+                    alert.name,
+                    if alert.query_condition.slo_condition.is_some() {
+                        "slo"
+                    } else {
+                        "scheduled"
+                    },
+                    alert.enabled,
+                    alert.trigger_condition.frequency.max(1),
+                    stale_deadline,
+                )
+            }
+            Some(alert_composites::Resolution::Composite(model)) => (
+                model.name.clone(),
+                "composite",
+                model.enabled,
+                sweep_secs,
+                state.and_then(|state| state.level_at).and_then(|level_at| {
+                    sweep_secs
+                        .checked_mul(stale_k)
+                        .and_then(|seconds| seconds.checked_mul(1_000_000))
+                        .and_then(|window| level_at.checked_add(window))
+                }),
+            ),
+            _ => anyhow::bail!("composite child definition missing"),
+        };
+        inputs.push(super::CompositeStateInput {
+            alert_id: id.clone(),
+            name,
+            alert_type: alert_type.to_string(),
+            enabled,
+            level: state.and_then(|state| state.level),
+            level_at: state.and_then(|state| state.level_at),
+            effective_cadence_seconds: cadence_seconds,
+            stale_deadline,
+        });
+    }
+    Ok(inputs)
+}
+
+fn composite_stale_k() -> i64 {
+    std::env::var("ZO_ALERT_COMPOSITE_STALE_K")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(3)
+        .max(1)
+}
+
+fn composite_sweep_secs() -> i64 {
+    std::env::var("ZO_ALERT_COMPOSITE_SWEEP_SECS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(300)
+        .max(1)
+}
+
+/// Evaluate a composite definition over its persisted children and current
+/// rollup states, exactly as the scheduler would. Shared by the detail and
+/// validate endpoints so they render the same truth without re-running any
+/// child query. `Err` means the definition cannot currently be evaluated
+/// (missing/corrupt child, invalid cadence); callers degrade to a null result.
+pub async fn evaluate_definition(
+    db: &DatabaseConnection,
+    definition: &composite_entity::Model,
+    children: &[alert_composite_children::Model],
+) -> Result<super::CompositeEvaluation, anyhow::Error> {
+    use config::meta::alerts::composite::StaleChildPolicy;
+
+    let child_ids = children
+        .iter()
+        .map(|child| child.child_alert_id.clone())
+        .collect::<Vec<_>>();
+    let inputs = resolve_child_inputs(
+        db,
+        &definition.org,
+        &child_ids,
+        composite_stale_k(),
+        composite_sweep_secs(),
+    )
+    .await?;
+    let stale_policy = match definition.stale_child_policy {
+        1 => StaleChildPolicy::TreatAsFalse,
+        2 => StaleChildPolicy::TreatAsTrue,
+        _ => StaleChildPolicy::UseLastState,
+    };
+    Ok(super::CompositeEvaluator::evaluate(
+        &definition.expression,
+        inputs,
+        definition.warning_counts_as_firing,
+        stale_policy,
+        config::utils::time::now_micros(),
+    )?)
+}
+
+/// Evaluate a draft expression over its referenced children, for the advisory
+/// validate/preview endpoint. Resolves the operand set from the expression, not
+/// a persisted child index.
+pub async fn evaluate_expression(
+    db: &DatabaseConnection,
+    org: &str,
+    expression: &str,
+    warning_counts_as_firing: bool,
+    stale_child_policy: i16,
+) -> Result<super::CompositeEvaluation, anyhow::Error> {
+    use config::meta::alerts::composite::{StaleChildPolicy, collect_references, parse_expr};
+
+    let references = collect_references(&parse_expr(expression)?)?;
+    let inputs = resolve_child_inputs(
+        db,
+        org,
+        &references,
+        composite_stale_k(),
+        composite_sweep_secs(),
+    )
+    .await?;
+    let stale_policy = match stale_child_policy {
+        1 => StaleChildPolicy::TreatAsFalse,
+        2 => StaleChildPolicy::TreatAsTrue,
+        _ => StaleChildPolicy::UseLastState,
+    };
+    Ok(super::CompositeEvaluator::evaluate(
+        expression,
+        inputs,
+        warning_counts_as_firing,
+        stale_policy,
+        config::utils::time::now_micros(),
+    )?)
+}
+
 /// Advisory graph validation used by preview. Persistence repeats the same
 /// checks while holding the organization graph lock.
 pub async fn validate_composite_graph(
@@ -496,6 +683,14 @@ pub async fn delete_composite(org: &str, id: &str) -> Result<(), CompositeServic
 
 fn map_expression_error(error: CompositeError) -> CompositeServiceError {
     CompositeServiceError::InvalidExpression(error.to_string())
+}
+
+/// An update that finds no matching definition is a 404, not an internal error.
+fn map_update_error(error: sea_orm::DbErr) -> CompositeServiceError {
+    match error {
+        sea_orm::DbErr::RecordNotFound(_) => CompositeServiceError::NotFound,
+        other => CompositeServiceError::Database(other),
+    }
 }
 
 fn ensure_mutation_allowed() -> Result<(), CompositeServiceError> {

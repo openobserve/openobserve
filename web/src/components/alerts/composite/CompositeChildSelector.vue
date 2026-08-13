@@ -129,6 +129,19 @@ const optionLabel = (option: ChildOption) =>
             {{ raw(option.name ?? option.alert_id) }}
           </span>
           <span class="text-text-secondary flex shrink-0 items-center gap-2 text-xs">
+            <span
+              v-if="!option.enabled"
+              class="text-status-warning-text"
+              :data-test="`alerts-composite-child-disabled-${option.alert_id}`"
+            >
+              {{ t("alerts.composite.disabledChild") }}
+            </span>
+            <span class="font-medium" :data-test="`alerts-composite-child-level-${option.alert_id}`">
+              {{ raw(option.level ?? "—") }}
+            </span>
+            <span :data-test="`alerts-composite-child-freshness-${option.alert_id}`">
+              {{ option.stale ? t("alerts.composite.freshnessExpired") : t("alerts.composite.fresh") }}
+            </span>
             <span>{{ raw(option.folder_name ?? option.folder_id) }}</span>
             <span>{{ raw(option.alert_type) }}</span>
           </span>

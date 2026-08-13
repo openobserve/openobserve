@@ -271,6 +271,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </button>
                   </template>
                 </div>
+                <!-- Composite rows have no stream/query summary: show the
+                     name-resolved expression the backend supplied instead. -->
+                <span
+                  v-if="row.alert_type === 'Composite' && row.conditions && row.conditions !== '--'"
+                  class="text-text-secondary min-w-0 truncate text-xs"
+                  :title="row.conditions"
+                  :data-test="`alert-list-composite-expression-${row.alert_id}`"
+                >
+                  {{ row.conditions }}
+                </span>
                 <OTooltip
                   v-if="row.name"
                   :content="row.name"

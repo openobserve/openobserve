@@ -103,15 +103,54 @@ async fn persist_alert_run_state(
                 return false;
             }
         };
+        let at = now_micros();
         let plan = config::meta::alerts::grouping::plan_group_updates(
             alert_id,
             classification,
             &prev,
-            now_micros(),
+            at,
         );
         if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
             log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
             return false;
+        }
+
+        // A composite reads only this multi-alert's rollup row. Nudge its
+        // parents on a rollup transition or a stale-to-fresh return, exactly
+        // as the single-row path does — otherwise a grouped child is sweep-only.
+        let rollup = plan
+            .updates
+            .iter()
+            .find(|update| {
+                update
+                    .state
+                    .as_ref()
+                    .is_some_and(|state| state.group_key.as_str() == ROLLUP_GROUP_KEY)
+            });
+        let transition_changed = rollup.is_some_and(|update| update.transition.is_some());
+        let stale_to_fresh = prev
+            .get(ROLLUP_GROUP_KEY)
+            .and_then(|state| state.level_at)
+            .is_some_and(|level_at| {
+                config::meta::alerts::composite::alert_stale_deadline_micros(
+                    level_at,
+                    &alert.trigger_condition,
+                    alert.tz_offset,
+                    composite_stale_k(),
+                )
+                .map(|deadline| at > deadline)
+                .unwrap_or(false)
+            });
+        if transition_changed || stale_to_fresh {
+            let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            nudge_composite_parents(
+                db,
+                &alert.org_id,
+                alert_id,
+                infra::table::alert_composites::ChildKind::Alert,
+                at,
+            )
+            .await;
         }
         return true;
     }
@@ -170,6 +209,36 @@ async fn persist_alert_run_state(
     if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
         log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
         return false;
+    }
+
+    // Composite parents observe this rollup row. Nudge them on a level/outcome
+    // transition or a stale-to-fresh return so a composite over an ordinary or
+    // SLO child is event-driven, not only sweep-driven (§11.2). Repeated fresh
+    // same-level evaluations deliberately do not nudge.
+    let transition_changed = update.transition.is_some();
+    let stale_to_fresh = prev
+        .as_ref()
+        .and_then(|previous| previous.level_at)
+        .is_some_and(|level_at| {
+            config::meta::alerts::composite::alert_stale_deadline_micros(
+                level_at,
+                &alert.trigger_condition,
+                alert.tz_offset,
+                composite_stale_k(),
+            )
+            .map(|deadline| now > deadline)
+            .unwrap_or(false)
+        });
+    if transition_changed || stale_to_fresh {
+        let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        nudge_composite_parents(
+            db,
+            &alert.org_id,
+            alert_id,
+            infra::table::alert_composites::ChildKind::Alert,
+            now,
+        )
+        .await;
     }
     true
 }
@@ -531,6 +600,78 @@ pub async fn handle_triggers(
     }
 }
 
+fn composite_debounce_secs() -> i64 {
+    std::env::var("ZO_ALERT_COMPOSITE_DEBOUNCE_SECS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(15)
+        .max(1)
+}
+
+fn composite_sweep_secs() -> i64 {
+    std::env::var("ZO_ALERT_COMPOSITE_SWEEP_SECS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(300)
+        .max(1)
+}
+
+fn composite_stale_k() -> i64 {
+    std::env::var("ZO_ALERT_COMPOSITE_STALE_K")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(3)
+        .max(1)
+}
+
+/// Advance composite parents after a committed rollup write that changes what
+/// they observe (a level/outcome transition, or a stale-to-fresh return at the
+/// same level). Idempotent and coalesced: `next_run_at` is only ever pulled
+/// earlier, never pushed out.
+async fn nudge_composite_parents(
+    db: &sea_orm::DatabaseConnection,
+    org: &str,
+    child_id: &str,
+    child_kind: infra::table::alert_composites::ChildKind,
+    now: i64,
+) {
+    let parents =
+        match infra::table::alert_composites::list_parents(db, org, child_kind, child_id).await {
+            Ok(parents) => parents,
+            Err(error) => {
+                log::error!("[COMPOSITE_ALERT] failed to look up parents for {child_id}: {error}");
+                return;
+            }
+        };
+    for parent in parents {
+        // Order matters: generation first, then the job advance. A completion
+        // that later re-reads the generation must observe the nudge.
+        if let Err(error) =
+            infra::table::alert_composites::increment_evaluation_generation(db, org, &parent.id)
+                .await
+        {
+            log::error!(
+                "[COMPOSITE_ALERT] failed to increment generation for parent {}: {error}",
+                parent.id
+            );
+            continue;
+        }
+        if let Ok(mut parent_job) =
+            infra::scheduler::get(org, db::scheduler::TriggerModule::CompositeAlert, &parent.id)
+                .await
+        {
+            let debounce_at = now + composite_debounce_secs() * 1_000_000;
+            parent_job.next_run_at = parent_job.next_run_at.min(debounce_at);
+            if let Err(error) = infra::scheduler::update_trigger(parent_job, false).await {
+                log::error!(
+                    "[COMPOSITE_ALERT] failed to advance parent {}: {error}",
+                    parent.id
+                );
+            }
+        }
+    }
+}
+
 /// Composite jobs are routed explicitly by their append-only scheduler
 /// module. The definition/evaluation service is intentionally separate from
 /// the query-alert handler so a composite can never execute child queries.
@@ -695,7 +836,7 @@ async fn handle_composite_alert_trigger(
         now,
     );
 
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
+    use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait};
     let transaction = db.begin().await?;
     let lease_deadline = now + config::get_config().limit.alert_schedule_timeout * 1_000_000;
     if !infra::scheduler::renew_claim_in_transaction(
@@ -709,11 +850,14 @@ async fn handle_composite_alert_trigger(
         transaction.rollback().await?;
         return Ok(());
     }
-    let current =
-        infra::table::entity::alert_composites::Entity::find_by_id(&definition.definition.id)
-            .filter(infra::table::entity::alert_composites::Column::Org.eq(&trigger.org))
-            .one(&transaction)
-            .await?;
+    let mut current_query = infra::table::entity::alert_composites::Entity::find_by_id(
+        &definition.definition.id,
+    )
+    .filter(infra::table::entity::alert_composites::Column::Org.eq(&trigger.org));
+    if transaction.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+        current_query = current_query.lock(sea_orm::sea_query::LockType::Update);
+    }
+    let current = current_query.one(&transaction).await?;
     if current.is_none_or(|current| {
         !current.enabled
             || current.evaluation_generation != definition.definition.evaluation_generation
@@ -841,54 +985,51 @@ async fn handle_composite_alert_trigger(
         }
     }
 
+    // Publish composite history through the existing trigger path with an
+    // `alert_type="composite"` discriminator (§12.4). `actual_value` is the
+    // boolean result (1/0); threshold fields are absent.
+    publish_triggers_usage(TriggerData {
+        _timestamp: now,
+        org: trigger.org.clone(),
+        module: TriggerDataType::CompositeAlert,
+        key: format!("{}/{}", definition.definition.name, definition.definition.id),
+        status: outcome.clone(),
+        actual_value: Some(i32::from(evaluated.result) as f64),
+        level: Some(evaluated.level.to_i32()),
+        scheduler_trace_id: Some(trace_id.to_string()),
+        retries: trigger.retries,
+        is_realtime: trigger.is_realtime,
+        is_silenced: trigger.is_silenced,
+        start_time: now,
+        end_time: now,
+        next_run_at: trigger.next_run_at,
+        ..Default::default()
+    });
+
     let significant = previous.as_ref().is_none_or(|previous| {
         previous.level != Some(evaluated.level)
             || previous.last_outcome.as_ref() != Some(&outcome)
             || previous.level_at.is_some_and(|level_at| {
-                evaluated
-                    .children
-                    .iter()
-                    .any(|child| child.stale && child.level_at == Some(level_at))
+                // Composite staleness is measured against
+                // `ZO_ALERT_COMPOSITE_STALE_K * ZO_ALERT_COMPOSITE_SWEEP_SECS`.
+                // If the composite was stale before this run and just wrote a
+                // fresh `level_at`, its parent must re-evaluate even at an
+                // unchanged level.
+                let window = composite_stale_k()
+                    .saturating_mul(composite_sweep_secs())
+                    .saturating_mul(1_000_000);
+                now.saturating_sub(level_at) > window
             })
     });
     if significant {
-        let parents = infra::table::alert_composites::list_parents(
+        nudge_composite_parents(
             db,
             &trigger.org,
-            infra::table::alert_composites::ChildKind::Composite,
             &definition.definition.id,
+            infra::table::alert_composites::ChildKind::Composite,
+            now,
         )
-        .await?;
-        for parent in parents {
-            infra::table::alert_composites::increment_evaluation_generation(
-                db,
-                &trigger.org,
-                &parent.id,
-            )
-            .await?;
-            if let Ok(mut parent_job) = infra::scheduler::get(
-                &trigger.org,
-                db::scheduler::TriggerModule::CompositeAlert,
-                &parent.id,
-            )
-            .await
-            {
-                let debounce_at = now
-                    + std::env::var("ZO_ALERT_COMPOSITE_DEBOUNCE_SECS")
-                        .ok()
-                        .and_then(|value| value.parse::<i64>().ok())
-                        .unwrap_or(15)
-                        .max(1)
-                        * 1_000_000;
-                parent_job.next_run_at = parent_job.next_run_at.min(debounce_at);
-                if let Err(error) = infra::scheduler::update_trigger(parent_job, false).await {
-                    log::error!(
-                        "[COMPOSITE_ALERT] failed to advance parent {}: {error}",
-                        parent.id
-                    );
-                }
-            }
-        }
+        .await;
     }
 
     log::info!(
@@ -904,13 +1045,7 @@ async fn handle_composite_alert_trigger(
             .filter(|child| child.stale)
             .count(),
     );
-    let sweep_at = now
-        + std::env::var("ZO_ALERT_COMPOSITE_SWEEP_SECS")
-            .ok()
-            .and_then(|value| value.parse::<i64>().ok())
-            .unwrap_or(300)
-            .max(1)
-            * 1_000_000;
+    let sweep_at = now + composite_sweep_secs() * 1_000_000;
     trigger.status = db::scheduler::TriggerStatus::Waiting;
     trigger.next_run_at = evaluated
         .next_stale_deadline
@@ -918,6 +1053,23 @@ async fn handle_composite_alert_trigger(
         .unwrap_or(sweep_at);
     if let Some(retry_at) = delivery_retry_at {
         trigger.next_run_at = trigger.next_run_at.min(retry_at);
+    }
+    // Lost-wakeup protection (§11.4): a child nudge, manual trigger, or
+    // mutation that lands after the state transaction commits advances
+    // `evaluation_generation`. If the generation has moved past the snapshot
+    // taken at the start of this run, completion must schedule another run no
+    // later than `now + debounce` rather than overwrite that event with the
+    // sweep deadline.
+    if let Ok(Some(current_generation)) = infra::table::alert_composites::current_generation(
+        db,
+        &trigger.org,
+        &trigger.module_key,
+    )
+    .await
+        && current_generation > definition.definition.evaluation_generation
+    {
+        trigger.next_run_at =
+            trigger.next_run_at.min(now + composite_debounce_secs() * 1_000_000);
     }
     trigger.data = config::utils::json::to_string(&scheduled_data)?;
     let _ = infra::scheduler::complete_claim(trigger).await?;

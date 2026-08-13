@@ -65,6 +65,16 @@ const stalePolicyOptions = computed(() => [
   { label: t("alerts.composite.treatStaleFalse"), value: "treat_as_false" },
   { label: t("alerts.composite.treatStaleTrue"), value: "treat_as_true" },
 ]);
+const stalePolicyHelp = computed(() => {
+  switch (draft.value.composite_condition.stale_child_policy) {
+    case "treat_as_false":
+      return t("alerts.composite.treatStaleFalseHelp");
+    case "treat_as_true":
+      return t("alerts.composite.treatStaleTrueHelp");
+    default:
+      return t("alerts.composite.useLastStateHelp");
+  }
+});
 
 const updateCondition = (
   patch: Partial<CompositeAlertDraft["composite_condition"]>,
@@ -189,7 +199,7 @@ watch(
           class="text-text-secondary text-xs"
           data-test="alerts-composite-stale-policy-help"
         >
-          {{ t("alerts.composite.useLastStateHelp") }}
+          {{ stalePolicyHelp }}
         </span>
       </div>
     </div>

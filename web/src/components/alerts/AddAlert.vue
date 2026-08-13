@@ -285,6 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :folder-id="activeFolderId as string"
                     :available-children="availableCompositeChildren"
                     @update:model-value="updateCompositeDraft"
+                    @validation="onCompositeValidation"
                   />
                   <QueryConfig
                     v-else
@@ -431,6 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm-action"
               :loading="isSubmitting || (isAnomalyMode && anomalySaving)"
+              :disabled="compositeSaveDisabled"
               @click="handleSave"
               >{{
                 isAnomalyMode && !anomalyEditMode ? t("alerts.saveAndTrain") : t("alerts.save")
@@ -711,12 +713,33 @@ export default defineComponent({
       }
     };
 
-    watch(isCompositeMode, (enabled) => enabled && loadCompositeChildren(), { immediate: true });
-
     const updateCompositeDraft = (draft: any) => {
       alertForm.setF("composite_condition", draft.composite_condition);
       alertForm.setF("children", draft.children ?? []);
     };
+
+    // Composite drafts validate asynchronously against the server; until the
+    // form reports a valid expression the Save button stays disabled (the schema
+    // blocks a bad expression on submit too — this is the visible affordance).
+    const compositeValidation = ref<{ valid: boolean }>({ valid: false });
+    const compositeSaveDisabled = computed(
+      () => isCompositeMode.value && compositeValidation.value.valid !== true,
+    );
+    const onCompositeValidation = (value: { valid: boolean }) => {
+      compositeValidation.value = value;
+    };
+
+    watch(
+      isCompositeMode,
+      (enabled) => {
+        if (!enabled) return;
+        // Fresh draft → re-validate before the button can re-enable on a stale
+        // `valid` from a previous visit to composite mode.
+        compositeValidation.value = { valid: false };
+        loadCompositeChildren();
+      },
+      { immediate: true },
+    );
 
     // Auto-expand preview when stream name is selected, collapse when cleared
     watch(
@@ -843,6 +866,8 @@ export default defineComponent({
       isCompositeMode,
       availableCompositeChildren,
       updateCompositeDraft,
+      compositeSaveDisabled,
+      onCompositeValidation,
     };
   },
 });

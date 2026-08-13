@@ -609,6 +609,13 @@ fn resolve_module_configs(
             poll_interval_secs: default_interval,
         },
         ModuleSchedulerConfig {
+            module: TriggerModule::CompositeAlert,
+            // Composite evaluation reuses the ordinary alert scheduler budget and
+            // cadence (§9.4); it has no dedicated concurrency/interval vars.
+            concurrency: default_concurrency,
+            poll_interval_secs: default_interval,
+        },
+        ModuleSchedulerConfig {
             module: TriggerModule::Report,
             concurrency: pick_concurrency(cfg.limit.scheduler_report_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_report_interval),
@@ -782,12 +789,13 @@ mod tests {
         // never be pulled once per-module pullers are enabled.
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &make_config());
-        assert_eq!(configs.len(), 8);
+        assert_eq!(configs.len(), 9);
         let modules: std::collections::HashSet<_> =
             configs.iter().map(|c| c.module.clone()).collect();
-        assert_eq!(modules.len(), 8, "duplicate module in resolved configs");
+        assert_eq!(modules.len(), 9, "duplicate module in resolved configs");
         for m in [
             TriggerModule::Alert,
+            TriggerModule::CompositeAlert,
             TriggerModule::Report,
             TriggerModule::DerivedStream,
             TriggerModule::Backfill,
@@ -810,6 +818,7 @@ mod tests {
 
         for m in [
             TriggerModule::Alert,
+            TriggerModule::CompositeAlert,
             TriggerModule::Report,
             TriggerModule::DerivedStream,
             TriggerModule::AnomalyDetection,

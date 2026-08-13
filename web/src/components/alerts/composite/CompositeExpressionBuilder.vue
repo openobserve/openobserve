@@ -71,6 +71,11 @@ const appendToken = (token: string): void => {
   emit("update:modelValue", `${props.modelValue}${separator}${token}`);
 };
 
+// Place an operand-tray child into the expression (submit IDs, present names).
+const placeChild = (id: string): void => {
+  appendToken(`{${id}}`);
+};
+
 const removeChild = (id: string): void => {
   emit("update:modelValue", removeExpressionOperand(props.modelValue, id));
   emit("remove-child", id);
@@ -187,15 +192,17 @@ onMounted(maybeApplyDefault);
       data-test="alerts-composite-expression-unused"
     >
       <span class="text-text-secondary text-xs">{{ t("alerts.composite.unusedChildren") }}</span>
-      <OBadge
+      <OButton
         v-for="child in unusedChildren"
         :key="child.alert_id"
-        variant="warning-soft"
-        size="sm"
+        variant="ghost-primary"
+        size="xs"
         :data-test="`alerts-composite-operand-tray-${child.alert_id}`"
+        :aria-label="t('alerts.composite.placeOperand', { name: child.name ?? child.alert_id })"
+        @click="placeChild(child.alert_id)"
       >
         {{ raw(child.name ?? child.alert_id) }}
-      </OBadge>
+      </OButton>
     </div>
   </section>
 </template>

@@ -209,6 +209,7 @@ struct ConfigResponse<'a> {
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
+    composite_alerts_available: bool,
     synthetics_enabled: bool,
     /// Chrome Web Store URL of the OpenObserve Recorder extension
     /// (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
@@ -372,6 +373,12 @@ pub async fn zo_config() -> impl IntoResponse {
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
+    // Composite alerts are available for creation when writes are not gated off
+    // and the deployment is not running super-cluster mode (§18, §19.2).
+    let composite_alerts_available = std::env::var("ZO_ALERT_COMPOSITE_WRITES_ENABLED")
+        .ok()
+        .is_none_or(|value| !matches!(value.to_ascii_lowercase().as_str(), "0" | "false" | "no"))
+        && !super_cluster_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
     let synthetics_recorder_extension_url =
@@ -489,6 +496,7 @@ pub async fn zo_config() -> impl IntoResponse {
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
         anomaly_detection_enabled,
+        composite_alerts_available,
         synthetics_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         enable_cross_linking: cfg.common.enable_cross_linking,

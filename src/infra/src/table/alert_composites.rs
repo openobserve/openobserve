@@ -215,6 +215,18 @@ pub async fn load_graph<C: ConnectionTrait>(
     Ok(graph)
 }
 
+pub async fn current_generation<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+) -> Result<Option<i64>, sea_orm::DbErr> {
+    Ok(alert_composites::Entity::find_by_id(id)
+        .filter(alert_composites::Column::Org.eq(org))
+        .one(conn)
+        .await?
+        .map(|definition| definition.evaluation_generation))
+}
+
 pub async fn increment_evaluation_generation<C: ConnectionTrait>(
     conn: &C,
     org: &str,

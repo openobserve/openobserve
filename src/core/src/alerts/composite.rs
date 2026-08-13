@@ -20,8 +20,8 @@ pub use runtime::{
 };
 pub use service::{
     CompositeCreate, CompositeServiceError, clone_composite, create_composite, delete_composite,
-    get_composite, move_composite, set_composite_enabled, trigger_composite, update_composite,
-    validate_composite_graph,
+    evaluate_definition, evaluate_expression, get_composite, move_composite, set_composite_enabled,
+    trigger_composite, update_composite, validate_composite_graph,
 };
 
 #[cfg(test)]

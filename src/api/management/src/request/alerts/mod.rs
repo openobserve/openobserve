@@ -298,6 +298,35 @@ async fn composite_detail_response(
     .await
     .is_ok();
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // Evaluate exactly as the scheduler would (system context, no child query).
+    // Inaccessible children are masked below; a failed evaluation degrades to
+    // nulls rather than failing the whole read.
+    let evaluation = openobserve_core::alerts::composite::evaluate_definition(
+        db,
+        &definition,
+        &composite.children,
+    )
+    .await
+    .ok();
+    let evaluated_by_id = evaluation
+        .as_ref()
+        .map(|evaluation| {
+            evaluation
+                .children
+                .iter()
+                .map(|child| (child.alert_id.clone(), child.clone()))
+                .collect::<std::collections::HashMap<_, _>>()
+        })
+        .unwrap_or_default();
+    let composite_state = infra::table::alert_states::get(
+        &definition.id,
+        config::meta::alerts::state::ROLLUP_GROUP_KEY,
+    )
+    .await
+    .ok()
+    .flatten();
+
     let mut children = Vec::with_capacity(composite.children.len());
     for child in composite.children {
         #[cfg(feature = "enterprise")]
@@ -352,6 +381,7 @@ async fn composite_detail_response(
             ),
             _ => (None, None, None, None),
         };
+        let evaluated = evaluated_by_id.get(&child.child_alert_id);
         children.push(serde_json::json!({
             "alert_id": child.child_alert_id,
             "accessible": name.is_some(),
@@ -359,14 +389,21 @@ async fn composite_detail_response(
             "alert_type": alert_type,
             "folder_id": folder_id,
             "enabled": enabled,
-            "level": null,
-            "level_at": null,
+            "level": evaluated.and_then(|child| child.level).map(|level| level.to_string()),
+            "level_at": evaluated.and_then(|child| child.level_at),
             "effective_cadence_seconds": null,
-            "stale_deadline": null,
-            "stale": true,
-            "truth": false,
+            "stale_deadline": evaluated.map(|child| child.stale_deadline),
+            "stale": evaluated.map(|child| child.stale).unwrap_or(true),
+            "truth": evaluated.map(|child| child.truth).unwrap_or(false),
         }));
     }
+    let evaluation_json = evaluation.map(|evaluation| {
+        serde_json::json!({
+            "result": evaluation.result,
+            "level": evaluation.level.to_string(),
+            "evaluated_at": composite_state.and_then(|state| state.level_at),
+        })
+    });
     MetaHttpResponse::json(serde_json::json!({
         "id": definition.id,
         "alert_type": "composite",
@@ -389,7 +426,7 @@ async fn composite_detail_response(
             "stale_child_policy": stale_policy_name(definition.stale_child_policy),
         },
         "children": children,
-        "evaluation": null,
+        "evaluation": evaluation_json,
     }))
 }
 
@@ -469,6 +506,9 @@ fn composite_error_response(
         }
         CompositeServiceError::NotFound => {
             composite_machine_error(StatusCode::NOT_FOUND, "composite_not_found", error)
+        }
+        CompositeServiceError::FolderNotFound => {
+            composite_machine_error(StatusCode::NOT_FOUND, "composite_folder_not_found", error)
         }
         CompositeServiceError::ChildReferenced(_) => {
             composite_machine_error(StatusCode::CONFLICT, "child_referenced", error)
@@ -612,9 +652,6 @@ pub async fn validate_composite_alert(
                     "alert_type": if alert.slo_id.is_some() { "slo" } else { "scheduled" },
                     "folder_id": alert.folder_id,
                     "enabled": alert.enabled,
-                    "stale": true,
-                    "truth": false,
-                    "stale_deadline": null,
                 }));
             }
             Ok(infra::table::alert_composites::Resolution::Composite(composite)) => {
@@ -625,9 +662,6 @@ pub async fn validate_composite_alert(
                     "alert_type": "composite",
                     "folder_id": composite.folder_id,
                     "enabled": composite.enabled,
-                    "stale": true,
-                    "truth": false,
-                    "stale_deadline": null,
                 }));
             }
             _ => inaccessible.push(id),
@@ -646,22 +680,67 @@ pub async fn validate_composite_alert(
         Ok(expression) => expression,
         Err(error) => return composite_error_response(error),
     };
+
+    // Current truth/result for the advisory preview. Degrades to nulls rather
+    // than failing the whole validation when a child cannot be evaluated.
+    let evaluation = openobserve_core::alerts::composite::evaluate_expression(
+        db,
+        &org_id,
+        &request.composite_condition.expression,
+        request.composite_condition.warning_counts_as_firing,
+        request.composite_condition.stale_child_policy.storage_id(),
+    )
+    .await
+    .ok();
+    let evaluated_by_id = evaluation
+        .as_ref()
+        .map(|evaluation| {
+            evaluation
+                .children
+                .iter()
+                .map(|child| (child.alert_id.clone(), child.clone()))
+                .collect::<std::collections::HashMap<_, _>>()
+        })
+        .unwrap_or_default();
+
+    let mut warnings = Vec::new();
+    for child in &mut children {
+        let id = child["alert_id"].as_str().unwrap_or_default().to_string();
+        let evaluated = evaluated_by_id.get(&id);
+        child["level"] = evaluated
+            .and_then(|child| child.level)
+            .map(|level| serde_json::json!(level.to_string()))
+            .unwrap_or(serde_json::Value::Null);
+        child["level_at"] = evaluated
+            .and_then(|child| child.level_at)
+            .map(|level_at| serde_json::json!(level_at))
+            .unwrap_or(serde_json::Value::Null);
+        child["stale_deadline"] = evaluated
+            .map(|child| serde_json::json!(child.stale_deadline))
+            .unwrap_or(serde_json::Value::Null);
+        child["stale"] = serde_json::json!(evaluated.map(|child| child.stale).unwrap_or(true));
+        child["truth"] = serde_json::json!(evaluated.map(|child| child.truth).unwrap_or(false));
+
+        if child["enabled"].as_bool() == Some(false) {
+            warnings.push(serde_json::json!({"code": "child_disabled", "alert_id": id}));
+        }
+        if evaluated.and_then(|child| child.level_at).is_none() {
+            warnings.push(serde_json::json!({"code": "child_never_evaluated", "alert_id": id}));
+        }
+    }
+
+    let (result, result_level) = evaluation
+        .as_ref()
+        .map(|evaluation| (evaluation.result, evaluation.level.to_string()))
+        .unwrap_or((false, "ok".to_string()));
+
     MetaHttpResponse::json(serde_json::json!({
         "valid": true,
         "canonical_expression": canonical_expression,
         "children": children,
-        "result": false,
-        "result_level": "ok",
-        "warnings": children.iter().flat_map(|child| {
-            let mut warnings = Vec::new();
-            if child.get("enabled").and_then(serde_json::Value::as_bool) == Some(false) {
-                warnings.push(serde_json::json!({"code": "child_disabled", "alert_id": child["alert_id"]}));
-            }
-            if child.get("level_at").is_none_or(serde_json::Value::is_null) {
-                warnings.push(serde_json::json!({"code": "child_never_evaluated", "alert_id": child["alert_id"]}));
-            }
-            warnings
-        }).collect::<Vec<_>>(),
+        "result": result,
+        "result_level": result_level,
+        "warnings": warnings,
     }))
 }
 

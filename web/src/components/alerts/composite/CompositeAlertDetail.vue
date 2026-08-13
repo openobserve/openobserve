@@ -64,6 +64,23 @@ const detailResult = computed(() =>
         ? t("alerts.composite.falseResult")
         : t("alerts.composite.unknownResult"),
 );
+
+const staleReasonLabel = (code: string): ReturnType<typeof t> | ReturnType<typeof raw> => {
+  const known: Record<string, ReturnType<typeof t>> = {
+    freshness_expired: t("alerts.composite.freshnessExpired"),
+    never_evaluated: t("alerts.composite.neverEvaluated"),
+    disabled: t("alerts.composite.disabledChild"),
+  };
+  return known[code] ?? raw(code);
+};
+
+const childReason = (
+  child: CompositeAlertReadableChild,
+): ReturnType<typeof t> | ReturnType<typeof raw> | null => {
+  if (child.stale_reason) return staleReasonLabel(child.stale_reason);
+  if (child.last_outcome === "error") return t("alerts.composite.evaluationError");
+  return null;
+};
 </script>
 
 <template>
@@ -85,6 +102,13 @@ const detailResult = computed(() =>
         >
           {{ detailResult }}
         </OBadge>
+        <div
+          v-if="value.evaluation?.evaluated_at"
+          class="text-text-secondary mt-2 text-xs"
+          data-test="alerts-composite-detail-evaluated-at"
+        >
+          {{ t("alerts.composite.evaluatedAt", { time: formatMicros(value.evaluation.evaluated_at) }) }}
+        </div>
       </div>
       <div class="border-border-default bg-surface-subtle rounded-surface border p-4">
         <div class="text-text-secondary text-xs">{{ t("alerts.composite.warningPolicy") }}</div>
@@ -151,6 +175,13 @@ const detailResult = computed(() =>
               data-test="alerts-composite-detail-freshness"
             >
               {{ row.stale ? t("alerts.composite.freshnessExpired") : t("alerts.composite.fresh") }}
+            </span>
+            <span
+              v-if="childReason(row)"
+              class="text-text-secondary block text-xs"
+              data-test="alerts-composite-detail-stale-reason"
+            >
+              {{ childReason(row) }}
             </span>
           </template>
           <span v-else class="font-mono text-xs">{{ raw(row.alert_id) }}</span>

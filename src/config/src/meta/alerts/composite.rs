@@ -488,6 +488,24 @@ fn evaluate_preflighted(
     })
 }
 
+/// Evaluate an expression over precomputed per-child truth values. The caller
+/// has already resolved staleness/policy against each child's *schedule-aware*
+/// deadline; this only combines the booleans by operator precedence. It must
+/// not re-derive staleness from cadence, or a cron child (whose cadence is a
+/// placeholder) would diverge from the diagnostics the caller computed.
+pub fn evaluate_truths(expr: &CompositeExpr, truths: &HashMap<String, bool>) -> bool {
+    match expr {
+        CompositeExpr::Child(id) => truths[id],
+        CompositeExpr::And(left, right) => {
+            evaluate_truths(left, truths) && evaluate_truths(right, truths)
+        }
+        CompositeExpr::Or(left, right) => {
+            evaluate_truths(left, truths) || evaluate_truths(right, truths)
+        }
+        CompositeExpr::Not(inner) => !evaluate_truths(inner, truths),
+    }
+}
+
 /// Level a composite reports.
 ///
 /// OPEN DECISION (D9): a firing composite is always `Critical` — composites

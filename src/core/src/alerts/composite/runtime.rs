@@ -15,8 +15,7 @@ use std::collections::{HashMap, HashSet};
 
 use config::meta::alerts::{
     composite::{
-        ChildState, CompositeError, CompositeExpr, StaleChildPolicy, evaluate_expr, parse_expr,
-        result_level,
+        CompositeExpr, StaleChildPolicy, evaluate_truths, parse_expr, result_level,
     },
     level::AlertLevel,
 };
@@ -123,8 +122,8 @@ impl CompositeEvaluator {
             ));
         }
 
-        let mut states = HashMap::with_capacity(references.len());
         let mut diagnostics = Vec::with_capacity(references.len());
+        let mut truths = HashMap::with_capacity(references.len());
         let mut next_stale_deadline: Option<i64> = None;
         for reference in references {
             let input = inputs
@@ -158,14 +157,7 @@ impl CompositeEvaluator {
                         .map_or(stale_deadline, |current| current.min(stale_deadline)),
                 );
             }
-            states.insert(
-                reference.clone(),
-                ChildState {
-                    level: input.level,
-                    level_at: input.level_at,
-                    frequency_secs: input.effective_cadence_seconds,
-                },
-            );
+            truths.insert(reference.clone(), truth);
             diagnostics.push(EvaluatedChild {
                 alert_id: reference,
                 name: input.name.clone(),
@@ -179,14 +171,9 @@ impl CompositeEvaluator {
             });
         }
 
-        let result = evaluate_expr(
-            &parsed,
-            &states,
-            warning_counts_as_firing,
-            stale_policy,
-            now,
-        )
-        .map_err(map_evaluation_error)?;
+        // Combine the schedule-aware truths; never re-derive staleness from
+        // cadence (a cron child's placeholder cadence would diverge here).
+        let result = evaluate_truths(&parsed, &truths);
         Ok(CompositeEvaluation {
             result,
             level: result_level(result),
@@ -234,9 +221,39 @@ fn level_truth(level: Option<AlertLevel>, warning_counts_as_firing: bool) -> boo
     }
 }
 
-fn map_evaluation_error(error: CompositeError) -> EvaluationFailure {
-    match error {
-        CompositeError::UnknownChild(id) => EvaluationFailure::ChildMissing(id),
-        other => EvaluationFailure::InvalidExpression(other.to_string()),
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use svix_ksuid::KsuidLike as _;
+
+    #[test]
+    fn cron_child_uses_schedule_aware_deadline_not_placeholder_cadence() {
+        // A cron child has a placeholder cadence (1s) but a schedule-aware
+        // `stale_deadline` hours away. The firing decision must not re-derive
+        // staleness from the placeholder cadence (which would mark it stale
+        // after ~3s), nor may it diverge from the returned diagnostics.
+        let child_id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let now = 1_786_500_000_000_000;
+        let evaluation = CompositeEvaluator::evaluate(
+            &format!("{{{child_id}}}"),
+            vec![CompositeStateInput {
+                alert_id: child_id,
+                name: "cron-child".to_string(),
+                alert_type: "scheduled".to_string(),
+                enabled: true,
+                level: Some(AlertLevel::Critical),
+                level_at: Some(now - 60_000_000),
+                effective_cadence_seconds: 1,
+                stale_deadline: Some(now + 3 * 3_600 * 1_000_000),
+            }],
+            true,
+            StaleChildPolicy::UseLastState,
+            now,
+        )
+        .unwrap();
+
+        assert!(evaluation.result, "cron child must fire");
+        assert!(!evaluation.children[0].stale);
+        assert!(evaluation.children[0].truth);
     }
 }

@@ -109,8 +109,8 @@ export const defaultAlertValue: any = () => {
     is_real_time: "false",
     composite_condition: {
       expression: "",
-      warning_counts_as_firing: false,
-      stale_child_policy: "treat_as_false",
+      warning_counts_as_firing: true,
+      stale_child_policy: "use_last_state",
     },
     children: [],
     query_condition: {

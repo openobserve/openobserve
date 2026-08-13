@@ -23,11 +23,24 @@ const value = computed(
   () => props.preview as unknown as CompositeAlertValidationResponse,
 );
 const rows = computed(() => value.value.children ?? []);
+// Direct operand negation (`!{id}`) inverts that child's truth in the final
+// boolean. Negated GROUPS are not attributed to their members here — the
+// inversion belongs to the group, not to any one child.
+const negatedIds = computed(() => {
+  const ids = new Set<string>();
+  const expression = value.value.canonical_expression ?? "";
+  for (const match of expression.matchAll(/!\{([^{}]+)\}/g)) {
+    if (match[1]) ids.add(match[1]);
+  }
+  return ids;
+});
 const columns = computed<OTableColumnDef<CompositeAlertChild>[]>(() => [
   { id: "child", header: t("alerts.composite.child"), accessorKey: "alert_id" },
   { id: "level", header: t("alerts.composite.level"), accessorKey: "level" },
   { id: "truth", header: t("alerts.composite.mappedTruth"), accessorKey: "truth" },
   { id: "freshness", header: t("alerts.composite.freshness"), accessorKey: "stale" },
+  { id: "lastComputed", header: t("alerts.composite.lastComputed"), accessorKey: "level_at" },
+  { id: "negation", header: t("alerts.composite.negation"), accessorKey: "alert_id" },
 ]);
 
 const readable = (child: CompositeAlertChild): child is CompositeAlertReadableChild =>
@@ -142,6 +155,19 @@ const formatMicros = (value?: number | null): ReturnType<typeof raw> =>
           <span v-if="row.stale">{{ t("alerts.composite.freshnessExpired") }}</span>
           <span v-else>{{ t("alerts.composite.fresh") }}</span>
         </template>
+      </template>
+      <template #cell-lastComputed="{ row }">
+        <span
+          v-if="readable(row)"
+          data-test="alerts-composite-preview-level-at"
+        >
+          {{ formatMicros(row.level_at) }}
+        </span>
+      </template>
+      <template #cell-negation="{ row }">
+        <span v-if="readable(row)">
+          {{ negatedIds.has(row.alert_id) ? t("alerts.composite.negated") : raw("—") }}
+        </span>
       </template>
     </OTable>
   </section>
