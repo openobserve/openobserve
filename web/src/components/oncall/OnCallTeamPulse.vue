@@ -1,0 +1,358 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!--
+  The four questions somebody has about a team before they read anything else:
+  who is holding the pager, who catches it if they miss it, how far the ladder
+  reaches before it gives up, and how the last week actually went.
+
+  The ladder and the week's figures come from `GET .../overview`, counted in the
+  database over the window. The shift's start and handover come from the
+  SCHEDULE instead, because the overview names who is on call but carries no
+  instants — a slot has no start and no end.
+-->
+<template>
+  <div class="grid grid-cols-1 gap-px md:grid-cols-2 xl:grid-cols-4" data-test="oncall-team-pulse">
+    <!-- ── On call now ─────────────────────────────────────────── -->
+    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
+      <span class="flex items-center gap-1.5">
+        <OIcon name="notifications-active" size="xs" class="text-text-secondary" />
+        <OText variant="section">{{ t("oncall.teamOnCallNow") }}</OText>
+      </span>
+
+      <template v-if="holder">
+        <span class="flex flex-wrap items-center gap-2">
+          <OUserCell :value="holder.user_email" />
+          <OTag variant="success-soft" size="sm">{{ raw(holder.rotation) }}</OTag>
+        </span>
+        <p class="text-text-secondary text-xs" data-test="oncall-pulse-shift">
+          {{ shiftLine }}
+        </p>
+
+        <!-- Would a page to this person actually land, per channel. Every
+             verdict carries the server's own reason, so a blocked channel says
+             WHY rather than failing quietly at 3am. -->
+        <span v-if="holderChannels.length" class="flex flex-wrap items-center gap-1">
+          <OTag
+            v-for="entry in holderChannels"
+            :key="entry.channel"
+            :variant="entry.deliverable ? 'success-soft' : 'error-soft'"
+            size="sm"
+            :data-test="`oncall-pulse-channel-${entry.channel}`"
+          >
+            {{ channelLabel(entry) }}
+            <OTooltip
+              v-if="entry.blocked_because"
+              side="bottom"
+              :content="raw(entry.blocked_because)"
+            />
+          </OTag>
+        </span>
+      </template>
+      <p v-else class="text-status-error-text text-sm" data-test="oncall-pulse-nobody">
+        {{ t("oncall.nobodyOnCallShort") }}
+      </p>
+    </section>
+
+    <!-- ── Backing them up ─────────────────────────────────────── -->
+    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
+      <span class="flex items-center gap-1.5">
+        <OIcon name="group-work" size="xs" class="text-text-secondary" />
+        <OText variant="section">{{ t("oncall.teamBackingUp") }}</OText>
+      </span>
+
+      <template v-if="holder?.next_user_email">
+        <span class="flex flex-wrap items-center gap-2">
+          <OUserCell :value="holder.next_user_email" />
+          <span v-if="secondaryPagedAt" class="text-text-secondary text-xs">
+            {{ secondaryPagedAt }}
+          </span>
+        </span>
+        <p class="text-text-secondary text-xs" data-test="oncall-pulse-next">
+          {{ nextPrimaryLine }}
+        </p>
+      </template>
+      <!-- A one-person rotation has no next: naming the same person as backup
+           would suggest a second pair of hands that does not exist. -->
+      <p v-else class="text-status-warning-text text-sm" data-test="oncall-pulse-no-backup">
+        {{ t("oncall.teamNobodyBacking") }}
+      </p>
+    </section>
+
+    <!-- ── Escalation reach ────────────────────────────────────── -->
+    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
+      <span class="flex items-center gap-1.5">
+        <OIcon name="arrow-upward" size="xs" class="text-text-secondary" />
+        <OText variant="section">{{ t("oncall.teamReach") }}</OText>
+      </span>
+
+      <ul class="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1">
+        <li
+          v-for="entry in reach"
+          :key="entry.priority"
+          class="col-span-2 grid grid-cols-subgrid items-baseline"
+          :data-test="`oncall-pulse-reach-${entry.priority.toLowerCase()}`"
+        >
+          <OTag type="alertPriority" :value="entry.priority.toLowerCase()" size="sm" />
+          <span v-if="!entry.pages_anyone" class="text-status-error-text truncate text-xs">
+            {{ t("oncall.reachPagesNobody") }}
+          </span>
+          <span v-else class="text-text-secondary truncate text-xs">
+            {{ reachLine(entry) }}
+          </span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ── Last N days ─────────────────────────────────────────── -->
+    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
+      <span class="flex items-center gap-1.5">
+        <OIcon name="show-chart" size="xs" class="text-text-secondary" />
+        <OText variant="section">{{ t("oncall.teamLastDays", { days: windowDays }) }}</OText>
+      </span>
+
+      <template v-if="stats && stats.pages">
+        <span class="flex flex-wrap items-baseline gap-x-2">
+          <span
+            class="text-text-heading text-2xl leading-none font-semibold"
+            data-test="oncall-pulse-pages"
+          >
+            {{ stats.pages }}
+          </span>
+          <span class="text-text-body text-sm">{{ t("oncall.activityPages") }}</span>
+          <!-- Counted in the database over the window, not averaged from a
+               fetched page, which is what makes it safe on a tile. -->
+          <span
+            v-if="stats.acknowledged"
+            class="text-status-success-text text-sm font-semibold"
+            data-test="oncall-pulse-fast"
+          >
+            {{ ackedFastPct }}
+          </span>
+          <span v-if="stats.acknowledged" class="text-text-secondary text-xs">
+            {{ t("oncall.activityAckedUnder5m") }}
+          </span>
+        </span>
+        <p class="text-text-secondary text-xs" data-test="oncall-pulse-activity">
+          {{ activityLine }}
+        </p>
+      </template>
+      <p v-else class="text-text-secondary text-sm" data-test="oncall-pulse-no-pages">
+        {{ t("oncall.activityNone") }}
+      </p>
+    </section>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from "vue";
+
+import { useOnCallClock } from "@/composables/useOnCallClock";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type {
+  ChannelReadiness,
+  OnCallPolicy,
+  OnCallSchedule,
+  OnCallSlot,
+  TeamOverview,
+  TeamReachability,
+  TeamRungSummary,
+} from "@/ts/interfaces/oncall";
+import type { I18nText } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { formatMicrosDuration } from "@/utils/formatters";
+import { formatInZone, nextHandover, upcomingShifts, winningRotation } from "@/utils/oncall";
+
+const props = withDefaults(
+  defineProps<{
+    /** Slots as `whoIsOnCall` returns them — the authority on WHO. */
+    slots?: OnCallSlot[];
+    /** The schedule answers WHEN; a slot carries no start or end instant. */
+    schedule?: OnCallSchedule | null;
+    policy?: OnCallPolicy | null;
+    /** `GET .../overview` — the ladder summary and the window's statistics. */
+    overview?: TeamOverview | null;
+    /** `GET .../reachability` — would a page to each person actually land. */
+    reachability?: TeamReachability | null;
+    timezone?: string;
+  }>(),
+  {
+    slots: () => [],
+    schedule: null,
+    policy: null,
+    overview: null,
+    reachability: null,
+    timezone: "UTC",
+  },
+);
+
+const { t } = useI18nTyped();
+const nowMicros = useOnCallClock();
+
+const holder = computed<OnCallSlot | null>(
+  () => props.slots.find((slot) => !!slot.user_email) ?? null,
+);
+
+/// The rotation actually in force, resolved the way the engine resolves it.
+const rotation = computed(() =>
+  props.schedule
+    ? winningRotation(props.schedule.rotations, nowMicros.value, props.schedule.timezone)
+    : null,
+);
+
+const zone = computed(
+  () => props.schedule?.timezone || props.overview?.timezone || props.timezone,
+);
+
+const clock = (micros: number) =>
+  formatInZone(micros, zone.value, { hour: "2-digit", minute: "2-digit" });
+
+/// "Since 18:00 Wed · 5h 12m left · hands to Mia at 18:00" — one sentence,
+/// because the three facts are only useful together.
+const shiftLine = computed<I18nText>(() => {
+  const current = rotation.value;
+  if (!current) return raw("");
+
+  const shift = upcomingShifts(current, nowMicros.value, 2)[0];
+  const endsAt = nextHandover(current, nowMicros.value);
+  const parts: string[] = [];
+
+  if (shift) {
+    parts.push(
+      String(
+        t("oncall.teamSince", {
+          time: raw(
+            formatInZone(shift.startMicros, zone.value, {
+              weekday: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          ),
+        }),
+      ),
+    );
+  }
+  if (endsAt && endsAt > nowMicros.value) {
+    parts.push(
+      String(t("oncall.teamLeft", { duration: formatMicrosDuration(endsAt - nowMicros.value) })),
+    );
+  }
+  const nextPerson = holder.value?.next_user_email;
+  parts.push(
+    endsAt && nextPerson
+      ? String(t("oncall.teamHandsTo", { name: raw(nextPerson), time: raw(clock(endsAt)) }))
+      : String(t("oncall.teamNoHandover")),
+  );
+  return raw(parts.join(" · "));
+});
+
+/// The channels that would be tried for whoever is on call right now.
+const holderChannels = computed<ChannelReadiness[]>(() => {
+  const email = holder.value?.user_email?.toLowerCase();
+  if (!email) return [];
+  const member = props.reachability?.members.find(
+    (candidate) => candidate.user_email.toLowerCase() === email,
+  );
+  return member?.channels ?? [];
+});
+
+function channelLabel(entry: ChannelReadiness): I18nText {
+  const name = t(`oncall.channel_${entry.channel}`);
+  return raw(`${entry.deliverable ? "✓" : "✗"} ${name}`);
+}
+
+/// When the ladder actually reaches the second person — read off the policy's
+/// P1 rungs rather than assumed, because "secondary" is a rung, not a role.
+const secondaryPagedAt = computed<I18nText | "">(() => {
+  const steps = props.policy?.rungs.find((rung) => rung.priority === 1)?.steps ?? [];
+  const sorted = [...steps].sort((a, b) => a.after_micros - b.after_micros);
+  const second = sorted[1];
+  return second
+    ? t("oncall.teamPagedAt", { delay: formatMicrosDuration(second.after_micros) })
+    : "";
+});
+
+const nextPrimaryLine = computed<I18nText>(() => {
+  const current = rotation.value;
+  if (!current) return raw("");
+  const [thisShift, afterThat] = upcomingShifts(current, nowMicros.value, 3).slice(0, 2);
+  if (!thisShift) return raw("");
+
+  const parts: string[] = [
+    String(
+      t("oncall.teamNextPrimary", {
+        name: raw(holder.value?.next_user_email ?? ""),
+        duration: formatMicrosDuration(thisShift.endMicros - nowMicros.value),
+      }),
+    ),
+  ];
+  // Only when it is somebody NEW: a two-person rotation cycles straight back,
+  // and "Then Ana" under "Next Ana" reads as a third shift that is not coming.
+  if (afterThat && afterThat.member !== holder.value?.next_user_email) {
+    parts.push(
+      String(
+        t("oncall.teamThen", {
+          name: raw(afterThat.member),
+          date: raw(formatInZone(afterThat.startMicros, zone.value, { dateStyle: "medium" })),
+        }),
+      ),
+    );
+  }
+  return raw(parts.join(" · "));
+});
+
+const reach = computed<TeamRungSummary[]>(() => props.overview?.rungs ?? []);
+
+function reachLine(entry: TeamRungSummary): I18nText {
+  const rungs = String(t("oncall.reachRungs", { count: entry.rungs }, entry.rungs));
+  if (!entry.nobody_after_micros) return raw(rungs);
+  const after = String(
+    t("oncall.reachNobodyAfter", {
+      duration: formatMicrosDuration(entry.nobody_after_micros),
+    }),
+  );
+  return raw(`${rungs} · ${after}`);
+}
+
+const stats = computed(() => props.overview?.stats ?? null);
+const windowDays = computed(() => props.overview?.days ?? 7);
+
+const ackedFastPct = computed<I18nText>(() =>
+  raw(`${Math.round(props.overview?.acked_under_5m_percent ?? 0)}%`),
+);
+
+/// How far pages actually got. "Reached the whole team" is the loud one — it
+/// means the ladder ran to the end and everybody was woken.
+const activityLine = computed<I18nText>(() => {
+  const s = stats.value;
+  if (!s) return raw("");
+  const parts: string[] = [];
+  if (s.reached_second_rung) {
+    parts.push(String(t("oncall.activityReachedSecond", { count: s.reached_second_rung })));
+  }
+  if (s.reached_final_rung) {
+    parts.push(String(t("oncall.activityReachedFinal", { count: s.reached_final_rung })));
+  }
+  if (s.night_pages) {
+    parts.push(String(t("oncall.activityOvernight", { count: s.night_pages }, s.night_pages)));
+  }
+  return raw(parts.join(" · "));
+});
+</script>

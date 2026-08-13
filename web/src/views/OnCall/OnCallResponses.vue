@@ -561,7 +561,6 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "@/services/oncall";
-import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type {
   CauseGroup,
   Channel,
