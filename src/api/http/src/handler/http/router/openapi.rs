@@ -668,5 +668,12 @@ mod experiment_tests {
                 .and_then(|operation| operation.operation_id.as_deref()),
             Some("RetryExperimentSlot")
         );
+        let row_detail = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}")
+            .and_then(|path| path.get.as_ref())
+            .expect("row detail path must be documented");
+        assert!(row_detail.responses.responses.contains_key("403"));
     }
 }
