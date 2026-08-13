@@ -265,7 +265,8 @@ describe("llmExperimentsService", () => {
                   name: "quality",
                   value_numeric: 0.5,
                   reasoning: "Partially correct",
-                  source_type: "remote",
+                  source_type: "experiment",
+                  origin_source_type: "remote",
                 },
               },
             ],
@@ -293,11 +294,46 @@ describe("llmExperimentsService", () => {
         {
           taskStatus: "error",
           execution: { errorMessage: "provider timeout", taskFingerprint: "attempt-1" },
-          scores: [{ score: { reasoning: "Partially correct", source_type: "remote" } }],
+          scores: [
+            {
+              score: {
+                reasoning: "Partially correct",
+                source_type: "experiment",
+                origin_source_type: "remote",
+              },
+            },
+          ],
         },
       ],
       scoreSummaries: [{ scorerId: "quality", sampleCount: 1 }],
     });
+  });
+
+  it("retries exactly one slot with the caller idempotency key", async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        experiment_id: "experiment-1",
+        item_logical_id: "case-1",
+        row_id: "row/1",
+        trial_index: 2,
+        status: "ok",
+        _timestamp: 101,
+      },
+    });
+
+    const execution = await llmExperimentsService.retrySlot(
+      "acme",
+      "experiment-1",
+      "row/1",
+      2,
+      "request-1",
+    );
+
+    expect(post).toHaveBeenCalledWith(
+      "/api/acme/experiments/experiment-1/rows/row%2F1/trials/2/retry",
+      { idempotencyKey: "request-1" },
+    );
+    expect(execution).toMatchObject({ rowId: "row/1", trialIndex: 2, status: "ok" });
   });
 
   it("calls the state-gated lifecycle endpoints and normalizes their durable fields", async () => {
