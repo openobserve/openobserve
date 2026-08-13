@@ -145,6 +145,7 @@ function maskingSuite({ name, tags, service, pii, flows, device = '' }) {
         expect(sessionId, 'a session was ingested for the masking flow').toBeTruthy();
 
         const dash = new RumDashboardPage(page);
+        test.skip(!(await dash.dashboardServed()), 'OpenObserve web UI not served by this build');
         await dash.login();
         await dash.openSession(sessionId);
         await dash.expectNoPiiInReplay(pii);

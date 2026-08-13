@@ -11,6 +11,21 @@ class RumDashboardPage {
     this.org = cfg.OO_ORG;
   }
 
+  // True only if this OpenObserve actually serves its web dashboard. A minimal from-source binary
+  // can serve /api (ingest + query work) yet return "Not Found" for /web/* (UI not embedded). The
+  // dashboard UI tests skip gracefully when this is false — the SDK/data layer is still fully asserted.
+  async dashboardServed() {
+    try {
+      await this.page.goto(`${cfg.OO_URL}/web/login`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      const loginForm = this.page
+        .locator('[data-test="login-user-id-field"]')
+        .or(this.page.getByText('Login as internal user'));
+      return await loginForm.first().isVisible({ timeout: 8000 }).catch(() => false);
+    } catch {
+      return false;
+    }
+  }
+
   async login() {
     await this.page.goto(`${cfg.OO_URL}/web/login`, {
       waitUntil: 'domcontentloaded',

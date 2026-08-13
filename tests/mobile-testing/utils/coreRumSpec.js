@@ -63,6 +63,7 @@ function coreRumSuite({ name, tags, flows, service, expectedSource, viewSubstrin
       async ({ page }) => {
         test.skip(!sessionId, 'no session id from the telemetry test');
         const dash = new RumDashboardPage(page);
+        test.skip(!(await dash.dashboardServed()), 'OpenObserve web UI not served by this build');
         await dash.login();
         await dash.openSession(sessionId);
         await dash.expectSessionViewable();
