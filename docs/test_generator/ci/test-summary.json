@@ -1,0 +1,7 @@
+[
+  { "title": "should load the stream list on the Logs Build page with no stream preselected", "action": "new", "verifies": "the stream select is enabled and lists the ingested e2e_automate logs stream with no preselected stream (STREAM_LIST_WITHOUT_STREAM 'build')" },
+  { "title": "should load the stream list on a new Dashboard Add Panel with no prior stream selection", "action": "new", "verifies": "a brand-new panel (editMode=false) loads the stream list on mount and lists e2e_automate with no prior stream selection" },
+  { "title": "should drop logs streams from the list when the stream type changes to metrics", "action": "new", "verifies": "switching the stream type reloads the list and the stale-response guard drops e2e_automate" },
+  { "title": "should filter stream options by a case-insensitive substring search", "action": "new", "verifies": "the searchable stream select filters options to those matching the substring" },
+  { "title": "should load the stream list on the Metrics Visualize page with a blank stream", "action": "new", "verifies": "the metrics Visualize workspace loads the stream list with a blank stream (STREAM_LIST_WITHOUT_STREAM 'metrics'), conditionally skipped when no metrics streams exist" }
+]

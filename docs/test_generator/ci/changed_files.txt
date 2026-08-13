@@ -1,0 +1,3 @@
+web/src/components/dashboards/addPanel/PanelFieldList.spec.ts
+web/src/components/dashboards/addPanel/PanelFieldList.vue
+web/src/utils/query/sqlDiagnostics.spec.ts

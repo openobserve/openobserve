@@ -1,0 +1,6 @@
+{
+  "group": "Dashboards-Visualize",
+  "spec_filename": "add-panel-stream-list.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

@@ -1,0 +1,26 @@
+{
+  "feature_slug": "add-panel-stream-list",
+  "feature_title": "Dashboard Add Panel Stream List Loads Without Preselected Stream",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "add-panel-stream-list.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/add-panel-stream-list.spec.js",
+  "playwright_group": "Dashboards-Visualize",
+  "source_files": [
+    "web/src/components/dashboards/addPanel/PanelFieldList.vue",
+    "web/src/components/dashboards/addPanel/PanelFieldList.spec.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives under web/src/ (web/src/components/dashboards/addPanel/... and web/src/utils/query/...). No enterprise-owned directories (enterprise/, src/enterprise/, o2_enterprise/) are touched and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR/logo-management) appear in the paths or symbols, so this is an open-source change.",
+    "skip": "Not skipping. There is no skip label or skip-comment (trigger_comment.txt and feature_hint.txt are both empty), and the change is not docs/CI/comment-only — it alters PanelFieldList.vue, a user-facing Vue component.",
+    "e2e": "The change fixes the stream dropdown in the dashboard Add-Panel / Visualize flow: previously, in edit/build mode with no preselected stream, the stream list never fetched, leaving the select stuck on 'No options found'. E2E should verify the dropdown populates with streams on the Logs Visualize (build) page and Metrics page even when no stream is preseeded.",
+    "area": "The UI change is in web/src/components/dashboards/addPanel/, and the sibling Playwright specs live under tests/ui-testing/playwright-tests/Dashboards/, so area = Dashboards.",
+    "group": "The change concerns the Visualize/build panel flow (the stream field list), so the closest matrix shard is Dashboards-Visualize (actual_folder Dashboards), which already runs visualize.spec.js.",
+    "existing_tests": "No E2E specs in the diff. The only changed test files are Vitest unit specs (web/src/components/dashboards/addPanel/PanelFieldList.spec.ts and web/src/utils/query/sqlDiagnostics.spec.ts), which are not Playwright E2E coverage."
+  }
+}

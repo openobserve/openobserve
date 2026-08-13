@@ -43,6 +43,16 @@ export default class LogsVisualise {
     // Query editor locators
     this.logsQueryEditor = page
       .locator('[data-test="logs-search-bar-query-editor"]');
+
+    // Stream-list selectors for the logs "Build" page / panel editor field list
+    // (PanelFieldList.vue) — the stream-type + stream OSelects above the field rows.
+    this.buildToggle = page.locator('[data-test="logs-build-toggle"]');
+    this.panelEditorContainer = page.locator('[data-test="panel-editor-container"]');
+    this.indexStreamSelect = page.locator('[data-test="index-dropdown-stream"]');
+    this.indexStreamTrigger = page.locator('[data-test="index-dropdown-stream-trigger"]');
+    this.indexStreamPopover = page.locator('[data-test="index-dropdown-stream-popover"]');
+    this.indexStreamOption = page.locator('[data-test="index-dropdown-stream-option"]');
+    this.indexStreamTypeTrigger = page.locator('[data-test="index-dropdown-stream_type-trigger"]');
     //Functions
   }
   async openLogs() {
@@ -725,5 +735,87 @@ export default class LogsVisualise {
     return this.page.locator(
       '[data-test="dashboard-config-connect-null-values"] [data-test$="-btn"]'
     );
+  }
+
+  // ── Panel-field-list stream select (logs "Build" / panel editor) ──────────
+
+  // Wait for the panel editor container to mount (async component).
+  async waitForPanelEditor() {
+    await this.panelEditorContainer.waitFor({ state: "attached", timeout: 30000 });
+  }
+
+  // Open the logs "Build" page (page key `build`, edit mode) with NO stream
+  // preselected. Unlike the read-only "Visualize" toggle (logs-visualize-toggle),
+  // the "Build" toggle has no stream guard and renders the editable panel editor.
+  async openBuildTab() {
+    await this.buildToggle.waitFor({ state: "visible", timeout: 10000 });
+    await this.buildToggle.click();
+    await this.waitForPanelEditor();
+  }
+
+  // Core fix: on the `build`/`metrics` pages the stream select must be present
+  // and ENABLED (not disabled/blank) even with no stream preselected.
+  async expectStreamSelectEnabled() {
+    await this.indexStreamTrigger.waitFor({ state: "visible", timeout: 10000 });
+    await expect(this.indexStreamTrigger).toBeEnabled();
+  }
+
+  // Open the stream dropdown and return the visible option labels.
+  async getStreamOptionLabels() {
+    await this.indexStreamSelect.waitFor({ state: "visible", timeout: 10000 });
+    await this.indexStreamSelect.click();
+    await this.indexStreamPopover.waitFor({ state: "visible", timeout: 10000 });
+    return await this.indexStreamOption.allTextContents();
+  }
+
+  // Assert a stream is listed in the open stream dropdown.
+  async expectStreamOptionVisible(streamName) {
+    await this.indexStreamSelect.waitFor({ state: "visible", timeout: 10000 });
+    await this.indexStreamSelect.click();
+    await this.indexStreamPopover.waitFor({ state: "visible", timeout: 10000 });
+    const option = this.page.locator(
+      '[data-test="index-dropdown-stream-option"]',
+      { hasText: streamName }
+    );
+    await expect(option.first()).toBeVisible({ timeout: 10000 });
+  }
+
+  // Assert a stream is NOT listed (e.g. after switching stream type).
+  async expectStreamOptionAbsent(streamName) {
+    await this.indexStreamSelect.waitFor({ state: "visible", timeout: 10000 });
+    await this.indexStreamSelect.click();
+    await this.indexStreamPopover.waitFor({ state: "visible", timeout: 10000 });
+    const option = this.page.locator(
+      '[data-test="index-dropdown-stream-option"]',
+      { hasText: streamName }
+    );
+    await expect(option).toHaveCount(0);
+  }
+
+  // Close the stream dropdown so a subsequent click on another control isn't
+  // swallowed by the portaled popover's outside-click handler.
+  async closeStreamDropdown() {
+    await this.page.keyboard.press("Escape");
+    await this.indexStreamPopover
+      .waitFor({ state: "hidden", timeout: 5000 })
+      .catch(() => {});
+  }
+
+  // Guard a stream-type switch actually took effect before asserting its effect.
+  async expectStreamTypeSelected(type) {
+    await expect(this.indexStreamTypeTrigger).toHaveAttribute(
+      "data-test-selected-value",
+      type
+    );
+  }
+
+  // Open the searchable stream dropdown, type a substring, return matching options.
+  async searchStreamDropdown(substring) {
+    await this.indexStreamSelect.waitFor({ state: "visible", timeout: 10000 });
+    await this.indexStreamSelect.click();
+    await this.indexStreamPopover.waitFor({ state: "visible", timeout: 10000 });
+    await this.page.keyboard.press("Control+a");
+    await this.page.keyboard.type(substring);
+    return await this.indexStreamOption.allTextContents();
   }
 }
