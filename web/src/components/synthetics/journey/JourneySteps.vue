@@ -44,7 +44,7 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
-import { ACTION_LABEL_KEYS, ACTION_ICONS } from "@/constants/synthetics";
+import { ACTION_ICONS, stepActionLabelKey } from "@/constants/synthetics";
 
 const { t } = useI18nTyped();
 
@@ -152,10 +152,13 @@ function actionIcon(row: TData): string {
   return isStepAction(action) ? ACTION_ICONS[action] : "ads-click";
 }
 
+// A right or double click is a `click` carrying `button`/`clickCount`, so the
+// action alone labelled all three "Click". Results rows carry neither field and
+// fall back to exactly that.
 function actionLabel(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
   return isStepAction(action)
-    ? t(ACTION_LABEL_KEYS[action])
+    ? t(stepActionLabelKey(action, row.button, row.clickCount))
     : action.charAt(0).toUpperCase() + action.slice(1);
 }
 

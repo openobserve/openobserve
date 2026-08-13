@@ -11263,6 +11263,14 @@
         "assert": "Assert",
         "screenshot": "Screenshot"
       },
+      "clickTypeLabel": "Click type",
+      "clickTypeHelp": "Left click is a plain click. Right click opens a context menu, and double click sends two clicks.",
+      "clickTypes": {
+        "left": "Left click",
+        "right": "Right click",
+        "middle": "Middle click",
+        "double": "Double click"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Text to type",

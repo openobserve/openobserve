@@ -517,6 +517,31 @@ describe("JourneySteps", () => {
     });
   });
 
+  // A right or double click is a `click` carrying two extra fields, so keying the
+  // label on the action alone showed the author a plain "Click" for all three.
+  describe("click type in the row label", () => {
+    const labelFor = async (over: Partial<BrowserStep>) => {
+      wrapper = mount(JourneySteps, {
+        props: { data: [makeStep({ name: "", ...over })], mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+      return wrapper.text();
+    };
+
+    it("names a right click and a double click as themselves", async () => {
+      expect(await labelFor({ button: "right" })).toContain("Right click");
+      expect(await labelFor({ clickCount: 2 })).toContain("Double click");
+    });
+
+    it("leaves a plain click reading as Click", async () => {
+      const text = await labelFor({});
+      expect(text).toContain("Click");
+      expect(text).not.toContain("Right click");
+      expect(text).not.toContain("Double click");
+    });
+  });
+
   // ── Row status spine ─────────────────────────────────────────────
   //
   // The 4px left border is the list's one way of saying "look at this row". Asserted
