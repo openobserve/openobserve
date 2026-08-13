@@ -200,6 +200,49 @@ jobs:
           if-no-files-found: error
 
   # -------------------------------------------------------------------------------------------
+  # BUILD OO (macOS) — same as build_oo_linux but a DARWIN binary for the iOS job (iOS simulators
+  # only run on macOS; a Linux binary can't execute there and there's no published darwin binary).
+  # Runs in PARALLEL with build_oo_linux; the iOS job just downloads this artifact (no in-job build).
+  # -------------------------------------------------------------------------------------------
+  build_oo_macos:
+    name: Build OpenObserve (macOS, from source)
+    needs: preflight
+    if: >-
+      github.event_name == 'repository_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_full_suite &&
+       (inputs.platforms == 'both' || inputs.platforms == 'ios')) ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'mobile-e2e'))
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mobile-e2e-macos-oo-v2
+      - name: Install Protoc (macOS)
+        run: brew install protobuf || true
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Build binary + web UI (embedded)
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: |
+          mkdir -p /tmp/dist
+          (cd web && npm ci && npm run build && cp -r ./dist/. /tmp/dist/)
+          test -f /tmp/dist/index.html
+          sed -i '' 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs
+          grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
+          cargo build --profile release-ci
+          test -f target/release-ci/openobserve
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oo-macos-binary
+          path: target/release-ci/openobserve
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------------------------------
   # ANDROID — runs the from-source OO binary NATIVELY; app posts to localhost via adb-reverse.
   # -------------------------------------------------------------------------------------------
   android:
@@ -358,7 +401,7 @@ jobs:
   # -------------------------------------------------------------------------------------------
   ios:
     name: iOS (rn-ios + ios-native)
-    needs: preflight
+    needs: [preflight, build_oo_macos]
     if: >-
       github.event_name == 'repository_dispatch' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_full_suite &&
@@ -403,36 +446,19 @@ jobs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
-      # macOS hosted runners have NO OpenObserve release binary to download (0 darwin assets on the
-      # GitHub releases) and cannot run Docker (no nested virtualization). So we build OpenObserve
-      # from source ON the runner — the same self-contained model as the Android job's Docker image,
-      # just compiled here. rust-cache makes reruns fast after the first cold build.
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      # The darwin OpenObserve binary is compiled ONCE by the build_oo_macos job (in parallel with
+      # build_oo_linux) and shared as an artifact — this job just downloads and runs it, so iterating
+      # on the iOS suite never recompiles OpenObserve (same pattern as Android + playwright.yml).
+      - name: Download OpenObserve binary (built from PR source)
+        uses: actions/download-artifact@v4
         with:
-          shared-key: mobile-e2e-macos-oo-v2
-      - name: Install Protoc (macOS)
-        run: brew install protobuf || true
-      - name: Build OpenObserve from source (binary + embedded web UI)
-        env:
-          # The web UI build (vite) OOMs on Node's default heap; macOS runners have the RAM.
-          NODE_OPTIONS: "--max-old-space-size=8192"
-        run: |
-          # Build the web UI to /tmp/dist and point rust-embed there (macOS sed needs the '' arg), so
-          # the dashboard is actually embedded — the default ../../web/dist path doesn't resolve during
-          # the crate build, leaving an empty UI and a login page that never renders.
-          mkdir -p /tmp/dist
-          (cd web && npm ci && npm run build && cp -r ./dist/. /tmp/dist/)
-          test -f /tmp/dist/index.html
-          sed -i '' 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs
-          grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
-          cargo build --profile release-ci
-          test -f target/release-ci/openobserve
+          name: oo-macos-binary
+          path: oo-bin
 
-      - name: Start OpenObserve (built from source) + mint RUM token
+      - name: Start OpenObserve (native, from source) + mint RUM token
         run: |
-          ZO_DATA_DIR="$PWD/oo-data" ./target/release-ci/openobserve > oo.log 2>&1 &
+          chmod +x oo-bin/openobserve
+          ZO_DATA_DIR="$PWD/oo-data" ./oo-bin/openobserve > oo.log 2>&1 &
           for i in $(seq 1 90); do curl -sf http://localhost:5080/healthz && break || sleep 2; done
           # GET (not POST): POST /rumtoken ROTATES the token each call; the default org already has
           # a token at creation, so GET reads the stable one the app must match. Validated locally.
