@@ -5,7 +5,7 @@ const testLogger = require('../utils/test-logger.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
-const EXTENDED_TIMEOUT_MS = 180000;
+const EXTENDED_TIMEOUT_MS = 300000;
 
 /**
  * Chart-image visual verification for notification templates v2 (PR #13640).
@@ -194,18 +194,24 @@ test.describe('Content Templates - Chart Visual Contract', () => {
 
   // Wait for the SCHEDULER to have evaluated this alert ≥minRows times, so
   // the triggers stream has actual_value rows queryable by fetch_series
-  // ([chart/mod.rs:130-201]). Manual triggers do NOT publish to the triggers
-  // stream — only the scheduler does — so build_chart_asset's series.len()
-  // >= 2 gate is only satisfiable after the scheduler has run at least once
-  // (giving 1 history row + the appended current-fire value = 2). This
-  // mirrors fetch_series's exact SQL so it's deterministic, not timing-based.
-  const waitForTriggerHistory = async (page, baseUrl, org, alertId, minRows = 1) => {
+  // ([chart/mod.rs:130-201]).
+  //
+  // For manual triggers, build_chart_asset needs series.len() >= 2 from
+  // HISTORY ALONE — because trigger_by_id calls send_notification with
+  // actual_value=None ([alert.rs:1780]), so the current-fire value is
+  // NEVER appended (chart/mod.rs:243-247 only appends when current_value
+  // is Some). Thus minRows must be 2 to satisfy the gate.
+  //
+  // Scheduler cadence = ZO_ALERT_SCHEDULE_INTERVAL (10s default) but the
+  // alert's own frequency (60s min) gates when it actually runs. So 2
+  // history rows takes ~120s worst-case. Timeout of 180s gives buffer.
+  const waitForTriggerHistory = async (page, baseUrl, org, alertId, minRows = 2) => {
     await expect.poll(async () => {
       const resp = await page.request.post(`${baseUrl}/api/${org}/_search?type=logs`, {
         data: {
           query: {
             sql: `SELECT COUNT(*) as c FROM "triggers" WHERE module = 'alert' AND key LIKE '%${alertId}' AND actual_value IS NOT NULL`,
-            start_time: (Date.now() - 300000) * 1000,
+            start_time: (Date.now() - 600000) * 1000,
             end_time: Date.now() * 1000,
             from: 0, size: 1,
           },
@@ -216,7 +222,7 @@ test.describe('Content Templates - Chart Visual Contract', () => {
         const j = await resp.json();
         return j.hits?.[0]?.c || 0;
       } catch { return 0; }
-    }, { timeout: 90000, intervals: [3000, 5000, 5000, 10000] }).toBeGreaterThanOrEqual(minRows);
+    }, { timeout: 180000, intervals: [5000, 10000, 15000] }).toBeGreaterThanOrEqual(minRows);
   };
 
   // ==========================================================================
@@ -274,7 +280,7 @@ test.describe('Content Templates - Chart Visual Contract', () => {
 
     // Wait for the scheduler to have written ≥1 evaluation to the triggers
     // stream — manual trigger alone cannot produce a chart (see helper doc).
-    await waitForTriggerHistory(page, baseUrl, org, alertId, 1);
+    await waitForTriggerHistory(page, baseUrl, org, alertId, 2);
 
     // Now the manual trigger fire has enough history for build_chart_asset
     // to satisfy series.len() >= 2 and render the chart.
@@ -469,7 +475,7 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     // per src/config/src/config.rs:2060) AND the alert eval returned at least one row
     // AND the triggers stream has ≥1 prior evaluation (needed for series.len() >= 2
     // in build_chart_asset). Wait for the scheduler to seed the history before firing.
-    await waitForTriggerHistory(page, baseUrl, org, alertId, 1);
+    await waitForTriggerHistory(page, baseUrl, org, alertId, 2);
     await pm.alertsPage.triggerAlertManually(alertName);
     await expect.poll(() => received.hook.length, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
 

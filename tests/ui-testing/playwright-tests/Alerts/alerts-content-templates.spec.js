@@ -310,22 +310,24 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     testLogger.info('Created alert', { alertName });
 
     // Bind the second (hook) destination via API so one alert fire reaches
-    // both destination shapes in a single trigger.
-    const getAlertResp = await page.request.get(`${baseUrl}/api/${org}/alerts`);
-    expect(getAlertResp.ok()).toBeTruthy();
+    // both destination shapes in a single trigger. v2 endpoints — v1 alerts
+    // list/get/put returned non-2xx in CI, chart-visual spec uses v2 without
+    // issue for the same operations.
+    const getAlertResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts`);
+    expect(getAlertResp.ok(), `alerts list should be reachable via v2: ${getAlertResp.status()}`).toBeTruthy();
     const alertList = await getAlertResp.json();
     const alertsArr = Array.isArray(alertList) ? alertList : (alertList.list || []);
     const alertMeta = alertsArr.find((a) => a.name === alertName);
-    expect(alertMeta).toBeTruthy();
+    expect(alertMeta, `alert "${alertName}" should be present in v2 list`).toBeTruthy();
     const alertId = alertMeta.alert_id || alertMeta.id;
 
-    const getAlertDetailResp = await page.request.get(`${baseUrl}/api/${org}/alerts/${alertId}`);
-    expect(getAlertDetailResp.ok()).toBeTruthy();
+    const getAlertDetailResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts/${alertId}`);
+    expect(getAlertDetailResp.ok(), `alert detail v2 GET should succeed: ${getAlertDetailResp.status()}`).toBeTruthy();
     const alertDetail = await getAlertDetailResp.json();
     alertDetail.destinations = Array.from(new Set([...(alertDetail.destinations || []), hookDestName]));
 
-    const putAlertResp = await page.request.put(`${baseUrl}/api/${org}/alerts/${alertId}`, { data: alertDetail });
-    expect(putAlertResp.ok()).toBeTruthy();
+    const putAlertResp = await page.request.put(`${baseUrl}/api/v2/${org}/alerts/${alertId}`, { data: alertDetail });
+    expect(putAlertResp.ok(), `alert v2 PUT should succeed: ${putAlertResp.status()}`).toBeTruthy();
     testLogger.info('Bound second (hook/custom) destination to the alert', { alertId, destinations: alertDetail.destinations });
 
     // Fire the alert manually — deterministic, no ingestion-timing race.
