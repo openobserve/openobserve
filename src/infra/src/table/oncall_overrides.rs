@@ -60,6 +60,7 @@ fn to_override(m: oncall_overrides::Model) -> ScheduleOverride {
         id: m.id,
         org_id: m.org_id,
         team_id: m.team_id,
+        slot: m.slot,
         user_email: m.user_email,
         start_at: m.start_at,
         end_at: m.end_at,
@@ -73,9 +74,11 @@ fn to_override(m: oncall_overrides::Model) -> ScheduleOverride {
 /// Stores one cover. `id` and `created_at` are minted here, because
 /// `created_at` is the overlap rule (§5) and a caller-supplied one would let a
 /// client decide which of two covers wins.
+#[allow(clippy::too_many_arguments)]
 pub async fn create(
     org_id: &str,
     team_id: &str,
+    slot: Option<String>,
     user_email: &str,
     start_at: i64,
     end_at: i64,
@@ -88,6 +91,7 @@ pub async fn create(
         id: ider::uuid(),
         org_id: org_id.to_string(),
         team_id: team_id.to_string(),
+        slot,
         user_email: user_email.to_string(),
         start_at,
         end_at,
@@ -100,6 +104,7 @@ pub async fn create(
         id: Set(record.id.clone()),
         org_id: Set(record.org_id.clone()),
         team_id: Set(record.team_id.clone()),
+        slot: Set(record.slot.clone()),
         user_email: Set(record.user_email.clone()),
         covering_for: Set(record.covering_for.clone()),
         start_at: Set(record.start_at),
@@ -268,6 +273,7 @@ mod tests {
             id: id.into(),
             org_id: "default".into(),
             team_id: "team_1".into(),
+            slot: None,
             user_email: "sam@o2.ai".into(),
             covering_for: Some("ana@o2.ai".into()),
             start_at: start,

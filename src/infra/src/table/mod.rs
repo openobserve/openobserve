@@ -53,6 +53,7 @@ pub mod oncall_responses;
 pub mod oncall_routing_config;
 pub mod oncall_schedules;
 pub mod oncall_teams;
+pub mod oncall_unavailability;
 pub mod oncall_user_contacts;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;

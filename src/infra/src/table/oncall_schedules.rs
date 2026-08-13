@@ -27,7 +27,7 @@ use std::{
 
 use config::{
     RwHashMap, ider,
-    meta::oncall::{Rotation, Schedule},
+    meta::oncall::{Rotation, Schedule, Unavailability},
     utils::time::now_micros,
 };
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
@@ -79,6 +79,31 @@ pub fn invalidate_cache(org_id: &str, team_id: &str) {
     SCHEDULE_CACHE.remove(&schedule_cache_key(org_id, team_id));
 }
 
+/// Drops every schedule an org holds.
+///
+/// The blunt instrument, and the only correct one for an absence: a window is
+/// stored per person and applies to every rotation they are on, so there is no
+/// single team to name. Bounded by the org's team count, which is the same
+/// order as the cache itself.
+pub fn invalidate_org(org_id: &str) {
+    let prefix = format!("{org_id}/");
+    SCHEDULE_CACHE.retain(|key, _| !key.starts_with(&prefix));
+}
+
+/// Invalidates every schedule in the org locally, and tells every other node.
+///
+/// `pub(super)` because `oncall_unavailability` has to call it: an absence is
+/// stored in its own table but read as part of the schedule, so the write that
+/// records it invalidates the schedule — and missing this is what makes the
+/// feature worse than useless. Somebody marks themselves away, believes it,
+/// stops watching, and the stale schedule pages them anyway.
+pub(super) async fn invalidate_org_and_publish(org_id: &str) {
+    invalidate_org(org_id);
+    if let Err(e) = crate::coordinator::oncall::emit_absences_changed(org_id).await {
+        log::error!("[oncall] emit absence cache event failed for {org_id}: {e}");
+    }
+}
+
 /// Invalidates locally and tells every other node to do the same.
 ///
 /// `pub(super)` because `oncall_overrides` has to call it: a cover is stored in
@@ -113,28 +138,34 @@ fn to_schedule(m: oncall_schedules::Model) -> Schedule {
         timezone: m.timezone,
         rotations,
         // Filled in by the read paths below. A `Schedule` built without them
-        // resolves as though nobody had arranged cover, which is why every
-        // loader that answers "who is on call" goes through
-        // `with_overrides` rather than constructing one here.
+        // resolves as though nobody had arranged cover and nobody were away,
+        // which is why every loader that answers "who is on call" goes through
+        // `with_resolution_inputs` rather than constructing one here.
         overrides: Vec::new(),
+        unavailability: Vec::new(),
         created_at: m.created_at,
         updated_at: m.updated_at,
     }
 }
 
-/// Attaches the team's covers to a schedule.
+/// Attaches the team's covers **and** the absences of the people on it.
 ///
 /// Kept as one function, and called by every read that resolves, because the
 /// failure it prevents is silent: a caller that loads the schedule and forgets
-/// the overrides gets a perfectly plausible answer that pages the person who
-/// arranged not to be paged. The alternative — leaving each caller to join the
-/// two — is how this feature would break the first time somebody added a
-/// resolution path.
+/// either of these gets a perfectly plausible answer that pages the person who
+/// arranged not to be paged, or the person on a beach. The alternative —
+/// leaving each caller to join the three — is how this feature would break the
+/// first time somebody added a resolution path.
 ///
-/// Failing to read the overrides is logged and swallowed rather than
-/// propagated: a page with a slightly wrong recipient beats no page at all
-/// (§12), and the same reasoning already governs the DashMap fallback.
-async fn with_overrides(mut schedule: Schedule, at: i64) -> Schedule {
+/// Failing either read is logged and swallowed rather than propagated: a page
+/// with a slightly wrong recipient beats no page at all (§12), and the same
+/// reasoning already governs the DashMap fallback.
+///
+/// The absences are narrowed to the schedule's own members here rather than in
+/// the query. The org read is one indexed scan whatever it is asked for, a
+/// rotation has single digits of people on it, and doing the intersection in
+/// SQL would cost a round trip per team on the path a page travels.
+async fn with_resolution_inputs(mut schedule: Schedule, at: i64) -> Schedule {
     match super::oncall_overrides::list_for_resolution(&schedule.org_id, &schedule.team_id, at)
         .await
     {
@@ -144,7 +175,39 @@ async fn with_overrides(mut schedule: Schedule, at: i64) -> Schedule {
             schedule.team_id
         ),
     }
+    match super::oncall_unavailability::list_for_resolution(&schedule.org_id, at).await {
+        Ok(windows) => schedule.unavailability = narrow_to_members(&schedule, windows),
+        Err(e) => log::error!(
+            "[ONCALL] could not load unavailability for team {}, resolving without it — somebody who is away may be paged: {e}",
+            schedule.team_id
+        ),
+    }
     schedule
+}
+
+/// The org's absence windows, cut down to the people this schedule can page.
+///
+/// Includes the covering engineers as well as the rotation members: a cover
+/// outranks an absence, so their window never changes who is paged, but the
+/// calendar still has to be able to say the shift is being held by somebody who
+/// was down as away.
+fn narrow_to_members(schedule: &Schedule, windows: Vec<Unavailability>) -> Vec<Unavailability> {
+    let mut people: std::collections::HashSet<String> = schedule
+        .rotations
+        .iter()
+        .flat_map(|r| r.members.iter())
+        .map(|m| m.trim().to_ascii_lowercase())
+        .collect();
+    people.extend(
+        schedule
+            .overrides
+            .iter()
+            .map(|o| o.user_email.trim().to_ascii_lowercase()),
+    );
+    windows
+        .into_iter()
+        .filter(|u| people.contains(&u.user_email.trim().to_ascii_lowercase()))
+        .collect()
 }
 
 /// Creates the schedule if the team has none, otherwise replaces its
@@ -203,7 +266,7 @@ pub async fn get_by_team(org_id: &str, team_id: &str) -> Result<Option<Schedule>
         .await?
         .map(to_schedule);
     Ok(match found {
-        Some(s) => Some(with_overrides(s, now_micros()).await),
+        Some(s) => Some(with_resolution_inputs(s, now_micros()).await),
         None => None,
     })
 }
@@ -237,7 +300,8 @@ pub async fn get_by_team_cached(
 /// are the coverage-gap sweep and the team list, both of which run per org on
 /// a background cadence, and the indexed per-team read is what the paging path
 /// already uses. Sharing one query shape is worth more here than saving a
-/// round trip on a screen nobody is paged by.
+/// round trip on a screen nobody is paged by. Absences are org-scoped and read
+/// the same way for the same reason.
 pub async fn list(org_id: &str) -> Result<Vec<Schedule>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let rows = oncall_schedules::Entity::find()
@@ -248,7 +312,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Schedule>, errors::Error> {
     let now = now_micros();
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
-        out.push(with_overrides(to_schedule(row), now).await);
+        out.push(with_resolution_inputs(to_schedule(row), now).await);
     }
     Ok(out)
 }
