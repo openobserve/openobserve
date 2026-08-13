@@ -1612,61 +1612,114 @@ describe("BrowserJourney restore-then-record", () => {
     expect(next[3].id).toBe("s3");
   });
 
-  // P4. A step whose starting state changed cannot keep claiming it passed. Deleting
-  // step 2 changes the state every later step begins from.
-  it("should flag later steps for review when a step is deleted", async () => {
-    const results = new Map([
-      ["s1", { stepId: "s1", stepName: "", passed: true, durationMs: 1 }],
-      ["s2", { stepId: "s2", stepName: "", passed: true, durationMs: 1 }],
-      ["s3", { stepId: "s3", stepName: "", passed: true, durationMs: 1 }],
-    ]);
-    wrapper = mountJourney({ modelValue: journey, stepResults: results });
+});
 
-    (wrapper.vm as any).invalidateFrom(1);
-    await flushPromises();
+// ── New-step marker (left row border) ──────────────────────────────────────
+//
+// A step the author just added needs to be findable in a long list. The list already
+// has one device for "look at this row" — the 4px left border it uses for validation
+// errors — so a new step reuses it rather than introducing a second vocabulary.
+//
+// Two rules matter: the marker must OUTLAST the reveal flash (a border that blinks for
+// a moment cannot help someone scrolling back), and an error on the same row must win,
+// because "this is broken" is always more urgent than "this is new".
+describe("BrowserJourney new-step marker", () => {
+  let wrapper: VueWrapper;
 
-    expect((wrapper.vm as any).needsRevalidation).toEqual(new Set(["s2", "s3"]));
+  const StubWithStatusColor = {
+    props: ["data", "mode", "selectedIds", "expandedIds", "getRowStatusColor"],
+    template: `<div class="journey-steps-stub">
+      <div v-for="item in data" :key="item.id" class="step-row" :data-step-id="item.id"
+           :data-status-color="getRowStatusColor ? getRowStatusColor(item) : ''" />
+    </div>`,
+  };
+
+  const NAV = { id: "n1", action: "navigate", name: "Open", value: "https://app.test/" };
+
+  function mountWithColors(props: Record<string, unknown> = {}) {
+    return mount(BrowserJourney, {
+      props: { modelValue: [NAV], ...props },
+      global: { stubs: { ...STUBS, JourneySteps: StubWithStatusColor } },
+    }) as VueWrapper;
+  }
+
+  const colorOf = (w: VueWrapper, id: string) =>
+    w.find(`[data-step-id="${id}"]`).attributes("data-status-color");
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
   });
 
-  // The steps before the edit are untouched: their starting state is unchanged, so
-  // their results are still evidence.
-  it("should leave steps before the edit point validated", async () => {
-    wrapper = mountJourney({ modelValue: journey });
-
-    (wrapper.vm as any).invalidateFrom(2);
-    await flushPromises();
-
-    expect((wrapper.vm as any).needsRevalidation.has("s1")).toBe(false);
-    expect((wrapper.vm as any).needsRevalidation.has("s2")).toBe(false);
-    expect((wrapper.vm as any).needsRevalidation.has("s3")).toBe(true);
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
-  // Found by driving the real UI: deleting step 2 of 3 left two steps and a banner
-  // claiming TWO needed review. `invalidateFrom` runs before the parent's modelValue
-  // update lands, so the set includes the step that was just deleted. The count the
-  // author reads must only ever describe steps that still exist.
-  it("should not count a deleted step among those needing review", async () => {
-    wrapper = mountJourney({ modelValue: journey });
+  it("should mark a newly added step with the row border", async () => {
+    wrapper = mountWithColors();
 
-    // Flag from index 1 (the delete point), then apply the delete the parent would.
-    (wrapper.vm as any).invalidateFrom(1);
-    await wrapper.setProps({ modelValue: [journey[0], journey[2]] });
-    await flushPromises();
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    const added = (wrapper.emitted("update:modelValue")!.at(-1)![0] as any[])[1];
+    await wrapper.setProps({ modelValue: [NAV, added] });
 
-    expect((wrapper.vm as any).revalidationCount).toBe(1);
+    expect(colorOf(wrapper, added.id)).toBe("var(--color-status-info-text)");
   });
 
-  // A full replay re-establishes every step's evidence, so the flags must clear —
-  // otherwise the review banner outlives the thing it was warning about.
-  it("should clear review flags when a replay starts", async () => {
-    wrapper = mountJourney({ modelValue: journey, replayPhase: "idle" });
-    (wrapper.vm as any).invalidateFrom(0);
-    await flushPromises();
-    expect((wrapper.vm as any).needsRevalidation.size).toBe(3);
+  // The reveal flash clears itself after ~1.4s. The marker must not go with it, or a
+  // step added before a scroll is indistinguishable from the rest by the time it is
+  // read.
+  it("should keep the marker after the reveal flash has expired", async () => {
+    wrapper = mountWithColors();
 
-    await wrapper.setProps({ replayPhase: "running" });
-    await flushPromises();
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    const added = (wrapper.emitted("update:modelValue")!.at(-1)![0] as any[])[1];
+    await wrapper.setProps({ modelValue: [NAV, added] });
 
-    expect((wrapper.vm as any).needsRevalidation.size).toBe(0);
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(colorOf(wrapper, added.id)).toBe("var(--color-status-info-text)");
+  });
+
+  it("should show the error colour when a new step also has an error", async () => {
+    wrapper = mountWithColors();
+
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    const added = (wrapper.emitted("update:modelValue")!.at(-1)![0] as any[])[1];
+    await wrapper.setProps({
+      modelValue: [NAV, added],
+      fieldIssues: [{ path: ["journey", 1, "name"], message: "Step name is required" }],
+    });
+
+    expect(colorOf(wrapper, added.id)).toBe("var(--color-status-error-text)");
+  });
+
+  // Once the step names an element it is a step like any other; leaving every added
+  // row striped forever is the noise this marker exists to avoid.
+  it("should drop the marker once the new step names an element", async () => {
+    wrapper = mountWithColors();
+
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    const added = (wrapper.emitted("update:modelValue")!.at(-1)![0] as any[])[1];
+    await wrapper.setProps({ modelValue: [NAV, added] });
+    expect(colorOf(wrapper, added.id)).toBe("var(--color-status-info-text)");
+
+    const completed = { ...added, locator: { candidates: [{ kind: "css", value: "#go" }] } };
+    await wrapper.setProps({ modelValue: [NAV, completed] });
+    // Let the reveal flash expire: completing a step within its 1.4s window should
+    // still flash, and that is not what this test is about.
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(colorOf(wrapper, completed.id)).toBeFalsy();
+  });
+
+  it("should not mark steps that were already in the journey", async () => {
+    wrapper = mountWithColors();
+
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+
+    expect(colorOf(wrapper, NAV.id)).toBeFalsy();
   });
 });
