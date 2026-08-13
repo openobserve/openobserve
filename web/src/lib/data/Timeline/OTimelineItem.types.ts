@@ -25,6 +25,21 @@ export interface TimelineItemProps {
    * When omitted the dot is rendered as a plain filled circle.
    */
   icon?: string;
+  /**
+   * Short text rendered IN the node, as a pill, instead of a dot.
+   *
+   * For timelines whose rail carries the axis itself — an escalation ladder's
+   * delays ("0m", "+20m"), a duration, a step number. The connector stays
+   * centred under a pill of any width, so a rail may mix pills and dots.
+   * Keep it to a few characters: this is a rail, not a column.
+   */
+  label?: I18nText;
+  /**
+   * Wraps the content column in a card, so each entry reads as its own block
+   * rather than as text floating beside a rail. Use when entries carry several
+   * lines; a one-line log reads better unframed.
+   */
+  framed?: boolean;
   /** Controls dot background colour. Defaults to "primary". */
   variant?: TimelineItemVariant;
 }

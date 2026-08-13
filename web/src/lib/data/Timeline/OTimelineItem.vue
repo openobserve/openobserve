@@ -42,13 +42,16 @@ const isOIcon = computed<boolean>(() =>
   <li class="relative flex gap-4 pb-6 last:pb-0">
     <!-- Left column: dot + vertical connector line -->
     <div class="relative flex shrink-0 flex-col items-center">
-      <!-- Dot / icon circle -->
+      <!-- Node: a pill when it carries a label, otherwise the dot. Both are
+           `h-7` so a rail mixing the two keeps its rhythm. -->
       <div
-        class="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full"
+        class="relative z-10 flex h-7 shrink-0 items-center justify-center rounded-full"
+        :class="label ? 'text-2xs px-2.5 font-medium' : 'size-7'"
         :style="dotStyle"
-        aria-hidden="true"
+        :aria-hidden="label ? undefined : true"
       >
-        <OIcon v-if="icon && isOIcon" :name="icon as any" size="xs" />
+        <span v-if="label" class="whitespace-nowrap">{{ label }}</span>
+        <OIcon v-else-if="icon && isOIcon" :name="icon as any" size="xs" />
         <span
           v-else-if="icon"
           class="material-icons text-timeline-dot-fg text-sm leading-none select-none"
@@ -59,13 +62,24 @@ const isOIcon = computed<boolean>(() =>
       <!--
         Vertical connector line.
         OTimeline's scoped :deep rule hides this element when the
-        parent <li> is :last-child.
+        parent <li> is :last-child — so `-mb-6` never overhangs the rail's end.
+
+        That `-mb-6` cancels the li's `pb-6`: this column is a flex child, so it
+        stretches only to the CONTENT box, and the line would otherwise stop
+        short of the next node and break the rail into stubs.
       -->
-      <div class="timeline-connector bg-timeline-line mt-1 w-px flex-1" />
+      <div class="timeline-connector bg-timeline-line -mb-6 mt-1 w-px flex-1" />
     </div>
 
     <!-- Right column: title, subtitle, extra slot content -->
-    <div class="min-w-0 flex-1 pt-0.5 pb-1">
+    <div
+      class="min-w-0 flex-1"
+      :class="
+        framed
+          ? 'card-container rounded-default bg-surface-base border-border-default border px-3 py-2'
+          : 'pt-0.5 pb-1'
+      "
+    >
       <p v-if="title" class="text-text-heading m-0 text-sm leading-snug font-medium">
         {{ title }}
       </p>
