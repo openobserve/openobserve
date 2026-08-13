@@ -1161,6 +1161,10 @@ pub fn service_routes() -> Router {
                     get(experiments::list_experiments).post(experiments::create_experiment),
                 )
                 .route(
+                    "/{org_id}/experiments/compare",
+                    get(experiments::compare_experiments),
+                )
+                .route(
                     "/{org_id}/experiments/{experiment_id}",
                     get(experiments::get_experiment),
                 )

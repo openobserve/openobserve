@@ -539,6 +539,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::experiments::preview_experiment,
     openobserve_api_management::request::experiments::create_experiment,
     openobserve_api_management::request::experiments::list_experiments,
+    openobserve_api_management::request::experiments::compare_experiments,
     openobserve_api_management::request::experiments::get_experiment,
     openobserve_api_management::request::experiments::get_experiment_row,
     openobserve_api_management::request::experiments::retry_experiment_slot,
@@ -675,5 +676,18 @@ mod experiment_tests {
             .and_then(|path| path.get.as_ref())
             .expect("row detail path must be documented");
         assert!(row_detail.responses.responses.contains_key("403"));
+
+        let comparison = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/compare")
+            .and_then(|path| path.get.as_ref())
+            .expect("comparison path must be documented");
+        assert_eq!(
+            comparison.operation_id.as_deref(),
+            Some("CompareExperiments")
+        );
+        assert!(comparison.responses.responses.contains_key("400"));
+        assert!(comparison.responses.responses.contains_key("403"));
     }
 }

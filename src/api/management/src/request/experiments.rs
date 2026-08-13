@@ -18,14 +18,21 @@ use openobserve_core::{
 
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-    models::experiments::{
-        CloneExperimentRequestBody, CreateExperimentRequestBody, CreateExperimentResponseBody,
-        ExperimentDetailQuery, ExperimentDetailResponseBody, ExperimentPreviewQuery,
-        ExperimentPreviewResponseBody, ExperimentResponseBody, ExperimentResultPaginationBody,
-        ExperimentResultsResponseBody, ExperimentRowDetailResponseBody,
-        ExperimentRowNavigationBody, ExperimentRowSnapshotBody, ListExperimentsResponseBody,
-        PinnedExperimentScorerBody, RetryExperimentSlotRequestBody, experiment_aggregate_summary,
-        experiment_result_slots, experiment_result_summary, experiment_row_result_summary,
+    models::{
+        experiment_comparison::{
+            DEFAULT_COMPARISON_THRESHOLD, ExperimentComparisonQuery,
+            ExperimentComparisonResponseBody, build_experiment_comparison,
+        },
+        experiments::{
+            CloneExperimentRequestBody, CreateExperimentRequestBody, CreateExperimentResponseBody,
+            ExperimentDetailQuery, ExperimentDetailResponseBody, ExperimentPreviewQuery,
+            ExperimentPreviewResponseBody, ExperimentResponseBody, ExperimentResultPaginationBody,
+            ExperimentResultsResponseBody, ExperimentRowDetailResponseBody,
+            ExperimentRowNavigationBody, ExperimentRowSnapshotBody, ListExperimentsResponseBody,
+            PinnedExperimentScorerBody, RetryExperimentSlotRequestBody,
+            experiment_aggregate_summary, experiment_result_slots, experiment_result_summary,
+            experiment_row_result_summary,
+        },
     },
 };
 
@@ -60,6 +67,30 @@ fn experiment_is_visible(
     permitted_objects: Option<&[String]>,
 ) -> bool {
     is_ofga_object_visible(org_id, "experiment", experiment_id, permitted_objects)
+}
+
+fn validate_comparison_selection(
+    baseline_id: &str,
+    candidate_id: &str,
+    threshold: f64,
+) -> Result<(), &'static str> {
+    if baseline_id == candidate_id {
+        return Err("Select two different Experiments");
+    }
+    if !threshold.is_finite() || threshold < 0.0 {
+        return Err("Comparison threshold must be a finite non-negative number");
+    }
+    Ok(())
+}
+
+fn validate_comparison_dataset(
+    baseline_dataset_id: &str,
+    candidate_dataset_id: &str,
+) -> Result<(), &'static str> {
+    if baseline_dataset_id != candidate_dataset_id {
+        return Err("Experiments must use the same Dataset");
+    }
+    Ok(())
 }
 
 async fn require_experiment_visibility(
@@ -294,6 +325,101 @@ pub async fn get_experiment(
         preview: preview.into(),
         results,
     })
+}
+
+/// Compare two Experiments over the honest intersection of their pinned rows.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/experiments/compare",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "CompareExperiments",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ExperimentComparisonQuery,
+    ),
+    responses(
+        (status = 200, description = "Baseline/candidate comparison", body = ExperimentComparisonResponseBody),
+        (status = 400, description = "Invalid threshold or cross-dataset comparison"),
+        (status = 403, description = "One or both Experiments are not accessible"),
+        (status = 404, description = "One or both Experiments were not found"),
+    )
+)]
+pub async fn compare_experiments(
+    Path(org_id): Path<String>,
+    Query(query): Query<ExperimentComparisonQuery>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    let threshold = query.threshold.unwrap_or(DEFAULT_COMPARISON_THRESHOLD);
+    if let Err(message) =
+        validate_comparison_selection(&query.baseline_id, &query.candidate_id, threshold)
+    {
+        return MetaHttpResponse::bad_request(message);
+    }
+    for experiment_id in [&query.baseline_id, &query.candidate_id] {
+        if let Err(response) =
+            require_experiment_visibility(&org_id, experiment_id, &user.user_id, "GET").await
+        {
+            return response;
+        }
+    }
+    let baseline = match experiments::get(&org_id, &query.baseline_id).await {
+        Ok(experiment) => experiment,
+        Err(error) => return experiment_error_response(error),
+    };
+    let candidate = match experiments::get(&org_id, &query.candidate_id).await {
+        Ok(experiment) => experiment,
+        Err(error) => return experiment_error_response(error),
+    };
+    if let Err(message) = validate_comparison_dataset(&baseline.dataset_id, &candidate.dataset_id) {
+        return MetaHttpResponse::bad_request(message);
+    }
+    if let Err(error) =
+        openobserve_core::self_reporting::llm_scores_schema::ensure_llm_scores_stream_initialized(
+            &org_id,
+        )
+        .await
+    {
+        log::error!("[Experiment] failed to initialize score stream for comparison: {error}");
+        return MetaHttpResponse::internal_error("Failed to compare Experiments");
+    }
+    let baseline_slots = match experiments::slot_set_existing(&org_id, &baseline).await {
+        Ok(slots) => slots,
+        Err(error) => return experiment_error_response(error),
+    };
+    let candidate_slots = match experiments::slot_set_existing(&org_id, &candidate).await {
+        Ok(slots) => slots,
+        Err(error) => return experiment_error_response(error),
+    };
+    let baseline_results =
+        match openobserve_core::llm_evaluations::experiment_runner::results(&baseline).await {
+            Ok(results) => results,
+            Err(error) => {
+                log::error!("[Experiment] failed to load baseline comparison evidence: {error}");
+                return MetaHttpResponse::internal_error("Failed to compare Experiments");
+            }
+        };
+    let candidate_results =
+        match openobserve_core::llm_evaluations::experiment_runner::results(&candidate).await {
+            Ok(results) => results,
+            Err(error) => {
+                log::error!("[Experiment] failed to load candidate comparison evidence: {error}");
+                return MetaHttpResponse::internal_error("Failed to compare Experiments");
+            }
+        };
+    MetaHttpResponse::json(build_experiment_comparison(
+        baseline.id,
+        candidate.id,
+        baseline.dataset_id,
+        threshold,
+        &baseline_slots,
+        &baseline_results.executions,
+        &baseline_results.scores,
+        &candidate_slots,
+        &candidate_results.executions,
+        &candidate_results.scores,
+    ))
 }
 
 /// Load one pinned dataset row and every trial's current execution and score evidence.
@@ -555,5 +681,25 @@ mod tests {
             "experiment-1",
             Some(&forbidden)
         ));
+    }
+
+    #[test]
+    fn comparison_selection_rejects_same_experiment_and_invalid_thresholds() {
+        assert_eq!(
+            validate_comparison_selection("same", "same", 0.0),
+            Err("Select two different Experiments")
+        );
+        assert!(validate_comparison_selection("baseline", "candidate", 0.25).is_ok());
+        assert!(validate_comparison_selection("baseline", "candidate", -0.01).is_err());
+        assert!(validate_comparison_selection("baseline", "candidate", f64::NAN).is_err());
+    }
+
+    #[test]
+    fn comparison_rejects_cross_dataset_pairs() {
+        assert!(validate_comparison_dataset("dataset", "dataset").is_ok());
+        assert_eq!(
+            validate_comparison_dataset("dataset-a", "dataset-b"),
+            Err("Experiments must use the same Dataset")
+        );
     }
 }
