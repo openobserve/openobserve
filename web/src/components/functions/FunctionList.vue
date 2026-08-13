@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, ref, computed, watch } from "vue";
+import { defineAsyncComponent, defineComponent, ref, computed, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
@@ -401,9 +401,13 @@ export default defineComponent({
         });
     };
 
-    if (jsTransforms.value == "" || jsTransforms.value == undefined) {
-      getJSTransforms();
-    }
+    // On mount, not in the setup body: a warm cache makes `apply` run
+    // synchronously, and applyFunctions reaches refs declared further down.
+    onMounted(() => {
+      if (jsTransforms.value == "" || jsTransforms.value == undefined) {
+        getJSTransforms();
+      }
+    });
 
     const resultTotal = ref<number>(0);
     const pageSize = ref(20);

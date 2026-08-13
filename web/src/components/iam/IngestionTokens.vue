@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="fetching"
               data-test="ingestion-tokens-refresh-btn"
-              @click="fetchTokens"
+              @click="refreshTokens"
             >
               <OTooltip
                 side="bottom"
@@ -353,7 +353,7 @@ export default defineComponent({
       },
     ];
 
-    const fetchTokens = async () => {
+    const fetchTokens = async (force = false) => {
       const org = store.state.selectedOrganization.identifier;
       try {
         // Stale-while-revalidate: the table keeps its rows while the list
@@ -363,6 +363,7 @@ export default defineComponent({
           apply: (data: any) => (tokens.value = data.data),
           loading,
           fetching,
+          force,
         });
       } catch (e: any) {
         toast({
@@ -374,6 +375,10 @@ export default defineComponent({
         loading.value = false;
       }
     };
+
+    // Named handler: binding fetchTokens straight to @click puts the DOM event
+    // in `force`, and without it the button is a no-op while the entry is fresh.
+    const refreshTokens = () => fetchTokens(true);
 
     // Plain async @submit handler — fires only after the schema passes (name
     // required + max 256). Awaited by OForm, so the footer Save spinner spans the
@@ -496,6 +501,7 @@ export default defineComponent({
       revealedToken,
       revealedBasicAuth,
       fetchTokens,
+      refreshTokens,
       createToken,
       createTokenSchema,
       createTokenDefaults,

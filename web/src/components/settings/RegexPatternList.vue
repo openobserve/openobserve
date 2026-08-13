@@ -328,12 +328,10 @@ export default defineComponent({
     };
 
     onMounted(async () => {
-      if (store.state.organizationData.regexPatterns.length == 0) {
-        await getRegexPatterns();
-      } else {
-        regexPatterns.value = store.state.organizationData.regexPatterns;
-        resultTotal.value = regexPatterns.value.length;
-      }
+      // Unconditional: the cache paints what it has straight away and only
+      // reaches the server when the entry is stale. Reading Vuex instead
+      // short-circuited that, so the list never revalidated after the first load.
+      await getRegexPatterns();
       if (router.currentRoute.value.query.from == "logs" && config.isEnterprise == "true") {
         createRegexPattern();
       }

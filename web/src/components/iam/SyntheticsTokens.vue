@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="fetching"
               data-test="synthetics-tokens-refresh-btn"
-              @click="fetchTokens"
+              @click="refreshTokens"
             >
               <OTooltip
                 side="bottom"
@@ -421,7 +421,7 @@ export default defineComponent({
       },
     ];
 
-    const fetchTokens = async () => {
+    const fetchTokens = async (force = false) => {
       const org = store.state.selectedOrganization.identifier;
       try {
         // Stale-while-revalidate: the table keeps its rows while the list
@@ -431,6 +431,7 @@ export default defineComponent({
           apply: (data: any) => (tokens.value = data.tokens ?? []),
           loading,
           fetching,
+          force,
         });
       } catch (e: any) {
         toast({
@@ -442,6 +443,10 @@ export default defineComponent({
         loading.value = false;
       }
     };
+
+    // Named handler: binding fetchTokens straight to @click puts the DOM event
+    // in `force`, and without it the button is a no-op while the entry is fresh.
+    const refreshTokens = () => fetchTokens(true);
 
     const reveal = (name: string, token: string) => {
       revealedToken.value = { name, token };
@@ -586,6 +591,7 @@ export default defineComponent({
       installCommand,
       copyCommand,
       fetchTokens,
+      refreshTokens,
       createToken,
       createTokenSchema,
       createTokenDefaults,
