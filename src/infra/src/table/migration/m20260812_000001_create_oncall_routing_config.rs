@@ -160,10 +160,6 @@ mod tests {
             .up(manager)
             .await
             .unwrap();
-        super::super::m20260811_000002_repair_oncall_schema_drift::Migration
-            .up(manager)
-            .await
-            .unwrap();
     }
 
     /// The case a fresh-install test cannot see: an existing deployment already
