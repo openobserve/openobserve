@@ -113,11 +113,15 @@ jobs:
 
       - name: Setup Python
         uses: actions/setup-python@v7
+        id: setup-python
         with:
           python-version: "3.11.6"
 
       - name: Setup rye
         uses: eifinger/setup-rye@v4
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
           working-directory: "tests/api-testing/"
@@ -206,6 +210,9 @@ jobs:
           - label: single_node_opt_true
             env: "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=true"
             mode: "true"
+          - label: remove_filter_with_index_false
+            env: "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX=false"
+            mode: "true"
     permissions:
       contents: read
     steps:
@@ -241,11 +248,15 @@ jobs:
 
       - name: Setup Python
         uses: actions/setup-python@v7
+        id: setup-python
         with:
           python-version: "3.11.6"
 
       - name: Setup rye
         uses: eifinger/setup-rye@v4
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
           working-directory: "tests/api-testing/"
@@ -363,10 +374,14 @@ jobs:
         run: cargo build --features mimalloc
 
       - uses: actions/setup-python@v7
+        id: setup-python
         with: { python-version: "3.11.6" }
 
       - name: Setup rye
         uses: eifinger/setup-rye@v4
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
           working-directory: "tests/api-testing/"
@@ -472,11 +487,15 @@ jobs:
 
       - name: Setup Python
         uses: actions/setup-python@v7
+        id: setup-python
         with:
           python-version: "3.11.6"
 
       - name: Setup rye
         uses: eifinger/setup-rye@v4
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: true
           working-directory: "tests/api-testing/"
