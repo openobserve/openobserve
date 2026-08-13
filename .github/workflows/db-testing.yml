@@ -139,6 +139,13 @@ jobs:
 
       - name: Setup rye
         uses: eifinger/setup-rye@v4
+        env:
+          # Reuse the interpreter provisioned by actions/setup-python for Rye's
+          # own bootstrap toolchain instead of downloading python-build-standalone
+          # during `rye self install`. That download is flaky and intermittently
+          # fails with exit 1, after which the next step ("Pin cpython") dies with
+          # "rye: command not found" (exit 127).
+          RYE_TOOLCHAIN: ${{ env.pythonLocation }}/bin/python
         with:
           enable-cache: false
           working-directory: "tests/db-testing/"
