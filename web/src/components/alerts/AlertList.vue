@@ -502,10 +502,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     aria-hidden="true"
                     @click.stop="showDeleteDialogFn({ row })"
                   />
-                  <DependencyChainPopover
-                    :focus="{ kind: 'alert', alertId: row.alert_id, name: row.name }"
-                    @deleted="onDependencyDeleted"
-                  />
                   <ODropdown>
                     <template #trigger>
                       <OButton
@@ -516,6 +512,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`alert-list-${row.name}-more-options`"
                       />
                     </template>
+                    <ODropdownItem
+                      :data-test="`alert-list-${row.name}-view-dependencies`"
+                      @select="openDependencyDialog(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="graph-1" size="sm" />
+                      </template>
+                      {{ t("alert_dependencies.viewDependencies") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator />
                     <ODropdownItem
                       :data-test="`alert-list-${row.name}-move-alert`"
                       @select="moveAlertToAnotherFolder(row)"
@@ -719,6 +725,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
+    <DependencyChainDialog
+      v-model:open="dependencyDialog.open"
+      :focus="dependencyDialog.focus"
+      @deleted="onDependencyDeleted"
+    />
+
     <template>
       <ODialog
         data-test="alert-list-form-dialog"
@@ -825,7 +837,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
-import DependencyChainPopover from "./DependencyChainPopover.vue";
+import DependencyChainDialog from "./DependencyChainDialog.vue";
+import type { DepFocus } from "@/composables/alerts/useDependencyGraph";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -863,7 +876,7 @@ export default defineComponent({
     ImportAlert,
     FolderList,
     MoveAcrossFolders,
-    DependencyChainPopover,
+    DependencyChainDialog,
     OToggleGroup,
     OToggleGroupItem,
     OInput,
@@ -2618,7 +2631,19 @@ export default defineComponent({
       activeFolderToMove.value = activeFolderId.value;
     };
 
-    // A delete inside the dependency popover — reload the current folder's alerts
+    // "View dependencies" lives in the ⋯ menu here (not a row icon) — selecting it
+    // opens the focused graph in a small dialog, so no popover stacks on the menu.
+    const dependencyDialog = ref<{ open: boolean; focus: DepFocus | null }>({
+      open: false,
+      focus: null,
+    });
+    const openDependencyDialog = (row: any) => {
+      dependencyDialog.value = {
+        open: true,
+        focus: { kind: "alert", alertId: row.alert_id, name: row.name },
+      };
+    };
+    // A delete inside the dependency dialog — reload the current folder's alerts
     // so the table drops the removed row.
     const onDependencyDeleted = () => getAlertsFn(store, activeFolderId.value);
 
@@ -3078,6 +3103,8 @@ export default defineComponent({
       t,
       store,
       router,
+      dependencyDialog,
+      openDependencyDialog,
       onDependencyDeleted,
       columns,
       recencyLevel,

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`view-dependencies-${focus.name}`"
         @click.stop
       >
-        <OIcon name="sync-alt" size="sm" />
+        <OIcon name="graph-1" size="sm" />
         <OTooltip side="top" :content="t('alert_dependencies.viewDependencies')" />
       </OButton>
     </template>
