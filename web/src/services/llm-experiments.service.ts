@@ -68,7 +68,27 @@ export interface ExperimentPreview {
   trialCount: number;
   slotCount: number;
   pinnedScorers: PinnedExperimentScorer[];
+  applicability?: ExperimentApplicability;
   sampleSlots: ExperimentSlot[];
+}
+
+export interface ExperimentScorerApplicability {
+  scorerId: string;
+  scorerVersion: number;
+  eligibleRowCount: number;
+  noReferenceRowCount: number;
+  eligibleSlotCount: number;
+  noReferenceSlotCount: number;
+}
+
+export interface ExperimentApplicability {
+  fullySkippedRowCount: number;
+  partiallySkippedRowCount: number;
+  fullySkippedSlotCount: number;
+  partiallySkippedSlotCount: number;
+  eligibleTaskSlotCount: number;
+  eligibleScoringDimensionCount: number;
+  scorerApplicability: ExperimentScorerApplicability[];
 }
 
 export interface LlmExperiment extends ExperimentCreatePayload {
@@ -97,6 +117,7 @@ export interface ExperimentExecution {
   rowId: string;
   trialIndex: number;
   status: "ok" | "error" | "skipped";
+  skipReason?: "no_reference" | "no_trace" | null;
   output: unknown | null;
   errorMessage: string | null;
   latencyMs: number | null;
@@ -110,6 +131,31 @@ export interface ExperimentExecution {
 export interface ExperimentResults {
   executions: ExperimentExecution[];
   scores: Record<string, unknown>[];
+  taskProgress?: ExperimentProgress;
+  scoringProgress?: ExperimentProgress;
+  skipSummary?: ExperimentSkipSummary;
+  scoreSummaries?: ExperimentScoreSummary[];
+}
+
+export interface ExperimentProgress {
+  completed: number;
+  total: number;
+  skipped: number;
+}
+
+export interface ExperimentSkipSummary {
+  fullySkippedSlots: number;
+  partiallySkippedSlots: number;
+  skippedDimensions: number;
+  noReferenceDimensions: number;
+  noTraceDimensions: number;
+}
+
+export interface ExperimentScoreSummary {
+  scorerId: string;
+  scorerVersion: number;
+  sampleCount: number;
+  skippedCount: number;
 }
 
 export interface CreateExperimentResult extends ExperimentDetail {
@@ -123,6 +169,7 @@ function value<T>(input: any, camel: string, snake: string, fallback: T): T {
 }
 
 function normalizePreview(input: any): ExperimentPreview {
+  const applicability = value<any>(input, "applicability", "applicability", {});
   return {
     datasetId: value(input, "datasetId", "dataset_id", ""),
     datasetVersion: Number(value(input, "datasetVersion", "dataset_version", 0)),
@@ -133,6 +180,48 @@ function normalizePreview(input: any): ExperimentPreview {
       id: scorer.id,
       version: Number(scorer.version),
     })),
+    applicability: {
+      fullySkippedRowCount: Number(
+        value(applicability, "fullySkippedRowCount", "fully_skipped_row_count", 0),
+      ),
+      partiallySkippedRowCount: Number(
+        value(applicability, "partiallySkippedRowCount", "partially_skipped_row_count", 0),
+      ),
+      fullySkippedSlotCount: Number(
+        value(applicability, "fullySkippedSlotCount", "fully_skipped_slot_count", 0),
+      ),
+      partiallySkippedSlotCount: Number(
+        value(applicability, "partiallySkippedSlotCount", "partially_skipped_slot_count", 0),
+      ),
+      eligibleTaskSlotCount: Number(
+        value(applicability, "eligibleTaskSlotCount", "eligible_task_slot_count", 0),
+      ),
+      eligibleScoringDimensionCount: Number(
+        value(
+          applicability,
+          "eligibleScoringDimensionCount",
+          "eligible_scoring_dimension_count",
+          0,
+        ),
+      ),
+      scorerApplicability: value<any[]>(
+        applicability,
+        "scorerApplicability",
+        "scorer_applicability",
+        [],
+      ).map((scorer) => ({
+        scorerId: value(scorer, "scorerId", "scorer_id", ""),
+        scorerVersion: Number(value(scorer, "scorerVersion", "scorer_version", 0)),
+        eligibleRowCount: Number(value(scorer, "eligibleRowCount", "eligible_row_count", 0)),
+        noReferenceRowCount: Number(
+          value(scorer, "noReferenceRowCount", "no_reference_row_count", 0),
+        ),
+        eligibleSlotCount: Number(value(scorer, "eligibleSlotCount", "eligible_slot_count", 0)),
+        noReferenceSlotCount: Number(
+          value(scorer, "noReferenceSlotCount", "no_reference_slot_count", 0),
+        ),
+      })),
+    },
     sampleSlots: value<any[]>(input, "sampleSlots", "sample_slots", []).map((slot) => ({
       rowId: value(slot, "rowId", "row_id", ""),
       logicalId: value(slot, "logicalId", "logical_id", ""),
@@ -172,6 +261,9 @@ function normalizeExperiment(input: any): LlmExperiment {
 }
 
 function normalizeResults(input: any): ExperimentResults {
+  const taskProgress = value<any>(input, "taskProgress", "task_progress", {});
+  const scoringProgress = value<any>(input, "scoringProgress", "scoring_progress", {});
+  const skipSummary = value<any>(input, "skipSummary", "skip_summary", {});
   return {
     executions: (input?.executions ?? []).map((record: any) => ({
       experimentId: value(record, "experimentId", "experiment_id", ""),
@@ -179,6 +271,7 @@ function normalizeResults(input: any): ExperimentResults {
       rowId: value(record, "rowId", "row_id", ""),
       trialIndex: Number(value(record, "trialIndex", "trial_index", 0)),
       status: record.status,
+      skipReason: value(record, "skipReason", "skip_reason", null),
       output: record.output ?? null,
       errorMessage: value(record, "errorMessage", "error_message", null),
       latencyMs: value(record, "latencyMs", "latency_ms", null),
@@ -189,6 +282,33 @@ function normalizeResults(input: any): ExperimentResults {
       timestamp: Number(record._timestamp ?? record.timestamp ?? 0),
     })),
     scores: Array.isArray(input?.scores) ? input.scores : [],
+    taskProgress: normalizeProgress(taskProgress),
+    scoringProgress: normalizeProgress(scoringProgress),
+    skipSummary: {
+      fullySkippedSlots: Number(value(skipSummary, "fullySkippedSlots", "fully_skipped_slots", 0)),
+      partiallySkippedSlots: Number(
+        value(skipSummary, "partiallySkippedSlots", "partially_skipped_slots", 0),
+      ),
+      skippedDimensions: Number(value(skipSummary, "skippedDimensions", "skipped_dimensions", 0)),
+      noReferenceDimensions: Number(
+        value(skipSummary, "noReferenceDimensions", "no_reference_dimensions", 0),
+      ),
+      noTraceDimensions: Number(value(skipSummary, "noTraceDimensions", "no_trace_dimensions", 0)),
+    },
+    scoreSummaries: value<any[]>(input, "scoreSummaries", "score_summaries", []).map((summary) => ({
+      scorerId: value(summary, "scorerId", "scorer_id", ""),
+      scorerVersion: Number(value(summary, "scorerVersion", "scorer_version", 0)),
+      sampleCount: Number(value(summary, "sampleCount", "sample_count", 0)),
+      skippedCount: Number(value(summary, "skippedCount", "skipped_count", 0)),
+    })),
+  };
+}
+
+function normalizeProgress(input: any): ExperimentProgress {
+  return {
+    completed: Number(input?.completed ?? 0),
+    total: Number(input?.total ?? 0),
+    skipped: Number(input?.skipped ?? 0),
   };
 }
 
@@ -215,7 +335,7 @@ const llmExperimentsService = {
     return {
       experiment: normalizeExperiment(response.data?.experiment),
       preview: normalizePreview(response.data?.preview),
-      results: { executions: [], scores: [] },
+      results: normalizeResults({}),
       created: response.data?.created === true,
     };
   },

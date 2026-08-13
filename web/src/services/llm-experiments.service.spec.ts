@@ -38,6 +38,24 @@ describe("llmExperimentsService", () => {
         trialCount: 2,
         slotCount: 6,
         pinnedScorers: [{ id: "scorer-1", version: 4 }],
+        applicability: {
+          fullySkippedRowCount: 1,
+          partiallySkippedRowCount: 1,
+          fullySkippedSlotCount: 2,
+          partiallySkippedSlotCount: 2,
+          eligibleTaskSlotCount: 4,
+          eligibleScoringDimensionCount: 4,
+          scorerApplicability: [
+            {
+              scorerId: "scorer-1",
+              scorerVersion: 4,
+              eligibleRowCount: 2,
+              noReferenceRowCount: 1,
+              eligibleSlotCount: 4,
+              noReferenceSlotCount: 2,
+            },
+          ],
+        },
         sampleSlots: [
           {
             rowId: "row-1",
@@ -57,6 +75,11 @@ describe("llmExperimentsService", () => {
     });
     expect(preview).toMatchObject({ rowCount: 3, trialCount: 2, slotCount: 6 });
     expect(preview.pinnedScorers).toEqual([{ id: "scorer-1", version: 4 }]);
+    expect(preview.applicability).toMatchObject({
+      fullySkippedRowCount: 1,
+      partiallySkippedRowCount: 1,
+      eligibleTaskSlotCount: 4,
+    });
     expect(preview.sampleSlots[0].expectedOutput).toBeNull();
   });
 
@@ -111,6 +134,18 @@ describe("llmExperimentsService", () => {
             },
           ],
           scores: [{ id: "score-1", name: "quality", value_numeric: 0.9 }],
+          taskProgress: { completed: 1, total: 1, skipped: 1 },
+          scoringProgress: { completed: 1, total: 1, skipped: 2 },
+          skipSummary: {
+            fullySkippedSlots: 1,
+            partiallySkippedSlots: 1,
+            skippedDimensions: 2,
+            noReferenceDimensions: 1,
+            noTraceDimensions: 1,
+          },
+          scoreSummaries: [
+            { scorerId: "scorer-1", scorerVersion: 4, sampleCount: 1, skippedCount: 2 },
+          ],
         },
       },
     });
@@ -128,6 +163,12 @@ describe("llmExperimentsService", () => {
       traceId: "abc123",
     });
     expect(detail.results.scores).toEqual([{ id: "score-1", name: "quality", value_numeric: 0.9 }]);
+    expect(detail.results).toMatchObject({
+      taskProgress: { completed: 1, total: 1, skipped: 1 },
+      scoringProgress: { completed: 1, total: 1, skipped: 2 },
+      skipSummary: { noReferenceDimensions: 1, noTraceDimensions: 1 },
+      scoreSummaries: [{ scorerId: "scorer-1", sampleCount: 1, skippedCount: 2 }],
+    });
   });
 
   it("calls the state-gated lifecycle endpoints and normalizes their durable fields", async () => {

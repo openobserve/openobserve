@@ -80,6 +80,25 @@
             {{ t("aiObservability.experiments.immutableHint") }}
           </p>
           <div
+            v-if="selectedDetail.results.taskProgress"
+            class="text-text-secondary mt-3 flex flex-wrap gap-3 text-xs"
+            data-test="ai-experiment-progress-summary"
+          >
+            <span>
+              {{
+                t("aiObservability.experiments.taskProgress", selectedDetail.results.taskProgress)
+              }}
+            </span>
+            <span v-if="selectedDetail.results.scoringProgress">
+              {{
+                t(
+                  "aiObservability.experiments.scoringProgress",
+                  selectedDetail.results.scoringProgress,
+                )
+              }}
+            </span>
+          </div>
+          <div
             v-if="selectedDetail.results.executions.length"
             class="mt-4 space-y-3"
             data-test="ai-experiment-results"
@@ -94,7 +113,9 @@
                   {{ execution.itemLogicalId }} ·
                   {{ t("aiObservability.experiments.trial", { index: execution.trialIndex + 1 }) }}
                 </span>
-                <OTag size="sm">{{ execution.status }}</OTag>
+                <OTag size="sm">
+                  {{ execution.skipReason ?? execution.status }}
+                </OTag>
               </div>
               <pre
                 v-if="execution.output !== null"
@@ -128,6 +149,25 @@
                 </li>
               </ul>
             </div>
+            <ul
+              v-if="selectedDetail.results.scoreSummaries?.length"
+              class="text-text-secondary space-y-1 text-xs"
+              data-test="ai-experiment-score-summaries"
+            >
+              <li
+                v-for="summary in selectedDetail.results.scoreSummaries"
+                :key="`${summary.scorerId}:${summary.scorerVersion}`"
+              >
+                {{
+                  t("aiObservability.experiments.scoreEvidence", {
+                    scorer: summary.scorerId,
+                    version: summary.scorerVersion,
+                    samples: summary.sampleCount,
+                    skipped: summary.skippedCount,
+                  })
+                }}
+              </li>
+            </ul>
           </div>
         </div>
       </section>
@@ -188,6 +228,33 @@
                 slots: preview.slotCount,
               })
             }}
+          </div>
+          <div
+            v-if="preview.applicability"
+            class="text-text-secondary mt-2 text-xs"
+            data-test="ai-experiment-applicability"
+          >
+            {{
+              t("aiObservability.experiments.skipTiers", {
+                full: preview.applicability.fullySkippedRowCount,
+                partial: preview.applicability.partiallySkippedRowCount,
+              })
+            }}
+            <ul class="mt-1 space-y-1">
+              <li
+                v-for="scorer in preview.applicability.scorerApplicability"
+                :key="`${scorer.scorerId}:${scorer.scorerVersion}`"
+              >
+                {{
+                  t("aiObservability.experiments.scorerApplicability", {
+                    scorer: scorer.scorerId,
+                    version: scorer.scorerVersion,
+                    eligible: scorer.eligibleSlotCount,
+                    noReference: scorer.noReferenceSlotCount,
+                  })
+                }}
+              </li>
+            </ul>
           </div>
           <ul class="text-text-secondary mt-2 space-y-1 text-xs">
             <li v-for="slot in preview.sampleSlots" :key="`${slot.rowId}:${slot.trialIndex}`">

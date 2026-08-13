@@ -30,6 +30,15 @@ const preview: ExperimentPreview = {
     { id: "quality", version: 4 },
     { id: "safety", version: 2 },
   ],
+  applicability: {
+    fullySkippedRowCount: 0,
+    partiallySkippedRowCount: 0,
+    fullySkippedSlotCount: 0,
+    partiallySkippedSlotCount: 0,
+    eligibleTaskSlotCount: 1,
+    eligibleScoringDimensionCount: 2,
+    scorerApplicability: [],
+  },
   sampleSlots: [],
 };
 
