@@ -1215,11 +1215,11 @@ export default defineComponent({
         ? "track-changes"
         : row?.alert_type === "Composite"
           ? "account-tree"
-        : row?.is_real_time === "anomaly"
-          ? "query-stats"
-          : row?.is_real_time
-            ? "bolt"
-            : "schedule";
+          : row?.is_real_time === "anomaly"
+            ? "query-stats"
+            : row?.is_real_time
+              ? "bolt"
+              : "schedule";
     const typeIconClass = (row: any): string =>
       // Deliberately the neutral tone, not a status colour: green here reads as
       // "healthy" on a row whose actual state lives two columns to the right.
@@ -1228,11 +1228,11 @@ export default defineComponent({
         ? "text-text-secondary"
         : row?.alert_type === "Composite"
           ? "text-status-warning-text"
-        : row?.is_real_time === "anomaly"
-          ? "text-status-info-text"
-          : row?.is_real_time
-            ? "text-status-warning-text"
-            : "text-text-secondary";
+          : row?.is_real_time === "anomaly"
+            ? "text-status-info-text"
+            : row?.is_real_time
+              ? "text-status-warning-text"
+              : "text-text-secondary";
 
     // At-a-glance operational counts for the summary strip. Counts over the rows
     // currently shown (folder + tab + search) so it tracks what the user sees.
@@ -1979,11 +1979,7 @@ export default defineComponent({
     const onAlertTabChange = async (tab: string) => {
       activeTab.value = tab;
       const apiType =
-        tab === "realTime"
-          ? "realtime"
-          : tab === "anomalyDetection"
-            ? "anomaly_detection"
-            : tab;
+        tab === "realTime" ? "realtime" : tab === "anomalyDetection" ? "anomaly_detection" : tab;
       await getAlertsFn(store, activeFolderId.value, "", true, apiType);
     };
 

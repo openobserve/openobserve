@@ -517,7 +517,7 @@ mod tests {
                 .await;
 
             let result = h.evaluate(&parent).await;
-            assert_eq!(result.children[0].stale, true);
+            assert!(result.children[0].stale);
             assert_eq!(result.children[0].truth, expected_truth);
             assert_eq!(result.result, Some(expected_truth));
             assert_eq!(
@@ -632,7 +632,7 @@ mod tests {
             .join(" && ");
         let parent = h.add_composite(composite(&expression)).await;
 
-        for id in &children {
+        for _ in &children {
             h.nudge(&parent, NudgeReason::ChildState).await;
         }
 

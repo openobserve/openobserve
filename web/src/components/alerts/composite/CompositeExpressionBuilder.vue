@@ -62,9 +62,10 @@ watch(
   { immediate: true },
 );
 
-const onLetteredInput = (value: string): void => {
-  letteredInput.value = value;
-  emit("update:modelValue", letteredToRaw(value, props.selectedChildren));
+const onLetteredInput = (value: string | number): void => {
+  const next = String(value ?? "");
+  letteredInput.value = next;
+  emit("update:modelValue", letteredToRaw(next, props.selectedChildren));
 };
 
 const appendToken = (token: string): void => {
@@ -78,11 +79,7 @@ const placeChild = (id: string): void => {
 };
 
 const maybeApplyDefault = (): void => {
-  if (
-    autoExpressionApplied ||
-    props.modelValue.trim() ||
-    props.selectedChildren.length !== 2
-  ) {
+  if (autoExpressionApplied || props.modelValue.trim() || props.selectedChildren.length !== 2) {
     return;
   }
   autoExpressionApplied = true;
@@ -212,7 +209,7 @@ onMounted(maybeApplyDefault);
     </div>
 
     <!-- Advanced: the raw `{id}` form, hidden behind a toggle. -->
-    <div class="flex flex-col gap-2 border-t border-border-default pt-2">
+    <div class="border-border-default flex flex-col gap-2 border-t pt-2">
       <OButton
         variant="ghost-muted"
         size="xs"

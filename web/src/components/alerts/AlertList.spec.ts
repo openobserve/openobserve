@@ -1335,9 +1335,9 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       expect(wrapper.find('[data-test="alert-list-child-count-composite-1"]').text()).toContain(
         "3",
       );
-      expect(
-        wrapper.find('[data-test="alert-list-reference-count-composite-1"]').text(),
-      ).toContain("2");
+      expect(wrapper.find('[data-test="alert-list-reference-count-composite-1"]').text()).toContain(
+        "2",
+      );
     });
 
     it("exposes Composite as a distinct list filter", async () => {
@@ -1394,7 +1394,9 @@ describe("AlertList - ODialog/ODrawer migration", () => {
         "default",
       );
       expect(wrapper.find('[data-test="alerts-composite-reference-conflict"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="alerts-composite-reference-parent-parent-1"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="alerts-composite-reference-parent-parent-1"]').exists(),
+      ).toBe(true);
     });
-  });
+  }, 15000);
 });

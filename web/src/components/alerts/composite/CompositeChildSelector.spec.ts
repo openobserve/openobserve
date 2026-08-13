@@ -37,8 +37,12 @@ describe("CompositeChildSelector", () => {
   it("renders each selected child as a lettered slot in selection order", () => {
     const wrapper = mountSelector(["child-2", "child-1"], [child(1), child(2)]);
 
-    expect(wrapper.find('[data-test="alerts-composite-selected-child-child-2"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alerts-composite-selected-child-child-1"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-composite-selected-child-child-2"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="alerts-composite-selected-child-child-1"]').exists()).toBe(
+      true,
+    );
     expect(wrapper.text()).toContain("A");
     expect(wrapper.text()).toContain("B");
     expect(wrapper.text()).toContain("Alert 2");
@@ -54,7 +58,10 @@ describe("CompositeChildSelector", () => {
   });
 
   it("removes a child by slot", async () => {
-    const wrapper = mountSelector(["child-1", "child-2", "child-3"], [child(1), child(2), child(3)]);
+    const wrapper = mountSelector(
+      ["child-1", "child-2", "child-3"],
+      [child(1), child(2), child(3)],
+    );
 
     await wrapper.find('[data-test="alerts-composite-child-remove-child-1"]').trigger("click");
     expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toEqual(["child-2", "child-3"]);
@@ -65,7 +72,9 @@ describe("CompositeChildSelector", () => {
     const wrapper = mountSelector(selected);
 
     expect(wrapper.find('[data-test="alerts-composite-child-cap"]').text()).toContain("10");
-    expect(wrapper.find('[data-test="alerts-composite-child-add"]').attributes("disabled")).toBeDefined();
+    expect(
+      wrapper.find('[data-test="alerts-composite-child-add"]').attributes("disabled"),
+    ).toBeDefined();
   });
 
   it("keeps an inaccessible child removable by its ID without revealing a name or level", () => {
@@ -74,6 +83,8 @@ describe("CompositeChildSelector", () => {
     const slot = wrapper.find('[data-test="alerts-composite-selected-child-secret-id"]');
     expect(slot.text()).toContain("secret-id");
     expect(slot.text()).not.toContain("Alert 1");
-    expect(wrapper.find('[data-test="alerts-composite-child-remove-secret-id"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-composite-child-remove-secret-id"]').exists()).toBe(
+      true,
+    );
   });
 });

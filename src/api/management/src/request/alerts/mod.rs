@@ -288,7 +288,7 @@ fn composite_input(
 
 async fn composite_detail_response(
     composite: infra::table::alert_composites::CompositeWithChildren,
-    user_id: Option<&str>,
+    _user_id: Option<&str>,
 ) -> Response {
     let definition = composite.definition;
     let scheduler_job_present = infra::scheduler::get(
@@ -331,7 +331,7 @@ async fn composite_detail_response(
     let mut children = Vec::with_capacity(composite.children.len());
     for child in composite.children {
         #[cfg(feature = "enterprise")]
-        let child_authorized = match user_id {
+        let child_authorized = match _user_id {
             Some(user_id) => {
                 check_permissions(
                     &child.child_alert_id,
@@ -925,7 +925,9 @@ pub async fn get_composite_timeline(
             slot: Some(slot),
             name: name.clone(),
             accessible: name.is_some(),
-            current_level: state.and_then(|state| state.level).map(|level| level.to_string()),
+            current_level: state
+                .and_then(|state| state.level)
+                .map(|level| level.to_string()),
             level_since: state.and_then(|state| state.level_since),
             transitions: transitions
                 .into_iter()

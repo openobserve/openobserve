@@ -104,12 +104,8 @@ async fn persist_alert_run_state(
             }
         };
         let at = now_micros();
-        let plan = config::meta::alerts::grouping::plan_group_updates(
-            alert_id,
-            classification,
-            &prev,
-            at,
-        );
+        let plan =
+            config::meta::alerts::grouping::plan_group_updates(alert_id, classification, &prev, at);
         if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
             log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
             return false;
@@ -118,15 +114,12 @@ async fn persist_alert_run_state(
         // A composite reads only this multi-alert's rollup row. Nudge its
         // parents on a rollup transition or a stale-to-fresh return, exactly
         // as the single-row path does — otherwise a grouped child is sweep-only.
-        let rollup = plan
-            .updates
-            .iter()
-            .find(|update| {
-                update
-                    .state
-                    .as_ref()
-                    .is_some_and(|state| state.group_key.as_str() == ROLLUP_GROUP_KEY)
-            });
+        let rollup = plan.updates.iter().find(|update| {
+            update
+                .state
+                .as_ref()
+                .is_some_and(|state| state.group_key.as_str() == ROLLUP_GROUP_KEY)
+        });
         let transition_changed = rollup.is_some_and(|update| update.transition.is_some());
         let stale_to_fresh = prev
             .get(ROLLUP_GROUP_KEY)
@@ -656,9 +649,12 @@ async fn nudge_composite_parents(
             );
             continue;
         }
-        if let Ok(mut parent_job) =
-            infra::scheduler::get(org, db::scheduler::TriggerModule::CompositeAlert, &parent.id)
-                .await
+        if let Ok(mut parent_job) = infra::scheduler::get(
+            org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &parent.id,
+        )
+        .await
         {
             let debounce_at = now + composite_debounce_secs() * 1_000_000;
             parent_job.next_run_at = parent_job.next_run_at.min(debounce_at);
@@ -756,7 +752,7 @@ async fn handle_composite_alert_trigger(
         let (name, alert_type, enabled, cadence_seconds, stale_deadline) =
             match resolved.get(&child.child_alert_id) {
                 Some(infra::table::alert_composites::Resolution::Alert(model)) => {
-                    let alert: config::meta::alerts::alert::Alert = model.clone().try_into()?;
+                    let alert: config::meta::alerts::alert::Alert = (**model).clone().try_into()?;
                     if alert.is_real_time {
                         anyhow::bail!("composite child is no longer eligible");
                     }
@@ -836,7 +832,9 @@ async fn handle_composite_alert_trigger(
         now,
     );
 
-    use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait};
+    use sea_orm::{
+        ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
+    };
     let transaction = db.begin().await?;
     let lease_deadline = now + config::get_config().limit.alert_schedule_timeout * 1_000_000;
     if !infra::scheduler::renew_claim_in_transaction(
@@ -850,10 +848,9 @@ async fn handle_composite_alert_trigger(
         transaction.rollback().await?;
         return Ok(());
     }
-    let mut current_query = infra::table::entity::alert_composites::Entity::find_by_id(
-        &definition.definition.id,
-    )
-    .filter(infra::table::entity::alert_composites::Column::Org.eq(&trigger.org));
+    let mut current_query =
+        infra::table::entity::alert_composites::Entity::find_by_id(&definition.definition.id)
+            .filter(infra::table::entity::alert_composites::Column::Org.eq(&trigger.org));
     if transaction.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
         current_query = current_query.lock(sea_orm::sea_query::LockType::Update);
     }
@@ -992,7 +989,10 @@ async fn handle_composite_alert_trigger(
         _timestamp: now,
         org: trigger.org.clone(),
         module: TriggerDataType::CompositeAlert,
-        key: format!("{}/{}", definition.definition.name, definition.definition.id),
+        key: format!(
+            "{}/{}",
+            definition.definition.name, definition.definition.id
+        ),
         status: outcome.clone(),
         actual_value: Some(i32::from(evaluated.result) as f64),
         level: Some(evaluated.level.to_i32()),
@@ -1060,16 +1060,14 @@ async fn handle_composite_alert_trigger(
     // taken at the start of this run, completion must schedule another run no
     // later than `now + debounce` rather than overwrite that event with the
     // sweep deadline.
-    if let Ok(Some(current_generation)) = infra::table::alert_composites::current_generation(
-        db,
-        &trigger.org,
-        &trigger.module_key,
-    )
-    .await
+    if let Ok(Some(current_generation)) =
+        infra::table::alert_composites::current_generation(db, &trigger.org, &trigger.module_key)
+            .await
         && current_generation > definition.definition.evaluation_generation
     {
-        trigger.next_run_at =
-            trigger.next_run_at.min(now + composite_debounce_secs() * 1_000_000);
+        trigger.next_run_at = trigger
+            .next_run_at
+            .min(now + composite_debounce_secs() * 1_000_000);
     }
     trigger.data = config::utils::json::to_string(&scheduled_data)?;
     let _ = infra::scheduler::complete_claim(trigger).await?;

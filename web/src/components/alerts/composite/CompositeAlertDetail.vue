@@ -25,9 +25,7 @@ const rows = computed(() => value.value.children ?? []);
 const expression = computed(() =>
   nameResolvedExpression(value.value.composite_condition.expression, rows.value),
 );
-const showMissingJob = computed(
-  () => value.value.enabled && !value.value.scheduler_job_present,
-);
+const showMissingJob = computed(() => value.value.enabled && !value.value.scheduler_job_present);
 
 const readable = (child: CompositeAlertChild): child is CompositeAlertReadableChild =>
   child.accessible;
@@ -67,7 +65,9 @@ const childReason = (
     <!-- Current evaluation -->
     <div class="border-border-default bg-surface-subtle rounded-surface border p-4">
       <div class="mb-3 flex items-center justify-between gap-3">
-        <span class="text-text-secondary text-xs">{{ t("alerts.composite.currentEvaluation") }}</span>
+        <span class="text-text-secondary text-xs">{{
+          t("alerts.composite.currentEvaluation")
+        }}</span>
         <OTag
           v-if="value.evaluation?.level"
           type="alertLevel"
@@ -104,7 +104,7 @@ const childReason = (
           <template v-if="readable(child)">
             <div class="flex items-center gap-2">
               <span
-                class="bg-theme-accent-soft text-theme-accent flex h-6 w-6 shrink-0 items-center justify-center rounded-default text-xs font-bold"
+                class="bg-theme-accent-soft text-theme-accent rounded-default flex h-6 w-6 shrink-0 items-center justify-center text-xs font-bold"
               >
                 {{ raw(letterFor(index)) }}
               </span>
@@ -118,7 +118,12 @@ const childReason = (
               </a>
               <OTag type="alertLevel" :value="child.level ?? 'nodata'" size="xs" />
               <OTag v-if="child.alert_type" type="alertType" :value="child.alert_type" size="xs" />
-              <OTag v-if="child.last_outcome" type="alertState" :value="child.last_outcome" size="xs" />
+              <OTag
+                v-if="child.last_outcome"
+                type="alertState"
+                :value="child.last_outcome"
+                size="xs"
+              />
               <OTag
                 v-if="!child.enabled"
                 variant="default-soft"
@@ -158,14 +163,18 @@ const childReason = (
     >
       <div class="text-text-secondary mb-2 text-xs">{{ t("alerts.composite.settings") }}</div>
       <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.expression") }}</dt>
+        <dt class="text-text-secondary whitespace-nowrap">
+          {{ t("alerts.composite.expression") }}
+        </dt>
         <dd
-          class="text-text-heading min-w-0 break-words font-mono text-xs"
+          class="text-text-heading min-w-0 font-mono text-xs break-words"
           data-test="alerts-composite-detail-expression"
         >
           {{ raw(expression) }}
         </dd>
-        <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.warningPolicy") }}</dt>
+        <dt class="text-text-secondary whitespace-nowrap">
+          {{ t("alerts.composite.warningPolicy") }}
+        </dt>
         <dd class="text-text-heading">
           {{
             value.composite_condition.warning_counts_as_firing
@@ -173,7 +182,9 @@ const childReason = (
               : t("alerts.composite.warningDoesNotCount")
           }}
         </dd>
-        <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.stalePolicy") }}</dt>
+        <dt class="text-text-secondary whitespace-nowrap">
+          {{ t("alerts.composite.stalePolicy") }}
+        </dt>
         <dd class="text-text-heading" data-test="alerts-composite-detail-stale-policy">
           {{
             value.composite_condition.stale_child_policy === "use_last_state"
@@ -181,7 +192,9 @@ const childReason = (
               : raw(value.composite_condition.stale_child_policy)
           }}
         </dd>
-        <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.levelWhenFiring") }}</dt>
+        <dt class="text-text-secondary whitespace-nowrap">
+          {{ t("alerts.composite.levelWhenFiring") }}
+        </dt>
         <dd class="text-text-heading">{{ t("alerts.composite.levelWhenFiringValue") }}</dd>
       </dl>
     </div>

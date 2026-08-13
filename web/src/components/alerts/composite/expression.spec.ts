@@ -54,9 +54,7 @@ describe("lettered <-> raw expression", () => {
   });
 
   it("translates letters back to the stored form", () => {
-    expect(letteredToRaw("A || (B && !C)", children)).toBe(
-      "{id-a} || ({id-b} && !{id-c})",
-    );
+    expect(letteredToRaw("A || (B && !C)", children)).toBe("{id-a} || ({id-b} && !{id-c})");
   });
 
   it("leaves unknown letters untouched for validation to reject", () => {

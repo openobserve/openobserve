@@ -122,110 +122,110 @@
       </template>
 
       <template v-else>
-      <!-- M-6 forbids silent truncation: when the last evaluation observed more
+        <!-- M-6 forbids silent truncation: when the last evaluation observed more
            groups than the cap tracks, say so rather than quietly showing a
            partial table. -->
-      <OBanner
-        v-if="groupData?.capped"
-        variant="warning"
-        class="shrink-0"
-        data-test="alerts-alertdetail-cap-banner"
-      >
-        {{
-          t("alerts.groups.capBanner", {
-            observed: groupData.groups_observed,
-            cap: groupData.group_cap,
-          })
-        }}
-      </OBanner>
+        <OBanner
+          v-if="groupData?.capped"
+          variant="warning"
+          class="shrink-0"
+          data-test="alerts-alertdetail-cap-banner"
+        >
+          {{
+            t("alerts.groups.capBanner", {
+              observed: groupData.groups_observed,
+              cap: groupData.group_cap,
+            })
+          }}
+        </OBanner>
 
-      <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
-        <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
-      </OContent>
+        <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
+          <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
+        </OContent>
 
-      <!-- A grouped alert that never opted in has no Groups tab, because it
+        <!-- A grouped alert that never opted in has no Groups tab, because it
            has no per-group state to show. Without saying so, the chart below
            showing one line per group makes that look like a bug rather than
            the deliberate opt-in it is (M-9). -->
-      <OBanner
-        v-if="isGroupedButSimple"
-        variant="info"
-        class="shrink-0"
-        data-test="alerts-alertdetail-simple-grouped-banner"
-      >
-        {{
-          t("alerts.multiAlert.groupedButSimple", {
-            columns: (aggregation?.group_by || []).join(", "),
-          })
-        }}
-        <template #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="alerts-alertdetail-enable-multi"
-            @click="editAlert"
-          >
-            {{ t("alerts.multiAlert.enableCta") }}
-          </OButton>
-        </template>
-      </OBanner>
+        <OBanner
+          v-if="isGroupedButSimple"
+          variant="info"
+          class="shrink-0"
+          data-test="alerts-alertdetail-simple-grouped-banner"
+        >
+          {{
+            t("alerts.multiAlert.groupedButSimple", {
+              columns: (aggregation?.group_by || []).join(", "),
+            })
+          }}
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="alerts-alertdetail-enable-multi"
+              @click="editAlert"
+            >
+              {{ t("alerts.multiAlert.enableCta") }}
+            </OButton>
+          </template>
+        </OBanner>
 
-      <!-- Above the tabs, not inside the Groups tab: the evaluation chart
+        <!-- Above the tabs, not inside the Groups tab: the evaluation chart
            answers "what is this alert watching, and how close is it to the
            thresholds" for EVERY scheduled alert. A grouped alert that never
            opted in to per-group evaluation has no Groups tab, and burying the
            chart there left it with no chart at all. -->
-      <!-- Hidden for SLO alerts: the chart plots a stream query, and this
+        <!-- Hidden for SLO alerts: the chart plots a stream query, and this
            family has neither. It bails safely without a stream, but what it
            renders then is an empty frame that reads as "no data" — a lie about
            an alert that is evaluating perfectly well. -->
-      <OContent v-if="alert && !isSloAlertView" class="shrink-0 py-3">
-        <AlertGroupChart :alert="alert" />
-      </OContent>
+        <OContent v-if="alert && !isSloAlertView" class="shrink-0 py-3">
+          <AlertGroupChart :alert="alert" />
+        </OContent>
 
-      <!-- The tabs live HERE, below the stat strip and the chart, not in the
+        <!-- The tabs live HERE, below the stat strip and the chart, not in the
            page header: everything above is shared context visible on every
            tab — only the region below actually switches. A header tab strip
            would promise the whole page changes. Per the tab-strip house rule
            the strip takes no horizontal wrapper padding (the first label
            self-aligns to the px-page-edge grid) and carries its own bottom
            divider via `bordered`. -->
-      <OTabs
-        v-model="activeTab"
-        dense
-        bordered
-        class="shrink-0"
-        data-test="alerts-alertdetail-tabs"
-      >
-        <!-- Custom trigger content: OTab's default slot exists for exactly
+        <OTabs
+          v-model="activeTab"
+          dense
+          bordered
+          class="shrink-0"
+          data-test="alerts-alertdetail-tabs"
+        >
+          <!-- Custom trigger content: OTab's default slot exists for exactly
              this (badges) — prop-driven label/icon cannot carry the firing
              count the mock shows on the Groups tab. -->
-        <OTab v-if="isMultiAlert" name="groups" data-test="alerts-alertdetail-tab-groups">
-          <OIcon name="layers" size="sm" class="o-tab__icon shrink-0" />
-          <span class="o-tab__label truncate">{{ t("alerts.groups.tab") }}</span>
-          <OTag
-            v-if="firingBadge"
-            variant="error-soft"
-            size="sm"
-            :label="firingBadge"
-            data-test="alerts-alertdetail-tab-groups-count"
-          />
-        </OTab>
-        <OTab name="history" :label="t('alerts.history')" icon="history" />
-        <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
-      </OTabs>
+          <OTab v-if="isMultiAlert" name="groups" data-test="alerts-alertdetail-tab-groups">
+            <OIcon name="layers" size="sm" class="o-tab__icon shrink-0" />
+            <span class="o-tab__label truncate">{{ t("alerts.groups.tab") }}</span>
+            <OTag
+              v-if="firingBadge"
+              variant="error-soft"
+              size="sm"
+              :label="firingBadge"
+              data-test="alerts-alertdetail-tab-groups-count"
+            />
+          </OTab>
+          <OTab name="history" :label="t('alerts.history')" icon="history" />
+          <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
+        </OTabs>
 
-      <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
-        <OTabPanel v-if="isMultiAlert" name="groups" stretch>
-          <AlertGroupsTable
-            :groups="groupData?.list || []"
-            :loading="loadingGroups"
-            @refresh="fetchGroups"
-            @show-history="openGroupHistory"
-          />
-        </OTabPanel>
+        <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
+          <OTabPanel v-if="isMultiAlert" name="groups" stretch>
+            <AlertGroupsTable
+              :groups="groupData?.list || []"
+              :loading="loadingGroups"
+              @refresh="fetchGroups"
+              @show-history="openGroupHistory"
+            />
+          </OTabPanel>
 
-        <!-- Multi-alerts keep the per-group transitions view untouched.
+          <!-- Multi-alerts keep the per-group transitions view untouched.
 
              Simple alerts get TWO readings of "history", because the
              transitions table is write-on-change: an alert that has been
@@ -235,61 +235,61 @@
              "Level changes" reads the rollup row's transitions
              (group_key ""), without the Group column/filter that would
              repeat the same non-answer on every line. -->
-        <OTabPanel name="history" stretch>
-          <AlertGroupHistory
-            v-if="isMultiAlert"
-            :transitions="transitions"
-            :loading="loadingTransitions"
-            :group-filter="historyGroupFilter"
-            @clear-filter="clearGroupFilter"
-            @refresh="fetchTransitions"
-          />
-          <!-- `v-else-if="alert"`, not a bare else: until the GET resolves the
+          <OTabPanel name="history" stretch>
+            <AlertGroupHistory
+              v-if="isMultiAlert"
+              :transitions="transitions"
+              :loading="loadingTransitions"
+              :group-filter="historyGroupFilter"
+              @clear-filter="clearGroupFilter"
+              @refresh="fetchTransitions"
+            />
+            <!-- `v-else-if="alert"`, not a bare else: until the GET resolves the
                page cannot know which mode it is in, and mounting the
                evaluations view speculatively fires its fetch even for alerts
                that turn out to be multi. -->
-          <div v-else-if="alert" class="flex h-full min-h-0 flex-col">
-            <OContent class="shrink-0 py-2">
-              <OToggleGroup
-                :model-value="historyView"
-                data-test="alerts-alertdetail-history-view"
-                @update:model-value="onHistoryViewChange"
-              >
-                <OToggleGroupItem
-                  value="evaluations"
-                  size="sm"
-                  data-test="alerts-alertdetail-history-view-evaluations"
+            <div v-else-if="alert" class="flex h-full min-h-0 flex-col">
+              <OContent class="shrink-0 py-2">
+                <OToggleGroup
+                  :model-value="historyView"
+                  data-test="alerts-alertdetail-history-view"
+                  @update:model-value="onHistoryViewChange"
                 >
-                  {{ t("alerts.groups.evaluationsView") }}
-                </OToggleGroupItem>
-                <OToggleGroupItem
-                  value="transitions"
-                  size="sm"
-                  data-test="alerts-alertdetail-history-view-transitions"
-                >
-                  {{ t("alerts.groups.levelChangesView") }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-            </OContent>
-            <div class="min-h-0 flex-1">
-              <AlertEvaluationHistory v-if="historyView === 'evaluations'" :alert-id="alertId" />
-              <AlertGroupHistory
-                v-else
-                :transitions="transitions"
-                :loading="loadingTransitions"
-                :show-group-column="false"
-                @refresh="fetchTransitions"
-              />
+                  <OToggleGroupItem
+                    value="evaluations"
+                    size="sm"
+                    data-test="alerts-alertdetail-history-view-evaluations"
+                  >
+                    {{ t("alerts.groups.evaluationsView") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem
+                    value="transitions"
+                    size="sm"
+                    data-test="alerts-alertdetail-history-view-transitions"
+                  >
+                    {{ t("alerts.groups.levelChangesView") }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
+              </OContent>
+              <div class="min-h-0 flex-1">
+                <AlertEvaluationHistory v-if="historyView === 'evaluations'" :alert-id="alertId" />
+                <AlertGroupHistory
+                  v-else
+                  :transitions="transitions"
+                  :loading="loadingTransitions"
+                  :show-group-column="false"
+                  @refresh="fetchTransitions"
+                />
+              </div>
             </div>
-          </div>
-        </OTabPanel>
+          </OTabPanel>
 
-        <OTabPanel name="configuration" stretch>
-          <OContent class="h-full overflow-y-auto py-4">
-            <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
-          </OContent>
-        </OTabPanel>
-      </OTabPanels>
+          <OTabPanel name="configuration" stretch>
+            <OContent class="h-full overflow-y-auto py-4">
+              <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
+            </OContent>
+          </OTabPanel>
+        </OTabPanels>
       </template>
     </div>
   </OPageLayout>

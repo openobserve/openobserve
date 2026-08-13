@@ -1040,9 +1040,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper = mountAlert({ modelValue, isUpdated: true });
       await flushPromises();
 
-      expect(wrapper.vm.form.state.values.composite_condition.expression).toBe(
-        "{id-a} && {id-b}",
-      );
+      expect(wrapper.vm.form.state.values.composite_condition.expression).toBe("{id-a} && {id-b}");
       await wrapper.vm.form.handleSubmit();
       await flushPromises();
 

@@ -49,7 +49,9 @@ describe("CompositeReferencesDrawer", () => {
   it("reports an opaque hidden count without rendering hidden identities", () => {
     const wrapper = mountDrawer({ open: true, hiddenReferenceCount: 3 });
 
-    expect(wrapper.find('[data-test="alerts-composite-reference-hidden-count"]').text()).toContain("3");
+    expect(wrapper.find('[data-test="alerts-composite-reference-hidden-count"]').text()).toContain(
+      "3",
+    );
     expect(wrapper.findAll('[data-test^="alerts-composite-reference-parent-"]')).toHaveLength(2);
   });
 
@@ -58,7 +60,13 @@ describe("CompositeReferencesDrawer", () => {
     const close = wrapper.find('[data-test="alerts-composite-reference-close"]');
 
     expect(close.attributes("aria-label")).toBeTruthy();
-    expect(wrapper.find('[data-test="alerts-composite-reference-drawer"]').attributes("aria-labelledby")).toBeTruthy();
-    expect(wrapper.find('[data-test="alerts-composite-reference-parent-parent-1"]').attributes("aria-label")).toContain("Checkout degraded");
+    expect(
+      wrapper.find('[data-test="alerts-composite-reference-drawer"]').attributes("aria-labelledby"),
+    ).toBeTruthy();
+    expect(
+      wrapper
+        .find('[data-test="alerts-composite-reference-parent-parent-1"]')
+        .attributes("aria-label"),
+    ).toContain("Checkout degraded");
   });
 });

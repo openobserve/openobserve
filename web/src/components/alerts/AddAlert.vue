@@ -671,9 +671,7 @@ export default defineComponent({
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
     );
-    const isCompositeMode = computed(
-      () => alertForm.formData.value.is_real_time === "composite",
-    );
+    const isCompositeMode = computed(() => alertForm.formData.value.is_real_time === "composite");
     const availableCompositeChildren = ref<any[]>([]);
 
     const loadCompositeChildren = async () => {
@@ -695,9 +693,7 @@ export default defineComponent({
           .filter((row: any) => {
             const id = row.alert_id ?? row.id;
             return (
-              id &&
-              id !== alertForm.formData.value.id &&
-              row.alert_type !== "anomaly_detection"
+              id && id !== alertForm.formData.value.id && row.alert_type !== "anomaly_detection"
             );
           })
           .map((row: any) => ({

@@ -213,10 +213,7 @@ export interface AlertGroupTransition {
   value?: number;
 }
 
-export type StaleChildPolicy =
-  | "treat_as_false"
-  | "treat_as_true"
-  | "use_last_state";
+export type StaleChildPolicy = "treat_as_false" | "treat_as_true" | "use_last_state";
 
 export interface CompositeAlertCondition {
   expression: string;
@@ -251,9 +248,7 @@ export interface CompositeAlertHiddenChild extends CompositeAlertChildBase {
   accessible: false;
 }
 
-export type CompositeAlertChild =
-  | CompositeAlertReadableChild
-  | CompositeAlertHiddenChild;
+export type CompositeAlertChild = CompositeAlertReadableChild | CompositeAlertHiddenChild;
 
 export interface CompositeAlertEvaluation {
   result: boolean | null;

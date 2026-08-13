@@ -1,9 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type {
-  CompositeAlertChild,
-  CompositeExpressionValidation,
-} from "@/ts/interfaces/alert";
+import type { CompositeAlertChild, CompositeExpressionValidation } from "@/ts/interfaces/alert";
 
 export interface CompositeChildDisplay {
   alert_id: string;
@@ -38,9 +35,7 @@ export const validateExpression = (
   const uniqueUsedIds = [...new Set(usedIds)];
   const unusedIds = selectedIds.filter((id) => !uniqueUsedIds.includes(id));
   const unknownIds = uniqueUsedIds.filter((id) => !selectedIds.includes(id));
-  const remaining = expression
-    .replace(/\{[^{}]+\}/g, "")
-    .replace(/&&|\|\||!|\(|\)|\s/g, "");
+  const remaining = expression.replace(/\{[^{}]+\}/g, "").replace(/&&|\|\||!|\(|\)|\s/g, "");
   let balance = 0;
   let balanced = true;
   for (const token of expression) {

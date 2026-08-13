@@ -14,9 +14,7 @@
 use std::collections::{HashMap, HashSet};
 
 use config::meta::alerts::{
-    composite::{
-        CompositeExpr, StaleChildPolicy, evaluate_truths, parse_expr, result_level,
-    },
+    composite::{CompositeExpr, StaleChildPolicy, evaluate_truths, parse_expr, result_level},
     level::AlertLevel,
 };
 
@@ -223,8 +221,9 @@ fn level_truth(level: Option<AlertLevel>, warning_counts_as_firing: bool) -> boo
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use svix_ksuid::KsuidLike as _;
+
+    use super::*;
 
     #[test]
     fn cron_child_uses_schedule_aware_deadline_not_placeholder_cadence() {

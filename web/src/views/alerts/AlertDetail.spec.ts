@@ -195,7 +195,12 @@ async function mountView({
     },
   } as any);
   vi.mocked(alertsService.getCompositeTimeline).mockResolvedValue({
-    data: { from: 0, to: 1, children: [], result: { alert_id: "alert-1", accessible: true, transitions: [] } },
+    data: {
+      from: 0,
+      to: 1,
+      children: [],
+      result: { alert_id: "alert-1", accessible: true, transitions: [] },
+    },
   } as any);
 
   const wrapper = mount(AlertDetail, {
@@ -477,9 +482,15 @@ describe("AlertDetail — History tab", () => {
       wrapper = await mountView({ alert: makeCompositeAlert() });
 
       expect(wrapper.findComponent({ name: "CompositeAlertDetail" }).exists()).toBe(true);
-      expect(wrapper.find('[data-test="alerts-composite-detail-result"]').text()).toMatch(/critical/i);
-      expect(wrapper.find('[data-test="alerts-composite-detail-child-id-a"]').text()).toMatch(/critical.*firing/i);
-      expect(wrapper.find('[data-test="alerts-composite-detail-child-id-b"]').text()).toMatch(/disabled/i);
+      expect(wrapper.find('[data-test="alerts-composite-detail-result"]').text()).toMatch(
+        /critical/i,
+      );
+      expect(wrapper.find('[data-test="alerts-composite-detail-child-id-a"]').text()).toMatch(
+        /critical.*firing/i,
+      );
+      expect(wrapper.find('[data-test="alerts-composite-detail-child-id-b"]').text()).toMatch(
+        /disabled/i,
+      );
       expect(wrapper.findComponent({ name: "AlertGroupChart" }).exists()).toBe(false);
       expect(wrapper.find('[data-otab-name="groups"]').exists()).toBe(false);
       expect(alertsService.list_groups).not.toHaveBeenCalled();
@@ -491,9 +502,9 @@ describe("AlertDetail — History tab", () => {
       await flushPromises();
 
       expect(alertsService.getCompositeReferences).toHaveBeenCalledWith("default", "alert-1");
-      expect(wrapper.find('[data-test="alerts-composite-reference-parent-parent-1"]').text()).toContain(
-        "Customer impact",
-      );
+      expect(
+        wrapper.find('[data-test="alerts-composite-reference-parent-parent-1"]').text(),
+      ).toContain("Customer impact");
     });
 
     it("shows missing-job repair guidance only for an enabled composite", async () => {
@@ -506,7 +517,9 @@ describe("AlertDetail — History tab", () => {
       wrapper = await mountView({
         alert: makeCompositeAlert({ enabled: false, scheduler_job_present: false }),
       });
-      expect(wrapper.find('[data-test="alerts-composite-detail-missing-job"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alerts-composite-detail-missing-job"]').exists()).toBe(
+        false,
+      );
     });
   });
 });

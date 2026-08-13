@@ -252,10 +252,7 @@ impl TriggerDataType {
     pub fn is_condition_bearing(&self) -> bool {
         matches!(
             self,
-            Self::Alert
-                | Self::DerivedStream
-                | Self::AnomalyDetection
-                | Self::CompositeAlert
+            Self::Alert | Self::DerivedStream | Self::AnomalyDetection | Self::CompositeAlert
         )
     }
 }

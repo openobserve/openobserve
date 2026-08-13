@@ -95,10 +95,7 @@ pub async fn create_composite(
 
 /// Composite resources are folder-scoped exactly like alerts: the target folder
 /// must exist (the ordinary alert path creates the default folder on demand).
-async fn ensure_folder_exists(
-    org: &str,
-    folder_id: &str,
-) -> Result<(), CompositeServiceError> {
+async fn ensure_folder_exists(org: &str, folder_id: &str) -> Result<(), CompositeServiceError> {
     use config::meta::folder::FolderType;
     match infra::table::folders::exists(org, folder_id, FolderType::Alerts).await {
         Ok(true) => Ok(()),
@@ -476,7 +473,7 @@ async fn resolve_child_inputs(
         let state = states.get(id);
         let (name, alert_type, enabled, cadence_seconds, stale_deadline) = match resolved.get(id) {
             Some(alert_composites::Resolution::Alert(model)) => {
-                let alert: config::meta::alerts::alert::Alert = model.clone().try_into()?;
+                let alert: config::meta::alerts::alert::Alert = (**model).clone().try_into()?;
                 if alert.is_real_time {
                     anyhow::bail!("composite child is not eligible");
                 }

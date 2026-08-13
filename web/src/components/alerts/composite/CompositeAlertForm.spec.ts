@@ -98,7 +98,9 @@ describe("CompositeAlertForm", () => {
       const wrapper = mountForm();
       await flushPromises();
 
-      expect(wrapper.find(`[data-test="alerts-composite-preview-error-${code}"]`).exists()).toBe(true);
+      expect(wrapper.find(`[data-test="alerts-composite-preview-error-${code}"]`).exists()).toBe(
+        true,
+      );
       expect(wrapper.emitted("validation")?.at(-1)?.[0]).toEqual(
         expect.objectContaining({ valid: false }),
       );
@@ -108,9 +110,17 @@ describe("CompositeAlertForm", () => {
   it("defaults Warning to firing and stale children to explicit use-last-state", () => {
     const wrapper = mountForm(draft());
 
-    expect(wrapper.find('[data-test="alerts-composite-warning-counts-as-firing"]').attributes("aria-checked")).toBe("true");
-    expect(wrapper.find('[data-test="alerts-composite-stale-policy"]').attributes("data-value")).toBe("use_last_state");
-    expect(wrapper.find('[data-test="alerts-composite-stale-policy-help"]').text()).toMatch(/last.*state/i);
+    expect(
+      wrapper
+        .find('[data-test="alerts-composite-warning-counts-as-firing"]')
+        .attributes("aria-checked"),
+    ).toBe("true");
+    expect(
+      wrapper.find('[data-test="alerts-composite-stale-policy"]').attributes("data-value"),
+    ).toBe("use_last_state");
+    expect(wrapper.find('[data-test="alerts-composite-stale-policy-help"]').text()).toMatch(
+      /last.*state/i,
+    );
   });
 
   it("writes Warning and stale-policy control changes into the draft condition", async () => {
@@ -137,7 +147,9 @@ describe("CompositeAlertForm", () => {
         },
       ]
     >;
-    expect(updates.some(([value]) => value.composite_condition.warning_counts_as_firing === false)).toBe(true);
+    expect(
+      updates.some(([value]) => value.composite_condition.warning_counts_as_firing === false),
+    ).toBe(true);
     expect(updates.at(-1)?.[0].composite_condition.stale_child_policy).toBe("treat_as_true");
   });
 

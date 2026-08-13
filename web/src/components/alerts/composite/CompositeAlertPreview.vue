@@ -20,9 +20,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18nTyped();
-const value = computed(
-  () => props.preview as unknown as CompositeAlertValidationResponse,
-);
+const value = computed(() => props.preview as unknown as CompositeAlertValidationResponse);
 const rows = computed(() => value.value.children ?? []);
 const expression = computed(() => props.expression ?? "");
 const selectedChildren = computed(() => props.selectedChildren ?? []);
@@ -31,18 +29,13 @@ const childById = computed(
   () => new Map(selectedChildren.value.map((child) => [child.alert_id, child])),
 );
 const letterById = computed(
-  () =>
-    new Map(
-      selectedChildren.value.map((child, index) => [child.alert_id, letterFor(index)]),
-    ),
+  () => new Map(selectedChildren.value.map((child, index) => [child.alert_id, letterFor(index)])),
 );
 const previewChildById = computed(
   () => new Map(value.value.children.map((child) => [child.alert_id, child])),
 );
 const tokens = computed(() => tokenizeExpression(expression.value));
-const operandTokens = computed(() =>
-  tokens.value.filter((token) => token.kind === "operand"),
-);
+const operandTokens = computed(() => tokens.value.filter((token) => token.kind === "operand"));
 // The human-facing expression ("A && B"), not the stored `{id}` form.
 const letteredExpression = computed(() =>
   tokens.value
@@ -58,12 +51,17 @@ const readable = (child: CompositeAlertChild): child is CompositeAlertReadableCh
 const levelFor = (id: string): string => {
   const preview = previewChildById.value.get(id);
   const selected = childById.value.get(id);
-  const level = preview?.level ?? selected?.level ?? null;
+  const level =
+    (preview && readable(preview) ? preview.level : undefined) ?? selected?.level ?? null;
   return level || "nodata";
 };
 
-const nameFor = (id: string): ReturnType<typeof raw> =>
-  raw(childById.value.get(id)?.name ?? id);
+const truthFor = (id: string): boolean | undefined => {
+  const child = previewChildById.value.get(id);
+  return child && readable(child) ? child.truth : undefined;
+};
+
+const nameFor = (id: string): ReturnType<typeof raw> => raw(childById.value.get(id)?.name ?? id);
 
 // Stale children — the one exception the server warnings don't already surface.
 // Shown as a compact banner instead of the old wide table.
@@ -101,7 +99,13 @@ const warningText = (code: string) => {
     >
       <span class="text-text-secondary text-sm">{{ t("alerts.composite.previewResult") }}</span>
       <OTag
-        :variant="preview.valid && preview.result ? 'success-soft' : preview.valid ? 'default-soft' : 'error-soft'"
+        :variant="
+          preview.valid && preview.result
+            ? 'success-soft'
+            : preview.valid
+              ? 'default-soft'
+              : 'error-soft'
+        "
         :icon="preview.valid && preview.result ? 'check-circle' : 'cancel'"
         size="sm"
         :label="resultLabel"
@@ -144,26 +148,24 @@ const warningText = (code: string) => {
           class="bg-border-default absolute top-1 bottom-1 left-2 w-0.5 rounded-full"
         />
 
-        <li
-          v-for="token in operandTokens"
-          :key="token.id"
-          class="relative pl-7"
-        >
+        <li v-for="token in operandTokens" :key="token.id" class="relative pl-7">
           <span
             aria-hidden="true"
             class="absolute top-1 left-0.5 h-3.5 w-3.5 rounded-full"
-            :class="previewChildById.get(token.id)?.truth ? 'bg-error-500' : 'bg-success-500'"
+            :class="truthFor(token.id) ? 'bg-error-500' : 'bg-success-500'"
           />
           <div class="flex flex-col gap-0.5">
             <span class="flex min-w-0 items-center gap-2 text-xs">
-              <span class="text-theme-accent font-bold">{{ raw(letterById.get(token.id) ?? "?") }}</span>
+              <span class="text-theme-accent font-bold">{{
+                raw(letterById.get(token.id) ?? "?")
+              }}</span>
               <span class="text-text-heading min-w-0 truncate">{{ nameFor(token.id) }}</span>
             </span>
             <span class="text-text-secondary flex items-center gap-1.5 text-xs">
               <OTag type="alertLevel" :value="levelFor(token.id)" size="xs" />
               <span>{{ raw("→") }}</span>
               <span class="text-text-heading font-mono font-semibold">
-                {{ raw(String(!!previewChildById.get(token.id)?.truth)) }}
+                {{ raw(String(!!truthFor(token.id))) }}
               </span>
             </span>
           </div>
@@ -176,13 +178,19 @@ const warningText = (code: string) => {
             :class="preview.result ? 'bg-error-500' : 'bg-success-500'"
           />
           <div class="flex flex-col gap-0.5">
-            <span class="text-text-heading text-xs font-semibold">{{ t("alerts.composite.result") }}</span>
+            <span class="text-text-heading text-xs font-semibold">{{
+              t("alerts.composite.result")
+            }}</span>
             <span class="text-text-secondary flex items-center gap-1.5 text-xs">
               <span class="font-mono">{{ raw(letteredExpression) }}</span>
               <span>{{ raw("→") }}</span>
               <OTag
                 :variant="preview.result ? 'error-soft' : 'success-soft'"
-                :label="preview.result ? t('alerts.composite.trueResult') : t('alerts.composite.falseResult')"
+                :label="
+                  preview.result
+                    ? t('alerts.composite.trueResult')
+                    : t('alerts.composite.falseResult')
+                "
                 size="xs"
               />
             </span>
@@ -205,7 +213,12 @@ const warningText = (code: string) => {
       variant="warning"
       dense
       :data-test="`alerts-composite-preview-stale-${child.alert_id}`"
-      :content="t('alerts.composite.warningChildStaleNamed', { name: child.name, level: child.level ?? raw('—') })"
+      :content="
+        t('alerts.composite.warningChildStaleNamed', {
+          name: child.name,
+          level: child.level ?? raw('—'),
+        })
+      "
     />
     <OBanner
       v-for="error in value.errors"

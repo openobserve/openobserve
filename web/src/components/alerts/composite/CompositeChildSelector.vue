@@ -35,8 +35,13 @@ const atCap = computed(() => count.value >= props.max);
 
 const optionsFor = (currentId: string) =>
   props.options
-    .filter((option) => option.alert_id === currentId || !props.modelValue.includes(option.alert_id))
-    .map((option) => ({ label: option.name ?? option.alert_id, value: option.alert_id }));
+    .filter(
+      (option) => option.alert_id === currentId || !props.modelValue.includes(option.alert_id),
+    )
+    .map((option) => ({
+      label: raw(option.name ?? option.alert_id),
+      value: option.alert_id,
+    }));
 
 const replace = (index: number, newId: string): void => {
   const next = [...props.modelValue];
@@ -45,7 +50,10 @@ const replace = (index: number, newId: string): void => {
 };
 
 const removeAt = (index: number): void => {
-  emit("update:modelValue", props.modelValue.filter((_, i) => i !== index));
+  emit(
+    "update:modelValue",
+    props.modelValue.filter((_, i) => i !== index),
+  );
 };
 
 const add = (): void => {
@@ -88,7 +96,7 @@ const childLink = (child: CompositeChildOption): string =>
         :data-test="`alerts-composite-selected-child-${id}`"
       >
         <span
-          class="bg-theme-accent-soft text-theme-accent flex h-7 w-7 shrink-0 items-center justify-center rounded-default font-bold"
+          class="bg-theme-accent-soft text-theme-accent rounded-default flex h-7 w-7 shrink-0 items-center justify-center font-bold"
         >
           {{ raw(letterFor(index)) }}
         </span>
@@ -101,7 +109,7 @@ const childLink = (child: CompositeChildOption): string =>
           :placeholder="t('alerts.composite.searchChildren')"
           class="min-w-0 flex-1"
           :data-test="`alerts-composite-child-select-${id}`"
-          @update:model-value="replace(index, $event)"
+          @update:model-value="replace(index, $event as string)"
         />
         <span v-else class="min-w-0 flex-1 truncate font-mono text-xs" :title="id">
           {{ raw(id) }}

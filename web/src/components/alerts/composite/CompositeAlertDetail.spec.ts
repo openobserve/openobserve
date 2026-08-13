@@ -19,7 +19,12 @@ vi.mock("@/services/alerts", () => ({
 
 beforeEach(() => {
   vi.mocked(alertsService.getCompositeTimeline).mockResolvedValue({
-    data: { from: 0, to: 1, children: [], result: { alert_id: "composite-1", accessible: true, transitions: [] } },
+    data: {
+      from: 0,
+      to: 1,
+      children: [],
+      result: { alert_id: "composite-1", accessible: true, transitions: [] },
+    },
   });
 });
 
@@ -82,8 +87,12 @@ describe("CompositeAlertDetail", () => {
   it("shows the current result, live evaluation, and name-resolved expression", () => {
     const wrapper = mountDetail(makeDetail());
 
-    expect(wrapper.find('[data-test="alerts-composite-detail-result"]').text()).toMatch(/critical/i);
-    expect(wrapper.find('[data-test="alerts-composite-detail-expression-live"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-composite-detail-result"]').text()).toMatch(
+      /critical/i,
+    );
+    expect(wrapper.find('[data-test="alerts-composite-detail-expression-live"]').exists()).toBe(
+      true,
+    );
     expect(wrapper.find('[data-test="alerts-composite-detail-expression"]').text()).toMatch(
       /High error rate.*AND.*High latency/s,
     );
@@ -97,7 +106,9 @@ describe("CompositeAlertDetail", () => {
     expect(first.text()).toMatch(/critical/i);
     expect(first.text()).toMatch(/firing/i);
     expect(first.find('[data-test="alerts-composite-detail-level-at-id-a"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alerts-composite-detail-child-id-b"]').text()).toMatch(/warning/i);
+    expect(wrapper.find('[data-test="alerts-composite-detail-child-id-b"]').text()).toMatch(
+      /warning/i,
+    );
   });
 
   it.each([
@@ -107,8 +118,12 @@ describe("CompositeAlertDetail", () => {
   ])(
     "missing-job warning follows enabled=%s scheduler_job_present=%s",
     (enabled, schedulerJobPresent, expected) => {
-      const wrapper = mountDetail(makeDetail({ enabled, scheduler_job_present: schedulerJobPresent }));
-      expect(wrapper.find('[data-test="alerts-composite-detail-missing-job"]').exists()).toBe(expected);
+      const wrapper = mountDetail(
+        makeDetail({ enabled, scheduler_job_present: schedulerJobPresent }),
+      );
+      expect(wrapper.find('[data-test="alerts-composite-detail-missing-job"]').exists()).toBe(
+        expected,
+      );
     },
   );
 
@@ -130,10 +145,14 @@ describe("CompositeAlertDetail", () => {
       }),
     );
 
-    expect(wrapper.find('[data-test="alerts-composite-detail-child-link-id-a"]').attributes("href")).toContain("id-a");
+    expect(
+      wrapper.find('[data-test="alerts-composite-detail-child-link-id-a"]').attributes("href"),
+    ).toContain("id-a");
     const secret = wrapper.find('[data-test="alerts-composite-detail-child-secret-id"]');
     expect(secret.text()).not.toMatch(/critical|warning|firing|stale/i);
-    expect(wrapper.find('[data-test="alerts-composite-detail-child-link-secret-id"]').exists()).toBe(false);
+    expect(
+      wrapper.find('[data-test="alerts-composite-detail-child-link-secret-id"]').exists(),
+    ).toBe(false);
   });
 
   it("preserves a long child name in the link title while truncating visually", () => {

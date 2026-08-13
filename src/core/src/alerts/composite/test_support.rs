@@ -351,7 +351,6 @@ pub struct StateRow {
 
 #[derive(Clone, Debug)]
 struct ChildDefinition {
-    id: String,
     spec: ChildSpec,
 }
 
@@ -720,13 +719,7 @@ impl CompositeHarness {
 
     pub async fn add_child(&mut self, spec: ChildSpec) -> String {
         let id = new_id();
-        self.children.insert(
-            id.clone(),
-            ChildDefinition {
-                id: id.clone(),
-                spec,
-            },
-        );
+        self.children.insert(id.clone(), ChildDefinition { spec });
         id
     }
 
@@ -1030,12 +1023,10 @@ impl CompositeHarness {
                 .get(id)
                 .and_then(|definition| definition.spec.delivery_silenced_until)
                 .is_some_and(|until| until > self.now);
-            if !silenced {
-                if self.deliver(id, &result) {
-                    result.outcome = RunOutcome::NotifyFailed;
-                    if let Some(state) = self.states.get_mut(&(id.to_string(), String::new())) {
-                        state.outcome = RunOutcome::NotifyFailed;
-                    }
+            if !silenced && self.deliver(id, &result) {
+                result.outcome = RunOutcome::NotifyFailed;
+                if let Some(state) = self.states.get_mut(&(id.to_string(), String::new())) {
+                    state.outcome = RunOutcome::NotifyFailed;
                 }
             }
         }
@@ -1351,11 +1342,11 @@ impl CompositeHarness {
     }
 
     pub async fn timeout_and_requeue(&mut self, claim: &Claim) {
-        if let Some(job) = self.jobs.get_mut(&claim.composite_id) {
-            if job.claim_epoch == claim.epoch {
-                job.processing = false;
-                job.next_run_at = self.now;
-            }
+        if let Some(job) = self.jobs.get_mut(&claim.composite_id)
+            && job.claim_epoch == claim.epoch
+        {
+            job.processing = false;
+            job.next_run_at = self.now;
         }
     }
 
@@ -1670,7 +1661,6 @@ impl CompositeHarness {
         self.children.insert(
             id.clone(),
             ChildDefinition {
-                id: id.clone(),
                 spec: ChildSpec::frequency("collision", 60),
             },
         );

@@ -77,9 +77,7 @@ const stalePolicyHelp = computed(() => {
   }
 });
 
-const updateCondition = (
-  patch: Partial<CompositeAlertDraft["composite_condition"]>,
-): void => {
+const updateCondition = (patch: Partial<CompositeAlertDraft["composite_condition"]>): void => {
   emit("update:modelValue", {
     ...draft.value,
     composite_condition: {
@@ -179,7 +177,7 @@ watch(
   >
     <!-- Left column: sub-alerts, expression, settings -->
     <div class="flex min-w-0 flex-col gap-4">
-      <div class="bg-card-glass-bg rounded-default border border-border-default">
+      <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
           <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
           <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
@@ -196,7 +194,7 @@ watch(
         </div>
       </div>
 
-      <div class="bg-card-glass-bg rounded-default border border-border-default">
+      <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
           <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
           <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
@@ -213,7 +211,7 @@ watch(
         </div>
       </div>
 
-      <div class="bg-card-glass-bg rounded-default border border-border-default">
+      <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
           <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
           <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
@@ -226,9 +224,7 @@ watch(
             :label="t('alerts.composite.warningCountsAsFiring')"
             data-test="alerts-composite-warning-counts-as-firing"
             :aria-checked="draft.composite_condition.warning_counts_as_firing"
-            @update:model-value="
-              updateCondition({ warning_counts_as_firing: Boolean($event) })
-            "
+            @update:model-value="updateCondition({ warning_counts_as_firing: Boolean($event) })"
           />
           <div class="flex flex-col gap-1">
             <OSelect
@@ -255,9 +251,9 @@ watch(
 
     <!-- Right column: live preview + summary -->
     <div class="flex min-w-0 flex-col gap-4">
-      <div class="bg-card-glass-bg rounded-default border border-border-default">
+      <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <span class="text-sm font-medium text-text-heading">{{ t("alerts.preview") }}</span>
+          <span class="text-text-heading text-sm font-medium">{{ t("alerts.preview") }}</span>
         </div>
         <div class="min-h-0 overflow-auto px-3 py-2">
           <CompositeAlertPreview
@@ -275,9 +271,9 @@ watch(
         </div>
       </div>
 
-      <div class="bg-card-glass-bg rounded-default border border-border-default">
+      <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <span class="text-sm font-medium text-text-heading">{{ t("alerts.summary.title") }}</span>
+          <span class="text-text-heading text-sm font-medium">{{ t("alerts.summary.title") }}</span>
         </div>
         <div class="px-3 py-2">
           <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
@@ -287,13 +283,19 @@ watch(
             </dd>
             <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.type") }}</dt>
             <dd class="text-text-heading">{{ t("alerts.compositeAlert") }}</dd>
-            <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.expression") }}</dt>
-            <dd class="text-text-heading min-w-0 break-all font-mono text-xs">
+            <dt class="text-text-secondary whitespace-nowrap">
+              {{ t("alerts.composite.expression") }}
+            </dt>
+            <dd class="text-text-heading min-w-0 font-mono text-xs break-all">
               {{ raw(summaryExpression) }}
             </dd>
-            <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.subAlerts") }}</dt>
+            <dt class="text-text-secondary whitespace-nowrap">
+              {{ t("alerts.composite.subAlerts") }}
+            </dt>
             <dd class="text-text-heading">{{ raw(String(selectedIds.length)) }}</dd>
-            <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.warningCountsAsFiring") }}</dt>
+            <dt class="text-text-secondary whitespace-nowrap">
+              {{ t("alerts.composite.warningCountsAsFiring") }}
+            </dt>
             <dd class="text-text-heading">
               {{
                 draft.composite_condition.warning_counts_as_firing
@@ -301,7 +303,9 @@ watch(
                   : t("alerts.composite.no")
               }}
             </dd>
-            <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.stalePolicy") }}</dt>
+            <dt class="text-text-secondary whitespace-nowrap">
+              {{ t("alerts.composite.stalePolicy") }}
+            </dt>
             <dd class="text-text-heading">
               {{
                 draft.composite_condition.stale_child_policy === "use_last_state"
@@ -309,7 +313,9 @@ watch(
                   : raw(draft.composite_condition.stale_child_policy)
               }}
             </dd>
-            <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.levelWhenFiring") }}</dt>
+            <dt class="text-text-secondary whitespace-nowrap">
+              {{ t("alerts.composite.levelWhenFiring") }}
+            </dt>
             <dd class="text-text-heading">{{ t("alerts.composite.levelWhenFiringValue") }}</dd>
           </dl>
         </div>

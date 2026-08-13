@@ -29,8 +29,11 @@ pub struct CompositeWithChildren {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Resolution {
     NotFound,
-    Alert(alerts::Model),
-    Composite(alert_composites::Model),
+    // Boxed: `alerts::Model` is ~1.4KB, so the unboxed enum dwarfed the
+    // `HashMap<String, Resolution>` returned by `resolve_many` (used on every
+    // composite evaluation).
+    Alert(Box<alerts::Model>),
+    Composite(Box<alert_composites::Model>),
     DuplicateId,
 }
 
@@ -345,8 +348,8 @@ pub async fn resolve_by_id<C: ConnectionTrait>(
         .await?;
     Ok(match (ordinary, composite) {
         (Some(_), Some(_)) => Resolution::DuplicateId,
-        (Some(alert), None) => Resolution::Alert(alert),
-        (None, Some(composite)) => Resolution::Composite(composite),
+        (Some(alert), None) => Resolution::Alert(Box::new(alert)),
+        (None, Some(composite)) => Resolution::Composite(Box::new(composite)),
         (None, None) => Resolution::NotFound,
     })
 }
@@ -384,8 +387,8 @@ pub async fn resolve_many<C: ConnectionTrait>(
         .map(|id| {
             let resolution = match (ordinary.get(&id), composites.get(&id)) {
                 (Some(_), Some(_)) => Resolution::DuplicateId,
-                (Some(alert), None) => Resolution::Alert(alert.clone()),
-                (None, Some(composite)) => Resolution::Composite(composite.clone()),
+                (Some(alert), None) => Resolution::Alert(Box::new(alert.clone())),
+                (None, Some(composite)) => Resolution::Composite(Box::new(composite.clone())),
                 (None, None) => Resolution::NotFound,
             };
             (id, resolution)

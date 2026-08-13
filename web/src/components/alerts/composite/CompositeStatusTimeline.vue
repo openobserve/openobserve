@@ -9,10 +9,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import type {
-  CompositeTimelineLane,
-  CompositeTimelineResponse,
-} from "@/ts/interfaces/alert";
+import type { CompositeTimelineLane, CompositeTimelineResponse } from "@/ts/interfaces/alert";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { letterFor } from "./expression";
 
@@ -37,7 +34,8 @@ const lanes = computed<CompositeTimelineLane[]>(() => {
   if (!data.value) return [];
   return [...data.value.children, data.value.result];
 });
-const isResult = (lane: CompositeTimelineLane): boolean => lane.alert_id === data.value?.result.alert_id;
+const isResult = (lane: CompositeTimelineLane): boolean =>
+  lane.alert_id === data.value?.result.alert_id;
 
 const LEVEL_BG: Record<string, string> = {
   critical: "bg-error-500",
@@ -53,12 +51,7 @@ const fetch = async (): Promise<void> => {
   const to = Date.now() * 1000;
   const from = to - micros;
   try {
-    const response = await alertsService.getCompositeTimeline(
-      orgId.value,
-      props.alertId,
-      from,
-      to,
-    );
+    const response = await alertsService.getCompositeTimeline(orgId.value, props.alertId, from, to);
     data.value = response.data;
   } catch {
     data.value = null;
@@ -128,12 +121,15 @@ onMounted(fetch);
       {{ t("alerts.composite.timelineLoading") }}
     </div>
 
-    <div v-else-if="lanes.length" class="grid grid-cols-[13.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">
+    <div
+      v-else-if="lanes.length"
+      class="grid grid-cols-[13.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5"
+    >
       <template v-for="(lane, index) in lanes" :key="lane.alert_id">
         <div class="flex min-w-0 items-center gap-2">
           <span
             v-if="!isResult(lane)"
-            class="bg-theme-accent-soft text-theme-accent flex h-6 w-6 shrink-0 items-center justify-center rounded-default text-xs font-bold"
+            class="bg-theme-accent-soft text-theme-accent rounded-default flex h-6 w-6 shrink-0 items-center justify-center text-xs font-bold"
           >
             {{ raw(letterFor(lane.slot ?? index)) }}
           </span>
@@ -152,7 +148,7 @@ onMounted(fetch);
             :data-test="`alerts-composite-timeline-level-${lane.alert_id}`"
           />
         </div>
-        <div class="flex h-3 overflow-hidden rounded-default gap-0.5">
+        <div class="rounded-default flex h-3 gap-0.5 overflow-hidden">
           <span
             v-for="(segment, i) in segments(lane)"
             :key="i"
@@ -176,13 +172,17 @@ onMounted(fetch);
         <span class="bg-error-500 h-2 w-2 rounded-full" />{{ t("alerts.composite.firing") }}
       </span>
       <span class="flex items-center gap-1.5">
-        <span class="bg-warning-500 h-2 w-2 rounded-full" />{{ t("alerts.composite.legendWarning") }}
+        <span class="bg-warning-500 h-2 w-2 rounded-full" />{{
+          t("alerts.composite.legendWarning")
+        }}
       </span>
       <span class="flex items-center gap-1.5">
         <span class="bg-success-500 h-2 w-2 rounded-full" />{{ t("alerts.composite.normal") }}
       </span>
       <span class="flex items-center gap-1.5">
-        <span class="bg-surface-subtle h-2 w-2 rounded-full" />{{ t("alerts.composite.legendNoData") }}
+        <span class="bg-surface-subtle h-2 w-2 rounded-full" />{{
+          t("alerts.composite.legendNoData")
+        }}
       </span>
     </div>
   </div>

@@ -27,7 +27,10 @@ const diagnostic = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const preview = (children: Array<Record<string, unknown>>, overrides: Record<string, unknown> = {}) => ({
+const preview = (
+  children: Array<Record<string, unknown>>,
+  overrides: Record<string, unknown> = {},
+) => ({
   valid: true,
   canonical_expression: "({id-a} && {id-b})",
   result: true,
@@ -58,9 +61,15 @@ describe("CompositeAlertPreview", () => {
       }),
     );
 
-    expect(wrapper.find('[data-test="alerts-composite-preview-warning-child_disabled"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alerts-composite-preview-error-composite_too_deep"]').text()).toContain("Maximum depth is two");
-    expect(wrapper.find('[data-test="alerts-composite-preview-result"]').attributes("aria-live")).toBe("polite");
+    expect(
+      wrapper.find('[data-test="alerts-composite-preview-warning-child_disabled"]').exists(),
+    ).toBe(true);
+    expect(
+      wrapper.find('[data-test="alerts-composite-preview-error-composite_too_deep"]').text(),
+    ).toContain("Maximum depth is two");
+    expect(
+      wrapper.find('[data-test="alerts-composite-preview-result"]').attributes("aria-live"),
+    ).toBe("polite");
   });
 
   it("surfaces a stale child as a compact banner", () => {
