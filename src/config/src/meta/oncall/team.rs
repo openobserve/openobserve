@@ -41,6 +41,20 @@ pub struct Team {
     pub timezone: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Alert Destination names this team is talked to on — the room the record
+    /// is posted to, as opposed to the people the ladder wakes.
+    ///
+    /// `None` means never set, which falls back to
+    /// `EscalationPolicy::destinations` so stored policies keep working;
+    /// `Some([])` means deliberately no channel. Precedence lives in one place,
+    /// `config::meta::oncall::policy::team_channel`.
+    ///
+    /// It is on the team rather than the policy because a team's room is not a
+    /// property of its escalation ladder — you want it without ever editing a
+    /// rung — and because a whole-row super-cluster snapshot built from `Team`
+    /// would otherwise have to carry a column it cannot see.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_destinations: Option<Vec<String>>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -452,6 +466,24 @@ impl Schedule {
     ///
     /// Matching is case-insensitive: membership is stored lowercased, but a
     /// rotation written by hand through the API may not be.
+    /// Whether this schedule still mentions somebody **anywhere** — on a
+    /// rotation, holding a cover, or as an absence window.
+    ///
+    /// The offboarding invariant, stated once as a question the schedule can
+    /// answer about itself. Somebody who has left an org must be gone from all
+    /// three, and the three are separately stored and separately deleted:
+    /// taking a leaver off the rotations while their cover survives leaves them
+    /// on call, because an override outranks every layer. Asking "is this
+    /// person anywhere in here" is the assertion that does not have to be
+    /// updated when a fourth place to hide is added.
+    pub fn names_member(&self, user_email: &str) -> bool {
+        let email = user_email.trim().to_ascii_lowercase();
+        let is = |m: &str| m.trim().to_ascii_lowercase() == email;
+        self.rotations.iter().any(|r| r.members.iter().any(|m| is(m)))
+            || self.overrides.iter().any(|o| is(&o.user_email))
+            || self.unavailability.iter().any(|u| is(&u.user_email))
+    }
+
     pub fn without_member(&self, user_email: &str) -> MemberRemoval {
         let email = user_email.trim().to_ascii_lowercase();
         let mut rotations = Vec::with_capacity(self.rotations.len());
@@ -568,6 +600,9 @@ mod tests {
             name: name.into(),
             timezone: "UTC".into(),
             description: None,
+            // Never set, which is what every team created before the field
+            // existed reads as — the escalation policy's list still stands.
+            channel_destinations: None,
             created_at: 0,
             updated_at: 0,
         }
@@ -1225,4 +1260,164 @@ mod tests {
         assert_eq!(warnings[0].covered_by.as_deref(), Some("bob@o2.ai"));
     }
 
+    // ── Offboarding: the leaver is gone from everywhere (G6) ────────────────
+
+    fn an_absence(user: &str, start: i64, end: i64) -> super::super::rotation::Unavailability {
+        super::super::rotation::Unavailability {
+            id: format!("un_{user}"),
+            org_id: "default".into(),
+            user_email: user.into(),
+            start_at: start,
+            end_at: end,
+            reason: None,
+            created_by: user.into(),
+            created_at: 1,
+        }
+    }
+
+    /// A schedule with the leaver in all three places somebody can hide: on
+    /// two rotations in two slots, holding a future cover, and down as away.
+    fn schedule_with_a_leaver() -> Schedule {
+        Schedule {
+            rotations: vec![
+                weekly("On-call rotation", &["ana@o2.ai", "leaver@o2.ai", "bob@o2.ai"]),
+                weekly("Seniors", &["leaver@o2.ai", "eve@o2.ai"]).in_slot("secondary"),
+            ],
+            overrides: vec![a_cover(
+                "leaver@o2.ai",
+                ANCHOR + MICROS_PER_WEEK,
+                ANCHOR + 2 * MICROS_PER_WEEK,
+            )],
+            unavailability: vec![an_absence(
+                "leaver@o2.ai",
+                ANCHOR + 3 * MICROS_PER_WEEK,
+                ANCHOR + 4 * MICROS_PER_WEEK,
+            )],
+            ..schedule(vec![])
+        }
+    }
+
+    /// The state offboarding leaves behind: rotations rewritten, cover
+    /// deleted, absence deleted.
+    fn schedule_after_offboarding() -> Schedule {
+        let before = schedule_with_a_leaver();
+        Schedule {
+            rotations: before.without_member("leaver@o2.ai").rotations,
+            overrides: Vec::new(),
+            unavailability: Vec::new(),
+            ..before
+        }
+    }
+
+    /// Before: they are on a rotation, on a cover and on an absence, and the
+    /// schedule says so. This is the assertion the "after" test is worth
+    /// nothing without.
+    #[test]
+    fn test_a_leaver_is_named_by_the_schedule_before_they_are_offboarded() {
+        let before = schedule_with_a_leaver();
+        assert!(before.names_member("leaver@o2.ai"));
+        assert!(before.names_member("LEAVER@o2.ai"), "case-insensitively");
+        assert_eq!(
+            before.on_call_now(ANCHOR + MICROS_PER_WEEK),
+            Some("leaver@o2.ai".into()),
+            "their cover puts them on call whatever the rotation says"
+        );
+    }
+
+    /// After: gone from all three, and from every answer the schedule gives at
+    /// any instant in the cycle, in every slot.
+    #[test]
+    fn test_a_leaver_is_named_nowhere_after_offboarding() {
+        let after = schedule_after_offboarding();
+        assert!(!after.names_member("leaver@o2.ai"));
+
+        for week in 0..8i64 {
+            let at = ANCHOR + week * MICROS_PER_WEEK;
+            for slot in ["primary", "secondary"] {
+                assert_ne!(
+                    after.on_call_in_slot(slot, at).as_deref(),
+                    Some("leaver@o2.ai"),
+                    "week {week}, slot {slot}"
+                );
+                assert_ne!(
+                    after.next_on_call_in_slot(slot, at).as_deref(),
+                    Some("leaver@o2.ai"),
+                    "week {week}, slot {slot}"
+                );
+            }
+            assert!(
+                !after.everyone_on_schedule(at).iter().any(|m| m == "leaver@o2.ai"),
+                "week {week}: not even in the broadcast of last resort"
+            );
+        }
+    }
+
+    /// The cover is the second door into the same bug, and it has to be shut
+    /// separately: an override outranks every layer, so taking somebody off
+    /// the rotation while their cover survives leaves them on call.
+    #[test]
+    fn test_dropping_the_rotations_alone_would_leave_the_leaver_on_call() {
+        let before = schedule_with_a_leaver();
+        let rotations_only = Schedule {
+            rotations: before.without_member("leaver@o2.ai").rotations,
+            ..before
+        };
+        assert_eq!(
+            rotations_only.on_call_now(ANCHOR + MICROS_PER_WEEK),
+            Some("leaver@o2.ai".into()),
+            "still on call, through the cover — which is why offboarding drops covers too"
+        );
+        assert!(rotations_only.names_member("leaver@o2.ai"));
+    }
+
+    /// Being the only person on a rotation is a coverage gap, and it has to be
+    /// reported rather than becoming a silently empty team.
+    #[test]
+    fn test_offboarding_the_only_member_reports_a_gap_rather_than_going_quiet() {
+        let s = Schedule {
+            rotations: vec![weekly("On-call rotation", &["leaver@o2.ai"])],
+            ..schedule(vec![])
+        };
+        let removal = s.without_member("leaver@o2.ai");
+
+        assert!(removal.changed);
+        assert_eq!(removal.emptied_rotations, vec!["On-call rotation".to_string()]);
+        assert!(removal.leaves_no_rotation);
+        assert!(
+            removal
+                .coverage_warning()
+                .expect("an emptied team must warn")
+                .contains("pages nobody")
+        );
+
+        let after = Schedule { rotations: removal.rotations, ..s };
+        assert_eq!(after.on_call_now(ANCHOR), None);
+        assert!(!after.is_staffed(ANCHOR));
+    }
+
+    /// Mid-shift: the pager moves to the next person immediately and
+    /// deterministically, rather than staying with somebody who has left.
+    #[test]
+    fn test_offboarding_somebody_mid_shift_hands_the_pager_straight_on() {
+        let s = Schedule {
+            rotations: vec![weekly(
+                "On-call rotation",
+                &["leaver@o2.ai", "ana@o2.ai", "bob@o2.ai"],
+            )],
+            ..schedule(vec![])
+        };
+        let mid_shift = ANCHOR + MICROS_PER_WEEK / 2;
+        assert_eq!(s.on_call_now(mid_shift), Some("leaver@o2.ai".into()));
+
+        let after = Schedule {
+            rotations: s.without_member("leaver@o2.ai").rotations,
+            ..s
+        };
+        assert_eq!(
+            after.on_call_now(mid_shift),
+            Some("ana@o2.ai".into()),
+            "the shift passes at once; nobody is left holding a pager they cannot answer"
+        );
+        assert!(after.is_staffed(mid_shift));
+    }
 }

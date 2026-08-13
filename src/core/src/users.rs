@@ -1077,6 +1077,51 @@ pub async fn remove_user_from_org(
                             }
                         }
                     }
+                    // G6. Until this call existed, removing somebody from an
+                    // org touched their invites, their user row and their
+                    // openfga tuples — and no on-call table at all. The leaver
+                    // stayed on every rotation, kept resolving as
+                    // `on_call_now`, and kept being paged; worse, the emailed
+                    // acknowledgement token is signed and session-free, so they
+                    // could still take a page belonging to whoever replaced
+                    // them. `service::ack_claims` refuses the token half; this
+                    // removes the data half.
+                    //
+                    // **After** the org membership is gone, not before: on-call
+                    // membership is derived from org membership, and clearing
+                    // the rotations first leaves a window in which anything
+                    // that syncs a team's roster could legitimately put them
+                    // back. The token check covers that window, which is why
+                    // this ordering is safe to choose on other grounds.
+                    //
+                    // Non-fatal. The user is out of the org whatever happens
+                    // here, and failing the request now would tell the caller
+                    // the removal did not happen when most of it did — so the
+                    // failure is logged loudly instead, because it means
+                    // somebody who has left is still on a rotation.
+                    #[cfg(feature = "enterprise")]
+                    {
+                        use o2_enterprise::enterprise::oncall::service as oncall_service;
+                        match oncall_service::offboard_member(
+                            org_id,
+                            email_id,
+                            config::utils::time::now_micros(),
+                        )
+                        .await
+                        {
+                            Ok(report) if report.needs_attention() => {
+                                for warning in report.warnings() {
+                                    log::warn!(
+                                        "[ONCALL] {email_id} left {org_id}: {warning}"
+                                    );
+                                }
+                            }
+                            Ok(_) => {}
+                            Err(e) => log::error!(
+                                "[ONCALL] {email_id} was removed from {org_id} but their on-call membership could not be cleaned up, so they may still be paged: {e}"
+                            ),
+                        }
+                    }
                     Ok(MetaHttpResponse::ok("User removed from organization"))
                 } else {
                     Ok(MetaHttpResponse::not_found(

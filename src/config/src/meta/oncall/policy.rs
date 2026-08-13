@@ -178,6 +178,118 @@ pub fn fallback_chain(channels: &[Channel]) -> Vec<Channel> {
         .collect()
 }
 
+/// Whether a channel talks to a **room** rather than to a person (G8).
+///
+/// The fallback chain was designed around one question — "have we reached this
+/// human yet" — and stopping at the first success is exactly right for it. It
+/// is the wrong question for a team's chat room: a team that ticks email *and*
+/// chat means "wake the on-call, and put it in the channel", and the chain read
+/// that as "put it in the channel only if the email bounced". `Also post to
+/// chat` was not expressible at all, and it is the common case.
+///
+/// So the two kinds are separated by what they address, not by how loud they
+/// are. Chat and Webhook both resolve to a destination the whole team watches;
+/// everything else resolves to one person's inbox, handset or screen.
+pub fn is_broadcast(channel: Channel) -> bool {
+    match channel {
+        Channel::Chat | Channel::Webhook => true,
+        Channel::Email | Channel::Sms | Channel::Voice | Channel::Push | Channel::InApp => false,
+    }
+}
+
+/// How one rung's channel set splits into "try until somebody answers" and
+/// "always post".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChannelPlan {
+    /// Tried **per recipient**, in [`FALLBACK_ORDER`], stopping at the first
+    /// success. Unchanged semantics — this is the chain that was built
+    /// deliberately for reaching a person.
+    pub chain: Vec<Channel>,
+    /// Sent **once per rung**, whatever the chain did.
+    ///
+    /// Once per rung and not once per recipient, which is the whole difference
+    /// between this and the bug that made the chain necessary: a rung fanning
+    /// out to six people used to post six identical messages into one room.
+    pub broadcast: Vec<Channel>,
+}
+
+impl ChannelPlan {
+    /// Whether this rung can reach anybody at all.
+    pub fn is_empty(&self) -> bool {
+        self.chain.is_empty() && self.broadcast.is_empty()
+    }
+}
+
+/// Split a rung's channels into the person-reaching chain and the broadcasts.
+///
+/// Both halves are filtered to what a `Notifier` can actually send, for the
+/// same reason [`fallback_chain`] is: a channel nothing can deliver makes a
+/// rung look attempted when nothing left the process.
+pub fn channel_plan(channels: &[Channel]) -> ChannelPlan {
+    ChannelPlan {
+        chain: fallback_chain(channels)
+            .into_iter()
+            .filter(|c| !is_broadcast(*c))
+            .collect(),
+        broadcast: FALLBACK_ORDER
+            .into_iter()
+            .filter(|c| c.is_deliverable() && is_broadcast(*c) && channels.contains(c))
+            .collect(),
+    }
+}
+
+// ── Where a team's channel lives (Change 1) ──────────────────────────────────
+
+/// The destinations a team's own channel posts go to, and what a page's
+/// `Webhook` channel resolves to.
+///
+/// The list used to live only on [`EscalationPolicy::destinations`]. There is
+/// one policy per team, so in practice it was already team-scoped — but a
+/// team's chat room is not a property of its **ladder**, and having to open the
+/// escalation editor to change where the team is talked to is how a channel
+/// ends up pointing at a room nobody reads. The team-level field is the one you
+/// can set without ever touching a rung.
+///
+/// Precedence, deliberately explicit:
+///
+/// - `None` — the team has never set one. The policy's list is used, so every
+///   policy stored before the field existed keeps working exactly as it did.
+/// - `Some(list)` — the team's list wins, **including when it is empty**. An
+///   empty list is somebody saying "this team has no channel"; falling back to
+///   the policy there would make the field impossible to turn off, and would
+///   silently resurrect a destination they had removed.
+pub fn team_channel<'a>(team: Option<&'a [String]>, policy: &'a [String]) -> &'a [String] {
+    match team {
+        Some(list) => list,
+        None => policy,
+    }
+}
+
+// ── The liaison seat (D-21) ──────────────────────────────────────────────────
+
+/// How many rungs an **impacted** team's record climbs.
+///
+/// Two: the one that opens it, and exactly one chase. `page_impacted` used to
+/// dispatch once and arm no timer at all, so an impacted primary who slept
+/// through their page was never chased and the record sat open with nobody on
+/// it. The other extreme — the team's full ladder — is worse in a different
+/// way: it walks a whole second team up to "everybody" for an outage they
+/// cannot fix. One chase is a liaison seat, not a fix-it seat.
+pub const IMPACTED_RUNGS: usize = 2;
+
+/// The ladder an impacted record actually runs: the first [`IMPACTED_RUNGS`]
+/// rungs of the team's own policy, in delay order.
+///
+/// Taken from the team's real ladder rather than synthesised, so the chase goes
+/// to whoever that team decided should be chased — usually their secondary —
+/// at the delay they chose.
+pub fn impacted_ladder(steps: &[LadderStep]) -> Vec<LadderStep> {
+    let mut ordered = steps.to_vec();
+    ordered.sort_by_key(|s| s.after_micros);
+    ordered.truncate(IMPACTED_RUNGS);
+    ordered
+}
+
 // ── Retries and the circuit breaker (03 §9) ──────────────────────────────────
 
 /// Attempts one channel gets before the chain moves on. §9's "max 3 attempts
@@ -1767,5 +1879,152 @@ mod tests {
                 AfterRung::NextRung
             );
         }
+    }
+
+    // ── Broadcast beside the chain (G8) ─────────────────────────────────────
+
+    /// The bug, stated: a team that ticks email **and** chat wants both, and
+    /// the fallback chain gave them chat only when email failed.
+    #[test]
+    fn test_chat_fires_alongside_email_rather_than_only_on_its_failure() {
+        let plan = channel_plan(&[Channel::Email, Channel::Webhook]);
+        assert_eq!(plan.chain, vec![Channel::Email], "the person is reached once");
+        assert_eq!(
+            plan.broadcast,
+            vec![Channel::Webhook],
+            "and the room is posted to regardless of what the chain did"
+        );
+        assert!(!plan.is_empty());
+    }
+
+    /// The half that was built deliberately and must not be lost: reaching one
+    /// person is still a chain, in fallback order, and the caller stops at the
+    /// first success.
+    #[test]
+    fn test_a_person_reaching_chain_keeps_its_order_and_its_membership() {
+        // Every channel ticked, including the ones no transport can send.
+        let plan = channel_plan(&[
+            Channel::InApp,
+            Channel::Email,
+            Channel::Sms,
+            Channel::Chat,
+            Channel::Webhook,
+            Channel::Voice,
+            Channel::Push,
+        ]);
+        assert_eq!(
+            plan.chain,
+            vec![Channel::Email],
+            "only the deliverable person-reaching channels, in FALLBACK_ORDER"
+        );
+        assert!(
+            plan.chain.iter().all(|c| !is_broadcast(*c)),
+            "a room is not a link in a chain that asks whether a human answered"
+        );
+        assert_eq!(plan.broadcast, vec![Channel::Webhook]);
+    }
+
+    /// A room is addressed by the rung, a person by their address. Getting this
+    /// backwards is how six people on one rung became six identical posts.
+    #[test]
+    fn test_only_the_room_channels_are_broadcasts() {
+        assert!(is_broadcast(Channel::Chat));
+        assert!(is_broadcast(Channel::Webhook));
+        for personal in [
+            Channel::Email,
+            Channel::Sms,
+            Channel::Voice,
+            Channel::Push,
+            Channel::InApp,
+        ] {
+            assert!(!is_broadcast(personal), "{personal} reaches one person");
+        }
+    }
+
+    /// A rung that pages nobody must not look like it had a plan.
+    #[test]
+    fn test_a_rung_with_nothing_deliverable_plans_nothing() {
+        let plan = channel_plan(&[Channel::Sms, Channel::Voice, Channel::Chat]);
+        assert!(plan.is_empty(), "{plan:?}");
+        assert!(channel_plan(&[]).is_empty());
+    }
+
+    // ── Where the team's channel lives (Change 1) ───────────────────────────
+
+    /// A policy stored before the team-level field existed keeps working. That
+    /// is the whole of the back-compatibility promise.
+    #[test]
+    fn test_a_team_that_never_set_a_channel_falls_back_to_its_policy() {
+        let policy = vec!["slack-platform".to_string()];
+        assert_eq!(team_channel(None, &policy), policy.as_slice());
+    }
+
+    /// Set on the team, the team wins — that is the point of moving it, so a
+    /// channel can be changed without opening the escalation editor.
+    #[test]
+    fn test_the_team_field_outranks_the_policy_list() {
+        let policy = vec!["slack-old".to_string()];
+        let team = vec!["slack-new".to_string()];
+        assert_eq!(team_channel(Some(&team), &policy), team.as_slice());
+    }
+
+    /// The case that decides whether the field can be turned off at all. An
+    /// empty team list means "no channel"; falling back here would resurrect a
+    /// destination somebody had just removed.
+    #[test]
+    fn test_clearing_the_team_channel_does_not_resurrect_the_policy_list() {
+        let policy = vec!["slack-old".to_string()];
+        assert!(team_channel(Some(&[]), &policy).is_empty());
+    }
+
+    // ── One chase for an impacted team (D-21) ───────────────────────────────
+
+    /// Exactly one rung after the one that opened the record: an impacted
+    /// primary who never answers is chased once, and never walked up somebody
+    /// else's ladder.
+    #[test]
+    fn test_an_impacted_record_climbs_its_first_rung_and_exactly_one_more() {
+        let m = MICROS_PER_MINUTE;
+        let full = vec![
+            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
+            LadderStep::new(5 * m, vec![EscalationTarget::NextOnCall]),
+            LadderStep::new(15 * m, vec![EscalationTarget::EveryoneOnSchedule]),
+            LadderStep::new(30 * m, vec![EscalationTarget::WholeTeam]),
+        ];
+        let cut = impacted_ladder(&full);
+
+        assert_eq!(cut.len(), IMPACTED_RUNGS);
+        assert_eq!(cut[0].after_micros, 0);
+        assert_eq!(cut[1].after_micros, 5 * m, "one chase, at the team's own delay");
+        assert!(
+            !cut.iter().any(|s| s.targets.contains(&EscalationTarget::WholeTeam)),
+            "an impacted team is never walked up to everybody"
+        );
+    }
+
+    /// Steps are not required to be stored in delay order, and truncating an
+    /// unsorted list would pick an arbitrary chase.
+    #[test]
+    fn test_the_chase_is_the_soonest_rung_not_the_next_one_stored() {
+        let m = MICROS_PER_MINUTE;
+        let jumbled = vec![
+            LadderStep::new(30 * m, vec![EscalationTarget::WholeTeam]),
+            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
+            LadderStep::new(5 * m, vec![EscalationTarget::NextOnCall]),
+        ];
+        let cut = impacted_ladder(&jumbled);
+        assert_eq!(
+            cut.iter().map(|s| s.after_micros).collect::<Vec<_>>(),
+            vec![0, 5 * m]
+        );
+    }
+
+    /// A team whose ladder has only one rung gets one rung. Inventing a second
+    /// would page somebody their own policy never names.
+    #[test]
+    fn test_a_one_rung_policy_gives_an_impacted_team_one_rung() {
+        let one = vec![LadderStep::new(0, vec![EscalationTarget::OnCallNow])];
+        assert_eq!(impacted_ladder(&one).len(), 1);
+        assert!(impacted_ladder(&[]).is_empty());
     }
 }

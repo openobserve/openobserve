@@ -1306,6 +1306,14 @@ pub fn service_routes() -> Router {
                     "/{org_id}/oncall/teams/{team_id}/policy",
                     get(oncall::get_policy).put(oncall::set_policy),
                 )
+                // Where the team is talked to, as opposed to where its ladder
+                // pages. Its own route rather than a field on the policy: a
+                // team's chat room is not a property of its escalation ladder,
+                // and changing one should never mean opening the other.
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/channel",
+                    get(oncall::get_team_channel).put(oncall::set_team_channel),
+                )
                 // The four derived team reads the screens are built on.
                 // Nothing here is stored: a saved risk list argues with the
                 // configuration beside it the moment somebody fixes something.

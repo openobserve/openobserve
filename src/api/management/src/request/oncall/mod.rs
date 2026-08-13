@@ -1415,6 +1415,143 @@ pub async fn set_policy(
     }
 }
 
+/// Where a team is talked to, as opposed to where its ladder pages (Change 1).
+///
+/// `destinations` absent or `null` puts the team back to "never set", so the
+/// escalation policy's list takes over again. `[]` says the team has no channel
+/// at all. The two are different answers deliberately: collapsing them would
+/// make the field impossible to turn off, because clearing it would silently
+/// resurrect whatever the policy still had in it.
+#[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+pub struct SetTeamChannelRequest {
+    #[serde(default)]
+    pub destinations: Option<Vec<String>>,
+}
+
+/// A team's channel and where the answer came from.
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct TeamChannelResponse {
+    pub team_id: String,
+    pub destinations: Vec<String>,
+    /// `team` or `policy`. Precedence is a thing an operator has to be able to
+    /// see: "I set the team channel and pages still go to the old room" is
+    /// otherwise unanswerable from the API.
+    pub source: &'static str,
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/teams/{team_id}/channel",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetOnCallTeamChannel",
+    summary = "Get where a team is talked to",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse)),
+)]
+pub async fn get_team_channel(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let team = match infra::table::oncall_teams::get_channel(&org_id, &team_id).await {
+            Ok(t) => t,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
+        // Read whole rather than reported as "unset": the caller wants to know
+        // where the team is actually talked to, and answering with an empty
+        // list while pages go to the policy's room would be a lie of omission.
+        let policy = match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id)
+            .await
+        {
+            Ok(p) => p.destinations,
+            Err(e) => return to_response(e),
+        };
+        let source = if team.is_some() { "team" } else { "policy" };
+        MetaHttpResponse::json(TeamChannelResponse {
+            team_id,
+            destinations: config::meta::oncall::policy::team_channel(team.as_deref(), &policy)
+                .to_vec(),
+            source,
+        })
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    put,
+    path = "/{org_id}/oncall/teams/{team_id}/channel",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "SetOnCallTeamChannel",
+    summary = "Set where a team is talked to",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    request_body(content = SetTeamChannelRequest, content_type = "application/json"),
+    responses((status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse)),
+)]
+pub async fn set_team_channel(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<SetTeamChannelRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let requested = body.destinations.map(|d| {
+            d.into_iter()
+                .map(|n| n.trim().to_string())
+                .filter(|n| !n.is_empty())
+                .collect::<Vec<_>>()
+        });
+        match infra::table::oncall_teams::set_channel(&org_id, &team_id, requested.clone()).await {
+            Ok(false) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
+            Err(e) => MetaHttpResponse::internal_error(e),
+            Ok(true) => {
+                let policy =
+                    match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id)
+                        .await
+                    {
+                        Ok(p) => p.destinations,
+                        Err(e) => return to_response(e),
+                    };
+                let source = if requested.is_some() { "team" } else { "policy" };
+                MetaHttpResponse::json(TeamChannelResponse {
+                    team_id,
+                    destinations: config::meta::oncall::policy::team_channel(
+                        requested.as_deref(),
+                        &policy,
+                    )
+                    .to_vec(),
+                    source,
+                })
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 /// Renders the confirmation page an emailed acknowledgement link opens.
 ///
 /// Deliberately plain HTML with no JavaScript: it is opened on a phone, at
@@ -1470,22 +1607,26 @@ pub async fn acknowledge(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::oncall::{escalation, token};
+        use o2_enterprise::enterprise::oncall::{escalation, service, token};
 
-        let claims = match token::verify(&form.token, config::utils::time::now_micros()).await {
+        // Signature, expiry, org, **and** whether the person the token names is
+        // still a member of that org. The last one is why this goes through
+        // the service rather than calling `token::verify` here: the token is
+        // stateless by design and stays that way, and the entitlement is read
+        // once, in one place both ack entry points share.
+        let claims = match service::ack_claims(
+            &form.token,
+            &org_id,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
             Ok(c) => c,
             Err(e) => {
                 return MetaHttpResponse::error(StatusCode::UNAUTHORIZED.as_u16(), e.to_string())
                     .into_response();
             }
         };
-        if claims.org_id != org_id {
-            return MetaHttpResponse::error(
-                StatusCode::UNAUTHORIZED.as_u16(),
-                "acknowledgement link does not belong to this organization",
-            )
-            .into_response();
-        }
         // `03` §8: the link is single-use. Signing makes it unforgeable and the
         // expiry makes it short-lived, but neither stops a replay inside the
         // TTL — and a record whose ladder has restarted since is a page a stale
@@ -1563,24 +1704,21 @@ fn ack_redirect(org_id: &str, response_id: &str) -> Response {
 pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::oncall::token;
+        use o2_enterprise::enterprise::oncall::service;
 
-        let claims = match token::verify(&q.token, config::utils::time::now_micros()).await {
+        // Checked on the GET too, not only on the POST that acts. A leaver who
+        // is refused here never sees the button — and, just as importantly,
+        // never sees the record's title, which this page would otherwise show
+        // to somebody who has left the organization.
+        let claims = match service::ack_claims(&q.token, &org_id, config::utils::time::now_micros())
+            .await
+        {
             Ok(c) => c,
             Err(e) => {
                 return MetaHttpResponse::error(StatusCode::UNAUTHORIZED.as_u16(), e.to_string())
                     .into_response();
             }
         };
-        // The org in the path must match the org the token was minted for, or
-        // a link for one tenant would act on another.
-        if claims.org_id != org_id {
-            return MetaHttpResponse::error(
-                StatusCode::UNAUTHORIZED.as_u16(),
-                "acknowledgement link does not belong to this organization",
-            )
-            .into_response();
-        }
         let title = infra::table::oncall_responses::get(&claims.org_id, &claims.response_id)
             .await
             .ok()

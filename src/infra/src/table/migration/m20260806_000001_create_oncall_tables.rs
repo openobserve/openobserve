@@ -56,6 +56,18 @@ impl MigrationTrait for Migration {
                             .default("UTC"),
                     )
                     .col(ColumnDef::new(OncallTeams::Description).string().null())
+                    // The team's own channel: a JSON array of alert
+                    // Destination names the team is talked to on. Nullable,
+                    // and null is not the same as `[]` — null means "never
+                    // set", which falls back to the escalation policy's list,
+                    // and `[]` means "this team has no channel". Text rather
+                    // than a join table because it is a short list read whole
+                    // or not at all, exactly like the policy's own.
+                    .col(
+                        ColumnDef::new(OncallTeams::ChannelDestinations)
+                            .text()
+                            .null(),
+                    )
                     .col(
                         ColumnDef::new(OncallTeams::CreatedAt)
                             .big_integer()
@@ -496,6 +508,7 @@ enum OncallTeams {
     Name,
     Timezone,
     Description,
+    ChannelDestinations,
     CreatedAt,
     UpdatedAt,
 }

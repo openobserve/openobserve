@@ -108,8 +108,34 @@ fn to_team(m: oncall_teams::Model) -> Team {
         name: m.name,
         timezone: m.timezone,
         description: m.description,
+        // Carried on the struct now, so a whole-row super-cluster snapshot
+        // replicates the team's room instead of having to preserve a column it
+        // could not see.
+        channel_destinations: to_channel(m.channel_destinations),
         created_at: m.created_at,
         updated_at: m.updated_at,
+    }
+}
+
+/// The team's own channel, as stored.
+///
+/// `None` — never set, so the escalation policy's list stands (which is what
+/// every team created before the field existed has). `Some(list)` — the team's
+/// answer, and an empty list is a real answer meaning "no channel". The
+/// precedence itself is [`config::meta::oncall::policy::team_channel`]; this
+/// only reads the column.
+///
+/// Unparseable JSON reads as "never set" rather than failing the caller: the
+/// caller is usually about to post a page's context into a room, and losing
+/// that to a bad column is worse than falling back to the policy.
+fn to_channel(raw: Option<String>) -> Option<Vec<String>> {
+    let raw = raw?;
+    match serde_json::from_str::<Vec<String>>(&raw) {
+        Ok(list) => Some(list),
+        Err(e) => {
+            log::error!("[oncall] team channel_destinations is not a JSON array ({e}); ignoring it");
+            None
+        }
     }
 }
 
@@ -135,10 +161,63 @@ pub async fn create(
         name: Set(name.to_string()),
         timezone: Set(timezone.to_string()),
         description: Set(description),
+        // Not `[]`: a new team has not decided anything about its channel, and
+        // storing an empty list here would mean "no channel" and silently
+        // ignore the policy destinations the team is about to inherit.
+        channel_destinations: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     };
     Ok(to_team(model.insert(client).await?))
+}
+
+/// The destination names this team is talked to on, or `None` if it has never
+/// set any.
+///
+/// Not folded into [`Team`]: the team row is read on the paging path for its
+/// display name and cached for that, and the channel is a delivery setting with
+/// a different write path and a different audience. Keeping them apart is what
+/// lets the channel be edited without invalidating the page path's cache.
+pub async fn get_channel(org_id: &str, id: &str) -> Result<Option<Vec<String>>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_teams::Entity::find_by_id(id)
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+        .and_then(|m| to_channel(m.channel_destinations)))
+}
+
+/// Sets — or clears — the team's channel.
+///
+/// `None` puts the team back to "never set", so the escalation policy's list
+/// takes over again; `Some(vec![])` says the team has no channel at all. Both
+/// are reachable deliberately, because a field that cannot be un-set is one
+/// nobody can undo a mistake in.
+///
+/// Returns `false` when there is no such team in this org — the caller already
+/// knows what it asked to store, so nothing is read back.
+pub async fn set_channel(
+    org_id: &str,
+    id: &str,
+    destinations: Option<Vec<String>>,
+) -> Result<bool, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some(existing) = oncall_teams::Entity::find_by_id(id)
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(false);
+    };
+    let stored = destinations
+        .as_ref()
+        .map(|d| serde_json::to_string(d).unwrap_or_else(|_| "[]".to_string()));
+    let mut model: oncall_teams::ActiveModel = existing.into();
+    model.channel_destinations = Set(stored);
+    model.updated_at = Set(now_micros());
+    model.update(client).await?;
+    invalidate_and_publish_team(org_id, id).await;
+    Ok(true)
 }
 
 pub async fn get(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> {
@@ -398,6 +477,7 @@ mod tests {
             name: "Platform".into(),
             timezone: "Asia/Kolkata".into(),
             description: Some("owns queriers".into()),
+            channel_destinations: None,
             created_at: 10,
             updated_at: 20,
         };
@@ -422,6 +502,28 @@ mod tests {
         let member = to_member(m);
         assert_eq!(member.user_email, "ana@o2.ai");
         assert_eq!(member.team_id, "team_1");
+    }
+
+    /// The three states of the column, and they are three different answers.
+    /// Collapsing null and `[]` is what would make the team channel impossible
+    /// to turn off — clearing it would silently fall back to whatever the
+    /// escalation policy still had in it.
+    #[test]
+    fn test_null_and_empty_are_different_answers_about_a_teams_channel() {
+        assert_eq!(to_channel(None), None, "never set");
+        assert_eq!(to_channel(Some("[]".into())), Some(vec![]), "no channel");
+        assert_eq!(
+            to_channel(Some(r#"["slack-platform","teams-sre"]"#.into())),
+            Some(vec!["slack-platform".to_string(), "teams-sre".to_string()])
+        );
+    }
+
+    /// A column somebody hand-edited into nonsense must not cost the room its
+    /// context: it reads as "never set", so the policy's list still stands.
+    #[test]
+    fn test_an_unreadable_channel_column_falls_back_rather_than_failing() {
+        assert_eq!(to_channel(Some("not json".into())), None);
+        assert_eq!(to_channel(Some("{\"a\":1}".into())), None);
     }
 
     /// Ksuids carry a one-second timestamp and a random payload, so two ids

@@ -673,6 +673,184 @@ pub fn dependents_all_clear(impacted: &[Response], confirmed_id: &str) -> bool {
         .any(|r| r.id != confirmed_id && !r.state.is_terminal())
 }
 
+// ── The team channel's copy of the record (Change 1) ─────────────────────────
+//
+// The team's chat destination used to receive the **page**: "[P2] checkout
+// error rate — Platform", addressed to Ana, in a room of thirty people who
+// learn from it only that Ana is being woken. It answered a question nobody in
+// the room had asked.
+//
+// What the room wants is the record: something fired, this team owns it, here
+// is who is on it and here is where it went. That is a different question from
+// the alert's own notification — which carries the rows and values that fired —
+// so both firing is not duplication, and this one is sent **unconditionally**
+// rather than as a fallback for an alert with no destination of its own.
+// Conditional behaviour there is how somebody adds a destination to an alert
+// next month and the channel silently stops getting on-call context.
+
+/// Where a record has got to, as far as its team's channel is concerned.
+///
+/// Three stages and no more: the room needs "somebody was woken", "somebody has
+/// it" and "it is over, and why". Every rung in between is the ladder's
+/// business, and posting them is what turns a flapping alert into channel noise
+/// — which is precisely why the incident path already dedups its own repeats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ChannelPostStage {
+    Paged,
+    Acknowledged,
+    Resolved,
+}
+
+impl ChannelPostStage {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Paged => "paged",
+            Self::Acknowledged => "acknowledged",
+            Self::Resolved => "resolved",
+        }
+    }
+
+    /// The stage a record in this state is at, or `None` for a state the room
+    /// is not told about.
+    ///
+    /// `Triaged` is deliberately absent: it means the agent is still looking,
+    /// which is not news to a room and would spend the record's one message on
+    /// a state that is over in ninety seconds.
+    pub fn of(state: ResponseState) -> Option<Self> {
+        match state {
+            ResponseState::Triggered => Some(Self::Paged),
+            ResponseState::Acknowledged => Some(Self::Acknowledged),
+            ResponseState::Resolved => Some(Self::Resolved),
+            ResponseState::Triaged => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ChannelPostStage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// One message in a team's channel, about one response record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ChannelPost {
+    /// What the transport edits by. One per record, for the whole of its life.
+    pub key: String,
+    pub stage: ChannelPostStage,
+    pub title: String,
+    pub body: String,
+    /// Where to read the whole thing, including the alert that fired.
+    pub url: String,
+}
+
+/// The prefix every channel-post key carries, so a destination that receives
+/// several kinds of message can tell them apart.
+pub const CHANNEL_POST_KEY_PREFIX: &str = "o2-oncall-response";
+
+/// The dedup key for a record's channel post: one per **record**.
+///
+/// Not per rung, and not per ladder run. A record handed to another team is
+/// still the same outage to the room that has been watching it, and minting a
+/// second key there would post the whole story twice.
+pub fn channel_post_key(response_id: &str) -> String {
+    format!("{CHANNEL_POST_KEY_PREFIX}:{response_id}")
+}
+
+/// What the room is told about a record right now.
+///
+/// `detail_url` links to the record rather than reproducing the alert. The
+/// record carries `title`, the subject and the runbook — it does **not** carry
+/// the rows and values that fired, so the alert's own detail cannot be
+/// reproduced here without widening the record, and a link cannot go stale the
+/// way a copied payload can.
+pub fn channel_post(
+    response: &Response,
+    team_name: &str,
+    stage: ChannelPostStage,
+    detail_url: &str,
+) -> ChannelPost {
+    let what = response
+        .title
+        .clone()
+        .unwrap_or_else(|| response.subject.source_id.clone());
+    let title = format!("[{stage}] {what} — {team_name}");
+
+    let mut body = String::with_capacity(256);
+    match stage {
+        ChannelPostStage::Paged => {
+            body.push_str(&format!("{team_name} has been paged for {what}.\n"));
+            if response.responder_role == ResponderRole::Impacted {
+                // The room's own service is affected by somebody else's
+                // outage. Saying so is the difference between "we are on the
+                // hook for a fix" and "we are containing a blast radius".
+                body.push_str(
+                    "This team is impacted rather than the owner: contain the impact on your \
+                     service; another team is fixing the cause.\n",
+                );
+            }
+        }
+        ChannelPostStage::Acknowledged => {
+            let who = response.acked_by.as_deref().unwrap_or("somebody");
+            body.push_str(&format!("{who} has it. {what} — {team_name}.\n"));
+        }
+        ChannelPostStage::Resolved => {
+            body.push_str(&format!("Resolved: {what} — {team_name}.\n"));
+            // The cause is the only thing in this message the room could not
+            // have worked out for itself, so it is never dropped.
+            match response.cause {
+                Some(cause) => body.push_str(&format!("Cause: {cause}\n")),
+                None => body.push_str("Cause: not recorded\n"),
+            }
+            if let Some(note) = response.cause_note.as_deref().filter(|n| !n.trim().is_empty()) {
+                body.push_str(&format!("{note}\n"));
+            }
+        }
+    }
+    body.push_str(&format!("\n{detail_url}\n"));
+
+    ChannelPost {
+        key: channel_post_key(&response.id),
+        stage,
+        title,
+        body,
+        url: detail_url.to_string(),
+    }
+}
+
+/// What a transport should do with a record's post at this stage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChannelPostAction {
+    /// Nothing has been posted for this record yet. Post it.
+    Post,
+    /// Revise the message already in the room.
+    Edit,
+    /// Say nothing.
+    Skip,
+}
+
+/// Whether this stage goes to the room, and how.
+///
+/// `can_edit` is [`super::agent::updates_in_place`] for the channel the post
+/// rides — its first caller. The rule it produces is the one that keeps a
+/// record to a single message:
+///
+/// - nothing posted yet → **post**, whatever the stage. A record whose opening
+///   post was lost still deserves to have its outcome said once, and posting
+///   for the first time is not re-posting.
+/// - posted, and the transport can revise what it sent → **edit**.
+/// - posted, and it cannot → **skip**. Not "post again": a room that gets three
+///   messages per record is the noise this whole design exists to avoid, and
+///   the responder who needs the update is on the page, not in the channel.
+pub fn channel_post_action(already_posted: bool, can_edit: bool) -> ChannelPostAction {
+    match (already_posted, can_edit) {
+        (false, _) => ChannelPostAction::Post,
+        (true, true) => ChannelPostAction::Edit,
+        (true, false) => ChannelPostAction::Skip,
+    }
+}
+
 impl std::fmt::Display for ResponseState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
@@ -1299,5 +1477,142 @@ mod tests {
             "order_service has not confirmed yet"
         );
         assert!(dependents_all_clear(&[], "anything"));
+    }
+
+    // ── The team channel's copy of the record (Change 1) ────────────────────
+
+    const URL: &str = "https://o2.example/web/oncall/responses/resp_1?org_identifier=default";
+
+    fn record(state: ResponseState) -> Response {
+        Response {
+            title: Some("Checkout error rate".into()),
+            state,
+            ..sample(None, None)
+        }
+    }
+
+    /// One message for the whole life of a record. The key is what makes that
+    /// true, so it is pinned: no rung in it, no ladder run in it.
+    #[test]
+    fn test_the_dedup_key_is_the_record_and_nothing_else() {
+        let paged = channel_post(&record(ResponseState::Triggered), "Platform", ChannelPostStage::Paged, URL);
+        let mut acked = record(ResponseState::Acknowledged);
+        acked.acked_by = Some("ana@o2.ai".into());
+        acked.ladder_run = Some(4);
+        acked.team_id = "another_team".into();
+        let acked = channel_post(&acked, "Platform", ChannelPostStage::Acknowledged, URL);
+
+        assert_eq!(paged.key, acked.key, "one message, edited, for one record");
+        assert_eq!(paged.key, "o2-oncall-response:resp_1");
+        assert!(!paged.key.contains("run") && !paged.key.contains('/'));
+    }
+
+    /// The three things the room is told, in order, and the one thing it is
+    /// not: a `Triaged` record is the agent still thinking, which is not news.
+    #[test]
+    fn test_the_room_hears_paged_acknowledged_and_resolved_and_nothing_else() {
+        assert_eq!(
+            ChannelPostStage::of(ResponseState::Triggered),
+            Some(ChannelPostStage::Paged)
+        );
+        assert_eq!(
+            ChannelPostStage::of(ResponseState::Acknowledged),
+            Some(ChannelPostStage::Acknowledged)
+        );
+        assert_eq!(
+            ChannelPostStage::of(ResponseState::Resolved),
+            Some(ChannelPostStage::Resolved)
+        );
+        assert_eq!(ChannelPostStage::of(ResponseState::Triaged), None);
+    }
+
+    /// The whole point of the change: the room learns what fired and who has
+    /// it, not that one named person is being woken.
+    #[test]
+    fn test_the_post_is_about_the_record_not_about_the_person_being_woken() {
+        let paged = channel_post(&record(ResponseState::Triggered), "Platform", ChannelPostStage::Paged, URL);
+        assert!(paged.title.contains("Checkout error rate"), "{}", paged.title);
+        assert!(paged.title.contains("Platform"));
+        assert!(paged.body.contains("has been paged"), "{}", paged.body);
+        assert!(
+            !paged.body.contains("Acknowledge:"),
+            "an ack link belongs to a person, not to a room"
+        );
+        assert!(paged.body.contains(URL), "the room can read the whole thing");
+    }
+
+    /// The record carries no rows or values, so the alert's detail is linked
+    /// rather than copied — a link cannot go stale.
+    #[test]
+    fn test_the_post_links_the_record_rather_than_copying_the_alert() {
+        let post = channel_post(&record(ResponseState::Triggered), "Platform", ChannelPostStage::Paged, URL);
+        assert_eq!(post.url, URL);
+        assert_eq!(post.body.matches(URL).count(), 1, "linked once, not pasted");
+    }
+
+    /// A resolution with no cause beside it teaches the next firing nothing,
+    /// so the line is written either way rather than quietly omitted.
+    #[test]
+    fn test_the_resolution_carries_its_cause_or_says_it_has_none() {
+        let mut resolved = record(ResponseState::Resolved);
+        resolved.cause = Some(ResolutionCause::ConfigChangeOrDeploy);
+        resolved.cause_note = Some("rolled back deploy 4821".into());
+        let with = channel_post(&resolved, "Platform", ChannelPostStage::Resolved, URL);
+        assert!(with.body.contains("Cause: config_change_or_deploy"), "{}", with.body);
+        assert!(with.body.contains("rolled back deploy 4821"));
+
+        let without = channel_post(&record(ResponseState::Resolved), "Platform", ChannelPostStage::Resolved, URL);
+        assert!(without.body.contains("Cause: not recorded"), "{}", without.body);
+    }
+
+    /// An impacted team's room is told it is a liaison seat. Reading "you have
+    /// been paged" and going looking for a fix is the failure this prevents.
+    #[test]
+    fn test_an_impacted_record_says_so_in_the_room() {
+        let mut impacted = record(ResponseState::Triggered);
+        impacted.responder_role = ResponderRole::Impacted;
+        let post = channel_post(&impacted, "Payments", ChannelPostStage::Paged, URL);
+        assert!(post.body.contains("impacted rather than the owner"), "{}", post.body);
+        assert!(post.body.contains("another team is fixing the cause"));
+    }
+
+    /// The rule that keeps one record to one message: the first post always
+    /// goes, a later stage edits where it can, and where it cannot the room
+    /// hears nothing rather than the same story three times.
+    #[test]
+    fn test_a_progressing_record_edits_its_post_and_never_repeats_it() {
+        assert_eq!(channel_post_action(false, true), ChannelPostAction::Post);
+        assert_eq!(
+            channel_post_action(false, false),
+            ChannelPostAction::Post,
+            "a first post is not a re-post, whatever the transport can do"
+        );
+        assert_eq!(channel_post_action(true, true), ChannelPostAction::Edit);
+        assert_eq!(
+            channel_post_action(true, false),
+            ChannelPostAction::Skip,
+            "not spamming beats not updating"
+        );
+    }
+
+    /// The gate is `updates_in_place`, which had no caller until now. Wiring it
+    /// to anything else would let a channel that cannot revise a message post a
+    /// second one.
+    #[test]
+    fn test_the_edit_gate_is_the_channels_own_answer() {
+        for editable in [Channel::Chat, Channel::Push, Channel::InApp] {
+            assert_eq!(
+                channel_post_action(true, super::super::agent::updates_in_place(editable)),
+                ChannelPostAction::Edit,
+                "{editable}"
+            );
+        }
+        for fixed in [Channel::Email, Channel::Sms, Channel::Voice, Channel::Webhook] {
+            assert_eq!(
+                channel_post_action(true, super::super::agent::updates_in_place(fixed)),
+                ChannelPostAction::Skip,
+                "{fixed}"
+            );
+        }
     }
 }

@@ -472,6 +472,7 @@ pub fn build(
             restrictions,
             starts_at: None,
             ends_at: None,
+            secondary_offset: None,
         }
     };
 

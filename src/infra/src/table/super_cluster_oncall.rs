@@ -57,16 +57,28 @@ use crate::{
 /// Applies a team exactly as the source region wrote it.
 pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let existing = oncall_teams::Entity::find_by_id(&team.id).one(client).await?;
     let model = oncall_teams::Model {
         id: team.id.clone(),
         org_id: team.org_id.clone(),
         name: team.name.clone(),
         timezone: team.timezone.clone(),
         description: team.description.clone(),
+        // The channel rides the snapshot now that `Team` carries it, so a room
+        // set in one region is the room the other region posts to. It used to
+        // be preserved from the local row instead, which meant it never
+        // replicated at all — a failover would page correctly and then talk to
+        // nobody.
+        channel_destinations: team
+            .channel_destinations
+            .as_ref()
+            .map(|d| serde_json::to_string(d))
+            .transpose()
+            .map_err(|e| errors::Error::Message(format!("team channel is not serialisable: {e}")))?,
         created_at: team.created_at,
         updated_at: team.updated_at,
     };
-    match oncall_teams::Entity::find_by_id(&team.id).one(client).await? {
+    match existing {
         Some(_) => {
             let mut active = model.into_active_model();
             active.id = Set(team.id.clone());
