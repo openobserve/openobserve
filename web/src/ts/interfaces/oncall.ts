@@ -345,6 +345,24 @@ export interface TeamOverview {
   acked_under_5m_percent: number;
 }
 
+/**
+ * One span of `GET /oncall/teams/{id}/resolved-schedule`. Segments tile the
+ * window exactly; one with no `user_email` is a GAP, which is the whole reason
+ * to ask the server rather than resolve the rotation on this side.
+ */
+export interface ResolvedSegment {
+  /** Micros. */
+  from: number;
+  /** Micros. */
+  to: number;
+  /** Absent means nobody is on call for this span. */
+  user_email?: string | null;
+  /** The layer this span belongs to — or the one a cover displaced. */
+  rotation: string;
+  /** Present when a cover took this span from the rotation. */
+  override_id?: string | null;
+}
+
 /** `GET /oncall/teams/{id}/load`. Who has been carrying the pager. */
 export interface MemberLoad {
   user_email: string;

@@ -15,6 +15,7 @@
 import http from "./http";
 import type {
   OwnershipRule,
+  ResolvedSegment,
   TeamLoad,
   TeamOverview,
   TeamReachability,
@@ -656,6 +657,26 @@ const oncall = {
   teamConfigRisks: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
     http().get<ConfigRisks>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/config-risks`,
+    ),
+
+  /// The schedule as the engine resolves it: restrictions applied, covers laid
+  /// on top, gaps included as segments with nobody in them. Caps at 31 days and
+  /// 2000 segments, and 400s rather than truncating — handle it as a message.
+  resolvedSchedule: ({
+    org_identifier,
+    team_id,
+    from,
+    to,
+  }: {
+    org_identifier: string;
+    team_id: string;
+    /** Micros. Both bounds or neither. */
+    from: number;
+    to: number;
+  }) =>
+    http().get<ResolvedSegment[]>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/resolved-schedule`,
+      { params: { from, to } },
     ),
 
   /// Everything the team header needs, in one call: membership, coverage, the

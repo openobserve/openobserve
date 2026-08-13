@@ -224,14 +224,55 @@
         />
       </OTabPanel>
 
+      <!-- What the schedule WILL do, then the rotations that decide it, then
+           the editor. Reading before editing: the timeline is resolved by the
+           engine, so it answers "is this right" in a way the draft cannot. -->
       <OTabPanel name="schedule">
-        <OnCallScheduleEditor
-          :team-id="teamId"
-          :timezone="team?.timezone ?? 'UTC'"
-          :schedule="schedule"
-          :members="members"
-          @saved="fetchAll"
-        />
+        <!-- Read, or edit — never both. The editor carries its own draft
+             calendar and rotation table, so showing it under these two put two
+             of each on the screen. -->
+        <OContent y class="flex flex-col gap-5">
+          <template v-if="!editingSchedule">
+            <OnCallScheduleTimeline
+              v-model:window="scheduleWindow"
+              :rotations="schedule?.rotations ?? []"
+              :segments="segments"
+              :timezone="team?.timezone ?? 'UTC'"
+              :loading="segmentsLoading"
+              @fill-gap="onFillGap"
+            />
+
+            <OnCallRotationsTable
+              :rotations="schedule?.rotations ?? []"
+              :timezone="team?.timezone ?? 'UTC'"
+              :load="teamLoad"
+              @edit="editingSchedule = true"
+              @add="editingSchedule = true"
+            />
+          </template>
+
+          <template v-else>
+            <span class="flex flex-wrap items-baseline gap-x-2">
+              <OText variant="panel-title">{{ t("oncall.scheduleEditing") }}</OText>
+              <OButton
+                variant="outline"
+                size="xs"
+                class="ms-auto"
+                data-test="oncall-schedule-done-editing"
+                @click="editingSchedule = false"
+              >
+                {{ t("oncall.scheduleDoneEditing") }}
+              </OButton>
+            </span>
+            <OnCallScheduleEditor
+              :team-id="teamId"
+              :timezone="team?.timezone ?? 'UTC'"
+              :schedule="schedule"
+              :members="members"
+              @saved="onScheduleSaved"
+            />
+          </template>
+        </OContent>
       </OTabPanel>
 
       <OTabPanel name="policy">
@@ -248,7 +289,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -262,7 +303,9 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
+import OnCallRotationsTable from "@/components/oncall/OnCallRotationsTable.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
+import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
 import OnCallContactReadiness from "@/components/oncall/OnCallContactReadiness.vue";
 import OnCallLoadBalance from "@/components/oncall/OnCallLoadBalance.vue";
@@ -290,6 +333,7 @@ import type {
   ConfigRisks,
   OnCallTeamMember,
   TeamOverview,
+  ResolvedSegment,
   TeamLoad,
   TeamReachability,
 } from "@/ts/interfaces/oncall";
@@ -322,6 +366,12 @@ const overview = ref<TeamOverview | null>(null);
 const reachability = ref<TeamReachability | null>(null);
 const configRisks = ref<ConfigRisks | null>(null);
 const teamLoad = ref<TeamLoad | null>(null);
+const segments = ref<ResolvedSegment[]>([]);
+const segmentsLoading = ref(false);
+/// Read or edit, never both — the editor brings its own calendar and table.
+const editingSchedule = ref(false);
+/// Owned by the timeline, which decides the visible range; the fetch follows it.
+const scheduleWindow = ref({ from: 0, to: 0 });
 const ruleCount = ref(0);
 // Where the team actually is in its setup decides the landing tab. A brand
 // new team opens on Members, because a schedule with nobody in it is not
@@ -587,10 +637,52 @@ async function sendTestPage() {
   }
 }
 
+/// The engine's own resolution of the visible window. Capped server-side at 31
+/// days and 2000 segments, and a 400 there is a message rather than a spinner.
+async function fetchSegments() {
+  const { from, to } = scheduleWindow.value;
+  if (!from || !to) return;
+  segmentsLoading.value = true;
+  try {
+    const res = await oncallService.resolvedSchedule({
+      org_identifier: orgId.value,
+      team_id: teamId.value,
+      from,
+      to,
+    });
+    segments.value = res.data ?? [];
+  } catch (err: any) {
+    segments.value = [];
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.timelineLoadFailed"),
+    });
+  } finally {
+    segmentsLoading.value = false;
+  }
+}
+
+/// Covering a gap is an override, which needs a person and a window — the
+/// editor is where that is chosen until the cover dialog lands.
+function onFillGap() {
+  editingSchedule.value = true;
+}
+
+/// Back to the resolved view on save: the point of saving is to see what the
+/// engine now says, not to keep staring at the form.
+async function onScheduleSaved() {
+  editingSchedule.value = false;
+  await fetchAll();
+  await fetchSegments();
+}
+
 function onTeamSaved() {
   editOpen.value = false;
   fetchAll();
 }
+
+// The timeline owns its window; refetch whenever it moves.
+watch(scheduleWindow, fetchSegments, { deep: true });
 
 onMounted(fetchAll);
 </script>

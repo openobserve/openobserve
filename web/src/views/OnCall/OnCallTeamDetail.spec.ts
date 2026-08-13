@@ -31,6 +31,11 @@ vi.mock("@/services/oncall", () => ({
     listTeams: vi.fn(),
     listOwnershipRules: vi.fn(),
     listResponses: vi.fn(),
+    resolvedSchedule: vi.fn(),
+    teamOverview: vi.fn(),
+    teamReachability: vi.fn(),
+    teamConfigRisks: vi.fn(),
+    teamLoad: vi.fn(),
   },
 }));
 
@@ -50,9 +55,11 @@ const stubs = {
     template: "<div><slot name='title-trail' /><slot name='actions' /><slot /></div>",
   },
   OTable: { name: "OTable", props: ["data", "columns"], template: "<div />" },
+  OnCallScheduleTimeline: true,
+  OnCallRotationsTable: true,
+  OnCallScheduleEditor: true,
   OnCallTeamPulse: true,
   OnCallMembers: true,
-  OnCallScheduleEditor: true,
   OnCallPolicyEditor: true,
   OnCallOwnership: true,
   OnCallTeamForm: true,
@@ -76,6 +83,11 @@ describe("OnCallTeamDetail", () => {
     service.listTeams.mockResolvedValue({ data: [] } as any);
     service.listOwnershipRules.mockResolvedValue({ data: [] } as any);
     service.listResponses.mockResolvedValue({ data: [] } as any);
+    service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
+    service.teamOverview.mockResolvedValue({ data: null } as any);
+    service.teamReachability.mockResolvedValue({ data: null } as any);
+    service.teamConfigRisks.mockResolvedValue({ data: null } as any);
+    service.teamLoad.mockResolvedValue({ data: null } as any);
   });
 
   /// Overview first — what the team HAS been doing — then the chain that
@@ -118,6 +130,49 @@ describe("OnCallTeamDetail", () => {
     await flushPromises();
 
     expect(wrapper.findComponent({ name: "OTabPanels" }).props("modelValue")).toBe("overview");
+  });
+
+  describe("the schedule tab", () => {
+    async function openSchedule() {
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+      return wrapper;
+    }
+
+    /// The editor carries its OWN draft calendar and rotation table, so showing
+    /// it beneath the resolved pair put two of each on the screen.
+    it("shows the resolved schedule, not the editor, by default", async () => {
+      const wrapper = await openSchedule();
+
+      expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallRotationsTable" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallScheduleEditor" }).exists()).toBe(false);
+    });
+
+    it("swaps to the editor on demand, and never renders both", async () => {
+      const wrapper = await openSchedule();
+      wrapper.findComponent({ name: "OnCallRotationsTable" }).vm.$emit("edit", "Primary");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallScheduleEditor" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallRotationsTable" }).exists()).toBe(false);
+    });
+
+    /// The point of saving is to see what the engine now says.
+    it("returns to the resolved view once the schedule is saved", async () => {
+      const wrapper = await openSchedule();
+      wrapper.findComponent({ name: "OnCallRotationsTable" }).vm.$emit("add");
+      await flushPromises();
+
+      wrapper.findComponent({ name: "OnCallScheduleEditor" }).vm.$emit("saved");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallScheduleEditor" }).exists()).toBe(false);
+    });
   });
 
   /// The banner maps each finding's `kind` to the tab that repairs it and emits

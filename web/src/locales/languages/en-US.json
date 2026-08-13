@@ -13092,6 +13092,27 @@
     "loadBalanceNone": "Nobody has been paged in this window.",
     "loadBalancePages": "{count} page | {count} pages",
     "loadBalancePagesNights": "{pages} pages · {nights} overnight",
-    "attentionShowLess": "Show less"
+    "attentionShowLess": "Show less",
+    "timelineOnShift": "On shift",
+    "timelineFillGap": "Fill this gap",
+    "timelineZone": "{zone} · your local time is {local}",
+    "timelineBandAria": "{who} on {rotation}, {from} to {to}",
+    "timelineGapAt": "Gap — {rotation} has nobody {range}",
+    "rotationsTitle": "Rotations",
+    "rotationsHint": "what feeds the ladder",
+    "rotationHandover": "Handover",
+    "rotationPeople": "People, in order",
+    "rotationOnNow": "On now → next",
+    "rotationFairness": "Fairness",
+    "rotationCadence": "{cadence} · {day} {time}",
+    "rotationCycle": "{count} person · {weeks} | {count} people · {weeks}",
+    "rotationCycleLength": "{count}-shift cycle",
+    "rotationHandsTo": "{current} → {next} in {duration}",
+    "rotationNobodyNext": "{current} · no handover",
+    "rotationNobody": "Nobody on call",
+    "edit": "Edit",
+    "timelineLoadFailed": "Could not resolve the schedule for this window",
+    "scheduleEditing": "Editing rotations",
+    "scheduleDoneEditing": "Back to schedule"
   }
 }
