@@ -129,4 +129,52 @@ describe("llmExperimentsService", () => {
     });
     expect(detail.results.scores).toEqual([{ id: "score-1", name: "quality", value_numeric: 0.9 }]);
   });
+
+  it("calls the state-gated lifecycle endpoints and normalizes their durable fields", async () => {
+    post
+      .mockResolvedValueOnce({
+        data: {
+          id: "experiment-1",
+          org_id: "acme",
+          ...payload,
+          scorers: [{ id: "scorer-1", version: 4 }],
+          status: "cancelled",
+          status_reason: "user_cancelled",
+          deadline_at: 1_800_086_400_000,
+          completed_at: 1_800_000_000_100,
+          lifecycle_version: 1,
+          retry_count: 0,
+          created_by: "owner@example.com",
+          created_at: 1_800_000_000_000,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: "experiment-2",
+          org_id: "acme",
+          ...payload,
+          scorers: [{ id: "scorer-1", version: 4 }],
+          status: "running",
+          status_reason: null,
+          deadline_at: 1_800_172_800_000,
+          completed_at: null,
+          lifecycle_version: 2,
+          retry_count: 1,
+          created_by: "owner@example.com",
+          created_at: 1_800_000_000_000,
+        },
+      });
+
+    const cancelled = await llmExperimentsService.cancel("acme", "experiment-1");
+    const retried = await llmExperimentsService.retry("acme", "experiment-2");
+
+    expect(post).toHaveBeenNthCalledWith(1, "/api/acme/experiments/experiment-1/cancel");
+    expect(post).toHaveBeenNthCalledWith(2, "/api/acme/experiments/experiment-2/retry");
+    expect(cancelled).toMatchObject({
+      status: "cancelled",
+      statusReason: "user_cancelled",
+      lifecycleVersion: 1,
+    });
+    expect(retried).toMatchObject({ status: "running", retryCount: 1, completedAt: null });
+  });
 });

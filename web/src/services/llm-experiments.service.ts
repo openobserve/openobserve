@@ -76,6 +76,11 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   orgId: string;
   scorers: PinnedExperimentScorer[];
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  statusReason: string | null;
+  deadlineAt: number;
+  completedAt: number | null;
+  lifecycleVersion: number;
+  retryCount: number;
   createdBy: string;
   createdAt: number;
 }
@@ -156,6 +161,11 @@ function normalizeExperiment(input: any): LlmExperiment {
     metadata: input.metadata ?? null,
     idempotencyKey: value(input, "idempotencyKey", "idempotency_key", null),
     status: input.status,
+    statusReason: value(input, "statusReason", "status_reason", null),
+    deadlineAt: Number(value(input, "deadlineAt", "deadline_at", 0)),
+    completedAt: value(input, "completedAt", "completed_at", null),
+    lifecycleVersion: Number(value(input, "lifecycleVersion", "lifecycle_version", 0)),
+    retryCount: Number(value(input, "retryCount", "retry_count", 0)),
     createdBy: value(input, "createdBy", "created_by", ""),
     createdAt: Number(value(input, "createdAt", "created_at", 0)),
   };
@@ -219,6 +229,16 @@ const llmExperimentsService = {
       preview: normalizePreview(response.data?.preview),
       results: normalizeResults(response.data?.results),
     };
+  },
+
+  async cancel(orgId: string, experimentId: string): Promise<LlmExperiment> {
+    const response = await http().post(`${base(orgId)}/${experimentId}/cancel`);
+    return normalizeExperiment(response.data);
+  },
+
+  async retry(orgId: string, experimentId: string): Promise<LlmExperiment> {
+    const response = await http().post(`${base(orgId)}/${experimentId}/retry`);
+    return normalizeExperiment(response.data);
   },
 };
 
