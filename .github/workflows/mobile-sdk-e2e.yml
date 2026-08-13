@@ -345,18 +345,14 @@ jobs:
   # ANDROID — runs the from-source OO binary NATIVELY; app posts to localhost via adb-reverse.
   # -------------------------------------------------------------------------------------------
   android:
-    # One matrix leg per Android platform → they run in PARALLEL on separate emulators and show up as
-    # distinct green/red jobs (clearer than one job running both serially). Linux runners are cheap, so
-    # the doubled setup is worth the isolation + wall-time win. Each leg builds+installs+tests ONLY its app.
-    name: Android (${{ matrix.platform }})
+    # Both Android platforms run in ONE job on a single emulator (proven-green config). A per-platform
+    # matrix split was tried for observability but exposed emulator first-render flakiness; revisit only
+    # with emulator hardening (disable-animations + app warm-up + launch retries).
+    name: Android (rn-android + android-native)
     needs: [decide, build_oo_linux]
     if: needs.decide.outputs.run_android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [rn-android, android-native]
     steps:
       - uses: actions/checkout@v4
 
@@ -442,7 +438,6 @@ jobs:
 
       # RN app: npm ci runs postinstall → patch-sdk + gen-config (writes rum.config.json from O2_RUM_*).
       - name: Build RN-Android APK
-        if: matrix.platform == 'rn-android'
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
           if [ -n "$O2_RN_SDK_VERSION" ]; then
@@ -459,27 +454,26 @@ jobs:
       # Native app: gradle reads O2_RUM_* via System.getenv into BuildConfig. No wrapper committed →
       # use the setup-gradle `gradle`.
       - name: Build Android-native APK
-        if: matrix.platform == 'android-native'
         working-directory: tests/mobile-testing/apps/o2-native-android
         run: gradle --no-daemon assembleDebug
 
-      - name: Boot emulator, install app, run suite
+      - name: Boot emulator, install apps, run suite
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          # NB: the emulator-runner executes each line in a SEPARATE shell, so state (cd, an unclosed
-          # `if`) does NOT persist across lines — every command MUST be complete on its own line.
-          # matrix.platform is substituted by GitHub before the script runs (guaranteed, not shell env).
+          # NB: the emulator-runner executes each line in a SEPARATE shell, so `cd` does not persist —
+          # the test command must chain `cd && npx` on one line.
           script: |
             adb reverse tcp:5080 tcp:5080
             adb root || true
             adb shell "toybox date @$(date +%s)" || adb shell "date $(date +%m%d%H%M%Y.%S)" || true
             adb shell 'printf "GET /healthz HTTP/1.0\r\nHost: h\r\n\r\n" | nc -w 5 10.0.2.2 5080' && echo "EMUPROBE: emulator reaches 10.0.2.2:5080 (native OO)" || echo "EMUPROBE: emulator CANNOT reach 10.0.2.2:5080"
-            if [ "${{ matrix.platform }}" = "rn-android" ]; then adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk; else adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk; fi
-            cd tests/mobile-testing && BLOB_REPORT_NAME=report-${{ matrix.platform }}.zip npx playwright test --project=${{ matrix.platform }}
+            adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
+            adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
+            cd tests/mobile-testing && BLOB_REPORT_NAME=report-android.zip npx playwright test --project=rn-android --project=android-native
 
       # Diagnostic: dump what actually reached _rumdata (services, counts, and the timestamp range vs
       # "now"). Distinguishes "app POST never landed" from "landed but outside the query window"
@@ -498,7 +492,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: blob-report-android-${{ matrix.platform }}
+          name: blob-report-android
           path: tests/mobile-testing/blob-report
           if-no-files-found: ignore
 
