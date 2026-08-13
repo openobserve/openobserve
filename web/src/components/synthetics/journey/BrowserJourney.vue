@@ -133,39 +133,20 @@ const emit = defineEmits<{
 const anchorStepId = ref<string | null>(null);
 
 /**
- * Steps whose starting state changed since they were last validated.
+ * Steps added during this editing session that still need the author.
  *
- * In-memory only, never serialized: it is an authoring-time observation, not part of
- * the monitor. Inserting, deleting or reordering changes the state every later step
- * begins from, so their previous green ticks describe a journey that no longer
- * exists — and a stale pass is the one thing a monitor must never show (§6).
+ * They are marked with the same 4px left border the list already uses for validation
+ * errors, rather than a badge or a colour of their own: the list should have ONE way of
+ * saying "look at this row". Scoped to steps created here so rows that were already in
+ * the journey are never marked, and cleared by the step naming an element (below) so a
+ * long editing session does not end up striped top to bottom.
  */
-const needsRevalidation = ref<Set<string>>(new Set());
+const newStepIds = ref<Set<string>>(new Set());
 
-/**
- * How many steps that STILL EXIST need re-validating.
- *
- * Not `needsRevalidation.size`: `invalidateFrom` runs before the parent's
- * `modelValue` update lands, so on a delete the set also holds the step that was just
- * removed. Counting the raw set told the author "2 later steps" about a journey with
- * one affected step left. The set is the record of intent; this is what is true now.
- */
-const revalidationCount = computed(
-  () => props.modelValue.filter((s) => needsRevalidation.value.has(s.id)).length,
-);
-
-/**
- * The review banner's text.
- *
- * Two keys rather than one interpolated string: "1 later steps" is what a bare count
- * produces, and the banner exists to be read carefully — a sentence that reads like a
- * bug undermines the warning it carries.
- */
-const revalidationMessage = computed(() =>
-  revalidationCount.value === 1
-    ? t("synthetics.journey.needsRevalidationOne")
-    : t("synthetics.journey.needsRevalidation", { count: revalidationCount.value }),
-);
+/** Remember a step the author just created, so its row carries the marker. */
+function markStepAsNew(id: string) {
+  newStepIds.value = new Set(newStepIds.value).add(id);
+}
 
 /** How many prefix steps have reported a result, for the restore banner. */
 const restoredCount = computed(() => recorder.stepResults.size);
@@ -183,24 +164,6 @@ const failedStepNumber = computed(() => {
   if (!id) return 0;
   return props.modelValue.findIndex((s) => s.id === id) + 1;
 });
-
-/** Flag every step from `index` onward as needing a re-run. */
-function invalidateFrom(index: number) {
-  if (index < 0) return;
-  const next = new Set(needsRevalidation.value);
-  for (const step of props.modelValue.slice(index)) next.add(step.id);
-  needsRevalidation.value = next;
-}
-
-// A replay re-establishes every step's evidence, so the flags have served their
-// purpose. Watched rather than cleared at the call site because replay is started by
-// the parent, and a banner that outlives the problem it describes is its own defect.
-watch(
-  () => props.replayPhase,
-  (phase) => {
-    if (phase === "running") needsRevalidation.value = new Set();
-  },
-);
 
 // ── Filter / expand / select state ──────────────────────────────────────────
 const filterQuery = ref("");
@@ -562,9 +525,6 @@ function clearFirstStepError() {
 defineExpose({
   selectedCount,
   isRecording,
-  needsRevalidation,
-  revalidationCount,
-  invalidateFrom,
   deleteSelectedSteps,
   stopActiveRecording,
   stopActiveReplay,
@@ -642,9 +602,6 @@ function commitRecordedSteps(steps: BrowserStep[]) {
   const next = [...props.modelValue];
   next.splice(insertAt, 0, ...steps);
   emit("update:modelValue", next);
-  // Everything after the inserted block now starts from a different state. Appending
-  // at the end invalidates nothing, which is exactly right.
-  invalidateFrom(insertAt + steps.length);
   anchorStepId.value = null;
 }
 
@@ -814,9 +771,6 @@ function confirmDelete() {
   const next = [...props.modelValue];
   next.splice(idx, 1);
   emit("update:modelValue", next);
-  // The removed step's successors now begin from whatever state its predecessor left,
-  // which is not the state they were validated against.
-  invalidateFrom(idx);
 }
 
 function cancelDelete() {
@@ -847,13 +801,11 @@ function handleInsertBelow(row: BrowserStep) {
   const next = [...props.modelValue];
   next.splice(idx + 1, 0, step);
   emit("update:modelValue", next);
+  markStepAsNew(step.id);
   revealStep(step.id);
 }
 function handleRowReorder(reordered: BrowserStep[]) {
-  // Everything from the first moved row onward starts somewhere new.
-  const firstMoved = reordered.findIndex((s, i) => s.id !== props.modelValue[i]?.id);
   emit("update:modelValue", reordered);
-  if (firstMoved >= 0) invalidateFrom(firstMoved);
 }
 function handleUpdateSelected(ids: string[]) {
   selectedStepIds.value = ids;
@@ -870,6 +822,7 @@ function addStep() {
     locator: { candidates: [] },
   };
   emit("update:modelValue", [...props.modelValue, step]);
+  markStepAsNew(step.id);
   revealStep(step.id);
 }
 
@@ -932,10 +885,16 @@ function getRowStatusColor(row: BrowserStep): string | undefined {
   // row that carries no highlight — every rule except these two local ones
   // reaches the journey only as a field error.
   const hasFieldErr = fieldErrorStepIds.value.has(row.id);
+  // Errors always win: "this is broken" outranks "this is new", and a row that is
+  // both is a row the author has to fix.
   if (hasFirstStepErr || hasSelectorErr || hasFieldErr) return "var(--color-status-error-text)";
-  // Transient "this is the one you just added". Lowest priority on purpose — an
-  // error on the same row is the more important thing to show, and the flash
-  // clears itself a moment later anyway.
+  // A step created here that still names no element. Outlasts the reveal flash on
+  // purpose — a marker that blinks for a moment cannot help someone who scrolls back
+  // to find what they just added — and stops as soon as the step is complete.
+  if (newStepIds.value.has(row.id) && stepIsMissingTarget(row))
+    return "var(--color-status-info-text)";
+  // Transient "this is the one you just added", for rows that arrive complete (a
+  // duplicate). Lowest priority; it clears itself a moment later anyway.
   if (flashStepId.value === row.id) return "var(--color-status-info-text)";
   return undefined;
 }
@@ -1153,26 +1112,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       <span class="text-text-secondary text-xs">{{ prefixFailure.error }}</span>
     </div>
 
-    <!-- Steps whose starting state changed since they were last validated. Their old
-         green ticks describe a journey that no longer exists. -->
-    <div
-      v-if="revalidationCount > 0"
-      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mx-2! mb-3 flex items-center justify-between gap-3 border p-3"
-      role="status"
-      data-test="synthetics-journey-revalidate-banner"
-    >
-      <span class="text-text-body text-sm">
-        {{ revalidationMessage }}
-      </span>
-      <OButton
-        variant="secondary"
-        size="xs"
-        data-test="synthetics-journey-revalidate-btn"
-        @click="onReplayButtonClick"
-      >
-        {{ t("synthetics.journey.replayJourney") }}
-      </OButton>
-    </div>
     <!-- Incognito blocked warning card (replay pre-flight or recording start) -->
     <div
       v-if="blockedReason === 'incognito' || recordingBlockedIncognito"
@@ -1537,7 +1476,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       @delete="handleDelete"
       @duplicate="handleDuplicate"
       :anchor-id="anchorStepId"
-      :review-ids="needsRevalidation"
       @record-before="onRecordBefore"
       @insert-below="handleInsertBelow"
       @retry-replay="emit('replay')"

@@ -74,11 +74,6 @@ const props = withDefaults(
      * button label alone cannot: the label is gone the moment recording starts.
      */
     anchorId?: string | null;
-    /**
-     * Ids of steps whose starting state changed since they were last validated.
-     * Rendered muted with a Review badge — a stale green tick is worse than none.
-     */
-    reviewIds?: Set<string>;
     /** When true, the step list is read-only (no drag, no selection). */
     readonly?: boolean;
     /** Whether drag reorder is enabled (editor mode, disabled during record/replay/filter). */
@@ -265,12 +260,6 @@ function isAnchor(row: TData): boolean {
   return !!props.anchorId && (row as { id?: string }).id === props.anchorId;
 }
 
-/** Whether `row` starts from a different state than when it was last validated. */
-function needsReview(row: TData): boolean {
-  const id = (row as { id?: string }).id;
-  return !!id && !!props.reviewIds?.has(id);
-}
-
 /**
  * Whether `row` is the journey's first step.
  *
@@ -384,17 +373,6 @@ function handleUpdateExpanded(ids: string[]) {
         >
           {{ t("synthetics.journey.recordingHere") }}
         </span>
-
-        <!-- This step now starts from a different state than it was validated against. -->
-        <OBadge
-          v-if="needsReview(row)"
-          variant="warning"
-          size="sm"
-          class="mr-1"
-          data-test="synthetics-journey-step-review-badge"
-        >
-          {{ t("synthetics.journey.reviewStep") }}
-        </OBadge>
 
         <!-- Action label badge -->
         <div class="w-24!">
