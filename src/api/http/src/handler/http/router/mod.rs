@@ -32,7 +32,7 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, authz, dashboards, folders, kv, model_pricing, organization, service_accounts,
-    short_url, slos, sourcemaps, status, stream, users,
+    short_url, slos, sourcemaps, status, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -56,7 +56,7 @@ use {
     openobserve_api_management::request::{
         actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
         domain_management, eval_jobs, gen_ai, keys, license, providers, score_configs, scorers,
-        service_streams, synthetics, workflows,
+        service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1252,39 +1252,57 @@ pub fn service_routes() -> Router {
                     put(workflows::enable_workflow),
                 );
         }
+    }
 
-        // Synthetics — all routes gated behind ZO_SYNTHETICS_ENABLED. When off,
-        // nothing is registered and every synthetics path 404s.
-        if config::get_config().synthetics.enabled {
+    // Synthetics — all routes gated behind ZO_SYNTHETICS_ENABLED. When off,
+    // nothing is registered and every synthetics path 404s.
+    if config::get_config().synthetics.enabled {
+        router = router
+            // Synthetics — CRUD + locations
+            .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))
+            .route("/{org_id}/synthetics/locations", get(synthetics::list_locations).post(synthetics::create_location))
+            .route("/{org_id}/synthetics/agent-tokens", get(synthetics::list_agent_tokens).post(synthetics::create_agent_token))
+            .route("/{org_id}/synthetics/agent-tokens/rotate", post(synthetics::rotate_agent_token))
+            .route("/{org_id}/synthetics/agent-tokens/{name}", patch(synthetics::set_agent_token_enabled))
+            .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
+            .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
+            .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
+            .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
+            .route("/{org_id}/synthetics/{id}/artifact", get(synthetics::get_artifact))
+            .route("/{org_id}/synthetics/{id}/artifacts/presign", post(synthetics::presign_artifacts))
+            .route("/{org_id}/synthetics/{id}/runs", get(synthetics::list_runs))
+            .route("/{org_id}/synthetics/{id}/runs/{run_id}", get(synthetics::get_run_detail))
+            // Synthetics — folder move (v2 prefix to match the shared MoveAcrossFolders utility)
+            .route("/v2/{org_id}/synthetics/move", patch(synthetics::move_synthetics))
+            // Synthetics — job API (org-scoped path; authenticated via the
+            // o2syn_ token, whose org must match {org_id} in the path)
+            .route("/{org_id}/synthetics/jobs/resolve", post(synthetics::job_resolve))
+            .route("/{org_id}/synthetics/jobs/ack", post(synthetics::job_ack))
+            .route(
+                "/{org_id}/synthetics/jobs/artifact-urls",
+                post(synthetics::job_artifact_urls),
+            )
+            .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload));
+
+        // The private-VPC-agent path, and the only part of synthetics that
+        // is enterprise. Not registered at all in an OSS build, so these
+        // 404 rather than 403 — the endpoints do not exist there.
+        //
+        // `lease` is the whole of the job API that is gated: a Lambda probe
+        // calls `resolve` and `ack` and is handed its work by the
+        // dispatcher, which leases in-process. Only a long-running agent
+        // inside a customer VPC pulls work by leasing.
+        #[cfg(feature = "enterprise")]
+        {
             router = router
-                // Synthetics — CRUD + locations
-                .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))
-                .route("/{org_id}/synthetics/locations", get(synthetics::list_locations).post(synthetics::create_location))
-                .route("/{org_id}/synthetics/agent-setup", get(synthetics::agent_setup))
-                .route("/{org_id}/synthetics/agent-tokens", get(synthetics::list_agent_tokens).post(synthetics::create_agent_token))
-                .route("/{org_id}/synthetics/agent-tokens/rotate", post(synthetics::rotate_agent_token))
-                .route("/{org_id}/synthetics/agent-tokens/{name}", patch(synthetics::set_agent_token_enabled))
-                .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
-                .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
-                .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
-                .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
-                .route("/{org_id}/synthetics/{id}/artifact", get(synthetics::get_artifact))
-                .route("/{org_id}/synthetics/{id}/artifacts/presign", post(synthetics::presign_artifacts))
-                .route("/{org_id}/synthetics/{id}/runs", get(synthetics::list_runs))
-                .route("/{org_id}/synthetics/{id}/runs/{run_id}", get(synthetics::get_run_detail))
-                // Synthetics — folder move (v2 prefix to match the shared MoveAcrossFolders utility)
-                .route("/v2/{org_id}/synthetics/move", patch(synthetics::move_synthetics))
-                // Synthetics — job API (org-scoped path; authenticated via the
-                // o2syn_ token, whose org must match {org_id} in the path)
-                .route("/{org_id}/synthetics/jobs/resolve", post(synthetics::job_resolve))
-                .route("/{org_id}/synthetics/jobs/lease", post(synthetics::job_lease))
-                .route("/{org_id}/synthetics/jobs/ack", post(synthetics::job_ack))
                 .route(
-                    "/{org_id}/synthetics/jobs/artifact-urls",
-                    post(synthetics::job_artifact_urls),
+                    "/{org_id}/synthetics/jobs/lease",
+                    post(synthetics::job_lease),
                 )
-                .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload))
-                // Synthetics — agent liveness API (org-scoped; o2syn_ token)
+                .route(
+                    "/{org_id}/synthetics/agent-setup",
+                    get(synthetics::agent_setup),
+                )
                 .route(
                     "/{org_id}/synthetics/agent/register",
                     post(synthetics::agent_register),
