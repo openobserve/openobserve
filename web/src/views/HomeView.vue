@@ -400,14 +400,12 @@ export default defineComponent({
   background:
     linear-gradient(var(--color-ai-input-bg), var(--color-ai-input-bg)) padding-box,
     var(--color-gradient-brand-ribbon) border-box !important;
-  box-shadow: var(--shadow-glow-lg-geom)
-    color-mix(in srgb, var(--color-ai-accent) 20%, transparent) !important;
+  box-shadow: var(--shadow-glow-lg-geom) color-mix(in srgb, var(--color-ai-accent) 20%, transparent) !important;
 }
 
 .dark .home-ai-panel :deep(.unified-input-box) {
   --color-ai-input-bg: var(--color-surface-panel);
-  box-shadow: var(--shadow-glow-lg-geom)
-    color-mix(in srgb, var(--color-ai-accent) 20%, transparent) !important;
+  box-shadow: var(--shadow-glow-lg-geom) color-mix(in srgb, var(--color-ai-accent) 20%, transparent) !important;
 }
 
 /* Soft ambient glow behind the input */

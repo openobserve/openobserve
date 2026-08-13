@@ -203,7 +203,8 @@ onMounted(async () => {
 .summary-text :deep(.summary-clickable:active) {
   transform: translateY(0) scale(0.98);
   background: color-mix(in srgb, var(--color-theme-accent) 18%, transparent);
-  box-shadow: var(--shadow-ring-hairline-geom) var(--color-theme-accent),
+  box-shadow:
+    var(--shadow-ring-hairline-geom) var(--color-theme-accent),
     var(--shadow-scroll-top);
 }
 

@@ -199,15 +199,13 @@
 .dark .o2vf_node .vue-flow__node-input:hover {
   background: color-mix(in srgb, var(--color-blue-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-blue-400) 50%, transparent) !important;
-  box-shadow: var(--shadow-glow-lg-geom)
-    color-mix(in srgb, var(--color-blue-500) 20%, transparent) !important;
+  box-shadow: var(--shadow-glow-lg-geom) color-mix(in srgb, var(--color-blue-500) 20%, transparent) !important;
 }
 
 .dark .o2vf_node .vue-flow__node-default:hover {
   background: color-mix(in srgb, var(--color-warning-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-orange-400) 50%, transparent) !important;
-  box-shadow: var(--shadow-glow-lg-geom)
-    color-mix(in srgb, var(--color-amber-500) 20%, transparent) !important;
+  box-shadow: var(--shadow-glow-lg-geom) color-mix(in srgb, var(--color-amber-500) 20%, transparent) !important;
 }
 
 .dark .o2vf_node .vue-flow__node-output:hover {
