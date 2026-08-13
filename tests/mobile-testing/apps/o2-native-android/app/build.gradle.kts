@@ -50,4 +50,7 @@ dependencies {
     implementation("ai.openobserve:o2-sdk-android-rum:$ooSdkVersion")
     implementation("ai.openobserve:o2-sdk-android-logs:$ooSdkVersion")
     implementation("ai.openobserve:o2-sdk-android-session-replay:$ooSdkVersion")
+    // OkHttp resource/network tracking (OpenObserveInterceptor)
+    implementation("ai.openobserve:o2-sdk-android-okhttp:$ooSdkVersion")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
