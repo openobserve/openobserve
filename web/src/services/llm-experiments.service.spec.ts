@@ -153,6 +153,32 @@ describe("llmExperimentsService", () => {
               skipped_count: 2,
             },
           ],
+          slots: [
+            {
+              row_id: "row-1",
+              logical_id: "case-1",
+              trial_index: 0,
+              input: { question: "When?" },
+              task_status: "ok",
+              execution: {
+                experiment_id: "experiment-1",
+                item_logical_id: "case-1",
+                row_id: "row-1",
+                trial_index: 0,
+                status: "ok",
+                _timestamp: 100,
+              },
+              scores: [{ scorer_id: "scorer-1", scorer_version: 4, status: "in_progress" }],
+            },
+          ],
+          pagination: { page: 1, page_size: 50, total_slots: 1, has_more: false },
+          aggregate_summary: {
+            p50_latency_ms: 12,
+            total_cost: 0.002,
+            incomplete: true,
+            incomplete_task_slots: 0,
+            incomplete_score_dimensions: 1,
+          },
         },
       },
     });
@@ -183,6 +209,19 @@ describe("llmExperimentsService", () => {
           skippedCount: 2,
         },
       ],
+      pagination: { page: 1, pageSize: 50, totalSlots: 1, hasMore: false },
+      aggregateSummary: {
+        p50LatencyMs: 12,
+        totalCost: 0.002,
+        incomplete: true,
+        incompleteTaskSlots: 0,
+        incompleteScoreDimensions: 1,
+      },
+    });
+    expect(detail.results.slots?.[0]).toMatchObject({
+      rowId: "row-1",
+      taskStatus: "ok",
+      scores: [{ scorerId: "scorer-1", status: "in_progress" }],
     });
   });
 
@@ -244,11 +283,9 @@ describe("llmExperimentsService", () => {
 
     expect(post).toHaveBeenNthCalledWith(1, "/api/acme/experiments/experiment-1/cancel");
     expect(post).toHaveBeenNthCalledWith(2, "/api/acme/experiments/experiment-2/retry");
-    expect(post).toHaveBeenNthCalledWith(
-      3,
-      "/api/acme/experiments/experiment-1/clone",
-      { name: "Copy" },
-    );
+    expect(post).toHaveBeenNthCalledWith(3, "/api/acme/experiments/experiment-1/clone", {
+      name: "Copy",
+    });
     expect(cancelled).toMatchObject({
       status: "cancelled",
       statusReason: "user_cancelled",
