@@ -106,3 +106,6 @@ node_modules/
 /form-advanced.png
 src/*/data/
 .vscode/settings.json
+
+# Compiler crash dumps — machine-local debris from a build that fell over.
+rustc-ice-*.txt
