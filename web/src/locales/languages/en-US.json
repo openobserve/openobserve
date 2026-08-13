@@ -13115,6 +13115,20 @@
     "scheduleEditing": "Editing rotations",
     "scheduleDoneEditing": "Back to schedule",
     "coverWhoRequired": "Choose who is covering",
-    "timelineCoverAria": "{who} is covering {rotation}, {from} to {to}"
+    "timelineCoverAria": "{who} is covering {rotation}, {from} to {to}",
+    "ladderPriorityPagesNobody": "{priority} pages nobody. No rung is configured, so an alert at this priority wakes no one.",
+    "ladderUnreachableCount": "{count} of {total} unreachable",
+    "dryRunTitle": "If a {priority} fired right now",
+    "dryRunHint": "dry run, nobody is paged",
+    "dryRunUnavailable": "Could not resolve this ladder.",
+    "dryRunWouldLand": "Would land",
+    "dryRunWouldNotLand": "Would not land",
+    "dryRunPartial": "Partial",
+    "dryRunNobody": "Reaches nobody",
+    "dryRunPeople": "{count} people",
+    "dryRunSkipped": "{names} would be skipped",
+    "escalationReadTitle": "Who gets paged, and how long after",
+    "escalationEditing": "Editing the escalation policy",
+    "ladderAddRung": "Add a final rung"
   }
 }

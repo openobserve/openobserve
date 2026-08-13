@@ -32,6 +32,7 @@ import type {
   Rotation,
   CauseAnalytics,
   ConfigRisks,
+  EscalationPreview,
   CauseGroup,
   ResolutionCause,
   CoverageGaps,
@@ -696,6 +697,23 @@ const oncall = {
   teamOverview: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
     http().get<TeamOverview>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/overview`,
+    ),
+
+  /// A dry run of one priority's ladder: who it would wake right now, rung by
+  /// rung, and whether each page would actually land. Sends nothing.
+  escalationPreview: ({
+    org_identifier,
+    team_id,
+    priority,
+  }: {
+    org_identifier: string;
+    team_id: string;
+    /** 1–5. Omit for the policy's default. */
+    priority?: number;
+  }) =>
+    http().get<EscalationPreview>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/escalation-preview`,
+      priority === undefined ? undefined : { params: { priority } },
     ),
 
   /// Per-member page load and rotation fairness over a window.

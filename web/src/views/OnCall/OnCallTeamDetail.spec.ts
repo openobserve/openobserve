@@ -32,6 +32,8 @@ vi.mock("@/services/oncall", () => ({
     listOwnershipRules: vi.fn(),
     listResponses: vi.fn(),
     resolvedSchedule: vi.fn(),
+    escalationPreview: vi.fn(),
+    createOverride: vi.fn(),
     teamOverview: vi.fn(),
     teamReachability: vi.fn(),
     teamConfigRisks: vi.fn(),
@@ -58,6 +60,9 @@ const stubs = {
   OnCallScheduleTimeline: true,
   OnCallRotationsTable: true,
   OnCallScheduleEditor: true,
+  OnCallEscalationLadder: true,
+  OnCallEscalationDryRun: true,
+  OnCallCoverForm: true,
   OnCallTeamPulse: true,
   OnCallMembers: true,
   OnCallPolicyEditor: true,
@@ -84,6 +89,7 @@ describe("OnCallTeamDetail", () => {
     service.listOwnershipRules.mockResolvedValue({ data: [] } as any);
     service.listResponses.mockResolvedValue({ data: [] } as any);
     service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
+    service.escalationPreview.mockResolvedValue({ data: null } as any);
     service.teamOverview.mockResolvedValue({ data: null } as any);
     service.teamReachability.mockResolvedValue({ data: null } as any);
     service.teamConfigRisks.mockResolvedValue({ data: null } as any);
@@ -172,6 +178,50 @@ describe("OnCallTeamDetail", () => {
 
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallScheduleEditor" }).exists()).toBe(false);
+    });
+  });
+
+  describe("the escalation tab", () => {
+    async function openEscalation() {
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "policy");
+      await flushPromises();
+      return wrapper;
+    }
+
+    /// Same shape as Schedule: reading the policy tells you its shape, the dry
+    /// run tells you whether it reaches anybody.
+    it("shows the dry run, not the editor, by default", async () => {
+      const wrapper = await openEscalation();
+
+      expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallEscalationDryRun" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).exists()).toBe(false);
+    });
+
+    it("swaps to the editor on demand, and never renders both", async () => {
+      const wrapper = await openEscalation();
+      wrapper.findComponent({ name: "OnCallEscalationLadder" }).vm.$emit("edit");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).exists()).toBe(false);
+    });
+
+    /// The answer depends on who is on call at THIS instant, so switching
+    /// priority has to re-ask rather than filter something already fetched.
+    it("re-asks the server when the priority changes", async () => {
+      const wrapper = await openEscalation();
+      const before = service.escalationPreview.mock.calls.length;
+
+      wrapper.findComponent({ name: "OnCallEscalationLadder" }).vm.$emit("update:selected", "P3");
+      await flushPromises();
+
+      expect(service.escalationPreview.mock.calls.length).toBeGreaterThan(before);
+      expect(service.escalationPreview).toHaveBeenLastCalledWith(
+        expect.objectContaining({ priority: 3 }),
+      );
     });
   });
 

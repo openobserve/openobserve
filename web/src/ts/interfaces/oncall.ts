@@ -295,6 +295,54 @@ export interface ConfigRisks {
 }
 
 /**
+ * `GET /oncall/teams/{id}/escalation-preview`. A dry run: who this priority
+ * would wake right now, rung by rung, and whether each page would land.
+ *
+ * Nothing is sent. Every verdict is resolved against the rotation and the
+ * transports as they stand at `at`, which is why it answers "would this work"
+ * in a way reading the policy cannot.
+ */
+export interface PreviewRecipient {
+  user_email: string;
+  /** Why this person is on this rung. A finished phrase — render it. */
+  reason: string;
+  would_a_page_land: boolean;
+  /** A finished sentence when the page would not land. */
+  why_not?: string | null;
+  deliverable_channels: Channel[];
+}
+
+export interface PreviewRung {
+  /** Delay from the record opening. */
+  after_micros: number;
+  /** The engine's words for what this rung aims at, e.g. "the next on-call". */
+  targets: string[];
+  recipients: PreviewRecipient[];
+  /** The rung fires and reaches nobody at all — worse than a slow rung. */
+  resolves_to_nobody: boolean;
+}
+
+export interface EscalationPreview {
+  team_id: string;
+  team_name: string;
+  /** `P1`..`P5`. */
+  priority: string;
+  /** Micros — the instant the answer is for. */
+  at: number;
+  pages_anyone: boolean;
+  channels: Channel[];
+  rungs: PreviewRung[];
+  repeat_count?: number | null;
+  final_action?: PolicyFinalAction | null;
+  /** What happens when the ladder runs out. A finished sentence. */
+  ends_with: string;
+  /** How a page can leave this team, automatically or by hand. Sentences. */
+  cross_team_moves: string[];
+  /** True when no rung would reach a single person — the loudest finding. */
+  reaches_nobody: boolean;
+}
+
+/**
  * `GET /oncall/teams/{id}/overview`. One call for the whole team header.
  *
  * Every figure is computed SERVER-side over the window — `acked_under_5m_percent`

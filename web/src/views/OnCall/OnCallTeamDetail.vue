@@ -275,8 +275,53 @@
         </OContent>
       </OTabPanel>
 
+      <!-- Same shape as Schedule: what the ladder WOULD do, then the editor on
+           demand. Reading the policy tells you its shape; only the dry run
+           tells you whether it reaches anybody. -->
       <OTabPanel name="policy">
-        <OnCallPolicyEditor :team-id="teamId" :policy="policy" @saved="fetchAll" />
+        <OContent y class="flex flex-col gap-5">
+          <template v-if="!editingPolicy">
+            <span class="flex flex-wrap items-baseline gap-x-2">
+              <OText variant="panel-title">{{ t("oncall.escalationReadTitle") }}</OText>
+              <OButton
+                variant="outline"
+                size="xs"
+                class="ms-auto"
+                data-test="oncall-policy-edit"
+                @click="editingPolicy = true"
+              >
+                {{ t("oncall.edit") }}
+              </OButton>
+            </span>
+
+            <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+              <OnCallEscalationLadder
+                v-model:selected="selectedPriority"
+                :priorities="overview?.rungs ?? []"
+                :preview="preview"
+                :loading="previewLoading"
+                @edit="editingPolicy = true"
+              />
+              <OnCallEscalationDryRun :preview="preview" />
+            </div>
+          </template>
+
+          <template v-else>
+            <span class="flex flex-wrap items-baseline gap-x-2">
+              <OText variant="panel-title">{{ t("oncall.escalationEditing") }}</OText>
+              <OButton
+                variant="outline"
+                size="xs"
+                class="ms-auto"
+                data-test="oncall-policy-done-editing"
+                @click="editingPolicy = false"
+              >
+                {{ t("oncall.scheduleDoneEditing") }}
+              </OButton>
+            </span>
+            <OnCallPolicyEditor :team-id="teamId" :policy="policy" @saved="onPolicySaved" />
+          </template>
+        </OContent>
       </OTabPanel>
 
       <OTabPanel name="ownership">
@@ -319,6 +364,8 @@ import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.v
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
 import OnCallContactReadiness from "@/components/oncall/OnCallContactReadiness.vue";
 import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
+import OnCallEscalationDryRun from "@/components/oncall/OnCallEscalationDryRun.vue";
+import OnCallEscalationLadder from "@/components/oncall/OnCallEscalationLadder.vue";
 import OnCallLoadBalance from "@/components/oncall/OnCallLoadBalance.vue";
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
 import OnCallTeamReach from "@/components/oncall/OnCallTeamReach.vue";
@@ -342,6 +389,7 @@ import type {
   OnCallSlot,
   OnCallTeam,
   ConfigRisks,
+  EscalationPreview,
   OnCallTeamMember,
   TeamOverview,
   ResolvedSegment,
@@ -384,6 +432,10 @@ const editingSchedule = ref(false);
 const coverOpen = ref(false);
 const coverSaving = ref(false);
 const coverGap = ref<{ from: number; to: number } | null>(null);
+const editingPolicy = ref(false);
+const selectedPriority = ref("P1");
+const preview = ref<EscalationPreview | null>(null);
+const previewLoading = ref(false);
 /// Owned by the timeline, which decides the visible range; the fetch follows it.
 const scheduleWindow = ref({ from: 0, to: 0 });
 const ruleCount = ref(0);
@@ -539,7 +591,7 @@ async function fetchAll() {
       activeTab.value = routeTab.value ?? (members.value.length ? "overview" : "members");
     }
     loaded.value = true;
-    await Promise.allSettled([fetchRuleCount(), fetchPages(), fetchInsights()]);
+    await Promise.allSettled([fetchRuleCount(), fetchPages(), fetchInsights(), fetchPreview()]);
   } catch (err: any) {
     toast({
       variant: "error",
@@ -711,6 +763,34 @@ async function saveCover(value: { user_email: string; start_at: number; end_at: 
 
 /// Back to the resolved view on save: the point of saving is to see what the
 /// engine now says, not to keep staring at the form.
+/// The dry run for whichever priority is selected. Re-asked on every change,
+/// because the answer depends on who is on call at THIS instant.
+async function fetchPreview() {
+  const priority = Number(selectedPriority.value.replace(/\D/g, "")) || 1;
+  previewLoading.value = true;
+  try {
+    const res = await oncallService.escalationPreview({
+      org_identifier: orgId.value,
+      team_id: teamId.value,
+      priority,
+    });
+    preview.value = res.data ?? null;
+  } catch {
+    // One priority failing must not blank the strip that lets you pick another.
+    preview.value = null;
+  } finally {
+    previewLoading.value = false;
+  }
+}
+
+/// Back to the dry run on save — seeing whether the change actually reaches
+/// anybody is the reason to have made it.
+async function onPolicySaved() {
+  editingPolicy.value = false;
+  await fetchAll();
+  await fetchPreview();
+}
+
 async function onScheduleSaved() {
   editingSchedule.value = false;
   await fetchAll();
@@ -724,6 +804,7 @@ function onTeamSaved() {
 
 // The timeline owns its window; refetch whenever it moves.
 watch(scheduleWindow, fetchSegments, { deep: true });
+watch(selectedPriority, fetchPreview);
 
 onMounted(fetchAll);
 </script>
