@@ -443,6 +443,37 @@ pub struct ExperimentDetailResponseBody {
     pub results: ExperimentResultsResponseBody,
 }
 
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentRowDetailResponseBody {
+    pub experiment_id: String,
+    pub snapshot: ExperimentRowSnapshotBody,
+    pub navigation: ExperimentRowNavigationBody,
+    pub row_id: String,
+    pub logical_id: String,
+    pub input: Value,
+    pub expected_output: Option<Value>,
+    pub trials: Vec<ExperimentResultSlotBody>,
+    pub score_summaries: Vec<ExperimentScoreSummaryBody>,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentRowSnapshotBody {
+    pub dataset_id: String,
+    pub dataset_version: i64,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentRowNavigationBody {
+    /// Zero-based position in deterministic pinned-snapshot row order.
+    pub row_index: usize,
+    pub total_rows: usize,
+    pub previous_row_id: Option<String>,
+    pub next_row_id: Option<String>,
+}
+
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 pub struct ExperimentResultsResponseBody {
     pub executions: Vec<Value>,
@@ -991,6 +1022,80 @@ pub fn experiment_result_summary(
     )
 }
 
+/// Builds row-local progress and aggregates from the same durable evidence as
+/// the global summary. Expected scorer counts are bounded to this row's trial
+/// slots, so the contract remains reusable by comparison views.
+pub fn experiment_row_result_summary(
+    slot_count: usize,
+    scorers: &[PinnedExperimentScorerBody],
+    executions: &[Value],
+    scores: &[Value],
+) -> (
+    ExperimentProgressBody,
+    ExperimentProgressBody,
+    ExperimentSkipSummaryBody,
+    Vec<ExperimentScoreSummaryBody>,
+) {
+    let slot_count = u64::try_from(slot_count).unwrap_or(u64::MAX);
+    let fully_skipped_slot_count = u64::try_from(
+        executions
+            .iter()
+            .filter(|record| {
+                record.get("status").and_then(Value::as_str) == Some("skipped")
+                    && record.get("skip_reason").and_then(Value::as_str) == Some("no_reference")
+            })
+            .count(),
+    )
+    .unwrap_or(u64::MAX);
+    let scorer_applicability = scorers
+        .iter()
+        .map(|scorer| {
+            let no_reference_slot_count = u64::try_from(
+                scores
+                    .iter()
+                    .filter(|score| {
+                        score.get("scorer_id").and_then(Value::as_str) == Some(scorer.id.as_str())
+                            && score.get("scorer_version").and_then(|value| {
+                                value
+                                    .as_i64()
+                                    .or_else(|| value.as_str()?.parse::<i64>().ok())
+                            }) == Some(i64::from(scorer.version))
+                            && score.get("status").and_then(Value::as_str) == Some("skipped")
+                            && score.get("skip_reason").and_then(Value::as_str)
+                                == Some("no_reference")
+                    })
+                    .count(),
+            )
+            .unwrap_or(u64::MAX);
+            ExperimentScorerApplicabilityBody {
+                scorer_id: scorer.id.clone(),
+                scorer_version: scorer.version,
+                eligible_row_count: u64::from(no_reference_slot_count < slot_count),
+                no_reference_row_count: u64::from(no_reference_slot_count == slot_count),
+                eligible_slot_count: slot_count.saturating_sub(no_reference_slot_count),
+                no_reference_slot_count,
+            }
+        })
+        .collect::<Vec<_>>();
+    let no_reference_dimensions = scorer_applicability
+        .iter()
+        .map(|scorer| scorer.no_reference_slot_count)
+        .fold(0_u64, u64::saturating_add);
+    let eligible_scoring_dimension_count = slot_count
+        .saturating_mul(u64::try_from(scorers.len()).unwrap_or(u64::MAX))
+        .saturating_sub(no_reference_dimensions);
+    let applicability = ExperimentApplicabilityPreviewBody {
+        fully_skipped_row_count: u64::from(fully_skipped_slot_count == slot_count),
+        partially_skipped_row_count: 0,
+        fully_skipped_slot_count,
+        partially_skipped_slot_count: 0,
+        eligible_task_slot_count: slot_count.saturating_sub(fully_skipped_slot_count),
+        eligible_scoring_dimension_count,
+        scorer_applicability,
+    };
+    experiment_result_summary(&applicability, scorers, executions, scores)
+}
+
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateExperimentResponseBody {
@@ -1132,6 +1237,49 @@ mod tests {
         assert_eq!(summaries[1].no_reference_count, 1);
         assert_eq!(summaries[1].no_trace_count, 1);
         assert_eq!(summaries[1].skipped_count, 2);
+    }
+
+    #[test]
+    fn row_result_summary_bounds_aggregates_to_the_selected_rows_trials() {
+        let scorers = vec![PinnedExperimentScorerBody {
+            id: "quality".to_string(),
+            version: 3,
+        }];
+        let executions = vec![
+            serde_json::json!({"row_id": "row-1", "trial_index": 0, "status": "ok"}),
+            serde_json::json!({
+                "row_id": "row-1", "trial_index": 1,
+                "status": "skipped", "skip_reason": "no_reference"
+            }),
+        ];
+        let scores = vec![
+            serde_json::json!({
+                "row_id": "row-1", "trial_index": 0, "scorer_id": "quality",
+                "scorer_version": "3", "status": "success", "value_numeric": 0.75,
+                "reasoning": "Matches the expected answer", "source_type": "llm_judge"
+            }),
+            serde_json::json!({
+                "row_id": "row-1", "trial_index": 1, "scorer_id": "quality",
+                "scorer_version": "3", "status": "skipped", "skip_reason": "no_reference"
+            }),
+        ];
+
+        let (task, scoring, skips, summaries) =
+            experiment_row_result_summary(2, &scorers, &executions, &scores);
+
+        assert_eq!((task.completed, task.total, task.skipped), (1, 1, 1));
+        assert_eq!(
+            (scoring.completed, scoring.total, scoring.skipped),
+            (1, 1, 1)
+        );
+        assert_eq!(skips.fully_skipped_slots, 1);
+        assert_eq!(summaries[0].sample_count, 1);
+        assert_eq!(summaries[0].pending_count, 0);
+        assert_eq!(summaries[0].no_reference_count, 1);
+        assert_eq!(
+            summaries[0].value,
+            Some(serde_json::json!({"kind": "numeric", "mean": 0.75}))
+        );
     }
 
     #[test]

@@ -22,8 +22,10 @@ use crate::{
         CloneExperimentRequestBody, CreateExperimentRequestBody, CreateExperimentResponseBody,
         ExperimentDetailQuery, ExperimentDetailResponseBody, ExperimentPreviewQuery,
         ExperimentPreviewResponseBody, ExperimentResponseBody, ExperimentResultPaginationBody,
-        ExperimentResultsResponseBody, ListExperimentsResponseBody, PinnedExperimentScorerBody,
-        experiment_aggregate_summary, experiment_result_slots, experiment_result_summary,
+        ExperimentResultsResponseBody, ExperimentRowDetailResponseBody,
+        ExperimentRowNavigationBody, ExperimentRowSnapshotBody, ListExperimentsResponseBody,
+        PinnedExperimentScorerBody, experiment_aggregate_summary, experiment_result_slots,
+        experiment_result_summary, experiment_row_result_summary,
     },
 };
 
@@ -266,6 +268,94 @@ pub async fn get_experiment(
         preview: preview.into(),
         results,
     })
+}
+
+/// Load one pinned dataset row and every trial's current execution and score evidence.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "GetExperimentRowDetail",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Experiment ID"),
+        ("row_id" = String, Path, description = "Pinned dataset row ID"),
+    ),
+    responses(
+        (status = 200, description = "Pinned row detail", body = ExperimentRowDetailResponseBody),
+        (status = 404, description = "Experiment or pinned row not found"),
+    )
+)]
+pub async fn get_experiment_row(
+    Path((org_id, experiment_id, row_id)): Path<(String, String, String)>,
+) -> Response {
+    let experiment = match experiments::get(&org_id, &experiment_id).await {
+        Ok(experiment) => experiment,
+        Err(error) => return experiment_error_response(error),
+    };
+    if let Err(error) =
+        openobserve_core::self_reporting::llm_scores_schema::ensure_llm_scores_stream_initialized(
+            &org_id,
+        )
+        .await
+    {
+        log::error!(
+            "[Experiment] failed to initialize score stream for row {row_id} in {experiment_id}: {error}"
+        );
+        return MetaHttpResponse::internal_error("Failed to load Experiment row");
+    }
+    let row = match openobserve_core::llm_evaluations::experiment_runner::row_result(
+        &experiment,
+        &row_id,
+    )
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return MetaHttpResponse::not_found("Experiment row not found"),
+        Err(error) => {
+            log::error!("[Experiment] failed to load row {row_id} for {experiment_id}: {error}");
+            return MetaHttpResponse::internal_error("Failed to load Experiment row");
+        }
+    };
+    let executions = row
+        .executions
+        .into_iter()
+        .filter_map(|record| serde_json::to_value(record).ok())
+        .collect::<Vec<_>>();
+    let scorers = experiment
+        .scorers
+        .iter()
+        .cloned()
+        .map(PinnedExperimentScorerBody::from)
+        .collect::<Vec<_>>();
+    let (_, _, _, score_summaries) =
+        experiment_row_result_summary(row.slots.len(), &scorers, &executions, &row.scores);
+    let first_slot = row
+        .slots
+        .first()
+        .expect("a resolved Experiment row always contains at least one trial");
+    let response = ExperimentRowDetailResponseBody {
+        experiment_id: experiment.id,
+        snapshot: ExperimentRowSnapshotBody {
+            dataset_id: experiment.dataset_id,
+            dataset_version: experiment.dataset_version,
+        },
+        navigation: ExperimentRowNavigationBody {
+            row_index: row.row_index,
+            total_rows: row.total_rows,
+            previous_row_id: row.previous_row_id,
+            next_row_id: row.next_row_id,
+        },
+        row_id: first_slot.row_id.clone(),
+        logical_id: first_slot.logical_id.clone(),
+        input: first_slot.input.clone(),
+        expected_output: first_slot.expected_output.clone(),
+        trials: experiment_result_slots(row.slots, &executions, &row.scores, &scorers),
+        score_summaries,
+    };
+    MetaHttpResponse::json(response)
 }
 
 /// Cancel a running Experiment. Repeating the request after cancellation is a no-op.
