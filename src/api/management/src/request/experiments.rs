@@ -24,8 +24,8 @@ use crate::{
         ExperimentPreviewResponseBody, ExperimentResponseBody, ExperimentResultPaginationBody,
         ExperimentResultsResponseBody, ExperimentRowDetailResponseBody,
         ExperimentRowNavigationBody, ExperimentRowSnapshotBody, ListExperimentsResponseBody,
-        PinnedExperimentScorerBody, experiment_aggregate_summary, experiment_result_slots,
-        experiment_result_summary, experiment_row_result_summary,
+        PinnedExperimentScorerBody, RetryExperimentSlotRequestBody, experiment_aggregate_summary,
+        experiment_result_slots, experiment_result_summary, experiment_row_result_summary,
     },
 };
 
@@ -210,17 +210,9 @@ pub async fn get_experiment(
     .await
     {
         Ok(results) => {
-            let executions = results
-                .executions
-                .into_iter()
-                .filter_map(|record| serde_json::to_value(record).ok())
-                .collect::<Vec<_>>();
+            let executions = results.executions;
             let scores = results.scores;
-            let summary_executions = results
-                .summary_executions
-                .into_iter()
-                .filter_map(|record| serde_json::to_value(record).ok())
-                .collect::<Vec<_>>();
+            let summary_executions = results.summary_executions;
             let summary_scores = results.summary_scores;
             let scorers = experiment
                 .scorers
@@ -242,8 +234,14 @@ pub async fn get_experiment(
             );
             let slots = experiment_result_slots(results.slots, &executions, &scores, &scorers);
             ExperimentResultsResponseBody {
-                executions,
-                scores,
+                executions: executions
+                    .into_iter()
+                    .filter_map(|record| serde_json::to_value(record).ok())
+                    .collect(),
+                scores: scores
+                    .into_iter()
+                    .filter_map(|record| serde_json::to_value(record).ok())
+                    .collect(),
                 slots,
                 pagination: ExperimentResultPaginationBody {
                     page: results.page,
@@ -319,11 +317,7 @@ pub async fn get_experiment_row(
             return MetaHttpResponse::internal_error("Failed to load Experiment row");
         }
     };
-    let executions = row
-        .executions
-        .into_iter()
-        .filter_map(|record| serde_json::to_value(record).ok())
-        .collect::<Vec<_>>();
+    let executions = row.executions;
     let scorers = experiment
         .scorers
         .iter()
@@ -405,6 +399,84 @@ pub async fn retry_experiment(Path((org_id, experiment_id)): Path<(String, Strin
     match experiments::retry_failed(&org_id, &experiment_id).await {
         Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
         Err(error) => experiment_error_response(error),
+    }
+}
+
+/// Retry one selected slot whose latest durable execution is an error.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "RetryExperimentSlot",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Experiment ID"),
+        ("row_id" = String, Path, description = "Pinned dataset row ID"),
+        ("trial_index" = u32, Path, description = "Zero-based trial index"),
+    ),
+    request_body(content = RetryExperimentSlotRequestBody, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Selected slot retry result"),
+        (status = 400, description = "Invalid idempotency key"),
+        (status = 403, description = "Experiment is not accessible"),
+        (status = 404, description = "Experiment, row, or trial not found"),
+        (status = 409, description = "Experiment lifecycle or latest slot state disallows retry"),
+    )
+)]
+pub async fn retry_experiment_slot(
+    Path((org_id, experiment_id, row_id, trial_index)): Path<(String, String, String, u32)>,
+    Headers(user): Headers<UserEmail>,
+    axum::Json(body): axum::Json<RetryExperimentSlotRequestBody>,
+) -> Response {
+    use openobserve_core::llm_evaluations::experiment_runner::ExperimentSlotRetryError;
+
+    let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
+        &org_id,
+        &user.user_id,
+        "POST",
+        "experiment",
+    )
+    .await
+    {
+        Ok(list) => list,
+        Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
+    };
+    if !is_ofga_object_visible(
+        &org_id,
+        "experiment",
+        &experiment_id,
+        permitted_objects.as_deref(),
+    ) {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
+    match openobserve_core::llm_evaluations::experiment_runner::retry_error_slot(
+        &org_id,
+        &experiment_id,
+        &row_id,
+        trial_index,
+        &body.idempotency_key,
+    )
+    .await
+    {
+        Ok(record) => MetaHttpResponse::json(record),
+        Err(ExperimentSlotRetryError::Experiment(error)) => experiment_error_response(error),
+        Err(ExperimentSlotRetryError::InvalidIdempotencyKey) => {
+            MetaHttpResponse::bad_request("Invalid slot retry idempotency key")
+        }
+        Err(ExperimentSlotRetryError::RowNotFound | ExperimentSlotRetryError::TrialNotFound) => {
+            MetaHttpResponse::not_found("Experiment slot not found")
+        }
+        Err(
+            error @ (ExperimentSlotRetryError::InvalidLifecycle(_)
+            | ExperimentSlotRetryError::LatestExecutionNotError),
+        ) => MetaHttpResponse::conflict(error),
+        Err(ExperimentSlotRetryError::Runtime(error)) => {
+            log::error!("[Experiment] failed to retry selected slot: {error}");
+            MetaHttpResponse::internal_error("Failed to retry Experiment slot")
+        }
     }
 }
 

@@ -241,6 +241,10 @@ pub struct LlmScoreRecord {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub review_submission_comments: Option<String>,
     pub source_type: LlmScoreDataSourceType,
+    /// Original scorer provenance before an Experiment wraps the score in its
+    /// own queryable source type. Older records omit this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_source_type: Option<LlmScoreDataSourceType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_stream: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -306,6 +310,7 @@ impl Default for LlmScoreRecord {
             review_submission_score_count: None,
             review_submission_comments: None,
             source_type: LlmScoreDataSourceType::LlmJudge,
+            origin_source_type: None,
             source_stream: None,
             source_stream_type: None,
             agent_name: None,
@@ -346,6 +351,7 @@ impl LlmScoreRecord {
             queue_item_id: Some(String::new()),
             review_submission_score_count: Some(0),
             review_submission_comments: Some(String::new()),
+            origin_source_type: Some(LlmScoreDataSourceType::Remote),
             source_stream: Some(String::new()),
             source_stream_type: Some(String::new()),
             agent_env: Some(String::new()),

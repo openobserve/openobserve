@@ -1118,6 +1118,10 @@ pub fn service_routes() -> Router {
                     get(experiments::get_experiment_row),
                 )
                 .route(
+                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry",
+                    post(experiments::retry_experiment_slot),
+                )
+                .route(
                     "/{org_id}/experiments/{experiment_id}/cancel",
                     post(experiments::cancel_experiment),
                 )

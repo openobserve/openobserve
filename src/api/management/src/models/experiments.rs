@@ -8,8 +8,8 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use config::meta::self_reporting::{
-    llm_experiments::{ExperimentExecutionStatus, ExperimentSkipReason},
-    llm_scores::LlmScoreStatus,
+    llm_experiments::{ExperimentExecutionRecord, ExperimentExecutionStatus, ExperimentSkipReason},
+    llm_scores::{LlmScoreRecord, LlmScoreStatus},
 };
 use openobserve_core::llm_evaluations::{
     datasets::{DatasetItemSource, DatasetSnapshotFilter},
@@ -201,6 +201,13 @@ pub struct CreateExperimentRequestBody {
 pub struct CloneExperimentRequestBody {
     /// Optional name for the clone. Defaults to `<source name> (copy)`.
     pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RetryExperimentSlotRequestBody {
+    /// Caller-generated key. Repeating the same request does not execute the slot again.
+    pub idempotency_key: String,
 }
 
 impl From<CreateExperimentRequestBody> for CreateExperiment {
@@ -581,79 +588,27 @@ pub struct ExperimentAggregateSummaryBody {
     pub incomplete_score_dimensions: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
-struct EvidenceSlotKey {
-    row_id: String,
-    trial_index: u64,
-}
-
-#[derive(Deserialize)]
-struct ExperimentExecutionEvidence {
-    #[serde(flatten)]
-    slot: EvidenceSlotKey,
-    status: ExperimentExecutionStatus,
-    #[serde(default)]
-    skip_reason: Option<ExperimentSkipReason>,
-}
-
-#[derive(Deserialize)]
-struct ExperimentScoreEvidence {
-    #[serde(flatten)]
-    slot: EvidenceSlotKey,
-    #[serde(default)]
-    scorer_id: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_scorer_version")]
-    scorer_version: Option<i32>,
-    #[serde(default)]
-    status: LlmScoreStatus,
-    #[serde(default)]
-    skip_reason: Option<ExperimentSkipReason>,
-}
-
-fn deserialize_optional_scorer_version<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum ScorerVersion {
-        Number(i32),
-        String(String),
-    }
-
-    let version = Option::<ScorerVersion>::deserialize(deserializer)?;
-    match version {
-        Some(ScorerVersion::Number(version)) => Ok(Some(version)),
-        Some(ScorerVersion::String(version)) => {
-            version.parse().map(Some).map_err(serde::de::Error::custom)
-        }
-        None => Ok(None),
-    }
+fn score_scorer_version(score: &LlmScoreRecord) -> Option<i32> {
+    score.scorer_version.as_deref()?.parse().ok()
 }
 
 pub fn experiment_result_slots(
     slots: Vec<ExperimentSlot>,
-    executions: &[Value],
-    scores: &[Value],
+    executions: &[ExperimentExecutionRecord],
+    scores: &[LlmScoreRecord],
     scorers: &[PinnedExperimentScorerBody],
 ) -> Vec<ExperimentResultSlotBody> {
     let executions = executions
         .iter()
-        .filter_map(|record| {
-            let row_id = record.get("row_id")?.as_str()?.to_string();
-            let trial_index = record.get("trial_index")?.as_u64()?;
-            Some(((row_id, trial_index), record.clone()))
-        })
+        .map(|record| ((record.row_id.clone(), record.trial_index), record.clone()))
         .collect::<HashMap<_, _>>();
     let scores = scores
         .iter()
         .filter_map(|score| {
-            let row_id = score.get("row_id")?.as_str()?.to_string();
-            let trial_index = score.get("trial_index")?.as_u64()?;
-            let scorer_id = score.get("scorer_id")?.as_str()?.to_string();
-            let scorer_version = score
-                .get("scorer_version")
-                .and_then(|value| value.as_i64().or_else(|| value.as_str()?.parse().ok()))?;
+            let row_id = score.row_id.clone()?;
+            let trial_index = score.trial_index?;
+            let scorer_id = score.scorer_id.clone()?;
+            let scorer_version = score.scorer_version.as_deref()?.parse::<i32>().ok()?;
             Some((
                 (row_id, trial_index, scorer_id, scorer_version),
                 score.clone(),
@@ -664,18 +619,17 @@ pub fn experiment_result_slots(
     slots
         .into_iter()
         .map(|slot| {
-            let coordinate = (slot.row_id.clone(), u64::from(slot.trial_index));
+            let coordinate = (slot.row_id.clone(), slot.trial_index);
             let execution = executions.get(&coordinate).cloned();
             let task_status = execution
                 .as_ref()
-                .and_then(|record| record.get("status"))
-                .and_then(Value::as_str)
-                .map(|status| match status {
-                    "pending" => ExperimentResultTaskStatusBody::InProgress,
-                    "ok" => ExperimentResultTaskStatusBody::Ok,
-                    "skipped" => ExperimentResultTaskStatusBody::Skipped,
-                    "error" => ExperimentResultTaskStatusBody::Error,
-                    _ => ExperimentResultTaskStatusBody::Error,
+                .map(|record| match record.status {
+                    ExperimentExecutionStatus::Pending => {
+                        ExperimentResultTaskStatusBody::InProgress
+                    }
+                    ExperimentExecutionStatus::Ok => ExperimentResultTaskStatusBody::Ok,
+                    ExperimentExecutionStatus::Skipped => ExperimentResultTaskStatusBody::Skipped,
+                    ExperimentExecutionStatus::Error => ExperimentResultTaskStatusBody::Error,
                 })
                 .unwrap_or(ExperimentResultTaskStatusBody::Pending);
             let score_bodies = scorers
@@ -684,20 +638,17 @@ pub fn experiment_result_slots(
                     let score = scores
                         .get(&(
                             slot.row_id.clone(),
-                            u64::from(slot.trial_index),
+                            slot.trial_index,
                             scorer.id.clone(),
-                            i64::from(scorer.version),
+                            scorer.version,
                         ))
                         .cloned();
                     let status = score
                         .as_ref()
-                        .and_then(|record| record.get("status"))
-                        .and_then(Value::as_str)
-                        .map(|status| match status {
-                            "success" => ExperimentResultScoreStatusBody::Success,
-                            "skipped" => ExperimentResultScoreStatusBody::Skipped,
-                            "error" => ExperimentResultScoreStatusBody::Error,
-                            _ => ExperimentResultScoreStatusBody::Error,
+                        .map(|record| match record.status {
+                            LlmScoreStatus::Success => ExperimentResultScoreStatusBody::Success,
+                            LlmScoreStatus::Skipped => ExperimentResultScoreStatusBody::Skipped,
+                            LlmScoreStatus::Error => ExperimentResultScoreStatusBody::Error,
                         })
                         .unwrap_or_else(|| {
                             if execution.is_none()
@@ -712,7 +663,7 @@ pub fn experiment_result_slots(
                         scorer_id: scorer.id.clone(),
                         scorer_version: scorer.version,
                         status,
-                        score,
+                        score: score.and_then(|record| serde_json::to_value(record).ok()),
                     }
                 })
                 .collect();
@@ -723,7 +674,7 @@ pub fn experiment_result_slots(
                 input: slot.input,
                 expected_output: slot.expected_output,
                 task_status,
-                execution,
+                execution: execution.and_then(|record| serde_json::to_value(record).ok()),
                 scores: score_bodies,
             }
         })
@@ -731,13 +682,13 @@ pub fn experiment_result_slots(
 }
 
 pub fn experiment_aggregate_summary(
-    executions: &[Value],
+    executions: &[ExperimentExecutionRecord],
     task_progress: &ExperimentProgressBody,
     scoring_progress: &ExperimentProgressBody,
 ) -> ExperimentAggregateSummaryBody {
     let mut latencies = executions
         .iter()
-        .filter_map(|record| record.get("latency_ms").and_then(Value::as_u64))
+        .filter_map(|record| record.latency_ms)
         .collect::<Vec<_>>();
     latencies.sort_unstable();
     let p50_latency_ms = if latencies.is_empty() {
@@ -745,10 +696,7 @@ pub fn experiment_aggregate_summary(
     } else {
         Some(latencies[(latencies.len() - 1) / 2])
     };
-    let total_cost = executions
-        .iter()
-        .filter_map(|record| record.get("cost").and_then(Value::as_f64))
-        .sum();
+    let total_cost = executions.iter().filter_map(|record| record.cost).sum();
     let incomplete_task_slots = task_progress.total.saturating_sub(task_progress.completed);
     let incomplete_score_dimensions = scoring_progress
         .total
@@ -762,52 +710,10 @@ pub fn experiment_aggregate_summary(
     }
 }
 
-fn aggregate_score_values(
-    scores: &[&ExperimentScoreEvidence],
-    raw_scores: &[Value],
-) -> Option<Value> {
-    let identities = scores
+fn aggregate_score_values(scores: &[&LlmScoreRecord]) -> Option<Value> {
+    let numeric = scores
         .iter()
-        .map(|score| {
-            (
-                score.slot.clone(),
-                score.scorer_id.clone(),
-                score.scorer_version,
-            )
-        })
-        .collect::<HashSet<_>>();
-    let matching = raw_scores
-        .iter()
-        .filter(|score| {
-            let Some(row_id) = score.get("row_id").and_then(Value::as_str) else {
-                return false;
-            };
-            let Some(trial_index) = score.get("trial_index").and_then(Value::as_u64) else {
-                return false;
-            };
-            let scorer_id = score
-                .get("scorer_id")
-                .and_then(Value::as_str)
-                .map(ToString::to_string);
-            let scorer_version = score.get("scorer_version").and_then(|value| {
-                value
-                    .as_i64()
-                    .and_then(|value| i32::try_from(value).ok())
-                    .or_else(|| value.as_str()?.parse().ok())
-            });
-            identities.contains(&(
-                EvidenceSlotKey {
-                    row_id: row_id.to_string(),
-                    trial_index,
-                },
-                scorer_id,
-                scorer_version,
-            ))
-        })
-        .collect::<Vec<_>>();
-    let numeric = matching
-        .iter()
-        .filter_map(|score| score.get("value_numeric").and_then(Value::as_f64))
+        .filter_map(|score| score.value_numeric)
         .collect::<Vec<_>>();
     if !numeric.is_empty() {
         return Some(serde_json::json!({
@@ -815,9 +721,9 @@ fn aggregate_score_values(
             "mean": numeric.iter().sum::<f64>() / numeric.len() as f64,
         }));
     }
-    let booleans = matching
+    let booleans = scores
         .iter()
-        .filter_map(|score| score.get("value_boolean").and_then(Value::as_bool))
+        .filter_map(|score| score.value_boolean)
         .collect::<Vec<_>>();
     if !booleans.is_empty() {
         return Some(serde_json::json!({
@@ -827,9 +733,9 @@ fn aggregate_score_values(
         }));
     }
     let mut counts = BTreeMap::<String, u64>::new();
-    for category in matching
+    for category in scores
         .iter()
-        .filter_map(|score| score.get("value_categorical").and_then(Value::as_str))
+        .filter_map(|score| score.value_categorical.as_deref())
     {
         *counts.entry(category.to_string()).or_default() += 1;
     }
@@ -842,32 +748,23 @@ fn aggregate_score_values(
 pub fn experiment_result_summary(
     applicability: &ExperimentApplicabilityPreviewBody,
     scorers: &[PinnedExperimentScorerBody],
-    executions: &[Value],
-    scores: &[Value],
+    executions: &[ExperimentExecutionRecord],
+    scores: &[LlmScoreRecord],
 ) -> (
     ExperimentProgressBody,
     ExperimentProgressBody,
     ExperimentSkipSummaryBody,
     Vec<ExperimentScoreSummaryBody>,
 ) {
-    let execution_evidence = executions
-        .iter()
-        .filter_map(|record| serde_json::from_value(record.clone()).ok())
-        .collect::<Vec<ExperimentExecutionEvidence>>();
-    let score_evidence = scores
-        .iter()
-        .filter_map(|score| serde_json::from_value(score.clone()).ok())
-        .collect::<Vec<ExperimentScoreEvidence>>();
-
-    let fully_skipped = execution_evidence
+    let fully_skipped = executions
         .iter()
         .filter(|record| {
             record.status == ExperimentExecutionStatus::Skipped
                 && record.skip_reason == Some(ExperimentSkipReason::NoReference)
         })
-        .map(|record| record.slot.clone())
+        .map(|record| (record.row_id.clone(), record.trial_index))
         .collect::<HashSet<_>>();
-    let completed_tasks = execution_evidence
+    let completed_tasks = executions
         .iter()
         .filter(|record| {
             matches!(
@@ -875,10 +772,10 @@ pub fn experiment_result_summary(
                 ExperimentExecutionStatus::Ok | ExperimentExecutionStatus::Error
             )
         })
-        .map(|record| record.slot.clone())
+        .map(|record| (record.row_id.clone(), record.trial_index))
         .collect::<HashSet<_>>();
 
-    let skipped_scores = score_evidence
+    let skipped_scores = scores
         .iter()
         .filter(|score| score.status == LlmScoreStatus::Skipped)
         .collect::<Vec<_>>();
@@ -886,7 +783,7 @@ pub fn experiment_result_summary(
     // once. Reference skips are already a strict subset of this evidence set.
     let observed_permanent_skip_slots = skipped_scores
         .iter()
-        .map(|score| score.slot.clone())
+        .filter_map(|score| Some((score.row_id.clone()?, score.trial_index?)))
         .collect::<HashSet<_>>();
     let partially_skipped = observed_permanent_skip_slots
         .iter()
@@ -913,7 +810,7 @@ pub fn experiment_result_summary(
     };
     let scoring_progress = ExperimentProgressBody {
         completed: u64::try_from(
-            score_evidence
+            scores
                 .iter()
                 .filter(|score| {
                     matches!(
@@ -938,11 +835,11 @@ pub fn experiment_result_summary(
     };
 
     let mut successful_counts = HashMap::<(&str, i32), u64>::new();
-    for score in &score_evidence {
+    for score in scores {
         let Some(scorer_id) = score.scorer_id.as_deref() else {
             continue;
         };
-        let Some(scorer_version) = score.scorer_version else {
+        let Some(scorer_version) = score_scorer_version(score) else {
             continue;
         };
         if score.status == LlmScoreStatus::Success {
@@ -961,11 +858,11 @@ pub fn experiment_result_summary(
                 .unwrap_or_default();
             let skip_count = |reason| {
                 u64::try_from(
-                    score_evidence
+                    scores
                         .iter()
                         .filter(|score| {
                             score.scorer_id.as_deref() == Some(scorer.id.as_str())
-                                && score.scorer_version == Some(scorer.version)
+                                && score_scorer_version(score) == Some(scorer.version)
                                 && score.status == LlmScoreStatus::Skipped
                                 && score.skip_reason == Some(reason)
                         })
@@ -975,11 +872,11 @@ pub fn experiment_result_summary(
             };
             let no_reference_count = skip_count(ExperimentSkipReason::NoReference);
             let no_trace_count = skip_count(ExperimentSkipReason::NoTrace);
-            let scorer_scores = score_evidence
+            let scorer_scores = scores
                 .iter()
                 .filter(|score| {
                     score.scorer_id.as_deref() == Some(scorer.id.as_str())
-                        && score.scorer_version == Some(scorer.version)
+                        && score_scorer_version(score) == Some(scorer.version)
                 })
                 .collect::<Vec<_>>();
             let error_count = u64::try_from(
@@ -1009,7 +906,7 @@ pub fn experiment_result_summary(
                 no_reference_count,
                 no_trace_count,
                 skipped_count: no_reference_count.saturating_add(no_trace_count),
-                value: aggregate_score_values(&scorer_scores, scores),
+                value: aggregate_score_values(&scorer_scores),
             }
         })
         .collect();
@@ -1028,8 +925,8 @@ pub fn experiment_result_summary(
 pub fn experiment_row_result_summary(
     slot_count: usize,
     scorers: &[PinnedExperimentScorerBody],
-    executions: &[Value],
-    scores: &[Value],
+    executions: &[ExperimentExecutionRecord],
+    scores: &[LlmScoreRecord],
 ) -> (
     ExperimentProgressBody,
     ExperimentProgressBody,
@@ -1041,8 +938,8 @@ pub fn experiment_row_result_summary(
         executions
             .iter()
             .filter(|record| {
-                record.get("status").and_then(Value::as_str) == Some("skipped")
-                    && record.get("skip_reason").and_then(Value::as_str) == Some("no_reference")
+                record.status == ExperimentExecutionStatus::Skipped
+                    && record.skip_reason == Some(ExperimentSkipReason::NoReference)
             })
             .count(),
     )
@@ -1054,15 +951,10 @@ pub fn experiment_row_result_summary(
                 scores
                     .iter()
                     .filter(|score| {
-                        score.get("scorer_id").and_then(Value::as_str) == Some(scorer.id.as_str())
-                            && score.get("scorer_version").and_then(|value| {
-                                value
-                                    .as_i64()
-                                    .or_else(|| value.as_str()?.parse::<i64>().ok())
-                            }) == Some(i64::from(scorer.version))
-                            && score.get("status").and_then(Value::as_str) == Some("skipped")
-                            && score.get("skip_reason").and_then(Value::as_str)
-                                == Some("no_reference")
+                        score.scorer_id.as_deref() == Some(scorer.id.as_str())
+                            && score_scorer_version(score) == Some(scorer.version)
+                            && score.status == LlmScoreStatus::Skipped
+                            && score.skip_reason == Some(ExperimentSkipReason::NoReference)
                     })
                     .count(),
             )
