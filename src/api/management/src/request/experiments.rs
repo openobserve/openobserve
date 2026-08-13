@@ -43,7 +43,9 @@ fn experiment_error_response(error: ExperimentError) -> Response {
         ExperimentError::Dataset(
             openobserve_core::llm_evaluations::datasets::DatasetError::NotFound,
         ) => MetaHttpResponse::not_found("Dataset not found"),
-        ExperimentError::IdempotencyConflict => MetaHttpResponse::conflict(error),
+        ExperimentError::IdempotencyConflict
+        | ExperimentError::InvalidLifecycleTransition { .. }
+        | ExperimentError::ConcurrentLifecycleUpdate => MetaHttpResponse::conflict(error),
         error => MetaHttpResponse::bad_request(error.to_string()),
     }
 }
@@ -205,4 +207,20 @@ pub async fn get_experiment(
         preview: preview.into(),
         results,
     })
+}
+
+/// Cancel a running Experiment. Repeating the request after cancellation is a no-op.
+pub async fn cancel_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
+    match experiments::cancel(&org_id, &experiment_id).await {
+        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Err(error) => experiment_error_response(error),
+    }
+}
+
+/// Retry an Experiment that failed. Repeating a successful retry request is a no-op.
+pub async fn retry_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
+    match experiments::retry_failed(&org_id, &experiment_id).await {
+        Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Err(error) => experiment_error_response(error),
+    }
 }

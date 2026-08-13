@@ -1164,6 +1164,14 @@ pub fn service_routes() -> Router {
                     "/{org_id}/experiments/{experiment_id}",
                     get(experiments::get_experiment),
                 )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/cancel",
+                    post(experiments::cancel_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/retry",
+                    post(experiments::retry_experiment),
+                )
 
                 // On-demand human annotation from Discovery
                 .route("/{org_id}/annotations", post(annotations::annotate_target))
