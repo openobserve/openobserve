@@ -1499,7 +1499,11 @@ describe("BrowserJourney restore-then-record", () => {
     respondToLastCommand({ success: true });
     await flushPromises();
     emitStreamEvent({
-      method: "recordingStarted", tabId: 1, url: "https://app.test/", mode: "insert", baselineStepCount: 0,
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/",
+      mode: "insert",
+      baselineStepCount: 0,
     });
     emitStreamEvent({
       method: "setActions",
@@ -1521,7 +1525,6 @@ describe("BrowserJourney restore-then-record", () => {
     expect(next[2].name).toBe("Accept cookies");
     expect(next[3].id).toBe("s3");
   });
-
 });
 
 // ── New-step marker (left row border) ──────────────────────────────────────
@@ -1623,6 +1626,27 @@ describe("BrowserJourney new-step marker", () => {
     await vi.advanceTimersByTimeAsync(5_000);
 
     expect(colorOf(wrapper, completed.id)).toBeFalsy();
+  });
+
+  // The one that matters, and the one the stubbed tests above cannot make: mount the
+  // REAL JourneySteps (and so the real OTable) and check the spine actually renders.
+  // Asserting what getRowStatusColor RETURNS says nothing about what the user sees.
+  it("should render the status spine on the row through the real table", async () => {
+    wrapper = mount(BrowserJourney, {
+      props: { modelValue: [NAV] },
+      global: { stubs: { ...STUBS, JourneySteps: undefined } },
+    }) as VueWrapper;
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    const added = (wrapper.emitted("update:modelValue")!.at(-1)![0] as any[])[1];
+    await wrapper.setProps({ modelValue: [NAV, added] });
+    await flushPromises();
+
+    expect(
+      wrapper.findAll('[data-status-bar="true"]').length,
+      "no status spine rendered for the newly added step",
+    ).toBe(1);
   });
 
   it("should not mark steps that were already in the journey", async () => {
