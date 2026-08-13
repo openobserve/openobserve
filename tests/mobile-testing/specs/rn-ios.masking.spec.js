@@ -9,4 +9,5 @@ maskingSuite({
   pii: ['alex.morgan@example.com', '4242 4242 4242 4242'],
   flows: ['ios-react-native/masking.yaml'],
   device: cfg.IOS_SIM_UDID,
+  requireReplay: false, // iOS mobile replay is not always rendered in CI → skip-with-reason, don't false-fail
 });

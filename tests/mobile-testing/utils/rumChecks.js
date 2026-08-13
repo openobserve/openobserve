@@ -135,7 +135,11 @@ function networkSuite({ name, tags, service, urlSubstring, flows, device = '' })
 }
 
 /** Session Replay privacy — no on-screen PII may leak into the replay DOM (MASK_ALL). */
-function maskingSuite({ name, tags, service, pii, flows, device = '' }) {
+// requireReplay (default true): the replay MUST render or the test FAILS — so an Android replay
+// regression can't hide. iOS specs pass requireReplay:false because the mobile replay is not always
+// rendered for iOS in CI (observed); there it skips-with-reason instead of a false fail. Scoping the
+// skip this way keeps enforcement on the platforms where the replay does render.
+function maskingSuite({ name, tags, service, pii, flows, device = '', requireReplay = true }) {
   test.describe(name, () => {
     test(
       'PII is masked in the session replay (MASK_ALL)',
@@ -152,12 +156,15 @@ function maskingSuite({ name, tags, service, pii, flows, device = '' }) {
         await dash.login();
         await dash.openSession(sessionId);
         // POSITIVE CONTROL: only assert "no PII" if the replay actually rendered — otherwise a
-        // not-rendered player has zero text nodes and the check would pass vacuously. If it never
-        // renders (observed for iOS in CI), skip with a clear reason rather than pass or false-fail.
-        test.skip(
-          !(await dash.replayRendered()),
-          'session replay did not render (no playback bar) — cannot verify masking',
-        );
+        // not-rendered player has zero text nodes and the check would pass vacuously.
+        const rendered = await dash.replayRendered();
+        if (requireReplay) {
+          // Android: the replay renders, so a non-render is a real regression → FAIL.
+          expect(rendered, 'session replay must render before masking can be verified').toBe(true);
+        } else {
+          // iOS: the replay is not always rendered in CI → skip-with-reason rather than false-fail.
+          test.skip(!rendered, 'session replay did not render (no playback bar) — cannot verify masking');
+        }
         await dash.expectNoPiiInReplay(pii);
       },
     );
@@ -256,9 +263,11 @@ function noPhoneHomeIosSuite({ name, tags, appId, device }) {
 
         // POSITIVE CONTROL: the bundle is readable and carries the OpenObserve SDK, so a zero result
         // below means "no Datadog hosts", not "the scan read nothing".
+        // -print0 | xargs -0: .app bundles can contain paths with spaces, which plain xargs would
+        // split into bogus args (a false failure).
         const marker = Number(
           execSync(
-            `find "${appPath}" -type f 2>/dev/null | xargs strings 2>/dev/null | grep -icE 'openobserve' || true`,
+            `find "${appPath}" -type f -print0 2>/dev/null | xargs -0 strings 2>/dev/null | grep -icE 'openobserve' || true`,
           )
             .toString()
             .trim(),
@@ -266,7 +275,7 @@ function noPhoneHomeIosSuite({ name, tags, appId, device }) {
         expect(marker, 'app scan is readable (openobserve strings present)').toBeGreaterThan(0);
 
         const hits = execSync(
-          `find "${appPath}" -type f 2>/dev/null | xargs strings 2>/dev/null | ` +
+          `find "${appPath}" -type f -print0 2>/dev/null | xargs -0 strings 2>/dev/null | ` +
             `grep -ioE 'datadoghq\\.(com|eu)|ddog-gov\\.com|browser-intake-datadoghq' | sort -u || true`,
         )
           .toString()
