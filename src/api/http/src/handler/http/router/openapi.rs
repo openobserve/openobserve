@@ -533,10 +533,34 @@ use crate::{
 )]
 pub struct ApiDoc;
 
+#[cfg(feature = "enterprise")]
+#[derive(OpenApi)]
+#[openapi(paths(
+    openobserve_api_management::request::experiments::preview_experiment,
+    openobserve_api_management::request::experiments::create_experiment,
+    openobserve_api_management::request::experiments::list_experiments,
+    openobserve_api_management::request::experiments::get_experiment,
+    openobserve_api_management::request::experiments::cancel_experiment,
+    openobserve_api_management::request::experiments::retry_experiment,
+    openobserve_api_management::request::experiments::clone_experiment,
+))]
+struct EnterpriseExperimentApiDoc;
+
 pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        #[cfg(feature = "enterprise")]
+        {
+            let enterprise = EnterpriseExperimentApiDoc::openapi();
+            openapi.paths.paths.extend(enterprise.paths.paths);
+            if let (Some(components), Some(enterprise_components)) =
+                (openapi.components.as_mut(), enterprise.components)
+            {
+                components.schemas.extend(enterprise_components.schemas);
+                components.responses.extend(enterprise_components.responses);
+            }
+        }
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
             openapi.servers = Some(vec![utoipa::openapi::Server::new(&cfg.common.base_uri)]);

@@ -19,10 +19,10 @@ use openobserve_core::{
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::experiments::{
-        CreateExperimentRequestBody, CreateExperimentResponseBody, ExperimentDetailResponseBody,
-        ExperimentPreviewQuery, ExperimentPreviewResponseBody, ExperimentResponseBody,
-        ExperimentResultsResponseBody, ListExperimentsResponseBody, PinnedExperimentScorerBody,
-        experiment_result_summary,
+        CloneExperimentRequestBody, CreateExperimentRequestBody, CreateExperimentResponseBody,
+        ExperimentDetailResponseBody, ExperimentPreviewQuery, ExperimentPreviewResponseBody,
+        ExperimentResponseBody, ExperimentResultsResponseBody, ListExperimentsResponseBody,
+        PinnedExperimentScorerBody, experiment_result_summary,
     },
 };
 
@@ -232,6 +232,23 @@ pub async fn get_experiment(
 }
 
 /// Cancel a running Experiment. Repeating the request after cancellation is a no-op.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/experiments/{experiment_id}/cancel",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "CancelExperiment",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Experiment ID"),
+    ),
+    responses(
+        (status = 200, description = "Experiment cancelled", body = ExperimentResponseBody),
+        (status = 404, description = "Experiment not found"),
+        (status = 409, description = "Invalid or concurrent lifecycle transition"),
+    )
+)]
 pub async fn cancel_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
     match experiments::cancel(&org_id, &experiment_id).await {
         Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
@@ -240,9 +257,59 @@ pub async fn cancel_experiment(Path((org_id, experiment_id)): Path<(String, Stri
 }
 
 /// Retry an Experiment that failed. Repeating a successful retry request is a no-op.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/experiments/{experiment_id}/retry",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "RetryExperiment",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Experiment ID"),
+    ),
+    responses(
+        (status = 200, description = "Failed Experiment returned to running", body = ExperimentResponseBody),
+        (status = 404, description = "Experiment not found"),
+        (status = 409, description = "Invalid or concurrent lifecycle transition"),
+    )
+)]
 pub async fn retry_experiment(Path((org_id, experiment_id)): Path<(String, String)>) -> Response {
     match experiments::retry_failed(&org_id, &experiment_id).await {
         Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
+        Err(error) => experiment_error_response(error),
+    }
+}
+
+/// Clone a cancelled Experiment into a new pending definition with isolated evidence.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/experiments/{experiment_id}/clone",
+    context_path = "/api",
+    tag = "Experiments",
+    operation_id = "CloneExperiment",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("experiment_id" = String, Path, description = "Cancelled source Experiment ID"),
+    ),
+    request_body(content = CloneExperimentRequestBody, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Pending clone created", body = ExperimentResponseBody),
+        (status = 404, description = "Experiment not found"),
+        (status = 409, description = "Only cancelled Experiments can be cloned"),
+    )
+)]
+pub async fn clone_experiment(
+    Path((org_id, experiment_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    axum::Json(body): axum::Json<CloneExperimentRequestBody>,
+) -> Response {
+    match experiments::clone_cancelled(&org_id, &experiment_id, &user.user_id, body.name).await {
+        Ok(experiment) => {
+            set_ownership(&org_id, "experiments", Authz::new(&experiment.id)).await;
+            MetaHttpResponse::json(ExperimentResponseBody::from(experiment))
+        }
         Err(error) => experiment_error_response(error),
     }
 }

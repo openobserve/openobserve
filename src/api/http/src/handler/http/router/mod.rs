@@ -1168,10 +1168,14 @@ pub fn service_routes() -> Router {
                     "/{org_id}/experiments/{experiment_id}/cancel",
                     post(experiments::cancel_experiment),
                 )
-                .route(
-                    "/{org_id}/experiments/{experiment_id}/retry",
-                    post(experiments::retry_experiment),
-                )
+                    .route(
+                        "/{org_id}/experiments/{experiment_id}/retry",
+                        post(experiments::retry_experiment),
+                    )
+                    .route(
+                        "/{org_id}/experiments/{experiment_id}/clone",
+                        post(experiments::clone_experiment),
+                    )
 
                 // On-demand human annotation from Discovery
                 .route("/{org_id}/annotations", post(annotations::annotate_target))
@@ -1858,6 +1862,24 @@ mod tests {
             json.contains("/{org_id}/query_functions"),
             "query_functions is missing from the OpenAPI surface"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn experiment_lifecycle_actions_are_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let paths = spec.paths.paths;
+
+        for path in [
+            "/api/{org_id}/experiments/{experiment_id}/cancel",
+            "/api/{org_id}/experiments/{experiment_id}/retry",
+            "/api/{org_id}/experiments/{experiment_id}/clone",
+        ] {
+            let action = paths
+                .get(path)
+                .unwrap_or_else(|| panic!("missing OpenAPI path {path}"));
+            assert!(action.post.is_some(), "{path} must publish POST metadata");
+        }
     }
 
     // ── tmp/code.md B4 — the query-function catalog route ─────────────────────

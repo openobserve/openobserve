@@ -197,6 +197,12 @@ pub struct CreateExperimentRequestBody {
     pub idempotency_key: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
+pub struct CloneExperimentRequestBody {
+    /// Optional name for the clone. Defaults to `<source name> (copy)`.
+    pub name: Option<String>,
+}
+
 impl From<CreateExperimentRequestBody> for CreateExperiment {
     fn from(value: CreateExperimentRequestBody) -> Self {
         Self {
