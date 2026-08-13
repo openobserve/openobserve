@@ -1581,19 +1581,19 @@
         ],
         "results": [
           [
-            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
-            "2"
-          ],
-          [
             "[\"scraping_pattern\",\"high_freq\"]",
             "2"
           ],
           [
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
+            "[\"credential_stuffing\"]",
             "2"
           ],
           [
-            "[\"credential_stuffing\"]",
+            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
+            "2"
+          ],
+          [
+            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
             "2"
           ]
         ],
@@ -5944,31 +5944,31 @@
         ],
         "results": [
           [
-            "1780750500.0",
+            "1786628280.0",
             "0",
             "performanceMetric",
             "itemPage"
           ],
           [
-            "1780750536.0",
+            "1786628316.0",
             "36000000",
             "performanceMetric",
             "searchPage"
           ],
           [
-            "1780750554.0",
+            "1786628334.0",
             "54000000",
             "performanceMetric",
             "cartPage"
           ],
           [
-            "1780750560.0",
+            "1786628340.0",
             "0",
             "performanceMetric",
             "cartPage"
           ],
           [
-            "1780750572.0",
+            "1786628352.0",
             "12000000",
             "performanceMetric",
             "itemPage"
@@ -7423,13 +7423,13 @@
           [
             "ZONE-1",
             "CC-DELTA",
-            "manual",
+            "auto",
             "SORT-M3"
           ],
           [
             "ZONE-1",
             "CC-DELTA",
-            "auto",
+            "manual",
             "SORT-M3"
           ],
           [

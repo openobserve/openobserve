@@ -125,12 +125,12 @@
           ],
           [
             "SORT-M3",
-            "manual",
+            "auto",
             "2"
           ],
           [
             "SORT-M3",
-            "auto",
+            "manual",
             "2"
           ],
           [
@@ -1055,14 +1055,14 @@
         ],
         "results": [
           [
-            "non-Android",
-            "0",
-            "4"
-          ],
-          [
             "Android",
             "1",
             "2"
+          ],
+          [
+            "non-Android",
+            "0",
+            "4"
           ],
           [
             "TOTAL",
@@ -1163,22 +1163,22 @@
           ],
           [
             "component_err",
-            "batch-sync",
-            "2"
-          ],
-          [
-            "component_err",
             "zone-controller",
             "1"
           ],
           [
             "component_err",
-            "pallet-mapper",
-            "1"
+            "batch-sync",
+            "2"
           ],
           [
             "component_err",
             "track-router",
+            "1"
+          ],
+          [
+            "component_err",
+            "pallet-mapper",
             "1"
           ]
         ],
@@ -1693,12 +1693,12 @@
           ],
           [
             "ZONE-2",
-            "SORT-Z9",
+            "SORT-Q5",
             "stream2"
           ],
           [
             "ZONE-2",
-            "SORT-Q5",
+            "SORT-Z9",
             "stream2"
           ],
           [
@@ -1773,12 +1773,12 @@
           [
             "scan-hub",
             "45.0",
-            "stream1"
+            "stream2"
           ],
           [
             "scan-hub",
             "45.0",
-            "stream2"
+            "stream1"
           ],
           [
             "conveyor-driver",
@@ -1793,12 +1793,12 @@
           [
             "zone-controller",
             "12.0",
-            "stream1"
+            "stream2"
           ],
           [
             "zone-controller",
             "12.0",
-            "stream2"
+            "stream1"
           ]
         ],
         "results_mode": "rowsort"
@@ -2018,12 +2018,12 @@
             "1"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "305.0",
             "2"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "305.0",
             "2"
           ]
@@ -2190,7 +2190,7 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-3",
             "2"
           ],
           [
@@ -2198,7 +2198,7 @@
             "2"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "2"
           ],
           [
@@ -2246,11 +2246,11 @@
         ],
         "results": [
           [
-            "warehouse-west",
+            "warehouse-south",
             "3"
           ],
           [
-            "warehouse-south",
+            "warehouse-west",
             "3"
           ],
           [
@@ -2258,11 +2258,11 @@
             "3"
           ],
           [
-            "warehouse-central",
+            "warehouse-east",
             "2"
           ],
           [
-            "warehouse-east",
+            "warehouse-central",
             "2"
           ]
         ],
@@ -2314,11 +2314,11 @@
             "725.0"
           ],
           [
-            "PL-005",
+            "PL-003",
             "610.0"
           ],
           [
-            "PL-003",
+            "PL-005",
             "610.0"
           ],
           [
@@ -2362,15 +2362,15 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "4",
-            "640.0",
-            "840.0"
-          ],
-          [
             "ZONE-1",
             "3",
             "745.0",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "4",
+            "640.0",
             "840.0"
           ],
           [
@@ -2404,19 +2404,19 @@
         ],
         "results": [
           [
-            "conveyor-driver",
-            "3"
-          ],
-          [
             "temp-regulator",
             "3"
           ],
           [
-            "charge-checker",
+            "conveyor-driver",
             "3"
           ],
           [
             "sorter-engine",
+            "3"
+          ],
+          [
+            "charge-checker",
             "3"
           ],
           [
