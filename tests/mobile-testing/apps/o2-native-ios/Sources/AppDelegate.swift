@@ -32,9 +32,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 applicationID: "o2-native-ios",
                 sessionSampleRate: 100,
                 uiKitViewsPredicate: DefaultUIKitRUMViewsPredicate(),
+                urlSessionTracking: .init(
+                    firstPartyHostsTracing: .trace(hosts: ["jsonplaceholder.typicode.com"])
+                ),
                 customEndpoint: URL(string: "\(BASE)/rum")
             )
         )
+
+        // Instrument URLSessions built with O2SessionDelegate so their requests land as RUM resources.
+        URLSessionInstrumentation.enable(with: .init(delegateClass: O2SessionDelegate.self))
 
         // Attribute all RUM events to a known user (mirrors android-native SampleApplication) so the
         // iOS-native user-identity test can assert usr_* fields.
@@ -49,8 +55,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         SessionReplay.enable(
             with: SessionReplay.Configuration(
                 replaySampleRate: 100,
-                textAndInputPrivacyLevel: .maskSensitiveInputs,
-                imagePrivacyLevel: .maskNone,
+                textAndInputPrivacyLevel: .maskAll, // mask ALL text so the masking test can assert no PII leaks
+                imagePrivacyLevel: .maskAll,
                 touchPrivacyLevel: .show,
                 customEndpoint: URL(string: "\(BASE)/replay")
             )
