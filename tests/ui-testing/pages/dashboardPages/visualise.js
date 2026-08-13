@@ -47,12 +47,17 @@ export default class LogsVisualise {
     // Stream-list selectors for the logs "Build" page / panel editor field list
     // (PanelFieldList.vue) — the stream-type + stream OSelects above the field rows.
     this.buildToggle = page.locator('[data-test="logs-build-toggle"]');
-    this.panelEditorContainer = page.locator('[data-test="panel-editor-container"]');
-    this.indexStreamSelect = page.locator('[data-test="index-dropdown-stream"]');
-    this.indexStreamTrigger = page.locator('[data-test="index-dropdown-stream-trigger"]');
-    this.indexStreamPopover = page.locator('[data-test="index-dropdown-stream-popover"]');
-    this.indexStreamOption = page.locator('[data-test="index-dropdown-stream-option"]');
-    this.indexStreamTypeTrigger = page.locator('[data-test="index-dropdown-stream_type-trigger"]');
+    // The Logs page renders BOTH the "Visualize" PanelEditor (v-show, hidden while
+    // the "Build" page is open) and the "Build" PanelEditor (v-if). Each mounts its
+    // own PanelFieldList, so these selectors resolve to 2 elements. Scope to the
+    // visible one to avoid strict-mode violations (and to target the editable Build
+    // editor rather than the hidden Visualize one).
+    this.panelEditorContainer = page.locator('[data-test="panel-editor-container"]:visible');
+    this.indexStreamSelect = page.locator('[data-test="index-dropdown-stream"]:visible');
+    this.indexStreamTrigger = page.locator('[data-test="index-dropdown-stream-trigger"]:visible');
+    this.indexStreamPopover = page.locator('[data-test="index-dropdown-stream-popover"]:visible');
+    this.indexStreamOption = page.locator('[data-test="index-dropdown-stream-option"]:visible');
+    this.indexStreamTypeTrigger = page.locator('[data-test="index-dropdown-stream_type-trigger"]:visible');
     //Functions
   }
   async openLogs() {
@@ -774,7 +779,7 @@ export default class LogsVisualise {
     await this.indexStreamSelect.click();
     await this.indexStreamPopover.waitFor({ state: "visible", timeout: 10000 });
     const option = this.page.locator(
-      '[data-test="index-dropdown-stream-option"]',
+      '[data-test="index-dropdown-stream-option"]:visible',
       { hasText: streamName }
     );
     await expect(option.first()).toBeVisible({ timeout: 10000 });
@@ -786,7 +791,7 @@ export default class LogsVisualise {
     await this.indexStreamSelect.click();
     await this.indexStreamPopover.waitFor({ state: "visible", timeout: 10000 });
     const option = this.page.locator(
-      '[data-test="index-dropdown-stream-option"]',
+      '[data-test="index-dropdown-stream-option"]:visible',
       { hasText: streamName }
     );
     await expect(option).toHaveCount(0);

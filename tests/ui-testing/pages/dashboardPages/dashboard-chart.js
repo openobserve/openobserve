@@ -140,17 +140,18 @@ export default class ChartTypeSelector {
 
   //  Stream Type select - waits for stream list to load after selection
   async selectStreamType(type) {
-    // Click the dropdown trigger
-    await this.page.locator('[data-test="index-dropdown-stream_type"]').click();
+    // Click the dropdown trigger (scoped to the visible field list — the Logs
+    // "Build" page mounts a hidden Visualize PanelFieldList alongside the Build one).
+    await this.page.locator('[data-test="index-dropdown-stream_type"]:visible').click();
 
     // Wait for popover, then pick option by text (OSelect uses o-select-option data-test)
-    const streamTypePopover = this.page.locator('[data-test="index-dropdown-stream_type-popover"]');
+    const streamTypePopover = this.page.locator('[data-test="index-dropdown-stream_type-popover"]:visible');
     await streamTypePopover.waitFor({ state: "visible", timeout: 10000 });
     await streamTypePopover.getByText(type, { exact: true }).first().click();
 
     // CRITICAL: Wait for stream list API call to complete after changing type
     await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-    await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 10000 });
+    await this.page.locator('[data-test="index-dropdown-stream"]:visible').waitFor({ state: "visible", timeout: 10000 });
   }
 
   // Stream select with retry mechanism (no page reload to preserve context)
