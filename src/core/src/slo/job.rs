@@ -99,8 +99,16 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
         recompute_slices: cfg.slo.recompute_slices,
         generation_reset_time,
     }) else {
+        log::warn!("here, skipped the pass");
         return Ok(PassOutcome::NothingToDo);
     };
+    log::warn!(
+        "here 2, now secs : {now_secs} range_start : {} range_end : {} slice interval sec {} ingest delay sec {} ",
+        range.start,
+        range.end,
+        slo.definition.slice_interval_secs,
+        cfg.slo.ingest_delay_secs
+    );
 
     let group_by = slo.definition.group_by.clone().unwrap_or_default();
     let params = PassParams {
@@ -117,7 +125,13 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
         max_groups: cfg.slo.max_groups,
     };
 
-    let (rows, query_rejects) = fetch_rows(slo, &group_by, &range, &params).await?;
+    let (rows, query_rejects) = match fetch_rows(slo, &group_by, &range, &params).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("here3 slo: {slo:?}");
+            return Err(anyhow::anyhow!(e));
+        }
+    };
     let mut result = build_slices(&slo.definition.sli_config, rows, &params);
     // Rows the query layer itself refused never reach `build_slices`, so their
     // reasons are merged in here. Dropping them would report a window that is
