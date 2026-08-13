@@ -44,6 +44,11 @@ use lettre::{
     AsyncTransport, Message,
     message::{MultiPart, SinglePart, header::ContentType},
 };
+#[cfg(feature = "enterprise")]
+use o2_openfga::{
+    authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
+    config::get_config as get_openfga_config,
+};
 use reqwest::Client;
 
 use crate::{
@@ -110,6 +115,9 @@ pub enum ReportError {
 
     #[error("Folder not found")]
     FolderNotFound,
+
+    #[error("Unauthorized Access")]
+    PermissionDenied,
 }
 
 pub async fn save(
@@ -484,35 +492,50 @@ pub async fn move_to_folder(
     org_id: &str,
     report_ids: &[String],
     dst_folder_id: &str,
+    _user_id: &str,
 ) -> Result<(), ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     for report_id in report_ids {
-        let (curr_folder, report) = get_by_id(org_id, report_id).await?;
+        let (_curr_folder, report) = get_by_id(org_id, report_id).await?;
+
+        // The middleware cannot check permissions for this batch endpoint, so the
+        // check is done here against the folder the report currently belongs to.
+        #[cfg(feature = "enterprise")]
+        if get_openfga_config().enabled
+            && !crate::common::utils::auth::check_permissions(
+                report_id,
+                org_id,
+                _user_id,
+                "reports",
+                "PUT",
+                Some(&_curr_folder.folder_id),
+            )
+            .await
+        {
+            return Err(ReportError::PermissionDenied);
+        }
 
         db::dashboards::reports::update_by_id(conn, report_id, Some(dst_folder_id), report)
             .await
             .map_err(ReportError::DbError)?;
 
-        remove_ownership(
-            org_id,
-            "reports",
-            Authz {
-                obj_id: report_id.clone(),
-                parent_type: "report_folders".to_owned(),
-                parent: curr_folder.folder_id,
-            },
-        )
-        .await;
-        set_ownership(
-            org_id,
-            "reports",
-            Authz {
-                obj_id: report_id.clone(),
-                parent_type: "report_folders".to_owned(),
-                parent: dst_folder_id.to_owned(),
-            },
-        )
-        .await;
+        #[cfg(feature = "enterprise")]
+        if get_openfga_config().enabled {
+            set_parent_relation(
+                report_id,
+                &get_ofga_type("reports"),
+                dst_folder_id,
+                &get_ofga_type("report_folders"),
+            )
+            .await;
+            remove_parent_relation(
+                report_id,
+                &get_ofga_type("reports"),
+                &_curr_folder.folder_id,
+                &get_ofga_type("report_folders"),
+            )
+            .await;
+        }
     }
     Ok(())
 }
