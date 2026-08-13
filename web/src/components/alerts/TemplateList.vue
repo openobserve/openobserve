@@ -211,6 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <DependencyChainPopover
               :focus="{ kind: 'template', name: row.name }"
               @deleted="getTemplates"
+              @open="onOpenDependency"
             />
           </template>
           <template v-if="selectedTemplates.length > 0" #bottom>
@@ -447,6 +448,13 @@ const editTemplate = (template: any = null) => {
 };
 const resetEditingTemplate = () => {
   editingTemplate.value = null;
+};
+// A template opened from its own dependency popover: open the native editor
+// in-place (same as the row's edit action) — a route push can't, we're already
+// on this route.
+const onOpenDependency = (node: { name: string }) => {
+  const template = getTemplateByName(node.name);
+  if (template) editTemplate(template);
 };
 const cloneTemplate = (template: any) => {
   track("Button Click", {

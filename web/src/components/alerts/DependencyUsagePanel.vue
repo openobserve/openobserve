@@ -186,8 +186,13 @@ import DependencyUsageRow from "./DependencyUsageRow.vue";
 
 const props = defineProps<{ focus: DepFocus }>();
 // Delete is confirmed + performed by the wrapper (a modal can't live in the
-// popover), so the panel only asks for it.
-const emit = defineEmits<{ (e: "requestDelete", node: DepNode): void }>();
+// popover), so the panel only asks for it. `open` is bubbled to the wrapper (then
+// the host list page) for entities whose editor lives IN-PLACE on the current
+// route — see openEntity.
+const emit = defineEmits<{
+  (e: "requestDelete", node: DepNode): void;
+  (e: "open", node: DepNode): void;
+}>();
 
 const pageSize = 50;
 
@@ -244,6 +249,17 @@ const pagedAlerts = computed(() => filteredAlerts.value.slice(pageStart.value, p
 
 const openEntity = (n: DepNode) => {
   if (n.missing) return;
+  // Templates and destinations edit IN-PLACE on their own list route (via each
+  // page's mount-time updateRoute). `focus.kind` is always the current page's
+  // kind, so when the clicked node matches it we're already on that route — a
+  // router.push there won't remount the page and the editor would never open.
+  // Hand it to the host page instead, which opens its native editor exactly as
+  // the row's own edit action does. Alerts (and every cross-kind target) live on
+  // a different route, so navigating there mounts them and opens the editor.
+  if (n.kind === props.focus.kind && (n.kind === "template" || n.kind === "destination")) {
+    emit("open", n);
+    return;
+  }
   const org_identifier = org();
   if (n.kind === "destination") {
     router.push({

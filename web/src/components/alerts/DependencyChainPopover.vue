@@ -41,7 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="h-[26rem] w-100 max-w-[92vw]" data-test="view-dependencies-popover">
-      <DependencyUsagePanel v-if="open" :focus="focus" @request-delete="onRequestDelete" />
+      <DependencyUsagePanel
+        v-if="open"
+        :focus="focus"
+        @request-delete="onRequestDelete"
+        @open="onOpenInPlace"
+      />
     </div>
   </OPopover>
 
@@ -72,7 +77,10 @@ import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependen
 import type { DepFocus, DepNode } from "@/composables/alerts/useDependencyGraph";
 
 defineProps<{ focus: DepFocus }>();
-const emit = defineEmits<{ (e: "deleted"): void }>();
+const emit = defineEmits<{
+  (e: "deleted"): void;
+  (e: "open", node: DepNode): void;
+}>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -84,6 +92,13 @@ const confirm = ref<{ visible: boolean; node: DepNode | null }>({ visible: false
 const onRequestDelete = (node: DepNode) => {
   open.value = false;
   confirm.value = { visible: true, node };
+};
+// An in-place-editable entity (template/destination on its own list route) was
+// opened: close the popover and let the host list page open its native editor —
+// a router.push can't (same route won't remount).
+const onOpenInPlace = (node: DepNode) => {
+  open.value = false;
+  emit("open", node);
 };
 const cancelDelete = () => {
   confirm.value = { visible: false, node: null };

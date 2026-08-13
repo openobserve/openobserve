@@ -239,6 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <DependencyChainPopover
                 :focus="{ kind: 'destination', name: row.name }"
                 @deleted="getDestinations"
+                @open="onOpenDependency"
               />
             </div>
           </template>
@@ -528,6 +529,13 @@ export default defineComponent({
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);
+    };
+    // A destination opened from its own dependency popover: open the native editor
+    // in-place (same as the row's edit action) — a route push can't, we're already
+    // on this route.
+    const onOpenDependency = (node: { name: string }) => {
+      const destination = getDestinationByName(node.name);
+      if (destination) editDestination(destination);
     };
     const editDestination = (destination: any) => {
       if (!destination) {
@@ -825,6 +833,7 @@ export default defineComponent({
       destinations,
       columns,
       editDestination,
+      onOpenDependency,
       getImageURL,
       loading,
       conformDeleteDestination,

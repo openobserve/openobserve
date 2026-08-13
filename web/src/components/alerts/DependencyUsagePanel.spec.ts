@@ -134,6 +134,25 @@ describe("DependencyUsagePanel", () => {
     });
   });
 
+  it("bubbles `open` for a same-kind (in-place) entity, but navigates cross-kind", async () => {
+    vi.mocked(alertsService.listByFolderId).mockResolvedValue({
+      data: { list: seedAlerts(1) },
+    } as any);
+    wrapper = mountPanel({ kind: "destination", name: "slack" });
+    await flushPromises();
+    // The focused destination edits in-place on THIS route, so opening it must
+    // hand off to the host page (emit) rather than a no-op router.push.
+    await wrapper.find('[data-test="dependency-usage-open-slack"]').trigger("click");
+    expect(wrapper.emitted("open")?.[0]?.[0] as any).toMatchObject({
+      kind: "destination",
+      name: "slack",
+    });
+    // A cross-kind target (the template) lives on another route → it navigates,
+    // so no further `open` is emitted.
+    await wrapper.find('[data-test="dependency-usage-open-tpl-http"]').trigger("click");
+    expect(wrapper.emitted("open")?.length).toBe(1);
+  });
+
   it("pages a large alert list (50/page) and searches it", async () => {
     vi.mocked(alertsService.listByFolderId).mockResolvedValue({
       data: { list: seedAlerts(120) },

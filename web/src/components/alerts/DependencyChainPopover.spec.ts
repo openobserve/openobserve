@@ -36,7 +36,7 @@ const OPopoverStub = {
 const PanelStub = {
   name: "DependencyUsagePanel",
   props: { focus: { type: Object, default: null } },
-  emits: ["requestDelete"],
+  emits: ["requestDelete", "open"],
   template: `<div class="panel-stub" />`,
 };
 const ConfirmDialogStub = {
@@ -97,6 +97,24 @@ describe("DependencyChainPopover", () => {
     const confirm = wrapper.find(".confirm-stub");
     expect(confirm.attributes("data-visible")).toBe("true");
     expect(confirm.attributes("data-title")).toContain("slack");
+  });
+
+  it("bubbles an in-place `open` to the host page and closes the popover", async () => {
+    wrapper = mountPopover({ kind: "template", name: "tpl-http" });
+    (wrapper.vm as any).open = true;
+    await nextTick();
+
+    wrapper.findComponent(PanelStub).vm.$emit("open", {
+      kind: "template",
+      name: "tpl-http",
+      id: "template:tpl-http",
+    });
+    await nextTick();
+    expect((wrapper.vm as any).open).toBe(false);
+    expect(wrapper.emitted("open")?.[0]?.[0] as any).toMatchObject({
+      kind: "template",
+      name: "tpl-http",
+    });
   });
 
   it("confirming the dialog deletes via the API and emits 'deleted'", async () => {
