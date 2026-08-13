@@ -466,5 +466,7 @@ async function removeDataset(row: LlmDataset) {
   }
 }
 
-onMounted(refresh);
+// Explicitly false: onMounted passes no argument, so `refresh` would fall back
+// to its force default and every visit would bypass the cache.
+onMounted(() => refresh(false));
 </script>

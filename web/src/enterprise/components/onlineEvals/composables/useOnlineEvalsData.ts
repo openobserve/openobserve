@@ -22,45 +22,45 @@ export function useOnlineEvalsData() {
   const providers = ref<Provider[]>([]);
   const isLoading = ref(false);
 
+  const applyScoreConfigs = (rows: ScoreConfig[]) => {
+    scoreConfigs.value = rows;
+    scoreConfigVersions.value = Object.fromEntries(
+      rows.map((config) => [entityId(config), [config]]),
+    );
+  };
+
   async function loadAll(orgId: string) {
     if (!orgId) return;
-    isLoading.value = true;
+    // `load`, not `get`: a stale entry still has rows, and `get` would block on
+    // the network with the skeleton up, throwing away what the user was reading.
+    // Only a genuinely cold page — nothing cached for any of the four — spins.
+    isLoading.value =
+      providersQuery.peek(orgId) === undefined &&
+      scoreConfigsQuery.peek(orgId) === undefined &&
+      scorersQuery.peek(orgId) === undefined &&
+      evalJobsQuery.peek(orgId) === undefined;
     try {
-      // Cached per list: revisiting the page inside the tier's staleTime costs
-      // nothing, and the four requests still fan out in parallel on a miss.
+      // The four requests still fan out in parallel, and each list settles on
+      // its own so one failing endpoint cannot blank the other three.
       const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
         [
-          providersQuery.get(orgId),
-          scoreConfigsQuery.get(orgId),
-          scorersQuery.get(orgId),
-          evalJobsQuery.get(orgId),
+          providersQuery.load({ org: orgId, apply: (rows) => (providers.value = rows) }),
+          scoreConfigsQuery.load({ org: orgId, apply: applyScoreConfigs }),
+          scorersQuery.load({ org: orgId, apply: (rows) => (scorers.value = rows) }),
+          evalJobsQuery.load({ org: orgId, apply: (rows) => (jobs.value = rows) }),
         ],
       );
 
-      if (providerResult.status === "fulfilled") {
-        providers.value = providerResult.value;
-      } else {
+      if (providerResult.status === "rejected") {
         showError(providerResult.reason, t("onlineEvals.loadError"));
       }
-
-      if (scoreConfigResult.status === "fulfilled") {
-        scoreConfigs.value = scoreConfigResult.value;
-        scoreConfigVersions.value = Object.fromEntries(
-          scoreConfigResult.value.map((config) => [entityId(config), [config]]),
-        );
-      } else {
+      if (scoreConfigResult.status === "rejected") {
         showError(scoreConfigResult.reason, t("onlineEvals.loadError"));
       }
-
-      if (scorerResult.status === "fulfilled") {
-        scorers.value = scorerResult.value;
-      } else {
+      if (scorerResult.status === "rejected") {
         showError(scorerResult.reason, t("onlineEvals.loadError"));
       }
-
-      if (jobResult.status === "fulfilled") {
-        jobs.value = jobResult.value;
-      } else {
+      if (jobResult.status === "rejected") {
         showError(jobResult.reason, t("onlineEvals.loadError"));
       }
     } finally {
