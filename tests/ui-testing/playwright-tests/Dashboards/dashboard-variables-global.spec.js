@@ -23,6 +23,47 @@ const testLogger = require("../utils/test-logger.js");
 
 test.describe.configure({ mode: "parallel" });
 
+/**
+ * Blocks until the variable's in-flight load has finished.
+ *
+ * loadVariableOptions() in VariablesValueSelector.vue early-returns while
+ * variableItem.isLoading is true, so opening the dropdown mid-load is dropped
+ * silently — no request is sent and none is retried. A monitored click landing in
+ * that window therefore observes "0 calls, 0/1 matched" and the test fails.
+ *
+ * isLoading is rendered as an OSpinner (role="status") inside the selector, which is
+ * the only reliable signal for it. Two things that look like signals are not:
+ *   - [data-test*="loading-indicator"] matches NOTHING in the dashboard components,
+ *     and waitFor({state:"hidden"}) on a non-matching selector resolves immediately.
+ *   - the displayed text is not usable either: the selector renders "(No Data Found)"
+ *     while the load is still in flight, so waiting for text settles too early.
+ * Both were measured returning in single-digit milliseconds with the spinner still up.
+ */
+const waitForVariableIdle = async (
+  page,
+  variableName,
+  { quietMs = 1000, timeout = 25000 } = {}
+) => {
+  const spinner = page.locator(
+    `[data-test="variable-selector-${variableName}"] [role="status"]`
+  );
+  const deadline = Date.now() + timeout;
+
+  // A single "spinner gone" check is NOT enough. Refreshing / changing the time
+  // range kicks off a cascade, so a second load can start a few hundred ms after
+  // the first spinner clears — and a click landing in that gap is dropped just the
+  // same. Require the idle state to HOLD for a quiet period before proceeding.
+  while (Date.now() < deadline) {
+    await spinner
+      .first()
+      .waitFor({ state: "detached", timeout: Math.max(1000, deadline - Date.now()) })
+      .catch(() => {});
+
+    await page.waitForTimeout(quietMs);
+    if ((await spinner.count()) === 0) return;
+  }
+};
+
 test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@dashboardVariables', '@globalVariables', '@smoke', '@P0'] }, () => {
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
@@ -142,9 +183,9 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     const variableDropdown = scopedVars.getVariableDropdown(variableName);
     await variableDropdown.waitFor({ state: "visible", timeout: 10000 });
 
-    // Wait for any loading indicators to disappear
-    const loadingIndicator = scopedVars.getVariableLoadingIndicator(variableName);
-    await loadingIndicator.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    // Wait for the variable's initial load to actually finish before clicking —
+    // a click landing mid-load is silently dropped (see waitForVariableIdle).
+    await waitForVariableIdle(page, variableName);
 
     // Ensure network is idle after variable initialization
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
@@ -471,6 +512,10 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
 
     // Wait for variable to refresh after time range change
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
+
+    // The refresh kicks off a fresh load; the monitored click below must not land
+    // while it is still in flight or it is dropped silently and no request fires.
+    await waitForVariableIdle(page, variableName);
 
     // Monitor API call when clicking dropdown again
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
