@@ -236,7 +236,7 @@ const useEnterpriseRoutes = () => {
       {
         // The tab is part of the URL, so a schedule somebody sends is the
         // schedule the recipient lands on. Defaults to `schedule`.
-        path: "oncall/teams/:teamId/:tab(schedule|members|policy)?",
+        path: "oncall/teams/:teamId/:tab(overview|schedule|members|policy|ownership)?",
         name: "onCallTeamDetail",
         component: OnCallTeamDetail,
         meta: { titleKey: "oncall.teamDetail" },

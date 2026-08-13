@@ -38,8 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OUserCell :value="holder.user_email" />
           <OTag variant="success-soft" size="sm">{{ raw(holder.rotation) }}</OTag>
         </span>
-        <p class="text-text-secondary text-xs" data-test="oncall-pulse-shift">
+        <p class="text-text-secondary truncate text-xs" data-test="oncall-pulse-shift">
           {{ shiftLine }}
+          <OTooltip side="bottom" :content="shiftLine" />
         </p>
 
         <!-- Would a page to this person actually land, per channel. Every
@@ -77,9 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="holder?.next_user_email">
         <span class="flex flex-wrap items-center gap-2">
           <OUserCell :value="holder.next_user_email" />
-          <span v-if="secondaryPagedAt" class="text-text-secondary text-xs">
-            {{ secondaryPagedAt }}
-          </span>
+          <span class="text-text-secondary text-xs">{{ backupLine }}</span>
         </span>
         <p class="text-text-secondary text-xs" data-test="oncall-pulse-next">
           {{ nextPrimaryLine }}
@@ -101,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <ul class="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1">
         <li
-          v-for="entry in reach"
+          v-for="entry in visibleReach"
           :key="entry.priority"
           class="col-span-2 grid grid-cols-subgrid items-baseline"
           :data-test="`oncall-pulse-reach-${entry.priority.toLowerCase()}`"
@@ -110,8 +109,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-if="!entry.pages_anyone" class="text-status-error-text truncate text-xs">
             {{ t("oncall.reachPagesNobody") }}
           </span>
-          <span v-else class="text-text-secondary truncate text-xs">
-            {{ reachLine(entry) }}
+          <span v-else class="flex min-w-0 items-baseline gap-2 text-xs">
+            <!-- One dot per rung: the shape of the ladder is readable before
+                 the number is, and a one-rung P3 stands out against a P1. -->
+            <span class="flex shrink-0 items-center gap-0.5" aria-hidden="true">
+              <span
+                v-for="dot in entry.rungs"
+                :key="dot"
+                class="bg-text-secondary size-1 rounded-full"
+              />
+            </span>
+            <span class="text-text-body shrink-0">
+              {{ t("oncall.reachRungs", { count: entry.rungs }, entry.rungs) }}
+            </span>
+            <span v-if="entry.nobody_after_micros" class="text-text-secondary ms-auto truncate">
+              {{ nobodyAfter(entry) }}
+            </span>
+          </span>
+        </li>
+        <!-- Every priority that wakes nobody, on one row. Five separate
+             "Pages nobody" lines is the same fact five times, and it pushed
+             this panel past the height of the three beside it. -->
+        <li
+          v-if="silentPriorities.length"
+          class="col-span-2 grid grid-cols-subgrid items-baseline"
+          data-test="oncall-pulse-reach-silent"
+        >
+          <span class="text-text-secondary text-2xs">{{ silentLabel }}</span>
+          <span class="text-status-error-text truncate text-xs">
+            {{ t("oncall.reachPagesNobody") }}
           </span>
         </li>
       </ul>
@@ -221,8 +247,14 @@ const zone = computed(
   () => props.schedule?.timezone || props.overview?.timezone || props.timezone,
 );
 
+/// Carries the zone abbreviation: "hands over at 18:00" is ambiguous to a
+/// reader in another office, which is most of them.
 const clock = (micros: number) =>
-  formatInZone(micros, zone.value, { hour: "2-digit", minute: "2-digit" });
+  formatInZone(micros, zone.value, {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
 
 /// "Since 18:00 Wed · 5h 12m left · hands to Mia at 18:00" — one sentence,
 /// because the three facts are only useful together.
@@ -280,13 +312,15 @@ function channelLabel(entry: ChannelReadiness): I18nText {
 
 /// When the ladder actually reaches the second person — read off the policy's
 /// P1 rungs rather than assumed, because "secondary" is a rung, not a role.
-const secondaryPagedAt = computed<I18nText | "">(() => {
+const backupLine = computed<I18nText>(() => {
   const steps = props.policy?.rungs.find((rung) => rung.priority === 1)?.steps ?? [];
-  const sorted = [...steps].sort((a, b) => a.after_micros - b.after_micros);
-  const second = sorted[1];
+  const second = [...steps].sort((a, b) => a.after_micros - b.after_micros)[1];
+  const role = String(t("oncall.roleSecondary"));
   return second
-    ? t("oncall.teamPagedAt", { delay: formatMicrosDuration(second.after_micros) })
-    : "";
+    ? raw(
+        `${role} · ${t("oncall.teamPagedAt", { delay: formatMicrosDuration(second.after_micros) })}`,
+      )
+    : raw(role);
 });
 
 const nextPrimaryLine = computed<I18nText>(() => {
@@ -320,15 +354,36 @@ const nextPrimaryLine = computed<I18nText>(() => {
 
 const reach = computed<TeamRungSummary[]>(() => props.overview?.rungs ?? []);
 
-function reachLine(entry: TeamRungSummary): I18nText {
-  const rungs = String(t("oncall.reachRungs", { count: entry.rungs }, entry.rungs));
-  if (!entry.nobody_after_micros) return raw(rungs);
-  const after = String(
-    t("oncall.reachNobodyAfter", {
-      duration: formatMicrosDuration(entry.nobody_after_micros),
-    }),
-  );
-  return raw(`${rungs} · ${after}`);
+/**
+ * Rows this panel may draw.
+ *
+ * Four panels sit side by side and the tallest sets the height of the row, so
+ * a list that grows one line per priority makes the other three mostly empty.
+ * Three is what fits beside them.
+ */
+const MAX_REACH_ROWS = 3;
+
+/// Priorities that wake nobody, collapsed to one line — the finding is "these
+/// page nobody", which is one fact however many priorities share it.
+const silentPriorities = computed(() => reach.value.filter((entry) => !entry.pages_anyone));
+
+const silentLabel = computed<I18nText>(() =>
+  raw(silentPriorities.value.map((entry) => entry.priority).join(", ")),
+);
+
+/// The ladders that actually fire, most urgent first. The silent summary takes
+/// the last slot when there is one, so it is never the row that falls off.
+const visibleReach = computed<TeamRungSummary[]>(() => {
+  const paging = reach.value.filter((entry) => entry.pages_anyone);
+  const budget = silentPriorities.value.length ? MAX_REACH_ROWS - 1 : MAX_REACH_ROWS;
+  return paging.slice(0, Math.max(0, budget));
+});
+
+/// The instant after which this priority stops waking anybody.
+function nobodyAfter(entry: TeamRungSummary): I18nText {
+  return t("oncall.reachNobodyAfter", {
+    duration: formatMicrosDuration(entry.nobody_after_micros ?? 0),
+  });
 }
 
 const stats = computed(() => props.overview?.stats ?? null);

@@ -230,9 +230,160 @@ export const RESOLUTION_CAUSES = [
 export type ResolutionCause = (typeof RESOLUTION_CAUSES)[number];
 
 /**
- * `GET /oncall/analytics/causes`. The only analytics endpoint that exists — it
- * counts causes, never durations, and the counting happens in the database
- * rather than over a fetched page, which is what makes it safe on any org size.
+ * `GET /oncall/teams/{id}/reachability`.
+ *
+ * Answers "would a page to this person land" from EVIDENCE rather than
+ * configuration: a real user of the org, a mailbox-shaped address, a transport
+ * that exists, a method that has been verified. Every negative carries its own
+ * reason, which is why the UI never has to invent one.
+ */
+export interface ChannelReadiness {
+  channel: Channel;
+  deliverable: boolean;
+  /** On file but no transport may use it — `phone`, `push`. */
+  configured_but_unverified: boolean;
+  /** A finished sentence. Render verbatim. */
+  blocked_because?: string | null;
+}
+
+export interface MemberReachability {
+  user_email: string;
+  is_org_user: boolean;
+  /** `root@example` is a valid login and cannot receive mail. */
+  mailbox_shaped: boolean;
+  channels: ChannelReadiness[];
+  deliverable_channels: Channel[];
+  configured_but_unverified: string[];
+  /** The one boolean the badge renders. */
+  would_a_page_land: boolean;
+  /** A finished sentence. Render verbatim. */
+  why_not?: string | null;
+}
+
+export interface TeamReachability {
+  team_id: string;
+  team_name: string;
+  /** One `false` here explains every unreachable row beneath it. */
+  smtp_configured: boolean;
+  members: MemberReachability[];
+  reachable: number;
+  total: number;
+  unreachable_members: string[];
+}
+
+/**
+ * `GET /oncall/teams/{id}/config-risks`. Computed, never stored — a risk that
+ * is derived cannot disagree with the thing it describes.
+ */
+export interface ConfigRisk {
+  kind: string;
+  severity: "high" | "medium" | "low" | string;
+  /** A finished sentence. Render verbatim. */
+  message: string;
+  priority?: string | null;
+  user_email?: string | null;
+  rotation?: string | null;
+  rung_micros?: number | null;
+}
+
+export interface ConfigRisks {
+  team_id: string;
+  horizon_days: number;
+  /** Pre-truncation count — may exceed `risks.length`. */
+  total: number;
+  risks: ConfigRisk[];
+}
+
+/**
+ * `GET /oncall/teams/{id}/overview`. One call for the whole team header.
+ *
+ * Every figure is computed SERVER-side over the window — `acked_under_5m_percent`
+ * counts in the database, not over a page of fetched records, which is what
+ * makes it safe to show on a tile.
+ */
+export interface TeamRungSummary {
+  /** `P1`..`P5`. */
+  priority: string;
+  rungs: number;
+  /** False means this priority never wakes a human. */
+  pages_anyone: boolean;
+  /** Delay of the last rung; absent when nothing fires. */
+  nobody_after_micros?: number | null;
+  /** A ladder that stops short of the whole team runs out of people. */
+  ends_with_whole_team: boolean;
+}
+
+export interface TeamPageStats {
+  pages: number;
+  acknowledged: number;
+  acked_under_5m: number;
+  /** Opened in the team's own night window. */
+  night_pages: number;
+  reached_second_rung: number;
+  reached_final_rung: number;
+}
+
+export interface TeamOverview {
+  team_id: string;
+  team_name: string;
+  timezone: string;
+  members: number;
+  /** Alert rules routed to this team. */
+  alerts_assigned: number;
+  ownership_paths: number;
+  covered_now: boolean;
+  on_call_now: string[];
+  rungs: TeamRungSummary[];
+  repeat_count?: number | null;
+  final_action?: PolicyFinalAction | null;
+  /** Micros. */
+  from: number;
+  /** Micros. */
+  to: number;
+  days: number;
+  stats: TeamPageStats;
+  acked_under_5m_percent: number;
+}
+
+/** `GET /oncall/teams/{id}/load`. Who has been carrying the pager. */
+export interface MemberLoad {
+  user_email: string;
+  pages: number;
+  /** Pages that landed in the team's own night window. */
+  nights: number;
+  acks: number;
+}
+
+export interface ShiftShare {
+  user_email: string;
+  micros: number;
+  percent: number;
+}
+
+export interface RotationFairness {
+  rotation: string;
+  shares: ShiftShare[];
+  verdict: string;
+  /** Already-worded summary. Render verbatim. */
+  summary: string;
+}
+
+export interface TeamLoad {
+  team_id: string;
+  from: number;
+  to: number;
+  days: number;
+  members: MemberLoad[];
+  upcoming_from: number;
+  upcoming_to: number;
+  rotations: RotationFairness[];
+}
+
+/**
+ * `GET /oncall/analytics/causes`. The ONLY analytics endpoint that exists —
+ * it counts causes, never durations, and the counting happens in the database
+ * rather than over a fetched page, which is what makes it safe to show on an
+ * org of any size.
  */
 export interface CauseAnalytics {
   /** Micros. */
@@ -245,8 +396,8 @@ export interface CauseAnalytics {
   causes: CauseCount[];
 }
 
-/// One row of the cause breakdown, with the most recent example so a row can be
-/// a link rather than just a number.
+/// One row of the cause breakdown, with the most recent example so a row can
+/// be a link rather than just a number.
 export interface CauseCount {
   cause: ResolutionCause;
   count: number;

@@ -15,6 +15,9 @@
 import http from "./http";
 import type {
   OwnershipRule,
+  TeamLoad,
+  TeamOverview,
+  TeamReachability,
   RoutingPreview,
   OnCallPolicy,
   OnCallResponse,
@@ -27,6 +30,7 @@ import type {
   PriorityRung,
   Rotation,
   CauseAnalytics,
+  ConfigRisks,
   CauseGroup,
   ResolutionCause,
   CoverageGaps,
@@ -596,10 +600,29 @@ const oncall = {
     http().delete(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/overrides/${encodeURIComponent(override_id)}`,
     ),
+  /// Sends a real page to whoever the ladder would reach, and reports who it
+  /// got to. `reached_anyone: false` carries `not_sent_because` — the honest
+  /// answer to "would a page actually land", which is not otherwise knowable.
+  testPage: ({
+    org_identifier,
+    team_id,
+    priority,
+  }: {
+    org_identifier: string;
+    team_id: string;
+    priority?: number;
+  }) =>
+    http().post<{
+      reached_anyone: boolean;
+      recipients?: string[] | null;
+      not_sent_because?: string | null;
+    }>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/test-page`,
+      priority === undefined ? {} : { priority },
+    ),
 
-  /// Cause counts over a window. The ONLY analytics endpoint that exists — and
-  /// the counting happens in the database, so it describes the org rather than
-  /// whichever page of records came back.
+  /// Cause counts over a window. The ONLY analytics endpoint that exists —
+  /// there is no time-to-ack or time-to-resolve aggregate, by design.
   analyticsCauses: ({
     org_identifier,
     team_id,
@@ -620,6 +643,34 @@ const oncall = {
       Object.keys(params).length ? { params } : undefined,
     );
   },
+
+  /// Would a page to each member actually land, and why not. Computed from
+  /// evidence, so every negative arrives with its own sentence.
+  teamReachability: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
+    http().get<TeamReachability>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/reachability`,
+    ),
+
+  /// Configuration problems this team actually has. `message` is a finished
+  /// sentence — render it, do not re-word it.
+  teamConfigRisks: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
+    http().get<ConfigRisks>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/config-risks`,
+    ),
+
+  /// Everything the team header needs, in one call: membership, coverage, the
+  /// ladder per priority, and the window's page statistics — all computed
+  /// server-side rather than derived from a fetched page.
+  teamOverview: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
+    http().get<TeamOverview>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/overview`,
+    ),
+
+  /// Per-member page load and rotation fairness over a window.
+  teamLoad: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
+    http().get<TeamLoad>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/load`,
+    ),
 };
 
 export default oncall;

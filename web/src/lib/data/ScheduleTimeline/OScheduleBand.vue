@@ -18,6 +18,10 @@ const TONE_CLASS: Record<ScheduleBandTone, string> = {
   5: "bg-schedule-band-5-bg text-schedule-band-5-text",
   6: "bg-schedule-band-6-bg text-schedule-band-6-text",
   gap: "bg-schedule-gap-bg text-schedule-gap-text border border-dashed border-schedule-gap-border",
+  // Solid, not the pale ramp: a coverage bar is read for its exceptions, and a
+  // 50-tint span against a white card is indistinguishable from empty track.
+  covered: "bg-badge-success-solid-bg text-badge-success-solid-text",
+  partial: "bg-badge-warning-solid-bg text-badge-warning-solid-text",
 };
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, Number.isFinite(n) ? n : 0));

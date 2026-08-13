@@ -17,81 +17,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   The ways this team would fail to wake somebody.
 
-  Every row is the server's own finding, message included — it is computed from
-  the configuration rather than stored beside it, so it cannot drift out of
-  agreement with the thing it describes. The messages are finished sentences
-  and are rendered verbatim; this component's only job is to sort them, cap
-  them, and point each one at the tab that repairs it.
+  Every row is the server's own finding, message included — computed from the
+  configuration rather than stored beside it, so it cannot drift out of
+  agreement with the thing it describes. The messages are finished sentences,
+  rendered verbatim; this component only sorts them, decides how many fit, and
+  points each at the tab that repairs it.
 -->
 <template>
   <OBanner
-    v-if="visible.length"
+    v-if="sorted.length"
     variant="warning"
     icon="warning-amber"
     inline-actions
     data-test="oncall-team-attention"
   >
-    <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
-      <span class="text-text-secondary text-2xs tracking-wide uppercase">
-        {{ t("oncall.attentionHeading") }}
-      </span>
-
-      <span
-        v-for="(risk, index) in visible"
-        :key="`${risk.kind}-${index}`"
-        class="flex flex-wrap items-baseline gap-1.5"
-        :data-test="`oncall-attention-${risk.kind}`"
-      >
-        <!-- Only the severe ones get colour. A banner where every row shouts is
-             one nobody reads past the first line. -->
-        <span
-          class="text-sm"
-          :class="risk.severity === 'high' ? 'text-status-error-text' : 'text-text-body'"
-        >
-          {{ raw(risk.message) }}
+    <div class="flex min-w-0 flex-col gap-1">
+      <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase">
+          {{ t("oncall.attentionHeading") }}
         </span>
-        <OButton
-          variant="ghost-primary"
-          size="xs"
-          :data-test="`oncall-attention-cta-${risk.kind}`"
-          @click="emit('act', tabFor(risk.kind))"
+
+        <!-- Collapsed, each finding is one truncated line sharing the row: the
+             server writes finished prose, and three of those stacked turns a
+             banner into a paragraph nobody finishes. -->
+        <span
+          v-for="risk in visible"
+          :key="riskKey(risk)"
+          class="flex min-w-0 flex-1 basis-64 items-baseline gap-1.5"
+          :data-test="`oncall-attention-${risk.kind}`"
         >
-          {{ t(CTA_KEY[tabFor(risk.kind)]) }}
+          <span
+            class="mt-1 size-1.5 shrink-0 rounded-full"
+            :class="risk.severity === 'high' ? 'bg-status-error-text' : 'bg-status-warning-text'"
+            aria-hidden="true"
+          />
+          <span
+            class="text-text-body min-w-0 text-sm"
+            :class="expanded ? '' : 'truncate'"
+          >
+            {{ raw(risk.message) }}
+            <OTooltip v-if="!expanded" side="bottom" :content="raw(risk.message)" />
+          </span>
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            class="shrink-0"
+            :data-test="`oncall-attention-cta-${risk.kind}`"
+            @click="emit('act', tabFor(risk.kind))"
+          >
+            {{ t(CTA_KEY[tabFor(risk.kind)]) }}
+          </OButton>
+        </span>
+
+        <!-- A counter you cannot open is just a number. The rest are one click
+             away rather than one screen away. -->
+        <OButton
+          v-if="hidden > 0 || expanded"
+          variant="ghost"
+          size="xs"
+          class="shrink-0"
+          data-test="oncall-attention-more"
+          @click="expanded = !expanded"
+        >
+          {{ expanded ? t("oncall.attentionShowLess") : t("oncall.attentionMore", { count: hidden }) }}
         </OButton>
       </span>
-
-      <!-- The server truncates its own list but reports the true total, so a
-           count that only described what fitted would be a quiet lie. -->
-      <span
-        v-if="hidden > 0"
-        class="text-text-secondary text-xs"
-        data-test="oncall-attention-more"
-      >
-        {{ t("oncall.attentionMore", { count: hidden }) }}
-      </span>
-    </span>
+    </div>
   </OBanner>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { ConfigRisk, ConfigRisks } from "@/ts/interfaces/oncall";
 import type { I18nKey } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const props = withDefaults(defineProps<{ risks?: ConfigRisks | null; max?: number }>(), {
   risks: null,
-  // Three fits the banner on a laptop without wrapping it into a paragraph.
-  max: 3,
+  // Two truncated findings plus the overflow control fit one line on a laptop;
+  // a third pushes the banner into a second row.
+  max: 2,
 });
 
 /** Emits the tab that repairs the finding: `policy` | `schedule` | `ownership`. */
 const emit = defineEmits<{ (e: "act", tab: string): void }>();
 
 const { t } = useI18nTyped();
+
+const expanded = ref(false);
 
 type FixTab = "policy" | "schedule" | "ownership";
 
@@ -116,6 +133,11 @@ function tabFor(kind: string): FixTab {
   return TAB_FOR_KIND[kind] ?? "policy";
 }
 
+/// Stable across re-sorts: two findings of one kind differ by who they name.
+function riskKey(risk: ConfigRisk): string {
+  return `${risk.kind}:${risk.priority ?? ""}:${risk.user_email ?? risk.rotation ?? ""}`;
+}
+
 const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 /// Severe first. The server returns them in its own order, and "nobody can be
@@ -126,10 +148,10 @@ const sorted = computed<ConfigRisk[]>(() =>
   ),
 );
 
-const visible = computed(() => sorted.value.slice(0, props.max));
+const visible = computed(() => (expanded.value ? sorted.value : sorted.value.slice(0, props.max)));
 
-/// Counted against the server's `total`, not against the list it sent: it
-/// truncates, and the count has to describe everything that was found.
+/// Counted against the server's `total`, not the list it sent: it truncates,
+/// and a count describing only what arrived would quietly under-report.
 const hidden = computed(() =>
   Math.max(0, (props.risks?.total ?? sorted.value.length) - visible.value.length),
 );

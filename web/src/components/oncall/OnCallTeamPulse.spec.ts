@@ -149,7 +149,32 @@ describe("OnCallTeamPulse", () => {
     const p1 = wrapper.find('[data-test="oncall-pulse-reach-p1"]').text();
     expect(p1).toContain("3 rungs");
     expect(p1).toContain("nobody after 15m");
-    expect(wrapper.find('[data-test="oncall-pulse-reach-p4"]').text()).toContain("Pages nobody");
+    // P4 is silent, so it belongs to the collapsed summary row rather than a
+    // line of its own — five "Pages nobody" lines is one fact stated five times.
+    expect(wrapper.find('[data-test="oncall-pulse-reach-silent"]').text()).toContain(
+      "Pages nobody",
+    );
+  });
+
+  /// Four panels share a row and the tallest sets its height, so this one is
+  /// capped: every silent priority collapses onto a single trailing line.
+  it("collapses every silent priority onto one row", () => {
+    const wrapper = render({
+      overview: overview({
+        rungs: [
+          { priority: "P1", rungs: 3, pages_anyone: true, ends_with_whole_team: true },
+          { priority: "P2", rungs: 2, pages_anyone: true, ends_with_whole_team: false },
+          { priority: "P3", rungs: 1, pages_anyone: true, ends_with_whole_team: false },
+          { priority: "P4", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
+          { priority: "P5", rungs: 0, pages_anyone: false, ends_with_whole_team: false },
+        ],
+      }),
+    });
+
+    const silent = wrapper.find('[data-test="oncall-pulse-reach-silent"]');
+    expect(silent.text()).toContain("P4, P5");
+    // Two paging rows plus the silent summary — never one row per priority.
+    expect(wrapper.findAll('[data-test^="oncall-pulse-reach-"]')).toHaveLength(3);
   });
 
   /// Server-computed over the window, which is what makes it safe on a tile.

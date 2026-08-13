@@ -30,23 +30,27 @@ vi.mock("@/services/oncall", () => ({
     whoIsOnCall: vi.fn(),
     listTeams: vi.fn(),
     listOwnershipRules: vi.fn(),
+    listResponses: vi.fn(),
   },
 }));
 
+const routeParams: Record<string, string> = { teamId: "team_1" };
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ params: { teamId: "team_1" } }),
+  useRoute: () => ({ params: routeParams }),
   useRouter: () => ({ push: vi.fn() }),
 }));
 
 const service = vi.mocked(oncallService);
 
-// The tab strip and stat strip are the two things under test, so they render
-// for real; everything they contain is a panel with its own spec.
+// The tab strip and the attention banner are what is under test, so they
+// render for real; everything they sit beside is a panel with its own spec.
 const stubs = {
   OPageLayout: {
     name: "OPageLayout",
     template: "<div><slot name='title-trail' /><slot name='actions' /><slot /></div>",
   },
+  OTable: { name: "OTable", props: ["data", "columns"], template: "<div />" },
+  OnCallTeamPulse: true,
   OnCallMembers: true,
   OnCallScheduleEditor: true,
   OnCallPolicyEditor: true,
@@ -61,6 +65,7 @@ function render() {
 describe("OnCallTeamDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete routeParams.tab;
     service.getTeam.mockResolvedValue({
       data: { id: "team_1", name: "Platform", timezone: "UTC" },
     } as any);
@@ -70,10 +75,12 @@ describe("OnCallTeamDetail", () => {
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
     service.listTeams.mockResolvedValue({ data: [] } as any);
     service.listOwnershipRules.mockResolvedValue({ data: [] } as any);
+    service.listResponses.mockResolvedValue({ data: [] } as any);
   });
 
-  /// Left to right is the order a team has to be built in — people first,
-  /// because a schedule with nobody in it is not something anyone can act on.
+  /// Overview first — what the team HAS been doing — then the chain that
+  /// decides it: when each person is on, what happens if nobody answers, what
+  /// reaches the team at all, and finally who the people are.
   it("orders the tabs the way a team is actually set up", async () => {
     const wrapper = render();
     await flushPromises();
@@ -81,39 +88,73 @@ describe("OnCallTeamDetail", () => {
     const names = wrapper
       .findAllComponents({ name: "OTab" })
       .map((tab) => tab.props("name"));
-    expect(names).toEqual(["members", "schedule", "policy", "ownership"]);
+    expect(names).toEqual(["overview", "schedule", "policy", "ownership", "members"]);
   });
 
-  /// A warning tile stated a problem and then left the reader to find the tab
-  /// that fixes it.
-  ///
-  /// `startsEmpty` picks a landing tab that DIFFERS from the expected one — an
-  /// unstaffed team lands on Members, a staffed one on Schedule — so each case
-  /// proves the tile moved the tab rather than agreeing with where it already was.
-  it.each([
-    ["rotations", "schedule", true],
-    ["oncall", "schedule", true],
-    ["members", "members", false],
-    ["rules", "ownership", false],
-  ])("opens the tab that answers the %s tile", async (statKey, expectedTab, startsEmpty) => {
-    if (startsEmpty) service.listMembers.mockResolvedValue({ data: [] } as any);
+  /// A team with nobody in it cannot have an overview worth reading, so it
+  /// lands where the work is instead.
+  it("lands on members while the team is still empty", async () => {
+    service.listMembers.mockResolvedValue({ data: [] } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "OTabPanels" }).props("modelValue")).toBe("members");
+  });
+
+  /// The setup checklist and the policies list both deep-link here with a
+  /// `tab` param. The view was not reading it — the links only appeared to work
+  /// because the default landing tab happened to be the one they asked for.
+  it("opens the tab the URL asked for", async () => {
+    routeParams.tab = "policy";
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "OTabPanels" }).props("modelValue")).toBe("policy");
+  });
+
+  it("ignores a tab the URL invented", async () => {
+    routeParams.tab = "not-a-tab";
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "OTabPanels" }).props("modelValue")).toBe("overview");
+  });
+
+  /// The banner maps each finding's `kind` to the tab that repairs it and emits
+  /// that tab, so the view only has to obey.
+  it.each([["policy"], ["schedule"], ["ownership"]])(
+    "opens the %s tab the banner asked for",
+    async (expectedTab) => {
     const wrapper = render();
     await flushPromises();
 
     const panels = wrapper.findComponent({ name: "OTabPanels" });
     expect(panels.props("modelValue")).not.toBe(expectedTab);
 
-    wrapper.findComponent({ name: "OStatStrip" }).vm.$emit("select", statKey);
+      wrapper.findComponent({ name: "OnCallTeamAttention" }).vm.$emit("act", expectedTab);
+      await flushPromises();
+
+      expect(panels.props("modelValue")).toBe(expectedTab);
+    },
+  );
+
+  /// The panel and the overview list both read this team's own pages; asking
+  /// for the whole org's would count other teams' work as this team's.
+  it("asks only for this team's pages", async () => {
+    render();
     await flushPromises();
 
-    expect(panels.props("modelValue")).toBe(expectedTab);
+    expect(service.listResponses).toHaveBeenCalledWith(
+      expect.objectContaining({ team_id: "team_1", include_resolved: true }),
+    );
   });
 
-  // Nothing is "current" on this strip, so no tile should render as chosen.
-  it("marks no tile as selected", async () => {
+  /// A failed page fetch costs the activity panel, never the rest of the page.
+  it("still renders the team when its pages cannot be loaded", async () => {
+    service.listResponses.mockRejectedValue(new Error("boom"));
     const wrapper = render();
     await flushPromises();
 
-    expect(wrapper.findComponent({ name: "OStatStrip" }).props("selectedKey")).toBeNull();
+    expect(wrapper.findComponent({ name: "OnCallTeamPulse" }).exists()).toBe(true);
   });
 });

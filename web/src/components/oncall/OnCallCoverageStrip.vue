@@ -87,8 +87,8 @@ function coverAt(at: number): Cover {
 }
 
 const TONE: Record<Cover, ScheduleBand["tone"]> = {
-  both: 1,
-  primary: 3,
+  both: "covered",
+  primary: "partial",
   none: "gap",
 };
 
@@ -154,9 +154,9 @@ const legend = computed<LegendEntry[]>(() => [
   {
     key: "both",
     label: t("oncall.coverPrimaryAndSecondary"),
-    swatch: "bg-schedule-band-1-bg",
+    swatch: "bg-badge-success-solid-bg",
   },
-  { key: "primary", label: t("oncall.coverPrimaryOnly"), swatch: "bg-schedule-band-3-bg" },
+  { key: "primary", label: t("oncall.coverPrimaryOnly"), swatch: "bg-badge-warning-solid-bg" },
   { key: "none", label: t("oncall.coverNobody"), swatch: "bg-schedule-gap-bg" },
 ]);
 </script>

@@ -13,15 +13,41 @@
       <OTag
         v-if="loaded"
         type="oncallCoverage"
-        :value="onCallNow.length ? 'covered' : 'gap'"
+        :value="(overview?.covered_now ?? onCallNow.length > 0) ? 'covered' : 'gap'"
         size="sm"
         data-test="oncall-team-coverage"
       />
+      <!-- The server's own count. It is computed, never stored, so it cannot
+           disagree with the configuration it describes. -->
+      <OTag
+        v-if="configRiskCount"
+        variant="amber-soft"
+        size="sm"
+        data-test="oncall-team-config-risks"
+      >
+        {{ t("oncall.riskConfigCount", { count: configRiskCount }, configRiskCount) }}
+      </OTag>
     </template>
 
     <template #actions>
       <OButton
         variant="outline"
+        size="sm-action"
+        data-test="oncall-team-page-btn"
+        @click="notAvailable('pageThisTeam')"
+      >
+        {{ t("oncall.pageThisTeam") }}
+      </OButton>
+      <OButton
+        variant="outline"
+        size="sm-action"
+        data-test="oncall-team-override-btn"
+        @click="notAvailable('takeOverride')"
+      >
+        {{ t("oncall.takeOverride") }}
+      </OButton>
+      <OButton
+        variant="primary"
         size="sm-action"
         data-test="oncall-team-detail-edit-btn"
         @click="editOpen = true"
@@ -30,56 +56,164 @@
       </OButton>
     </template>
 
-    <OContent y>
-      <!-- `selected-key` stays null on purpose: these tiles navigate to the
-           tab that answers them, they are not a filter with a current choice. -->
-      <OStatStrip
-        :items="summaryStats"
-        selectable
-        :selected-key="null"
-        data-test="oncall-team-stats"
-        @select="openStatTab"
+    <!-- Who holds the pager, who catches it, how far the ladder reaches, and how
+         last week went — the four questions asked before anything else on the
+         page. The tabs below are where you go to CHANGE any of them. -->
+    <div class="bg-border-default border-border-default border-y">
+      <OnCallTeamPulse
+        :slots="onCallNow"
+        :schedule="schedule"
+        :policy="policy"
+        :overview="overview"
+        :reachability="reachability"
+        :timezone="team?.timezone ?? 'UTC'"
       />
+    </div>
 
-      <!-- Says what the two names MEAN. "Primary" and "Secondary" are
-           positions in one rotation, not two rotations somebody has to staff,
-           and the old bar showed a rotation's name where a role belonged. -->
-      <div v-if="onCallNow.length" class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
-        <div
-          v-for="slot in onCallNow"
-          :key="slot.rotation"
-          class="flex flex-wrap items-center gap-x-4 gap-y-1"
-          :data-test="`oncall-slot-${slot.rotation}`"
-        >
-          <span class="flex items-center gap-2">
-            <OTag variant="success-soft" size="sm">{{ t("oncall.rolePrimary") }}</OTag>
-            <OUserCell :value="slot.user_email" />
-          </span>
-          <span v-if="slot.next_user_email" class="flex items-center gap-2">
-            <OTag variant="default-soft" size="sm">{{ t("oncall.roleSecondary") }}</OTag>
-            <OUserCell :value="slot.next_user_email" />
-          </span>
-          <span class="text-text-muted text-xs">
-            {{ t("oncall.fromRotation", { name: slot.rotation }) }}
-          </span>
-        </div>
-      </div>
-
+    <OContent class="py-2">
+      <OnCallTeamAttention :risks="configRisks" @act="onAttentionAct" />
     </OContent>
 
-    <!-- Left to right is the order a team has to be built in: people, then
-         when each of them is on, then what happens if nobody answers, then
-         what reaches the team at all. -->
+    <!-- What the team HAS been doing, then the chain that decides it: when each
+         person is on, what happens if nobody answers, what reaches the team at
+         all, and finally who the people are. -->
     <OTabs v-model="activeTab" data-test="oncall-team-tabs">
-      <OTab name="members" :label="t('oncall.members')" icon="group-work" />
+      <OTab name="overview" :label="t('oncall.teamOverview')" icon="format-list-bulleted" />
       <OTab name="schedule" :label="t('oncall.schedule')" icon="calendar-month" />
-      <OTab name="policy" :label="t('oncall.policy')" icon="arrow-upward" />
-      <OTab name="ownership" :label="t('oncall.routing')" icon="account-tree" />
+      <!-- Counts via the default slot, which is the documented seam for badges;
+           `label` and `icon` are ignored once it is provided. -->
+      <OTab name="policy">
+        <OIcon name="arrow-upward" size="xs" />
+        {{ t("oncall.escalationTab") }}
+        <OTag v-if="silentPriorities" variant="amber-soft" size="sm">{{ silentPriorities }}</OTag>
+      </OTab>
+      <OTab name="ownership">
+        <OIcon name="account-tree" size="xs" />
+        {{ t("oncall.routing") }}
+        <OTag v-if="ruleCount" variant="default-soft" size="sm">{{ ruleCount }}</OTag>
+      </OTab>
+      <OTab name="members">
+        <OIcon name="group-work" size="xs" />
+        {{ t("oncall.members") }}
+        <OTag v-if="memberCount" variant="default-soft" size="sm">{{ memberCount }}</OTag>
+      </OTab>
     </OTabs>
 
     <!-- `scroll` defaults to overflow-hidden, which silently clipped the
          escalation policy so its lower priorities were unreachable. -->
     <OTabPanels v-model="activeTab" grow scroll="y">
+      <!-- What actually happened, not just what fired: the pages this team was
+           woken by, and how fast each was answered. -->
+      <OTabPanel name="overview">
+        <!-- Left is what happened and when nobody is covered; right is how you
+             reach these people. Two columns because the right rail is reference
+             material — read once during an incident, not scanned. -->
+        <OContent
+          y
+          class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+        >
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col gap-2">
+              <span class="flex flex-wrap items-baseline gap-x-2">
+                <OText variant="panel-title">{{ t("oncall.teamRecentPages") }}</OText>
+                <OText variant="meta">{{ t("oncall.teamRecentPagesHint") }}</OText>
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  class="ms-auto"
+                  data-test="oncall-team-open-oncall"
+                  @click="openOnCallList"
+                >
+                  {{ t("oncall.teamOpenInOnCall") }}
+                </OButton>
+              </span>
+
+              <OTable
+                :frame="false"
+                :data="recentPages"
+                :columns="pageColumns"
+                row-key="id"
+                :loading="pagesLoading"
+                pagination="client"
+                :page-size="10"
+                sort-by="opened_at"
+                sort-order="desc"
+                :show-global-filter="false"
+                table-id="oncall-team-recent-pages"
+                data-test="oncall-team-pages-table"
+                @row-click="openPage"
+              >
+                <template #cell-opened_at="{ row }">
+                  <OTimeCell :value="row.opened_at" unit="us" />
+                </template>
+                <template #cell-title="{ row }">
+                  <span class="text-text-heading truncate text-sm">
+                    {{ raw(row.title || row.subject.source_id) }}
+                  </span>
+                </template>
+                <template #cell-acked_by="{ row }">
+                  <OUserCell v-if="row.acked_by" :value="row.acked_by" />
+                  <span v-else class="text-text-muted text-sm">{{ ABSENT }}</span>
+                </template>
+                <template #cell-time_to_ack="{ row }">
+                  <span class="text-text-body text-sm">{{ timeToAck(row) }}</span>
+                </template>
+                <template #cell-escalated="{ row }">
+                  <OTag v-if="didEscalate(row)" variant="amber-soft" size="sm">
+                    {{ t("oncall.escalate") }}
+                  </OTag>
+                  <span v-else class="text-text-muted text-sm">
+                    {{ t("oncall.teamNotEscalated") }}
+                  </span>
+                </template>
+                <template #empty>
+                  <OEmptyState
+                    size="hero"
+                    preset="no-oncall-responses"
+                    data-test="oncall-team-pages-empty"
+                  />
+                </template>
+              </OTable>
+            </div>
+
+            <!-- Gaps are the only thing worth looking at here, so they are the
+                 only bands that get an alarming colour. -->
+            <div class="flex flex-col gap-2">
+              <span class="flex flex-wrap items-baseline gap-x-2">
+                <OText variant="panel-title">
+                  {{ t("oncall.teamCoverage", { days: COVERAGE_DAYS }) }}
+                </OText>
+                <OText variant="meta">{{ t("oncall.teamCoverageHint") }}</OText>
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  class="ms-auto"
+                  data-test="oncall-team-open-schedule"
+                  @click="activeTab = 'schedule'"
+                >
+                  {{ t("oncall.calendar") }}
+                </OButton>
+              </span>
+              <OnCallCoverageStrip
+                :rotations="schedule?.rotations ?? []"
+                :timezone="team?.timezone ?? 'UTC'"
+                :days="COVERAGE_DAYS"
+              />
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-4">
+            <OnCallTeamReach :destinations="policy?.destinations ?? []" />
+            <OnCallContactReadiness
+              :reachability="reachability"
+              :testing="testingPage"
+              @test-page="sendTestPage"
+            />
+            <OnCallLoadBalance :load="teamLoad" />
+          </div>
+        </OContent>
+      </OTabPanel>
+
       <OTabPanel name="members">
         <OnCallMembers
           :team-id="teamId"
@@ -115,15 +249,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
-import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 
@@ -131,7 +263,19 @@ import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
+import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
+import OnCallContactReadiness from "@/components/oncall/OnCallContactReadiness.vue";
+import OnCallLoadBalance from "@/components/oncall/OnCallLoadBalance.vue";
+import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
+import OnCallTeamReach from "@/components/oncall/OnCallTeamReach.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
+import OnCallTeamPulse from "@/components/oncall/OnCallTeamPulse.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -139,16 +283,29 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import oncallService from "@/services/oncall";
 import type {
   OnCallPolicy,
+  OnCallResponse,
   OnCallSchedule,
   OnCallSlot,
   OnCallTeam,
+  ConfigRisks,
   OnCallTeamMember,
+  TeamOverview,
+  TeamLoad,
+  TeamReachability,
 } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { formatMicrosDuration } from "@/utils/formatters";
 
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
+const router = useRouter();
+
+/** The window the activity panel and the recent-pages list describe. */
+const ACTIVITY_WINDOW_MICROS = 7 * MICROS_PER_DAY;
+/** How far ahead the coverage strip draws. */
+const COVERAGE_DAYS = 14;
 
 const team = ref<OnCallTeam | null>(null);
 const members = ref<OnCallTeamMember[]>([]);
@@ -158,6 +315,13 @@ const onCallNow = ref<OnCallSlot[]>([]);
 // The routing tester can resolve to ANY team, so the whole list is needed to
 // name the winner rather than showing a bare id.
 const teams = ref<OnCallTeam[]>([]);
+const responses = ref<OnCallResponse[]>([]);
+const pagesLoading = ref(false);
+const testingPage = ref(false);
+const overview = ref<TeamOverview | null>(null);
+const reachability = ref<TeamReachability | null>(null);
+const configRisks = ref<ConfigRisks | null>(null);
+const teamLoad = ref<TeamLoad | null>(null);
 const ruleCount = ref(0);
 // Where the team actually is in its setup decides the landing tab. A brand
 // new team opens on Members, because a schedule with nobody in it is not
@@ -170,86 +334,136 @@ const editOpen = ref(false);
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const teamId = computed(() => String(route.params.teamId ?? ""));
 
-const subtitle = computed(() =>
-  team.value
-    ? t("oncall.teamSubtitle", { tz: team.value.timezone, count: members.value.length })
-    : undefined,
-);
+/// The tabs, in the order they render. Also the route's whitelist — a `:tab`
+/// outside this set is ignored rather than left on a panel that does not exist.
+const TEAM_TABS = ["overview", "members", "schedule", "policy", "ownership"] as const;
 
-const rotationCount = computed(() => schedule.value?.rotations?.length ?? 0);
+/// Which tab the URL asked for.
+///
+/// The setup checklist and the policies list both deep-link here with a `tab`
+/// param, and the view was never reading it — the links only appeared to work
+/// because the default landing tab happened to be the one they asked for.
+const routeTab = computed(() => {
+  const tab = String(route.params.tab ?? "");
+  return (TEAM_TABS as readonly string[]).includes(tab) ? tab : null;
+});
 
-/// A team with no rotation pages nobody, and a team with no routing rule is
-/// never reached in the first place. Both are worth a colour before they cost
-/// somebody an outage.
-const summaryStats = computed<StatItem[]>(() => [
+/// The counts come from the overview, which counts alert rules routed here in
+/// the database. Falls back to what the page already knows when that call has
+/// not answered — a header that waits on a second request reads as broken.
+/// The server's count when it has answered, otherwise what the page already
+/// knows — a header that waits on a second request reads as broken.
+const memberCount = computed(() => overview.value?.members ?? members.value.length);
+
+const subtitle = computed(() => {
+  if (!team.value) return undefined;
+  const rules = overview.value?.alerts_assigned;
+  const base = t(
+    "oncall.teamSubtitle",
+    { tz: team.value.timezone, count: memberCount.value },
+    memberCount.value,
+  );
+  if (rules === undefined) return base;
+  return raw(`${base} · ${t("oncall.teamAlertRules", { count: rules }, rules)}`);
+});
+
+const ABSENT = raw("—");
+
+/// Pages this team was woken by, inside the activity window.
+const recentPages = computed(() => {
+  const since = Date.now() * 1000 - ACTIVITY_WINDOW_MICROS;
+  return responses.value.filter((row) => row.opened_at >= since);
+});
+
+/// The delay before a record's ladder would have woken a SECOND person. Read
+/// from the policy so it needs no per-record request and covers every page.
+function secondRungDelay(record: OnCallResponse): number | null {
+  const steps = policy.value?.rungs.find((rung) => rung.priority === record.priority)?.steps;
+  if (!steps || steps.length < 2) return null;
+  return [...steps].sort((a, b) => a.after_micros - b.after_micros)[1].after_micros;
+}
+
+function timeToAck(record: OnCallResponse) {
+  return record.acked_at ? raw(formatMicrosDuration(record.acked_at - record.opened_at)) : ABSENT;
+}
+
+/// Whether anybody beyond the first responder was woken — the same policy-based
+/// answer the activity panel counts.
+function didEscalate(record: OnCallResponse): boolean {
+  const after = secondRungDelay(record);
+  if (after === null) return false;
+  const delay = record.acked_at ? record.acked_at - record.opened_at : null;
+  return delay === null ? false : delay >= after;
+}
+
+const pageColumns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
   {
-    key: "oncall",
-    label: t("oncall.statOnCallNow"),
-    value: onCallNow.value.length ? raw(onCallNow.value[0].user_email) : ABSENT,
-    icon: "notifications-active",
-    tone: onCallNow.value.length ? "success" : "error",
-    dataTest: "oncall-team-stat-oncall",
-    // Answered by the schedule, so it opens the same tab the rotation tile does.
-    selectable: true,
+    id: "opened_at",
+    header: t("oncall.openedAt"),
+    size: 140,
+    accessorKey: "opened_at",
+    sortable: true,
   },
   {
-    key: "rotations",
-    label: t("oncall.statRotations"),
-    value: rotationCount.value,
-    icon: "calendar-month",
-    tone: rotationCount.value ? "neutral" : "warning",
-    dataTest: "oncall-team-stat-rotations",
-    selectable: true,
+    id: "title",
+    header: t("oncall.subject"),
+    accessorFn: (row: OnCallResponse) => row.title || row.subject.source_id,
+    sortable: true,
+    meta: { isName: true },
   },
   {
-    key: "members",
-    label: t("oncall.members"),
-    value: members.value.length,
-    icon: "group-work",
-    tone: "neutral",
-    dataTest: "oncall-team-stat-members",
-    selectable: true,
+    id: "acked_by",
+    header: t("oncall.teamAnsweredBy"),
+    size: 180,
+    accessorFn: (row: OnCallResponse) => row.acked_by ?? "",
+    sortable: true,
   },
   {
-    key: "rules",
-    label: t("oncall.statRoutingRules"),
-    value: ruleCount.value,
-    icon: "account-tree",
-    tone: ruleCount.value ? "neutral" : "warning",
-    dataTest: "oncall-team-stat-rules",
-    selectable: true,
+    id: "time_to_ack",
+    header: t("oncall.timeToAck"),
+    size: 120,
+    accessorFn: (row: OnCallResponse) =>
+      row.acked_at ? row.acked_at - row.opened_at : Number.MAX_SAFE_INTEGER,
+    sortable: true,
+  },
+  {
+    id: "escalated",
+    header: t("oncall.teamEscalatedCol"),
+    size: 120,
+    accessorFn: (row: OnCallResponse) => (didEscalate(row) ? 1 : 0),
+    sortable: true,
   },
 ]);
 
-/// Which tab answers each tile. A tile coloured warning states a problem and
-/// then left the reader to find the fix themselves.
-const STAT_TAB: Record<string, string> = {
-  oncall: "schedule",
-  rotations: "schedule",
-  members: "members",
-  rules: "ownership",
-};
-
-function openStatTab(key: string) {
-  const tab = STAT_TAB[key];
-  if (tab) activeTab.value = tab;
+function openPage(row: OnCallResponse) {
+  router.push({
+    name: "onCallResponseDetail",
+    params: { responseId: row.id },
+    query: { org_identifier: orgId.value },
+  });
 }
 
-const ABSENT = raw("—");
+function openOnCallList() {
+  router.push({ name: "onCallResponses", query: { org_identifier: orgId.value } });
+}
+
+/// The banner already resolved which tab repairs the finding.
+function onAttentionAct(tab: string) {
+  activeTab.value = tab;
+}
 
 async function fetchAll() {
   const org_identifier = orgId.value;
   const team_id = teamId.value;
   try {
-    const [teamRes, memberRes, scheduleRes, policyRes, onCallRes, teamsRes] =
-      await Promise.all([
-        oncallService.getTeam({ org_identifier, team_id }),
-        oncallService.listMembers({ org_identifier, team_id }),
-        oncallService.getSchedule({ org_identifier, team_id }),
-        oncallService.getPolicy({ org_identifier, team_id }),
-        oncallService.whoIsOnCall({ org_identifier, team_id }),
-        oncallService.listTeams({ org_identifier }),
-      ]);
+    const [teamRes, memberRes, scheduleRes, policyRes, onCallRes, teamsRes] = await Promise.all([
+      oncallService.getTeam({ org_identifier, team_id }),
+      oncallService.listMembers({ org_identifier, team_id }),
+      oncallService.getSchedule({ org_identifier, team_id }),
+      oncallService.getPolicy({ org_identifier, team_id }),
+      oncallService.whoIsOnCall({ org_identifier, team_id }),
+      oncallService.listTeams({ org_identifier }),
+    ]);
     team.value = teamRes.data;
     teams.value = teamsRes.data ?? [];
     members.value = memberRes.data ?? [];
@@ -258,10 +472,10 @@ async function fetchAll() {
     onCallNow.value = onCallRes.data ?? [];
     // Only on success, so a failed load never renders a team as uncovered.
     if (!loaded.value) {
-      activeTab.value = members.value.length ? "schedule" : "members";
+      activeTab.value = routeTab.value ?? (members.value.length ? "overview" : "members");
     }
     loaded.value = true;
-    await fetchRuleCount();
+    await Promise.allSettled([fetchRuleCount(), fetchPages(), fetchInsights()]);
   } catch (err: any) {
     toast({
       variant: "error",
@@ -281,6 +495,95 @@ async function fetchRuleCount() {
     ruleCount.value = (res.data ?? []).length;
   } catch {
     ruleCount.value = 0;
+  }
+}
+
+/// The team's own pages, for the activity panel and the overview list. A
+/// failure here costs those two surfaces, never the rest of the page.
+/// The three insight calls. Each degrades one panel rather than the page, so
+/// they are settled independently and never block the team from rendering.
+async function fetchInsights() {
+  const org_identifier = orgId.value;
+  const team_id = teamId.value;
+  const [ov, reach, risks, load] = await Promise.allSettled([
+    oncallService.teamOverview({ org_identifier, team_id }),
+    oncallService.teamReachability({ org_identifier, team_id }),
+    oncallService.teamConfigRisks({ org_identifier, team_id }),
+    oncallService.teamLoad({ org_identifier, team_id }),
+  ]);
+  overview.value = ov.status === "fulfilled" ? (ov.value.data ?? null) : null;
+  reachability.value = reach.status === "fulfilled" ? (reach.value.data ?? null) : null;
+  configRisks.value = risks.status === "fulfilled" ? (risks.value.data ?? null) : null;
+  teamLoad.value = load.status === "fulfilled" ? (load.value.data ?? null) : null;
+}
+
+async function fetchPages() {
+  pagesLoading.value = true;
+  try {
+    const res = await oncallService.listResponses({
+      org_identifier: orgId.value,
+      team_id: teamId.value,
+      include_resolved: true,
+    });
+    responses.value = res.data ?? [];
+  } catch {
+    responses.value = [];
+  } finally {
+    pagesLoading.value = false;
+  }
+}
+
+/// Priorities whose ladder wakes nobody — the count the escalation tab badges.
+const silentPriorities = computed(
+  () => (overview.value?.rungs ?? []).filter((rung) => !rung.pages_anyone).length,
+);
+
+/// `total` rather than `risks.length`: the server truncates the list it
+/// returns but reports the real count, and a badge that quietly under-reported
+/// would be worse than no badge.
+const configRiskCount = computed(() => configRisks.value?.total ?? 0);
+
+/// Says so rather than firing a request that 404s. Every one of these is a
+/// design element with no endpoint behind it yet.
+function notAvailable(featureKey: "pageThisTeam" | "takeOverride") {
+  toast({
+    variant: "info",
+    message: t("oncall.notAvailableYet", { feature: t(`oncall.${featureKey}`) }),
+  });
+}
+
+/// The one honest answer to "would a page actually land": send a real one and
+/// report who it reached. `reached_anyone: false` carries the server's own
+/// reason, which is rendered verbatim rather than re-worded.
+async function sendTestPage() {
+  testingPage.value = true;
+  try {
+    const res = await oncallService.testPage({
+      org_identifier: orgId.value,
+      team_id: teamId.value,
+    });
+    const data = res.data;
+    const reached = data?.recipients?.length ?? 0;
+    if (data?.reached_anyone && reached) {
+      toast({
+        variant: "success",
+        message: t("oncall.testPageSent", { count: reached }, reached),
+      });
+    } else {
+      toast({
+        variant: "warning",
+        message: t("oncall.testPageNobody", {
+          reason: raw(data?.not_sent_because) || t("oncall.wouldPageNobody"),
+        }),
+      });
+    }
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.testPageFailed"),
+    });
+  } finally {
+    testingPage.value = false;
   }
 }
 

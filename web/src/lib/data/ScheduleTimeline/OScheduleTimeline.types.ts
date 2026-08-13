@@ -17,8 +17,13 @@ import type { I18nText } from "@/types/i18n";
  * five-person rotation never puts two neighbouring bands on one hue.
  * `gap` is the one alarming value — nobody is covering this span — and gets the
  * error-tinted `--color-schedule-gap-*` treatment instead of a band tone.
+ *
+ * `covered` / `partial` answer a DIFFERENT question from the ramp: not "who is
+ * on this span" but "how much cover does it have". The ramp is deliberately
+ * pale because its job is only to separate neighbours; a coverage bar needs
+ * solid status colour, so these two are status-toned rather than decorative.
  */
-export type ScheduleBandTone = 1 | 2 | 3 | 4 | 5 | 6 | "gap";
+export type ScheduleBandTone = 1 | 2 | 3 | 4 | 5 | 6 | "gap" | "covered" | "partial";
 
 /** Number of distinct decorative band tones, for callers hashing into the ramp. */
 export const SCHEDULE_BAND_TONE_COUNT = 6;
