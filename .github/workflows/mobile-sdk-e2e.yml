@@ -499,7 +499,10 @@ jobs:
             || { echo "::error::RUM ingest canary POST failed — pipeline broken, aborting before suite"; exit 1; }
           echo "RUM ingest canary OK — token + pipeline verified on the runner OpenObserve"
           {
-            echo "O2_RUM_HOST=http://10.0.2.2:5080"
+            # iOS simulator shares the host network stack, so it reaches the native OO at localhost.
+            # (10.0.2.2 is the ANDROID emulator's host alias and is unreachable from an iOS sim —
+            # using it here silently dropped every upload → 0 rows in _rumdata.)
+            echo "O2_RUM_HOST=http://127.0.0.1:5080"
             echo "O2_RUM_ORG=default"
             echo "O2_RUM_TOKEN=$TOKEN"
             echo "O2_RUM_ENV=testing"
@@ -627,8 +630,11 @@ jobs:
           if [ ! -d all-blob-reports ] || [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
             echo "::warning::no blob reports found (device jobs may have been skipped)"; exit 0
           fi
-          npx playwright merge-reports --reporter html,json ./all-blob-reports || true
-          test -f playwright-report/index.html && echo "merged report OK"
+          # -c merge.config.js supplies a single relative testDir so blobs from Linux (Android) and
+          # macOS (iOS) merge despite their different absolute recording paths. Never fail the job:
+          # producing the report (pass OR fail data) is the whole point, even when a device job is red.
+          npx playwright merge-reports -c merge.config.js ./all-blob-reports || echo "::warning::merge-reports reported an error"
+          test -f playwright-report/index.html && echo "merged report OK" || echo "::warning::no merged index.html produced"
       - name: Upload merged HTML report
         if: always()
         uses: actions/upload-artifact@v4
