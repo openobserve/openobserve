@@ -9,6 +9,29 @@ use serde::{Deserialize, Serialize};
 
 pub const LLM_EXPERIMENT_STREAM: &str = "_llm_experiment";
 
+/// Permanent evidence reason shared by Experiment execution and score records.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExperimentSkipReason {
+    NoReference,
+    NoTrace,
+}
+
+impl ExperimentSkipReason {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NoReference => "no_reference",
+            Self::NoTrace => "no_trace",
+        }
+    }
+}
+
+impl std::fmt::Display for ExperimentSkipReason {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 /// Stable logical identity for one immutable Experiment slot.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ExperimentSlotId {
@@ -63,7 +86,7 @@ pub struct ExperimentExecutionRecord {
     pub error_message: Option<String>,
     /// Permanent reason an intentionally ineligible slot was not executed.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub skip_reason: Option<String>,
+    pub skip_reason: Option<ExperimentSkipReason>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_attempt_count: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -98,7 +121,7 @@ impl ExperimentExecutionRecord {
         Self {
             output: Some(serde_json::Value::String(String::new())),
             error_message: Some(String::new()),
-            skip_reason: Some(String::new()),
+            skip_reason: Some(ExperimentSkipReason::NoReference),
             error_attempt_count: Some(0),
             latency_ms: Some(0),
             tokens_in: Some(0),
@@ -115,7 +138,10 @@ impl ExperimentExecutionRecord {
 mod tests {
     use serde_json::json;
 
-    use super::{ExperimentExecutionRecord, ExperimentExecutionStatus, LLM_EXPERIMENT_STREAM};
+    use super::{
+        ExperimentExecutionRecord, ExperimentExecutionStatus, ExperimentSkipReason,
+        LLM_EXPERIMENT_STREAM,
+    };
 
     #[test]
     fn execution_record_round_trips_the_normalized_slot_contract() {
@@ -212,15 +238,19 @@ mod tests {
             row_id: "row-1".to_string(),
             trial_index: 0,
             status: ExperimentExecutionStatus::Skipped,
-            skip_reason: Some("no_reference".to_string()),
+            skip_reason: Some(ExperimentSkipReason::NoReference),
             _timestamp: 12,
             ..Default::default()
         };
 
         let value = serde_json::to_value(&record).unwrap();
+        assert_eq!(value["skip_reason"], "no_reference");
         let round_trip: ExperimentExecutionRecord = serde_json::from_value(value).unwrap();
 
         assert!(round_trip.is_terminal());
-        assert_eq!(round_trip.skip_reason.as_deref(), Some("no_reference"));
+        assert_eq!(
+            round_trip.skip_reason,
+            Some(ExperimentSkipReason::NoReference)
+        );
     }
 }

@@ -7,6 +7,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use config::meta::self_reporting::llm_experiments::ExperimentSkipReason;
 use openobserve_core::llm_evaluations::{
     datasets::{DatasetItemSource, DatasetSnapshotFilter},
     experiment_evidence::{ExperimentApplicabilityPreview, ExperimentScorerApplicabilityPreview},
@@ -462,6 +463,12 @@ pub struct ExperimentScoreSummaryBody {
     pub skipped_count: u64,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct ScoreEvidenceCounts {
+    successful: u64,
+    skipped: u64,
+}
+
 /// Derive deterministic API progress from the latest durable execution and
 /// score evidence. Intentionally skipped work is reported, but excluded from
 /// task and scoring denominators.
@@ -483,11 +490,15 @@ pub fn experiment_result_summary(
         ))
     }
 
+    fn skip_reason(value: &Value) -> Option<ExperimentSkipReason> {
+        serde_json::from_value(value.get("skip_reason")?.clone()).ok()
+    }
+
     let fully_skipped = executions
         .iter()
         .filter(|record| {
             record.get("status").and_then(Value::as_str) == Some("skipped")
-                && record.get("skip_reason").and_then(Value::as_str) == Some("no_reference")
+                && skip_reason(record) == Some(ExperimentSkipReason::NoReference)
         })
         .filter_map(slot_key)
         .collect::<HashSet<_>>();
@@ -506,10 +517,19 @@ pub fn experiment_result_summary(
         .iter()
         .filter(|score| score.get("status").and_then(Value::as_str) == Some("skipped"))
         .collect::<Vec<_>>();
-    let partially_skipped = skipped_scores
+    let planned_reference_skip_slots = skipped_scores
+        .iter()
+        .filter(|score| skip_reason(score) == Some(ExperimentSkipReason::NoReference))
+        .filter_map(|score| slot_key(score))
+        .collect::<HashSet<_>>();
+    let observed_permanent_skip_slots = skipped_scores
         .iter()
         .filter_map(|score| slot_key(score))
+        .collect::<HashSet<_>>();
+    let partially_skipped = planned_reference_skip_slots
+        .union(&observed_permanent_skip_slots)
         .filter(|slot| !fully_skipped.contains(slot))
+        .cloned()
         .collect::<HashSet<_>>();
     let successful_scores = scores
         .iter()
@@ -524,7 +544,7 @@ pub fn experiment_result_summary(
     let no_trace_dimensions = u64::try_from(
         skipped_scores
             .iter()
-            .filter(|score| score.get("skip_reason").and_then(Value::as_str) == Some("no_trace"))
+            .filter(|score| skip_reason(score) == Some(ExperimentSkipReason::NoTrace))
             .count(),
     )
     .unwrap_or(u64::MAX);
@@ -543,15 +563,13 @@ pub fn experiment_result_summary(
     };
     let skip_summary = ExperimentSkipSummaryBody {
         fully_skipped_slots: applicability.fully_skipped_slot_count,
-        partially_skipped_slots: applicability
-            .partially_skipped_slot_count
-            .max(u64::try_from(partially_skipped.len()).unwrap_or(u64::MAX)),
+        partially_skipped_slots: u64::try_from(partially_skipped.len()).unwrap_or(u64::MAX),
         skipped_dimensions,
         no_reference_dimensions,
         no_trace_dimensions,
     };
 
-    let mut counts = HashMap::<(&str, i32), (u64, u64)>::new();
+    let mut counts = HashMap::<(&str, i32), ScoreEvidenceCounts>::new();
     for score in scores {
         let Some(scorer_id) = score.get("scorer_id").and_then(Value::as_str) else {
             continue;
@@ -565,15 +583,15 @@ pub fn experiment_result_summary(
         };
         let entry = counts.entry((scorer_id, scorer_version)).or_default();
         if score.get("status").and_then(Value::as_str) == Some("skipped") {
-            entry.1 = entry.1.saturating_add(1);
+            entry.skipped = entry.skipped.saturating_add(1);
         } else {
-            entry.0 = entry.0.saturating_add(1);
+            entry.successful = entry.successful.saturating_add(1);
         }
     }
     let score_summaries = scorers
         .iter()
         .map(|scorer| {
-            let (sample_count, _) = counts
+            let evidence_counts = counts
                 .get(&(scorer.id.as_str(), scorer.version))
                 .copied()
                 .unwrap_or_default();
@@ -589,13 +607,13 @@ pub fn experiment_result_summary(
                 .iter()
                 .filter(|score| {
                     score.get("scorer_id").and_then(Value::as_str) == Some(scorer.id.as_str())
-                        && score.get("skip_reason").and_then(Value::as_str) == Some("no_trace")
+                        && skip_reason(score) == Some(ExperimentSkipReason::NoTrace)
                 })
                 .count();
             ExperimentScoreSummaryBody {
                 scorer_id: scorer.id.clone(),
                 scorer_version: scorer.version,
-                sample_count,
+                sample_count: evidence_counts.successful,
                 skipped_count: predicted_no_reference
                     .saturating_add(u64::try_from(observed_no_trace).unwrap_or(u64::MAX)),
             }
@@ -747,5 +765,31 @@ mod tests {
         assert_eq!(summaries[0].skipped_count, 1);
         assert_eq!(summaries[1].sample_count, 0);
         assert_eq!(summaries[1].skipped_count, 2);
+    }
+
+    #[test]
+    fn partial_skip_slots_are_the_exact_union_of_permanent_dimension_evidence() {
+        let applicability = ExperimentApplicabilityPreviewBody {
+            partially_skipped_slot_count: 99,
+            eligible_task_slot_count: 3,
+            eligible_scoring_dimension_count: 3,
+            scorer_applicability: vec![],
+            ..Default::default()
+        };
+        let executions = vec![
+            serde_json::json!({"row_id": "row-full", "trial_index": 0, "status": "skipped", "skip_reason": "no_reference"}),
+            serde_json::json!({"row_id": "row-reference", "trial_index": 0, "status": "ok"}),
+            serde_json::json!({"row_id": "row-trace", "trial_index": 0, "status": "ok"}),
+        ];
+        let scores = vec![
+            serde_json::json!({"row_id": "row-full", "trial_index": 0, "status": "skipped", "skip_reason": "no_reference"}),
+            serde_json::json!({"row_id": "row-reference", "trial_index": 0, "status": "skipped", "skip_reason": "no_reference"}),
+            serde_json::json!({"row_id": "row-trace", "trial_index": 0, "status": "skipped", "skip_reason": "no_trace"}),
+            serde_json::json!({"row_id": "row-trace", "trial_index": 0, "status": "skipped", "skip_reason": "no_reference"}),
+        ];
+
+        let (_, _, skips, _) = experiment_result_summary(&applicability, &[], &executions, &scores);
+
+        assert_eq!(skips.partially_skipped_slots, 2);
     }
 }

@@ -20,6 +20,8 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+use super::llm_experiments::ExperimentSkipReason;
+
 pub const LLM_SCORES_STREAM: &str = "_llm_scores";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -205,7 +207,7 @@ pub struct LlmScoreRecord {
     pub status: LlmScoreStatus,
     /// Permanent reason this dimension was intentionally not scored.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub skip_reason: Option<String>,
+    pub skip_reason: Option<ExperimentSkipReason>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scorer_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -349,7 +351,7 @@ impl LlmScoreRecord {
             job_id: Some(String::new()),
             job_version: Some(0),
             reasoning: Some(String::new()),
-            skip_reason: Some(String::new()),
+            skip_reason: Some(ExperimentSkipReason::NoReference),
             metadata: Some(serde_json::json!({})),
             author: Some(String::new()),
             ..Self::default()
