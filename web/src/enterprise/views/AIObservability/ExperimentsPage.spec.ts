@@ -13,11 +13,14 @@ const route = reactive({ query: { selected: "one" } as Record<string, string> })
 
 const experiment = (id: string) => makeExperiment({ id, name: `Experiment ${id}` });
 
-const { cancelExperiment, retryExperiment, cloneExperiment } = vi.hoisted(() => ({
-  cancelExperiment: vi.fn(),
-  retryExperiment: vi.fn(),
-  cloneExperiment: vi.fn(),
-}));
+const { cancelExperiment, retryExperiment, cloneExperiment, compareExperiments, getExperimentRow } =
+  vi.hoisted(() => ({
+    cancelExperiment: vi.fn(),
+    retryExperiment: vi.fn(),
+    cloneExperiment: vi.fn(),
+    compareExperiments: vi.fn(),
+    getExperimentRow: vi.fn(),
+  }));
 
 const details = new Map<string, ExperimentDetail>(
   ["one", "two"].map((id) => {
@@ -59,6 +62,8 @@ vi.mock("@/services/llm-experiments.service", () => ({
     cancel: cancelExperiment,
     retry: retryExperiment,
     clone: cloneExperiment,
+    compare: compareExperiments,
+    getRow: getExperimentRow,
   },
 }));
 
@@ -77,9 +82,85 @@ beforeEach(() => {
   cancelExperiment.mockReset();
   retryExperiment.mockReset();
   cloneExperiment.mockReset();
+  compareExperiments.mockReset();
+  getExperimentRow.mockReset();
 });
 
 describe("ExperimentsPage navigation", () => {
+  it("loads the deep-linked comparison and fetches each side with its retained row ID", async () => {
+    const comparisonRow = {
+      logicalId: "case-1",
+      baselineRowId: "old-row",
+      candidateRowId: "new-row",
+      bucket: "regressed" as const,
+      dimensions: [],
+    };
+    compareExperiments.mockResolvedValue({
+      baselineId: "one",
+      candidateId: "two",
+      datasetId: "dataset-1",
+      threshold: 0,
+      assignmentRule: "Any regression wins",
+      counts: {
+        baselineRows: 1,
+        candidateRows: 1,
+        commonRows: 1,
+        regressed: 1,
+        improved: 0,
+        unchanged: 0,
+        new: 0,
+        missing: 0,
+      },
+      dimensions: [],
+      rows: [comparisonRow],
+    });
+    getExperimentRow.mockImplementation(
+      async (_org: string, experimentId: string, rowId: string) => ({
+        experimentId,
+        snapshot: { datasetId: "dataset-1", datasetVersion: 1 },
+        navigation: {
+          rowIndex: 0,
+          totalRows: 1,
+          previousRowId: null,
+          nextRowId: null,
+        },
+        rowId,
+        logicalId: "case-1",
+        input: null,
+        expectedOutput: null,
+        trials: [],
+        scoreSummaries: [],
+      }),
+    );
+    route.query = { baseline: "one", candidate: "two" };
+
+    const wrapper = mount(ExperimentsPage, {
+      global: {
+        stubs: {
+          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
+          ExperimentBrowser: true,
+          ExperimentComparisonPanel: {
+            props: ["comparison"],
+            template: `<button data-test="inspect-comparison" @click="$emit('inspect', comparison.rows[0])">Inspect</button>`,
+          },
+          ExperimentComparisonRowDrawer: true,
+          OButton: true,
+          OTag: true,
+          OInput: true,
+          OTextarea: true,
+          OSelect: true,
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(compareExperiments).toHaveBeenCalledWith("acme", "one", "two", 0);
+    await wrapper.get('[data-test="inspect-comparison"]').trigger("click");
+    await flushPromises();
+    expect(getExperimentRow).toHaveBeenNthCalledWith(1, "acme", "one", "old-row");
+    expect(getExperimentRow).toHaveBeenNthCalledWith(2, "acme", "two", "new-row");
+  });
+
   it("shows skip tiers, typed status, and scorer sample counts", async () => {
     const row = experiment("one");
     details.set(

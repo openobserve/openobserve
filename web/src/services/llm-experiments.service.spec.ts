@@ -29,6 +29,65 @@ beforeEach(() => {
 });
 
 describe("llmExperimentsService", () => {
+  it("loads an honest comparison and preserves per-side row identities and coverage", async () => {
+    get.mockResolvedValue({
+      data: {
+        baseline_id: "baseline",
+        candidate_id: "candidate",
+        dataset_id: "dataset-1",
+        threshold: 0.05,
+        assignment_rule: "Any regression wins",
+        counts: {
+          baseline_rows: 2,
+          candidate_rows: 2,
+          common_rows: 1,
+          regressed: 1,
+          improved: 0,
+          unchanged: 0,
+          new: 1,
+          missing: 1,
+        },
+        dimensions: [
+          {
+            name: "quality",
+            kind: "score",
+            baseline: 0.8,
+            candidate: 0.6,
+            delta: -0.2,
+            baseline_sample_count: 2,
+            candidate_sample_count: 1,
+            comparable_row_count: 1,
+            baseline_only_row_count: 0,
+            candidate_only_row_count: 0,
+            assignment: "unchanged",
+          },
+        ],
+        rows: [
+          {
+            logical_id: "case-1",
+            baseline_row_id: "row-v1",
+            candidate_row_id: "row-v2",
+            bucket: "regressed",
+            dimensions: [],
+          },
+        ],
+      },
+    });
+
+    const comparison = await llmExperimentsService.compare("acme", "baseline", "candidate", 0.05);
+
+    expect(get).toHaveBeenCalledWith("/api/acme/experiments/compare", {
+      params: { baselineId: "baseline", candidateId: "candidate", threshold: 0.05 },
+    });
+    expect(comparison).toMatchObject({
+      baselineId: "baseline",
+      candidateId: "candidate",
+      counts: { commonRows: 1, new: 1, missing: 1 },
+      dimensions: [{ baselineSampleCount: 2, candidateSampleCount: 1 }],
+      rows: [{ logicalId: "case-1", baselineRowId: "row-v1", candidateRowId: "row-v2" }],
+    });
+  });
+
   it("previews pinned rows, trials, scorers, and reference-free samples", async () => {
     post.mockResolvedValue({
       data: {

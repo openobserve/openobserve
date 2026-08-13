@@ -212,6 +212,56 @@ export interface ExperimentScoreSummary {
   value: Record<string, unknown> | null;
 }
 
+export type ExperimentComparisonBucket = "regressed" | "improved" | "unchanged" | "new" | "missing";
+
+export type ExperimentComparisonAssignment =
+  "regressed" | "improved" | "unchanged" | "baseline_only" | "candidate_only" | "unavailable";
+
+export interface ExperimentComparisonDimension {
+  name: string;
+  kind: "score" | "cost" | "latency";
+  baseline: number | null;
+  candidate: number | null;
+  delta: number | null;
+  baselineSampleCount: number;
+  candidateSampleCount: number;
+  assignment: ExperimentComparisonAssignment;
+}
+
+export interface ExperimentComparisonSummaryDimension extends ExperimentComparisonDimension {
+  comparableRowCount: number;
+  baselineOnlyRowCount: number;
+  candidateOnlyRowCount: number;
+}
+
+export interface ExperimentComparisonRow {
+  logicalId: string;
+  baselineRowId: string | null;
+  candidateRowId: string | null;
+  bucket: ExperimentComparisonBucket;
+  dimensions: ExperimentComparisonDimension[];
+}
+
+export interface ExperimentComparison {
+  baselineId: string;
+  candidateId: string;
+  datasetId: string;
+  threshold: number;
+  assignmentRule: string;
+  counts: {
+    baselineRows: number;
+    candidateRows: number;
+    commonRows: number;
+    regressed: number;
+    improved: number;
+    unchanged: number;
+    new: number;
+    missing: number;
+  };
+  dimensions: ExperimentComparisonSummaryDimension[];
+  rows: ExperimentComparisonRow[];
+}
+
 export interface ExperimentResultQuery {
   sampleSize?: number;
   resultPage?: number;
@@ -459,6 +509,57 @@ export function normalizeExperimentRowDetail(input: any): ExperimentRowDetail {
   };
 }
 
+function normalizeComparisonDimension(input: any): ExperimentComparisonDimension {
+  return {
+    name: String(input?.name ?? ""),
+    kind: input?.kind,
+    baseline: value(input, "baseline", "baseline", null),
+    candidate: value(input, "candidate", "candidate", null),
+    delta: value(input, "delta", "delta", null),
+    baselineSampleCount: Number(value(input, "baselineSampleCount", "baseline_sample_count", 0)),
+    candidateSampleCount: Number(value(input, "candidateSampleCount", "candidate_sample_count", 0)),
+    assignment: input?.assignment,
+  };
+}
+
+export function normalizeExperimentComparison(input: any): ExperimentComparison {
+  const counts = input?.counts ?? {};
+  return {
+    baselineId: value(input, "baselineId", "baseline_id", ""),
+    candidateId: value(input, "candidateId", "candidate_id", ""),
+    datasetId: value(input, "datasetId", "dataset_id", ""),
+    threshold: Number(input?.threshold ?? 0),
+    assignmentRule: value(input, "assignmentRule", "assignment_rule", ""),
+    counts: {
+      baselineRows: Number(value(counts, "baselineRows", "baseline_rows", 0)),
+      candidateRows: Number(value(counts, "candidateRows", "candidate_rows", 0)),
+      commonRows: Number(value(counts, "commonRows", "common_rows", 0)),
+      regressed: Number(counts.regressed ?? 0),
+      improved: Number(counts.improved ?? 0),
+      unchanged: Number(counts.unchanged ?? 0),
+      new: Number(counts.new ?? 0),
+      missing: Number(counts.missing ?? 0),
+    },
+    dimensions: value<any[]>(input, "dimensions", "dimensions", []).map((dimension) => ({
+      ...normalizeComparisonDimension(dimension),
+      comparableRowCount: Number(value(dimension, "comparableRowCount", "comparable_row_count", 0)),
+      baselineOnlyRowCount: Number(
+        value(dimension, "baselineOnlyRowCount", "baseline_only_row_count", 0),
+      ),
+      candidateOnlyRowCount: Number(
+        value(dimension, "candidateOnlyRowCount", "candidate_only_row_count", 0),
+      ),
+    })),
+    rows: value<any[]>(input, "rows", "rows", []).map((row) => ({
+      logicalId: value(row, "logicalId", "logical_id", ""),
+      baselineRowId: value(row, "baselineRowId", "baseline_row_id", null),
+      candidateRowId: value(row, "candidateRowId", "candidate_row_id", null),
+      bucket: row.bucket,
+      dimensions: (row.dimensions ?? []).map(normalizeComparisonDimension),
+    })),
+  };
+}
+
 function normalizeProgress(input: any): ExperimentProgress {
   return {
     completed: Number(input?.completed ?? 0),
@@ -516,6 +617,18 @@ const llmExperimentsService = {
       preview: normalizePreview(response.data?.preview),
       results: normalizeResults(response.data?.results),
     };
+  },
+
+  async compare(
+    orgId: string,
+    baselineId: string,
+    candidateId: string,
+    threshold = 0,
+  ): Promise<ExperimentComparison> {
+    const response = await http().get(`${base(orgId)}/compare`, {
+      params: { baselineId, candidateId, threshold },
+    });
+    return normalizeExperimentComparison(response.data);
   },
 
   async cancel(orgId: string, experimentId: string): Promise<LlmExperiment> {
