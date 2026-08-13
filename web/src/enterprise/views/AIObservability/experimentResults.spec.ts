@@ -61,4 +61,22 @@ describe("experiment result slot filtering", () => {
     ]);
     expect(filterExperimentResultSlots([noReference, noTrace, error], "error")).toEqual([error]);
   });
+
+  it("classifies an ok execution with a failed scorer as error", () => {
+    const scorerError = slot({
+      taskStatus: "ok",
+      execution: { rowId: "row-1", status: "ok" } as ExperimentResultSlot["execution"],
+      scores: [
+        {
+          scorerId: "quality",
+          scorerVersion: 1,
+          status: "error",
+          score: { status: "error", error_message: "scorer exhausted retries" },
+        },
+      ],
+    });
+
+    expect(filterExperimentResultSlots([scorerError], "error")).toEqual([scorerError]);
+    expect(filterExperimentResultSlots([scorerError], "ok")).toEqual([]);
+  });
 });

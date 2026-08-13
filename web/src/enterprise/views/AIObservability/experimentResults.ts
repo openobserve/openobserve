@@ -8,7 +8,9 @@ export function experimentResultSlotStatus(slot: ExperimentResultSlot): string {
   const scoreSkipReason = slot.scores
     .map((score) => score.score?.skipReason ?? score.score?.skip_reason)
     .find((reason) => reason === "no_reference" || reason === "no_trace");
-  return slot.execution?.skipReason ?? scoreSkipReason ?? slot.taskStatus;
+  const hasError =
+    slot.taskStatus === "error" || slot.scores.some((score) => score.status === "error");
+  return slot.execution?.skipReason ?? scoreSkipReason ?? (hasError ? "error" : slot.taskStatus);
 }
 
 export function filterExperimentResultSlots(
