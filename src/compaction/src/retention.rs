@@ -738,6 +738,7 @@ async fn handle_delete_by_date_done(
 
 #[cfg(test)]
 mod tests {
+    use config::utils::time::parse_str_to_timestamp_micros;
     use itertools::Itertools;
 
     use super::*;
@@ -756,20 +757,13 @@ mod tests {
         assert!(res.is_ok());
     }
 
-    fn micros(s: &str) -> i64 {
-        DateTime::parse_from_rfc3339(s)
-            .unwrap()
-            .to_utc()
-            .timestamp_micros()
-    }
-
     #[test]
     fn test_generate_deletion_dates_keeps_the_day_of_the_retention_boundary() {
         // the retention boundary falls in the middle of 2026-08-06, that day still holds data
         // that is inside the retention period, so it must not be deleted
         let dates = generate_deletion_dates(
-            micros("2026-08-03T00:00:00Z"),
-            micros("2026-08-06T04:52:42Z"),
+            parse_str_to_timestamp_micros("2026-08-03T00:00:00Z").unwrap(),
+            parse_str_to_timestamp_micros("2026-08-06T04:52:42Z").unwrap(),
         );
         assert_eq!(
             dates,
@@ -784,8 +778,8 @@ mod tests {
     #[test]
     fn test_generate_deletion_dates_with_day_aligned_end() {
         let dates = generate_deletion_dates(
-            micros("2026-08-03T00:00:00Z"),
-            micros("2026-08-05T00:00:00Z"),
+            parse_str_to_timestamp_micros("2026-08-03T00:00:00Z").unwrap(),
+            parse_str_to_timestamp_micros("2026-08-05T00:00:00Z").unwrap(),
         );
         assert_eq!(
             dates,
@@ -800,15 +794,15 @@ mod tests {
     fn test_generate_deletion_dates_less_than_a_day() {
         assert!(
             generate_deletion_dates(
-                micros("2026-08-06T00:00:00Z"),
-                micros("2026-08-06T04:52:42Z"),
+                parse_str_to_timestamp_micros("2026-08-06T00:00:00Z").unwrap(),
+                parse_str_to_timestamp_micros("2026-08-06T04:52:42Z").unwrap(),
             )
             .is_empty()
         );
         assert!(
             generate_deletion_dates(
-                micros("2026-08-06T00:00:00Z"),
-                micros("2026-08-05T00:00:00Z"),
+                parse_str_to_timestamp_micros("2026-08-06T00:00:00Z").unwrap(),
+                parse_str_to_timestamp_micros("2026-08-05T00:00:00Z").unwrap(),
             )
             .is_empty()
         );
