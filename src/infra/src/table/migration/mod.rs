@@ -162,6 +162,7 @@ mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
 mod m20260809_000001_create_alert_eval_intervals_table;
 mod m20260811_000001_create_llm_experiments;
 mod m20260812_000001_add_provider_rate_limits;
+mod m20260813_000001_add_llm_experiment_lifecycle;
 
 /// Apply **only** the SLO tables, for targeted integration tests.
 ///
@@ -331,6 +332,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260809_000001_create_alert_eval_intervals_table::Migration),
             Box::new(m20260811_000001_create_llm_experiments::Migration),
             Box::new(m20260812_000001_add_provider_rate_limits::Migration),
+            Box::new(m20260813_000001_add_llm_experiment_lifecycle::Migration),
         ]
     }
 }
