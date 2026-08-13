@@ -516,4 +516,42 @@ describe("JourneySteps", () => {
       expect(text).toContain("Navigate");
     });
   });
+
+  // ── Row status spine ─────────────────────────────────────────────
+  //
+  // The 4px left border is the list's one way of saying "look at this row". Asserted
+  // against the REAL OTable, not a stub: BrowserJourney's own tests check what
+  // `getRowStatusColor` RETURNS, which says nothing about whether the table renders it.
+  describe("row status color", () => {
+    it("should render the status spine on a row the callback colours", async () => {
+      const steps = [makeStep({ id: "a" }), makeStep({ id: "b" })];
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: steps,
+          mode: "editor",
+          getRowStatusColor: (row: any) =>
+            row.id === "b" ? "var(--color-status-info-text)" : undefined,
+        },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const marked = wrapper.findAll('[data-status-bar="true"]');
+      expect(marked.length, "the table rendered no status spine at all").toBe(1);
+    });
+
+    it("should render no spine when the callback returns nothing", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: [makeStep({ id: "a" })],
+          mode: "editor",
+          getRowStatusColor: () => undefined,
+        },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-status-bar="true"]').length).toBe(0);
+    });
+  });
 });
