@@ -1223,12 +1223,12 @@
             "2"
           ],
           [
-            "batch-sync",
+            "lane-monitor",
             "100.0",
             "1"
           ],
           [
-            "lane-monitor",
+            "batch-sync",
             "100.0",
             "1"
           ],
