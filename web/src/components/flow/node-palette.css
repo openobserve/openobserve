@@ -197,8 +197,10 @@
 .dark .o2vf_node_default:hover {
   background: color-mix(in srgb, var(--color-warning-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-orange-400) 50%, transparent) !important;
+  /* amber-500 in dark / amber-600 in light — the ramp deliberately lightens on a
+     dark surface, same as --color-accent going primary-600 -> primary-400. */
   box-shadow: var(--shadow-glow-lg-geom)
-    color-mix(in srgb, var(--color-amber-600) 20%, transparent) !important;
+    color-mix(in srgb, var(--color-amber-500) 20%, transparent) !important;
 }
 
 .dark .o2vf_node_output {

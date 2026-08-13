@@ -133,7 +133,10 @@ export function useStickyColumns(props: any, store: any) {
         box-shadow: var(--shadow-sticky-left) !important;
       }
 
-      /* Right-sticky total column body cells: inset shadow on left */
+      /* Right-sticky total column body cells: shadow on the left edge. The
+         original drew an INSET shadow inside the column; the token casts
+         outward onto the scrolling cells instead. Same boundary, opposite
+         side, and it matches what OTable's sticky cells already do. */
       ${scope} tbody td.pivot-total-col {
         position: sticky !important;
         z-index: 2 !important;
@@ -141,19 +144,22 @@ export function useStickyColumns(props: any, store: any) {
         box-shadow: var(--shadow-sticky-right) !important;
       }
 
-      /* Middle sticky body cells (left + right): outward right + inset left */
+      /* Middle sticky body cells: outward on both edges */
       ${scope} tbody td.sticky-column.pivot-total-col {
         box-shadow: var(--shadow-sticky-left), var(--shadow-sticky-right) !important;
       }
 
-      /* Sticky total row (bottom sticky) */
+      /* Sticky total row (bottom sticky). --shadow-sticky-footer, NOT
+         --shadow-scroll-bottom: a pinned footer casts OUTWARD and UPWARD onto
+         the rows it overlaps. scroll-bottom is an INSET bottom-edge gradient
+         meaning "content continues below" — a different affordance entirely. */
       ${scope}.pivot-sticky-totals .pivot-sticky-total-row td {
         position: sticky !important;
         bottom: 0 !important;
         z-index: 2 !important;
         background-color: ${bgColor} !important;
         font-weight: bold !important;
-        box-shadow: var(--shadow-scroll-bottom) !important;
+        box-shadow: var(--shadow-sticky-footer) !important;
       }
 
       /* Corner: sticky total row + sticky total column intersection */

@@ -109,7 +109,7 @@
 .o2vf_node .vue-flow__node-default:hover {
   background: color-mix(in srgb, var(--color-amber-50) 95%, transparent);
   border-color: var(--color-amber-500);
-  box-shadow: var(--shadow-glow-lg-geom) color-mix(in srgb, var(--color-amber-500) 20%, transparent);
+  box-shadow: var(--shadow-glow-lg-geom) color-mix(in srgb, var(--color-amber-600) 20%, transparent);
 }
 
 .o2vf_node .vue-flow__node-output:hover {
