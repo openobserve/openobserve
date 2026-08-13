@@ -36,6 +36,7 @@ use datafusion::{
         ExecutionPlan,
         expressions::{BinaryExpr, LikeExpr},
         filter::{FilterExec, FilterExecBuilder},
+        projection::{ProjectionExec, ProjectionExpr},
     },
     scalar::ScalarValue,
 };
@@ -108,10 +109,8 @@ impl TreeNodeRewriter for PlanRewriter {
             }
 
             // 2. Rewrite the datasource projection to include FST fields
-            let mut add_fst_fields_to_projection = AddFstFieldsToProjection::new(
-                self.fields.iter().map(|f| f.0.clone()).collect(),
-                filter.schema(),
-            );
+            let mut add_fst_fields_to_projection =
+                AddFstFieldsToProjection::new(self.fields.iter().map(|f| f.0.clone()).collect());
             let input = filter
                 .input()
                 .clone()
@@ -133,8 +132,16 @@ impl TreeNodeRewriter for PlanRewriter {
                 .data()?;
 
             // 5. Create new filter with rewritten predicate
+            // Preserve the original filter output after adding helper FST fields. Mapping by
+            // name is required because the datasource projection may have been reordered.
+            let filter_projection = filter
+                .schema()
+                .fields()
+                .iter()
+                .map(|field| new_schema.index_of(field.name()))
+                .collect::<std::result::Result<Vec<_>, _>>()?;
             let new_filter = FilterExecBuilder::new(rewritten_predicate, input)
-                .apply_projection(add_fst_fields_to_projection.filter_projection.clone())?
+                .apply_projection(Some(filter_projection))?
                 .with_fetch(filter.fetch())
                 .build()?;
             return Ok(Transformed::yes(Arc::new(new_filter)));
@@ -362,6 +369,13 @@ fn rewrite_match_all_physical(
     }
 }
 
+// check if the expr is a plain reference to the given column
+fn is_column_named(expr: &Arc<dyn PhysicalExpr>, field: &str) -> bool {
+    expr.as_any()
+        .downcast_ref::<Column>()
+        .is_some_and(|column| column.name() == field)
+}
+
 // create like expr with not null physical
 fn create_like_expr_with_not_null_physical(
     schema: &Schema,
@@ -410,22 +424,70 @@ fn is_match_all_physical(expr: &Arc<dyn PhysicalExpr>) -> bool {
 
 struct AddFstFieldsToProjection {
     fst_fields: Vec<String>,
-    filter_schema: SchemaRef,
-    pub filter_projection: Option<Vec<usize>>,
 }
 
 impl AddFstFieldsToProjection {
-    pub fn new(fst_fields: Vec<String>, filter_schema: SchemaRef) -> Self {
-        Self {
-            fst_fields,
-            filter_schema,
-            filter_projection: None,
-        }
+    pub fn new(fst_fields: Vec<String>) -> Self {
+        Self { fst_fields }
     }
 }
 
 impl TreeNodeRewriter for AddFstFieldsToProjection {
     type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_down(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
+        if let Some(projection) = plan.as_any().downcast_ref::<ProjectionExec>() {
+            // Rewrite the input ourselves so we can update this projection's expressions
+            // before DataFusion tries to rebuild it with the changed input schema.
+            let input = projection.input().clone().rewrite(self)?.data;
+            let input_schema = input.schema();
+            let mut column_index_rewriter = ColumnIndexRewriter::new(input_schema.clone());
+            let mut projection_exprs = projection
+                .expr()
+                .iter()
+                .map(|projection_expr| {
+                    Ok(ProjectionExpr {
+                        expr: projection_expr
+                            .expr
+                            .clone()
+                            .rewrite(&mut column_index_rewriter)
+                            .data()?,
+                        alias: projection_expr.alias.clone(),
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            // CSE and other optimizer rules can insert projections between the filter and
+            // datasource. Carry newly requested FST fields through those projections.
+            for field in &self.fst_fields {
+                let Ok(index) = input_schema.index_of(field) else {
+                    continue;
+                };
+                match projection_exprs.iter().find(|expr| expr.alias == *field) {
+                    Some(expr) if is_column_named(&expr.expr, field) => {}
+                    Some(expr) => {
+                        return Err(DataFusionError::Internal(format!(
+                            "RewriteMatchAllRule: full text search field {field} is already used as an alias for {}",
+                            expr.expr
+                        )));
+                    }
+                    None => projection_exprs.push(ProjectionExpr {
+                        expr: Arc::new(Column::new(field, index)),
+                        alias: field.clone(),
+                    }),
+                }
+            }
+
+            let new_projection = ProjectionExec::try_new(projection_exprs, input)?;
+            return Ok(Transformed::new(
+                Arc::new(new_projection) as Self::Node,
+                true,
+                TreeNodeRecursion::Jump,
+            ));
+        }
+
+        Ok(Transformed::no(plan))
+    }
 
     fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
         if let Some(empty_exec) = plan.as_any().downcast_ref::<NewEmptyExec>() {
@@ -436,25 +498,15 @@ impl TreeNodeRewriter for AddFstFieldsToProjection {
             let mut parquet_projection = self
                 .fst_fields
                 .iter()
-                .map(|f| schema.index_of(f).unwrap())
-                .collect::<Vec<_>>();
+                .map(|field| schema.index_of(field))
+                .collect::<std::result::Result<Vec<_>, _>>()?;
             if let Some(projection) = empty_exec.projection() {
                 parquet_projection.extend(projection.iter().copied());
+            } else {
+                parquet_projection.extend(0..schema.fields().len());
             }
-            parquet_projection.sort();
+            parquet_projection.sort_unstable();
             parquet_projection.dedup();
-
-            // based on filter schema, create new filter projection
-            let mut filter_projection = self
-                .filter_schema
-                .fields()
-                .iter()
-                .map(|f| schema.index_of(f.name()).unwrap())
-                .filter_map(|i| parquet_projection.iter().position(|f| *f == i))
-                .collect::<Vec<_>>();
-            filter_projection.sort();
-            filter_projection.dedup();
-            self.filter_projection = Some(filter_projection);
 
             // create new NewEmptyExec with new projection
             let projected_schema = project_schema(&schema, Some(&parquet_projection))?;
@@ -664,5 +716,115 @@ mod tests {
             }
             Ok(TreeNodeRecursion::Continue)
         });
+    }
+
+    #[tokio::test]
+    async fn test_cse_projection_schema_propagation() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("log", DataType::Utf8, false),
+            Field::new("msg", DataType::Utf8, false),
+            Field::new("source_path", DataType::Utf8, false),
+        ]));
+
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new())
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_physical_optimizer_rules(vec![Arc::new(RewriteMatchPhysical::new(vec![(
+                "msg".to_string(),
+                DataType::Utf8,
+            )]))])
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("t", schema).with_partitions(1);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+
+        let sql = "WITH parsed AS (\
+            SELECT trim(log) AS api FROM t \
+            WHERE source_path LIKE '%access_log%' \
+              AND match_all('%/pharma-app/%')\
+        ) \
+        SELECT api FROM parsed \
+        WHERE api IS NOT NULL AND api LIKE '/v%/%'";
+        let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+        let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+        // Every ProjectionExec must reference the field at the same index in its input.
+        let mut found_cse_projection = false;
+        physical_plan
+            .apply(
+                &mut |node: &Arc<dyn ExecutionPlan>| -> Result<TreeNodeRecursion> {
+                    if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
+                        found_cse_projection |= projection
+                            .expr()
+                            .iter()
+                            .any(|expr| expr.alias.starts_with("__common_expr"));
+                        let input_schema = projection.input().schema();
+                        for projection_expr in projection.expr() {
+                            projection_expr.expr.apply(
+                                &mut |expr: &Arc<dyn PhysicalExpr>| -> Result<TreeNodeRecursion> {
+                                    if let Some(column) = expr.as_any().downcast_ref::<Column>() {
+                                        assert_eq!(
+                                            input_schema.index_of(column.name()).unwrap(),
+                                            column.index(),
+                                            "column '{}' has a stale index in ProjectionExec",
+                                            column.name()
+                                        );
+                                    }
+                                    Ok(TreeNodeRecursion::Continue)
+                                },
+                            )?;
+                        }
+                    }
+                    Ok(TreeNodeRecursion::Continue)
+                },
+            )
+            .unwrap();
+        assert!(found_cse_projection, "expected CSE to add a ProjectionExec");
+    }
+
+    #[tokio::test]
+    async fn test_filter_output_schema_when_fst_field_reorders_scan() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("msg", DataType::Utf8, false),
+            Field::new("source_path", DataType::Utf8, false),
+        ]));
+
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new())
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_physical_optimizer_rules(vec![Arc::new(RewriteMatchPhysical::new(vec![(
+                "msg".to_string(),
+                DataType::Utf8,
+            )]))])
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("t", schema).with_partitions(1);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+
+        let plan = ctx
+            .state()
+            .create_logical_plan(
+                "SELECT source_path FROM t \
+                 WHERE source_path LIKE '%access_log%' AND match_all('test')",
+            )
+            .await
+            .unwrap();
+        let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+        assert_eq!(
+            physical_plan
+                .schema()
+                .fields()
+                .iter()
+                .map(|field| field.name().as_str())
+                .collect::<Vec<_>>(),
+            vec!["source_path"]
+        );
     }
 }
