@@ -463,33 +463,30 @@ pub struct ExperimentScoreSummaryBody {
     pub scorer_id: String,
     pub scorer_version: i32,
     pub sample_count: u64,
+    pub no_reference_count: u64,
+    pub no_trace_count: u64,
     pub skipped_count: u64,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-struct SuccessfulScoreCount {
-    successful: u64,
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
+struct EvidenceSlotKey {
+    row_id: String,
+    trial_index: u64,
 }
 
 #[derive(Deserialize)]
 struct ExperimentExecutionEvidence {
-    row_id: String,
-    trial_index: u64,
+    #[serde(flatten)]
+    slot: EvidenceSlotKey,
     status: ExperimentExecutionStatus,
     #[serde(default)]
     skip_reason: Option<ExperimentSkipReason>,
 }
 
-impl ExperimentExecutionEvidence {
-    fn slot_key(&self) -> (String, u64) {
-        (self.row_id.clone(), self.trial_index)
-    }
-}
-
 #[derive(Deserialize)]
 struct ExperimentScoreEvidence {
-    row_id: String,
-    trial_index: u64,
+    #[serde(flatten)]
+    slot: EvidenceSlotKey,
     #[serde(default)]
     scorer_id: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_scorer_version")]
@@ -498,12 +495,6 @@ struct ExperimentScoreEvidence {
     status: LlmScoreStatus,
     #[serde(default)]
     skip_reason: Option<ExperimentSkipReason>,
-}
-
-impl ExperimentScoreEvidence {
-    fn slot_key(&self) -> (String, u64) {
-        (self.row_id.clone(), self.trial_index)
-    }
 }
 
 fn deserialize_optional_scorer_version<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
@@ -556,7 +547,7 @@ pub fn experiment_result_summary(
             record.status == ExperimentExecutionStatus::Skipped
                 && record.skip_reason == Some(ExperimentSkipReason::NoReference)
         })
-        .map(ExperimentExecutionEvidence::slot_key)
+        .map(|record| record.slot.clone())
         .collect::<HashSet<_>>();
     let completed_tasks = execution_evidence
         .iter()
@@ -566,7 +557,7 @@ pub fn experiment_result_summary(
                 ExperimentExecutionStatus::Ok | ExperimentExecutionStatus::Error
             )
         })
-        .map(ExperimentExecutionEvidence::slot_key)
+        .map(|record| record.slot.clone())
         .collect::<HashSet<_>>();
 
     let skipped_scores = score_evidence
@@ -577,7 +568,7 @@ pub fn experiment_result_summary(
     // once. Reference skips are already a strict subset of this evidence set.
     let observed_permanent_skip_slots = skipped_scores
         .iter()
-        .map(|score| score.slot_key())
+        .map(|score| score.slot.clone())
         .collect::<HashSet<_>>();
     let partially_skipped = observed_permanent_skip_slots
         .iter()
@@ -622,7 +613,7 @@ pub fn experiment_result_summary(
         no_trace_dimensions,
     };
 
-    let mut counts = HashMap::<(&str, i32), SuccessfulScoreCount>::new();
+    let mut successful_counts = HashMap::<(&str, i32), u64>::new();
     for score in &score_evidence {
         let Some(scorer_id) = score.scorer_id.as_deref() else {
             continue;
@@ -630,39 +621,43 @@ pub fn experiment_result_summary(
         let Some(scorer_version) = score.scorer_version else {
             continue;
         };
-        let entry = counts.entry((scorer_id, scorer_version)).or_default();
         if score.status == LlmScoreStatus::Success {
-            entry.successful = entry.successful.saturating_add(1);
+            let count = successful_counts
+                .entry((scorer_id, scorer_version))
+                .or_default();
+            *count = count.saturating_add(1);
         }
     }
     let score_summaries = scorers
         .iter()
         .map(|scorer| {
-            let evidence_counts = counts
+            let sample_count = successful_counts
                 .get(&(scorer.id.as_str(), scorer.version))
                 .copied()
                 .unwrap_or_default();
-            let predicted_no_reference = applicability
-                .scorer_applicability
-                .iter()
-                .find(|candidate| {
-                    candidate.scorer_id == scorer.id && candidate.scorer_version == scorer.version
-                })
-                .map(|candidate| candidate.no_reference_slot_count)
-                .unwrap_or_default();
-            let observed_no_trace = score_evidence
-                .iter()
-                .filter(|score| {
-                    score.scorer_id.as_deref() == Some(scorer.id.as_str())
-                        && score.skip_reason == Some(ExperimentSkipReason::NoTrace)
-                })
-                .count();
+            let skip_count = |reason| {
+                u64::try_from(
+                    score_evidence
+                        .iter()
+                        .filter(|score| {
+                            score.scorer_id.as_deref() == Some(scorer.id.as_str())
+                                && score.scorer_version == Some(scorer.version)
+                                && score.status == LlmScoreStatus::Skipped
+                                && score.skip_reason == Some(reason)
+                        })
+                        .count(),
+                )
+                .unwrap_or(u64::MAX)
+            };
+            let no_reference_count = skip_count(ExperimentSkipReason::NoReference);
+            let no_trace_count = skip_count(ExperimentSkipReason::NoTrace);
             ExperimentScoreSummaryBody {
                 scorer_id: scorer.id.clone(),
                 scorer_version: scorer.version,
-                sample_count: evidence_counts.successful,
-                skipped_count: predicted_no_reference
-                    .saturating_add(u64::try_from(observed_no_trace).unwrap_or(u64::MAX)),
+                sample_count,
+                no_reference_count,
+                no_trace_count,
+                skipped_count: no_reference_count.saturating_add(no_trace_count),
             }
         })
         .collect();
@@ -809,8 +804,12 @@ mod tests {
         assert_eq!(skips.no_reference_dimensions, 2);
         assert_eq!(skips.no_trace_dimensions, 1);
         assert_eq!(summaries[0].sample_count, 1);
+        assert_eq!(summaries[0].no_reference_count, 1);
+        assert_eq!(summaries[0].no_trace_count, 0);
         assert_eq!(summaries[0].skipped_count, 1);
         assert_eq!(summaries[1].sample_count, 0);
+        assert_eq!(summaries[1].no_reference_count, 1);
+        assert_eq!(summaries[1].no_trace_count, 1);
         assert_eq!(summaries[1].skipped_count, 2);
     }
 
