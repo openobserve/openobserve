@@ -130,6 +130,54 @@ describe("ExperimentsPage navigation", () => {
               skip_reason: "no_trace",
             },
           ],
+          slots: [
+            {
+              rowId: "row-1",
+              logicalId: "case-1",
+              trialIndex: 0,
+              input: null,
+              expectedOutput: null,
+              taskStatus: "skipped",
+              execution: {
+                experimentId: row.id,
+                itemLogicalId: "case-1",
+                rowId: "row-1",
+                trialIndex: 0,
+                status: "skipped",
+                skipReason: "no_reference",
+                output: null,
+                errorMessage: null,
+                latencyMs: null,
+                tokensIn: null,
+                tokensOut: null,
+                cost: null,
+                traceId: null,
+                timestamp: 1,
+              },
+              scores: [
+                {
+                  scorerId: "reference-quality",
+                  scorerVersion: 1,
+                  status: "skipped",
+                  score: {
+                    name: "reference-quality",
+                    status: "skipped",
+                    skip_reason: "no_reference",
+                  },
+                },
+                {
+                  scorerId: "trace-quality",
+                  scorerVersion: 1,
+                  status: "skipped",
+                  score: {
+                    name: "trace-quality",
+                    status: "skipped",
+                    skip_reason: "no_trace",
+                  },
+                },
+              ],
+            },
+          ],
           taskProgress: { completed: 0, total: 1, skipped: 1 },
           scoringProgress: { completed: 0, total: 1, skipped: 1 },
           skipSummary: {
@@ -144,11 +192,21 @@ describe("ExperimentsPage navigation", () => {
               scorerId: "quality",
               scorerVersion: 2,
               sampleCount: 0,
+              errorCount: 0,
+              pendingCount: 0,
               noReferenceCount: 1,
               noTraceCount: 1,
               skippedCount: 2,
+              value: { kind: "numeric", mean: 0.75 },
             },
           ],
+          aggregateSummary: {
+            p50LatencyMs: 12,
+            totalCost: 0.002,
+            incomplete: true,
+            incompleteTaskSlots: 1,
+            incompleteScoreDimensions: 1,
+          },
         },
       }),
     );
@@ -167,6 +225,8 @@ describe("ExperimentsPage navigation", () => {
     });
     await flushPromises();
 
+    expect(wrapper.findAll("progress")).toHaveLength(2);
+    expect(wrapper.findAll('[data-test="ai-experiment-result-slot"]')).toHaveLength(1);
     expect(wrapper.get('[data-test="ai-experiment-progress-summary"]').text()).toContain(
       "aiObservability.experiments.taskProgress",
     );
@@ -177,6 +237,7 @@ describe("ExperimentsPage navigation", () => {
     expect(wrapper.get('[data-test="ai-experiment-score-summaries"]').text()).toContain(
       "quality · v2: 0 samples, 1 no reference, 1 no trace",
     );
+    expect(wrapper.text()).toContain('"mean": 0.75');
   });
 
   it("updates the selected detail when Back/Forward changes the deep link", async () => {

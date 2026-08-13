@@ -473,7 +473,7 @@ pub struct ExperimentResultSlotBody {
     pub trial_index: u32,
     pub input: Value,
     pub expected_output: Option<Value>,
-    pub task_status: String,
+    pub task_status: ExperimentResultTaskStatusBody,
     pub execution: Option<Value>,
     pub scores: Vec<ExperimentResultScoreBody>,
 }
@@ -483,9 +483,28 @@ pub struct ExperimentResultSlotBody {
 pub struct ExperimentResultScoreBody {
     pub scorer_id: String,
     pub scorer_version: i32,
-    /// `pending` and `in_progress` are explicit placeholders without evidence.
-    pub status: String,
+    pub status: ExperimentResultScoreStatusBody,
     pub score: Option<Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExperimentResultTaskStatusBody {
+    Pending,
+    InProgress,
+    Ok,
+    Skipped,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExperimentResultScoreStatusBody {
+    Pending,
+    InProgress,
+    Success,
+    Skipped,
+    Error,
 }
 
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
@@ -620,15 +639,14 @@ pub fn experiment_result_slots(
                 .as_ref()
                 .and_then(|record| record.get("status"))
                 .and_then(Value::as_str)
-                .map(|status| {
-                    if status == "pending" {
-                        "in_progress"
-                    } else {
-                        status
-                    }
+                .map(|status| match status {
+                    "pending" => ExperimentResultTaskStatusBody::InProgress,
+                    "ok" => ExperimentResultTaskStatusBody::Ok,
+                    "skipped" => ExperimentResultTaskStatusBody::Skipped,
+                    "error" => ExperimentResultTaskStatusBody::Error,
+                    _ => ExperimentResultTaskStatusBody::Error,
                 })
-                .unwrap_or("pending")
-                .to_string();
+                .unwrap_or(ExperimentResultTaskStatusBody::Pending);
             let score_bodies = scorers
                 .iter()
                 .map(|scorer| {
@@ -644,12 +662,19 @@ pub fn experiment_result_slots(
                         .as_ref()
                         .and_then(|record| record.get("status"))
                         .and_then(Value::as_str)
-                        .map(ToString::to_string)
+                        .map(|status| match status {
+                            "success" => ExperimentResultScoreStatusBody::Success,
+                            "skipped" => ExperimentResultScoreStatusBody::Skipped,
+                            "error" => ExperimentResultScoreStatusBody::Error,
+                            _ => ExperimentResultScoreStatusBody::Error,
+                        })
                         .unwrap_or_else(|| {
-                            if execution.is_none() || task_status == "pending" {
-                                "pending".to_string()
+                            if execution.is_none()
+                                || task_status == ExperimentResultTaskStatusBody::Pending
+                            {
+                                ExperimentResultScoreStatusBody::Pending
                             } else {
-                                "in_progress".to_string()
+                                ExperimentResultScoreStatusBody::InProgress
                             }
                         });
                     ExperimentResultScoreBody {
@@ -1169,10 +1194,32 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["row-b", "row-a"]
         );
-        assert_eq!(rows[0].task_status, "pending");
-        assert_eq!(rows[0].scores[0].status, "pending");
-        assert_eq!(rows[1].task_status, "ok");
-        assert_eq!(rows[1].scores[0].status, "in_progress");
+        assert_eq!(rows[0].task_status, ExperimentResultTaskStatusBody::Pending);
+        assert_eq!(
+            rows[0].scores[0].status,
+            ExperimentResultScoreStatusBody::Pending
+        );
+        assert_eq!(rows[1].task_status, ExperimentResultTaskStatusBody::Ok);
+        assert_eq!(
+            rows[1].scores[0].status,
+            ExperimentResultScoreStatusBody::InProgress
+        );
+    }
+
+    #[test]
+    fn result_status_enums_serialize_only_the_public_lifecycle_vocabulary() {
+        assert_eq!(
+            serde_json::to_value(ExperimentResultTaskStatusBody::InProgress).unwrap(),
+            serde_json::json!("in_progress")
+        );
+        assert_eq!(
+            serde_json::to_value(ExperimentResultScoreStatusBody::Success).unwrap(),
+            serde_json::json!("success")
+        );
+        assert!(
+            serde_json::from_value::<ExperimentResultTaskStatusBody>(serde_json::json!("other"))
+                .is_err()
+        );
     }
 
     #[test]
