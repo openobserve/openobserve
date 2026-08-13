@@ -23,6 +23,7 @@ use crate::{
 };
 
 pub mod action_scripts;
+pub mod alert_composites;
 pub mod alert_eval_intervals;
 pub mod alert_incidents;
 pub mod alert_states;

@@ -48,6 +48,8 @@ pub enum TriggerModule {
     /// concurrency budget with latency-sensitive incremental passes would
     /// starve them (§6b.9).
     SloBackfill,
+    /// Boolean expression evaluated over durable child-alert rollup states.
+    CompositeAlert,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -61,6 +63,7 @@ impl std::fmt::Display for TriggerModule {
             Self::AnomalyDetection => write!(f, "anomaly_detection"),
             Self::Slo => write!(f, "slo"),
             Self::SloBackfill => write!(f, "slo_backfill"),
+            Self::CompositeAlert => write!(f, "composite_alert"),
         }
     }
 }
@@ -73,6 +76,9 @@ pub struct TriggerId {
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Trigger {
     pub id: i64,
+    /// Monotonic physical-claim generation used to fence reclaimed jobs.
+    #[serde(default)]
+    pub claim_epoch: i64,
     pub org: String,
     pub module: TriggerModule,
     pub module_key: String,
@@ -437,6 +443,7 @@ mod tests {
     fn test_trigger_start_end_time_none_absent_from_json() {
         let t = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "org".to_string(),
             module: TriggerModule::Alert,
             module_key: "k".to_string(),
@@ -459,6 +466,7 @@ mod tests {
     fn test_trigger_start_end_time_some_present_in_json() {
         let t = Trigger {
             id: 2,
+            claim_epoch: 0,
             org: "org".to_string(),
             module: TriggerModule::Alert,
             module_key: "k".to_string(),
@@ -510,6 +518,7 @@ mod tests {
     fn test_trigger_mem_size_at_least_struct_size() {
         let t = Trigger {
             id: 1,
+            claim_epoch: 0,
             org: "myorg".to_string(),
             module: TriggerModule::Alert,
             module_key: "key".to_string(),

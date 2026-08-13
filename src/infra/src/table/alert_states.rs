@@ -593,6 +593,19 @@ where
     Ok(())
 }
 
+/// Writes one state/transition update inside a caller-owned metadata
+/// transaction. Composite evaluation uses this after renewing and fencing its
+/// scheduler claim in the same transaction.
+pub async fn persist_update_in_transaction<C>(
+    txn: &C,
+    update: &StateUpdate,
+) -> Result<(), errors::Error>
+where
+    C: sea_orm::ConnectionTrait,
+{
+    write_update(txn, update).await
+}
+
 /// Append one transition row, inside a caller-owned transaction.
 ///
 /// Split out so the delivery callbacks can write a transition alongside their

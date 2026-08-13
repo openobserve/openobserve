@@ -623,6 +623,7 @@ pub async fn update_backfill_job(
             start_time: trigger.start_time,
             end_time: trigger.end_time,
             retries: 0, // Reset retries
+            claim_epoch: trigger.claim_epoch,
             data: serde_json::to_string(&updated_trigger_data)?,
         },
         true,

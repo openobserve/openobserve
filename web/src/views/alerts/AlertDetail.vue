@@ -59,6 +59,15 @@
         >
           {{ firingSummary }}
         </span>
+        <CompositeReferencesDrawer
+          v-if="(alert?.referenced_by_composite_count ?? 0) > 0"
+          :open="referenceDrawerOpen"
+          :reference-count="alert?.referenced_by_composite_count ?? 0"
+          :references="compositeReferences"
+          :hidden-reference-count="hiddenReferenceCount"
+          @update:open="handleReferenceOpen"
+          @navigate="navigateToReference"
+        />
       </div>
     </template>
 
@@ -85,6 +94,34 @@
     </OContent>
 
     <div v-else class="flex h-full min-h-0 flex-col">
+      <template v-if="isCompositeAlert">
+        <OContent class="min-h-0 flex-1 overflow-y-auto py-4">
+          <CompositeAlertDetail v-if="alert" :alert="alert" />
+        </OContent>
+
+        <OTabs
+          v-model="activeTab"
+          dense
+          bordered
+          class="shrink-0"
+          data-test="alerts-alertdetail-tabs"
+        >
+          <OTab name="history" :label="t('alerts.history')" icon="history" />
+          <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
+        </OTabs>
+        <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
+          <OTabPanel name="history" stretch>
+            <AlertEvaluationHistory :alert-id="alertId" />
+          </OTabPanel>
+          <OTabPanel name="configuration" stretch>
+            <OContent class="h-full overflow-y-auto py-4">
+              <AlertConfigSummary v-if="alert" :alert="alert" />
+            </OContent>
+          </OTabPanel>
+        </OTabPanels>
+      </template>
+
+      <template v-else>
       <!-- M-6 forbids silent truncation: when the last evaluation observed more
            groups than the cap tracks, say so rather than quietly showing a
            partial table. -->
@@ -253,6 +290,7 @@
           </OContent>
         </OTabPanel>
       </OTabPanels>
+      </template>
     </div>
   </OPageLayout>
 </template>
@@ -268,6 +306,8 @@ import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.v
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";
 import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
+import CompositeAlertDetail from "@/components/alerts/composite/CompositeAlertDetail.vue";
+import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -292,7 +332,12 @@ import {
   sloIdOf,
 } from "@/utils/alerts/sloAlertRouting";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { AlertGroup, AlertGroupsResponse, AlertGroupTransition } from "@/ts/interfaces/alert";
+import type {
+  AlertGroup,
+  AlertGroupsResponse,
+  AlertGroupTransition,
+  CompositeAlertReference,
+} from "@/ts/interfaces/alert";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -317,6 +362,9 @@ const activeTab = ref<string | number>("history");
 // is the default — the transitions log is write-on-change, so it answers
 // "when did it change?" but not "has it been running, and what did it see?".
 const historyView = ref<"evaluations" | "transitions">("evaluations");
+const referenceDrawerOpen = ref(false);
+const compositeReferences = ref<CompositeAlertReference[]>([]);
+const hiddenReferenceCount = ref(0);
 
 const onHistoryViewChange = (value: unknown) => {
   if (value !== "evaluations" && value !== "transitions") return;
@@ -338,6 +386,32 @@ const isMultiAlert = computed(() => {
   const qc = alert.value?.query_condition ?? alert.value?.condition;
   return qc?.type === "promql" ? !!qc?.promql_multi_alert : !!qc?.aggregation?.multi_alert;
 });
+const isCompositeAlert = computed(() => alert.value?.alert_type === "composite");
+
+const handleReferenceOpen = async (open: boolean) => {
+  referenceDrawerOpen.value = open;
+  if (!open || !orgId.value || !alertId.value) return;
+  try {
+    const response = await alertsService.getCompositeReferences(orgId.value, alertId.value);
+    compositeReferences.value = response.data.references ?? [];
+    hiddenReferenceCount.value = response.data.hidden_reference_count ?? 0;
+  } catch {
+    compositeReferences.value = [];
+    hiddenReferenceCount.value = 0;
+  }
+};
+
+const navigateToReference = (reference: CompositeAlertReference) => {
+  referenceDrawerOpen.value = false;
+  router.push({
+    name: "alertDetail",
+    params: { alert_id: reference.alert_id },
+    query: {
+      org_identifier: orgId.value,
+      folder: reference.folder_id || "default",
+    },
+  });
+};
 
 // Grouped, but still evaluating as one collapsed result. The distinction the
 // banner exists to explain: grouping produces the SERIES on the chart,
@@ -580,6 +654,7 @@ const editAlert = () => {
 onMounted(async () => {
   await fetchAlert();
   await fetchSloName();
+  if (isCompositeAlert.value) return;
   // Multi-alerts land on Groups (the reason the page exists for them); everything
   // else has no groups tab, so History is the only sensible default. The alert is
   // fetched exactly once and never re-fetched, so handling the initial load here

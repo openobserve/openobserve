@@ -19,7 +19,7 @@ use axum::{
     Json,
     extract::{OriginalUri, Path, Query},
     http::StatusCode,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use axum_extra::extract::Query as ExtraQuery;
 use config::meta::{
@@ -54,8 +54,8 @@ use crate::{
     models::alerts::{
         requests::{
             AlertBulkEnableRequest, CloneAlertRequestBody, CreateAlertRequestBody,
-            EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
-            UpdateAlertRequestBody,
+            CreateAlertRequestSchema, EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery,
+            MoveAlertsRequestBody, UpdateAlertRequestBody, ValidateCompositeRequestBody,
         },
         responses::{
             AlertBulkEnableResponse, AlertGroupLabel, AlertGroupResponseItem,
@@ -96,7 +96,7 @@ pub mod templates;
         ("org_id" = String, Path, description = "Organization name"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if alert folder is not the default folder)"),
       ),
-    request_body(content = inline(CreateAlertRequestBody), description = "Alert data", content_type = "application/json"),
+    request_body(content = inline(CreateAlertRequestSchema), description = "Alert data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -120,6 +120,9 @@ pub async fn create_alert(
     if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
         return create_anomaly_alert(&org_id, user_email.user_id, req_body, &folder_id).await;
     }
+    if req_body.alert_type == Some(AlertTypeFilter::Composite) {
+        return create_composite_alert(&org_id, &folder_id, user_email.user_id, req_body).await;
+    }
     let overwrite = is_overwrite(query_str);
     let mut alert: MetaAlert = req_body.into();
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
@@ -135,6 +138,591 @@ pub async fn create_alert(
                 .with_name(v.name),
         ),
         Err(e) => e.into(),
+    }
+}
+
+async fn create_composite_alert(
+    org_id: &str,
+    folder_id: &str,
+    user_id: String,
+    req: CreateAlertRequestBody,
+) -> Response {
+    if let Some(field) = req.composite_unsupported_field() {
+        return composite_field_error(
+            StatusCode::BAD_REQUEST,
+            "composite_unsupported_field",
+            field,
+            "field is not supported for composite alerts",
+        );
+    }
+    let Some(condition) = req.composite_condition.clone() else {
+        return composite_machine_error(
+            StatusCode::BAD_REQUEST,
+            "composite_condition_required",
+            "composite_condition is required",
+        );
+    };
+    #[cfg(feature = "enterprise")]
+    if let Some(children) =
+        composite_unauthorized_children(org_id, &user_id, &condition.expression).await
+    {
+        return composite_access_error(children);
+    }
+    let input = composite_input(None, org_id, folder_id, user_id, req.alert, condition);
+    match openobserve_core::alerts::composite::create_composite(input).await {
+        Ok(definition) => MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Alert saved")
+                .with_id(definition.id)
+                .with_name(definition.name),
+        ),
+        Err(error) => composite_error_response(error),
+    }
+}
+
+async fn update_composite_alert(
+    org_id: &str,
+    id: &str,
+    user_id: String,
+    req: UpdateAlertRequestBody,
+) -> Response {
+    if let Some(field) = req.composite_unsupported_field() {
+        return composite_field_error(
+            StatusCode::BAD_REQUEST,
+            "composite_unsupported_field",
+            field,
+            "field is not supported for composite alerts",
+        );
+    }
+    let Some(condition) = req.composite_condition.clone() else {
+        return composite_machine_error(
+            StatusCode::BAD_REQUEST,
+            "composite_condition_required",
+            "composite_condition is required",
+        );
+    };
+    #[cfg(feature = "enterprise")]
+    if let Some(children) =
+        composite_unauthorized_children(org_id, &user_id, &condition.expression).await
+    {
+        return composite_access_error(children);
+    }
+    let folder_id = openobserve_core::alerts::composite::get_composite(org_id, id)
+        .await
+        .ok()
+        .flatten()
+        .map(|current| current.definition.folder_id)
+        .unwrap_or_else(|| "default".to_string());
+    let input = composite_input(
+        Some(id.to_string()),
+        org_id,
+        &folder_id,
+        user_id,
+        req.alert,
+        condition,
+    );
+    match openobserve_core::alerts::composite::update_composite(id, input).await {
+        Ok(_) => MetaHttpResponse::ok("Alert Updated"),
+        Err(error) => composite_error_response(error),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn composite_unauthorized_children(
+    org_id: &str,
+    user_id: &str,
+    expression: &str,
+) -> Option<Vec<String>> {
+    use config::meta::alerts::composite::{collect_references, parse_expr};
+    let Ok(parsed) = parse_expr(expression) else {
+        return None;
+    };
+    let Ok(references) = collect_references(&parsed) else {
+        return None;
+    };
+    let mut unauthorized = Vec::new();
+    for id in references {
+        if !check_permissions(
+            &id, org_id, user_id, "alerts", "GET", None, false, true, false,
+        )
+        .await
+        {
+            unauthorized.push(id);
+        }
+    }
+    (!unauthorized.is_empty()).then_some(unauthorized)
+}
+
+fn composite_input(
+    id: Option<String>,
+    org_id: &str,
+    folder_id: &str,
+    user_id: String,
+    alert: crate::models::alerts::Alert,
+    condition: crate::models::alerts::requests::CompositeCondition,
+) -> openobserve_core::alerts::composite::CompositeCreate {
+    openobserve_core::alerts::composite::CompositeCreate {
+        id,
+        org: org_id.to_string(),
+        folder_id: folder_id.to_string(),
+        name: alert.name,
+        description: Some(alert.description).filter(|value| !value.is_empty()),
+        expression: condition.expression,
+        warning_counts_as_firing: condition.warning_counts_as_firing,
+        stale_child_policy: condition.stale_child_policy.storage_id(),
+        destinations: alert.destinations,
+        template: alert.template,
+        context_attributes: alert
+            .context_attributes
+            .map(|value| serde_json::json!(value)),
+        enabled: alert.enabled,
+        silence_seconds: alert.trigger_condition.silence_minutes * 60,
+        creates_incident: alert.creates_incident,
+        workflows: alert.workflows,
+        priority: alert.priority.map(|value| value.to_i32()),
+        tags: alert.tags,
+        owner: alert.owner.or_else(|| Some(user_id.clone())),
+        last_edited_by: Some(user_id),
+    }
+}
+
+async fn composite_detail_response(
+    composite: infra::table::alert_composites::CompositeWithChildren,
+    user_id: Option<&str>,
+) -> Response {
+    let definition = composite.definition;
+    let scheduler_job_present = infra::scheduler::get(
+        &definition.org,
+        TriggerModule::CompositeAlert,
+        &definition.id,
+    )
+    .await
+    .is_ok();
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut children = Vec::with_capacity(composite.children.len());
+    for child in composite.children {
+        #[cfg(feature = "enterprise")]
+        let child_authorized = match user_id {
+            Some(user_id) => {
+                check_permissions(
+                    &child.child_alert_id,
+                    &definition.org,
+                    user_id,
+                    "alerts",
+                    "GET",
+                    None,
+                    false,
+                    true,
+                    false,
+                )
+                .await
+            }
+            None => false,
+        };
+        #[cfg(not(feature = "enterprise"))]
+        let child_authorized = true;
+        if !child_authorized {
+            children.push(serde_json::json!({
+                "alert_id": child.child_alert_id,
+                "accessible": false,
+            }));
+            continue;
+        }
+        let resolution = infra::table::alert_composites::resolve_by_id(
+            db,
+            &definition.org,
+            &child.child_alert_id,
+        )
+        .await;
+        let (name, alert_type, folder_id, enabled) = match resolution {
+            Ok(infra::table::alert_composites::Resolution::Alert(alert)) => (
+                Some(alert.name),
+                Some(if alert.slo_id.is_some() {
+                    "slo"
+                } else {
+                    "scheduled"
+                }),
+                Some(alert.folder_id),
+                Some(alert.enabled),
+            ),
+            Ok(infra::table::alert_composites::Resolution::Composite(composite)) => (
+                Some(composite.name),
+                Some("composite"),
+                Some(composite.folder_id),
+                Some(composite.enabled),
+            ),
+            _ => (None, None, None, None),
+        };
+        children.push(serde_json::json!({
+            "alert_id": child.child_alert_id,
+            "accessible": name.is_some(),
+            "name": name,
+            "alert_type": alert_type,
+            "folder_id": folder_id,
+            "enabled": enabled,
+            "level": null,
+            "level_at": null,
+            "effective_cadence_seconds": null,
+            "stale_deadline": null,
+            "stale": true,
+            "truth": false,
+        }));
+    }
+    MetaHttpResponse::json(serde_json::json!({
+        "id": definition.id,
+        "alert_type": "composite",
+        "folderId": definition.folder_id,
+        "name": definition.name,
+        "description": definition.description,
+        "enabled": definition.enabled,
+        "destinations": definition.destinations,
+        "template": definition.template,
+        "context_attributes": definition.context_attributes,
+        "trigger_condition": { "silence": definition.silence_seconds / 60 },
+        "creates_incident": definition.creates_incident,
+        "workflows": definition.workflows,
+        "priority": definition.priority,
+        "tags": definition.tags,
+        "scheduler_job_present": scheduler_job_present,
+        "composite_condition": {
+            "expression": definition.expression,
+            "warning_counts_as_firing": definition.warning_counts_as_firing,
+            "stale_child_policy": stale_policy_name(definition.stale_child_policy),
+        },
+        "children": children,
+        "evaluation": null,
+    }))
+}
+
+fn composite_list_item(
+    definition: infra::table::entity::alert_composites::Model,
+) -> Option<ListAlertsResponseBodyItem> {
+    let alert_id = Ksuid::from_str(&definition.id).ok()?;
+    let tags = definition
+        .tags
+        .and_then(|tags| serde_json::from_value(tags).ok())
+        .unwrap_or_default();
+    Some(ListAlertsResponseBodyItem {
+        alert_id,
+        folder_id: definition.folder_id.clone(),
+        folder_name: definition.folder_id,
+        name: definition.name,
+        owner: definition.owner,
+        description: definition.description,
+        alert_type: "composite".to_string(),
+        condition: None,
+        trigger_condition: None,
+        enabled: definition.enabled,
+        last_triggered_at: None,
+        last_satisfied_at: None,
+        is_real_time: false,
+        last_trained_at: None,
+        status: None,
+        last_error: None,
+        last_outcome: None,
+        last_outcome_at: None,
+        last_outcome_since: None,
+        level: None,
+        level_since: None,
+        priority: definition.priority.map(|value| value as u8),
+        tags,
+        groups_observed: None,
+        groups_firing: None,
+        groups_observed_is_lower_bound: None,
+        groups_firing_is_lower_bound: None,
+        child_count: None,
+        referenced_by_composite_count: None,
+    })
+}
+
+fn stale_policy_name(value: i16) -> &'static str {
+    match value {
+        1 => "treat_as_false",
+        2 => "treat_as_true",
+        _ => "use_last_state",
+    }
+}
+
+fn composite_error_response(
+    error: openobserve_core::alerts::composite::CompositeServiceError,
+) -> Response {
+    use openobserve_core::alerts::composite::CompositeServiceError;
+    match error {
+        CompositeServiceError::ClientSuppliedId => composite_machine_error(
+            StatusCode::BAD_REQUEST,
+            "composite_unsupported_field",
+            error,
+        ),
+        CompositeServiceError::InvalidExpression(_) => composite_machine_error(
+            StatusCode::BAD_REQUEST,
+            "composite_invalid_expression",
+            error,
+        ),
+        CompositeServiceError::ChildNotAccessible(children) => composite_access_error(children),
+        CompositeServiceError::ChildNotEligible(_) => {
+            composite_machine_error(StatusCode::BAD_REQUEST, "child_not_eligible", error)
+        }
+        CompositeServiceError::Cycle => {
+            composite_machine_error(StatusCode::CONFLICT, "composite_cycle", error)
+        }
+        CompositeServiceError::TooDeep => {
+            composite_machine_error(StatusCode::CONFLICT, "composite_too_deep", error)
+        }
+        CompositeServiceError::NotFound => {
+            composite_machine_error(StatusCode::NOT_FOUND, "composite_not_found", error)
+        }
+        CompositeServiceError::ChildReferenced(_) => {
+            composite_machine_error(StatusCode::CONFLICT, "child_referenced", error)
+        }
+        CompositeServiceError::Lock(_) => composite_machine_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "composite_graph_lock_unavailable",
+            error,
+        ),
+        CompositeServiceError::WritesDisabled => composite_machine_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "composite_writes_disabled",
+            error,
+        ),
+        CompositeServiceError::SuperClusterUnsupported => composite_machine_error(
+            StatusCode::CONFLICT,
+            "composite_super_cluster_unsupported",
+            error,
+        ),
+        CompositeServiceError::Database(_) | CompositeServiceError::Scheduler(_) => {
+            composite_machine_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "composite_internal_error",
+                error,
+            )
+        }
+    }
+}
+
+fn composite_machine_error(status: StatusCode, code: &str, message: impl ToString) -> Response {
+    (
+        status,
+        Json(serde_json::json!({
+            "code": code,
+            "message": message.to_string(),
+        })),
+    )
+        .into_response()
+}
+
+fn composite_access_error(children: Vec<String>) -> Response {
+    (
+        StatusCode::FORBIDDEN,
+        Json(serde_json::json!({
+            "code": "child_not_accessible",
+            "message": "one or more child alerts are not accessible",
+            "children": children.into_iter().map(|alert_id| serde_json::json!({
+                "alert_id": alert_id,
+                "accessible": false,
+            })).collect::<Vec<_>>(),
+        })),
+    )
+        .into_response()
+}
+
+fn composite_field_error(
+    status: StatusCode,
+    code: &str,
+    field: &str,
+    message: impl ToString,
+) -> Response {
+    (
+        status,
+        Json(serde_json::json!({
+            "code": code,
+            "message": message.to_string(),
+            "field": field,
+        })),
+    )
+        .into_response()
+}
+
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/composites/validate",
+    context_path = "/api",
+    tag = "Alerts",
+    request_body(content = inline(ValidateCompositeRequestBody), content_type = "application/json"),
+    responses((status = 200, body = crate::models::alerts::responses::CompositeValidationResponse))
+)]
+pub async fn validate_composite_alert(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(request): Json<ValidateCompositeRequestBody>,
+) -> Response {
+    use config::meta::alerts::composite::{collect_references, parse_expr};
+    let parsed = match parse_expr(&request.composite_condition.expression) {
+        Ok(parsed) => parsed,
+        Err(error) => {
+            return composite_machine_error(
+                StatusCode::BAD_REQUEST,
+                "composite_invalid_expression",
+                error,
+            );
+        }
+    };
+    let references = match collect_references(&parsed) {
+        Ok(references) => references,
+        Err(error) => {
+            return composite_machine_error(
+                StatusCode::BAD_REQUEST,
+                "composite_invalid_expression",
+                error,
+            );
+        }
+    };
+    #[cfg(feature = "enterprise")]
+    let mut inaccessible = Vec::new();
+    #[cfg(not(feature = "enterprise"))]
+    let mut inaccessible = Vec::new();
+    #[cfg(feature = "enterprise")]
+    for id in &references {
+        if !check_permissions(
+            id,
+            &org_id,
+            &user_email.user_id,
+            "alerts",
+            "GET",
+            None,
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            inaccessible.push(id.clone());
+        }
+    }
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut children = Vec::with_capacity(references.len());
+    for id in references {
+        if inaccessible.contains(&id) {
+            continue;
+        }
+        match infra::table::alert_composites::resolve_by_id(db, &org_id, &id).await {
+            Ok(infra::table::alert_composites::Resolution::Alert(alert)) if !alert.is_real_time => {
+                children.push(serde_json::json!({
+                    "alert_id": id,
+                    "accessible": true,
+                    "name": alert.name,
+                    "alert_type": if alert.slo_id.is_some() { "slo" } else { "scheduled" },
+                    "folder_id": alert.folder_id,
+                    "enabled": alert.enabled,
+                    "stale": true,
+                    "truth": false,
+                    "stale_deadline": null,
+                }));
+            }
+            Ok(infra::table::alert_composites::Resolution::Composite(composite)) => {
+                children.push(serde_json::json!({
+                    "alert_id": id,
+                    "accessible": true,
+                    "name": composite.name,
+                    "alert_type": "composite",
+                    "folder_id": composite.folder_id,
+                    "enabled": composite.enabled,
+                    "stale": true,
+                    "truth": false,
+                    "stale_deadline": null,
+                }));
+            }
+            _ => inaccessible.push(id),
+        }
+    }
+    if !inaccessible.is_empty() {
+        return composite_access_error(inaccessible);
+    }
+    let canonical_expression = match openobserve_core::alerts::composite::validate_composite_graph(
+        &org_id,
+        request.composite_id.as_deref(),
+        &request.composite_condition.expression,
+    )
+    .await
+    {
+        Ok(expression) => expression,
+        Err(error) => return composite_error_response(error),
+    };
+    MetaHttpResponse::json(serde_json::json!({
+        "valid": true,
+        "canonical_expression": canonical_expression,
+        "children": children,
+        "result": false,
+        "result_level": "ok",
+        "warnings": children.iter().flat_map(|child| {
+            let mut warnings = Vec::new();
+            if child.get("enabled").and_then(serde_json::Value::as_bool) == Some(false) {
+                warnings.push(serde_json::json!({"code": "child_disabled", "alert_id": child["alert_id"]}));
+            }
+            if child.get("level_at").is_none_or(serde_json::Value::is_null) {
+                warnings.push(serde_json::json!({"code": "child_never_evaluated", "alert_id": child["alert_id"]}));
+            }
+            warnings
+        }).collect::<Vec<_>>(),
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{id}/composite-references",
+    context_path = "/api",
+    tag = "Alerts",
+    responses((status = 200, body = crate::models::alerts::responses::CompositeReferencesResponse))
+)]
+pub async fn get_composite_references(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let kind = if openobserve_core::alerts::composite::get_composite(&org_id, &alert_id)
+        .await
+        .ok()
+        .flatten()
+        .is_some()
+    {
+        infra::table::alert_composites::ChildKind::Composite
+    } else {
+        infra::table::alert_composites::ChildKind::Alert
+    };
+    match infra::table::alert_composites::list_parents(db, &org_id, kind, &alert_id).await {
+        Ok(parents) => {
+            let mut references = Vec::new();
+            #[cfg(feature = "enterprise")]
+            let mut hidden_reference_count = 0;
+            #[cfg(not(feature = "enterprise"))]
+            let hidden_reference_count = 0;
+            for parent in parents {
+                #[cfg(feature = "enterprise")]
+                if !check_permissions(
+                    &parent.id,
+                    &org_id,
+                    &user_email.user_id,
+                    "alerts",
+                    "GET",
+                    Some(&parent.folder_id),
+                    false,
+                    true,
+                    false,
+                )
+                .await
+                {
+                    hidden_reference_count += 1;
+                    continue;
+                }
+                references.push(serde_json::json!({
+                    "alert_id": parent.id,
+                    "name": parent.name,
+                }));
+            }
+            MetaHttpResponse::json(serde_json::json!({
+                "references": references,
+                "hidden_reference_count": hidden_reference_count,
+            }))
+        }
+        Err(error) => MetaHttpResponse::internal_error(error),
     }
 }
 
@@ -426,7 +1014,14 @@ pub async fn list_alert_group_transitions(
         ("x-o2-mcp" = json!({"description": "Get alert details by ID", "category": "alerts"}))
     )
 )]
-pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn get_alert(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    let detail_user_id = Some(user_email.user_id.as_str());
+    #[cfg(not(feature = "enterprise"))]
+    let detail_user_id = None;
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -445,6 +1040,11 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Resp
             MetaHttpResponse::json(resp_body)
         }
         Err(AlertError::AlertNotFound) => {
+            if let Ok(Some(composite)) =
+                openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str).await
+            {
+                return composite_detail_response(composite, detail_user_id).await;
+            }
             #[cfg(not(feature = "enterprise"))]
             {
                 MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
@@ -628,6 +1228,29 @@ pub async fn clone_alert(
             }
         }
         Err(AlertError::AlertNotFound) => {
+            if openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str)
+                .await
+                .ok()
+                .flatten()
+                .is_some()
+            {
+                return match openobserve_core::alerts::composite::clone_composite(
+                    &org_id,
+                    &alert_id_str,
+                    req_body.name,
+                    req_body.folder_id,
+                    "api".to_string(),
+                )
+                .await
+                {
+                    Ok(saved) => MetaHttpResponse::json(serde_json::json!({
+                        "id": saved.id,
+                        "name": saved.name,
+                        "alert_type": "composite",
+                    })),
+                    Err(error) => composite_error_response(error),
+                };
+            }
             #[cfg(not(feature = "enterprise"))]
             {
                 MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
@@ -712,6 +1335,9 @@ pub async fn update_alert(
             alert,
         )
         .await;
+    }
+    if req_body.alert_type == Some(AlertTypeFilter::Composite) {
+        return update_composite_alert(&org_id, &alert_id_str, user_email.user_id, req_body).await;
     }
 
     // Save anomaly fields before req_body is consumed, in case we need the fallback.
@@ -838,7 +1464,10 @@ async fn build_and_run_anomaly_update(
         ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts", "requires_confirmation": true}))
     )
 )]
-pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn delete_alert(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -856,7 +1485,45 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     if is_regular_alert {
         return match alert::delete_by_id_user(client, &org_id, alert_id).await {
             Ok(_) => MetaHttpResponse::ok("Alert deleted"),
+            Err(AlertError::AlertReferencedByComposites { parents }) => {
+                reference_conflict_response(
+                    &org_id,
+                    &user_email.user_id,
+                    parents
+                        .into_iter()
+                        .map(|parent| (parent.alert_id, parent.name, parent.folder_id))
+                        .collect(),
+                )
+                .await
+            }
             Err(e) => e.into(),
+        };
+    }
+
+    if openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str)
+        .await
+        .ok()
+        .flatten()
+        .is_some()
+    {
+        return match openobserve_core::alerts::composite::delete_composite(&org_id, &alert_id_str)
+            .await
+        {
+            Ok(()) => MetaHttpResponse::ok("Alert deleted"),
+            Err(openobserve_core::alerts::composite::CompositeServiceError::ChildReferenced(
+                parents,
+            )) => {
+                reference_conflict_response(
+                    &org_id,
+                    &user_email.user_id,
+                    parents
+                        .into_iter()
+                        .map(|parent| (parent.id, parent.name, parent.folder_id))
+                        .collect(),
+                )
+                .await
+            }
+            Err(error) => composite_error_response(error),
         };
     }
 
@@ -878,6 +1545,62 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
 
     #[cfg(not(feature = "enterprise"))]
     MetaHttpResponse::not_found(format!("alert {alert_id_str} not found"))
+}
+
+async fn readable_parent_snapshot(
+    org_id: &str,
+    user_id: &str,
+    parents: Vec<(String, String, String)>,
+) -> (Vec<serde_json::Value>, usize) {
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, user_id);
+    let mut references = Vec::new();
+    #[cfg(feature = "enterprise")]
+    let mut hidden = 0;
+    #[cfg(not(feature = "enterprise"))]
+    let hidden = 0;
+    for (alert_id, name, folder_id) in parents {
+        #[cfg(not(feature = "enterprise"))]
+        let _ = folder_id;
+        #[cfg(feature = "enterprise")]
+        if !check_permissions(
+            &alert_id,
+            org_id,
+            user_id,
+            "alerts",
+            "GET",
+            Some(&folder_id),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            hidden += 1;
+            continue;
+        }
+        references.push(serde_json::json!({"alert_id": alert_id, "name": name}));
+    }
+    (references, hidden)
+}
+
+async fn reference_conflict_response(
+    org_id: &str,
+    user_id: &str,
+    parents: Vec<(String, String, String)>,
+) -> Response {
+    let (references, hidden_reference_count) =
+        readable_parent_snapshot(org_id, user_id, parents).await;
+    (
+        StatusCode::CONFLICT,
+        Json(serde_json::json!({
+            "code": "child_referenced",
+            "message": "this alert is referenced by one or more composite alerts",
+            "references": references,
+            "hidden_reference_count": hidden_reference_count,
+        })),
+    )
+        .into_response()
 }
 
 /// DeleteAlertBulk
@@ -939,6 +1662,7 @@ pub async fn delete_alert_bulk(
     let mut successful = Vec::with_capacity(req.ids.len());
     let mut unsuccessful = Vec::with_capacity(req.ids.len());
     let mut err = None;
+    let mut conflicts = Vec::new();
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     for id in req.ids {
@@ -946,9 +1670,60 @@ pub async fn delete_alert_bulk(
         let alert_id = Ksuid::from_str(&id).unwrap();
         let is_regular_alert = alert::get_by_id(client, &org_id, alert_id).await.is_ok();
         let result = if is_regular_alert {
-            alert::delete_by_id_user(client, &org_id, alert_id)
-                .await
-                .map_err(|e| e.to_string())
+            match alert::delete_by_id_user(client, &org_id, alert_id).await {
+                Ok(()) => Ok(()),
+                Err(AlertError::AlertReferencedByComposites { parents }) => {
+                    let (references, hidden_reference_count) = readable_parent_snapshot(
+                        &org_id,
+                        &_user_id,
+                        parents
+                            .into_iter()
+                            .map(|parent| (parent.alert_id, parent.name, parent.folder_id))
+                            .collect(),
+                    )
+                    .await;
+                    conflicts.push(serde_json::json!({
+                        "alert_id": id,
+                        "code": "child_referenced",
+                        "references": references,
+                        "hidden_reference_count": hidden_reference_count,
+                    }));
+                    Err("child_referenced".to_string())
+                }
+                Err(error) => Err(error.to_string()),
+            }
+        } else if openobserve_core::alerts::composite::get_composite(&org_id, &id)
+            .await
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            match openobserve_core::alerts::composite::delete_composite(&org_id, &id).await {
+                Ok(()) => Ok(()),
+                Err(
+                    openobserve_core::alerts::composite::CompositeServiceError::ChildReferenced(
+                        parents,
+                    ),
+                ) => {
+                    let (references, hidden_reference_count) = readable_parent_snapshot(
+                        &org_id,
+                        &_user_id,
+                        parents
+                            .into_iter()
+                            .map(|parent| (parent.id, parent.name, parent.folder_id))
+                            .collect(),
+                    )
+                    .await;
+                    conflicts.push(serde_json::json!({
+                        "alert_id": id,
+                        "code": "child_referenced",
+                        "references": references,
+                        "hidden_reference_count": hidden_reference_count,
+                    }));
+                    Err("child_referenced".to_string())
+                }
+                Err(error) => Err(error.to_string()),
+            }
         } else {
             // Not a regular alert — fall back to anomaly config delete (enterprise only).
             #[cfg(not(feature = "enterprise"))]
@@ -970,11 +1745,12 @@ pub async fn delete_alert_bulk(
         }
     }
 
-    MetaHttpResponse::json(BulkDeleteResponse {
-        successful,
-        unsuccessful,
-        err,
-    })
+    MetaHttpResponse::json(serde_json::json!({
+        "successful": successful,
+        "unsuccessful": unsuccessful,
+        "err": err,
+        "conflicts": conflicts,
+    }))
 }
 
 /// Query parameters for the tag facet endpoint (PT-8b).
@@ -1053,6 +1829,46 @@ pub async fn list_alert_tags(
     };
 
     let mut counts = db::alerts::alert::tag_counts_for_alerts(&org_id, &visible_ids).await;
+    let mut composite_counts = std::collections::BTreeMap::<String, u64>::new();
+    if let Ok(composites) = infra::table::alert_composites::list_by_org(client, &org_id).await {
+        for composite in composites.into_iter().filter(|composite| {
+            query
+                .folder
+                .as_ref()
+                .is_none_or(|folder| &composite.folder_id == folder)
+        }) {
+            #[cfg(feature = "enterprise")]
+            if !check_permissions(
+                &composite.id,
+                &org_id,
+                user_email.user_id.as_str(),
+                "alerts",
+                "GET",
+                Some(&composite.folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                continue;
+            }
+            let tags: Vec<String> = composite
+                .tags
+                .and_then(|tags| serde_json::from_value(tags).ok())
+                .unwrap_or_default();
+            for tag in tags {
+                *composite_counts.entry(tag).or_default() += 1;
+            }
+        }
+    }
+    for (tag, count) in composite_counts {
+        if let Some((_, current)) = counts.iter_mut().find(|(existing, _)| existing == &tag) {
+            *current += count;
+        } else {
+            counts.push((tag, count));
+        }
+    }
 
     if let Some(prefix) = query.prefix.as_deref() {
         let prefix = prefix.trim().to_lowercase();
@@ -1115,11 +1931,9 @@ pub async fn list_alerts(
     #[cfg(feature = "enterprise")]
     let user_id = Some(user_email.user_id.as_str());
 
-    #[cfg(feature = "enterprise")]
     let folder_slug = query.folder.clone();
-    #[cfg(feature = "enterprise")]
     let name_substring = query.alert_name_substring.clone();
-    #[cfg(feature = "enterprise")]
+    let enabled_filter = query.enabled;
     let page_size_and_idx = query.page_size.map(|s| (s, query.page_idx.unwrap_or(0)));
 
     // Resolve the tag filter to an alert-ID set BEFORE building the query
@@ -1128,9 +1942,6 @@ pub async fn list_alerts(
     // post-filtering an already-fetched page.
     let requested_tags = query.requested_tags();
 
-    #[cfg(not(feature = "enterprise"))]
-    let mut params = query.into(&org_id);
-    #[cfg(feature = "enterprise")]
     let mut params = query.into(&org_id);
 
     if !requested_tags.is_empty() {
@@ -1155,15 +1966,14 @@ pub async fn list_alerts(
     #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
     let requested_sort = (params.sort_by, params.sort_desc);
 
-    // In enterprise builds, pagination is applied after merging regular alerts with
-    // anomaly detection configs, so we fetch all matching results from the DB here.
-    #[cfg(feature = "enterprise")]
-    {
-        params.page_size_and_idx = None;
-    }
+    // Pagination is always applied after merging every alert storage kind.
+    params.page_size_and_idx = None;
 
     // Fetch regular (scheduled / realtime) alerts unless the filter is anomaly-only.
-    let list: Vec<ListAlertsResponseBodyItem> = if alert_type != AlertTypeFilter::AnomalyDetection {
+    let mut list: Vec<ListAlertsResponseBodyItem> = if !matches!(
+        alert_type,
+        AlertTypeFilter::AnomalyDetection | AlertTypeFilter::Composite
+    ) {
         let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
         let mut scheduled_jobs: HashMap<String, Trigger> =
             scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
@@ -1182,8 +1992,13 @@ pub async fn list_alerts(
                 .into_iter()
                 // Apply is_real_time filter when a specific type is requested.
                 .filter(|(_, a)| match alert_type {
-                    AlertTypeFilter::Scheduled => !a.is_real_time,
-                    AlertTypeFilter::Realtime => a.is_real_time,
+                    AlertTypeFilter::Scheduled => {
+                        !a.is_real_time && a.query_condition.slo_condition.is_none()
+                    }
+                    AlertTypeFilter::Realtime => {
+                        a.is_real_time && a.query_condition.slo_condition.is_none()
+                    }
+                    AlertTypeFilter::Slo => a.query_condition.slo_condition.is_some(),
                     _ => true,
                 })
                 .map(|(folder, alert)| {
@@ -1196,8 +2011,59 @@ pub async fn list_alerts(
         vec![]
     };
     // In enterprise builds, anomaly configs will be appended — we need mutability.
-    #[cfg(feature = "enterprise")]
-    let mut list = list;
+    if matches!(
+        alert_type,
+        AlertTypeFilter::All | AlertTypeFilter::Composite
+    ) {
+        let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        if let Ok(definitions) = infra::table::alert_composites::list_by_org(db, &org_id).await {
+            for definition in definitions {
+                if !folder_slug
+                    .as_ref()
+                    .is_none_or(|folder| &definition.folder_id == folder)
+                    || !name_substring.as_ref().is_none_or(|name| {
+                        definition
+                            .name
+                            .to_lowercase()
+                            .contains(&name.to_lowercase())
+                    })
+                    || !enabled_filter.is_none_or(|enabled| definition.enabled == enabled)
+                {
+                    continue;
+                }
+                #[cfg(feature = "enterprise")]
+                if !check_permissions(
+                    &definition.id,
+                    &org_id,
+                    user_email.user_id.as_str(),
+                    "alerts",
+                    "GET",
+                    Some(&definition.folder_id),
+                    false,
+                    true,
+                    false,
+                )
+                .await
+                {
+                    continue;
+                }
+                let Some(item) = composite_list_item(definition) else {
+                    continue;
+                };
+                let priority_matches = match &priority_filter {
+                    None => true,
+                    Some(wanted) => item.priority.is_some_and(|priority| {
+                        wanted.iter().any(|value| value.to_i32() as u8 == priority)
+                    }),
+                };
+                if priority_matches
+                    && config::meta::alerts::tags::matches_all_tags(&item.tags, &tag_filter)
+                {
+                    list.push(item);
+                }
+            }
+        }
+    }
 
     // Fetch anomaly detection configs and merge when the filter includes them (enterprise only).
     #[cfg(feature = "enterprise")]
@@ -1219,6 +2085,7 @@ pub async fn list_alerts(
             configs
                 .iter()
                 .filter_map(anomaly_config_to_list_item)
+                .filter(|item| enabled_filter.is_none_or(|enabled| item.enabled == enabled))
                 .filter(|item| match &priority_filter {
                     None => true,
                     // An empty set means "asked for priorities, none valid" —
@@ -1240,8 +2107,9 @@ pub async fn list_alerts(
         }
     }
 
-    // Apply pagination to the combined list (regular alerts + anomaly configs).
-    #[cfg(feature = "enterprise")]
+    sort_merged_alert_list(&mut list, requested_sort.0, requested_sort.1);
+
+    // Apply pagination to the combined list.
     let list = if let Some((page_size, page_idx)) = page_size_and_idx {
         // Use saturating_mul to prevent u64 overflow before casting to usize.
         let start = page_idx.saturating_mul(page_size) as usize;
@@ -1257,8 +2125,64 @@ pub async fn list_alerts(
     // over the page that is actually being returned — not per alert.
     let mut list = list;
     enrich_with_run_state(&mut list).await;
+    enrich_with_composite_metadata(&org_id, user_id, &mut list).await;
 
     MetaHttpResponse::json(ListAlertsResponseBody { list })
+}
+
+async fn enrich_with_composite_metadata(
+    org_id: &str,
+    user_id: Option<&str>,
+    list: &mut [ListAlertsResponseBodyItem],
+) {
+    #[cfg(not(feature = "enterprise"))]
+    let _ = user_id;
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    for item in list {
+        if !matches!(item.alert_type.as_str(), "scheduled" | "slo" | "composite") {
+            continue;
+        }
+        let id = item.alert_id.to_string();
+        let kind = if item.alert_type == "composite" {
+            if let Ok(Some(composite)) =
+                infra::table::alert_composites::get_by_id(db, org_id, &id).await
+            {
+                item.child_count = Some(composite.children.len());
+            }
+            infra::table::alert_composites::ChildKind::Composite
+        } else {
+            infra::table::alert_composites::ChildKind::Alert
+        };
+        if let Ok(parents) =
+            infra::table::alert_composites::list_parents(db, org_id, kind, &id).await
+        {
+            #[cfg(feature = "enterprise")]
+            let mut readable = 0;
+            #[cfg(not(feature = "enterprise"))]
+            let readable = parents.len();
+            #[cfg(feature = "enterprise")]
+            if let Some(user_id) = user_id {
+                for parent in parents {
+                    if check_permissions(
+                        &parent.id,
+                        org_id,
+                        user_id,
+                        "alerts",
+                        "GET",
+                        Some(&parent.folder_id),
+                        false,
+                        true,
+                        false,
+                    )
+                    .await
+                    {
+                        readable += 1;
+                    }
+                }
+            }
+            item.referenced_by_composite_count = Some(readable);
+        }
+    }
 }
 
 /// Attach `last_outcome` / `last_outcome_at` / `last_outcome_since` to a page of
@@ -1269,7 +2193,6 @@ pub async fn list_alerts(
 /// Re-sort a merged (regular + anomaly) list the way the SQL ORDER BY sorts
 /// the regular one (PT-3): unset priority LAST in both directions, ties broken
 /// on (name, folder name, id) so pagination stays a total order.
-#[cfg(feature = "enterprise")]
 fn sort_merged_alert_list(
     list: &mut [ListAlertsResponseBodyItem],
     sort_by: Option<config::meta::alerts::alert::AlertSortField>,
@@ -1402,6 +2325,25 @@ pub async fn enable_alert(
             MetaHttpResponse::json(resp_body)
         }
         Err(AlertError::AlertNotFound) => {
+            if openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
+                .await
+                .ok()
+                .flatten()
+                .is_some()
+            {
+                return match openobserve_core::alerts::composite::set_composite_enabled(
+                    &org_id,
+                    &alert_id.to_string(),
+                    should_enable,
+                )
+                .await
+                {
+                    Ok(()) => MetaHttpResponse::json(EnableAlertResponseBody {
+                        enabled: should_enable,
+                    }),
+                    Err(error) => composite_error_response(error),
+                };
+            }
             #[cfg(not(feature = "enterprise"))]
             {
                 MetaHttpResponse::not_found(format!("alert {alert_id} not found"))
@@ -1509,6 +2451,27 @@ pub async fn enable_alert_bulk(
                 successful.push(id);
             }
             Err(AlertError::AlertNotFound) => {
+                if openobserve_core::alerts::composite::get_composite(&org_id, &id.to_string())
+                    .await
+                    .ok()
+                    .flatten()
+                    .is_some()
+                {
+                    match openobserve_core::alerts::composite::set_composite_enabled(
+                        &org_id,
+                        &id.to_string(),
+                        should_enable,
+                    )
+                    .await
+                    {
+                        Ok(()) => successful.push(id),
+                        Err(error) => {
+                            unsuccessful.push(id);
+                            err = Some(error.to_string());
+                        }
+                    }
+                    continue;
+                }
                 #[cfg(not(feature = "enterprise"))]
                 {
                     unsuccessful.push(id);
@@ -1590,6 +2553,22 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     match alert::trigger_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
         Err(AlertError::AlertNotFound) => {
+            if openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
+                .await
+                .ok()
+                .flatten()
+                .is_some()
+            {
+                return match openobserve_core::alerts::composite::trigger_composite(
+                    &org_id,
+                    &alert_id.to_string(),
+                )
+                .await
+                {
+                    Ok(()) => MetaHttpResponse::ok("Alert triggered"),
+                    Err(error) => composite_error_response(error),
+                };
+            }
             #[cfg(not(feature = "enterprise"))]
             {
                 MetaHttpResponse::not_found(format!("alert {alert_id} not found"))
@@ -1722,7 +2701,20 @@ pub async fn move_alerts(
 
     // anomaly_config_ids is now a required Vec (defaults to empty), so no
     // per-ID DB lookups are needed to classify IDs.
-    let alert_ids: Vec<Ksuid> = req_body.alert_ids;
+    let mut alert_ids: Vec<Ksuid> = Vec::new();
+    let mut composite_ids = Vec::new();
+    for id in req_body.alert_ids {
+        if openobserve_core::alerts::composite::get_composite(&org_id, &id.to_string())
+            .await
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            composite_ids.push(id);
+        } else {
+            alert_ids.push(id);
+        }
+    }
     #[cfg(feature = "enterprise")]
     let anomaly_ids: Vec<Ksuid> = req_body.anomaly_config_ids;
 
@@ -1759,6 +2751,18 @@ pub async fn move_alerts(
         .await
     {
         return e.into();
+    }
+    for id in composite_ids {
+        if let Err(error) = openobserve_core::alerts::composite::move_composite(
+            &org_id,
+            &id.to_string(),
+            &req_body.dst_folder_id,
+            &user_email.user_id,
+        )
+        .await
+        {
+            return composite_error_response(error);
+        }
     }
 
     let message = if total_ids == 1 {

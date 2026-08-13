@@ -13,21 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Composite alerts — Feature 4 of `alerts_2.md`.
-//!
-//! TODO(composite): the feature is deferred — this module is pure logic with
-//! tests and is deliberately not wired into the scheduler, API, or UI yet.
-//!
-//! Pure logic only: expression parsing/evaluation over child *states*, the
-//! stale-child policy (§6.4), and the write-time guards (child counts, cycles).
+//! Pure composite-alert domain logic: strict expression parsing and
+//! normalization, evaluation over durable child state, schedule-aware
+//! freshness, and graph guards.
 //! Composites never re-run child queries — that is the whole point of building
 //! them on the durable state layer.
 
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
+use chrono::{FixedOffset, Offset as _, Utc};
+use chrono_tz::Tz;
+use cron::Schedule;
 use serde::{Deserialize, Serialize};
+use svix_ksuid::Ksuid;
 
-use super::level::AlertLevel;
+use super::{FrequencyType, TriggerCondition, level::AlertLevel};
 
 /// Maximum children per composite (C-1). Bounded so one composite cannot
 /// fan out an unbounded state read on every evaluation.
@@ -38,6 +41,8 @@ pub const MIN_CHILDREN: usize = 2;
 pub const MAX_DEPTH: usize = 2;
 /// Staleness multiplier: a child is stale after K x its own frequency (§6.4).
 pub const STALE_FREQUENCY_MULTIPLIER: i64 = 3;
+/// Maximum accepted expression size, measured in UTF-8 bytes.
+pub const MAX_EXPRESSION_BYTES: usize = 4 * 1024;
 
 /// Boolean expression over child alerts.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -77,10 +82,12 @@ impl ChildState {
 }
 
 /// What a composite does with a child whose state has gone stale (§6.4).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(i16)]
 pub enum StaleChildPolicy {
     /// Trust the frozen state (default).
     #[serde(rename = "use_last_state")]
+    #[default]
     UseLastState,
     /// A stale child never satisfies the expression.
     #[serde(rename = "treat_as_false")]
@@ -145,6 +152,12 @@ enum Token {
 }
 
 fn tokenize(input: &str) -> Result<Vec<Token>, CompositeError> {
+    if input.len() > MAX_EXPRESSION_BYTES {
+        return Err(CompositeError::Parse(format!(
+            "expression exceeds {MAX_EXPRESSION_BYTES} bytes"
+        )));
+    }
+
     let chars: Vec<char> = input.chars().collect();
     let mut out = Vec::new();
     let mut i = 0;
@@ -172,24 +185,20 @@ fn tokenize(input: &str) -> Result<Vec<Token>, CompositeError> {
                     return Err(CompositeError::Parse(format!("expected `{c}{c}`")));
                 }
             }
-            // Operand tokens: alert ksuids in stored expressions, readable
-            // names in tests and the UI. Braces are accepted so `{ksuid}` is
-            // valid without changing the grammar.
-            c if c.is_alphanumeric() || c == '_' || c == '-' || c == '{' || c == '}' => {
-                let start = i;
-                while i < chars.len()
-                    && (chars[i].is_alphanumeric()
-                        || chars[i] == '_'
-                        || chars[i] == '-'
-                        || chars[i] == '{'
-                        || chars[i] == '}')
-                {
-                    i += 1;
+            '{' => {
+                let body_start = i + 1;
+                let Some(relative_end) = chars[body_start..].iter().position(|c| *c == '}') else {
+                    return Err(CompositeError::Parse("unclosed `{`".to_string()));
+                };
+                let end = body_start + relative_end;
+                let raw: String = chars[body_start..end].iter().collect();
+                if raw.is_empty() || raw.contains(['{', '}']) || Ksuid::from_str(&raw).is_err() {
+                    return Err(CompositeError::Parse(
+                        "operands must be brace-wrapped KSUIDs".to_string(),
+                    ));
                 }
-                let raw: String = chars[start..i].iter().collect();
-                out.push(Token::Ident(
-                    raw.trim_matches(|c| c == '{' || c == '}').to_string(),
-                ));
+                out.push(Token::Ident(raw));
+                i = end + 1;
             }
             other => {
                 return Err(CompositeError::Parse(format!(
@@ -283,6 +292,115 @@ pub fn parse_expr(input: &str) -> Result<CompositeExpr, CompositeError> {
     Ok(expr)
 }
 
+/// Collect child IDs in expression order, rejecting a repeated operand.
+pub fn collect_references(expr: &CompositeExpr) -> Result<Vec<String>, CompositeError> {
+    fn walk(
+        expr: &CompositeExpr,
+        seen: &mut HashSet<String>,
+        out: &mut Vec<String>,
+    ) -> Result<(), CompositeError> {
+        match expr {
+            CompositeExpr::Child(id) => {
+                if !seen.insert(id.clone()) {
+                    return Err(CompositeError::DuplicateChild(id.clone()));
+                }
+                out.push(id.clone());
+            }
+            CompositeExpr::And(left, right) | CompositeExpr::Or(left, right) => {
+                walk(left, seen, out)?;
+                walk(right, seen, out)?;
+            }
+            CompositeExpr::Not(inner) => walk(inner, seen, out)?,
+        }
+        Ok(())
+    }
+
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    walk(expr, &mut seen, &mut out)?;
+    Ok(out)
+}
+
+/// Emit the only persisted expression representation.
+pub fn canonical_expression(expr: &CompositeExpr) -> String {
+    match expr {
+        CompositeExpr::Child(id) => format!("{{{id}}}"),
+        CompositeExpr::And(left, right) => format!(
+            "({} && {})",
+            canonical_expression(left),
+            canonical_expression(right)
+        ),
+        CompositeExpr::Or(left, right) => format!(
+            "({} || {})",
+            canonical_expression(left),
+            canonical_expression(right)
+        ),
+        CompositeExpr::Not(inner) => format!("(!{})", canonical_expression(inner)),
+    }
+}
+
+/// Derive the absolute freshness deadline for an ordinary scheduled alert.
+/// Cron schedules are advanced occurrence by occurrence because neighboring
+/// gaps need not be equal (weekends, month lengths, and DST transitions).
+pub fn alert_stale_deadline_micros(
+    level_at: i64,
+    condition: &TriggerCondition,
+    legacy_tz_offset: i32,
+    stale_k: i64,
+) -> Result<i64, CompositeError> {
+    if stale_k <= 0 {
+        return Err(CompositeError::Parse(
+            "stale multiplier must be positive".to_string(),
+        ));
+    }
+
+    if condition.frequency_type != FrequencyType::Cron {
+        if condition.frequency <= 0 {
+            return Err(CompositeError::Parse(
+                "alert frequency must be positive".to_string(),
+            ));
+        }
+        return condition
+            .frequency
+            .checked_mul(stale_k)
+            .and_then(|seconds| seconds.checked_mul(1_000_000))
+            .and_then(|window| level_at.checked_add(window))
+            .ok_or_else(|| CompositeError::Parse("freshness deadline overflow".to_string()));
+    }
+
+    let schedule = Schedule::from_str(&condition.cron)
+        .map_err(|error| CompositeError::Parse(format!("invalid cron: {error}")))?;
+    let configured_timezone = condition
+        .timezone
+        .as_deref()
+        .and_then(|timezone| timezone.parse::<Tz>().ok());
+    let legacy_timezone = FixedOffset::east_opt(
+        legacy_tz_offset
+            .checked_mul(60)
+            .ok_or_else(|| CompositeError::Parse("legacy timezone offset overflow".to_string()))?,
+    );
+    if configured_timezone.is_none() && legacy_timezone.is_none() {
+        return Err(CompositeError::Parse("invalid alert timezone".to_string()));
+    }
+
+    let mut cursor = level_at;
+    for _ in 0..stale_k {
+        let anchor = chrono::DateTime::<Utc>::from_timestamp_micros(cursor)
+            .ok_or_else(|| CompositeError::Parse("invalid freshness timestamp".to_string()))?;
+        let offset = configured_timezone
+            .as_ref()
+            .map(|timezone| anchor.with_timezone(timezone).offset().fix())
+            .or(legacy_timezone)
+            .ok_or_else(|| CompositeError::Parse("invalid alert timezone".to_string()))?;
+        cursor = schedule
+            .after(&anchor.with_timezone(&offset))
+            .next()
+            .map(|next| next.timestamp_micros())
+            .ok_or_else(|| CompositeError::Parse("cron has no future occurrence".to_string()))?;
+    }
+    Ok(cursor)
+}
+
 // ── Evaluation ──────────────────────────────────────────────────────────────
 
 fn level_truth(level: Option<AlertLevel>, warning_counts_as_firing: bool) -> bool {
@@ -324,20 +442,48 @@ pub fn evaluate_expr(
     stale_policy: StaleChildPolicy,
     now: i64,
 ) -> Result<bool, CompositeError> {
+    fn preflight(
+        expr: &CompositeExpr,
+        states: &HashMap<String, ChildState>,
+    ) -> Result<(), CompositeError> {
+        match expr {
+            CompositeExpr::Child(id) => states
+                .contains_key(id)
+                .then_some(())
+                .ok_or_else(|| CompositeError::UnknownChild(id.clone())),
+            CompositeExpr::And(left, right) | CompositeExpr::Or(left, right) => {
+                preflight(left, states)?;
+                preflight(right, states)
+            }
+            CompositeExpr::Not(inner) => preflight(inner, states),
+        }
+    }
+
+    preflight(expr, states)?;
+    evaluate_preflighted(expr, states, warning_counts_as_firing, stale_policy, now)
+}
+
+fn evaluate_preflighted(
+    expr: &CompositeExpr,
+    states: &HashMap<String, ChildState>,
+    warning_counts_as_firing: bool,
+    stale_policy: StaleChildPolicy,
+    now: i64,
+) -> Result<bool, CompositeError> {
     Ok(match expr {
         CompositeExpr::Child(name) => {
             child_truth(name, states, warning_counts_as_firing, stale_policy, now)?
         }
         CompositeExpr::Not(inner) => {
-            !evaluate_expr(inner, states, warning_counts_as_firing, stale_policy, now)?
+            !evaluate_preflighted(inner, states, warning_counts_as_firing, stale_policy, now)?
         }
         CompositeExpr::And(a, b) => {
-            evaluate_expr(a, states, warning_counts_as_firing, stale_policy, now)?
-                && evaluate_expr(b, states, warning_counts_as_firing, stale_policy, now)?
+            evaluate_preflighted(a, states, warning_counts_as_firing, stale_policy, now)?
+                && evaluate_preflighted(b, states, warning_counts_as_firing, stale_policy, now)?
         }
         CompositeExpr::Or(a, b) => {
-            evaluate_expr(a, states, warning_counts_as_firing, stale_policy, now)?
-                || evaluate_expr(b, states, warning_counts_as_firing, stale_policy, now)?
+            evaluate_preflighted(a, states, warning_counts_as_firing, stale_policy, now)?
+                || evaluate_preflighted(b, states, warning_counts_as_firing, stale_policy, now)?
         }
     })
 }
@@ -380,21 +526,6 @@ pub fn validate_children(children: &[String]) -> Result<(), CompositeError> {
     Ok(())
 }
 
-/// Depth of a composite reference subtree. Plain alerts (absent from
-/// `existing`) are depth 0; a composite is 1 + its deepest composite child.
-fn depth_of(id: &str, existing: &HashMap<String, Vec<String>>) -> usize {
-    match existing.get(id) {
-        None => 0,
-        Some(children) => {
-            1 + children
-                .iter()
-                .map(|c| depth_of(c, existing))
-                .max()
-                .unwrap_or(0)
-        }
-    }
-}
-
 /// Reject reference cycles and over-deep nesting at write time (C-4, D6).
 ///
 /// Detected on write, never at evaluation: a cycle discovered mid-evaluation
@@ -404,47 +535,66 @@ pub fn validate_no_cycle(
     children: &[String],
     existing: &HashMap<String, Vec<String>>,
 ) -> Result<(), CompositeError> {
-    // Depth-first search back toward `composite_id`.
-    fn walk(
-        current: &str,
-        target: &str,
-        existing: &HashMap<String, Vec<String>>,
-        path: &mut Vec<String>,
-    ) -> Option<Vec<String>> {
-        if current == target {
-            path.push(current.to_string());
-            return Some(path.clone());
-        }
-        if path.iter().any(|p| p == current) {
-            // A pre-existing loop between other composites; stop descending.
-            return None;
-        }
-        path.push(current.to_string());
-        if let Some(kids) = existing.get(current) {
-            for k in kids {
-                if let Some(found) = walk(k, target, existing, path) {
-                    return Some(found);
-                }
-            }
-        }
-        path.pop();
-        None
-    }
+    let mut candidate = existing.clone();
+    candidate.insert(composite_id.to_string(), children.to_vec());
 
-    for child in children {
-        let mut path = Vec::new();
-        if let Some(cycle) = walk(child, composite_id, existing, &mut path) {
+    fn visit(
+        id: &str,
+        graph: &HashMap<String, Vec<String>>,
+        visiting: &mut Vec<String>,
+        complete: &mut HashSet<String>,
+    ) -> Result<(), CompositeError> {
+        if complete.contains(id) || !graph.contains_key(id) {
+            return Ok(());
+        }
+        if let Some(position) = visiting.iter().position(|entry| entry == id) {
+            let mut cycle = visiting[position..].to_vec();
+            if cycle.len() > 1 {
+                cycle.push(id.to_string());
+            }
             return Err(CompositeError::Cycle(cycle));
         }
+        visiting.push(id.to_string());
+        for child in graph.get(id).into_iter().flatten() {
+            visit(child, graph, visiting, complete)?;
+        }
+        visiting.pop();
+        complete.insert(id.to_string());
+        Ok(())
     }
 
-    // Depth of the composite as it would exist after this write.
-    let deepest = children
-        .iter()
-        .map(|c| depth_of(c, existing))
-        .max()
-        .unwrap_or(0);
-    if 1 + deepest > MAX_DEPTH {
+    let mut complete = HashSet::new();
+    for id in candidate.keys() {
+        visit(id, &candidate, &mut Vec::new(), &mut complete)?;
+    }
+
+    fn candidate_depth(
+        id: &str,
+        graph: &HashMap<String, Vec<String>>,
+        memo: &mut HashMap<String, usize>,
+    ) -> usize {
+        if let Some(depth) = memo.get(id) {
+            return *depth;
+        }
+        let depth = match graph.get(id) {
+            None => 0,
+            Some(children) => {
+                1 + children
+                    .iter()
+                    .map(|child| candidate_depth(child, graph, memo))
+                    .max()
+                    .unwrap_or(0)
+            }
+        };
+        memo.insert(id.to_string(), depth);
+        depth
+    }
+
+    let mut memo = HashMap::new();
+    if candidate
+        .keys()
+        .any(|id| candidate_depth(id, &candidate, &mut memo) > MAX_DEPTH)
+    {
         return Err(CompositeError::TooDeep { max: MAX_DEPTH });
     }
     Ok(())

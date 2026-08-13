@@ -138,6 +138,8 @@ use crate::{
         openobserve_api_management::request::dashboards::timed_annotations::update_annotations,
         openobserve_api_management::request::dashboards::timed_annotations::delete_annotation_panels,
         openobserve_api_management::request::alerts::create_alert,
+        openobserve_api_management::request::alerts::validate_composite_alert,
+        openobserve_api_management::request::alerts::get_composite_references,
         openobserve_api_management::request::alerts::get_alert,
         openobserve_api_management::request::alerts::export_alert,
         openobserve_api_management::request::alerts::update_alert,

@@ -75,9 +75,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Right: Table -->
         <div class="h-full min-w-0 flex-1">
-          <div class="bg-card-glass-bg h-full">
+          <div class="bg-card-glass-bg flex h-full flex-col">
+            <div class="border-border-default shrink-0 border-b px-3 py-2">
+              <AppTabs
+                :tabs="alertTabs"
+                :active-tab="activeTab"
+                size="sm"
+                @update:active-tab="onAlertTabChange"
+              />
+            </div>
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
+              class="min-h-0 flex-1"
               :frame="false"
               v-model:selected-ids="selectedAlertIds"
               selection="multiple"
@@ -122,39 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
               <template #toolbar>
                 <div class="flex w-full items-center gap-2">
-                  <OToggleGroup
-                    :model-value="activeTab"
-                    @update:model-value="
-                      (v) => {
-                        activeTab = v as string;
-                        filterAlertsByTab();
-                      }
-                    "
-                  >
-                    <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                      <template #icon-left
-                        ><OIcon name="format-list-bulleted" size="sm"
-                      /></template>
-                      {{ t("alerts.all") }}
-                    </OToggleGroupItem>
-                    <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                      <template #icon-left><OIcon name="schedule" size="sm" /></template>
-                      {{ t("alerts.scheduled") }}
-                    </OToggleGroupItem>
-                    <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
-                      <template #icon-left><OIcon name="bolt" size="sm" /></template>
-                      {{ t("alerts.realTime") }}
-                    </OToggleGroupItem>
-                    <OToggleGroupItem
-                      v-if="isAnomalyDetectionEnabled"
-                      value="anomalyDetection"
-                      size="sm"
-                      data-test="tab-anomalyDetection"
-                    >
-                      <template #icon-left><OIcon name="query-stats" size="sm" /></template>
-                      {{ t("alerts.anomalyDetection") }}
-                    </OToggleGroupItem>
-                  </OToggleGroup>
                   <div class="min-w-0 flex-1">
                     <OInput
                       v-model="dynamicQueryModel"
@@ -227,6 +203,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
                   <span class="truncate">{{ row.name || "--" }}</span>
+                  <template v-if="row.alert_type === 'Composite'">
+                    <OTag
+                      variant="warning-soft"
+                      size="sm"
+                      :label="t('alerts.compositeAlert')"
+                      :data-test="`alert-list-composite-badge-${row.alert_id}`"
+                    />
+                    <span
+                      class="text-text-secondary text-xs whitespace-nowrap"
+                      :data-test="`alert-list-child-count-${row.alert_id}`"
+                    >
+                      {{ t("alerts.composite.childrenCount", { count: row.child_count }) }}
+                    </span>
+                  </template>
+                  <span
+                    v-if="
+                      row.referenced_by_composite_count > 0 ||
+                      (referenceDrawerOpen &&
+                        !referenceConflictCode &&
+                        referenceAlertId === row.alert_id)
+                    "
+                    :data-test="`alert-list-reference-count-${row.alert_id}`"
+                  >
+                    <CompositeReferencesDrawer
+                      :open="
+                        referenceDrawerOpen &&
+                        !referenceConflictCode &&
+                        referenceAlertId === row.alert_id
+                      "
+                      :reference-count="row.referenced_by_composite_count ?? 0"
+                      :references="referenceRows"
+                      :hidden-reference-count="hiddenReferenceCount"
+                      @update:open="handleReferenceOpen($event, row)"
+                      @navigate="navigateToReference"
+                    />
+                  </span>
                   <!-- An SLO alert has no stream, so this is the only thing on
                        the row that says what it watches. The badge marks the
                        family; the label names the SLO and goes there. -->
@@ -715,6 +727,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
+    <CompositeReferencesDrawer
+      v-if="referenceConflictCode"
+      :open="referenceDrawerOpen"
+      :show-trigger="false"
+      :references="referenceRows"
+      :hidden-reference-count="hiddenReferenceCount"
+      :conflict-code="referenceConflictCode"
+      @update:open="referenceDrawerOpen = $event"
+      @navigate="navigateToReference"
+    />
+
     <template>
       <ODialog
         data-test="alert-list-form-dialog"
@@ -794,7 +817,7 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
@@ -839,6 +862,9 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
+import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
+import type { CompositeAlertReference } from "@/ts/interfaces/alert";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -876,6 +902,8 @@ export default defineComponent({
     OUserCell,
     OTag,
     OStatStrip,
+    AppTabs,
+    CompositeReferencesDrawer,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
@@ -933,6 +961,48 @@ export default defineComponent({
     const showHistoryDrawer = ref(false);
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
+    const referenceDrawerOpen = ref(false);
+    const referenceAlertId = ref("");
+    const referenceRows = ref<CompositeAlertReference[]>([]);
+    const hiddenReferenceCount = ref(0);
+    const referenceConflictCode = ref<string | undefined>();
+
+    const navigateToReference = (reference: CompositeAlertReference) => {
+      referenceDrawerOpen.value = false;
+      router.push({
+        name: "alertDetail",
+        params: { alert_id: reference.alert_id },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: reference.folder_id || "default",
+        },
+      });
+    };
+
+    const handleReferenceOpen = async (open: boolean, row: any) => {
+      referenceAlertId.value = row.alert_id;
+      referenceDrawerOpen.value = open;
+      referenceConflictCode.value = undefined;
+      hiddenReferenceCount.value = 0;
+      if (!open) return;
+      try {
+        const response = await alertsService.getCompositeReferences(
+          store.state.selectedOrganization.identifier,
+          row.alert_id,
+        );
+        referenceRows.value = response.data.references ?? [];
+      } catch {
+        referenceRows.value = [];
+      }
+    };
+
+    const openReferenceConflict = (failure: any) => {
+      referenceAlertId.value = failure.alert_id;
+      referenceRows.value = failure.references ?? [];
+      hiddenReferenceCount.value = failure.hidden_reference_count ?? 0;
+      referenceConflictCode.value = "child_referenced";
+      referenceDrawerOpen.value = true;
+    };
 
     const { getStreams } = useStreams(t);
 
@@ -1133,6 +1203,8 @@ export default defineComponent({
     const typeIconName = (row: any): IconName =>
       isSloRow(row)
         ? "track-changes"
+        : row?.alert_type === "Composite"
+          ? "account-tree"
         : row?.is_real_time === "anomaly"
           ? "query-stats"
           : row?.is_real_time
@@ -1144,6 +1216,8 @@ export default defineComponent({
       // The glyph and the badge carry the family; colour carries state.
       isSloRow(row)
         ? "text-text-secondary"
+        : row?.alert_type === "Composite"
+          ? "text-status-warning-text"
         : row?.is_real_time === "anomaly"
           ? "text-status-info-text"
           : row?.is_real_time
@@ -1267,15 +1341,17 @@ export default defineComponent({
 
     // Tabs for alerts view
     const alertTabs = computed(() => {
-      const tabs: { label: string; value: string }[] = [
-        { label: t("alerts.all"), value: "all" },
-        { label: t("alerts.scheduled"), value: "scheduled" },
-        { label: t("alerts.realTime"), value: "realTime" },
+      const tabs: { label: I18nText; value: string; icon?: IconName }[] = [
+        { label: t("alerts.all"), value: "all", icon: "format-list-bulleted" },
+        { label: t("alerts.scheduled"), value: "scheduled", icon: "schedule" },
+        { label: t("alerts.realTime"), value: "realTime", icon: "bolt" },
+        { label: t("alerts.compositeAlert"), value: "composite", icon: "account-tree" },
       ];
       if (isAnomalyDetectionEnabled.value) {
         tabs.push({
           label: t("alerts.anomalyDetection"),
           value: "anomalyDetection",
+          icon: "query-stats",
         });
       }
       return tabs;
@@ -1294,6 +1370,10 @@ export default defineComponent({
       {
         label: t("alerts.realTime"),
         value: "realTime",
+      },
+      {
+        label: t("alerts.compositeAlert"),
+        value: "composite",
       },
     ]);
 
@@ -1449,10 +1529,15 @@ export default defineComponent({
     const selectedAlertIds = ref<string[]>([]);
     const selectedAlerts = computed({
       get: () =>
-        filteredResults.value.filter((row: any) => selectedAlertIds.value.includes(row.alert_id)),
+        filteredResults.value.filter(
+          (row: any) => selectedAlertIds.value.includes(row.alert_id) || row.selected === true,
+        ),
       set: (val) => {
         if (val.length === 0) {
           selectedAlertIds.value = [];
+          filteredResults.value.forEach((row: any) => {
+            row.selected = false;
+          });
         }
       },
     });
@@ -1553,7 +1638,13 @@ export default defineComponent({
         loading.value = false;
       }
     };
-    const getAlertsFn = async (store: any, folderId: any, query = "", refreshResults = true) => {
+    const getAlertsFn = async (
+      store: any,
+      folderId: any,
+      query = "",
+      refreshResults = true,
+      alertType = "",
+    ) => {
       //why refreshResults flag is used
       // this is the only used for one edge case when we move alerts from one folder to another folder
       //we forcing the destination and source folder to fetch the alerts again
@@ -1589,6 +1680,7 @@ export default defineComponent({
           store?.state?.selectedOrganization?.identifier,
           folderId,
           query,
+          alertType,
         );
         var counter = 1;
         let localAllAlerts = [];
@@ -1610,6 +1702,34 @@ export default defineComponent({
           if (data.alert_type === "anomaly_detection") {
             const num = counter++;
             return normalizeAnomalyToAlertRow(data, num);
+          }
+
+          if (data.alert_type === "composite") {
+            return {
+              ...data,
+              alert_id: data.alert_id || data.id,
+              alert_type: "Composite",
+              stream_name: "--",
+              stream_type: "",
+              conditions: data.expression_summary || data.composite_condition?.expression || "--",
+              rawCondition: null,
+              period: "",
+              frequency: "",
+              status: "--",
+              child_count: data.child_count ?? data.children?.length ?? 0,
+              referenced_by_composite_count: data.referenced_by_composite_count ?? 0,
+              uuid: data.uuid,
+              selected: false,
+              type: "composite",
+              folder_name: {
+                name: data.folder_name,
+                id: data.folder_id,
+              },
+              is_real_time: "composite",
+              last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
+              last_triggered_at_raw: data.last_triggered_at ?? null,
+              last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
+            };
           }
 
           let frequency = "";
@@ -1716,6 +1836,11 @@ export default defineComponent({
           filteredResults.value = allAlerts.value;
         }
 
+        if (!router.currentRoute.value.query.action) {
+          showAddAlertDialog.value = false;
+          showImportAlertDialog.value = false;
+        }
+
         //here we are filtering the alerts by the activeTab
         //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table
         filterAlertsByTab(refreshResults);
@@ -1820,7 +1945,9 @@ export default defineComponent({
       }
       if (activeTab.value === "scheduled") {
         // Scheduled: is_real_time is falsy (false / undefined / null) — anomaly rows ("anomaly") excluded
-        filteredResults.value = allAlerts.value.filter((alert: any) => !alert.is_real_time);
+        filteredResults.value = allAlerts.value.filter(
+          (alert: any) => !alert.is_real_time && alert.alert_type !== "Composite",
+        );
       } else if (activeTab.value === "realTime") {
         // Real-time: strictly boolean true — anomaly rows excluded
         filteredResults.value = allAlerts.value.filter((alert: any) => alert.is_real_time === true);
@@ -1829,10 +1956,25 @@ export default defineComponent({
         filteredResults.value = allAlerts.value.filter(
           (alert: any) => alert.is_real_time === "anomaly",
         );
+      } else if (activeTab.value === "composite") {
+        filteredResults.value = allAlerts.value.filter(
+          (alert: any) => alert.alert_type === "Composite",
+        );
       } else {
         // "all" — show everything
         filteredResults.value = allAlerts.value;
       }
+    };
+
+    const onAlertTabChange = async (tab: string) => {
+      activeTab.value = tab;
+      const apiType =
+        tab === "realTime"
+          ? "realtime"
+          : tab === "anomalyDetection"
+            ? "anomaly_detection"
+            : tab;
+      await getAlertsFn(store, activeFolderId.value, "", true, apiType);
     };
 
     const refreshAlerts = async () => {
@@ -1844,23 +1986,10 @@ export default defineComponent({
       filterAlertsByTab();
     };
 
-    // onMounted(async () => {
-    //   if (!store.state.organizationData.foldersByType) {
-    //     await getFoldersListByType(store, "alerts");
-    //   }
-    //   if (
-    //     router.currentRoute.value.query.folder &&
-    //     store.state.organizationData?.foldersByType?.find(
-    //       (it: any) => it.folderId === router.currentRoute.value.query.folder,
-    //     )
-    //   ) {
-    //     activeFolderId.value = router.currentRoute.value.query.folder as string;
-    //   } else {
-    //     activeFolderId.value = "default";
-    //   }
-    //   await getAlertsFn(store, router.currentRoute.value.query.folder ?? "default");
-    //   filterAlertsByTab();
-    // });
+    onMounted(async () => {
+      await getAlertsByFolderId(store, activeFolderId.value);
+      filterAlertsByTab();
+    });
     watch(
       () => store.state.organizationData.foldersByType["alerts"],
       async (folders) => {
@@ -2285,6 +2414,13 @@ export default defineComponent({
           if (err.response?.status == 403) {
             return;
           }
+          if (err.response?.status === 409 && err.response?.data?.code === "child_referenced") {
+            openReferenceConflict({
+              alert_id: selectedDelete.value.alert_id,
+              ...err.response.data,
+            });
+            return;
+          }
           toast({
             variant: "error",
             message: err?.data?.message || "Error while deleting alert.",
@@ -2614,8 +2750,12 @@ export default defineComponent({
 
     const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
-      await getAlertsFn(store, selectedFolderId, "", false);
-      await getAlertsFn(store, activeFolderId);
+      if (selectedFolderId === activeFolderId) {
+        await getAlertsFn(store, activeFolderId);
+      } else {
+        await getAlertsFn(store, selectedFolderId, "", false);
+        await getAlertsFn(store, activeFolderId);
+      }
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
       selectedAnomalyConfigsToMove.value = [];
@@ -2831,11 +2971,13 @@ export default defineComponent({
       );
       filteredResults.value = tempResults.filter((alert: any) => {
         if (activeTab.value === "scheduled") {
-          return !alert.is_real_time;
+          return !alert.is_real_time && alert.alert_type !== "Composite";
         } else if (activeTab.value === "realTime") {
           return alert.is_real_time === true;
         } else if (activeTab.value === "anomalyDetection") {
           return alert.is_real_time === "anomaly";
+        } else if (activeTab.value === "composite") {
+          return alert.alert_type === "Composite";
         } else {
           return true;
         }
@@ -2956,6 +3098,10 @@ export default defineComponent({
           const { successful = [], unsuccessful = [] } = response.data;
           const successCount = successful.length;
           const failCount = unsuccessful.length;
+          const referenceFailure = unsuccessful.find(
+            (failure: any) => failure.code === "child_referenced",
+          );
+          if (referenceFailure) openReferenceConflict(referenceFailure);
 
           if (failCount > 0 && successCount > 0) {
             // Partial success
@@ -3182,6 +3328,14 @@ export default defineComponent({
       isCompactToolbar,
       isAnomalyDetectionEnabled,
       refreshAlerts,
+      onAlertTabChange,
+      referenceDrawerOpen,
+      referenceAlertId,
+      referenceRows,
+      hiddenReferenceCount,
+      referenceConflictCode,
+      handleReferenceOpen,
+      navigateToReference,
     };
   },
 });

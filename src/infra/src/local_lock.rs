@@ -16,7 +16,7 @@
 use std::sync::{Arc, LazyLock as Lazy};
 
 use hashbrown::HashMap;
-use tokio::sync::{Mutex, MutexGuard, RwLock};
+use tokio::sync::{Mutex, MutexGuard, OwnedMutexGuard, RwLock};
 
 use super::errors::Result;
 
@@ -44,6 +44,17 @@ impl LockHolder {
     }
     pub async fn lock(&self) -> MutexGuard<'_, bool> {
         let guard = self.lock.lock().await;
+        log::debug!("local lock key: {} acquired", self.key);
+        guard
+    }
+
+    /// Acquire a guard that owns its lock allocation.
+    ///
+    /// Multi-step service operations (such as composite graph mutations) need
+    /// to move the guard through async helpers without building a
+    /// self-referential holder/borrow pair.
+    pub async fn lock_owned(&self) -> OwnedMutexGuard<bool> {
+        let guard = self.lock.clone().lock_owned().await;
         log::debug!("local lock key: {} acquired", self.key);
         guard
     }

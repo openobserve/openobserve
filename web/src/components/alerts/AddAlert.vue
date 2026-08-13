@@ -161,7 +161,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex min-h-0 flex-1">
         <!-- LEFT column wrapper (flex: 6.5) -->
-        <div class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 py-2">
+        <div
+          :class="[
+            'flex min-h-0 min-w-0 flex-col gap-2 py-2',
+            isCompositeMode ? 'flex-1' : 'flex-[6.5]',
+          ]"
+        >
           <!-- Stream Name & Stream Type -->
           <div
             class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
@@ -169,7 +174,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
               <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact font-semibold tracking-[0.01em]"
-                >{{ t("alerts.streamConfig") }} <span class="text-text-body">*</span></span
+                >{{ isCompositeMode ? t("alerts.alertType") : t("alerts.streamConfig") }}
+                  <span v-if="!isCompositeMode" class="text-text-body">*</span></span
               >
             </div>
             <div class="flex items-center gap-4 px-3 py-2">
@@ -191,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Stream Type -->
-              <div class="flex items-center gap-1.5">
+              <div v-if="!isCompositeMode" class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.streamType") }} <span class="text-text-body">*</span>
                 </div>
@@ -210,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Stream Name -->
-              <div class="flex min-w-0 flex-1 items-center gap-1.5">
+              <div v-if="!isCompositeMode" class="flex min-w-0 flex-1 items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
@@ -272,7 +278,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex flex-col gap-4"
               >
                 <div>
+                  <CompositeAlertForm
+                    v-if="isCompositeMode"
+                    :model-value="formData"
+                    :org-identifier="store.state.selectedOrganization.identifier"
+                    :folder-id="activeFolderId as string"
+                    :available-children="availableCompositeChildren"
+                    @update:model-value="updateCompositeDraft"
+                  />
                   <QueryConfig
+                    v-else
                     ref="step2Ref"
                     :tab="formData.query_condition.type || 'custom'"
                     :multiTimeRange="formData.query_condition.multi_time_range"
@@ -428,6 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
         <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
         <div
+          v-if="!isCompositeMode"
           class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-l pt-2 pb-2"
         >
           <!-- Preview Card -->
@@ -554,7 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import { defineComponent, computed, watch, provide } from "vue";
+import { defineComponent, computed, watch, provide, ref } from "vue";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -587,6 +603,8 @@ import { buildAlertAutoName } from "@/utils/autoName";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
+import alertsService from "@/services/alerts";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -636,6 +654,7 @@ export default defineComponent({
     OFormInlineEdit,
     OFormSelect,
     OPageHeader,
+    CompositeAlertForm,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
@@ -647,6 +666,57 @@ export default defineComponent({
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
     );
+    const isCompositeMode = computed(
+      () => alertForm.formData.value.is_real_time === "composite",
+    );
+    const availableCompositeChildren = ref<any[]>([]);
+
+    const loadCompositeChildren = async () => {
+      if (!isCompositeMode.value) return;
+      try {
+        const response = await alertsService.listByFolderId(
+          0,
+          1000,
+          "name",
+          false,
+          "",
+          alertForm.store.state.selectedOrganization.identifier,
+          undefined,
+          "",
+          "all",
+        );
+        const rows = Array.isArray(response.data?.list) ? response.data.list : [];
+        availableCompositeChildren.value = rows
+          .filter((row: any) => {
+            const id = row.alert_id ?? row.id;
+            return (
+              id &&
+              id !== alertForm.formData.value.id &&
+              row.alert_type !== "anomaly_detection"
+            );
+          })
+          .map((row: any) => ({
+            alert_id: row.alert_id ?? row.id,
+            name: row.name,
+            alert_type: row.alert_type,
+            folder_id: row.folder_id,
+            folder_name: row.folder_name,
+            enabled: row.enabled,
+            level: row.level,
+            stale: row.stale,
+            accessible: true,
+          }));
+      } catch {
+        availableCompositeChildren.value = [];
+      }
+    };
+
+    watch(isCompositeMode, (enabled) => enabled && loadCompositeChildren(), { immediate: true });
+
+    const updateCompositeDraft = (draft: any) => {
+      alertForm.setF("composite_condition", draft.composite_condition);
+      alertForm.setF("children", draft.children ?? []);
+    };
 
     // Auto-expand preview when stream name is selected, collapse when cleared
     watch(
@@ -676,6 +746,10 @@ export default defineComponent({
       { label: alertForm.t("alerts.realTime"), value: "true" },
       ...(isAnomalyDetectionEnabled.value
         ? [{ label: alertForm.t("alerts.anomalyDetection"), value: "anomaly" }]
+        : []),
+      ...(alertForm.store.state.zoConfig.composite_alerts_available === true ||
+      isCompositeMode.value
+        ? [{ label: alertForm.t("alerts.compositeAlert"), value: "composite" }]
         : []),
     ]);
 
@@ -766,6 +840,9 @@ export default defineComponent({
       goBackToAlertsList,
       onStreamTypeChange,
       activeEvaluationStatus,
+      isCompositeMode,
+      availableCompositeChildren,
+      updateCompositeDraft,
     };
   },
 });

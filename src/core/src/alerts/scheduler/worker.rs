@@ -326,6 +326,8 @@ impl SchedulerJobPuller {
             for trigger in triggers {
                 let job_id = trigger.id;
                 let job_key = trigger.module_key.clone();
+                let claim =
+                    (trigger.module == TriggerModule::CompositeAlert).then(|| trigger.clone());
                 let (tx, mut rx) = mpsc::channel::<()>(1);
                 let scheduled_job = ScheduledJob {
                     trace_id: trace_id.clone(),
@@ -363,7 +365,26 @@ impl SchedulerJobPuller {
                             return;
                         }
 
-                        if let Err(e) =
+                        if let Some(claim) = claim.as_ref() {
+                            match infra::scheduler::keep_alive_claim(
+                                claim,
+                                alert_timeout,
+                                report_timeout,
+                            )
+                            .await
+                            {
+                                Ok(true) => {}
+                                Ok(false) => {
+                                    log::warn!(
+                                        "[SCHEDULER][JobPuller-{trace_id_keep_alive}] composite claim for job[{job_id}] trigger[{job_key}] is stale; stopping keep_alive"
+                                    );
+                                    return;
+                                }
+                                Err(e) => log::error!(
+                                    "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for composite job[{job_id}] trigger[{job_key}] failed: {e}"
+                                ),
+                            }
+                        } else if let Err(e) =
                             infra::scheduler::keep_alive(&[job_id], alert_timeout, report_timeout)
                                 .await
                         {

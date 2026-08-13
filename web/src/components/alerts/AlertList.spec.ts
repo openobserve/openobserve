@@ -206,6 +206,7 @@ async function mountAlertList() {
           template: '<div class="confirm-dialog-stub" :data-open="modelValue"></div>',
         },
         AppTabs: {
+          name: "AppTabs",
           props: ["tabs", "activeTab"],
           emits: ["update:active-tab"],
           template:

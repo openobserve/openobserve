@@ -27,6 +27,37 @@ use crate::{
     errors::{DbError, Error, Result},
 };
 
+const PULL_QUERY: &str = r#"UPDATE scheduled_jobs
+SET status = $1, start_time = $2, claim_epoch = claim_epoch + 1,
+    end_time = CASE WHEN module = $3 THEN $4 ELSE $5 END
+WHERE id IN (
+    SELECT id FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7
+      AND NOT (is_realtime = $8 AND is_silenced = $9)
+    ORDER BY next_run_at, id LIMIT $10
+)
+RETURNING *;"#;
+
+const PULL_QUERY_BY_MODULE: &str = r#"UPDATE scheduled_jobs
+SET status = $1, start_time = $2, claim_epoch = claim_epoch + 1,
+    end_time = CASE WHEN module = $3 THEN $4 ELSE $5 END
+WHERE id IN (
+    SELECT id FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7
+      AND NOT (is_realtime = $8 AND is_silenced = $9) AND module = $10
+    ORDER BY next_run_at, id LIMIT $11
+)
+RETURNING *;"#;
+
+const KEEP_ALIVE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
+SET end_time = CASE WHEN module = $1 THEN $2 ELSE $3 END
+WHERE id = $4 AND claim_epoch = $5 AND status = $6;"#;
+
+const COMPLETE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
+SET status = $1, retries = $2, next_run_at = $3,
+    is_realtime = $4, is_silenced = $5, data = $6
+WHERE id = $7 AND claim_epoch = $8 AND status = $9;"#;
+
 pub struct SqliteScheduler {}
 
 impl SqliteScheduler {
@@ -62,7 +93,8 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    data         TEXT not null
+    data         TEXT not null,
+    claim_epoch  BIGINT default 0 not null
 );
             "#,
         )
@@ -75,6 +107,13 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
             "scheduled_jobs",
             "data",
             "TEXT NOT NULL DEFAULT ''",
+        )
+        .await?;
+        add_column(
+            &client,
+            "scheduled_jobs",
+            "claim_epoch",
+            "BIGINT NOT NULL DEFAULT 0",
         )
         .await?;
 
@@ -374,6 +413,55 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
+    async fn keep_alive_claim(
+        &self,
+        claim: &Trigger,
+        alert_timeout: i64,
+        report_timeout: i64,
+    ) -> Result<bool> {
+        let now = now_micros();
+        let report_max_time = now
+            + Duration::try_seconds(report_timeout)
+                .ok_or_else(|| Error::Message("invalid report timeout".into()))?
+                .num_microseconds()
+                .ok_or_else(|| Error::Message("report timeout overflow".into()))?;
+        let alert_max_time = now
+            + Duration::try_seconds(alert_timeout)
+                .ok_or_else(|| Error::Message("invalid alert timeout".into()))?
+                .num_microseconds()
+                .ok_or_else(|| Error::Message("alert timeout overflow".into()))?;
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let result = sqlx::query(KEEP_ALIVE_CLAIM_QUERY)
+            .bind(TriggerModule::Report)
+            .bind(report_max_time)
+            .bind(alert_max_time)
+            .bind(claim.id)
+            .bind(claim.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .execute(&*client)
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn complete_claim(&self, trigger: Trigger) -> Result<bool> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let result = sqlx::query(COMPLETE_CLAIM_QUERY)
+            .bind(&trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(trigger.id)
+            .bind(trigger.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .execute(&*client)
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
     /// Returns the Trigger jobs with "Waiting" status.
     /// Steps:
     /// - Lock the Sqlite client for read-write
@@ -408,36 +496,9 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         // `module` filter still scopes which rows a per-module puller claims; see postgres.rs for
         // the C3 lock rationale. Legacy `None` string is byte-identical (LIMIT $10).
         let query = if module.is_some() {
-            r#"UPDATE scheduled_jobs
-SET status = $1, start_time = $2,
-    end_time = CASE
-        WHEN module = $3 THEN $4
-        ELSE $5
-    END
-WHERE id IN (
-    SELECT id
-    FROM scheduled_jobs
-    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
-      AND module = $10
-    ORDER BY next_run_at
-    LIMIT $11
-)
-RETURNING *;"#
+            PULL_QUERY_BY_MODULE
         } else {
-            r#"UPDATE scheduled_jobs
-SET status = $1, start_time = $2,
-    end_time = CASE
-        WHEN module = $3 THEN $4
-        ELSE $5
-    END
-WHERE id IN (
-    SELECT id
-    FROM scheduled_jobs
-    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
-    ORDER BY next_run_at
-    LIMIT $10
-)
-RETURNING *;"#
+            PULL_QUERY
         };
 
         let mut q = sqlx::query_as::<_, Trigger>(query)

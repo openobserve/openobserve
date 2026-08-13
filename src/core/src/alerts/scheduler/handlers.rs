@@ -525,7 +525,462 @@ pub async fn handle_triggers(
         }
         db::scheduler::TriggerModule::Slo => handle_slo_triggers(trigger).await,
         db::scheduler::TriggerModule::SloBackfill => handle_slo_backfill_triggers(trigger).await,
+        db::scheduler::TriggerModule::CompositeAlert => {
+            handle_composite_alert_trigger(trace_id, trigger).await
+        }
     }
+}
+
+/// Composite jobs are routed explicitly by their append-only scheduler
+/// module. The definition/evaluation service is intentionally separate from
+/// the query-alert handler so a composite can never execute child queries.
+async fn handle_composite_alert_trigger(
+    trace_id: &str,
+    mut trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        infra::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &trigger.module_key,
+        )
+        .await?;
+        return Ok(());
+    }
+    // Until a production database-backed evaluator can obtain the metadata
+    // transaction used for state fencing, a missing/stale definition is
+    // completed safely through the epoch-fenced scheduler seam. This path is
+    // also the required lifecycle behavior after deletion.
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let definition =
+        infra::table::alert_composites::get_by_id(db, &trigger.org, &trigger.module_key).await?;
+    let Some(definition) = definition else {
+        infra::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &trigger.module_key,
+        )
+        .await?;
+        return Ok(());
+    };
+    if !definition.definition.enabled {
+        infra::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &trigger.module_key,
+        )
+        .await?;
+        return Ok(());
+    }
+    let mut scheduled_data: config::meta::triggers::ScheduledTriggerData =
+        config::utils::json::from_str(&trigger.data).unwrap_or_default();
+
+    use config::meta::{
+        alerts::{
+            composite::StaleChildPolicy,
+            state::{ROLLUP_GROUP_KEY, apply_outcome},
+        },
+        self_reporting::usage::RunOutcome,
+    };
+    let now = now_micros();
+    let child_ids = definition
+        .children
+        .iter()
+        .map(|child| child.child_alert_id.clone())
+        .collect::<Vec<_>>();
+    let states = infra::table::alert_states::get_rollups(&child_ids).await?;
+    let states = states
+        .into_iter()
+        .map(|state| (state.alert_id.clone(), state))
+        .collect::<std::collections::HashMap<_, _>>();
+    let resolved =
+        infra::table::alert_composites::resolve_many(db, &trigger.org, &child_ids).await?;
+    let stale_k = std::env::var("ZO_ALERT_COMPOSITE_STALE_K")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(3)
+        .max(1);
+    let composite_sweep_seconds = std::env::var("ZO_ALERT_COMPOSITE_SWEEP_SECS")
+        .ok()
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(300)
+        .max(1);
+    let mut children = Vec::with_capacity(definition.children.len());
+    for child in &definition.children {
+        let state = states.get(&child.child_alert_id);
+        let (name, alert_type, enabled, cadence_seconds, stale_deadline) =
+            match resolved.get(&child.child_alert_id) {
+                Some(infra::table::alert_composites::Resolution::Alert(model)) => {
+                    let alert: config::meta::alerts::alert::Alert = model.clone().try_into()?;
+                    if alert.is_real_time {
+                        anyhow::bail!("composite child is no longer eligible");
+                    }
+                    let stale_deadline = state
+                        .and_then(|state| state.level_at)
+                        .map(|level_at| {
+                            config::meta::alerts::composite::alert_stale_deadline_micros(
+                                level_at,
+                                &alert.trigger_condition,
+                                alert.tz_offset,
+                                stale_k,
+                            )
+                        })
+                        .transpose()?;
+                    (
+                        alert.name,
+                        if alert.query_condition.slo_condition.is_some() {
+                            "slo"
+                        } else {
+                            "scheduled"
+                        },
+                        alert.enabled,
+                        alert.trigger_condition.frequency.max(1),
+                        stale_deadline,
+                    )
+                }
+                Some(infra::table::alert_composites::Resolution::Composite(model)) => (
+                    model.name.clone(),
+                    "composite",
+                    model.enabled,
+                    composite_sweep_seconds,
+                    state.and_then(|state| state.level_at).and_then(|level_at| {
+                        composite_sweep_seconds
+                            .checked_mul(stale_k)
+                            .and_then(|seconds| seconds.checked_mul(1_000_000))
+                            .and_then(|window| level_at.checked_add(window))
+                    }),
+                ),
+                _ => anyhow::bail!("composite child definition missing"),
+            };
+        children.push(crate::alerts::composite::CompositeStateInput {
+            alert_id: child.child_alert_id.clone(),
+            name,
+            alert_type: alert_type.to_string(),
+            enabled,
+            level: state.and_then(|state| state.level),
+            level_at: state.and_then(|state| state.level_at),
+            effective_cadence_seconds: cadence_seconds,
+            stale_deadline,
+        });
+    }
+    let stale_policy = match definition.definition.stale_child_policy {
+        1 => StaleChildPolicy::TreatAsFalse,
+        2 => StaleChildPolicy::TreatAsTrue,
+        _ => StaleChildPolicy::UseLastState,
+    };
+    let evaluated = crate::alerts::composite::CompositeEvaluator::evaluate(
+        &definition.definition.expression,
+        children,
+        definition.definition.warning_counts_as_firing,
+        stale_policy,
+        now,
+    )?;
+    let previous =
+        infra::table::alert_states::get(&definition.definition.id, ROLLUP_GROUP_KEY).await?;
+    let outcome = if evaluated.result {
+        RunOutcome::Firing
+    } else {
+        RunOutcome::Normal
+    };
+    let update = apply_outcome(
+        &definition.definition.id,
+        ROLLUP_GROUP_KEY,
+        previous.as_ref(),
+        outcome.clone(),
+        Some(evaluated.level),
+        now,
+    );
+
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
+    let transaction = db.begin().await?;
+    let lease_deadline = now + config::get_config().limit.alert_schedule_timeout * 1_000_000;
+    if !infra::scheduler::renew_claim_in_transaction(
+        &transaction,
+        trigger.id,
+        trigger.claim_epoch,
+        lease_deadline,
+    )
+    .await?
+    {
+        transaction.rollback().await?;
+        return Ok(());
+    }
+    let current =
+        infra::table::entity::alert_composites::Entity::find_by_id(&definition.definition.id)
+            .filter(infra::table::entity::alert_composites::Column::Org.eq(&trigger.org))
+            .one(&transaction)
+            .await?;
+    if current.is_none_or(|current| {
+        !current.enabled
+            || current.evaluation_generation != definition.definition.evaluation_generation
+    }) {
+        transaction.rollback().await?;
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        trigger.next_run_at = now
+            + std::env::var("ZO_ALERT_COMPOSITE_DEBOUNCE_SECS")
+                .ok()
+                .and_then(|value| value.parse::<i64>().ok())
+                .unwrap_or(15)
+                .max(1)
+                * 1_000_000;
+        let _ = infra::scheduler::complete_claim(trigger).await?;
+        return Ok(());
+    }
+    infra::table::alert_states::persist_update_in_transaction(&transaction, &update).await?;
+    transaction.commit().await?;
+
+    let mut delivery_retry_at = None;
+    if evaluated.result {
+        let delivery = config::meta::alerts::level::delivery_decision(
+            evaluated.level,
+            scheduled_data
+                .last_notified_level
+                .and_then(config::meta::alerts::level::AlertLevel::from_i32),
+            scheduled_data.delivery_silenced_until,
+            now,
+            Some(true),
+        );
+        if delivery.should_deliver()
+            && (!definition
+                .definition
+                .destinations
+                .as_array()
+                .is_none_or(Vec::is_empty)
+                || !definition
+                    .definition
+                    .workflows
+                    .as_array()
+                    .is_none_or(Vec::is_empty))
+        {
+            let notification_alert = composite_notification_alert(&definition.definition);
+            let notification_row = composite_notification_row(
+                &definition.definition.expression,
+                evaluated.result,
+                &evaluated.children,
+            );
+            let rows = [notification_row];
+
+            #[cfg(feature = "enterprise")]
+            let incident_handled = if notification_alert.creates_incident
+                && o2_enterprise::enterprise::common::config::get_config()
+                    .incidents
+                    .enabled
+            {
+                crate::alerts::incidents::correlate_alert_to_incident(
+                    &notification_alert,
+                    &rows[0],
+                    &rows,
+                    now,
+                    Some(evaluated.level),
+                )
+                .await
+                .map(|outcome| outcome.is_some())
+                .unwrap_or_else(|error| {
+                    log::error!(
+                        "[COMPOSITE_ALERT] incident correlation failed for {}: {error}",
+                        definition.definition.id
+                    );
+                    false
+                })
+            } else {
+                false
+            };
+            #[cfg(not(feature = "enterprise"))]
+            let incident_handled = false;
+
+            let delivery_result = if incident_handled {
+                Ok(crate::alerts::alert::NotificationOutcome::default())
+            } else {
+                notification_alert
+                    .send_notification(
+                        trace_id,
+                        &rows,
+                        now,
+                        None,
+                        now,
+                        Some(evaluated.level),
+                        Some(i32::from(evaluated.result) as f64),
+                        None,
+                        &scheduled_data.notified_destinations,
+                    )
+                    .await
+            };
+            match delivery_result {
+                Ok(outcome) if outcome.failed.is_empty() => {
+                    scheduled_data.notified_destinations.clear();
+                    scheduled_data.last_notified_level = Some(evaluated.level.to_i32());
+                    scheduled_data.delivery_silenced_until = definition
+                        .definition
+                        .silence_seconds
+                        .checked_mul(1_000_000)
+                        .and_then(|window| now.checked_add(window));
+                    trigger.retries = 0;
+                }
+                Ok(outcome) => {
+                    for destination in outcome.succeeded {
+                        if !scheduled_data.notified_destinations.contains(&destination) {
+                            scheduled_data.notified_destinations.push(destination);
+                        }
+                    }
+                    trigger.retries = trigger.retries.saturating_add(1);
+                    delivery_retry_at = Some(now.saturating_add(10_000_000));
+                }
+                Err(error) => {
+                    log::error!(
+                        "[COMPOSITE_ALERT] delivery failed for {}: {error}",
+                        definition.definition.id
+                    );
+                    trigger.retries = trigger.retries.saturating_add(1);
+                    delivery_retry_at = Some(now.saturating_add(10_000_000));
+                }
+            }
+        }
+    }
+
+    let significant = previous.as_ref().is_none_or(|previous| {
+        previous.level != Some(evaluated.level)
+            || previous.last_outcome.as_ref() != Some(&outcome)
+            || previous.level_at.is_some_and(|level_at| {
+                evaluated
+                    .children
+                    .iter()
+                    .any(|child| child.stale && child.level_at == Some(level_at))
+            })
+    });
+    if significant {
+        let parents = infra::table::alert_composites::list_parents(
+            db,
+            &trigger.org,
+            infra::table::alert_composites::ChildKind::Composite,
+            &definition.definition.id,
+        )
+        .await?;
+        for parent in parents {
+            infra::table::alert_composites::increment_evaluation_generation(
+                db,
+                &trigger.org,
+                &parent.id,
+            )
+            .await?;
+            if let Ok(mut parent_job) = infra::scheduler::get(
+                &trigger.org,
+                db::scheduler::TriggerModule::CompositeAlert,
+                &parent.id,
+            )
+            .await
+            {
+                let debounce_at = now
+                    + std::env::var("ZO_ALERT_COMPOSITE_DEBOUNCE_SECS")
+                        .ok()
+                        .and_then(|value| value.parse::<i64>().ok())
+                        .unwrap_or(15)
+                        .max(1)
+                        * 1_000_000;
+                parent_job.next_run_at = parent_job.next_run_at.min(debounce_at);
+                if let Err(error) = infra::scheduler::update_trigger(parent_job, false).await {
+                    log::error!(
+                        "[COMPOSITE_ALERT] failed to advance parent {}: {error}",
+                        parent.id
+                    );
+                }
+            }
+        }
+    }
+
+    log::info!(
+        "[COMPOSITE_ALERT] trace_id={trace_id} composite_id={} generation_start={} generation_end={} child_count={} result={} stale_count={} nudge_reason=scheduler error_code=",
+        definition.definition.id,
+        definition.definition.evaluation_generation,
+        definition.definition.evaluation_generation,
+        evaluated.children.len(),
+        evaluated.result,
+        evaluated
+            .children
+            .iter()
+            .filter(|child| child.stale)
+            .count(),
+    );
+    let sweep_at = now
+        + std::env::var("ZO_ALERT_COMPOSITE_SWEEP_SECS")
+            .ok()
+            .and_then(|value| value.parse::<i64>().ok())
+            .unwrap_or(300)
+            .max(1)
+            * 1_000_000;
+    trigger.status = db::scheduler::TriggerStatus::Waiting;
+    trigger.next_run_at = evaluated
+        .next_stale_deadline
+        .map(|deadline| deadline.saturating_add(1).min(sweep_at))
+        .unwrap_or(sweep_at);
+    if let Some(retry_at) = delivery_retry_at {
+        trigger.next_run_at = trigger.next_run_at.min(retry_at);
+    }
+    trigger.data = config::utils::json::to_string(&scheduled_data)?;
+    let _ = infra::scheduler::complete_claim(trigger).await?;
+    Ok(())
+}
+
+fn composite_notification_alert(
+    definition: &infra::table::entity::alert_composites::Model,
+) -> config::meta::alerts::alert::Alert {
+    let mut alert = config::meta::alerts::alert::Alert::default();
+    alert.id = svix_ksuid::Ksuid::from_str(&definition.id).ok();
+    alert.org_id = definition.org.clone();
+    alert.name = definition.name.clone();
+    alert.description = definition.description.clone().unwrap_or_default();
+    alert.destinations =
+        serde_json::from_value(definition.destinations.clone()).unwrap_or_default();
+    alert.template = definition.template.clone();
+    alert.context_attributes = definition
+        .context_attributes
+        .clone()
+        .and_then(|value| serde_json::from_value(value).ok());
+    alert.creates_incident = definition.creates_incident;
+    alert.workflows = serde_json::from_value(definition.workflows.clone()).unwrap_or_default();
+    alert.priority = definition
+        .priority
+        .and_then(config::meta::alerts::priority::AlertPriority::from_i32);
+    alert.tags = definition
+        .tags
+        .clone()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    alert.trigger_condition.silence = definition.silence_seconds;
+    alert
+}
+
+fn composite_notification_row(
+    expression: &str,
+    result: bool,
+    children: &[crate::alerts::composite::EvaluatedChild],
+) -> config::utils::json::Map<String, config::utils::json::Value> {
+    let mut resolved_expression = expression.to_string();
+    for child in children {
+        resolved_expression =
+            resolved_expression.replace(&format!("{{{}}}", child.alert_id), &child.name);
+    }
+    let value = config::utils::json::json!({
+        "composite_result": result,
+        "composite_expression": resolved_expression,
+        "composite_expression_ids": expression,
+        "firing_children": children.iter().filter(|child| child.truth).map(|child| child.name.clone()).collect::<Vec<_>>(),
+        "stale_children": children.iter().filter(|child| child.stale).map(|child| child.name.clone()).collect::<Vec<_>>(),
+        "child_states": children.iter().map(|child| config::utils::json::json!({
+            "alert_id": child.alert_id,
+            "name": child.name,
+            "alert_type": child.alert_type,
+            "enabled": child.enabled,
+            "level": child.level.map(|level| level.to_string()),
+            "level_at": child.level_at,
+            "stale": child.stale,
+            "truth": child.truth,
+        })).collect::<Vec<_>>(),
+    });
+    value.as_object().cloned().unwrap_or_default()
 }
 
 /// Handle an anomaly detection trigger.

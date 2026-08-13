@@ -281,6 +281,8 @@ pub enum AlertTypeFilter {
     /// column, not the JSON payload, which is why it can be a SQL predicate
     /// rather than an app-side scan (D60).
     Slo,
+    /// Composite definitions are stored outside the ordinary `alerts` table.
+    Composite,
 }
 
 /// Parameters for listing alerts.

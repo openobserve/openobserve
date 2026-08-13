@@ -64,6 +64,9 @@ pub struct CreateAlertRequestBody {
     /// Anomaly-detection-specific fields (nested object).
     pub anomaly_config: Option<AnomalyAlertFields>,
 
+    /// Composite-only boolean condition over stable child alert IDs.
+    pub composite_condition: Option<CompositeCondition>,
+
     /// The alert configuration. All fields from Alert are flattened into this request body.
     #[serde(flatten)]
     #[schema(inline)]
@@ -71,6 +74,33 @@ pub struct CreateAlertRequestBody {
 }
 
 impl CreateAlertRequestBody {
+    pub fn composite_unsupported_field(&self) -> Option<&'static str> {
+        if self.anomaly_config.is_some() {
+            return Some("anomaly_config");
+        }
+        if self.alert.id.is_some() {
+            return Some("id");
+        }
+        if !self.alert.stream_name.is_empty() {
+            return Some("stream_name");
+        }
+        if self.alert.query_condition != QueryCondition::default() {
+            return Some("query_condition");
+        }
+        if !self.alert.row_template.is_empty() {
+            return Some("row_template");
+        }
+        if self.alert.is_real_time {
+            return Some("is_real_time");
+        }
+        if self.alert.deduplication.is_some() {
+            return Some("deduplication");
+        }
+        if self.alert.tz_offset != 0 {
+            return Some("tz_offset");
+        }
+        composite_trigger_unsupported_field(&self.alert.trigger_condition)
+    }
     /// Return the anomaly config fields, combining `detection_function` +
     /// `detection_function_field` into the canonical "avg(field)" form.
     /// Returns `None` when no `anomaly_config` was supplied or when
@@ -83,6 +113,16 @@ impl CreateAlertRequestBody {
         )?;
         Some(base)
     }
+}
+
+/// Documentation union for the unified create endpoint. Runtime dispatch is
+/// still driven by `alert_type`; this wrapper makes the OpenAPI contract
+/// explicit for clients that generate discriminated request types.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(untagged)]
+pub enum CreateAlertRequestSchema {
+    Query(CreateAlertRequestBody),
+    Composite(CreateAlertRequestBody),
 }
 
 /// Anomaly-detection-specific fields for `CreateAlertRequestBody`.
@@ -140,13 +180,85 @@ pub struct UpdateAlertRequestBody {
     /// are changed).
     pub anomaly_config: Option<UpdateAnomalyAlertFields>,
 
+    /// Composite-only boolean condition over stable child alert IDs.
+    pub composite_condition: Option<CompositeCondition>,
+
     /// Alert configuration fields (used for scheduled/realtime alerts).
     #[serde(flatten)]
     #[schema(inline)]
     pub alert: Alert,
 }
 
+/// Composite expression and truth-policy configuration.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeCondition {
+    pub expression: String,
+    #[serde(default = "default_true")]
+    pub warning_counts_as_firing: bool,
+    #[serde(default)]
+    pub stale_child_policy: CompositeStaleChildPolicy,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CompositeStaleChildPolicy {
+    #[default]
+    UseLastState,
+    TreatAsFalse,
+    TreatAsTrue,
+}
+
+impl CompositeStaleChildPolicy {
+    pub fn storage_id(self) -> i16 {
+        match self {
+            Self::UseLastState => 0,
+            Self::TreatAsFalse => 1,
+            Self::TreatAsTrue => 2,
+        }
+    }
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+/// Advisory validation/preview request. Persistence repeats all checks under
+/// the organization graph lock.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct ValidateCompositeRequestBody {
+    pub composite_condition: CompositeCondition,
+    pub composite_id: Option<String>,
+    pub folder_id: Option<String>,
+}
+
 impl UpdateAlertRequestBody {
+    pub fn composite_unsupported_field(&self) -> Option<&'static str> {
+        if self.anomaly_config.is_some() {
+            return Some("anomaly_config");
+        }
+        if self.alert.id.is_some() {
+            return Some("id");
+        }
+        if !self.alert.stream_name.is_empty() {
+            return Some("stream_name");
+        }
+        if self.alert.query_condition != QueryCondition::default() {
+            return Some("query_condition");
+        }
+        if !self.alert.row_template.is_empty() {
+            return Some("row_template");
+        }
+        if self.alert.is_real_time {
+            return Some("is_real_time");
+        }
+        if self.alert.deduplication.is_some() {
+            return Some("deduplication");
+        }
+        if self.alert.tz_offset != 0 {
+            return Some("tz_offset");
+        }
+        composite_trigger_unsupported_field(&self.alert.trigger_condition)
+    }
     /// Return the anomaly config fields, combining `detection_function` +
     /// `detection_function_field` into the canonical "avg(field)" form when both are present.
     pub fn anomaly_fields(&self) -> UpdateAnomalyAlertFields {
@@ -159,6 +271,32 @@ impl UpdateAlertRequestBody {
             );
         }
         base
+    }
+}
+
+fn composite_trigger_unsupported_field(trigger: &super::TriggerCondition) -> Option<&'static str> {
+    if trigger.period_minutes != 0 {
+        Some("trigger_condition.period")
+    } else if trigger.operator != super::Operator::default() {
+        Some("trigger_condition.operator")
+    } else if trigger.threshold_count != 0 {
+        Some("trigger_condition.threshold")
+    } else if trigger.warning_threshold_count.is_some() {
+        Some("trigger_condition.warning_threshold")
+    } else if trigger.notify_on_warning.is_some() {
+        Some("trigger_condition.notify_on_warning")
+    } else if trigger.frequency_minutes != 0 {
+        Some("trigger_condition.frequency")
+    } else if trigger.frequency_type != super::FrequencyType::default() {
+        Some("trigger_condition.frequency_type")
+    } else if !trigger.cron.is_empty() {
+        Some("trigger_condition.cron")
+    } else if trigger.timezone.is_some() {
+        Some("trigger_condition.timezone")
+    } else if trigger.tolerance_seconds.is_some() {
+        Some("trigger_condition.tolerance_in_secs")
+    } else {
+        None
     }
 }
 

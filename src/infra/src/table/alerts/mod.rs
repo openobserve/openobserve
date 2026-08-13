@@ -740,14 +740,21 @@ async fn list_models<C: ConnectionTrait>(
         Some(slo_id) => query.filter(alerts::Column::SloId.eq(slo_id)),
     };
 
-    // Apply the alert-type filter, for the one variant that IS a column
-    // predicate (SA-16). `Scheduled` and `Realtime` read `is_real_time` and
-    // stay in-memory in the HTTP handler; `AnomalyDetection` short-circuits
-    // before this query runs. Only `Slo` maps to an indexed column, which is
-    // what the variant's own docs promise.
+    // Apply ordinary-alert type predicates before pagination. Composite rows
+    // live in their own table, while scheduled/realtime query alerts exclude
+    // SLO rows even if old data happens to carry an unexpected realtime bit.
     let query = match params.alert_type {
+        AlertTypeFilter::Scheduled => query
+            .filter(alerts::Column::IsRealTime.eq(false))
+            .filter(alerts::Column::SloId.is_null()),
+        AlertTypeFilter::Realtime => query
+            .filter(alerts::Column::IsRealTime.eq(true))
+            .filter(alerts::Column::SloId.is_null()),
         AlertTypeFilter::Slo => query.filter(alerts::Column::SloId.is_not_null()),
-        _ => query,
+        AlertTypeFilter::Composite => {
+            query.filter(alerts::Column::Id.eq(TAG_FILTER_NO_MATCH_SENTINEL))
+        }
+        AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection => query,
     };
 
     // Apply the optional priority filter (PT-3). Multiple values OR together;

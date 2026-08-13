@@ -430,9 +430,19 @@ pub async fn get_alert_history(
         match get_by_id(conn, &org_id, alert_id).await {
             Ok((f, _)) => Some(f.folder_id),
             Err(_) => {
-                return MetaHttpResponse::not_found(format!(
-                    "Alert '{alert_id}' not found in organization"
-                ));
+                match openobserve_core::alerts::composite::get_composite(
+                    &org_id,
+                    &alert_id.to_string(),
+                )
+                .await
+                {
+                    Ok(Some(composite)) => Some(composite.definition.folder_id),
+                    _ => {
+                        return MetaHttpResponse::not_found(format!(
+                            "Alert '{alert_id}' not found in organization"
+                        ));
+                    }
+                }
             }
         }
     } else {

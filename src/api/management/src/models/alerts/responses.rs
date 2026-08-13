@@ -128,6 +128,61 @@ pub struct ListAlertsResponseBodyItem {
     /// `groups_observed` does not.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub groups_firing_is_lower_bound: Option<bool>,
+    /// Composite rows only: number of referenced children.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub child_count: Option<usize>,
+    /// Count of parent composites currently readable to the caller.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub referenced_by_composite_count: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeChildResponse {
+    pub alert_id: String,
+    pub accessible: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effective_cadence_seconds: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale_deadline: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truth: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeValidationResponse {
+    pub valid: bool,
+    pub canonical_expression: Option<String>,
+    pub children: Vec<CompositeChildResponse>,
+    pub result: Option<bool>,
+    pub result_level: Option<String>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeReferenceItem {
+    pub alert_id: String,
+    pub name: String,
+    pub folder_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeReferencesResponse {
+    pub references: Vec<CompositeReferenceItem>,
+    pub hidden_reference_count: usize,
 }
 
 /// One tracked group of a multi-alert (§5.4's group table).
@@ -267,7 +322,9 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             alert.get_last_triggered_at(trigger.as_ref()),
             alert.get_last_satisfied_at(trigger.as_ref()),
         );
-        let alert_type = if alert.is_real_time {
+        let alert_type = if alert.query_condition.slo_condition.is_some() {
+            "slo".to_string()
+        } else if alert.is_real_time {
             "realtime".to_string()
         } else {
             "scheduled".to_string()
@@ -302,6 +359,8 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            child_count: None,
+            referenced_by_composite_count: None,
         })
     }
 }
@@ -400,6 +459,8 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         groups_firing: None,
         groups_observed_is_lower_bound: None,
         groups_firing_is_lower_bound: None,
+        child_count: None,
+        referenced_by_composite_count: None,
     })
 }
 
@@ -484,6 +545,8 @@ mod tests {
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            child_count: None,
+            referenced_by_composite_count: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();

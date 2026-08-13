@@ -850,6 +850,17 @@ where
         return Ok(MetaHttpResponse::not_found("stream not found"));
     }
 
+    // Related-resource cleanup includes a graph-locked preflight of every
+    // alert owned by this stream. It must run before the schema mutation so a
+    // referenced alert rejects the cascade without deleting any member.
+    if del_related_feature_resources
+        && let Err(response) =
+            cleanup_related_resources(org_id.to_string(), stream_name.to_string(), stream_type)
+                .await
+    {
+        return Ok(response);
+    }
+
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
         return Ok((
@@ -861,14 +872,6 @@ where
             )),
         )
             .into_response());
-    }
-
-    if del_related_feature_resources
-        && let Err(response) =
-            cleanup_related_resources(org_id.to_string(), stream_name.to_string(), stream_type)
-                .await
-    {
-        return Ok(response);
     }
 
     // create delete for compactor

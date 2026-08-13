@@ -12,6 +12,21 @@
 //! scheduler seams with deterministic time and injected delivery sinks; it
 //! must not reimplement the evaluator as a parallel fake.
 
+mod runtime;
+mod service;
+
+pub use runtime::{
+    CompositeEvaluation, CompositeEvaluator, CompositeStateInput, EvaluatedChild, EvaluationFailure,
+};
+pub use service::{
+    CompositeCreate, CompositeServiceError, clone_composite, create_composite, delete_composite,
+    get_composite, move_composite, set_composite_enabled, trigger_composite, update_composite,
+    validate_composite_graph,
+};
+
+#[cfg(test)]
+pub mod test_support;
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -349,7 +364,7 @@ mod tests {
                 h.fail_graph_transaction_at(failpoint);
 
                 assert!(
-                    h.apply_definition_mutation(&parent, mutation)
+                    h.apply_definition_mutation(&parent, &mutation)
                         .await
                         .is_err()
                 );
@@ -646,7 +661,7 @@ mod tests {
             let evaluation = h.evaluate_claim(&claim).await;
 
             h.write_rollup(&a, AlertLevel::Critical, NOW + 1).await;
-            h.mutate_during_processing(&parent, mutation).await;
+            h.mutate_during_processing(&parent, &mutation).await;
             let completion = h.commit_and_complete(claim, evaluation).await;
 
             assert!(
@@ -708,7 +723,7 @@ mod tests {
             let claim = h.claim(&parent).await;
             let result = h.evaluate_claim(&claim).await;
 
-            h.mutate_during_processing(&parent, mutation).await;
+            h.mutate_during_processing(&parent, &mutation).await;
             let commit = h.commit_claim(&claim, result).await;
             assert!(!commit.state_written);
             assert!(!commit.transition_written);
@@ -865,9 +880,9 @@ mod tests {
         );
         assert_eq!(
             first["firing_children"],
-            ["High error rate", "High latency"]
+            serde_json::json!(["High error rate", "High latency"])
         );
-        assert_eq!(first["stale_children"], ["High latency"]);
+        assert_eq!(first["stale_children"], serde_json::json!(["High latency"]));
         assert_eq!(first["child_states"].as_array().unwrap().len(), 2);
         assert_eq!(first["child_states"][0]["alert_id"], a);
         assert_eq!(first["child_states"][0]["name"], "High error rate");
@@ -968,7 +983,7 @@ mod tests {
                 h.capabilities().composite_alerts_available,
                 mode != GateMode::SuperCluster
             );
-            for mutation in mutations {
+            for mutation in &mutations {
                 let decision = h.gate(mutation);
                 if matches!(mutation, Mutation::Disable | Mutation::Delete) {
                     assert!(
