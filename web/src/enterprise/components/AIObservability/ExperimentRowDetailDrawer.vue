@@ -241,9 +241,8 @@ function scoreReasoning(score: Record<string, unknown> | null | undefined) {
 }
 
 function isClientReported(score: Record<string, unknown> | null | undefined) {
-  const source = String(score?.source_type ?? score?.sourceType ?? "");
-  const metadata = score?.metadata as Record<string, unknown> | undefined;
-  return source === "remote" || source === "feedback" || metadata?.client_reported === true;
+  const origin = String(score?.origin_source_type ?? score?.originSourceType ?? "");
+  return origin === "remote" || origin === "feedback";
 }
 
 function format(value: unknown) {

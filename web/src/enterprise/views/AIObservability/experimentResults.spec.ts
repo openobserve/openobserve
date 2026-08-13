@@ -1,8 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ExperimentResultSlot } from "@/services/llm-experiments.service";
-import { filterExperimentResultSlots } from "./experimentResults";
+import {
+  experimentTraceLocation,
+  filterExperimentResultSlots,
+  openExperimentTrace,
+} from "./experimentResults";
 
 function slot(overrides: Partial<ExperimentResultSlot>): ExperimentResultSlot {
   return {
@@ -19,6 +23,33 @@ function slot(overrides: Partial<ExperimentResultSlot>): ExperimentResultSlot {
 }
 
 describe("experiment result slot filtering", () => {
+  it("builds an internal trace target without mutating the Experiment route", () => {
+    const execution = {
+      traceId: "trace-1",
+      timestamp: 4_000_000_000,
+    } as NonNullable<ExperimentResultSlot["execution"]>;
+    const location = experimentTraceLocation("acme", execution);
+    expect(location).toEqual({
+      name: "traceDetails",
+      query: {
+        org_identifier: "acme",
+        stream: "_evaluator",
+        from: 400_000_000,
+        to: 7_600_000_000,
+        trace_id: "trace-1",
+      },
+    });
+    const resolve = vi.fn(() => ({ href: "/web/traces?trace_id=trace-1" }));
+    const open = vi.fn();
+
+    expect(openExperimentTrace("acme", execution, resolve, open)).toBe(true);
+    expect(resolve).toHaveBeenCalledWith(location);
+    expect(open).toHaveBeenCalledWith(
+      "/web/traces?trace_id=trace-1",
+      "_blank",
+      "noopener,noreferrer",
+    );
+  });
   it("keeps pinned order and renders a completed task with a pending score once", () => {
     const completedWithPendingScore = slot({
       rowId: "row-b",

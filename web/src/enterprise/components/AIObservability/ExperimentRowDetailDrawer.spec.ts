@@ -51,7 +51,8 @@ const detail: ExperimentRowDetail = {
           score: {
             value_numeric: 0.5,
             reasoning: "Partially correct",
-            source_type: "remote",
+            source_type: "experiment",
+            origin_source_type: "remote",
           },
         },
       ],
@@ -112,5 +113,23 @@ describe("ExperimentRowDetailDrawer", () => {
     expect(wrapper.emitted("navigate")?.[0]).toEqual(["row-0"]);
     expect(wrapper.emitted("retry")?.[0]).toEqual([detail.trials[0]]);
     expect(wrapper.emitted("trace")?.[0]).toEqual([detail.trials[0].execution]);
+  });
+
+  it("does not infer client provenance from an Experiment wrapper", () => {
+    const serverDetail = structuredClone(detail);
+    delete serverDetail.trials[0].scores[0].score?.origin_source_type;
+
+    const wrapper = mount(ExperimentRowDetailDrawer, {
+      props: { open: true, detail: serverDetail },
+      global: {
+        stubs: {
+          ODrawer: { props: ["open"], template: '<section v-if="open"><slot /></section>' },
+          OButton: { template: "<button><slot /></button>" },
+          OTag: { template: "<span><slot /></span>" },
+        },
+      },
+    });
+
+    expect(wrapper.text()).not.toContain("Client reported");
   });
 });

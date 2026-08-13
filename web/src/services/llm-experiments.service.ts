@@ -535,6 +535,20 @@ const llmExperimentsService = {
     return normalizeExperiment(response.data);
   },
 
+  async retrySlot(
+    orgId: string,
+    experimentId: string,
+    rowId: string,
+    trialIndex: number,
+    idempotencyKey: string,
+  ): Promise<ExperimentExecution> {
+    const response = await http().post(
+      `${base(orgId)}/${experimentId}/rows/${encodeURIComponent(rowId)}/trials/${trialIndex}/retry`,
+      { idempotencyKey },
+    );
+    return normalizeExecution(response.data);
+  },
+
   async clone(orgId: string, experimentId: string, name?: string): Promise<LlmExperiment> {
     const response = await http().post(`${base(orgId)}/${experimentId}/clone`, {
       ...(name ? { name } : {}),

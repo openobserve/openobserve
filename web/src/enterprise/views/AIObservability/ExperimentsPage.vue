@@ -405,6 +405,7 @@ import {
 import {
   experimentResultSlotStatus,
   filterExperimentResultSlots,
+  openExperimentTrace,
   type ExperimentResultStatusFilter,
 } from "./experimentResults";
 
@@ -628,9 +629,15 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
   if (!detail || slot.taskStatus !== "error") return;
   retryingRow.value = true;
   try {
-    const experiment = await llmExperimentsService.retry(orgId.value, detail.experiment.id);
-    applyLifecycleUpdate(experiment);
+    await llmExperimentsService.retrySlot(
+      orgId.value,
+      detail.experiment.id,
+      slot.rowId,
+      slot.trialIndex,
+      globalThis.crypto.randomUUID(),
+    );
     await loadRowDetail(slot.rowId);
+    await loadDetail(detail.experiment.id, false);
     toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
   } catch {
     toast({ variant: "error", message: t("aiObservability.experiments.retryError") });
@@ -748,18 +755,12 @@ function scoreLabel(score: Record<string, unknown>) {
 }
 
 function openTrace(execution: ExperimentExecution) {
-  if (!execution.traceId) return;
-  const padding = 3_600_000_000;
-  router.push({
-    name: "traceDetails",
-    query: {
-      org_identifier: orgId.value,
-      stream: "_evaluator",
-      from: Math.max(0, execution.timestamp - padding),
-      to: execution.timestamp + padding,
-      trace_id: execution.traceId,
-    },
-  });
+  openExperimentTrace(
+    orgId.value,
+    execution,
+    (location) => router.resolve(location),
+    globalThis.open,
+  );
 }
 
 const detailPoller = globalThis.setInterval(async () => {
