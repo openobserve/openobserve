@@ -66,6 +66,16 @@
             >
               {{ t("aiObservability.experiments.retry") }}
             </OButton>
+            <OButton
+              v-else-if="selectedDetail.experiment.status === 'cancelled'"
+              size="sm"
+              variant="primary"
+              :disabled="controllingExperiment"
+              data-test="ai-experiment-clone"
+              @click="cloneSelectedExperiment"
+            >
+              {{ t("aiObservability.experiments.clone") }}
+            </OButton>
           </div>
           <p class="text-text-secondary mt-1 text-sm">
             {{
@@ -302,6 +312,10 @@ import llmExperimentsService, {
 } from "@/services/llm-experiments.service";
 import { createPreviewRequestGate, withPreviewScorers } from "./experimentPreview";
 import { fetchExperimentDetails } from "./experimentDiscovery";
+import {
+  createExperimentLifecycleActions,
+  type ExperimentLifecycleAction,
+} from "./experimentLifecycleActions";
 
 defineOptions({ name: "AIExperimentsPage" });
 
@@ -469,33 +483,34 @@ function applyLifecycleUpdate(experiment: LlmExperiment) {
   experimentDetails.value = { ...experimentDetails.value, [experiment.id]: updated };
 }
 
-async function cancelSelectedExperiment() {
-  const experiment = selectedDetail.value?.experiment;
-  if (!experiment || experiment.status !== "running" || controllingExperiment.value) return;
-  controllingExperiment.value = true;
-  try {
-    applyLifecycleUpdate(await llmExperimentsService.cancel(orgId.value, experiment.id));
-    toast({ variant: "success", message: t("aiObservability.experiments.cancelSuccess") });
-  } catch {
-    toast({ variant: "error", message: t("aiObservability.experiments.cancelError") });
-  } finally {
-    controllingExperiment.value = false;
-  }
-}
+const lifecycleActions = createExperimentLifecycleActions({
+  current: () => selectedDetail.value?.experiment,
+  busy: () => controllingExperiment.value,
+  setBusy: (busy) => (controllingExperiment.value = busy),
+  execute: (action, experiment) => {
+    if (action === "cancel") return llmExperimentsService.cancel(orgId.value, experiment.id);
+    if (action === "retry") return llmExperimentsService.retry(orgId.value, experiment.id);
+    return llmExperimentsService.clone(orgId.value, experiment.id);
+  },
+  apply: async (action, experiment) => {
+    if (action !== "clone") {
+      applyLifecycleUpdate(experiment);
+      return;
+    }
+    experiments.value = [experiment, ...experiments.value];
+    await loadDetail(experiment.id);
+  },
+  notify: (action: ExperimentLifecycleAction, success) => {
+    toast({
+      variant: success ? "success" : "error",
+      message: t(`aiObservability.experiments.${action}${success ? "Success" : "Error"}`),
+    });
+  },
+});
 
-async function retrySelectedExperiment() {
-  const experiment = selectedDetail.value?.experiment;
-  if (!experiment || experiment.status !== "failed" || controllingExperiment.value) return;
-  controllingExperiment.value = true;
-  try {
-    applyLifecycleUpdate(await llmExperimentsService.retry(orgId.value, experiment.id));
-    toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
-  } catch {
-    toast({ variant: "error", message: t("aiObservability.experiments.retryError") });
-  } finally {
-    controllingExperiment.value = false;
-  }
-}
+const cancelSelectedExperiment = lifecycleActions.cancel;
+const retrySelectedExperiment = lifecycleActions.retry;
+const cloneSelectedExperiment = lifecycleActions.clone;
 
 async function selectDetailFromRoute() {
   const experimentId = String(route.query.selected ?? "");

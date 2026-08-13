@@ -13,9 +13,10 @@ const route = reactive({ query: { selected: "one" } as Record<string, string> })
 
 const experiment = (id: string) => makeExperiment({ id, name: `Experiment ${id}` });
 
-const { cancelExperiment, retryExperiment } = vi.hoisted(() => ({
+const { cancelExperiment, retryExperiment, cloneExperiment } = vi.hoisted(() => ({
   cancelExperiment: vi.fn(),
   retryExperiment: vi.fn(),
+  cloneExperiment: vi.fn(),
 }));
 
 const details = new Map<string, ExperimentDetail>(
@@ -57,6 +58,7 @@ vi.mock("@/services/llm-experiments.service", () => ({
     create: vi.fn(),
     cancel: cancelExperiment,
     retry: retryExperiment,
+    clone: cloneExperiment,
   },
 }));
 
@@ -74,6 +76,7 @@ beforeEach(() => {
   replace.mockReset();
   cancelExperiment.mockReset();
   retryExperiment.mockReset();
+  cloneExperiment.mockReset();
 });
 
 describe("ExperimentsPage navigation", () => {
@@ -284,5 +287,47 @@ describe("ExperimentsPage navigation", () => {
     expect(retryExperiment).toHaveBeenCalledWith("acme", "one");
     expect(retryExperiment).toHaveBeenCalledTimes(1);
     expect(retryWrapper.find('[data-test="ai-experiment-retry"]').exists()).toBe(false);
+
+    const cancelled = makeExperiment({
+      ...running,
+      status: "cancelled",
+      statusReason: "user_cancelled",
+      lifecycleVersion: 4,
+    });
+    const cloned = makeExperiment({
+      ...cancelled,
+      id: "clone-one",
+      name: "Experiment one (copy)",
+      status: "pending",
+      statusReason: null,
+      lifecycleVersion: 0,
+      retryCount: 0,
+    });
+    details.set("one", makeExperimentDetail(cancelled));
+    details.set("clone-one", makeExperimentDetail(cloned));
+    cloneExperiment.mockResolvedValue(cloned);
+    retryWrapper.unmount();
+    route.query = { selected: "one" };
+    const cloneWrapper = mount(ExperimentsPage, {
+      global: {
+        stubs: {
+          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
+          ExperimentBrowser: true,
+          OButton: { template: `<button v-bind="$attrs"><slot /></button>` },
+          OTag: true,
+          OInput: true,
+          OTextarea: true,
+          OSelect: true,
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(cloneWrapper.find('[data-test="ai-experiment-clone"]').exists()).toBe(true);
+    await cloneWrapper.get('[data-test="ai-experiment-clone"]').trigger("click");
+    await flushPromises();
+    expect(cloneExperiment).toHaveBeenCalledWith("acme", "one");
+    expect(cloneExperiment).toHaveBeenCalledTimes(1);
+    expect(cloneWrapper.text()).toContain("Experiment one (copy)");
   });
 });
