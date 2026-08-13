@@ -19,11 +19,12 @@
  * Classification is marker-based and intentionally conservative: a spec is only
  * PURE_API when NOT A SINGLE UI marker appears, so
  * the guard never nags a genuine UI test. False "REVIEW" is preferred to a false
- * "PURE_API". Detection is line-based over comment-stripped source.
+ * "PURE_API". Detection is whole-file regex matching over comment-stripped source.
  *
- * Usage:
+ * Usage (--json emits machine-readable output in any mode):
  *   node classify-specs.js --all [--json]        scan every spec, print summary
  *   node classify-specs.js --check <files...>    exit 1 if any file is PURE_API
+ *                                                (also warns, non-fatally, on REVIEW)
  *   node classify-specs.js <files...>            classify just those files
  */
 'use strict';
@@ -164,6 +165,17 @@ function main() {
   }
 
   if (check) {
+    // REVIEW = no markers matched. Non-fatal, but surface it: a spec hitting the
+    // API through a helper we don't recognise would land here and otherwise pass
+    // behind a green message with false confidence.
+    const review = results.filter((r) => r.verdict === 'REVIEW');
+    if (review.length) {
+      console.warn(
+        `⚠ ${review.length} spec(s) matched no UI or API markers (REVIEW) — confirm by ` +
+          `hand they are not API-only (a pure-API test belongs in tests/api-testing/):\n` +
+          review.map((r) => `    - ${rel(r.file)}`).join('\n'),
+      );
+    }
     const pure = results.filter((r) => r.verdict === 'PURE_API');
     if (pure.length) {
       console.error(
