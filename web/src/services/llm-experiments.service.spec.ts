@@ -144,7 +144,14 @@ describe("llmExperimentsService", () => {
             noTraceDimensions: 1,
           },
           scoreSummaries: [
-            { scorerId: "scorer-1", scorerVersion: 4, sampleCount: 1, skippedCount: 2 },
+            {
+              scorer_id: "scorer-1",
+              scorer_version: 4,
+              sample_count: 1,
+              no_reference_count: 1,
+              no_trace_count: 1,
+              skipped_count: 2,
+            },
           ],
         },
       },
@@ -167,7 +174,15 @@ describe("llmExperimentsService", () => {
       taskProgress: { completed: 1, total: 1, skipped: 1 },
       scoringProgress: { completed: 1, total: 1, skipped: 2 },
       skipSummary: { noReferenceDimensions: 1, noTraceDimensions: 1 },
-      scoreSummaries: [{ scorerId: "scorer-1", sampleCount: 1, skippedCount: 2 }],
+      scoreSummaries: [
+        {
+          scorerId: "scorer-1",
+          sampleCount: 1,
+          noReferenceCount: 1,
+          noTraceCount: 1,
+          skippedCount: 2,
+        },
+      ],
     });
   });
 

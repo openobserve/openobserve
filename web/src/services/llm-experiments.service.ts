@@ -155,6 +155,8 @@ export interface ExperimentScoreSummary {
   scorerId: string;
   scorerVersion: number;
   sampleCount: number;
+  noReferenceCount: number;
+  noTraceCount: number;
   skippedCount: number;
 }
 
@@ -299,6 +301,8 @@ function normalizeResults(input: any): ExperimentResults {
       scorerId: value(summary, "scorerId", "scorer_id", ""),
       scorerVersion: Number(value(summary, "scorerVersion", "scorer_version", 0)),
       sampleCount: Number(value(summary, "sampleCount", "sample_count", 0)),
+      noReferenceCount: Number(value(summary, "noReferenceCount", "no_reference_count", 0)),
+      noTraceCount: Number(value(summary, "noTraceCount", "no_trace_count", 0)),
       skippedCount: Number(value(summary, "skippedCount", "skipped_count", 0)),
     })),
   };
