@@ -1,36 +1,24 @@
 /* Copyright 2026 OpenObserve Inc. */
 /* ============================================================
-   UTILITIES — app-level utility classes.
-   ============================================================
-   The sanctioned home (O2_STYLE_MIGRATION_PLAN.md §3) for styling that is
-   neither an element reset (base-elements.css) nor component-local, and that a
-   component <style> block therefore should not own.
+   UTILITIES — app-level utility classes (O2_STYLE_MIGRATION_PLAN.md §3).
 
-   A rule belongs here when BOTH are true:
-     1. It cannot be written as a Tailwind utility in the template — it needs a
-        pseudo-element, a non-utility CSS property, or a generated child node.
-     2. It is a reusable app-level treatment, not one component's private look.
+   A rule belongs here when BOTH hold:
+     1. it can't be a Tailwind utility in the template — needs a pseudo-element,
+        a non-utility property, or a runtime-generated node;
+     2. it's a reusable app-level treatment, not one component's private look.
 
-   Declaring it with `@utility` (rather than a plain `.class` rule) is what makes
-   it composable: it lands in `@layer utilities`, so variants (`hover:`, `dark:`)
-   and the normal utility cascade apply, and a component reaches it by writing
-   the class in its template — no raw `var(--color-*)` in an SFC style block.
+   Use `@utility`, not a plain `.class`: it lands in @layer utilities, so
+   variants (hover:, dark:) and the normal cascade work.
 
-   RULES (same as base-elements.css):
-   - Colours via var(--color-*) only — never a raw hex.
-   - rem units (1px hairline borders excepted).
+   Colours via var(--color-*) only, never a raw hex. rem units (1px hairlines
+   excepted).
    ============================================================ */
 
 /* ── Gradient backgrounds ───────────────────────────────────────────────────
-   The --color-gradient-* tokens are deliberately NOT registered in @theme
-   (semantic.css) — a `@theme` colour generates `background-color: <gradient>`,
-   which is invalid CSS the browser drops. They are background-IMAGES, so they
-   get hand-written utilities here instead. This is what a component consumes;
-   a raw `var(--color-gradient-*)` in an SFC style block (or a
-   `bg-[image:var(--color-gradient-*)]` arbitrary value in a template) is not
-   needed now that these exist. Values still live in the token layer, so dark
-   overrides (dark.css redefines --color-gradient-ai-subtle) keep working.
-   Only the ones something actually consumes are declared. */
+   The --color-gradient-* tokens are deliberately NOT in @theme: a @theme colour
+   would generate `background-color: <gradient>`, which is invalid and dropped.
+   They're background-IMAGES, so they get hand-written utilities. Values stay in
+   the token layer, so dark.css overrides still apply. Declared on demand. */
 @utility bg-gradient-ai {
   background-image: var(--color-gradient-ai);
 }
@@ -52,19 +40,16 @@
 @utility bg-gradient-danger-hover {
   background-image: var(--color-gradient-danger-hover);
 }
-/* Not a --color-gradient-* name, but the same thing: a linear-gradient token
-   (light and dark variants in base.css / dark.css) used as a bubble fill. */
+/* Same thing under a different name: a linear-gradient token used as a fill. */
 @utility bg-chat-bubble-user {
   background-image: var(--color-chat-bubble-user);
 }
 
 /* ── Drag-and-drop row affordances ──────────────────────────────────────────
-   VueDraggableNext/Sortable adds `ghostClass` / `dragClass` to a row CLONE it
-   creates at runtime, so no template can put utilities on it and the class name
-   must be a single token. That makes the utility layer — not a component style
-   block — the right home. `!important` reproduces what the old scoped rules had
-   for free: an unlayered rule outranks every row-level utility underneath it.
-   Consumers: lib/core/Table/sub-components/OTableBody.vue. */
+   Sortable adds these classes to a row CLONE it builds at runtime, so no
+   template can reach it and the name must be a single token. `!important`
+   reproduces what the old scoped rules got for free — outranking the row's own
+   utilities. Consumer: lib/core/Table/sub-components/OTableBody.vue. */
 @utility table-drag-ghost {
   opacity: 0.3 !important;
   background: var(--color-primary-50) !important;
