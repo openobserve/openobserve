@@ -254,6 +254,12 @@ mod tests {
             ["synthetics", "dispatcher"].join("::"),
             ["core", "synthetics"].join("::"),
             ["queue", "synthetics_probe_token_"].join("::"),
+            // The crate the service now lives in, not just the module path.
+            // `openobserve-synthetics` is deliberately absent from this crate's
+            // dependencies, so this can only ever fire if someone adds it — at
+            // which point the loop-prevention guarantee has stopped being a
+            // property of the crate graph and become a convention.
+            ["openobserve", "synthetics"].join("_"),
         ] {
             assert!(
                 !source.contains(&layer),

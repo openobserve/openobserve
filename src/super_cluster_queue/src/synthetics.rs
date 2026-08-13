@@ -202,18 +202,21 @@ mod tests {
         let source = include_str!("synthetics.rs");
         // Assembled at runtime; spelling these out as literals would put them
         // in this file and make the assertions fail on themselves.
-        let service_layer = ["synthetics", "service"].join("::");
-        let publish_fn = ["queue", "synthetics_check"].join("::");
-
-        assert!(
-            !source.contains(&service_layer),
-            "{service_layer} publishes what it writes; applying through it loops"
-        );
-        assert!(
-            !source.contains(&publish_fn),
-            "the processor must never publish: applying a replicated write \
-             would re-broadcast it"
-        );
+        for layer in [
+            ["synthetics", "service"].join("::"),
+            ["queue", "synthetics_check"].join("::"),
+            // The crate the service now lives in, not just the module path.
+            // `openobserve-synthetics` is deliberately absent from this crate's
+            // dependencies, so this can only ever fire if someone adds it — at
+            // which point the loop-prevention guarantee has stopped being a
+            // property of the crate graph and become a convention.
+            ["openobserve", "synthetics"].join("_"),
+        ] {
+            assert!(
+                !source.contains(&layer),
+                "{layer} publishes what it writes; applying through it loops"
+            );
+        }
     }
 
     /// The runtime tables are region-owned (`synthetics_jobs` is a lease queue,
