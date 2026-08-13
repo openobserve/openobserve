@@ -4,45 +4,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
-import type { ExperimentDetail, LlmExperiment } from "@/services/llm-experiments.service";
+import type { ExperimentDetail } from "@/services/llm-experiments.service";
+import { makeExperiment, makeExperimentDetail } from "./experimentTestFixtures";
 
 const push = vi.fn();
 const replace = vi.fn();
 const route = reactive({ query: { selected: "one" } as Record<string, string> });
 
-const experiment = (id: string): LlmExperiment => ({
-  id,
-  orgId: "acme",
-  name: `Experiment ${id}`,
-  datasetId: "dataset-a",
-  datasetVersion: 1,
-  task: { type: "remote", config: {} },
-  scorers: [],
-  trialCount: 1,
-  status: "completed",
-  createdBy: "test",
-  createdAt: 1_800_000_000_000,
-});
+const experiment = (id: string) => makeExperiment({ id, name: `Experiment ${id}` });
 
 const details = new Map<string, ExperimentDetail>(
   ["one", "two"].map((id) => {
     const row = experiment(id);
-    return [
-      id,
-      {
-        experiment: row,
-        preview: {
-          datasetId: row.datasetId,
-          datasetVersion: 1,
-          rowCount: 0,
-          trialCount: 1,
-          slotCount: 0,
-          pinnedScorers: [],
-          sampleSlots: [],
-        },
-        results: { executions: [], scores: [] },
-      },
-    ];
+    return [id, makeExperimentDetail(row)];
   }),
 );
 

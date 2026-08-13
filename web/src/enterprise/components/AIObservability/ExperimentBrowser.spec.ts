@@ -4,8 +4,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
-import type { LlmExperiment } from "@/services/llm-experiments.service";
 import ExperimentBrowser from "./ExperimentBrowser.vue";
+import {
+  makeExperiment,
+  makeExperimentDetail,
+} from "@/enterprise/views/AIObservability/experimentTestFixtures";
 
 const replace = vi.fn();
 const push = vi.fn();
@@ -20,19 +23,8 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
-const experiment = (id: string, datasetId: string, createdAt: number): LlmExperiment => ({
-  id,
-  orgId: "acme",
-  name: id,
-  datasetId,
-  datasetVersion: 1,
-  task: { type: "remote", config: {} },
-  scorers: [],
-  trialCount: 1,
-  status: "completed",
-  createdBy: "test",
-  createdAt,
-});
+const experiment = (id: string, datasetId: string, createdAt: number) =>
+  makeExperiment({ id, name: id, datasetId, createdAt });
 
 const stubs = {
   OSelect: {
@@ -139,7 +131,12 @@ describe("ExperimentBrowser", () => {
     await wrapper.get('[data-test="ai-experiment-compare"]').trigger("click");
     expect(push).toHaveBeenCalledWith({
       name: "aiExperiments",
-      query: { dataset: "dataset-a", baseline: "old", candidate: "new" },
+      query: {
+        org_identifier: "acme",
+        dataset: "dataset-a",
+        baseline: "old",
+        candidate: "new",
+      },
     });
   });
 
@@ -166,6 +163,34 @@ describe("ExperimentBrowser", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it("renders boolean and categorical aggregate evidence instead of an empty score label", () => {
+    const row = experiment("scored", "dataset-a", 1);
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [row],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+        details: {
+          scored: makeExperimentDetail(row, {
+            results: {
+              executions: [],
+              scores: [
+                { name: "approved", value_boolean: true },
+                { name: "label", value_categorical: "good" },
+              ],
+            },
+          }),
+        },
+      },
+      global: { stubs },
+    });
+
+    const text = wrapper.get('[data-test="ai-experiment-row-scored"]').text();
+    expect(text).toContain("aiObservability.experiments.booleanScoreSummary");
+    expect(text).toContain("aiObservability.experiments.categoricalScoreSummary");
+    expect(text).not.toContain("aiObservability.experiments.noScores");
+  });
+
   it("disables cross-dataset comparison after one selection", async () => {
     const wrapper = mount(ExperimentBrowser, {
       props: {
@@ -184,7 +209,7 @@ describe("ExperimentBrowser", () => {
 
     expect(checkboxes[1].attributes("disabled")).toBeDefined();
     expect(wrapper.get('[data-test="ai-experiment-comparison-reason"]').text()).toContain(
-      "Select two experiments",
+      "aiObservability.experiments.comparisonReasons.select_two",
     );
   });
 });

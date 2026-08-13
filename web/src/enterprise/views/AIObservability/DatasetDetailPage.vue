@@ -309,6 +309,7 @@ import llmExperimentsService, {
   type LlmExperiment,
 } from "@/services/llm-experiments.service";
 import { fetchExperimentDetails } from "./experimentDiscovery";
+import { aiExperimentsRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIDatasetDetailPage" });
 
@@ -454,17 +455,16 @@ async function refreshExperiments() {
 }
 
 function openExperiments() {
-  router.push({
-    name: "aiExperiments",
-    query: { org_identifier: orgId.value, dataset: datasetId.value },
-  });
+  router.push(aiExperimentsRoute(orgId.value, { datasetId: datasetId.value }));
 }
 
 function openExperiment(experimentId: string) {
-  router.push({
-    name: "aiExperiments",
-    query: { org_identifier: orgId.value, dataset: datasetId.value, selected: experimentId },
-  });
+  router.push(
+    aiExperimentsRoute(orgId.value, {
+      datasetId: datasetId.value,
+      selectedId: experimentId,
+    }),
+  );
 }
 
 function onPageChange(page: number) {

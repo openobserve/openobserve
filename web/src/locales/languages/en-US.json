@@ -10657,8 +10657,15 @@
       "selectForComparison": "Select for comparison",
       "progress": "{done} of {total} slots",
       "noScores": "No aggregate scores",
+      "numericScoreSummary": "{name}: {value} ({count} samples)",
+      "booleanScoreSummary": "{name}: {trueCount} true, {falseCount} false ({count} samples)",
+      "categoricalScoreSummary": "{name}: {values} ({count} samples)",
       "noCost": "No cost recorded",
-      "crossDatasetComparison": "Experiments can only be compared when they use the same dataset."
+      "comparisonReasons": {
+        "select_two": "Select two experiments to compare.",
+        "select_only_two": "Select only two experiments to compare.",
+        "different_dataset": "Experiments can only be compared when they use the same dataset."
+      }
     },
     "datasets": {
       "listTitle": "Datasets",

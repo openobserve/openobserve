@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { beforeEach, describe, expect, it } from "vitest";
-import type { ExperimentDetail, LlmExperiment } from "@/services/llm-experiments.service";
+import type { ExperimentDetail } from "@/services/llm-experiments.service";
 import {
   comparisonEligibility,
   experimentEvidence,
@@ -10,20 +10,10 @@ import {
   readExperimentBaselines,
   writeExperimentBaselines,
 } from "./experimentDiscovery";
+import { makeExperiment } from "./experimentTestFixtures";
 
-const experiment = (id: string, datasetId: string, createdAt: number): LlmExperiment => ({
-  id,
-  orgId: "acme",
-  name: id,
-  datasetId,
-  datasetVersion: 1,
-  task: { type: "remote", config: {} },
-  scorers: [],
-  trialCount: 1,
-  status: "completed",
-  createdBy: "test",
-  createdAt,
-});
+const experiment = (id: string, datasetId: string, createdAt: number) =>
+  makeExperiment({ id, name: id, datasetId, createdAt });
 
 beforeEach(() => localStorage.clear());
 
@@ -51,14 +41,14 @@ describe("experiment discovery", () => {
   it("reports why cross-dataset comparison is unavailable", () => {
     expect(comparisonEligibility([experiment("a", "one", 1), experiment("b", "two", 2)])).toEqual({
       eligible: false,
-      reason: "Experiments can only be compared when they use the same dataset.",
+      reason: "different_dataset",
     });
     expect(
       comparisonEligibility([experiment("a", "one", 1), experiment("b", "one", 2)]).eligible,
     ).toBe(true);
   });
 
-  it("summarizes distinct completed slots, numeric scores, and cost", () => {
+  it("summarizes numeric, boolean, categorical, mixed, and missing score values", () => {
     const base = experiment("a", "one", 1);
     const detail = {
       experiment: base,
@@ -107,6 +97,16 @@ describe("experiment discovery", () => {
         scores: [
           { name: "quality", value_numeric: 0.5 },
           { name: "quality", value_numeric: 1 },
+          { name: "quality", value_numeric: null },
+          { name: "approved", value_boolean: true },
+          { name: "approved", value_boolean: false },
+          { name: "approved" },
+          { name: "label", value_categorical: "good" },
+          { name: "label", value_categorical: "good" },
+          { name: "label", value_categorical: "bad" },
+          { name: "mixed", value_numeric: 0.25 },
+          { name: "mixed", value_categorical: "review" },
+          { name: "missing", value_numeric: null, value_boolean: null, value_categorical: null },
         ],
       },
     } satisfies ExperimentDetail;
@@ -115,7 +115,32 @@ describe("experiment discovery", () => {
       completedSlots: 1,
       totalSlots: 2,
       cost: 0.30000000000000004,
-      scores: [{ name: "quality", value: 0.75 }],
+      scores: [
+        { name: "quality", kind: "numeric", value: 0.75, sampleCount: 2 },
+        { name: "mixed", kind: "numeric", value: 0.25, sampleCount: 1 },
+        {
+          name: "approved",
+          kind: "boolean",
+          trueCount: 1,
+          falseCount: 1,
+          sampleCount: 2,
+        },
+        {
+          name: "label",
+          kind: "categorical",
+          values: [
+            { value: "good", count: 2 },
+            { value: "bad", count: 1 },
+          ],
+          sampleCount: 3,
+        },
+        {
+          name: "mixed",
+          kind: "categorical",
+          values: [{ value: "review", count: 1 }],
+          sampleCount: 1,
+        },
+      ],
     });
   });
 

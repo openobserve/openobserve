@@ -2,11 +2,27 @@
 
 import type { ExperimentDetail, LlmExperiment } from "@/services/llm-experiments.service";
 
+export type ExperimentScoreSummary =
+  | { name: string; kind: "numeric"; value: number; sampleCount: number }
+  | {
+      name: string;
+      kind: "boolean";
+      trueCount: number;
+      falseCount: number;
+      sampleCount: number;
+    }
+  | {
+      name: string;
+      kind: "categorical";
+      values: Array<{ value: string; count: number }>;
+      sampleCount: number;
+    };
+
 export interface ExperimentEvidence {
   completedSlots: number;
   totalSlots: number;
   cost: number | null;
-  scores: Array<{ name: string; value: number }>;
+  scores: ExperimentScoreSummary[];
 }
 
 export interface ExperimentDatasetGroup {
@@ -39,13 +55,27 @@ export function experimentEvidence(detail?: ExperimentDetail): ExperimentEvidenc
     .map((execution) => execution.cost)
     .filter((cost): cost is number => typeof cost === "number" && Number.isFinite(cost));
   const numericScores = new Map<string, number[]>();
+  const booleanScores = new Map<string, boolean[]>();
+  const categoricalScores = new Map<string, string[]>();
   for (const score of detail.results.scores) {
     const name = String(
       score.name ?? score.scorer_name ?? score.scorerId ?? score.scorer_id ?? "score",
     );
-    const value = Number(score.value_numeric ?? score.value ?? Number.NaN);
-    if (!Number.isFinite(value)) continue;
-    numericScores.set(name, [...(numericScores.get(name) ?? []), value]);
+    if (score.value_numeric !== null && score.value_numeric !== undefined) {
+      const value = Number(score.value_numeric);
+      if (Number.isFinite(value)) {
+        numericScores.set(name, [...(numericScores.get(name) ?? []), value]);
+      }
+    }
+    if (typeof score.value_boolean === "boolean") {
+      booleanScores.set(name, [...(booleanScores.get(name) ?? []), score.value_boolean]);
+    }
+    if (typeof score.value_categorical === "string") {
+      categoricalScores.set(name, [
+        ...(categoricalScores.get(name) ?? []),
+        score.value_categorical,
+      ]);
+    }
   }
 
   return {
@@ -54,10 +84,31 @@ export function experimentEvidence(detail?: ExperimentDetail): ExperimentEvidenc
     ).size,
     totalSlots: detail.preview.slotCount,
     cost: costs.length ? costs.reduce((total, cost) => total + cost, 0) : null,
-    scores: [...numericScores].map(([name, values]) => ({
-      name,
-      value: values.reduce((total, value) => total + value, 0) / values.length,
-    })),
+    scores: [
+      ...[...numericScores].map(([name, values]): ExperimentScoreSummary => ({
+        name,
+        kind: "numeric",
+        value: values.reduce((total, value) => total + value, 0) / values.length,
+        sampleCount: values.length,
+      })),
+      ...[...booleanScores].map(([name, values]): ExperimentScoreSummary => ({
+        name,
+        kind: "boolean",
+        trueCount: values.filter(Boolean).length,
+        falseCount: values.filter((value) => !value).length,
+        sampleCount: values.length,
+      })),
+      ...[...categoricalScores].map(([name, values]): ExperimentScoreSummary => {
+        const counts = new Map<string, number>();
+        for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+        return {
+          name,
+          kind: "categorical",
+          values: [...counts].map(([value, count]) => ({ value, count })),
+          sampleCount: values.length,
+        };
+      }),
+    ],
   };
 }
 
@@ -88,20 +139,22 @@ export function groupExperiments(
   }));
 }
 
-export function comparisonEligibility(experiments: LlmExperiment[]) {
+export type ComparisonIneligibilityReason = "select_two" | "select_only_two" | "different_dataset";
+
+export function comparisonEligibility(experiments: LlmExperiment[]): {
+  eligible: boolean;
+  reason: ComparisonIneligibilityReason | null;
+} {
   if (experiments.length < 2) {
-    return { eligible: false, reason: "Select two experiments to compare." };
+    return { eligible: false, reason: "select_two" };
   }
   if (experiments.length > 2) {
-    return { eligible: false, reason: "Select only two experiments to compare." };
+    return { eligible: false, reason: "select_only_two" };
   }
   if (experiments[0].datasetId !== experiments[1].datasetId) {
-    return {
-      eligible: false,
-      reason: "Experiments can only be compared when they use the same dataset.",
-    };
+    return { eligible: false, reason: "different_dataset" };
   }
-  return { eligible: true, reason: "" };
+  return { eligible: true, reason: null };
 }
 
 export function readExperimentBaselines(orgId: string): Record<string, string> {
