@@ -147,11 +147,11 @@
             "4"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
             "3"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "3"
           ],
           [
@@ -259,16 +259,16 @@
             "26.4"
           ],
           [
-            "ZONE-2",
-            "2",
-            "457.5",
-            "50.3"
-          ],
-          [
             "ZONE-1",
             "2",
             "580.0",
             "50.45"
+          ],
+          [
+            "ZONE-2",
+            "2",
+            "457.5",
+            "50.3"
           ],
           [
             "ZONE-3",
@@ -297,19 +297,19 @@
         ],
         "results": [
           [
-            "2026-08-13T05:24:00",
+            "2026-08-13T08:20:00",
             "5",
             "5",
             "100.0"
           ],
           [
-            "2026-08-13T05:25:00",
+            "2026-08-13T08:21:00",
             "5",
             "5",
             "100.0"
           ],
           [
-            "2026-08-13T05:26:00",
+            "2026-08-13T08:22:00",
             "4",
             "4",
             "100.0"
@@ -663,16 +663,16 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "4",
-            "386.25",
-            "88.1"
-          ],
-          [
             "ZONE-1",
             "4",
             "653.75",
             "94.6"
+          ],
+          [
+            "ZONE-2",
+            "4",
+            "386.25",
+            "88.1"
           ],
           [
             "ZONE-4",
@@ -3829,22 +3829,22 @@
         ],
         "results": [
           [
-            "2026-08-13T15:00:00",
+            "2026-08-13T17:56:00",
             "2",
             "0"
           ],
           [
-            "2026-08-13T15:01:00",
+            "2026-08-13T17:57:00",
             "2",
             "0"
           ],
           [
-            "2026-08-13T15:02:00",
+            "2026-08-13T17:58:00",
             "2",
             "0"
           ],
           [
-            "2026-08-13T15:03:00",
+            "2026-08-13T17:59:00",
             "1",
             "0"
           ]
@@ -4142,19 +4142,19 @@
         ],
         "results": [
           [
-            "charge-checker",
-            "2"
-          ],
-          [
             "conveyor-driver",
             "2"
           ],
           [
-            "zone-controller",
-            "1"
+            "charge-checker",
+            "2"
           ],
           [
             "temp-regulator",
+            "1"
+          ],
+          [
+            "zone-controller",
             "1"
           ],
           [
@@ -4182,7 +4182,7 @@
         ],
         "results": [
           [
-            "ZONE-4",
+            "ZONE-1",
             "0",
             "1",
             "2"
@@ -4194,7 +4194,7 @@
             "2"
           ],
           [
-            "ZONE-1",
+            "ZONE-4",
             "0",
             "1",
             "2"
@@ -4309,9 +4309,9 @@
         ],
         "results": [
           [
-            "ZONE-3",
+            "ZONE-1",
             "0",
-            "2",
+            "1",
             "1"
           ],
           [
@@ -4327,9 +4327,9 @@
             "1"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "0",
-            "1",
+            "2",
             "1"
           ]
         ],
@@ -4355,9 +4355,9 @@
         ],
         "results": [
           [
-            "ZONE-3",
+            "ZONE-4",
             "2",
-            "725.0"
+            "385.0"
           ],
           [
             "ZONE-1",
@@ -4365,9 +4365,9 @@
             "725.0"
           ],
           [
-            "ZONE-4",
+            "ZONE-3",
             "2",
-            "385.0"
+            "725.0"
           ],
           [
             "ZONE-2",
@@ -4395,12 +4395,6 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "Q798 warehouse event record 0 ACK batch batchIdList:Q798-0",
-            "Q798 warehouse event record 4",
-            "2"
-          ],
-          [
             "ZONE-4",
             "Q797 warehouse event record 4",
             "Q798 warehouse event record 3 ACK batch batchIdList:Q798-3",
@@ -4410,6 +4404,12 @@
             "ZONE-2",
             "Q798 warehouse event record 1",
             "Q799 warehouse event record 0 ACK batch batchIdList:Q799-0",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "Q798 warehouse event record 0 ACK batch batchIdList:Q798-0",
+            "Q798 warehouse event record 4",
             "2"
           ],
           [
@@ -4502,6 +4502,11 @@
         ],
         "results": [
           [
+            "batch-sync",
+            "2",
+            "0"
+          ],
+          [
             "scan-hub",
             "2",
             "0"
@@ -4512,18 +4517,13 @@
             "0"
           ],
           [
-            "zone-controller",
-            "1",
-            "0"
-          ],
-          [
             "track-router",
             "1",
             "0"
           ],
           [
-            "batch-sync",
-            "2",
+            "zone-controller",
+            "1",
             "0"
           ]
         ],
@@ -4730,18 +4730,18 @@
         ],
         "results": [
           [
-            "US-EAST",
-            "inbound",
-            "2"
-          ],
-          [
             "EU-WEST",
             "outbound",
             "2"
           ],
           [
-            "EU-NORTH",
-            "internal",
+            "US-EAST",
+            "inbound",
+            "2"
+          ],
+          [
+            "US-WEST",
+            "inbound",
             "1"
           ],
           [
@@ -4750,8 +4750,8 @@
             "1"
           ],
           [
-            "US-WEST",
-            "inbound",
+            "EU-NORTH",
+            "internal",
             "1"
           ]
         ],
@@ -4776,13 +4776,6 @@
         ],
         "results": [
           [
-            "pallet-mapper",
-            "2",
-            "0",
-            "2",
-            "1"
-          ],
-          [
             "track-router",
             "2",
             "0",
@@ -4790,14 +4783,21 @@
             "1"
           ],
           [
-            "scan-hub",
+            "pallet-mapper",
+            "2",
+            "0",
+            "2",
+            "1"
+          ],
+          [
+            "batch-sync",
             "1",
             "0",
             "1",
             "3"
           ],
           [
-            "batch-sync",
+            "scan-hub",
             "1",
             "0",
             "1",
@@ -4879,13 +4879,13 @@
             "2"
           ],
           [
-            "ZONE-1",
-            "CC-DELTA",
+            "ZONE-4",
+            "CC-GAMMA",
             "2"
           ],
           [
-            "ZONE-4",
-            "CC-GAMMA",
+            "ZONE-1",
+            "CC-DELTA",
             "2"
           ],
           [
@@ -4999,17 +4999,17 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "2",
-            "465.0"
-          ],
-          [
             "ZONE-4",
             "2",
             "437.5"
           ],
           [
             "ZONE-3",
+            "2",
+            "465.0"
+          ],
+          [
+            "ZONE-1",
             "2",
             "465.0"
           ],
@@ -5056,11 +5056,11 @@
         ],
         "results": [
           [
-            "inbound",
+            "internal",
             "3"
           ],
           [
-            "internal",
+            "inbound",
             "3"
           ],
           [
@@ -5137,20 +5137,20 @@
         ],
         "results": [
           [
-            "track-router",
-            "EU-NORTH",
-            "2",
-            "0"
-          ],
-          [
             "pallet-mapper",
             "AP-EAST",
             "2",
             "0"
           ],
           [
-            "scan-hub",
-            "EU-WEST",
+            "track-router",
+            "EU-NORTH",
+            "2",
+            "0"
+          ],
+          [
+            "lane-monitor",
+            "SA-EAST",
             "1",
             "0"
           ],
@@ -5161,8 +5161,8 @@
             "0"
           ],
           [
-            "lane-monitor",
-            "SA-EAST",
+            "scan-hub",
+            "EU-WEST",
             "1",
             "0"
           ]
@@ -5188,12 +5188,16 @@
         ],
         "results": [
           [
+            "warehouse-north",
+            "2"
+          ],
+          [
             "warehouse-central",
             "2"
           ],
           [
-            "warehouse-north",
-            "2"
+            "warehouse-east",
+            "1"
           ],
           [
             "warehouse-west",
@@ -5201,10 +5205,6 @@
           ],
           [
             "warehouse-south",
-            "1"
-          ],
-          [
-            "warehouse-east",
             "1"
           ]
         ],
@@ -5403,6 +5403,40 @@
           ],
           [
             "Q017 warehouse event record 2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1002",
+      "sql": "WITH filtered AS (SELECT http_method, split_part(page_url, '?', 1) AS raw_url_no_query FROM \"{stream}\" WHERE resource_path LIKE '%/logs/warehouse/%' AND match_all('warehouse') AND page_url LIKE '%shop.example.com/%'), in_shop AS (SELECT http_method, CASE WHEN raw_url_no_query LIKE '%shop.example.com/%' THEN '/' || split_part(raw_url_no_query, 'shop.example.com/', 2) ELSE NULL END AS api_path FROM filtered), scoped AS (SELECT http_method, api_path FROM in_shop WHERE api_path IS NOT NULL AND (api_path LIKE '/item/%' OR api_path LIKE '/search%' OR api_path LIKE '/cart%')), normalized AS (SELECT http_method, regexp_replace(regexp_replace(api_path, '/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', '/{id}'), '/[0-9]+', '/{id}') AS api FROM scoped), cleaned AS (SELECT http_method, regexp_replace(regexp_replace(api, '//', '/'), '//', '/') AS api FROM normalized) SELECT http_method, api, COUNT(*) AS hit_count FROM cleaned GROUP BY http_method, api ORDER BY hit_count DESC, http_method ASC, api ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "http_method",
+          "api",
+          "hit_count"
+        ],
+        "results": [
+          [
+            "DELETE",
+            "/item/{id}",
+            "30"
+          ],
+          [
+            "POST",
+            "/item/{id}",
+            "30"
+          ],
+          [
+            "PUT",
+            "/item/{id}",
+            "30"
           ]
         ],
         "results_mode": "rowsort"
