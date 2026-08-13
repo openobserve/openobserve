@@ -544,6 +544,18 @@ pub async fn get_cached_online_querier_nodes(group: Option<RoleGroup>) -> Option
     filter_nodes_with_group(nodes, group)
 }
 
+/// Online nodes carrying the `alert_manager` role.
+///
+/// Exists because the maintenance sweeps have to elect their leader from the
+/// same set the job runs on. Electing from the querier list instead — which is
+/// what they did — is invisible on a single `all`-role node and permanently
+/// false anywhere `alert_manager` is a role of its own, because such a node is
+/// never in that list and so can never be the first uuid in it.
+#[inline]
+pub async fn get_cached_online_alert_manager_nodes() -> Option<Vec<Node>> {
+    get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_alert_manager()).await
+}
+
 #[inline]
 pub async fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| node.status == NodeStatus::Online && node.is_ingester()).await

@@ -49,17 +49,12 @@ pub fn run() {
     log::info!("[SLO_MAINTENANCE] initialized with interval: {interval}s");
 
     spawn_pausable_job!("slo_maintenance", interval, {
-        let is_leader = match infra::cluster::get_cached_online_query_nodes(None).await {
-            Some(mut nodes) if !nodes.is_empty() => {
-                nodes.sort_by(|a, b| a.uuid.cmp(&b.uuid));
-                nodes[0].uuid == LOCAL_NODE.uuid
-            }
-            // Same deliberate fallback as the other sweeps: with no cluster
-            // view, assume single node and do the work rather than letting the
-            // aggregate drift indefinitely.
-            _ => true,
-        };
-        if !is_leader {
+        // Elected from the alert-manager set, which is the set the gate above
+        // admitted this node on. It used to be elected from the query nodes,
+        // where a dedicated alert manager does not appear at all — so on any
+        // role-separated deployment this was permanently false and the
+        // aggregate drifted forever. See `leader`.
+        if !crate::job::leader::is_alert_manager_leader().await {
             log::debug!("[SLO_MAINTENANCE] not leader, skipping this pass");
             continue;
         }

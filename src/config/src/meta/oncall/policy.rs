@@ -684,6 +684,100 @@ pub fn plan(
     }
 }
 
+// ── A rung that woke nobody (03 §9) ──────────────────────────────────────────
+
+/// How many times one rung is sent again when every channel errored.
+///
+/// Four, which with the backoff below is about seven and a half minutes of
+/// trying. Long enough to sit out the transport failures that actually happen
+/// — an SMTP restart, a DNS blip, a webhook's proxy cycling — and short enough
+/// that a provider which is genuinely gone does not hold the ladder still while
+/// the outage it was raised about goes unworked.
+pub const MAX_TRANSPORT_ATTEMPTS: u32 = 4;
+
+/// The wait before the first re-send of a rung the transport lost.
+///
+/// Thirty seconds, not the one second [`retry_delay_micros`] uses: that one is
+/// retrying a single send inside a rung, and by the time we are here every
+/// channel for every recipient has already spent its own budget. Trying again
+/// immediately would only re-discover the same outage.
+pub const TRANSPORT_BACKOFF_MICROS: i64 = 30 * 1_000_000;
+
+/// The longest this backs off. Beyond four minutes a re-send stops being a
+/// retry and starts being a second ladder running at its own pace.
+pub const MAX_TRANSPORT_BACKOFF_MICROS: i64 = 4 * MICROS_PER_MINUTE;
+
+/// What one rung's dispatch achieved, as far as the ladder is concerned.
+///
+/// The distinction this exists for is the one §9 does not make and the engine
+/// needs: a rung that resolved to **nobody** and a rung whose real recipients
+/// were all lost to the **transport** are both "nobody was reached", and they
+/// want opposite things.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RungOutcome {
+    /// At least one person was reached on at least one channel.
+    Reached,
+    /// The rung's targets resolved to no human at all.
+    NoRecipients,
+    /// Real recipients, and every channel errored for every one of them.
+    DeliveryFailed,
+}
+
+/// The ladder's next move once a rung has gone out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AfterRung {
+    /// Somebody was woken. Come back when the next rung is due.
+    NextRung,
+    /// §9, verbatim: "if every channel for a responder fails, escalation
+    /// advances to the next level immediately rather than waiting out the level
+    /// timeout" — which is written about a rung with nobody on it. Waiting five
+    /// minutes for a name that will never resolve helps no one, so the next
+    /// level is tried inside the same tick.
+    AdvanceNow,
+    /// Come back at `at` and send this **same** rung again. It is not spent:
+    /// the recipients exist and will be reachable when the transport is.
+    /// `attempts` is the count to record, so the next failure backs off further.
+    RetryRung { at: i64, attempts: u32 },
+    /// The transport has had [`MAX_TRANSPORT_ATTEMPTS`] goes at this rung and
+    /// is not coming back in time to matter. Give the rung up and let the
+    /// ladder carry on **at its configured pace** — the next rung when the
+    /// next rung is due, so a dead provider ends at `Exhausted` and whatever
+    /// the policy's final action is, rather than looping or collapsing.
+    GiveUpRung,
+}
+
+/// How long to wait before sending a lost rung again.
+///
+/// 30 s → 1 m → 2 m → 4 m. Doubling, because the second failure means something
+/// the first did not: the first is a blip, the fourth is an outage.
+fn transport_backoff_micros(attempts_made: u32) -> i64 {
+    TRANSPORT_BACKOFF_MICROS
+        .saturating_mul(1i64 << attempts_made.min(16))
+        .min(MAX_TRANSPORT_BACKOFF_MICROS)
+}
+
+/// What the ladder does next, from what the rung achieved and how many times
+/// the transport has already lost it.
+///
+/// The whole point is that only [`RungOutcome::NoRecipients`] consumes the
+/// ladder without pausing. Applying §9's "advance immediately" to a transport
+/// failure too is what let thirty seconds of SMTP retire a P1: every rung read
+/// as sent, `elapsed` walked forward inside one tick, and the record wrote its
+/// own "nobody acknowledged" eleven seconds after it opened.
+pub fn after_rung(outcome: RungOutcome, attempts_made: u32, now: i64) -> AfterRung {
+    match outcome {
+        RungOutcome::Reached => AfterRung::NextRung,
+        RungOutcome::NoRecipients => AfterRung::AdvanceNow,
+        RungOutcome::DeliveryFailed if attempts_made >= MAX_TRANSPORT_ATTEMPTS => {
+            AfterRung::GiveUpRung
+        }
+        RungOutcome::DeliveryFailed => AfterRung::RetryRung {
+            at: now + transport_backoff_micros(attempts_made),
+            attempts: attempts_made + 1,
+        },
+    }
+}
+
 impl std::fmt::Display for Channel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
@@ -1490,5 +1584,188 @@ mod tests {
         obj.remove("final_action");
         let back: EscalationPolicy = serde_json::from_value(json).unwrap();
         assert_eq!(back, policy());
+    }
+
+    /// The engine's loop, with the dispatching replaced by a fixed outcome:
+    /// which rungs one tick consumes, and what it leaves the ladder doing.
+    ///
+    /// Spelled out here rather than described in prose because "how much of the
+    /// ladder does one tick eat" is the whole of G2, and it is a property of
+    /// [`plan`] and [`after_rung`] together.
+    fn one_tick(
+        steps: &[LadderStep],
+        already_sent: &[i64],
+        outcome: RungOutcome,
+        attempts_made: u32,
+        now: i64,
+    ) -> (Vec<i64>, Option<AfterRung>) {
+        let mut notified = already_sent.to_vec();
+        let mut this_tick: Vec<i64> = Vec::new();
+        let mut elapsed = 0;
+        loop {
+            match plan(steps, elapsed, &notified) {
+                LadderAction::Exhausted | LadderAction::Wait { .. } => return (this_tick, None),
+                LadderAction::Notify {
+                    due,
+                    next_wakeup_micros,
+                } => {
+                    for step in &due {
+                        this_tick.push(step.after_micros);
+                        notified.push(step.after_micros);
+                    }
+                    match after_rung(outcome, attempts_made, now) {
+                        // The one move that keeps walking inside the same tick.
+                        AfterRung::AdvanceNow => elapsed = next_wakeup_micros.unwrap_or(elapsed),
+                        other => return (this_tick, Some(other)),
+                    }
+                }
+            }
+        }
+    }
+
+    /// The coverage case, exactly as it was. A rung that resolved to nobody
+    /// must not burn its delay in silence: nobody will appear in five minutes,
+    /// so the ladder tries the next level now, and a ladder of them runs out
+    /// inside one tick. §9 wrote "advance immediately" about this.
+    #[test]
+    fn test_a_rung_that_reached_nobody_still_advances_inside_the_tick() {
+        let p1 = steps(AlertPriority::P1);
+        let (sent, ended) = one_tick(&p1, &[], RungOutcome::NoRecipients, 0, 1_000);
+        assert_eq!(
+            sent,
+            vec![0, 5 * MIN, 15 * MIN, 30 * MIN, 60 * MIN],
+            "a ladder that resolves to nobody at every level is finished, and waiting an hour to say so helps no one"
+        );
+        assert_eq!(ended, None, "and the ladder is spent");
+    }
+
+    /// G2. The same ladder, the same "nobody was reached" — except the people
+    /// were there and SMTP was not. One tick must consume **one** rung, not the
+    /// ladder: thirty seconds of a dead transport used to exhaust a five-rung
+    /// P1 in eleven milliseconds and delete its timer.
+    #[test]
+    fn test_a_transport_failure_consumes_one_rung_not_the_ladder() {
+        let p1 = steps(AlertPriority::P1);
+        let now = 1_000_000;
+        let (sent, ended) = one_tick(&p1, &[], RungOutcome::DeliveryFailed, 0, now);
+        assert_eq!(sent, vec![0], "only the rung that was actually tried");
+        assert_eq!(
+            ended,
+            Some(AfterRung::RetryRung {
+                at: now + TRANSPORT_BACKOFF_MICROS,
+                attempts: 1,
+            }),
+            "and the tick ends on a short backoff rather than on the next level"
+        );
+    }
+
+    /// The other half of G2: the rung is not consumed either, so when mail
+    /// comes back the very people who should have been woken still are. This
+    /// is what the engine relies on when it drops an unreached rung from the
+    /// ledger before re-planning.
+    #[test]
+    fn test_the_lost_rung_is_still_pageable_when_the_transport_returns() {
+        let p1 = steps(AlertPriority::P1);
+        // What the timeline holds after the failed tick, and what the engine
+        // plans from: the same list with the rung the transport lost taken back
+        // out, because it was attempted rather than sent.
+        let timeline = vec![0];
+        let unreached = vec![0];
+        let ledger: Vec<i64> = timeline
+            .iter()
+            .copied()
+            .filter(|r| !unreached.contains(r))
+            .collect();
+
+        assert_eq!(
+            one_tick(&p1, &timeline, RungOutcome::Reached, 0, 2_000),
+            (vec![], None),
+            "counting it as sent is what leaves the primary on-call never woken"
+        );
+        assert_eq!(
+            one_tick(&p1, &ledger, RungOutcome::Reached, 0, 2_000),
+            (vec![0], Some(AfterRung::NextRung)),
+            "so the retry sends that same rung, and the ladder then resumes at its own pace"
+        );
+    }
+
+    /// It has to end. Four attempts of a doubling backoff is about seven and a
+    /// half minutes; after that the rung is given up and the ladder carries on
+    /// at its configured pace — one rung per tick, on to `Exhausted` and
+    /// whatever the policy's final action is. A dead provider must land
+    /// somewhere honest, not loop.
+    #[test]
+    fn test_a_dead_transport_gives_the_rung_up_rather_than_retrying_forever() {
+        let now = 5_000;
+        let mut at = now;
+        for attempt in 0..MAX_TRANSPORT_ATTEMPTS {
+            match after_rung(RungOutcome::DeliveryFailed, attempt, at) {
+                AfterRung::RetryRung { at: next, attempts } => {
+                    assert_eq!(attempts, attempt + 1);
+                    assert!(next > at, "each attempt is later than the last");
+                    at = next;
+                }
+                other => panic!("attempt {attempt} gave up early: {other:?}"),
+            }
+        }
+        assert!(
+            at - now <= 10 * MICROS_PER_MINUTE,
+            "the whole budget is minutes, not hours: {}us",
+            at - now
+        );
+        assert_eq!(
+            after_rung(RungOutcome::DeliveryFailed, MAX_TRANSPORT_ATTEMPTS, at),
+            AfterRung::GiveUpRung
+        );
+
+        // And giving up still costs the ladder exactly one rung per tick.
+        let p1 = steps(AlertPriority::P1);
+        let (sent, ended) = one_tick(
+            &p1,
+            &[],
+            RungOutcome::DeliveryFailed,
+            MAX_TRANSPORT_ATTEMPTS,
+            at,
+        );
+        assert_eq!(sent, vec![0]);
+        assert_eq!(ended, Some(AfterRung::GiveUpRung));
+    }
+
+    /// 30 s → 1 m → 2 m → 4 m, and no further. The doubling is the point — the
+    /// fourth failure means something the first did not — and the cap is what
+    /// stops a retry becoming a second ladder.
+    #[test]
+    fn test_the_backoff_doubles_and_is_capped() {
+        let waits: Vec<i64> = (0..6).map(transport_backoff_micros).collect();
+        assert_eq!(
+            waits,
+            vec![
+                30 * 1_000_000,
+                MICROS_PER_MINUTE,
+                2 * MICROS_PER_MINUTE,
+                MAX_TRANSPORT_BACKOFF_MICROS,
+                MAX_TRANSPORT_BACKOFF_MICROS,
+                MAX_TRANSPORT_BACKOFF_MICROS,
+            ]
+        );
+        // An attempt count from a replicated row can be anything at all, and a
+        // backoff that overflows is a page scheduled in the past or never.
+        assert_eq!(
+            transport_backoff_micros(u32::MAX),
+            MAX_TRANSPORT_BACKOFF_MICROS
+        );
+    }
+
+    /// A rung somebody was woken on never retries, whatever the transport did
+    /// to the other recipients. The page landed; the ladder's job is done until
+    /// the next level is due.
+    #[test]
+    fn test_a_rung_that_woke_somebody_never_retries() {
+        for attempts in [0, 1, MAX_TRANSPORT_ATTEMPTS, u32::MAX] {
+            assert_eq!(
+                after_rung(RungOutcome::Reached, attempts, 7),
+                AfterRung::NextRung
+            );
+        }
     }
 }

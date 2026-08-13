@@ -40,6 +40,7 @@ pub(crate) mod files;
 mod flatten_compactor;
 #[cfg(feature = "enterprise")]
 mod incidents;
+mod leader;
 pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]

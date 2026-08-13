@@ -161,18 +161,13 @@ pub fn run() {
 }
 
 /// Whether this node does the whole-org work this pass.
+///
+/// Elected from the alert-manager set, which is the set `run` admitted this
+/// node on. It used to be elected from the query nodes, which on a
+/// role-separated deployment contains every node except the one asking — so
+/// this was permanently false and all three sweeps below silently never ran.
 async fn is_leader() -> bool {
-    match infra::cluster::get_cached_online_query_nodes(None).await {
-        Some(mut nodes) if !nodes.is_empty() => {
-            nodes.sort_by(|a, b| a.uuid.cmp(&b.uuid));
-            nodes[0].uuid == LOCAL_NODE.uuid
-        }
-        // Same deliberate fallback as the other sweeps: with no cluster
-        // view, assume single node and do the work. An abandoned page that
-        // nobody reconciles is worse than a duplicated re-arm, which the
-        // scheduler's claim lock collapses back to one anyway.
-        _ => true,
-    }
+    crate::job::leader::is_alert_manager_leader().await
 }
 
 async fn sweep() -> Result<(), anyhow::Error> {

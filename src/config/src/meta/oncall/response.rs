@@ -402,6 +402,26 @@ impl ResponseEvent {
         self
     }
 
+    /// Marks a rung's own entry as one the transport lost outright.
+    ///
+    /// Written on the `Page` entry, beside the per-recipient `Delivery` rows
+    /// that say which sends failed, and it carries the one fact the ladder
+    /// cannot reconstruct from them: that this rung had real recipients and
+    /// reached **none** of them. A rung that resolved to nobody deliberately
+    /// does not get it — that rung is spent, and this one is not.
+    pub fn reached_nobody(mut self) -> Self {
+        self.delivered = Some(false);
+        self
+    }
+
+    /// Whether this entry is a rung of `ladder_run` that was tried and lost to
+    /// the transport, and so has not really been sent.
+    pub fn is_unreached_rung(&self, ladder_run: i32) -> bool {
+        self.kind == ResponseEventKind::Page
+            && self.delivered == Some(false)
+            && self.run() == ladder_run
+    }
+
     /// Which run this entry belongs to. Entries written before the ladder
     /// could restart carry none, and belong to the first run.
     pub fn run(&self) -> i32 {
@@ -962,6 +982,47 @@ mod tests {
             !failed.is_delivery_of(1, 0, "ana@o2.ai", Channel::Email),
             "a failure must be retried, not deduped away"
         );
+    }
+
+    /// The one fact the ladder cannot get from the per-recipient rows: this
+    /// rung had real people on it and reached none of them. A rung that
+    /// resolved to nobody is not marked, because that rung IS spent — nobody
+    /// will appear on it in five minutes — and marking it would make the engine
+    /// re-send a page to no one for as long as its retry budget lasts.
+    #[test]
+    fn test_only_a_rung_the_transport_lost_reads_as_unsent() {
+        let lost = ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "could not reach ana@o2.ai")
+            .at_rung(5)
+            .in_run(2)
+            .reached_nobody();
+        assert!(lost.is_unreached_rung(2));
+        assert!(
+            !lost.is_unreached_rung(3),
+            "a previous run's lost rung says nothing about this one"
+        );
+
+        let nobody_matched =
+            ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "nobody matched on call now")
+                .at_rung(5)
+                .in_run(2);
+        assert!(!nobody_matched.is_unreached_rung(2));
+
+        let paged = ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "paged ana@o2.ai")
+            .at_rung(5)
+            .in_run(2);
+        assert!(!paged.is_unreached_rung(2));
+
+        // A failed per-recipient row is not a rung, and must not take one out
+        // of the ledger on its own: the rest of the rung may well have landed.
+        let one_failure = ResponseEvent::new(ResponseEventKind::Delivery, 10, "o2-engine", "failed")
+            .at_rung(5)
+            .in_run(2)
+            .delivered_to("ana@o2.ai", Channel::Email, false);
+        assert!(!one_failure.is_unreached_rung(2));
+
+        let back: ResponseEvent =
+            serde_json::from_str(&serde_json::to_string(&lost).unwrap()).unwrap();
+        assert!(back.is_unreached_rung(2), "and it survives storage");
     }
 
     #[test]
