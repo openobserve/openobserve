@@ -82,6 +82,7 @@ def grouped_simple_alert(name: str) -> dict[str, Any]:
 
 
 def realtime_alert(name: str) -> dict[str, Any]:
+    """A realtime (is_real_time=True) alert — evaluated inline, no run-state persisted."""
     a = simple_alert(name)
     a["is_real_time"] = True
     return a

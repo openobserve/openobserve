@@ -5,8 +5,13 @@ directly, so a silently-dropped flag or a disabled guard fails here even when th
 UI still "looks" right.
 
 Coverage: MA-03/04/05/06 (save validation), THR-03, PT-06 (tag validation),
-API-01/02 (round-trip + type contract), API-06/07 (group endpoints reachable —
-the B1 RBAC regression guard), PT-10/13 (priority filter + tag facet).
+API-01/02 (round-trip + type contract), API-06/07 (the two per-group routes are
+reachable and 200 under the test's auth), PT-10/13 (priority filter + tag facet).
+
+Auth note: the suite runs as root (the framework `client` fixture), so the
+group-route checks verify reachability/authorization for the authenticated user
+— they do NOT reproduce the B1 *non-admin* 403 RBAC path (that would need a
+non-admin reader fixture; the original Playwright spec also ran as root).
 """
 from __future__ import annotations
 
@@ -54,7 +59,7 @@ def test_reject_tag_not_starting_with_letter(alerts):
 
 
 def test_valid_per_group_alert_roundtrips_and_group_endpoints_readable(alerts):
-    """API-01/02 + API-06/07: valid per-group alert saves, round-trips, group routes 200 (B1)."""
+    """API-01/02 + API-06/07: valid per-group alert saves, round-trips, group routes reachable (200)."""
     name = uniq("p0_multi")
     resp = alerts.create_alert(multi_alert(name))
     assert resp.status_code == 200, resp.text
@@ -69,16 +74,19 @@ def test_valid_per_group_alert_roundtrips_and_group_endpoints_readable(alerts):
     assert "city" in detail["query_condition"]["aggregation"]["group_by"]
     assert detail["query_condition"]["aggregation"]["having"]["operator"] == ">"
 
-    # B1 regression guard: the two new group routes returned 403 for a non-admin
-    # before the RBAC fix. They must stay authorized for a user who can read the alert.
+    # Group-route reachability (API-06/07): the two per-group routes must stay
+    # authorized and 200 for the authenticated (root) user, and return the
+    # expected shape. This is a reachability/authorization smoke — as root it
+    # cannot reproduce the B1 non-admin-403 regression, but it does catch the
+    # routes being removed, 404'd, or globally broken.
     groups = alerts.get_alert_groups_resp(alert_id)
-    assert groups.status_code == 200, "group endpoint must not 403 (B1)"
+    assert groups.status_code == 200, "group endpoint must be reachable (200)"
     gjson = groups.json()
     assert isinstance(gjson["list"], list)
     assert "group_cap" in gjson
 
     trans = alerts.get_alert_transitions_resp(alert_id, limit=5)
-    assert trans.status_code == 200, "group transitions endpoint must not 403 (B1)"
+    assert trans.status_code == 200, "group transitions endpoint must be reachable (200)"
 
 
 def test_tags_normalized_and_deduped_and_priority_filter(alerts):
