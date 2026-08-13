@@ -728,6 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ViewDependenciesDialog
       v-model:open="dependenciesDialog.open"
       :focus="dependenciesDialog.focus"
+      @deleted="onDependencyDeleted"
     />
 
     <template>
@@ -2642,6 +2643,9 @@ export default defineComponent({
         focus: { kind: "alert", alertId: row.alert_id, name: row.name },
       };
     };
+    // A delete inside the dependency popup — reload the current folder's alerts so
+    // the table drops the removed row.
+    const onDependencyDeleted = () => getAlertsFn(store, activeFolderId.value);
 
     const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
@@ -3101,6 +3105,7 @@ export default defineComponent({
       router,
       dependenciesDialog,
       viewDependencies,
+      onDependencyDeleted,
       columns,
       recencyLevel,
       alertRowClass,

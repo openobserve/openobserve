@@ -23,7 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog v-model:open="openModel" size="xl" :title="dialogTitle">
     <div class="h-[60vh] min-h-0" data-test="view-dependencies-dialog-body">
-      <AlertDependenciesGraph v-if="open" embedded :focus="focus" />
+      <AlertDependenciesGraph
+        v-if="open"
+        embedded
+        :focus="focus"
+        @deleted="emit('deleted')"
+        @close="openModel = false"
+      />
     </div>
   </ODialog>
 </template>
@@ -39,7 +45,11 @@ const props = defineProps<{
   open: boolean;
   focus: DepFocus | null;
 }>();
-const emit = defineEmits<{ (e: "update:open", value: boolean): void }>();
+const emit = defineEmits<{
+  (e: "update:open", value: boolean): void;
+  // Bubbled from the graph so the originating list can refresh after a delete.
+  (e: "deleted"): void;
+}>();
 
 const { t } = useI18nTyped();
 

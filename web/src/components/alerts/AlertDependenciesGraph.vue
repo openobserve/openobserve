@@ -352,6 +352,13 @@ const props = withDefaults(
   { embedded: false, focus: null },
 );
 
+const emit = defineEmits<{
+  // A node was deleted — the parent list should refresh its own table.
+  (e: "deleted"): void;
+  // The focused entity is gone (or the chain is empty) — the popup should close.
+  (e: "close"): void;
+}>();
+
 type FilterKey = "linked" | "all" | "orphan" | "broken";
 type VisibleNode = DepNode & { expanded?: boolean; dimmed?: boolean };
 
@@ -756,6 +763,11 @@ const performDelete = async () => {
     }
     toast({ variant: "success", message: t("alert_dependencies.deletedToast", { name: n.name }) });
     await refresh();
+    // Let the originating list refresh its own table so the deleted row clears.
+    emit("deleted");
+    // If the popup was focused on this now-gone entity (or nothing is left in the
+    // chain), close it — its subject no longer exists.
+    if (props.focus && (!focusNodeId.value || !visibleNodes.value.length)) emit("close");
   } catch (err: any) {
     toast({
       variant: "error",

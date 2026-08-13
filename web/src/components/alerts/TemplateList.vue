@@ -269,6 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ViewDependenciesDialog
       v-model:open="dependenciesDialog.open"
       :focus="dependenciesDialog.focus"
+      @deleted="getTemplates"
     />
   </div>
 </template>
