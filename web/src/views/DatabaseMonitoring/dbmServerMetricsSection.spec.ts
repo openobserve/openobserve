@@ -16,11 +16,10 @@
 /**
  * W6 wiring, asserted by SOURCE READ.
  *
- * The convention in this directory (`dbmFleetDefaultSort`, `dbmLockAlertAction`,
- * `dbmActivityRowNavigation`): there is no `mount()` harness for
- * `views/DatabaseMonitoring/`, and five specs document the decision not to
- * build one. So WIRING is pinned here and VALUES live in a pure function with
- * its own unit test — `utils/dbm/serverMetrics.spec.ts`.
+ * The convention in this directory: there is no `mount()` harness for
+ * `views/DatabaseMonitoring/` — see dbmRequestGuard.spec.ts for the reason.
+ * So WIRING is pinned here and VALUES live in a pure function with its own
+ * unit test — `utils/dbm/serverMetrics.spec.ts`.
  */
 
 import { readFileSync } from "node:fs";
@@ -65,19 +64,75 @@ describe("W6 server metrics section wiring", () => {
     expect(page).toContain("dbm.detail.serverMetrics.subtitle");
     expect(page).toContain("dbm.detail.serverMetrics.clientSubtitle");
     expect(messages.dbm.detail.serverMetrics.subtitle).toBe("Server-side — all clients");
+    // The client label carries the NFR-5 STANDING disclosure: client-vantage
+    // figures cover completed calls only. It used to be a conditional insight
+    // card, which meant the one bias that is always true was only ever stated
+    // when a heuristic happened to fire.
     expect(messages.dbm.detail.serverMetrics.clientSubtitle).toBe(
-      "Client-observed — instrumented callers only",
+      "Client-observed — instrumented callers only, finished calls only. " +
+        "A query still running, or one that hung, isn't in these numbers.",
     );
   });
 
   /**
-   * The three absence states each render their own sentence. Collapsing any
-   * two sends the reader after a fix that is not the one they need.
+   * The four non-data states each render their own sentence. Collapsing any
+   * two sends the reader after a fix that is not the one they need — the worst
+   * case being a FAILED read rendered as `off`, which prescribes reconfiguring
+   * a collector that may be fine.
    */
-  it("renders all three absence states separately", () => {
-    for (const key of ["noMatch", "ambiguous", "off"]) {
+  it("renders all four non-data states separately", () => {
+    for (const key of ["noMatch", "ambiguous", "off", "readFailed"]) {
       expect(page).toContain(`dbm.detail.serverMetrics.${key}`);
     }
+  });
+
+  /**
+   * Failed ≠ off, in copy and in data. The read's lifecycle is tracked apart
+   * from its result: a thrown request lands in `failed` — never in the empty
+   * envelope's `off` — and the failed copy must not claim capture is off.
+   */
+  it("keeps a failed read distinct from capture-off", () => {
+    const sm = messages.dbm.detail.serverMetrics;
+    expect(sm.readFailed).toBeTruthy();
+    expect(sm.readFailed).not.toEqual(sm.off);
+    expect(sm.readFailedHint.toLowerCase()).not.toContain("collector");
+    // The catch path marks the READ failed rather than synthesising an off
+    // envelope the response never sent.
+    const catchBlock = page.slice(page.indexOf("const loadServerMetrics"));
+    expect(catchBlock).toContain('serverMetricsRead.value = "failed"');
+    expect(page).toContain("dbm-detail-server-metrics-failed");
+  });
+
+  /**
+   * `off` may only render once a read has ANSWERED. While it is in flight the
+   * section makes no claim — which sentence applies is exactly what is still
+   * unknown — so the off line is gated on the lifecycle, not just the state.
+   */
+  it("never shows the off copy while the read is loading", () => {
+    const offIdx = page.indexOf('dbm-detail-server-metrics"');
+    const offBranch = page.slice(page.lastIndexOf("v-if=", offIdx), offIdx);
+    expect(offBranch).toContain("serverMetricsRead === 'done'");
+    expect(offBranch).toContain("serverMetrics.state === 'off'");
+  });
+
+  /**
+   * The off line carries the fix, not just the diagnosis: a "Set up" button
+   * routed to the same setup destination as the list pages' empty states, with
+   * the env-var detail demoted to tooltip depth (operator detail, not headline
+   * copy).
+   */
+  it("wires the off state's Set up action to the DBM setup route", () => {
+    expect(page).toContain("dbm-detail-server-metrics-setup");
+    expect(page).toContain("DBM_SETUP_ROUTE");
+    expect(page).toContain("org_identifier");
+    // The env var survives, but as tooltip content on the one-liner.
+    expect(messages.dbm.detail.serverMetrics.offHint).toContain(
+      "ZO_DB_MONITORING_TOP_QUERY_ENABLED",
+    );
+    const offIdx = page.indexOf("dbm-detail-server-metrics-off");
+    const offBlock = page.slice(offIdx, page.indexOf("</span>", offIdx));
+    expect(offBlock).toContain("OTooltip");
+    expect(offBlock).toContain("offHint");
   });
 
   /** "No server match" is ordinary, so it must not use the error styling. */

@@ -45,14 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #header-tabs>
-      <DbmSectionTabs
-        :database-count="databaseCount"
-        :query-count="queryCount"
-        :activity-count="activityCount"
-        :deadlock-count="deadlockCount"
-        :blocked-count="waitingCount"
-        :table-health-count="tableHealthCount"
-      />
+      <!-- The sibling badges come from the shell's one shared fan-out; this
+           page's own count is its own. -->
+      <DbmSectionTabs v-bind="tabCounts" />
     </template>
 
     <template #actions>
@@ -129,9 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #subheader>
-          <!-- The counts that used to be crammed into the page subtitle. They
-               summarise exactly the rows below, so they belong inside the table
-               frame rather than in the header. -->
+          <!-- The window's counts live inside the table frame, not in the page
+               header: they summarise exactly the rows below. -->
           <div
             class="px-page-edge border-table-row-divider border-b py-1.5"
             data-test="dbm-blocked-summary"
@@ -468,13 +462,13 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
-  type ActivityStateBucket,
   type BlockingChain,
   type BlockingSample,
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
-import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
+import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
+import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
@@ -500,8 +494,7 @@ import {
   waitEventKey,
   WAIT_TONE_RULES,
 } from "@/utils/dbm/blocking";
-import { countClaim, type DbmCountClaim } from "@/utils/dbm/format";
-import { activitySampleTotal } from "@/utils/dbm/activity";
+import { claimedCount, countClaim } from "@/utils/dbm/format";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -520,10 +513,10 @@ const { range, current, refresh, setRange, queryParams } = useDbmScope(route.que
 // last request the reader made the one that paints.
 const requestSeq = useDbmRequestSeq();
 
-// The sibling-tab badges are the same numbers on every tab, so they are
-// fetched once per window and shared across the six routes rather than
-// re-fetched on each remount. See useDbmCountCache.
-const countCache = useDbmCountCache("blockedqueries");
+// The sibling-tab badges are the same numbers on every tab, so DbmShell
+// fetches them ONCE per window for every route and this page reads the
+// snapshot. See useDbmTabCounts.
+const tabCountsContext = useDbmTabCountsContext();
 
 /**
  * Whether this page is describing NOW or a stretch of the past.
@@ -544,19 +537,27 @@ const serverChains = ref<BlockingChain[] | null>(null);
 const waitingCount = ref(0);
 /** The server capped the read, so the waits below are a subset of what is stuck. */
 const truncated = ref(false);
-const deadlockCount = ref<DbmCountClaim | null>(null);
-const tableHealthCount = ref<number | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const notCollecting = ref(false);
 const sampledAt = ref<number | null>(null);
 const sampleInterval = ref<number | null>(null);
-const queryCount = ref<number | null>(null);
-const databaseCount = ref<number | null>(null);
-/** `null` until read, and again if the read fails — so the badge stays bare. */
-const activityStates = ref<ActivityStateBucket[] | null>(null);
-/** Sessions in the window. See `activitySampleTotal` for why not `hits.length`. */
-const activityCount = computed(() => activitySampleTotal(activityStates.value));
+/**
+ * The sibling badges from the shell's shared fan-out, plus THIS tab's own
+ * count in place of the shared one.
+ *
+ * `waitingCount` is the wait total this page loaded, passed as a bare number:
+ * the shared snapshot carries a `DbmCountClaim` here so a capped read can
+ * render `65+`, but this badge states the total the page loaded and
+ * `truncated` is already disclosed beside the table.
+ */
+const tabCounts = computed(() =>
+  tabCountProps(withOwnCount(tabCountsContext.counts.value, "blockedCount", waitingCount.value)),
+);
+
+/** Read by the empty states to say what else in DBM is answering. */
+const queryCount = computed(() => claimedCount(tabCountsContext.counts.value.queryCount));
+const databaseCount = computed(() => tabCountsContext.counts.value.databaseCount);
 
 const search = ref("");
 /** "My query is hanging" is how the incident arrives, so this is the default. */
@@ -1048,22 +1049,21 @@ const onRowAction = (id: string, row: BlockedRow) => {
   }
 };
 
-/**
- * The refresh button. A named handler rather than `@click="load"`: that passes
- * the click EVENT as the first argument, which would arrive as a truthy
- * `force` and quietly make every caller look like a refresh.
- *
- * `force` reaches the BADGE cache only — the table is always fetched live.
- */
+// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
+// badge cache alongside the page's own load — the URL does not change on a
+// refresh, so the shell cannot see one on its own.
 const onRefresh = () => {
   void load();
-  void loadContext(requestSeq.current(), true);
+  tabCountsContext.refresh({ force: true });
 };
 
 const onDateChange = (value: DbmDateChange) => {
   setRange(value);
   router.replace({ query: { ...route.query, ...queryParams.value } }).catch(() => {});
-  load();
+  // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
+  // mount replay would otherwise double every request. See
+  // `DbmDateChange.userChangedValue`.
+  if (value?.userChangedValue !== false) load();
 };
 
 const load = async () => {
@@ -1092,14 +1092,18 @@ const load = async () => {
     sampleInterval.value = data.sample_interval_seconds ?? null;
   } catch (err: unknown) {
     if (requestSeq.isStale(token)) return;
+    // Whatever went wrong, the previous window's rows are no longer an answer
+    // to the question on screen — leaving them would put stale waits and stale
+    // summary counts under an error banner.
+    samples.value = [];
+    serverChains.value = null;
+    waitingCount.value = 0;
+    truncated.value = false;
     // The endpoint is not on this build yet, or nothing has ever sampled the
     // lock tables: "not collecting", not a failure the user can act on.
     const status = (err as { response?: { status?: number } })?.response?.status;
     if (status === 404 || status === 501) {
       notCollecting.value = true;
-      samples.value = [];
-      waitingCount.value = 0;
-      truncated.value = false;
     } else {
       error.value =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
@@ -1108,84 +1112,6 @@ const load = async () => {
   } finally {
     if (!requestSeq.isStale(token)) loading.value = false;
   }
-};
-
-const loadContext = async (token: number = requestSeq.current(), force = false) => {
-  if (!org.value) return;
-  const window = { startTime: current.value.startTime, endTime: current.value.endTime };
-
-  // Through the SHARED cache, keyed on the range: these five badges are the
-  // same five numbers on every DBM tab, and the six tabs are separate routes,
-  // so without this each switch re-fetches all of them.
-  const badges = await badgesFrom(
-    countCache.read(
-      org.value,
-      range.value,
-      async () => {
-        // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
-        // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE
-        // badge instead of abandoning the rest.
-        const [databases, queries, deadlocks, activity, tableHealth] = await Promise.allSettled([
-          dbMonitoringService.getDatabases(org.value, window),
-          dbMonitoringService.getQueries(org.value, { ...window, limit: 1 }),
-          dbMonitoringService.getDeadlocks(org.value, window),
-          dbMonitoringService.getActivity(org.value, window),
-          dbMonitoringService.getTableHealth(org.value, window),
-        ]);
-        // A blank badge is the honest rendering when we could not count. The
-        // claim objects are built HERE, inside the cached value, so the
-        // server's `truncated` survives a hit and the badge still shows `65+`.
-        const value = {
-          // `hits.length`, as before: /databases returns no `total`, and
-          // inventing one would make this badge disagree with the Overview
-          // table it counts.
-          databaseCount:
-            databases.status === "fulfilled" ? (databases.value.data.hits?.length ?? 0) : null,
-          queryCount:
-            queries.status === "fulfilled"
-              ? (queries.value.data.total ?? queries.value.data.hits?.length ?? 0)
-              : null,
-          deadlockCount:
-            deadlocks.status === "fulfilled"
-              ? countClaim(
-                  deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
-                  deadlocks.value.data.truncated,
-                )
-              : null,
-          // The STATE BREAKDOWN, never `total`/`hits.length`: those are a
-          // row-limited sample and would render a constant cap as the
-          // population.
-          activityStates:
-            activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null,
-          tableHealthCount:
-            tableHealth.status === "fulfilled"
-              ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
-              : null,
-        };
-        // `allSettled` never rejects, so a fan-out in which a badge failed
-        // would otherwise be CACHED — remembering "we could not count" as the
-        // answer for the whole window. Throwing keeps it out of the cache; the
-        // partial result still reaches the badges below.
-        if (
-          [databases, queries, deadlocks, activity, tableHealth].some(
-            (r) => r.status === "rejected",
-          )
-        ) {
-          throw new DbmPartialCounts(value);
-        }
-        return value;
-      },
-      { force },
-    ),
-  );
-
-  if (requestSeq.isStale(token) || !badges) return;
-
-  databaseCount.value = badges.databaseCount;
-  queryCount.value = badges.queryCount;
-  deadlockCount.value = badges.deadlockCount;
-  activityStates.value = badges.activityStates;
-  tableHealthCount.value = badges.tableHealthCount;
 };
 
 // ─── AI ──────────────────────────────────────────────────────────────────────
@@ -1240,8 +1166,9 @@ const dbmContext = createDbmContextProvider(() => {
 onMounted(() => {
   contextRegistry.register(DBM_CONTEXT_KEY, dbmContext);
   contextRegistry.setActive(DBM_CONTEXT_KEY);
+  // Only this page's OWN read. The badges are DbmShell's, fetched once for
+  // every tab — a call here would put the fan-out back on every mount.
   load();
-  loadContext();
 });
 
 // Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole

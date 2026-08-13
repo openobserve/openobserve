@@ -15,7 +15,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { collectInstanceMetrics, type DbmMetricStreamReader } from "./instanceMetricsRead";
+import {
+  DBM_METRIC_STREAM_NAMES,
+  collectInstanceMetrics,
+  type DbmMetricStreamReader,
+} from "./instanceMetricsRead";
 import { DBM_INSTANCE_METRICS } from "./instanceMetrics";
 
 const WINDOW = { startTime: 1_000_000, endTime: 2_000_000 };
@@ -39,6 +43,20 @@ const pgBackends = (host: string, value: number, ts = 1) => ({
 // empty and the page behaves exactly as today. Metrics must never block or
 // degrade the query view." Four of the six Postgres metrics are disabled
 // upstream by default, so a missing stream is the COMMON case, not the edge.
+
+describe("DBM_METRIC_STREAM_NAMES", () => {
+  // Callers prefetch schemas by this list, and the existing-streams filter
+  // skips anything not in it — a stream missing here is never read at all,
+  // however correct its catalog spec is.
+  it("includes the MySQL connection-limit stream the limits recipe fills", () => {
+    expect(DBM_METRIC_STREAM_NAMES).toContain("mysql_connection_max");
+  });
+
+  it("names every stream in the catalog exactly once", () => {
+    const streams = DBM_INSTANCE_METRICS.map((spec) => spec.stream);
+    expect([...DBM_METRIC_STREAM_NAMES].sort()).toEqual([...new Set(streams)].sort());
+  });
+});
 
 describe("collectInstanceMetrics", () => {
   it("returns the instances a readable stream reported", async () => {
@@ -134,7 +152,7 @@ describe("collectInstanceMetrics", () => {
   });
 
   // The same seam, for the columns the fold GROUPS on rather than filters on.
-  // Postgres emits one row per database per scrape; if `db_namespace` is not
+  // Postgres emits one row per database per scrape; if `postgresql_database_name` is not
   // projected, every database collapses into one series, same-timestamp rows
   // overwrite each other, and an instance running 5 + 7 backends reports 7 —
   // which against a limit of 10 renders a calm 70% for a database 20% OVER its
@@ -149,8 +167,18 @@ describe("collectInstanceMetrics", () => {
       const shape = (full: Record<string, unknown>) =>
         Object.fromEntries(projection.map((column) => [column, full[column]]));
       return [
-        shape({ _timestamp: 2, value: 5, service_instance_id: "a:5432", db_namespace: "app" }),
-        shape({ _timestamp: 2, value: 7, service_instance_id: "a:5432", db_namespace: "jobs" }),
+        shape({
+          _timestamp: 2,
+          value: 5,
+          service_instance_id: "a:5432",
+          postgresql_database_name: "app",
+        }),
+        shape({
+          _timestamp: 2,
+          value: 7,
+          service_instance_id: "a:5432",
+          postgresql_database_name: "jobs",
+        }),
       ];
     });
     const result = await collectInstanceMetrics(read, WINDOW);
@@ -241,5 +269,159 @@ describe("collectInstanceMetrics", () => {
     );
     const result = await collectInstanceMetrics(read, WINDOW);
     expect(result.metricsByKey.size).toBe(0);
+  });
+
+  // ── the catalog filter ───────────────────────────────────────────────────
+  //
+  // Four of the eight metrics are disabled upstream by default, so most
+  // deployments are missing most of the catalog. Sweeping streams the catalog
+  // says are absent collected the same six 400s on every load, forever.
+
+  it("queries only the streams the catalog says exist", async () => {
+    const read = readerFor({});
+    await collectInstanceMetrics(read, WINDOW, {
+      existingStreams: new Set(["postgresql_backends", "mysql_threads"]),
+    });
+    const streamsRead = (read as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    expect(streamsRead.slice().sort()).toEqual(["mysql_threads", "postgresql_backends"]);
+  });
+
+  it("reports a catalog-absent stream as absent, not failed", async () => {
+    const read = readerFor({});
+    const result = await collectInstanceMetrics(read, WINDOW, {
+      existingStreams: new Set(["postgresql_backends"]),
+    });
+    // Not queried ⇒ nothing reported, and NOT "could not be read": the stream
+    // does not exist, which is the ordinary not-enabled case.
+    expect(result.failedStreams).toEqual([]);
+  });
+
+  it("sweeps everything when the catalog is unknown or empty", async () => {
+    for (const catalog of [null, new Set<string>()]) {
+      const read = readerFor({});
+      await collectInstanceMetrics(read, WINDOW, { existingStreams: catalog });
+      expect((read as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(
+        DBM_INSTANCE_METRICS.length,
+      );
+    }
+  });
+
+  // ── the optional-column fallback ─────────────────────────────────────────
+  //
+  // Seen live: a stream that exists whose collector does not emit the
+  // per-database label — `unknown field 'postgresql_database_name'`. The split is the
+  // optional part of the projection; the health signal must survive it.
+
+  it("retries a failed read once without the optional series columns", async () => {
+    const read: DbmMetricStreamReader = vi.fn(async (stream, sql) => {
+      if (stream !== "postgresql_backends") return [];
+      if (sql.includes("postgresql_database_name"))
+        throw new Error("unknown field 'postgresql_database_name'");
+      return [pgBackends("pgprod-1", 20)];
+    });
+    const result = await collectInstanceMetrics(read, WINDOW);
+    expect(result.metricsByKey.get("postgresql|pgprod-1")?.connections?.latest).toBe(20);
+    expect(result.failedStreams).not.toContain("postgresql_backends");
+    const retrySql = (read as ReturnType<typeof vi.fn>).mock.calls
+      .filter((c) => c[0] === "postgresql_backends")
+      .map((c) => c[1] as string);
+    expect(retrySql).toHaveLength(2);
+    expect(retrySql[1]).not.toContain("postgresql_database_name");
+  });
+
+  it("marks the stream failed when the stripped retry fails too", async () => {
+    const read: DbmMetricStreamReader = vi.fn(async (stream) => {
+      if (stream === "postgresql_backends") throw new Error("permission denied");
+      return [];
+    });
+    const result = await collectInstanceMetrics(read, WINDOW);
+    expect(result.failedStreams).toContain("postgresql_backends");
+    // One retry, not a loop.
+    const calls = (read as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c) => c[0] === "postgresql_backends",
+    );
+    expect(calls).toHaveLength(2);
+  });
+
+  // ── schema-driven projection ─────────────────────────────────────────────
+  //
+  // The spec's column names are a claim about the collector, and the claim has
+  // been wrong before. When the caller supplies the stream's real fields the
+  // SQL is built from the intersection, so a renamed optional column costs the
+  // split — never a 400 — and a renamed load-bearing column costs the stream
+  // without wasting the request.
+
+  it("drops an optional column the schema does not carry, without a retry", async () => {
+    const read = readerFor({ postgresql_backends: [pgBackends("pgprod-1", 20)] });
+    const result = await collectInstanceMetrics(read, WINDOW, {
+      fieldsByStream: new Map([
+        ["postgresql_backends", new Set(["_timestamp", "value", "service_instance_id"])],
+      ]),
+    });
+    expect(result.metricsByKey.get("postgresql|pgprod-1")?.connections?.latest).toBe(20);
+    const calls = (read as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c) => c[0] === "postgresql_backends",
+    );
+    // First attempt already correct: no field the stream lacks, no retry.
+    expect(calls).toHaveLength(1);
+    expect(calls[0][1]).not.toContain("postgresql_database_name");
+  });
+
+  it("keeps the full projection when the schema carries every column", async () => {
+    const read = readerFor({});
+    await collectInstanceMetrics(read, WINDOW, {
+      fieldsByStream: new Map([
+        [
+          "postgresql_backends",
+          new Set(["_timestamp", "value", "service_instance_id", "postgresql_database_name"]),
+        ],
+      ]),
+    });
+    const calls = (read as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c) => c[0] === "postgresql_backends",
+    );
+    expect(calls[0][1]).toContain("postgresql_database_name");
+  });
+
+  it("marks a stream failed without querying when its identity column is gone", async () => {
+    const read = readerFor({});
+    const result = await collectInstanceMetrics(read, WINDOW, {
+      fieldsByStream: new Map([["postgresql_backends", new Set(["_timestamp", "value"])]]),
+    });
+    // Identity is load-bearing: without it the fold cannot key instances, so
+    // the request would only buy rows we must discard.
+    expect(result.failedStreams).toContain("postgresql_backends");
+    const calls = (read as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c) => c[0] === "postgresql_backends",
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  it("marks a stream failed without querying when its filter column is gone", async () => {
+    const read = readerFor({});
+    const result = await collectInstanceMetrics(read, WINDOW, {
+      fieldsByStream: new Map([
+        ["mysql_threads", new Set(["_timestamp", "value", "mysql_instance_endpoint"])],
+      ]),
+    });
+    // mysql.threads carries several kinds in one stream; unfiltered, the
+    // numbers would be real but mean the wrong thing.
+    expect(result.failedStreams).toContain("mysql_threads");
+    expect(
+      (read as ReturnType<typeof vi.fn>).mock.calls.filter((c) => c[0] === "mysql_threads"),
+    ).toHaveLength(0);
+  });
+
+  it("keeps the trust-then-retry path for a stream with no schema entry", async () => {
+    const read: DbmMetricStreamReader = vi.fn(async (stream, sql) => {
+      if (stream !== "postgresql_backends") return [];
+      if (sql.includes("postgresql_database_name")) throw new Error("unknown field");
+      return [pgBackends("pgprod-1", 20)];
+    });
+    // A schema map that simply lacks this stream (fetch failed for it).
+    const result = await collectInstanceMetrics(read, WINDOW, {
+      fieldsByStream: new Map([["mysql_threads", new Set(["kind"])]]),
+    });
+    expect(result.metricsByKey.get("postgresql|pgprod-1")?.connections?.latest).toBe(20);
   });
 });

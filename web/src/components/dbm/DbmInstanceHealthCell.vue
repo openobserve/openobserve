@@ -23,9 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     • A connection COUNT answers nothing. "412 connections" is fine on one
       instance and an outage on the next, so the cell leads with the RATIO and
       keeps the raw pair behind it. Where no limit arrived it shows the count
-      and says why there is no percentage — distinguishing an engine that
-      publishes none (every MySQL instance, permanently) from one whose limit
-      metric simply did not arrive, because those are different fixes.
+      and says why there is no percentage — distinguishing an engine whose
+      receiver publishes none (a MySQL instance without the setup card's
+      limits recipe) from one whose limit metric simply did not arrive,
+      because those are different fixes.
 
     • Every empty cell states a REASON. This column joins the address the
       client dialled to the host the collector scrapes, and behind a pooler
@@ -54,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="hasTrend"
           :points="trendPoints"
           shape="area"
-          :tone="tone === 'danger' ? 'danger' : 'default'"
+          :tone="tone"
           size="xs"
           :aria-label="t('dbm.instanceMetrics.trendLabel')"
           data-test="dbm-instance-health-trend"
@@ -88,17 +89,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip side="left" :content="noLimitHint" />
     </template>
 
-    <!-- Nothing to show, and always a reason why. An em dash on its own is the
-         reading that makes a user conclude the feature is broken. -->
+    <!-- Nothing to show, and always a reason why — in the TOOLTIP, not on the
+         row. A visible sentence under every dash would, on the common fleets
+         (a pooler, one engine with no receiver), turn the whole column into
+         one truncated sentence repeated per row: noise wearing the costume of
+         honesty. The dash keeps the per-row hover explanation, and the column
+         header's own hint carries the fresh-install story once. -->
     <template v-else>
-      <span class="text-text-muted font-mono text-xs">{{ raw("—") }}</span>
       <span
-        class="text-text-label text-3xs max-w-40 truncate"
+        class="text-text-muted font-mono text-xs"
         data-test="dbm-instance-health-reason"
+        :data-test-reason-label="absence.label"
+        >{{ raw("—") }}</span
       >
-        {{ absence.label }}
-      </span>
-      <OTooltip side="left" :content="absence.hint" />
+      <OTooltip side="left" :content="absenceTooltip" />
     </template>
 
     <!-- The rest of what the receiver sent. Each appears only when it says
@@ -146,8 +150,22 @@ const { t } = useI18nTyped();
  */
 const SATURATION_DANGER = 0.9;
 
-/** Only MySQL genuinely publishes no connection limit. */
+/**
+ * Engines whose RECEIVER publishes no connection limit. Kept for hint CHOICE
+ * only: a MySQL row with no limit gets the "install the limits recipe" hint
+ * (the setup card's sqlquery/mysql_limits fills `mysql_connection_max`), while
+ * a Postgres row with no limit gets "your limit metric did not arrive" — the
+ * receiver publishes one, so its absence is a delivery problem. A MySQL row
+ * WHOSE LIMIT ARRIVED never reaches either hint: it renders the measured
+ * ratio like any Postgres row.
+ */
 const ENGINES_WITHOUT_LIMIT = new Set(["mysql", "mariadb"]);
+
+/**
+ * Engines an OTel receiver recipe exists for — the set the metric catalog
+ * (`DBM_INSTANCE_METRICS`) reads. MariaDB rides the mysql receiver.
+ */
+const SUPPORTED_METRIC_ENGINES = new Set(["postgresql", "mysql", "mariadb"]);
 
 const tone = computed(() => {
   const ratio = props.metrics.saturation.ratio;
@@ -158,8 +176,10 @@ const ratioToneClass = computed(() =>
   tone.value === "danger" ? "text-status-error-text" : "text-text-heading",
 );
 
+// Gated on the same array `trendPoints` reads: the two must agree, or the
+// sparkline could mount over points that cannot draw a line.
 /** Two readings make a trend; one is a dot pretending to be a direction. */
-const hasTrend = computed(() => props.metrics.connectionSeries.length > 1);
+const hasTrend = computed(() => props.metrics.connectionPoints.length > 1);
 
 /**
  * The trend, with a break wherever the collector skipped a scrape. A line
@@ -192,9 +212,10 @@ const connectionsLabel = computed<I18nText>(() =>
 );
 
 /**
- * "This engine publishes no limit" is true of MySQL and false of Postgres, so
- * saying it on a Postgres row whose limit metric merely failed to arrive sends
- * the reader to fix something that is not broken.
+ * "The receiver publishes no limit — install the limits recipe" is true of a
+ * MySQL row and false of a Postgres one, so saying it on a Postgres row whose
+ * limit metric merely failed to arrive sends the reader to install something
+ * that is not missing.
  */
 const noLimitHint = computed<I18nText>(() =>
   ENGINES_WITHOUT_LIMIT.has(props.engine.toLowerCase())
@@ -223,10 +244,22 @@ const absence = computed<{ label: I18nText; hint: I18nText }>(() => {
       label: t("dbm.instanceMetrics.unmatched.loopback"),
       hint: t("dbm.instanceMetrics.unmatched.loopbackHint"),
     },
-    "no-receiver": {
-      label: t("dbm.instanceMetrics.unmatched.noReceiver"),
-      hint: t("dbm.instanceMetrics.unmatched.noReceiverHint"),
-    },
+    // "No metrics for this engine" said the same thing to a MySQL fleet
+    // missing its receiver (a config step away from data) and to Redis (no
+    // receiver recipe exists — nothing to add). One is an instruction, the
+    // other is a disclosure, and collapsing them sent Redis users hunting for
+    // a receiver they cannot install.
+    "no-receiver": SUPPORTED_METRIC_ENGINES.has(props.engine.toLowerCase())
+      ? {
+          label: t("dbm.instanceMetrics.unmatched.noReceiver", { engine: props.engine }),
+          hint: t("dbm.instanceMetrics.unmatched.noReceiverHint", { engine: props.engine }),
+        }
+      : {
+          label: t("dbm.instanceMetrics.unmatched.engineUnsupported", { engine: props.engine }),
+          hint: t("dbm.instanceMetrics.unmatched.engineUnsupportedHint", {
+            engine: props.engine,
+          }),
+        },
     unreadable: {
       label: t("dbm.instanceMetrics.unmatched.unreadable"),
       hint: t("dbm.instanceMetrics.unmatched.unreadableHint"),
@@ -251,6 +284,16 @@ const absence = computed<{ label: I18nText; hint: I18nText }>(() => {
     hint: t("dbm.instanceMetrics.noReadingHint"),
   };
 });
+
+// One tooltip string: the cause, then what to do about it. Both halves are
+// already-translated `I18nText`; the join widens to `string`, so `raw()` marks
+// the composition — the em dash is punctuation, not untranslated copy.
+const absenceTooltip = computed<I18nText>(() =>
+  raw(`${absence.value.label} — ${absence.value.hint}`),
+);
+
+/** Below this, the database is going to disk for most of its reads. */
+const CACHE_HIT_POOR = 0.9;
 
 /**
  * Cache hit, replication lag and deadlocks. Each is read from its own stream
@@ -290,7 +333,4 @@ const secondary = computed(() => {
   }
   return items;
 });
-
-/** Below this, the database is going to disk for most of its reads. */
-const CACHE_HIT_POOR = 0.9;
 </script>

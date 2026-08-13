@@ -297,7 +297,7 @@ export const buildStateSummary = (
  * clock-skewed future start never renders as a negative age.
  */
 export const transactionAgeSeconds = (
-  session: Pick<Partial<ActivitySession>, "xact_start" | "query_start">,
+  session: Pick<Partial<ActivitySession>, "xact_start">,
   now: number = Date.now(),
 ): number | null => {
   const started = normaliseDbTimestamp(session?.xact_start);
@@ -306,16 +306,15 @@ export const transactionAgeSeconds = (
 };
 
 /**
- * Above this, an open transaction is worth pointing at.
+ * Above `IDLE_BLOCKER_SECONDS`, an open transaction is worth pointing at.
  *
  * `idle in transaction` for 5ms is ordinary; for twenty minutes it is holding
  * back the xmin horizon and blocking autovacuum. Marking every open transaction
  * would put a warning on essentially every active row and train the reader to
- * ignore the one that matters. Same floor the blocking page uses for an idle
- * lock holder, so the two pages agree on what "long enough to care" means.
+ * ignore the one that matters. The floor is imported from blocking.ts — the
+ * same one the blocking page uses for an idle lock holder — so the two pages
+ * agree on what "long enough to care" means.
  */
-export { IDLE_BLOCKER_SECONDS };
-
 export const isNotableTransactionAge = (ageSeconds: number | null | undefined): boolean =>
   ageSeconds != null && Number.isFinite(ageSeconds) && ageSeconds >= IDLE_BLOCKER_SECONDS;
 
@@ -387,6 +386,10 @@ export const buildActivityRows = (sessions: ActivitySession[]): ActivityRow[] =>
  *
  * `0` is a measurement ("under a millisecond"), not a missing value, so only
  * a genuinely absent figure becomes an em dash.
+ *
+ * Coarser than format.ts's two-decimal `formatNs` convention on purpose:
+ * these are wall-clock session ages read at a glance ("40.0s", "1.5m"), not
+ * latencies compared digit-for-digit across tabs.
  */
 export const formatDurationMs = (ms: number | null | undefined): string => {
   if (typeof ms !== "number" || !Number.isFinite(ms)) return "—";
@@ -440,11 +443,9 @@ export const activityDisclosureLines = (
     ? t("dbm.activity.disclosure.sampled", { interval: disclosure.intervalSeconds ?? 0 })
     : t("dbm.activity.disclosure.sampledUnknown"),
   t("dbm.activity.disclosure.filtered"),
-  // No grain caveat here any more: the breakdowns used to be COUNT(*) over
-  // rows, and since every poll writes one row per session those totals were
-  // session-SAMPLES, which had to be disclosed. They are now
-  // COUNT(DISTINCT session pid), so the tiles really do count sessions and the
-  // old warning would itself be the misleading statement.
+  // No grain caveat: the breakdowns are COUNT(DISTINCT session pid) per state,
+  // so the tiles really do count sessions and a warning would itself be the
+  // misleading statement.
 ];
 
 /**
@@ -455,15 +456,15 @@ export const activityCountClaim = (count: number, truncated?: boolean): DbmCount
   countClaim(count, truncated);
 
 /**
- * Total SESSION SAMPLES in the aggregate — NOT a distinct-session count.
+ * Total DISTINCT SESSIONS across the state breakdown.
  *
- * The backend computes the breakdowns as `COUNT(*) … GROUP BY` over rows, and
- * activity ingest writes one row per session per poll. A 200-session instance
- * polled every 10s for an hour therefore aggregates to ~72,000, not 200.
- *
- * Naming and copy both say "samples" for that reason: calling this a session
- * count would render a ~360x overstatement as the page's authoritative figure.
- * A true distinct-session count needs `COUNT(DISTINCT session_pid)` server-side.
+ * The backend computes each bucket as `COUNT(DISTINCT session pid)` per state
+ * (api.rs's activity aggregate SQL, pinned by its own test), never `COUNT(*)`
+ * over the one-row-per-session-per-poll observations the stream stores — so
+ * the tiles genuinely count sessions, not polls. One caveat survives the sum:
+ * a pid observed in two states inside the window counts once per state, so
+ * this total is "sessions per state, summed", not a window-wide distinct
+ * count. The name is kept for its cross-directory consumers.
  */
 export const activitySampleTotal = (
   buckets: ActivityStateBucket[] | null | undefined,
@@ -492,9 +493,8 @@ export interface ActivityWaitRemainder {
  * explaining the gap. The tail is collapsed into one accounted-for remainder
  * instead of vanishing.
  */
-// Generic over the row so a caller that has already attached its rendered
-// label gets it back. Typed to the bare `ActivityWaitRow` the slice silently
-// erased that label, and the template's `bucket.label` failed to typecheck.
+// Generic so a caller that attached a rendered label gets it back from the
+// slice.
 export const topWaitRows = <T extends ActivityWaitRow>(
   rows: T[],
   limit: number,
@@ -551,7 +551,6 @@ export type ActivityEmptyCause = "healthy" | "not-collecting";
  */
 export const activityEmptyCause = (input: {
   notCollecting?: boolean | null;
-  logLinesSeen?: number | null;
   hasBreakdown?: boolean;
 }): ActivityEmptyCause => {
   // The server's explicit verdict wins outright.
@@ -580,9 +579,9 @@ export interface ActivityQueryDetailTarget {
  *
  *  • A session with NO fingerprint does not navigate. An idle backend running
  *    no statement is the ordinary case — the wire marks the field optional —
- *    and a detail page keyed on nothing is the broken link that the fleet
- *    page's trafficless early-return exists to prevent. Returning null lets
- *    the caller decline rather than push a dead route.
+ *    and a detail page keyed on NOTHING has no read that could answer, from
+ *    either vantage. Returning null lets the caller decline rather than push
+ *    a dead route.
  *
  *  • No `stream`. A server-vantage sample knows its database, not which trace
  *    stream the client spans landed in, and `/query/endpoints` requires stream

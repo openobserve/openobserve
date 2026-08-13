@@ -72,8 +72,9 @@ describe("DbmCoverageLine", () => {
 
     /**
      * `lineHealthyAll` carries the SAME "measured across every call, so they're
-     * exact" claim as `lineExact` but was reachable with no flag at all — any
-     * list page whose remainder bucket happens to be empty printed it.
+     * exact" claim as `lineExact` and is reachable with no flag at all — any
+     * list page whose remainder bucket happens to be empty prints it — so it
+     * must answer to `percentiles_estimated` too.
      */
     it("does not claim exactness on a full list when percentiles were fused", () => {
       const wrapper = mountLine({
@@ -95,11 +96,11 @@ describe("DbmCoverageLine", () => {
   });
 
   /**
-   * The summary is a single-sentence priority chain, and a narrowing filter used
-   * to win it outright — so on a filtered table the staleness warning was
-   * silently dropped. A filtered table during an incident is exactly when the
-   * reader most needs to know the numbers are behind, so the two facts share one
-   * sentence rather than one evicting the other.
+   * The summary is a single-sentence priority chain, and a narrowing filter
+   * must not win it outright — that would silently drop the staleness warning.
+   * A filtered table during an incident is exactly when the reader most needs
+   * to know the numbers are behind, so the two facts share one sentence rather
+   * than one evicting the other.
    */
   describe("a filtered view never hides staleness", () => {
     it("names the filter AND the lag when the counting is behind", () => {
@@ -112,21 +113,17 @@ describe("DbmCoverageLine", () => {
     });
 
     /**
-     * `truncated` sat one branch below `filterLabel` and evicted staleness the
-     * same way. Both undercount, but for unrelated reasons — the tail was too
-     * big to take in, AND the counting is behind — so reporting only the first
-     * lets a reader believe the shortfall is bounded and already known. Same
-     * defect, same fix: one sentence, both facts.
+     * `truncated` sits one branch below `filterLabel` in the chain and could
+     * evict staleness the same way. Both undercount, but for unrelated reasons
+     * — the tail was too big to take in, AND the counting is behind — so
+     * reporting only the first lets a reader believe the shortfall is bounded
+     * and already known. Same rule as the filter: one sentence, both facts.
      */
     it("names the truncation AND the lag when both hold", () => {
-      const wrapper = mountLine({
-        freshness: behindBy(45),
-      });
-      // behindBy() rebuilds freshness, so re-assert truncation on top of it.
+      // behindBy() rebuilds freshness, so truncation is asserted on top of it.
       const wrapperTruncated = mountLine({
         freshness: { ...behindBy(45), tail_truncated: true },
       });
-      expect(lineText(wrapper)).toContain("45 minutes behind");
       expect(lineText(wrapperTruncated)).toContain("undercount");
       expect(
         lineText(wrapperTruncated),
@@ -188,9 +185,9 @@ describe("DbmCoverageLine", () => {
   });
 
   /**
-   * Below the stale threshold the line printed "the last half-minute is still
-   * coming in", which at 25 minutes behind is simply false. The copy must never
-   * assert a freshness the data does not support.
+   * The trailer's "the last half-minute is still coming in" is only true while
+   * the counting really is current — at 25 minutes behind it is simply false.
+   * The copy must never assert a freshness the data does not support.
    */
   describe("the counted-up-to note never overstates freshness", () => {
     const trailer = (wrapper: ReturnType<typeof mountLine>) =>

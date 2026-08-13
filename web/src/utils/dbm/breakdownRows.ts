@@ -27,12 +27,10 @@
  *
  *  • A column a child has no value for is `null`, never `0` — a zero in a
  *    latency column reads as "instant", which is a lie. The cells render the
- *    muted em-dash the app already uses. This now applies only where a value
+ *    muted em-dash the app already uses. That applies only where a value
  *    genuinely does not exist (the placeholder row, and `Used by` on a service
- *    row, which IS the caller): p50/p95/p99 all come through, because every
- *    `query_stats` row reports them. An earlier version blanked p50 and p99 on
- *    the mistaken belief that the grain omits them, leaving two columns empty
- *    beside a populated p95.
+ *    row, which IS the caller): p50/p95/p99 all come through — see
+ *    breakdown.ts, every `query_stats` row carries all three.
  *
  *  • The schema tier disappears when no row named a schema. That is
  *    `buildDatabaseBreakdown`'s `collapsed`, honoured as-is: a lone "—" schema
@@ -85,8 +83,8 @@ export interface DbmBreakdownRow {
   share: number;
   /**
    * The WORST p50/p95/p99 among this node's rows — never a pooled percentile,
-   * and `null` only when no row reported one. These were previously blanked on
-   * the belief that the query grain omits p50/p99; it does not.
+   * and `null` only when no row reported one (see breakdown.ts: every
+   * `query_stats` row carries all three).
    */
   p50_ns: number | null;
   p95_ns: number | null;

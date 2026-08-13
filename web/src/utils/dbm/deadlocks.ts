@@ -37,11 +37,9 @@ import { oneLine } from "./format";
  * decoder: it rejects an event with no sides, because a deadlock with no
  * participants is not something the UI can say anything true about.
  *
- * The decoding this function used to do (parsing the JSON-string participants
- * column, re-deriving `objects` with a regex, merging MySQL sides by timestamp)
- * moved into `api.rs`. Client-side stitching could only ever see the rows that
- * fitted in the response limit, so it split deadlocks at the page boundary; the
- * server sees the whole window.
+ * Assembly belongs server-side (api.rs) because the server sees the whole
+ * window: client-side stitching can only ever see the rows that fit in the
+ * response limit, so it splits deadlocks at the page boundary.
  */
 export const parseDeadlockEvent = (hit: DeadlockEvent): DeadlockEvent | null => {
   if (!Array.isArray(hit.participants) || hit.participants.length === 0) return null;

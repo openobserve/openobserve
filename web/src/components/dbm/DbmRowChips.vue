@@ -50,8 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 
@@ -64,7 +62,7 @@ export interface DbmRowChip {
   rule?: I18nText;
 }
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     /** Chips derived from insights that named exactly this row. */
     chips?: DbmRowChip[];
@@ -78,6 +76,4 @@ const TONES: Record<DbmRowChip["tone"], string> = {
   info: "bg-badge-blue-soft-bg text-badge-blue-soft-text",
   new: "bg-badge-primary-soft-bg text-badge-primary-soft-text",
 };
-
-const chips = computed(() => props.chips);
 </script>

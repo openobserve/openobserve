@@ -39,8 +39,11 @@ const read = (file: string) => readFileSync(join(here, file), "utf8");
 const PAGES = [
   "QueriesPage.vue",
   "DatabasesPage.vue",
+  "SamplesPage.vue",
+  "ActivityPage.vue",
   "DeadlocksPage.vue",
   "BlockedQueriesPage.vue",
+  "TableHealthPage.vue",
   "QueryDetailPage.vue",
 ];
 
@@ -91,47 +94,11 @@ describe("DBM pages guard against out-of-order responses", () => {
    * samples under B-labelled headline stats.
    *
    * Asserts the PROPERTY — every load in the handler shares one token — rather
-   * than a fixed list of load names. The earlier version pinned exactly three
-   * calls and broke the moment a fourth (plans) was added, even though the new
-   * call was correctly guarded. A test that fails on correct code trains people
-   * to edit the test, which is how the next genuinely unguarded load gets
-   * waved through.
+   * than a fixed list of load names. A version pinned to an exact call count
+   * breaks the moment a correctly guarded load is added, and a test that fails
+   * on correct code trains people to edit the test — which is how the next
+   * genuinely unguarded load gets waved through.
    */
-  /**
-   * **The tab-badge fetches are part of the load, and were outside the guard.**
-   *
-   * Every page fills in its sibling tabs' badges from a second function
-   * (`loadQueryCount` / `loadLockCounts`) that `onMounted` and the window
-   * watchers call alongside `load()`. That function claimed no token, so its
-   * five responses wrote their counts back unconditionally: change the window
-   * while they are in flight and the badges paint the OLD window's numbers
-   * beside the new window's table, with the spinner already cleared by the
-   * guarded load. That is precisely the failure `useDbmRequestSeq` exists to
-   * prevent — one page, one unit of work.
-   *
-   * `current()`, not `begin()`: these fetches JOIN the load that started them,
-   * exactly as `loadBreakdown` does above. Claiming the page here would
-   * invalidate the parent load that is still running.
-   */
-  const COUNT_LOADERS = ["loadQueryCount", "loadLockCounts", "loadCounts"];
-
-  it.each(PAGES)("%s guards the tab-badge fetches too", (page) => {
-    const source = read(page);
-    const name = COUNT_LOADERS.find((n) => source.includes(`const ${n} = async`));
-    if (!name) return; // the page paints no sibling badges
-    const body = source.split(`const ${name} = async`)[1]?.split("\n};")[0] ?? "";
-    expect(body, `${name} must have a body`).not.toBe("");
-
-    expect(
-      body,
-      `${name} writes badge counts without a token, so a superseded response ` +
-        `repaints the previous window's badges`,
-    ).toMatch(/requestSeq\.(current|begin)\(\)/);
-    expect(body, `${name} must discard a superseded response`).toContain(
-      "requestSeq.isStale(token)",
-    );
-  });
-
   it("QueryDetailPage voids every superseded stream-pick load together", () => {
     const source = read("QueryDetailPage.vue");
     const handler = source.split("const onStreamPick")[1]?.split("\nconst ")[0] ?? "";

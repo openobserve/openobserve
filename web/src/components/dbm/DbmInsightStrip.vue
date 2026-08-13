@@ -198,8 +198,8 @@ const sentenceOf = (insight: DbmInsight): I18nText => {
         after: formatNs(e.current),
       });
     // I2's evidence is a SHARE, not a rank move — it never sets fromRank/toRank
-    // (only I8 does), so rendering it as "moved #x → #y" printed a rank the rule
-    // never measured and made this card indistinguishable from rank-churn.
+    // (only I8 does). Rendering it as "moved #x → #y" would print a rank the
+    // rule never measured and make this card indistinguishable from rank-churn.
     case "new-expensive":
       return t("dbm.insights.new-expensive.body", {
         share: formatPercent(e.share, 0),
@@ -217,7 +217,8 @@ const sentenceOf = (insight: DbmInsight): I18nText => {
     case "rank-churn":
       return t("dbm.insights.rank-churn.body", {
         from: e.fromRank ?? t("dbm.insights.rank-churn.unranked"),
-        // Ranks are 1-based; `?? 0` printed "#0", which is not a rank.
+        // Ranks are 1-based; a `?? 0` fallback would print "#0", which is not
+        // a rank.
         to: e.toRank ?? 1,
       });
     case "all-failing":

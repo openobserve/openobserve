@@ -51,14 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #header-tabs>
-      <DbmSectionTabs
-        :database-count="databaseCount"
-        :query-count="queryCount"
-        :activity-count="activityCount"
-        :deadlock-count="deadlockCount"
-        :blocked-count="blockedCount"
-        :table-health-count="tableHealthCount"
-      />
+      <!-- The sibling badges come from the shell's one shared fan-out; this
+           page's own is counted from the relations it already loaded. -->
+      <DbmSectionTabs v-bind="tabCounts" />
     </template>
 
     <template #actions>
@@ -79,8 +74,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            arithmetic that fired it. The rule line is one hover away rather
            than in the primary reading path: a recommendation you cannot audit
            is one readers learn to scroll past. -->
+      <!-- Gated on `!loading`, like every other verdict on this page: the
+           inner branches always have something to say (a list, or one of the
+           two empty states), and "All clear" on first paint would assert a
+           verdict before any data has answered. -->
       <section
-        v-if="collapsedRecommendations.length || recommendationsEmpty"
+        v-if="!loading"
         class="border-border-subtle bg-surface-base px-page-edge flex flex-col gap-1.5 border-b py-2"
         data-test="dbm-recommendations"
       >
@@ -308,12 +307,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="search = ''"
           />
           <!-- The engine has no such recipe. Telling this reader to switch on
-               collection would send them to fix a non-problem. -->
+               collection would send them to fix a non-problem — which is why
+               the checklist here is EMPTY: the "to start collecting" steps are
+               Postgres steps, and offering them to a MySQL user is the exact
+               wrong answer this state exists to avoid. -->
           <DbmLockEmptyState
             v-else-if="!loading && emptyCause === 'engine-unsupported'"
             :healthy="false"
             :title="t('dbm.tableHealth.engineUnsupportedTitle')"
             :description="t('dbm.tableHealth.engineUnsupportedDescription')"
+            :checklist-title="raw('')"
+            :checks="[]"
             data-test="dbm-table-health-engine-unsupported"
           />
           <!-- The engine supports it and nothing arrived: actionable. -->
@@ -359,17 +363,18 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService from "@/services/db_monitoring";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
-import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
+import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
+import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
-import { activitySampleTotal } from "@/utils/dbm/activity";
 import {
   scanCountDisclosure,
   tableHealthColumns,
   tableHealthEmptyCause,
   tableHealthRows,
+  tableSizeLabel,
   tupleCountDisclosure,
   type TableHealthCoverage,
   type TableHealthEmptyCause,
@@ -384,11 +389,9 @@ import {
   type DbmRecommendationTone,
   type IndexHealthRow,
 } from "@/utils/dbm/recommendations";
-import { countClaim, formatCount, type DbmCountClaim } from "@/utils/dbm/format";
+import { formatCount } from "@/utils/dbm/format";
 import { formatDurationMs } from "@/utils/dbm/activity";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { ActivitySession, BlockingSample } from "@/services/db_monitoring";
-import { tableSizeLabel } from "@/utils/dbm/tableHealth";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -400,10 +403,10 @@ const { range, current, refresh, setRange } = useDbmScope(route.query);
 // the reader made the one that paints.
 const requestSeq = useDbmRequestSeq();
 
-// The sibling-tab badges are the same numbers on every tab, so they are
-// fetched once per window and shared across the six routes rather than
-// re-fetched on each remount. See useDbmCountCache.
-const countCache = useDbmCountCache("tablehealth");
+// The sibling-tab badges are the same numbers on every tab, so DbmShell fetches
+// them ONCE per window for every route and this page reads the snapshot.
+// See useDbmTabCounts.
+const tabCountsContext = useDbmTabCountsContext();
 
 const org = computed(() => store.state?.selectedOrganization?.identifier ?? "");
 
@@ -415,13 +418,16 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const search = ref("");
 
-// Sibling tab badges. Each is `null` until its own request answers — never
-// `0`, which would claim a measured absence we have not measured.
-const databaseCount = ref<number | null>(null);
-const queryCount = ref<number | null>(null);
-const activityCount = ref<number | null>(null);
-const deadlockCount = ref<DbmCountClaim | null>(null);
-const blockedCount = ref<DbmCountClaim | null>(null);
+/**
+ * The sibling badges from the shell's shared fan-out, plus THIS tab's own
+ * count in place of the shared one. `tableHealthCount` is defined below, off
+ * the relations this page actually loaded.
+ */
+const tabCounts = computed(() =>
+  tabCountProps(
+    withOwnCount(tabCountsContext.counts.value, "tableHealthCount", tableHealthCount.value),
+  ),
+);
 
 const allRows = computed(() => tableHealthRows(hits.value));
 
@@ -459,10 +465,17 @@ const disclosures = computed(() =>
 
 const countLine = computed(() => t("dbm.tableHealth.countLine", { count: rows.value.length }));
 
+/**
+ * The "to start collecting" steps, in the checklist shape DbmLockEmptyState
+ * renders (`title` is the visible line; a shapeless `{ label }` here would
+ * paint three blank rows). All three are `note`: they are instructions, not
+ * observations, and a ✓ or ✕ would claim a check this page never ran. Each key
+ * carries the whole sentence, so the detail slot stays empty.
+ */
 const notCollectingChecks = computed<DbmLockCheck[]>(() => [
-  { label: t("dbm.tableHealth.checkRecipe") },
-  { label: t("dbm.tableHealth.checkGrant") },
-  { label: t("dbm.tableHealth.checkRange") },
+  { id: "recipe", status: "note", title: t("dbm.tableHealth.checkRecipe"), detail: raw("") },
+  { id: "grant", status: "note", title: t("dbm.tableHealth.checkGrant"), detail: raw("") },
+  { id: "range", status: "note", title: t("dbm.tableHealth.checkRange"), detail: raw("") },
 ]);
 
 /**
@@ -505,8 +518,20 @@ const sizeColumnMax = computed(() => {
 /** The three inputs the rules predicate on, beyond the table feed itself. */
 const indexHits = ref<IndexHealthRow[]>([]);
 const indexCountersAreCumulative = ref(false);
-const sessions = ref<ActivitySession[]>([]);
-const blockingSamples = ref<BlockingSample[]>([]);
+/**
+ * The two rule inputs that are PROJECTIONS of the shared fan-out's own
+ * responses — the long-running-query rule reads the activity sample, the
+ * high-impact-blocker rule the blocking sample. Read from the snapshot rather
+ * than refetched: a second request over the same window could disagree with
+ * the badge sitting beside it.
+ *
+ * Always arrays, never `undefined`. This is the exact field that once arrived
+ * unset from a cross-page cache hit and threw `samples is not iterable` out of
+ * `chainsFromSamples`; the snapshot's uniform shape is what makes that
+ * unrepresentable now. See useDbmTabCounts.
+ */
+const sessions = computed(() => tabCountsContext.counts.value.sessions);
+const blockingSamples = computed(() => tabCountsContext.counts.value.blockingSamples);
 
 const RECOMMENDATION_TONES: Record<DbmRecommendationTone, { chip: string; icon: IconName }> = {
   error: { chip: "bg-badge-error-soft-bg text-badge-error-soft-text", icon: "error" },
@@ -523,8 +548,15 @@ const RECOMMENDATION_TONES: Record<DbmRecommendationTone, { chip: string; icon: 
 const recommendations = computed<DbmRecommendation[]>(() =>
   buildRecommendations({
     indexes: indexHits.value,
-    sessions: sessions.value,
-    blocking: blockingSamples.value,
+    // Copied out of the snapshot: it exposes readonly arrays (no reader may
+    // mutate the shared state), and the rule inputs are mutable types. The
+    // session copy is per-row because `blocking_pids` is itself a readonly
+    // array in the snapshot.
+    sessions: sessions.value.map((row) => ({
+      ...row,
+      blocking_pids: row.blocking_pids ? [...row.blocking_pids] : row.blocking_pids,
+    })),
+    blocking: [...blockingSamples.value],
     // The high-row-count rule reads ONE statement's server-side counters, which
     // this page does not fetch — it is surfaced on Query detail, where that
     // request already happens. Passing null here states "not evaluated" rather
@@ -553,8 +585,12 @@ const recommendationsEmpty = computed(() =>
   recommendationsEmptyCause(recommendations.value, hits.value[0]?.engine ?? ""),
 );
 
-/** The headline sentence, with the numbers the rule measured. */
-const recommendationBody = (rec: DbmRecommendation) => {
+/**
+ * The headline sentence, with the numbers the rule measured. The switch is
+ * exhaustive over the closed `DbmRecommendationId` union — no default, so a
+ * new rule id fails to compile here instead of rendering silently blank.
+ */
+const recommendationBody = (rec: DbmRecommendation): I18nText => {
   const e = rec.evidence;
   switch (rec.id) {
     case "unused-index": {
@@ -580,8 +616,6 @@ const recommendationBody = (rec: DbmRecommendation) => {
         rows: formatCount(e.rowsPerCall),
         calls: formatCount(e.calls),
       });
-    default:
-      return raw("");
   }
 };
 
@@ -599,9 +633,13 @@ const load = async () => {
   refresh();
 
   try {
+    // ONE request for both sections — the index search runs concurrently
+    // with the table search server-side. A separate endpoint would cost a
+    // full extra round trip for the same stream.
     const { data } = await dbMonitoringService.getTableHealth(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
+      includeIndexes: true,
     });
 
     if (requestSeq.isStale(token)) return;
@@ -611,24 +649,13 @@ const load = async () => {
     countersAreCumulative.value = Boolean(data.counters_are_cumulative);
     tuplesAreEstimated.value = Boolean(data.tuples_are_estimated);
 
-    // Index health feeds the unused-index rule. Fetched separately and
-    // tolerated separately: a build without the endpoint still renders the
-    // table and the rules that do not depend on it.
-    try {
-      const index = await dbMonitoringService.getIndexHealth(org.value, {
-        startTime: current.value.startTime,
-        endTime: current.value.endTime,
-      });
-      if (requestSeq.isStale(token)) return;
-      indexHits.value = index.data.hits ?? [];
-      indexCountersAreCumulative.value = Boolean(index.data.counters_are_cumulative);
-    } catch {
-      if (requestSeq.isStale(token)) return;
-      indexHits.value = [];
-      // No response, no claim: the disclosure must not persist from a previous
-      // window and label rows this request never received.
-      indexCountersAreCumulative.value = false;
-    }
+    // Index health feeds the unused-index rule, and still degrades
+    // independently: `index_read_failed` is the server saying the index search
+    // failed while the tables succeeded, so the rules that need no index data
+    // keep rendering and no disclosure is claimed for rows never received.
+    indexHits.value = data.index_read_failed ? [] : (data.index_hits ?? []);
+    indexCountersAreCumulative.value =
+      !data.index_read_failed && Boolean(data.index_counters_are_cumulative);
   } catch (err: unknown) {
     if (requestSeq.isStale(token)) return;
     hits.value = [];
@@ -654,112 +681,27 @@ const load = async () => {
   }
 };
 
-/**
- * The sibling tab badges. Independent of each other and of the main read, so
- * one failing endpoint leaves the others populated. Every catch sets `null`,
- * never `0` — a blank badge reads as "unknown", a zero as "nothing there".
- */
-const loadContext = async (token: number = requestSeq.current(), force = false) => {
-  if (!org.value) return;
-  const window = { startTime: current.value.startTime, endTime: current.value.endTime };
-
-  // Through the SHARED cache, keyed on the range: these five badges are the
-  // same five numbers on every DBM tab, and the six tabs are separate routes,
-  // so without this each switch re-fetches all of them.
-  const badges = await badgesFrom(
-    countCache.read(
-      org.value,
-      range.value,
-      async () => {
-        // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
-        // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE
-        // badge instead of abandoning the rest.
-        const [databases, queries, activity, deadlocks, blocking] = await Promise.allSettled([
-          dbMonitoringService.getDatabases(org.value, window),
-          dbMonitoringService.getQueries(org.value, { ...window, limit: 1 }),
-          dbMonitoringService.getActivity(org.value, window),
-          dbMonitoringService.getDeadlocks(org.value, window),
-          dbMonitoringService.getBlocking(org.value, window),
-        ]);
-        // A blank badge is the honest rendering when we could not count. The
-        // claim objects are built HERE, inside the cached value, so the
-        // server's `truncated` survives a hit and the badge still shows `65+`.
-        const value = {
-          databaseCount:
-            databases.status === "fulfilled"
-              ? (databases.value.data.total ?? databases.value.data.hits?.length ?? 0)
-              : null,
-          queryCount:
-            queries.status === "fulfilled"
-              ? (queries.value.data.total ?? queries.value.data.hits?.length ?? 0)
-              : null,
-          activityCount:
-            activity.status === "fulfilled" ? activitySampleTotal(activity.value.data) : null,
-          // Reused by the long-running-query rule rather than fetched again: a
-          // second request over the same window could disagree with the badge.
-          sessions: activity.status === "fulfilled" ? (activity.value.data.hits ?? []) : [],
-          deadlockCount:
-            deadlocks.status === "fulfilled"
-              ? countClaim(
-                  deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
-                  deadlocks.value.data.truncated,
-                )
-              : null,
-          blockedCount:
-            blocking.status === "fulfilled"
-              ? countClaim(
-                  blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
-                  blocking.value.data.truncated,
-                )
-              : null,
-          // Reused by the high-impact-blocker rule, as activity is above.
-          blockingSamples: blocking.status === "fulfilled" ? (blocking.value.data.hits ?? []) : [],
-        };
-        // `allSettled` never rejects, so a fan-out in which a badge failed
-        // would otherwise be CACHED — remembering "we could not count" as the
-        // answer for the whole window. Throwing keeps it out of the cache; the
-        // partial result still reaches the badges below.
-        if (
-          [databases, queries, activity, deadlocks, blocking].some((r) => r.status === "rejected")
-        ) {
-          throw new DbmPartialCounts(value);
-        }
-        return value;
-      },
-      { force },
-    ),
-  );
-
-  if (requestSeq.isStale(token) || !badges) return;
-
-  databaseCount.value = badges.databaseCount;
-  queryCount.value = badges.queryCount;
-  activityCount.value = badges.activityCount;
-  sessions.value = badges.sessions;
-  deadlockCount.value = badges.deadlockCount;
-  blockedCount.value = badges.blockedCount;
-  blockingSamples.value = badges.blockingSamples;
-};
-
-/**
- * The refresh button. A named handler rather than `@click="load"`: that passes
- * the click EVENT as the first argument, which would arrive as a truthy
- * `force` and quietly make every refresh bypass the cache.
- */
+// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
+// badge cache alongside the page's own load — the URL does not change on a
+// refresh, so the shell cannot see one on its own.
 const onRefresh = () => {
   void load();
-  void loadContext(requestSeq.current(), true);
+  tabCountsContext.refresh({ force: true });
 };
 
 const onDateChange = (change: DbmDateChange) => {
   setRange(change);
+  // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
+  // mount replay would otherwise double every request. See
+  // `DbmDateChange.userChangedValue`.
+  if (change?.userChangedValue === false) return;
   load();
-  loadContext();
 };
 
 onMounted(() => {
+  // Only this page's OWN read. The badges are DbmShell's, fetched once for
+  // every tab — a call here would put the fan-out back on every mount.
   load();
-  loadContext();
 });
 
 // Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole

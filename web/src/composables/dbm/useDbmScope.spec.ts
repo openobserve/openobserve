@@ -153,12 +153,11 @@ describe("useDbmScope", () => {
 });
 
 /**
- * W5/B12. The comparison window used to be welded to the previous ADJACENT one,
- * which made "did this get slower since the deploy?" unanswerable: setting the
- * picker to 7 days silently compared against the 7 days before that.
- *
- * The baseline is now selectable. `previous` stays the default, so today's
- * behaviour is unchanged unless the reader asks for something else.
+ * The comparison baseline is selectable. Welded to the previous ADJACENT
+ * window, "did this get slower since the deploy?" would be unanswerable —
+ * setting the picker to 7 days would silently compare against the 7 days
+ * before that. `previous` remains the default, so nothing changes unless the
+ * reader asks for a different baseline.
  */
 describe("useDbmScope baseline selection", () => {
   const HOUR_US = 60 * 60_000_000;

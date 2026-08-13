@@ -50,6 +50,9 @@
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { useI18nTyped, I18nText } from "@/types/i18n";
 import { formatCount } from "@/utils/dbm/format";
+// Type-only, so the recommendations → services → tableHealth import chain
+// cannot become a runtime cycle.
+import type { IndexHealthRow } from "@/utils/dbm/recommendations";
 
 type Translate = ReturnType<typeof useI18nTyped>["t"];
 
@@ -99,6 +102,22 @@ export interface TableHealthResponse {
   /** The API's own statement that the tuple counts are estimates. */
   tuples_are_estimated: boolean;
   engine_coverage: TableHealthCoverage;
+  // ── the index section, present only when `include_indexes` was asked ──────
+  // One response carries both sections so the page issues one round trip —
+  // both are searches over the same stream. All optional, because the badge
+  // fan-out asks for tables only.
+  index_hits?: IndexHealthRow[];
+  index_total?: number;
+  /** The index counters' own lifetime-totals disclosure. */
+  index_counters_are_cumulative?: boolean;
+  index_engine_coverage?: TableHealthCoverage;
+  /**
+   * The index search failed while the table search succeeded. Stated, not
+   * implied by emptiness: an empty index list is the honest fresh-install
+   * answer, and "we could not read" must not wear that costume — the
+   * unused-index rule stays silent instead of declaring every index healthy.
+   */
+  index_read_failed?: boolean;
 }
 
 /** A row prepared for the table, with the derived fields the template needs. */

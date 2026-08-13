@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The six DBM list pages paginate, and a capped page says so.
+ * The DBM list pages paginate, and a capped page says so.
  *
  * Every one of them shipped `pagination="none"`, which is defensible only while
  * the row count is small: with a 500-row activity sample the reader gets one
@@ -22,8 +22,8 @@
  * one-prop change, so the regression worth pinning is not that the prop flipped
  * — it is the HONESTY consequence of flipping it.
  *
- * Three endpoints (`/activity`, `/deadlocks`, `/blocking`) cap their reads and
- * disclose it with `truncated`. `OTablePagination` prints
+ * The capped endpoints (`/activity`, `/deadlocks`, `/blocking`, `/samples`)
+ * cap their reads and disclose it with `truncated`. `OTablePagination` prints
  * `Showing 1 - 25 of {totalCount}`, and on a capped read that sentence is a lie:
  * the server returned 100 because it stopped at 100, not because there are 100.
  * The library already has the answer — `totalCountExact: false` appends the same
@@ -32,10 +32,7 @@
  * spec is: a page with a cap must bind that prop to its cap flag, and a page
  * without one must not fake a cap it never has.
  *
- * Read off the source rather than by mounting, for the reason
- * dbmRequestGuard.spec.ts gives: these views need a router, a store and a dozen
- * O2 children, and a harness that heavy fails for reasons unrelated to the
- * wiring and gets deleted the first time it does.
+ * Read off the source, for the reason dbmRequestGuard.spec.ts gives.
  */
 
 import { readFileSync } from "node:fs";
@@ -48,7 +45,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (file: string) => readFileSync(join(here, file), "utf8");
 
 /**
- * The six list pages, and the `data-test` of the OTable each one owns.
+ * The list pages, and the `data-test` of the OTable each one owns.
  *
  * QueryDetailPage is absent deliberately: its two tables already paginate and
  * were never opted out, so pinning them here would pin a change nobody made.
@@ -59,6 +56,7 @@ const PAGES: [string, string][] = [
   ["DatabasesPage.vue", "dbm-databases-table"],
   ["DeadlocksPage.vue", "dbm-deadlocks-table"],
   ["QueriesPage.vue", "dbm-queries-table"],
+  ["SamplesPage.vue", "dbm-samples-table"],
   ["TableHealthPage.vue", "dbm-table-health-table"],
 ];
 
@@ -75,7 +73,12 @@ const PAGES: [string, string][] = [
  * aggregations, not row-limited event reads: they carry no `truncated` in the
  * payload that feeds the table.
  */
-const CAPPED = new Set(["ActivityPage.vue", "BlockedQueriesPage.vue", "DeadlocksPage.vue"]);
+const CAPPED = new Set([
+  "ActivityPage.vue",
+  "BlockedQueriesPage.vue",
+  "DeadlocksPage.vue",
+  "SamplesPage.vue",
+]);
 
 /**
  * The opening `<OTable …>` tag of the page's main list table.
@@ -173,13 +176,9 @@ describe("pagination never claims a capped read is complete", () => {
 });
 
 /**
- * Behaviour the pages ALREADY have, which switching pagination on must not
- * quietly take away.
- *
- * These are regression guards, not specs — they were green before pagination
- * existed and are expected to be. They live in their own block so the
- * new-behaviour suites above can be verified RED honestly: mixed in, their
- * passing would have masked whether the pagination tests fail for real.
+ * Behaviour the pages ALREADY have, which pagination must not quietly take
+ * away. Regression guards, kept in their own block so a failure in the
+ * pagination suites above stays legible on its own.
  */
 describe("paginating the lists does not cost them their existing honesty", () => {
   /**

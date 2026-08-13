@@ -45,10 +45,8 @@
  * WORST p50/p95/p99 among its rows, which is a true statement about the rows it
  * covers — "no query under this service had a p95 better than this".
  *
- * All three are carried, not just p95. An earlier version blanked p50 and p99
- * on the claim that the query grain does not report them; it does (every
- * `query_stats` row carries p50_ns/p95_ns/p99_ns), so those columns were empty
- * for no reason while the identical figure sat one row above.
+ * Every `query_stats` row carries p50_ns/p95_ns/p99_ns, and all three follow
+ * the same worst-of rule — none is blanked, none is special.
  */
 
 import type { DbTotalsRow, QueryStatsRow } from "@/services/db_monitoring";

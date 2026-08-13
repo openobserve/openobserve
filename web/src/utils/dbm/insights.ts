@@ -575,6 +575,9 @@ export const detectInsights = (input: DbmInsightInput): DbmInsight[] => {
  * `n-plus-one` counts calls inside ONE window and `all-failing` reads the
  * current window's error rate. Neither is here, and neither may be given a
  * baseline: naming one would assert a comparison that never happened.
+ *
+ * Consumed by the contract specs, which pin that each listed rule's text
+ * names its baseline and no other rule's does.
  */
 export const BASELINE_COMPARED_RULES = [
   "regression",
@@ -774,18 +777,13 @@ export const callsDropPercent = (
  * two queries saves one line and costs the reader an expand click — a bad
  * trade. Below three rows the tail simply renders.
  *
- * What this rule deliberately does NOT do is fill the screen.
- *
- * An earlier cut carried a `minVisibleRows: 14` floor — "never fold a row that
- * would have rendered in empty space" — on the reasoning that the layout budget
- * exists to be spent on data. On real data that floor was the bug: it guaranteed
- * five genuinely distinct queries followed by EIGHT identical
- * `SELECT cNN FROM table_? WHERE k = ?` rows at 0% each, which is precisely the
- * noise the fold exists to remove, occupying the prime rows above the fold. The
- * budget was never a mandate to PAD the table; it was a cap on chrome. Empty
- * space below a short, meaningful table is a better screen than fourteen rows of
- * which eight say nothing. So the floor is now a hard minimum head (`minHeadRows`)
- * rather than a target, and what earns a row is INFORMATION, not position.
+ * What this rule deliberately does NOT do is fill the screen. `minHeadRows` is
+ * a floor, not a target: rows are never added to fill a layout budget, because
+ * a run of identical 0%-share rows occupying the prime lines above the fold is
+ * precisely the noise the fold exists to remove. The layout budget is a cap on
+ * chrome, not a mandate to pad — empty space below a short, meaningful table
+ * is a better screen than rows that say nothing. What earns a row is
+ * INFORMATION, not position.
  */
 export const DBM_TAIL_RULES = {
   /** Keep rows until the running share of listed time reaches this. */

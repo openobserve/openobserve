@@ -145,6 +145,11 @@ const DEFAULT_QUERIES_LIMIT: usize = 100;
 const MAX_QUERIES_LIMIT: usize = 1000;
 const DEFAULT_ENDPOINTS_LIMIT: usize = 50;
 const MAX_ENDPOINTS_LIMIT: usize = 500;
+/// FR-6 global samples: a deliberately small answer — the page shows "the
+/// slowest executions", not "all executions", and 100 rows is already more
+/// than a reader scans. Well under the 100k search cap by construction.
+const DEFAULT_SAMPLES_LIMIT: usize = 100;
+const MAX_SAMPLES_LIMIT: usize = 500;
 
 /// Metrics merged additively across windows/rows. `traces` is deliberately in
 /// this list but is an UPPER BOUND, not exact (§5.1 merge rule) — the response
@@ -216,6 +221,37 @@ impl ScopeFilters {
     pub(crate) fn sql_preds(&self) -> String {
         let mut out = String::new();
         for (col, get) in Self::COLS {
+            if let Some(v) = get(self) {
+                out.push_str("\n    AND ");
+                out.push_str(col);
+                out.push_str(" = '");
+                out.push_str(&escape_sq(v));
+                out.push('\'');
+            }
+        }
+        out
+    }
+
+    /// The same scope, as predicates over RAW TRACE SPANS rather than rollup
+    /// rows: spans carry the `o2_db_*` column names, not the rollup's aliases
+    /// (`db_system` etc.), and have no `trace_stream_name` column at all — the
+    /// stream is the table being read, so that filter is applied by choosing
+    /// which streams to read (`involved_streams`), never as a predicate.
+    /// Same injection contract as [`Self::sql_preds`]: fixed column whitelist,
+    /// values single-quote-escaped.
+    const SPAN_COLS: [(&'static str, ScopeGetter); 5] = [
+        ("o2_db_system", |f| f.system.as_ref()),
+        ("o2_db_instance", |f| f.instance.as_ref()),
+        ("o2_db_namespace", |f| f.namespace.as_ref()),
+        ("o2_db_env", |f| f.env.as_ref()),
+        ("service_name", |f| f.service.as_ref()),
+    ];
+
+    /// Escaped `AND col = 'value'` fragments for raw-span reads (see
+    /// [`Self::SPAN_COLS`]).
+    pub(crate) fn span_sql_preds(&self) -> String {
+        let mut out = String::new();
+        for (col, get) in Self::SPAN_COLS {
             if let Some(v) = get(self) {
                 out.push_str("\n    AND ");
                 out.push_str(col);
@@ -338,6 +374,86 @@ LIMIT {limit}"#,
     )
 }
 
+/// FR-6 global samples: the slowest individual DB spans in the window, one
+/// stream at a time — no rollup, no fingerprint predicate, the whole DB-span
+/// population of the stream ordered by how long each call took.
+///
+/// Same column vocabulary as [`rollup::build_rank_sql`] (the precedent for
+/// referencing `o2_db_*` columns unconditionally on a stream that carries
+/// `o2_db_fingerprint`), and durations as `end_time - start_time` — NANOSECONDS,
+/// the module's raw-span convention. The span's own `duration` column is
+/// MICROseconds and is deliberately not read: one unit for every number this
+/// module emits.
+pub(crate) fn build_samples_sql(
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+    preds: &str,
+    limit: usize,
+) -> String {
+    format!(
+        r#"SELECT
+    _timestamp,
+    trace_id,
+    end_time - start_time AS duration_ns,
+    o2_db_fingerprint AS fingerprint,
+    o2_db_query_norm AS query_norm,
+    o2_db_system AS db_system,
+    o2_db_instance AS db_instance,
+    o2_db_namespace AS db_namespace,
+    o2_db_env AS env,
+    o2_db_operation AS operation,
+    o2_db_stmt_class AS stmt_class,
+    service_name,
+    span_status,
+    o2_db_status_code AS status_code
+FROM "{}"
+WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+    AND o2_db_fingerprint IS NOT NULL{preds}
+ORDER BY duration_ns DESC
+LIMIT {limit}"#,
+        escape_ident(stream_name)
+    )
+}
+
+/// Merge the per-stream top-`limit` sample reads into one global top-`limit`.
+///
+/// Each input stream's rows are its own slowest spans (its SQL is
+/// `ORDER BY … DESC LIMIT limit`), so the union contains the true global
+/// top-`limit` — a span missing from its stream's top-`limit` cannot be in the
+/// global one. Rows are stamped with the stream they came from
+/// (`trace_stream_name`) because the trace pivot needs a concrete stream to
+/// open.
+///
+/// `truncated` answers "were there more qualifying spans than returned?": true
+/// when the union outgrew the cap, or when any single stream answered exactly
+/// its per-stream cap (its own read was cut, so spans beyond the returned set
+/// exist even if the union fit). Ties order by timestamp then trace id so the
+/// answer is deterministic.
+pub(crate) fn fold_sample_rows(
+    per_stream: Vec<(String, Vec<Value>)>,
+    limit: usize,
+) -> (Vec<Value>, bool) {
+    let mut any_capped = false;
+    let mut all: Vec<Value> = Vec::new();
+    for (stream, rows) in per_stream {
+        any_capped |= rows.len() >= limit;
+        for mut row in rows {
+            row["trace_stream_name"] = json!(stream);
+            all.push(row);
+        }
+    }
+    let total = all.len();
+    all.sort_by(|a, b| {
+        get_i64(b, "duration_ns")
+            .cmp(&get_i64(a, "duration_ns"))
+            .then_with(|| get_i64(b, "_timestamp").cmp(&get_i64(a, "_timestamp")))
+            .then_with(|| get_str(a, "trace_id").cmp(&get_str(b, "trace_id")))
+    });
+    all.truncate(limit);
+    (all, any_capped || total > limit)
+}
+
 // ─── Merge math (pure — unit-tested) ─────────────────────────────────────────
 
 /// Merge stat rows into one aggregate (used across windows, across constituent
@@ -420,6 +536,95 @@ fn stamp_trace_streams<'a>(merged: &mut Value, rows: impl IntoIterator<Item = &'
         merged["trace_stream_name"] = json!(streams.iter().next().unwrap());
     }
     merged["trace_streams"] = json!(streams);
+}
+
+/// Fold `error_class` rollup rows (one per window × (system, instance, env,
+/// status code)) into one exact count per status code, largest first — the
+/// FR-5 errors-by-code breakdown. These are the rollup's exact per-SQLSTATE
+/// counts, never the sample-derived approximation the detail page previously
+/// held: samples are capped, so counting them undercounts precisely when
+/// errors matter most. An empty code becomes `unknown`, matching the rollup's
+/// own `COALESCE(o2_db_status_code, 'unknown')` bucket. Ties sort by code so
+/// the output is deterministic.
+pub(crate) fn fold_error_code_counts(rows: &[Value]) -> Vec<Value> {
+    let mut counts: BTreeMap<String, i64> = BTreeMap::new();
+    for row in rows {
+        let code = get_str(row, "status_code");
+        let code = if code.is_empty() {
+            "unknown".to_string()
+        } else {
+            code
+        };
+        *counts.entry(code).or_insert(0) += get_i64(row, "errors");
+    }
+    let mut out: Vec<(String, i64)> = counts.into_iter().collect();
+    out.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    out.into_iter()
+        .map(|(status_code, errors)| json!({ "status_code": status_code, "errors": errors }))
+        .collect()
+}
+
+/// Fold the constituent `query_stats` rows fetched for ONE fingerprint into
+/// per-(instance, namespace) totals — the FR-5 "where it runs" breakdown.
+///
+/// The history series merges these same rows per WINDOW, discarding the
+/// dimension detail the rollup deliberately keeps (rank stage keeps ALL
+/// constituent rows of a winning fingerprint, per namespace × env × service).
+/// This fold is the other projection of the same fetch: per dimension,
+/// summed across windows. Zero additional reads.
+///
+/// Two contracts the caller relies on:
+///
+/// - NULL and `""` both mean "absent" in `_o2_db_stats` — `get_str` collapses both to `""`, so one
+///   instance can never split into two rows over which spelling of absent its spans carried.
+/// - These are totals over the windows the fingerprint was TRACKED in on that instance (rank is per
+///   (system, instance)). A window where it ranked below the per-instance cutoff contributes
+///   nothing, so the figures are floors, never exact window totals — the UI must disclose, not
+///   render absence as zero.
+///
+/// Sorted by total time descending; ties break by (instance, namespace) so the
+/// output is deterministic. Percentiles/max ride along from [`merge_rows`]
+/// (request-weighted, i.e. estimates).
+pub(crate) fn fold_instance_breakdown<'a>(rows: impl IntoIterator<Item = &'a Value>) -> Vec<Value> {
+    let mut groups: BTreeMap<(String, String), Vec<&'a Value>> = BTreeMap::new();
+    for row in rows {
+        let key = (get_str(row, "db_instance"), get_str(row, "db_namespace"));
+        groups.entry(key).or_default().push(row);
+    }
+    let mut out: Vec<Value> = groups
+        .into_iter()
+        .map(|((instance, namespace), group)| {
+            let mut merged = merge_rows(group);
+            merged["db_instance"] = json!(instance);
+            merged["db_namespace"] = json!(namespace);
+            merged
+        })
+        .collect();
+    out.sort_by(|a, b| {
+        get_i64(b, "total_time_ns")
+            .cmp(&get_i64(a, "total_time_ns"))
+            .then_with(|| get_str(a, "db_instance").cmp(&get_str(b, "db_instance")))
+            .then_with(|| get_str(a, "db_namespace").cmp(&get_str(b, "db_namespace")))
+    });
+    out
+}
+
+/// Stamp each overview row with its calls-per-second over the requested window
+/// (FR-1). Computed at READ time because only the read knows the window it was
+/// asked for — the stored rows carry raw window counts. Left unrounded; the UI
+/// owns display precision. Rows without a `calls` metric (a trafficless
+/// instance never emitted one) are left unstamped, so absence keeps meaning
+/// "not measured" rather than becoming a fabricated 0/s.
+pub(crate) fn stamp_qps(hits: &mut [Value], start_time: i64, end_time: i64) {
+    let window_secs = (end_time - start_time) as f64 / 1_000_000.0;
+    if window_secs <= 0.0 {
+        return;
+    }
+    for row in hits.iter_mut() {
+        if row.get("calls").is_some_and(|v| !v.is_null()) {
+            row["qps"] = json!(get_i64(row, "calls") as f64 / window_secs);
+        }
+    }
 }
 
 /// The windows a fingerprint is "below top-N" in: windows that HAVE rollup
@@ -544,6 +749,18 @@ pub(crate) fn group_query_rows(
             merged["query_norm"] = json!(norm);
             merged["operation"] = json!(operation);
             merged["stmt_class"] = json!(stmt_class);
+            // The scalar survives the fold when the constituents agree on
+            // exactly one database. It used to vanish here unconditionally —
+            // collected into `namespaces` but never re-emitted — and the
+            // scalar is the server-vantage JOIN KEY: without it the detail
+            // page could not ask for the database's own counters and rendered
+            // "not collected" over 1,000+ matching server records (verified
+            // live on fingerprint fa61ae4b0c9ff1a2). Never invented when the
+            // fingerprint genuinely ran on several databases: attributing one
+            // database's counters to another is worse than asking nothing.
+            if namespaces.len() == 1 {
+                merged["db_namespace"] = json!(namespaces.iter().next().unwrap());
+            }
             merged["namespaces"] = json!(namespaces);
             merged["envs"] = json!(envs);
             merged["services"] = json!(services);
@@ -1084,6 +1301,14 @@ pub struct DatabasesQuery {
     pub stream: Option<String>,
     pub system: Option<String>,
     pub service: Option<String>,
+    /// The Δ baseline window, returned as `baseline_hits` in the same
+    /// response. The CLIENT computes the bounds — the baseline is a reader
+    /// choice (previous window, same hours yesterday) this endpoint must not
+    /// guess at. Both or neither; the pair rides one round trip and the two
+    /// windows are read concurrently, where the page used to issue two
+    /// requests for them.
+    pub baseline_start_time: Option<i64>,
+    pub baseline_end_time: Option<i64>,
 }
 
 /// GET /{org_id}/traces/db_monitoring/databases — FR-1 overview.
@@ -1109,6 +1334,8 @@ pub struct DatabasesQuery {
         ("stream" = Option<String>, Query, description = "Trace stream filter"),
         ("system" = Option<String>, Query, description = "Database system filter"),
         ("service" = Option<String>, Query, description = "Calling service filter"),
+        ("baseline_start_time" = Option<i64>, Query, description = "Δ baseline window start (microseconds); returns baseline_hits in the same response"),
+        ("baseline_end_time" = Option<i64>, Query, description = "Δ baseline window end (microseconds)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -1123,10 +1350,96 @@ pub async fn get_dbm_databases(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
+    match read_databases_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The databases endpoint's whole body — validation, both windows, envelope —
+/// as a callable, so [`get_dbm_badges`] runs the SAME pipeline the tab renders
+/// and the badge cannot disagree with the page by construction. `Err` carries
+/// the ready HTTP response, exactly as [`read_databases_window`] does.
+async fn read_databases_body(
+    org_id: &str,
+    user_id: &str,
+    q: &DatabasesQuery,
+) -> Result<Value, HttpResponse> {
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
     }
+    let baseline = match (q.baseline_start_time, q.baseline_end_time) {
+        (Some(bs), Some(be)) if bs < be => Some((bs, be)),
+        (None, None) => None,
+        _ => {
+            return Err(MetaHttpResponse::bad_request(
+                "baseline_start_time and baseline_end_time must be supplied together, start before end",
+            ));
+        }
+    };
+
+    let current_fut = read_databases_window(org_id, user_id, q, start_time, end_time);
+    let (current, baseline_out) = match baseline {
+        Some((bs, be)) => {
+            // Both windows CONCURRENTLY — this pair used to be two sequential
+            // HTTP requests from the page.
+            let baseline_fut = read_databases_window(org_id, user_id, q, bs, be);
+            let (c, b) = tokio::join!(current_fut, baseline_fut);
+            (c, Some(b))
+        }
+        None => (current_fut.await, None),
+    };
+    let window = current?;
+
+    let mut body = json!({
+        "hits": window.hits,
+        "top_n_subset": window.top_n_subset,
+        "freshness": window.freshness.to_json(),
+    });
+    if let Some(baseline_result) = baseline_out {
+        let extra = body.as_object_mut().expect("body is an object");
+        match baseline_result {
+            Ok(b) => {
+                extra.insert("baseline_hits".into(), json!(b.hits));
+                extra.insert("baseline_read_failed".into(), json!(false));
+            }
+            Err(_) => {
+                // The baseline is enrichment — it feeds the Δ comparison, not
+                // the table. Its failure degrades to an empty section, stated
+                // rather than implied by emptiness, exactly as table_health's
+                // index section does.
+                extra.insert("baseline_hits".into(), json!([]));
+                extra.insert("baseline_read_failed".into(), json!(true));
+            }
+        }
+    }
+    Ok(body)
+}
+
+/// One window of the FR-1 overview, ready to serialize.
+struct DatabasesWindow {
+    hits: Vec<Value>,
+    top_n_subset: bool,
+    freshness: Freshness,
+}
+
+/// The whole per-window pipeline of the databases overview — searches, RBAC,
+/// tails, grouping, services, freshness — extracted verbatim from the handler
+/// so the Δ baseline can be a second concurrent call rather than a second
+/// endpoint round trip. `Err` carries the ready HTTP response because each
+/// failure already knew its status; the handler returns it for the CURRENT
+/// window and degrades on the baseline.
+async fn read_databases_window(
+    org_id: &str,
+    user_id: &str,
+    q: &DatabasesQuery,
+    start_time: i64,
+    end_time: i64,
+) -> Result<DatabasesWindow, HttpResponse> {
+    let cfg = get_config();
     let filters = ScopeFilters {
         system: q.system.clone(),
         service: q.service.clone(),
@@ -1142,42 +1455,44 @@ pub async fn get_dbm_databases(
     };
 
     let totals_sql = build_stats_sql(
-        &org_id,
+        org_id,
         "db_totals",
         start_time,
         end_time,
         &totals_filters.sql_preds(),
     );
     let qs_sql = build_stats_sql(
-        &org_id,
+        org_id,
         "query_stats",
         start_time,
         end_time,
         &filters.sql_preds(),
     );
-    let (totals_rows, qs_rows) = match (
-        run_stats_search(&org_id, totals_sql, start_time, end_time).await,
-        run_stats_search(&org_id, qs_sql, start_time, end_time).await,
+    // Concurrent, where they were awaited one after the other: two independent
+    // record families over the same summary stream have no ordering to honour.
+    let (totals_rows, qs_rows) = match tokio::join!(
+        run_stats_search(org_id, totals_sql, start_time, end_time),
+        run_stats_search(org_id, qs_sql, start_time, end_time),
     ) {
         (Ok(t), Ok(q)) => (t, q),
         (t, q) => {
             let e = t.err().or(q.err()).unwrap();
             log::error!("[DbMonitoring] databases rollup read failed for {org_id}: {e}");
-            return MetaHttpResponse::internal_error(e);
+            return Err(MetaHttpResponse::internal_error(e));
         }
     };
 
     let Some(streams) = involved_streams(
-        &org_id,
-        &user_email.user_id,
+        org_id,
+        user_id,
         q.stream.as_ref(),
         &[&totals_rows[..], &qs_rows[..]],
     )
     .await
     else {
-        return unauthorized_response();
+        return Err(unauthorized_response());
     };
-    let collected = collect_tails(&org_id, &streams, start_time, end_time).await;
+    let collected = collect_tails(org_id, &streams, start_time, end_time).await;
     let tails = &collected.tails;
 
     // Pool rollup + tail rows, uniformly re-filtered in Rust (the tail is
@@ -1244,6 +1559,9 @@ pub async fn get_dbm_databases(
         );
         row["calling_services"] = json!(services.get(&key).cloned().unwrap_or_default());
     }
+    // FR-1: calls-per-second over THIS window (the baseline call passes its own
+    // bounds, so baseline rows carry a rate over the baseline window).
+    stamp_qps(&mut hits, start_time, end_time);
     sort_rows(&mut hits, None);
 
     // Estimated whenever any group fused more than one source row (multiple
@@ -1259,11 +1577,11 @@ pub async fn get_dbm_databases(
         percentiles_estimated,
     };
 
-    MetaHttpResponse::json(json!({
-        "hits": hits,
-        "top_n_subset": top_n_subset,
-        "freshness": freshness.to_json(),
-    }))
+    Ok(DatabasesWindow {
+        hits,
+        top_n_subset,
+        freshness,
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -1284,6 +1602,13 @@ pub struct QueriesQuery {
     /// Free-text search over the normalized query text. Applied at merge time
     /// in Rust — never interpolated into SQL.
     pub search: Option<String>,
+    /// The Δ baseline window, returned as `baseline_hits` in the same
+    /// response — same contract as the databases endpoint: client-computed
+    /// bounds, both or neither, read concurrently with the current window.
+    /// The baseline is fetched under the SAME filters and sort so the two
+    /// sets are comparable row-for-row.
+    pub baseline_start_time: Option<i64>,
+    pub baseline_end_time: Option<i64>,
 }
 
 /// GET /{org_id}/traces/db_monitoring/queries — FR-2 top queries.
@@ -1328,10 +1653,93 @@ pub async fn get_dbm_queries(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
+    match read_queries_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The top-queries endpoint's whole body as a callable — same extraction as
+/// [`read_databases_body`], for the same badges-agree-with-tabs reason.
+async fn read_queries_body(
+    org_id: &str,
+    user_id: &str,
+    q: &QueriesQuery,
+) -> Result<Value, HttpResponse> {
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
     }
+    let baseline = match (q.baseline_start_time, q.baseline_end_time) {
+        (Some(bs), Some(be)) if bs < be => Some((bs, be)),
+        (None, None) => None,
+        _ => {
+            return Err(MetaHttpResponse::bad_request(
+                "baseline_start_time and baseline_end_time must be supplied together, start before end",
+            ));
+        }
+    };
+
+    let current_fut = read_queries_window(org_id, user_id, q, start_time, end_time);
+    let (current, baseline_out) = match baseline {
+        Some((bs, be)) => {
+            let baseline_fut = read_queries_window(org_id, user_id, q, bs, be);
+            let (c, b) = tokio::join!(current_fut, baseline_fut);
+            (c, Some(b))
+        }
+        None => (current_fut.await, None),
+    };
+    let window = current?;
+
+    let mut body = json!({
+        "hits": window.hits,
+        "other": window.other,
+        "total": window.total,
+        "top_n_subset": window.top_n_subset,
+        "freshness": window.freshness.to_json(),
+    });
+    if let Some(baseline_result) = baseline_out {
+        let extra = body.as_object_mut().expect("body is an object");
+        match baseline_result {
+            Ok(b) => {
+                extra.insert("baseline_hits".into(), json!(b.hits));
+                // The remainder too: the page measures Δ shares against the
+                // WHOLE scope (shown + `_other`), so a baseline without its
+                // remainder would silently inflate every previous-window share.
+                extra.insert("baseline_other".into(), json!(b.other));
+                extra.insert("baseline_read_failed".into(), json!(false));
+            }
+            Err(_) => {
+                // Enrichment only — the Δ column goes quiet, the table stands.
+                extra.insert("baseline_hits".into(), json!([]));
+                extra.insert("baseline_other".into(), json!([]));
+                extra.insert("baseline_read_failed".into(), json!(true));
+            }
+        }
+    }
+    Ok(body)
+}
+
+/// One window of the FR-2 top-queries pipeline, ready to serialize. Same
+/// extraction as [`DatabasesWindow`], for the same reason.
+struct QueriesWindow {
+    hits: Vec<Value>,
+    other: Vec<Value>,
+    total: usize,
+    top_n_subset: bool,
+    freshness: Freshness,
+}
+
+async fn read_queries_window(
+    org_id: &str,
+    user_id: &str,
+    q: &QueriesQuery,
+    start_time: i64,
+    end_time: i64,
+) -> Result<QueriesWindow, HttpResponse> {
+    let cfg = get_config();
     let filters = ScopeFilters {
         system: q.system.clone(),
         instance: q.instance.clone(),
@@ -1350,26 +1758,20 @@ pub async fn get_dbm_queries(
     // (§5.2): narrower scopes and free-text search show `top_n_subset` instead.
     let allow_other = !filters.narrower_than_other_grain() && search.is_none();
 
-    let qs_sql = build_queries_stats_sql(&org_id, start_time, end_time, &filters, search);
-    let qs_rows = match run_stats_search(&org_id, qs_sql, start_time, end_time).await {
+    let qs_sql = build_queries_stats_sql(org_id, start_time, end_time, &filters, search);
+    let qs_rows = match run_stats_search(org_id, qs_sql, start_time, end_time).await {
         Ok(rows) => rows,
         Err(e) => {
             log::error!("[DbMonitoring] queries rollup read failed for {org_id}: {e}");
-            return MetaHttpResponse::internal_error(e);
+            return Err(MetaHttpResponse::internal_error(e));
         }
     };
 
-    let Some(streams) = involved_streams(
-        &org_id,
-        &user_email.user_id,
-        q.stream.as_ref(),
-        &[&qs_rows[..]],
-    )
-    .await
+    let Some(streams) = involved_streams(org_id, user_id, q.stream.as_ref(), &[&qs_rows[..]]).await
     else {
-        return unauthorized_response();
+        return Err(unauthorized_response());
     };
-    let collected = collect_tails(&org_id, &streams, start_time, end_time).await;
+    let collected = collect_tails(org_id, &streams, start_time, end_time).await;
     let tails = &collected.tails;
 
     let mut pool: Vec<Value> = qs_rows.into_iter().filter(|r| filters.matches(r)).collect();
@@ -1410,13 +1812,13 @@ pub async fn get_dbm_queries(
         tail_truncated: collected.tail_truncated,
         percentiles_estimated,
     };
-    MetaHttpResponse::json(json!({
-        "hits": hits,
-        "other": other,
-        "total": total,
-        "top_n_subset": !allow_other,
-        "freshness": freshness.to_json(),
-    }))
+    Ok(QueriesWindow {
+        hits,
+        other,
+        total,
+        top_n_subset: !allow_other,
+        freshness,
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -1540,6 +1942,52 @@ pub async fn get_dbm_query_history(
         }
     };
 
+    // FR-5 errors-by-code: the rollup's EXACT per-status-code counts
+    // (`error_class` records), summed across the windows in range. The detail
+    // page used to derive these from its capped sample rows, which undercounts
+    // exactly when errors spike.
+    //
+    // `error_class` rows exist at (system, instance, env) — they carry no
+    // namespace/service columns, so under one of those narrower filters the
+    // counts would describe a different population than the series beside
+    // them. Omitted rather than overstated; the page falls back to its
+    // sample-derived counts and says so.
+    //
+    // Non-fatal on read failure: this block is enrichment, and a 500 here
+    // would take the whole series down with it.
+    let ec_filters = ScopeFilters {
+        system: q.system.clone(),
+        instance: q.instance.clone(),
+        env: q.env.clone(),
+        stream: q.stream.clone(),
+        ..Default::default()
+    };
+    let error_classes: Vec<Value> = if q.namespace.is_none() && q.service.is_none() {
+        let ec_sql = build_stats_sql(
+            &org_id,
+            "error_class",
+            start_time,
+            end_time,
+            &format!(
+                "{}{}",
+                ec_filters.sql_preds(),
+                fingerprint_pred(fingerprint)
+            ),
+        );
+        match run_stats_search(&org_id, ec_sql, start_time, end_time).await {
+            Ok(rows) => {
+                let rows: Vec<Value> = rows.into_iter().filter(|r| ec_filters.matches(r)).collect();
+                fold_error_code_counts(&rows)
+            }
+            Err(e) => {
+                log::warn!("[DbMonitoring] history error-class read failed for {org_id}: {e}");
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
+
     // Per-window fingerprint points (constituent rows merged per window).
     let mut fp_by_window: BTreeMap<i64, Vec<&Value>> = BTreeMap::new();
     for row in fp_rows.iter().filter(|r| filters.matches(r)) {
@@ -1640,6 +2088,19 @@ pub async fn get_dbm_query_history(
         series.push(point);
     }
 
+    // FR-5 "where it runs": the same constituent rows the series above merged
+    // away, folded per (instance, namespace) instead. Tail rows are included so
+    // the breakdown covers the same span as the series' live point. Backfilled
+    // below-cutoff windows are NOT in it — the backfill aggregates without
+    // dimensions — so these are totals over the tracked windows only, and the
+    // UI must say so rather than present them as exact window totals.
+    let breakdown = fold_instance_breakdown(
+        fp_rows
+            .iter()
+            .filter(|r| filters.matches(r))
+            .chain(tail_rows.iter()),
+    );
+
     let freshness = Freshness {
         data_through: collected.data_through,
         live_tail: cfg.db_monitoring.live_tail,
@@ -1657,6 +2118,15 @@ pub async fn get_dbm_query_history(
         // raw-span panels instead of guessing a default stream.
         "trace_stream_name": backfill_stream,
         "backfill_capped": !flag_only.is_empty(),
+        // Exact per-status-code error counts over the range (largest first).
+        // Empty when the scope is narrower than the counts' grain — the page
+        // must then fall back to sample-derived counts, not claim exactness.
+        "error_classes": error_classes,
+        // Per-(instance, namespace) totals for this fingerprint over its
+        // TRACKED windows (see `fold_instance_breakdown`) — heaviest first.
+        // Windows where the fingerprint ranked below the per-instance cutoff
+        // contribute nothing, so these are floors, not exact window totals.
+        "breakdown": breakdown,
         "freshness": freshness.to_json(),
     }))
 }
@@ -1734,6 +2204,193 @@ pub async fn get_dbm_query_endpoints(
             MetaHttpResponse::internal_error(e)
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SamplesQuery {
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub stream: Option<String>,
+    pub system: Option<String>,
+    pub instance: Option<String>,
+    pub namespace: Option<String>,
+    pub env: Option<String>,
+    pub service: Option<String>,
+    pub limit: Option<usize>,
+}
+
+/// GET /{org_id}/traces/db_monitoring/samples — FR-6 global slow samples: the
+/// slowest DB spans in the window ACROSS every system, instance and query.
+///
+/// The per-query samples on the detail page answer "show me one bad execution
+/// of THIS query"; this endpoint answers the shape of question that starts an
+/// incident — "what were the worst database calls anywhere, just now?" — before
+/// the reader knows which query to blame.
+///
+/// Reads RAW trace spans (the client vantage), no rollup and no tail: every
+/// row is one real completed execution with its trace attached. Stream
+/// resolution and RBAC follow the rollup-backed endpoints exactly — explicit
+/// `stream` param 403s loudly when unreadable; otherwise the involved streams
+/// are discovered from the window's rollup rows (falling back to the org's
+/// trace streams) and FILTERED to what the caller may read, then schema-gated
+/// on `o2_db_fingerprint` so a stream that never carried a DB span is skipped
+/// rather than queried.
+///
+/// Bounded: one fixed-shape SQL per involved stream, each `LIMIT limit`
+/// (default 100, max 500 — far under the search cap), merged in Rust
+/// ([`fold_sample_rows`]). `truncated` in the response says when more
+/// qualifying spans existed than were returned.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/db_monitoring/samples",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringSamples",
+    summary = "Database Monitoring: slowest database calls in the window",
+    description = "The slowest raw DB spans across all systems, instances and queries in the window, with trace ids for pivoting. Client-observed, completed calls only.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+        ("stream" = Option<String>, Query, description = "Trace stream filter"),
+        ("system" = Option<String>, Query, description = "Database system filter"),
+        ("instance" = Option<String>, Query, description = "Database instance filter"),
+        ("namespace" = Option<String>, Query, description = "Database/schema filter"),
+        ("env" = Option<String>, Query, description = "Deployment environment filter"),
+        ("service" = Option<String>, Query, description = "Calling service filter"),
+        ("limit" = Option<usize>, Query, description = "Max spans (default 100, max 500)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    )
+)]
+pub async fn get_dbm_samples(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<SamplesQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    // An explicit `stream` is checked HERE, before range parsing and before any
+    // read runs — same placement and same reasoning as `get_dbm_query_endpoints`
+    // and `get_dbm_query_history`: the caller must not be able to run raw-span
+    // work on an unreadable stream, nor probe stream existence through the
+    // difference between a 400 and a 403.
+    if let Some(stream) = q.stream.as_deref().filter(|s| !s.is_empty())
+        && !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Traces).await
+    {
+        return unauthorized_response();
+    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
+    if start_time >= end_time {
+        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    }
+    let limit = q
+        .limit
+        .unwrap_or(DEFAULT_SAMPLES_LIMIT)
+        .clamp(1, MAX_SAMPLES_LIMIT);
+    let filters = ScopeFilters {
+        system: q.system.clone(),
+        instance: q.instance.clone(),
+        namespace: q.namespace.clone(),
+        env: q.env.clone(),
+        service: q.service.clone(),
+        stream: q.stream.clone(),
+    };
+
+    // Stream discovery, through the same chokepoint the rollup-backed endpoints
+    // use: the window's `db_totals` rows name the trace streams that held DB
+    // spans, `involved_streams` falls back to the org's trace streams on a cold
+    // start and filters to what the caller may read. The discovery read is
+    // scoped at the grains `db_totals` rows exist at (system, instance) —
+    // narrower filters apply to the span read itself, below. Non-fatal: the
+    // rollup here only narrows the fan-out, it is not the data.
+    let totals_filters = ScopeFilters {
+        system: q.system.clone(),
+        instance: q.instance.clone(),
+        stream: q.stream.clone(),
+        ..Default::default()
+    };
+    let totals_sql = build_stats_sql(
+        &org_id,
+        "db_totals",
+        start_time,
+        end_time,
+        &totals_filters.sql_preds(),
+    );
+    let totals_rows = match run_stats_search(&org_id, totals_sql, start_time, end_time).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::warn!("[DbMonitoring] samples stream discovery failed for {org_id}: {e}");
+            Vec::new()
+        }
+    };
+    let Some(streams) = involved_streams(
+        &org_id,
+        &user_email.user_id,
+        q.stream.as_ref(),
+        &[&totals_rows[..]],
+    )
+    .await
+    else {
+        return unauthorized_response();
+    };
+
+    // Schema gate (the rollup discovery's own rule): only streams that carry
+    // `o2_db_fingerprint` have DB spans to rank, and querying one that does not
+    // would error on the column rather than answer empty.
+    let mut db_streams = Vec::with_capacity(streams.len());
+    for stream in streams {
+        let has_fp = infra::schema::get(&org_id, &stream, StreamType::Traces)
+            .await
+            .map(|s| s.field_with_name(super::O2_DB_FINGERPRINT).is_ok())
+            .unwrap_or(false);
+        if has_fp {
+            db_streams.push(stream);
+        }
+    }
+
+    let preds = filters.span_sql_preds();
+    let mut per_stream: Vec<(String, Vec<Value>)> = Vec::new();
+    let mut first_err: Option<anyhow::Error> = None;
+    let mut failed = 0usize;
+    for stream in &db_streams {
+        let sql = build_samples_sql(stream, start_time, end_time, &preds, limit);
+        match rollup::run_dbm_search(&org_id, sql, start_time, end_time).await {
+            Ok(rows) => per_stream.push((stream.clone(), rows)),
+            Err(e) => {
+                log::warn!("[DbMonitoring] samples read failed for {org_id}/{stream}: {e}");
+                failed += 1;
+                first_err.get_or_insert(e);
+            }
+        }
+    }
+    // One bad stream must not take down the fleet view (the `collect_tails`
+    // posture) — but EVERY read failing is not a quiet empty window, it is an
+    // error the caller must see.
+    if failed > 0
+        && per_stream.is_empty()
+        && let Some(e) = first_err
+    {
+        log::error!("[DbMonitoring] samples: all {failed} stream reads failed for {org_id}");
+        return MetaHttpResponse::internal_error(e);
+    }
+
+    let (hits, truncated) = fold_sample_rows(per_stream, limit);
+    MetaHttpResponse::json(json!({
+        "hits": hits,
+        // More qualifying spans existed than were returned (same disclosure
+        // convention as the rollup responses' `tail_truncated`/`truncated`).
+        "truncated": truncated,
+        "limit": limit,
+        // The streams actually read, so the UI can say where the answer came
+        // from — and, when a read failed, that the answer is partial.
+        "streams_scanned": db_streams,
+        "streams_failed": failed,
+    }))
 }
 
 // ─── Server-vantage endpoints (deadlocks / blocking) ─────────────────────────
@@ -2796,9 +3453,26 @@ pub async fn get_dbm_deadlocks(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
+    match read_deadlocks_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The deadlocks endpoint's whole body as a callable — same extraction as
+/// [`read_databases_body`], for the same badges-agree-with-tabs reason. The
+/// stream permission check stays INSIDE the body, so a badges caller is held
+/// to exactly the auth this endpoint enforces.
+async fn read_deadlocks_body(
+    org_id: &str,
+    user_id: &str,
+    q: &DeadlocksQuery,
+) -> Result<Value, HttpResponse> {
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
     }
     let stream = q
         .stream
@@ -2808,8 +3482,8 @@ pub async fn get_dbm_deadlocks(
     // Server-vantage events live in a LOGS stream (`dbm_server` by default),
     // not a trace stream — the permission is checked against the type actually
     // read, or the check would consult the wrong OFGA object.
-    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
-        return unauthorized_response();
+    if !can_read_stream(org_id, user_id, stream, StreamType::Logs).await {
+        return Err(unauthorized_response());
     }
     let limit = q
         .limit
@@ -2824,11 +3498,11 @@ pub async fn get_dbm_deadlocks(
     // emit events with no engine, no participants and no victim, and the probe
     // would be skipped because `hits` is non-empty — content-free rows with no
     // diagnostic. See `present_dbm_columns`.
-    let present = match present_dbm_columns(&org_id, stream).await {
+    let present = match present_dbm_columns(org_id, stream).await {
         Ok(present) => present,
         Err(e) => {
             log::error!("[DbMonitoring] deadlocks schema read failed for {org_id}/{stream}: {e}");
-            return MetaHttpResponse::internal_error(e);
+            return Err(MetaHttpResponse::internal_error(e));
         }
     };
     let sql = build_dbm_events_sql(
@@ -2840,11 +3514,11 @@ pub async fn get_dbm_deadlocks(
         limit,
         &present,
     );
-    let rows = match run_events_search(&org_id, stream, sql, start_time, end_time).await {
+    let rows = match run_events_search(org_id, stream, sql, start_time, end_time).await {
         Ok(rows) => rows,
         Err(e) => {
             log::error!("[DbMonitoring] deadlocks read failed for {org_id}/{stream}: {e}");
-            return MetaHttpResponse::internal_error(e);
+            return Err(MetaHttpResponse::internal_error(e));
         }
     };
     let row_count = rows.len();
@@ -2871,7 +3545,7 @@ pub async fn get_dbm_deadlocks(
     // and the probe is two extra reads that would buy nothing there.
     let probe = if hits.is_empty() {
         probe_collection(
-            &org_id,
+            org_id,
             stream,
             server_vantage::KIND_DEADLOCK,
             start_time,
@@ -2883,7 +3557,7 @@ pub async fn get_dbm_deadlocks(
         CollectionProbe::default()
     };
 
-    MetaHttpResponse::json(json!({
+    Ok(json!({
         "hits": hits,
         "query_shapes": shapes,
         // EVENT count (post-stitch), which is what the tab badge means by
@@ -3028,9 +3702,25 @@ pub async fn get_dbm_blocking(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
+    match read_blocking_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The blocking endpoint's whole body as a callable — same extraction as
+/// [`read_databases_body`], for the same badges-agree-with-tabs reason, auth
+/// included.
+async fn read_blocking_body(
+    org_id: &str,
+    user_id: &str,
+    q: &BlockingQuery,
+) -> Result<Value, HttpResponse> {
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
     }
     let stream = q
         .stream
@@ -3038,8 +3728,8 @@ pub async fn get_dbm_blocking(
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
     // Logs stream, same reasoning as `get_dbm_deadlocks`.
-    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
-        return unauthorized_response();
+    if !can_read_stream(org_id, user_id, stream, StreamType::Logs).await {
+        return Err(unauthorized_response());
     }
     let limit = q
         .limit
@@ -3051,11 +3741,11 @@ pub async fn get_dbm_blocking(
     // loud one: an empty set drops the pid columns, `BlockingSample::from_record`
     // then filters out every row, and the page tells the operator
     // `not_collecting: true` — a healthy collector reported as broken.
-    let present = match present_dbm_columns(&org_id, stream).await {
+    let present = match present_dbm_columns(org_id, stream).await {
         Ok(present) => present,
         Err(e) => {
             log::error!("[DbMonitoring] blocking schema read failed for {org_id}/{stream}: {e}");
-            return MetaHttpResponse::internal_error(e);
+            return Err(MetaHttpResponse::internal_error(e));
         }
     };
     let sql = build_dbm_events_sql(
@@ -3067,11 +3757,11 @@ pub async fn get_dbm_blocking(
         limit,
         &present,
     );
-    let rows = match run_events_search(&org_id, stream, sql, start_time, end_time).await {
+    let rows = match run_events_search(org_id, stream, sql, start_time, end_time).await {
         Ok(rows) => rows,
         Err(e) => {
             log::error!("[DbMonitoring] blocking read failed for {org_id}/{stream}: {e}");
-            return MetaHttpResponse::internal_error(e);
+            return Err(MetaHttpResponse::internal_error(e));
         }
     };
 
@@ -3093,7 +3783,7 @@ pub async fn get_dbm_blocking(
     // See the deadlocks handler: diagnose only the empty case.
     let probe = if hits.is_empty() {
         probe_collection(
-            &org_id,
+            org_id,
             stream,
             server_vantage::KIND_BLOCKING,
             start_time,
@@ -3105,7 +3795,7 @@ pub async fn get_dbm_blocking(
         CollectionProbe::default()
     };
 
-    MetaHttpResponse::json(json!({
+    Ok(json!({
         "hits": hits,
         "chains": chains.iter().map(|c| c.to_json()).collect::<Vec<_>>(),
         "total": hits.len(),
@@ -3185,9 +3875,25 @@ pub async fn get_dbm_activity(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
+    match read_activity_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The activity endpoint's whole body as a callable — same extraction as
+/// [`read_databases_body`], for the same badges-agree-with-tabs reason, auth
+/// included.
+async fn read_activity_body(
+    org_id: &str,
+    user_id: &str,
+    q: &ActivityQuery,
+) -> Result<Value, HttpResponse> {
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
     }
     let stream = q
         .stream
@@ -3196,8 +3902,8 @@ pub async fn get_dbm_activity(
         .unwrap_or(DEFAULT_SERVER_STREAM);
     // A LOGS stream, same as deadlocks/blocking. StreamType::Traces here would
     // consult the wrong OFGA object and silently authorize.
-    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
-        return unauthorized_response();
+    if !can_read_stream(org_id, user_id, stream, StreamType::Logs).await {
+        return Err(unauthorized_response());
     }
     let limit = q
         .limit
@@ -3208,11 +3914,11 @@ pub async fn get_dbm_activity(
     // A failed schema read is reported, never absorbed into an empty set — an
     // empty set drops the projection and the page would report a healthy
     // collector as broken. See `present_dbm_columns`.
-    let present = match present_dbm_columns(&org_id, stream).await {
+    let present = match present_dbm_columns(org_id, stream).await {
         Ok(present) => present,
         Err(e) => {
             log::error!("[DbMonitoring] activity schema read failed for {org_id}/{stream}: {e}");
-            return MetaHttpResponse::internal_error(e);
+            return Err(MetaHttpResponse::internal_error(e));
         }
     };
 
@@ -3225,50 +3931,50 @@ pub async fn get_dbm_activity(
         limit,
         &present,
     );
-    let rows = match run_events_search(&org_id, stream, sql, start_time, end_time).await {
-        Ok(rows) => rows,
-        Err(e) => {
-            log::error!("[DbMonitoring] activity read failed for {org_id}/{stream}: {e}");
-            return MetaHttpResponse::internal_error(e);
+    // ── all five reads CONCURRENTLY ───────────────────────────────────────
+    //
+    // Session rows, the two breakdowns, the probe and the sample-times query
+    // are independent questions over the same window, and awaited in series
+    // their latencies added: measured live at a 12h window this handler took
+    // 5.4s, by far the slowest read in DBM. Only the ROW query is fatal on
+    // failure; the aggregates keep their degrade-to-empty behaviour.
+    let rows_fut = run_events_search(org_id, stream, sql, start_time, end_time);
+    let by_wait_fut = async {
+        match build_dbm_activity_breakdown_sql(
+            stream,
+            server_vantage::O2_DBM_WAIT_EVENT_TYPE,
+            Some(server_vantage::O2_DBM_WAIT_EVENT),
+            start_time,
+            end_time,
+            &preds,
+            &present,
+        ) {
+            Some(sql) => wait_event_breakdown(
+                &run_events_search(org_id, stream, sql, start_time, end_time)
+                    .await
+                    .unwrap_or_default(),
+            ),
+            None => Vec::new(),
         }
     };
-    let row_count = rows.len();
-    let hits: Vec<Value> = rows.iter().map(activity_row_to_dto).collect();
-
-    // ── the aggregates, from SQL over the WHOLE window ────────────────────
-    let by_wait_event = match build_dbm_activity_breakdown_sql(
-        stream,
-        server_vantage::O2_DBM_WAIT_EVENT_TYPE,
-        Some(server_vantage::O2_DBM_WAIT_EVENT),
-        start_time,
-        end_time,
-        &preds,
-        &present,
-    ) {
-        Some(sql) => wait_event_breakdown(
-            &run_events_search(&org_id, stream, sql, start_time, end_time)
-                .await
-                .unwrap_or_default(),
-        ),
-        None => Vec::new(),
+    let by_state_fut = async {
+        match build_dbm_activity_breakdown_sql(
+            stream,
+            server_vantage::O2_DBM_SESSION_STATE,
+            None,
+            start_time,
+            end_time,
+            &preds,
+            &present,
+        ) {
+            Some(sql) => state_breakdown(
+                &run_events_search(org_id, stream, sql, start_time, end_time)
+                    .await
+                    .unwrap_or_default(),
+            ),
+            None => Vec::new(),
+        }
     };
-    let by_state = match build_dbm_activity_breakdown_sql(
-        stream,
-        server_vantage::O2_DBM_SESSION_STATE,
-        None,
-        start_time,
-        end_time,
-        &preds,
-        &present,
-    ) {
-        Some(sql) => state_breakdown(
-            &run_events_search(&org_id, stream, sql, start_time, end_time)
-                .await
-                .unwrap_or_default(),
-        ),
-        None => Vec::new(),
-    };
-
     // The probe runs UNCONDITIONALLY here, unlike the deadlocks/blocking
     // template which computes it only on an empty tab.
     //
@@ -3278,21 +3984,20 @@ pub async fn get_dbm_activity(
     // page's fidelity only when there were no sessions to state it about —
     // inverting the honesty requirement exactly. Named `interval_probe` because
     // it is read for the interval whether or not the tab is empty.
-    let mut interval_probe = probe_collection(
-        &org_id,
+    let probe_fut = probe_collection(
+        org_id,
         stream,
         server_vantage::KIND_ACTIVITY,
         start_time,
         end_time,
         &preds,
-    )
-    .await;
+    );
     // Recover the poll spacing from a DISTINCT query rather than from the shared
     // probe's row scan: activity writes one row per session per poll, so 2000
     // scanned rows can be a single poll on a busy instance and the interval
     // would read null exactly where the disclosure matters most.
-    if let Ok(times) = run_events_search(
-        &org_id,
+    let times_fut = run_events_search(
+        org_id,
         stream,
         build_dbm_sample_times_sql(
             stream,
@@ -3303,8 +4008,22 @@ pub async fn get_dbm_activity(
         ),
         start_time,
         end_time,
-    )
-    .await
+    );
+
+    let (rows, by_wait_event, by_state, mut interval_probe, times_result) =
+        tokio::join!(rows_fut, by_wait_fut, by_state_fut, probe_fut, times_fut);
+
+    let rows = match rows {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::error!("[DbMonitoring] activity read failed for {org_id}/{stream}: {e}");
+            return Err(MetaHttpResponse::internal_error(e));
+        }
+    };
+    let row_count = rows.len();
+    let hits: Vec<Value> = rows.iter().map(activity_row_to_dto).collect();
+
+    if let Ok(times) = times_result
         && !times.is_empty()
     {
         let mut ts: Vec<i64> = times.iter().map(|r| get_i64(r, "_timestamp")).collect();
@@ -3313,7 +4032,7 @@ pub async fn get_dbm_activity(
         interval_probe.kind_sample_times = ts;
     }
 
-    MetaHttpResponse::json(json!({
+    Ok(json!({
         // A SAMPLE of sessions, not the population — the breakdowns below are
         // the population. `truncated` says whether this sample hit its cap.
         "hits": hits,
@@ -3340,10 +4059,13 @@ pub async fn get_dbm_activity(
 
 // ─── W3.4 · Plans read API ───────────────────────────────────────────────────
 //
-// **What this endpoint may and may not claim (D-H).** The plan it returns is a
-// GENERIC, NULL-BOUND, ESTIMATED plan: the receiver sets
-// `plan_cache_mode = force_generic_plan`, PREPAREs the statement, and EXPLAINs
-// it with every bind parameter bound to literal `null`. So:
+// **What this endpoint may and may not claim (D-H), PER RECORD.** Two producers
+// write plans now, with different epistemic status, and every claim below is
+// conditional on the row's `o2_dbm_plan_source`:
+//
+// `generic_null_bound` (the receiver's `db.server.top_query`): a GENERIC,
+// NULL-BOUND, ESTIMATED plan — `plan_cache_mode = force_generic_plan`,
+// PREPAREd, EXPLAINed with every bind bound to literal `null`. So:
 //
 //   * it is not "the plan that ran" — Postgres's default `plan_cache_mode = auto` means production
 //     may well have executed a CUSTOM plan;
@@ -3351,12 +4073,23 @@ pub async fn get_dbm_activity(
 //   * a STABLE hash is NOT an all-clear — generic plans are a pure function of (statement, schema,
 //     stats) and are stable by construction, so the classic "planner flipped to a seq scan at
 //     03:04" incident may never move it;
-//   * LATENCY IS NEVER ATTRIBUTED TO A PLAN. Per-plan latency would come from `pg_stat_statements`
-//     real executions while this plan was never executed.
+//   * LATENCY IS NEVER ATTRIBUTED TO one of these plans. Per-plan latency would come from
+//     `pg_stat_statements` real executions while this plan was never executed.
 //
-// The response states the first point in `plan_source` so the UI cannot label it
-// wrongly, and carries no latency field at all so the fourth cannot be
-// reintroduced by a UI that finds the column lying around.
+// `auto_explain` (the W-E3 filelog producer): the plan Postgres ACTUALLY
+// EXECUTED, with real binds, and — when `log_analyze` was on — real row counts
+// and a real per-execution duration. For these rows a duration IS defensible:
+// each record carries its OWN measured wall clock, so `avg/max duration across
+// N captured executions` attributes latency only to executions that really ran
+// under that plan. Two hard limits survive: the capture is threshold-filtered
+// and possibly sampled (`log_min_duration` / `sample_rate`), so aggregates
+// describe the CAPTURED population, never "average latency"; and a generic
+// row still never gets a latency — the absent-not-null DTO shape makes the
+// executed/generic distinction structural, not stylistic.
+//
+// The per-hit `plan_source` states which contract each row is under (absent ⇒
+// generic: rows written before the column existed can only be generic); the
+// response-level `plan_source` is a derived summary of the hits.
 
 /// Distinct plans for one fingerprint over the window, with first/last seen.
 ///
@@ -3426,22 +4159,56 @@ pub(crate) fn build_dbm_plans_sql(
     } else {
         "NULL AS plan_hash_version".to_string()
     };
-    // Deliberately SUM(calls) and never any exec-time aggregate: see D-H above.
+    // Deliberately SUM(calls) and never any pg_stat_statements exec-time
+    // aggregate: see D-H above.
     let calls_col = if present.contains(server_vantage::O2_DBM_CALLS) {
         format!("SUM({}) AS calls", server_vantage::O2_DBM_CALLS)
     } else {
         "0 AS calls".to_string()
     };
+    // Provenance is part of the GROUP key when the stream has it (E-C): the two
+    // producers can — by design — yield the SAME structural hash, and collapsing
+    // an executed group into a generic one would erase the very distinction the
+    // per-record column exists to surface. A stream written before the column
+    // existed can only hold generic rows, so grouping by hash alone stays
+    // correct there and the DTO backfills the source.
+    let has_source = present.contains(server_vantage::O2_DBM_PLAN_SOURCE);
+    let (source_col, source_group) = if has_source {
+        (
+            format!(
+                ", MAX({}) AS plan_source",
+                server_vantage::O2_DBM_PLAN_SOURCE
+            ),
+            format!(", {}", server_vantage::O2_DBM_PLAN_SOURCE),
+        )
+    } else {
+        (String::new(), String::new())
+    };
+    // EXECUTED-only aggregates, over the per-execution durations auto_explain
+    // measured. This is NOT the banned latency-by-plan: each explain row
+    // carries its OWN real wall clock for an execution that really ran under
+    // this plan. The generic groups yield NULLs here (top_query rows have no
+    // duration column) and the DTO omits the keys for them.
+    let duration_cols = if present.contains(server_vantage::O2_DBM_PLAN_DURATION_MS) {
+        format!(
+            ", AVG({d}) AS avg_duration_ms, MAX({d}) AS max_duration_ms, \
+             COUNT({d}) AS executions",
+            d = server_vantage::O2_DBM_PLAN_DURATION_MS
+        )
+    } else {
+        String::new()
+    };
     Some(format!(
         "SELECT {hash} AS plan_hash, {plan_col}, {version_col}, {calls_col}, \
-         MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen \
+         MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen{source_col}{duration_cols} \
          FROM \"{stream}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
-         AND {kind} = '{kind_val}'\n    AND {fp} = '{fp_val}'{preds}\nGROUP BY {hash}\n\
-         ORDER BY last_seen DESC",
+         AND {kind} IN ('{kind_top}', '{kind_explain}')\n    AND {fp} = '{fp_val}'{preds}\n\
+         GROUP BY {hash}{source_group}\nORDER BY last_seen DESC",
         hash = server_vantage::O2_DBM_PLAN_HASH,
         stream = escape_ident(stream_name),
         kind = server_vantage::O2_DBM_KIND,
-        kind_val = escape_sq(server_vantage::KIND_TOP_QUERY),
+        kind_top = escape_sq(server_vantage::KIND_TOP_QUERY),
+        kind_explain = escape_sq(server_vantage::KIND_EXPLAIN),
         fp = server_vantage::O2_DBM_FINGERPRINT,
         fp_val = escape_sq(fingerprint),
     ))
@@ -3462,7 +4229,17 @@ pub(crate) fn build_dbm_plans_sql(
 /// share is absent rather than approximated.
 fn plan_row_to_dto(row: &Value) -> Value {
     let calls = get_i64(row, "calls");
-    json!({
+    // Per-hit provenance (E-C). Absent ⇒ generic: rows written before the
+    // column existed can only be generic — nothing else could have written
+    // them — so the backfill defaults to the WEAKER claim. Defaulting the
+    // other way would silently upgrade every historical row to a claim it
+    // cannot support.
+    let plan_source = row
+        .get("plan_source")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(server_vantage::PLAN_SOURCE_GENERIC);
+    let mut dto = json!({
         "plan_hash": row.get("plan_hash").and_then(Value::as_str),
         // The PARSED tree, so the UI renders a structure rather than re-parsing
         // a string. Malformed input reads as absent rather than failing the
@@ -3475,7 +4252,49 @@ fn plan_row_to_dto(row: &Value) -> Value {
         "first_seen": get_i64(row, "first_seen"),
         "last_seen": get_i64(row, "last_seen"),
         "calls": calls,
-    })
+        "plan_source": plan_source,
+    });
+    // Duration keys — ONLY on executed hits that measured one, and ABSENT (not
+    // null) everywhere else. A null latency on a generic plan invites a UI to
+    // render "—" in a latency column and thereby implies the column APPLIES to
+    // that row, which is the exact framing D-H forbids. The invariant: a claim
+    // about duration appears on a hit if and only if that hit carries a real
+    // duration.
+    if plan_source == server_vantage::PLAN_SOURCE_AUTO_EXPLAIN
+        && let Some(avg) = row.get("avg_duration_ms").and_then(Value::as_f64)
+    {
+        let obj = dto.as_object_mut().unwrap();
+        obj.insert("avg_duration_ms".into(), json!(avg));
+        if let Some(max) = row.get("max_duration_ms").and_then(Value::as_f64) {
+            obj.insert("max_duration_ms".into(), json!(max));
+        }
+        if let Some(execs) = row.get("executions").and_then(Value::as_i64) {
+            obj.insert("executions".into(), json!(execs));
+        }
+    }
+    dto
+}
+
+/// The response-level `plan_source` summary, derived from the hits (E-C).
+///
+/// Kept for the UI type that predates per-hit provenance, but no longer a
+/// constant: a window holding both producers is `"mixed"`, and calling it
+/// either single value would mislabel half the rows. An empty window reads as
+/// generic — the weaker claim, same reasoning as the DTO backfill.
+fn derived_plan_source(hits: &[Value]) -> &'static str {
+    let mut saw_executed = false;
+    let mut saw_generic = false;
+    for h in hits {
+        match h.get("plan_source").and_then(Value::as_str) {
+            Some(server_vantage::PLAN_SOURCE_AUTO_EXPLAIN) => saw_executed = true,
+            _ => saw_generic = true,
+        }
+    }
+    match (saw_executed, saw_generic) {
+        (true, true) => "mixed",
+        (true, false) => server_vantage::PLAN_SOURCE_AUTO_EXPLAIN,
+        _ => server_vantage::PLAN_SOURCE_GENERIC,
+    }
 }
 
 // ─── W6 · server-side query metrics ──────────────────────────────────────────
@@ -3544,7 +4363,7 @@ pub(crate) fn server_metrics_capture_state(present: &HashSet<String>) -> &'stati
 pub(crate) fn build_dbm_server_metrics_sql(
     stream_name: &str,
     engine: &str,
-    database: &str,
+    database: Option<&str>,
     fingerprint: &str,
     start_time: i64,
     end_time: i64,
@@ -3584,6 +4403,21 @@ pub(crate) fn build_dbm_server_metrics_sql(
     ]
     .join(", ");
 
+    // The database predicate exists only when the engine's records carry one:
+    // mysql/mariadb top_query rows ship NO database field at all (verified
+    // live — 43k records, zero with a database), so a database predicate
+    // against them matches nothing forever, and the section told every MySQL
+    // reader to "set up" capture that was already running. Absent, the match
+    // is (fingerprint, engine) and the instance GROUPing below carries the
+    // cross-instance protection exactly as it always did.
+    let db_pred = match database {
+        Some(db) => format!(
+            "\n    AND {} = '{}'",
+            server_vantage::O2_DBM_DATABASE,
+            escape_sq(db)
+        ),
+        None => String::new(),
+    };
     // NOTE the absent instance predicate: see the module note above. The
     // instance is SELECTed and GROUPed (display + ambiguity detection) but
     // never constrained, or every match behind a pooler is lost.
@@ -3592,7 +4426,7 @@ pub(crate) fn build_dbm_server_metrics_sql(
          MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen \
          FROM \"{stream}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
          AND {kind} = '{kind_val}'\n    AND {fp} = '{fp_val}'\n    \
-         AND {eng} = '{eng_val}'\n    AND {db} = '{db_val}'\nGROUP BY {inst}\n\
+         AND {eng} = '{eng_val}'{db_pred}\nGROUP BY {inst}\n\
          ORDER BY calls DESC",
         inst = server_vantage::O2_DBM_INSTANCE,
         calls = server_vantage::O2_DBM_CALLS,
@@ -3603,8 +4437,6 @@ pub(crate) fn build_dbm_server_metrics_sql(
         fp_val = escape_sq(fingerprint),
         eng = server_vantage::O2_DBM_ENGINE,
         eng_val = escape_sq(engine),
-        db = server_vantage::O2_DBM_DATABASE,
-        db_val = escape_sq(database),
     ))
 }
 
@@ -3647,6 +4479,7 @@ pub(crate) fn server_metrics_envelope(
     engine: &str,
     stream: &str,
     capture: &str,
+    database_scoped: bool,
 ) -> Value {
     let base = json!({
         "stream": stream,
@@ -3654,6 +4487,11 @@ pub(crate) fn server_metrics_envelope(
         // What the folded exec-time field measured on THIS engine, so the
         // header can name it rather than guessing.
         "exec_time_kind": exec_time_kind(engine),
+        // Whether the counters were narrowed to ONE database or cover the
+        // whole instance. mysql/mariadb records carry no database, so their
+        // numbers are instance-wide by construction — the UI must caption
+        // that rather than let them read as per-database figures.
+        "attribution": if database_scoped { "database" } else { "instance" },
     });
     let mut env = base.as_object().cloned().unwrap_or_default();
 
@@ -3752,13 +4590,23 @@ pub async fn get_dbm_query_server_metrics(
     let Some(engine) = q.engine.as_deref().filter(|e| !e.is_empty()) else {
         return MetaHttpResponse::bad_request("engine is required");
     };
-    // The database is part of the join key, so an absent one cannot be defaulted
-    // — an empty predicate would match every database and attribute the wrong
-    // one's counters. MySQL top_query carries no `db.namespace` at all, so this
-    // legitimately 400s for MySQL rather than inventing a database.
-    let Some(database) = q.database.as_deref().filter(|d| !d.is_empty()) else {
+    // The database is part of the join key WHERE THE ENGINE'S RECORDS CARRY
+    // ONE — for those engines an absent database cannot be defaulted, since an
+    // empty predicate would match every database and attribute the wrong one's
+    // counters. mysql/mariadb top_query records carry NO database field at all
+    // (receiver contract, verified live), so for them the predicate is
+    // dropped: the match is (fingerprint, engine), instance ambiguity is
+    // still refused by the envelope, and the response says the attribution is
+    // instance-wide so the UI can caption it honestly.
+    let database_less_engine = matches!(engine.to_ascii_lowercase().as_str(), "mysql" | "mariadb");
+    let database = q.database.as_deref().filter(|d| !d.is_empty());
+    if database.is_none() && !database_less_engine {
         return MetaHttpResponse::bad_request("database is required");
-    };
+    }
+    // Sent-but-unusable: a database predicate against records that carry no
+    // database column matches nothing forever — the exact bug this branch
+    // exists to end.
+    let database = if database_less_engine { None } else { database };
     // Defaults, like `/query/plans`: these are server-vantage records in the
     // single shared LOGS stream. Requiring it would make the UI hardcode a
     // backend constant to reach its own endpoint.
@@ -3819,7 +4667,743 @@ pub async fn get_dbm_query_server_metrics(
         engine,
         stream,
         server_metrics_capture_state(&present),
+        database.is_some(),
     ))
+}
+
+// ─── Server-vantage query list (`/server_queries`) ───────────────────────────
+//
+// The whole-list sibling of `/query/server_metrics`: the same per-fingerprint
+// fold, grouped over every statement in the window instead of filtered to one.
+// It exists for the deployment that wired the database collector but traces no
+// application traffic — there the client-vantage `/queries` list is honestly
+// empty, while the databases themselves have been reporting their statement
+// counters all along.
+//
+// A SEPARATE endpoint, never a fallback folded into `/queries`: `/queries`
+// reads the rollup and live trace tails under `StreamType::Traces` auth, and
+// folding a Logs-auth server source into it would put three provenances under
+// two auth models in one response (see `get_dbm_query_server_metrics`). The UI
+// renders these rows under their own heading for the same reason — a
+// server-side call count sitting unlabelled in a client-vantage table would
+// read as traced traffic that never existed.
+//
+// **This list ranks by CALL COUNT and can do nothing else honestly.** The
+// receiver's top_query feed is a most-FREQUENT top-N (`KIND_TOP_QUERY` docs):
+// the expensive-but-rare statement may never have been sent at all, so a list
+// re-ranked by total time would present a call-count-selected sample as "your
+// most expensive queries". `ranked_by` states the ordering on the wire so the
+// UI cannot silently retitle it.
+
+/// A browse page, not an export: 50 rows is what a reader scans, and the cap
+/// keeps the grouped fold bounded on a stream holding weeks of intervals.
+const DEFAULT_SERVER_QUERIES_LIMIT: usize = 50;
+const MAX_SERVER_QUERIES_LIMIT: usize = 200;
+
+/// Whether server-side counters have EVER been captured on this stream —
+/// `"on"` or `"off"`. Same contract as [`server_metrics_capture_state`], with
+/// one addition: this list also needs the FINGERPRINT column (it is the group
+/// key and the navigation key to the detail page), so a stream carrying calls
+/// but no fingerprints reports `"off"` here while the single-query endpoint
+/// still answers.
+///
+/// Deliberately the SAME condition [`build_dbm_server_queries_sql`] skips on:
+/// reported independently the two would drift, and the UI would tell a user
+/// their capture is off while the query it gates ran fine.
+pub(crate) fn server_queries_capture_state(present: &HashSet<String>) -> &'static str {
+    if present.contains(server_vantage::O2_DBM_CALLS)
+        && present.contains(server_vantage::O2_DBM_FINGERPRINT)
+    {
+        "on"
+    } else {
+        "off"
+    }
+}
+
+/// The window's statements as the databases reported them, one row per
+/// (fingerprint, engine, database, instance), ranked by summed call count.
+///
+/// The counters are PER-INTERVAL DELTAS (`o2_dbm_metrics_are_delta`, stated
+/// unconditionally by the writer), so `SUM` over the window is the correct
+/// fold and the SAME one `build_dbm_server_metrics_sql` performs — treating
+/// them as cumulative gauges (MAX) would discard every interval but one.
+/// The known asymmetry is inherited from the writer, not introduced here: the
+/// first emission per statement carries the whole `pg_stat_statements`
+/// backlog, which the writer documents as undetectable per record.
+///
+/// `MAX(query)` picks one representative text per group — every row in a group
+/// shares a fingerprint, so the texts differ only in normalizer-invisible
+/// spacing and which one is arbitrary (the `MAX(plan)` reasoning).
+///
+/// The dimension columns are grouped only when the STREAM carries them:
+/// naming an absent column fails the whole query with a schema error, and
+/// mysql/mariadb feeds legitimately ship no database at all.
+///
+/// `None` when the stream has never carried the counter or fingerprint columns
+/// — an empty section, not a 500 (`ZO_DB_MONITORING_TOP_QUERY_ENABLED`
+/// defaults OFF).
+pub(crate) fn build_dbm_server_queries_sql(
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+    preds: &str,
+    limit: usize,
+    present: &HashSet<String>,
+) -> Option<String> {
+    if !present.contains(server_vantage::O2_DBM_CALLS)
+        || !present.contains(server_vantage::O2_DBM_FINGERPRINT)
+    {
+        return None;
+    }
+    // Group keys under their WIRE aliases: storage names never reach the
+    // browser (the `activity_row_to_dto` contract), and aliasing in SQL keeps
+    // the reader below a plain key lookup. GROUP BY names the storage columns.
+    let mut group_cols: Vec<&str> = vec![server_vantage::O2_DBM_FINGERPRINT];
+    let mut projected: Vec<String> = vec![format!(
+        "{} AS fingerprint",
+        server_vantage::O2_DBM_FINGERPRINT
+    )];
+    for (col, alias) in [
+        (server_vantage::O2_DBM_ENGINE, "db_system"),
+        (server_vantage::O2_DBM_DATABASE, "db_namespace"),
+        (server_vantage::O2_DBM_INSTANCE, "db_instance"),
+    ] {
+        if present.contains(col) {
+            group_cols.push(col);
+            projected.push(format!("{col} AS {alias}"));
+        } else {
+            projected.push(format!("NULL AS {alias}"));
+        }
+    }
+    let query_text = if present.contains(server_vantage::O2_DBM_ACTIVITY_QUERY) {
+        format!("MAX({}) AS query", server_vantage::O2_DBM_ACTIVITY_QUERY)
+    } else {
+        "NULL AS query".to_string()
+    };
+    let exec_time = if present.contains(server_vantage::O2_DBM_EXEC_TIME_S) {
+        format!("SUM({}) AS exec_time_s", server_vantage::O2_DBM_EXEC_TIME_S)
+    } else {
+        "NULL AS exec_time_s".to_string()
+    };
+    Some(format!(
+        "SELECT {proj}, {query_text}, SUM({calls}) AS calls, {exec_time}, \
+         MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen \
+         FROM \"{stream}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
+         AND {kind} = '{kind_val}'{preds}\nGROUP BY {group}\n\
+         ORDER BY calls DESC\nLIMIT {limit}",
+        proj = projected.join(", "),
+        calls = server_vantage::O2_DBM_CALLS,
+        stream = escape_ident(stream_name),
+        kind = server_vantage::O2_DBM_KIND,
+        kind_val = escape_sq(server_vantage::KIND_TOP_QUERY),
+        group = group_cols.join(", "),
+    ))
+}
+
+/// The server-queries response envelope — a callable fn, so the shape is
+/// tested for real instead of scraped out of the handler's source text.
+///
+/// Per hit: the MEAN and never a percentile (`pg_stat_statements` accumulates
+/// a total and a count, so a quotient is the only central tendency this feed
+/// supports), and `exec_time_kind` states what the folded time field measured
+/// on that row's engine — Postgres execution vs MySQL wait (see
+/// [`exec_time_kind`]) — so a mixed-engine list cannot mislabel either.
+pub(crate) fn server_queries_envelope(
+    rows: &[Value],
+    stream: &str,
+    capture: &str,
+    limit: usize,
+) -> Value {
+    let hits: Vec<Value> = rows
+        .iter()
+        .map(|r| {
+            let calls = rollup::get_i64(r, "calls");
+            let exec_time_s = r.get("exec_time_s").and_then(Value::as_f64);
+            let engine = rollup::get_str(r, "db_system");
+            // The MEAN, and never a percentile — see the envelope docs.
+            let mean_exec_time_s = match (exec_time_s, calls) {
+                (Some(total), c) if c > 0 => json!(total / c as f64),
+                _ => Value::Null,
+            };
+            json!({
+                "fingerprint": rollup::get_str(r, "fingerprint"),
+                "query": str_or_null(r, "query"),
+                "db_system": engine,
+                "db_namespace": str_or_null(r, "db_namespace"),
+                "db_instance": str_or_null(r, "db_instance"),
+                "calls": calls,
+                "exec_time_s": exec_time_s,
+                "mean_exec_time_s": mean_exec_time_s,
+                "exec_time_kind": exec_time_kind(&engine),
+                "first_seen": rollup::get_i64(r, "first_seen"),
+                "last_seen": rollup::get_i64(r, "last_seen"),
+            })
+        })
+        .collect();
+    json!({
+        "hits": hits,
+        "total": hits.len(),
+        // Group count against the cap: the SQL LIMIT bites on GROUPS, so a
+        // full page means more statements existed than were returned.
+        "truncated": rows.len() >= limit,
+        "stream": stream,
+        "server_queries_capture": capture,
+        // The feed's own selection criterion, stated so the UI titles the list
+        // as "most frequently run" rather than implying most expensive — the
+        // receiver sends a most-frequent slice and rows outside it never
+        // arrive (see KIND_TOP_QUERY).
+        "ranked_by": "calls",
+    })
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ServerQueriesQuery {
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub stream: Option<String>,
+    pub system: Option<String>,
+    pub instance: Option<String>,
+    /// See [`DeadlocksQuery::database`] — `namespace` is the same concept under
+    /// the rollup endpoints' spelling.
+    pub database: Option<String>,
+    pub namespace: Option<String>,
+    pub limit: Option<usize>,
+}
+
+impl ServerQueriesQuery {
+    fn database(&self) -> Option<&str> {
+        self.database
+            .as_deref()
+            .or(self.namespace.as_deref())
+            .filter(|s| !s.is_empty())
+    }
+}
+
+/// GET /{org_id}/traces/db_monitoring/server_queries — the statement list as
+/// the DATABASES report it, for deployments with no traced application
+/// traffic.
+///
+/// Ranked by call count because the underlying feed is a most-frequent top-N
+/// and can support no other ranking honestly — see the module note above.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/db_monitoring/server_queries",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringServerQueries",
+    summary = "Database Monitoring: statements as reported by the databases themselves",
+    description = "Per-statement counters (pg_stat_statements / events_statements_summary_by_digest) aggregated over the window, ranked by call count. Server-vantage: measured inside the database across every client, disjoint from the trace-derived /queries list. Reports a MEAN and never a percentile.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("system" = Option<String>, Query, description = "Database engine filter"),
+        ("instance" = Option<String>, Query, description = "Database instance filter"),
+        ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
+        ("limit" = Option<usize>, Query, description = "Max statements returned (default 50, cap 200)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    )
+)]
+pub async fn get_dbm_server_queries(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<ServerQueriesQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    match read_server_queries_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The server-queries endpoint's whole body as a callable — same extraction as
+/// [`read_databases_body`]. [`get_dbm_badges`] runs it as the zero-trace
+/// fallback slice, under the same Logs-stream auth this endpoint enforces.
+async fn read_server_queries_body(
+    org_id: &str,
+    user_id: &str,
+    q: &ServerQueriesQuery,
+) -> Result<Value, HttpResponse> {
+    let stream = q
+        .stream
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_SERVER_STREAM);
+    // Checked BEFORE the range parsing, so a caller cannot probe stream
+    // existence through error-message differences. A LOGS stream — these are
+    // server-vantage records, and `StreamType::Traces` here would consult the
+    // wrong OFGA object and silently authorize.
+    if !can_read_stream(org_id, user_id, stream, StreamType::Logs).await {
+        return Err(unauthorized_response());
+    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
+    if start_time >= end_time {
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
+    }
+    let limit = q
+        .limit
+        .unwrap_or(DEFAULT_SERVER_QUERIES_LIMIT)
+        .clamp(1, MAX_SERVER_QUERIES_LIMIT);
+    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
+
+    // A failed schema read is reported, never absorbed into an empty set — an
+    // empty set would report a healthy capture pipeline as `off`. See
+    // `present_dbm_columns`.
+    let present = match present_dbm_columns(org_id, stream).await {
+        Ok(present) => present,
+        Err(e) => {
+            log::error!(
+                "[DbMonitoring] server queries schema read failed for {org_id}/{stream}: {e}"
+            );
+            return Err(MetaHttpResponse::internal_error(e));
+        }
+    };
+
+    let rows =
+        match build_dbm_server_queries_sql(stream, start_time, end_time, &preds, limit, &present) {
+            Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
+                Ok(rows) => rows,
+                Err(e) => {
+                    log::error!(
+                        "[DbMonitoring] server queries read failed for {org_id}/{stream}: {e}"
+                    );
+                    return Err(MetaHttpResponse::internal_error(e));
+                }
+            },
+            // The stream has never carried server counters — an empty section, not
+            // an error.
+            None => Vec::new(),
+        };
+
+    Ok(server_queries_envelope(
+        &rows,
+        stream,
+        server_queries_capture_state(&present),
+        limit,
+    ))
+}
+
+// ─── Server-vantage slowest executions (`/server_samples`) ───────────────────
+//
+// The server-vantage sibling of `/samples` (FR-6), for the same
+// no-traced-traffic deployment `/server_queries` serves. Each hit is ONE real
+// execution with its OWN measured wall-clock duration, from either of the two
+// per-execution producers the server vantage has:
+//
+//   • `KIND_STATEMENT` — a `log_min_duration_statement` completed-statement
+//     line (exact duration, every client, no plan), and
+//   • `KIND_EXPLAIN` — a Postgres `auto_explain` record (the same measurement
+//     with the executed plan attached).
+//
+// The top_query counters CANNOT power this list: they are interval
+// aggregates, and presenting an interval total (or its mean) as "a slow call"
+// would invent executions that never happened.
+//
+// **The two producers land on DIFFERENT streams by design.** The demo
+// collector routes only the kinds it knew the backend could read (deadlock /
+// explain) to `dbm_server`; the tailed database-log remainder — which is
+// where statement-duration lines live — goes to the `dbm_server_logs`
+// sibling. So when the caller names no stream, the handler reads BOTH
+// defaults and merges, rather than defaulting to one and silently losing the
+// other producer's rows. An explicit `?stream=` still means that one stream.
+//
+// What these rows honestly are, and the envelope states both limits:
+//   • measured INSIDE the database — in-engine time from statement start to
+//     completion, not what any caller experienced (network and connection
+//     wait are not in it);
+//   • a THRESHOLD-FILTERED capture: `log_min_duration_statement` /
+//     `auto_explain.log_min_duration` (and possibly `sample_rate`) decide
+//     which executions get logged, so the rows describe the captured
+//     population, never "all executions". The rows the threshold admitted ARE
+//     the slow ones, which is what this page ranks — but a quiet window means
+//     "nothing crossed the threshold", not "nothing ran".
+
+/// The stream the demo tailer routes the raw database-log remainder to — the
+/// sibling of [`DEFAULT_SERVER_STREAM`], and where `KIND_STATEMENT` rows land
+/// (the collector's routing sends only deadlock/explain lines to
+/// `dbm_server`; everything else in the tailed log, statement durations
+/// included, goes here).
+const DEFAULT_SERVER_LOGS_STREAM: &str = "dbm_server_logs";
+
+/// The per-execution duration columns, in COALESCE order: the statement-log
+/// duration first — on any row carrying both (impossible today: the kinds are
+/// disjoint) the plainer measurement wins.
+const SAMPLE_DURATION_COLS: [&str; 2] = [
+    server_vantage::O2_DBM_STMT_DURATION_MS,
+    server_vantage::O2_DBM_PLAN_DURATION_MS,
+];
+
+/// Whether per-execution capture has EVER run against this stream — `"on"` or
+/// `"off"`. Gate: EITHER per-execution duration column, the field that makes
+/// a row a single execution rather than an interval aggregate.
+///
+/// Deliberately the SAME condition [`build_dbm_server_samples_sql`] skips on —
+/// see [`server_queries_capture_state`] for why the two must not drift.
+pub(crate) fn server_samples_capture_state(present: &HashSet<String>) -> &'static str {
+    if SAMPLE_DURATION_COLS.iter().any(|c| present.contains(*c)) {
+        "on"
+    } else {
+        "off"
+    }
+}
+
+/// The slowest captured executions in the window, one row per EXECUTION.
+///
+/// A plain ranked fetch, no grouping: each `KIND_STATEMENT` / `KIND_EXPLAIN`
+/// record is one real execution carrying its own measured duration, so a
+/// top-N by that duration is exact over the captured population.
+///
+/// The duration expression COALESCEs whichever of the two per-execution
+/// columns the stream carries, and only the present ones are named — naming
+/// an absent column fails the whole query with a schema error, and a stream
+/// normally carries exactly one of the two (the producers land on different
+/// streams).
+///
+/// `None` when the stream has never carried EITHER per-execution duration
+/// column — an empty section, not a 500 (both captures are opt-in database
+/// settings).
+pub(crate) fn build_dbm_server_samples_sql(
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+    preds: &str,
+    limit: usize,
+    present: &HashSet<String>,
+) -> Option<String> {
+    let dur_cols: Vec<&str> = SAMPLE_DURATION_COLS
+        .iter()
+        .copied()
+        .filter(|c| present.contains(*c))
+        .collect();
+    let dur = match dur_cols.as_slice() {
+        [] => return None,
+        [one] => (*one).to_string(),
+        many => format!("COALESCE({})", many.join(", ")),
+    };
+    // Wire aliases, optional-column gating: same reasoning as
+    // `build_dbm_server_queries_sql`.
+    let opt = |col: &str, alias: &str| -> String {
+        if present.contains(col) {
+            format!("{col} AS {alias}")
+        } else {
+            format!("NULL AS {alias}")
+        }
+    };
+    let cols = [
+        "_timestamp".to_string(),
+        // Which producer captured the row — the read side maps it to the
+        // per-hit `source` field, so a mixed window cannot mislabel a hit.
+        opt(server_vantage::O2_DBM_KIND, "kind"),
+        opt(server_vantage::O2_DBM_FINGERPRINT, "fingerprint"),
+        opt(server_vantage::O2_DBM_ACTIVITY_QUERY, "query"),
+        format!("{dur} AS duration_ms"),
+        // Present only when `auto_explain.log_analyze` was on — absent stays
+        // absent rather than becoming a confident zero.
+        opt(server_vantage::O2_DBM_PLAN_ROWS_ACTUAL, "rows_actual"),
+        opt(server_vantage::O2_DBM_ENGINE, "db_system"),
+        opt(server_vantage::O2_DBM_DATABASE, "db_namespace"),
+        opt(server_vantage::O2_DBM_INSTANCE, "db_instance"),
+        // The session user from the statement-log prefix; auto_explain rows
+        // never carry one.
+        opt(server_vantage::O2_DBM_SESSION_USER, "db_user"),
+        // Identity for the producer-twin dedupe (`dedupe_producer_twins`),
+        // never surfaced in the envelope: both producers' lines carry the
+        // same log prefix, so the pid travels on both.
+        opt(server_vantage::O2_DBM_SESSION_PID, "session_pid"),
+    ]
+    .join(", ");
+    Some(format!(
+        "SELECT {cols} FROM \"{stream}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
+         AND {kind} IN ('{kind_stmt}', '{kind_explain}')\n    AND {dur} IS NOT NULL{preds}\n\
+         ORDER BY duration_ms DESC\nLIMIT {limit}",
+        stream = escape_ident(stream_name),
+        kind = server_vantage::O2_DBM_KIND,
+        kind_stmt = escape_sq(server_vantage::KIND_STATEMENT),
+        kind_explain = escape_sq(server_vantage::KIND_EXPLAIN),
+    ))
+}
+
+/// Per-hit provenance for the server-samples envelope: which producer
+/// captured the execution. `KIND_STATEMENT` rows are statement-log lines;
+/// `KIND_EXPLAIN` rows are auto_explain documents. Absent/unknown kinds
+/// default to the WEAKER claim (`statement_log` — duration only, no plan),
+/// mirroring how `plan_source` treats absent as generic.
+fn sample_source_of(kind: Option<&str>) -> &'static str {
+    match kind {
+        Some(server_vantage::KIND_EXPLAIN) => "auto_explain",
+        _ => "statement_log",
+    }
+}
+
+/// Drop auto_explain rows that describe an execution the statement log
+/// already reported.
+///
+/// With both producers wide open (statement logging AND auto_explain), one
+/// completed statement writes TWO log lines — a `duration:` line and a plan
+/// document — and both canonicalize into per-execution rows. Left merged,
+/// every slow call lists twice: once with the session user, once without
+/// (verified live: twin rows share the exact prefix timestamp, durations
+/// ~1 ms apart because the statement duration includes parse/plan time).
+///
+/// Identity is (completion timestamp, fingerprint) — the log prefix stamps
+/// the same millisecond on both lines. The pid CANNOT anchor the identity:
+/// verified live, plan documents carry no `o2_dbm_session_pid` (only the
+/// statement line's prefix is pid-parsed), so it refines the match only when
+/// the explain row actually has one. The rules are asymmetric on purpose:
+///  • a STATEMENT row is never dropped — it carries the user and the full
+///    statement duration;
+///  • an EXPLAIN row is dropped only when a statement row claims its
+///    identity (and, when the explain row carries a pid, the same pid) — a
+///    deployment that captures only auto_explain (thresholds differ per
+///    knob) keeps every row;
+///  • two rows of the SAME kind sharing an identity are both kept: two
+///    sessions can complete the same statement inside a millisecond, and
+///    collapsing them would undercount real work. N statement rows absorb
+///    all their explain twins and the count stays N — the executions.
+///
+/// Known edge, accepted: same statement, same millisecond, one execution
+/// above the statement-log threshold and one below it — the below-threshold
+/// explain row is absorbed by the other's statement row. Requires two
+/// same-shape completions in one millisecond straddling the threshold.
+pub(crate) fn dedupe_producer_twins(rows: &mut Vec<Value>) {
+    let base =
+        |r: &Value| -> (i64, String) { (get_i64(r, "_timestamp"), get_str(r, "fingerprint")) };
+    let mut statement_pids: HashMap<(i64, String), HashSet<i64>> = HashMap::new();
+    for r in rows.iter() {
+        if r.get("kind").and_then(Value::as_str) != Some(server_vantage::KIND_EXPLAIN) {
+            statement_pids
+                .entry(base(r))
+                .or_default()
+                .insert(get_i64(r, "session_pid"));
+        }
+    }
+    rows.retain(|r| {
+        if r.get("kind").and_then(Value::as_str) != Some(server_vantage::KIND_EXPLAIN) {
+            return true;
+        }
+        match statement_pids.get(&base(r)) {
+            None => true,
+            Some(pids) => {
+                let pid = get_i64(r, "session_pid");
+                // No pid on the explain row (the normal case): any statement
+                // twin absorbs it. A pid present must actually match.
+                pid != 0 && !pids.contains(&pid)
+            }
+        }
+    });
+}
+
+/// The server-samples response envelope — callable, like its siblings, so the
+/// honesty keys are tested for real.
+pub(crate) fn server_samples_envelope(
+    rows: &[Value],
+    stream: &str,
+    capture: &str,
+    limit: usize,
+) -> Value {
+    let hits: Vec<Value> = rows
+        .iter()
+        .map(|r| {
+            json!({
+                "timestamp": get_i64(r, "_timestamp"),
+                "fingerprint": str_or_null(r, "fingerprint"),
+                "query": str_or_null(r, "query"),
+                "duration_ms": r.get("duration_ms").and_then(as_f64_loose),
+                "rows_actual": r.get("rows_actual").and_then(server_vantage::as_i64_loose),
+                "db_system": str_or_null(r, "db_system"),
+                "db_namespace": str_or_null(r, "db_namespace"),
+                "db_instance": str_or_null(r, "db_instance"),
+                "db_user": str_or_null(r, "db_user"),
+                "source": sample_source_of(r.get("kind").and_then(Value::as_str)),
+            })
+        })
+        .collect();
+    json!({
+        "hits": hits,
+        "total": hits.len(),
+        "truncated": rows.len() >= limit,
+        "stream": stream,
+        "server_samples_capture": capture,
+        // The capture is threshold-filtered (log_min_duration_statement /
+        // auto_explain.log_min_duration / sample_rate), so these rows describe
+        // the CAPTURED population — the UI must not present them as every
+        // execution.
+        "threshold_filtered": true,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ServerSamplesQuery {
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub stream: Option<String>,
+    pub system: Option<String>,
+    pub instance: Option<String>,
+    /// See [`DeadlocksQuery::database`].
+    pub database: Option<String>,
+    pub namespace: Option<String>,
+    pub limit: Option<usize>,
+}
+
+impl ServerSamplesQuery {
+    fn database(&self) -> Option<&str> {
+        self.database
+            .as_deref()
+            .or(self.namespace.as_deref())
+            .filter(|s| !s.is_empty())
+    }
+}
+
+/// GET /{org_id}/traces/db_monitoring/server_samples — the slowest executions
+/// the DATABASE ITSELF captured, for deployments with no traced traffic.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/db_monitoring/server_samples",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringServerSamples",
+    summary = "Database Monitoring: slowest executions captured by the database's own logging",
+    description = "Single executions with their measured in-engine durations — from log_min_duration_statement completed-statement lines and Postgres auto_explain records — ranked slowest first. A threshold-filtered capture: rows describe only the executions the database chose to log.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream; when absent BOTH defaults ('dbm_server' and 'dbm_server_logs') are read and merged"),
+        ("system" = Option<String>, Query, description = "Database engine filter"),
+        ("instance" = Option<String>, Query, description = "Database instance filter"),
+        ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
+        ("limit" = Option<usize>, Query, description = "Max executions returned (default 100, cap 500)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    )
+)]
+pub async fn get_dbm_server_samples(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<ServerSamplesQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    match read_server_samples_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The server-samples endpoint's whole body as a callable — same extraction as
+/// [`read_databases_body`]. [`get_dbm_badges`] runs it as the zero-trace
+/// fallback slice, keeping the two-stream merge and the producer-twin dedupe.
+async fn read_server_samples_body(
+    org_id: &str,
+    user_id: &str,
+    q: &ServerSamplesQuery,
+) -> Result<Value, HttpResponse> {
+    // An explicit stream means that one stream. NO stream means both default
+    // streams: the two per-execution producers land on different ones by
+    // design (statement lines on the raw-log sibling, auto_explain on the
+    // events stream — see the module note), and defaulting to either alone
+    // would silently lose the other producer's rows.
+    let candidates: Vec<&str> = match q.stream.as_deref().filter(|s| !s.is_empty()) {
+        Some(s) => vec![s],
+        None => vec![DEFAULT_SERVER_STREAM, DEFAULT_SERVER_LOGS_STREAM],
+    };
+    // Permission before range parsing; Logs, not Traces — see
+    // `get_dbm_server_queries`. On the default pair a stream the caller
+    // cannot read is DROPPED rather than failing the whole read — per-stream
+    // RBAC means the answer is what the caller may see — and only a caller
+    // who may see nothing gets the 403.
+    let mut streams: Vec<&str> = Vec::with_capacity(candidates.len());
+    for s in candidates {
+        if can_read_stream(org_id, user_id, s, StreamType::Logs).await {
+            streams.push(s);
+        }
+    }
+    if streams.is_empty() {
+        return Err(unauthorized_response());
+    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
+    if start_time >= end_time {
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
+    }
+    let limit = q
+        .limit
+        .unwrap_or(DEFAULT_SAMPLES_LIMIT)
+        .clamp(1, MAX_SAMPLES_LIMIT);
+    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
+
+    let mut rows: Vec<Value> = Vec::new();
+    let mut any_truncated = false;
+    let mut capture = "off";
+    for stream in &streams {
+        // Reported, never absorbed — see `present_dbm_columns`.
+        let present = match present_dbm_columns(org_id, stream).await {
+            Ok(present) => present,
+            Err(e) => {
+                log::error!(
+                    "[DbMonitoring] server samples schema read failed for {org_id}/{stream}: {e}"
+                );
+                return Err(MetaHttpResponse::internal_error(e));
+            }
+        };
+        if server_samples_capture_state(&present) == "on" {
+            capture = "on";
+        }
+        // A stream that never captured contributes nothing — not an error.
+        if let Some(sql) =
+            build_dbm_server_samples_sql(stream, start_time, end_time, &preds, limit, &present)
+        {
+            match run_events_search(org_id, stream, sql, start_time, end_time).await {
+                Ok(stream_rows) => {
+                    any_truncated |= stream_rows.len() >= limit;
+                    rows.extend(stream_rows);
+                }
+                Err(e) => {
+                    log::error!(
+                        "[DbMonitoring] server samples read failed for {org_id}/{stream}: {e}"
+                    );
+                    return Err(MetaHttpResponse::internal_error(e));
+                }
+            }
+        }
+    }
+
+    // Merge to ONE ranked list: each stream returned its own top-N, so the
+    // union re-sorts by duration and re-cuts. `truncated` is true when the
+    // merge cut rows OR any single stream's read hit its limit — either way
+    // more qualifying executions existed than were returned.
+    rows.sort_by(|a, b| {
+        let da = a.get("duration_ms").and_then(as_f64_loose).unwrap_or(0.0);
+        let db = b.get("duration_ms").and_then(as_f64_loose).unwrap_or(0.0);
+        db.partial_cmp(&da).unwrap_or(std::cmp::Ordering::Equal)
+    });
+    // One execution, one row — the two producers each logged it.
+    dedupe_producer_twins(&mut rows);
+    let truncated = any_truncated || rows.len() > limit;
+    rows.truncate(limit);
+
+    let envelope_stream = streams.join(",");
+    let mut envelope = server_samples_envelope(&rows, &envelope_stream, capture, limit);
+    // The per-stream cut may already have hidden rows even when the merged
+    // list is short — restate truncation over the whole read.
+    if let Some(obj) = envelope.as_object_mut() {
+        obj.insert("truncated".to_string(), json!(truncated));
+    }
+    Ok(envelope)
 }
 
 #[derive(Debug, Deserialize)]
@@ -3907,10 +5491,13 @@ pub async fn get_dbm_query_plans(
     MetaHttpResponse::json(json!({
         "hits": hits,
         "stream": stream,
-        // The honesty contract, stated by the API so the UI cannot mislabel it.
-        // `generic_null_bound` is what the plan IS: EXPLAINed under
-        // force_generic_plan with every parameter bound to NULL, never executed.
-        "plan_source": "generic_null_bound",
+        // The honesty contract, stated by the API so the UI cannot mislabel
+        // it — now DERIVED, because two producers exist: `generic_null_bound`
+        // when every hit is the receiver's never-executed NULL-bound estimate,
+        // `auto_explain` when every hit is a real executed plan, `mixed` when
+        // the window holds both. The per-hit `plan_source` is authoritative;
+        // this summary exists for the response-level consumers that predate it.
+        "plan_source": derived_plan_source(&hits),
         // Which of the TWO causes of an empty `hits` this is. `off` means the
         // stream never carried a plan hash column, so nothing ever looked and
         // the collector hint is the right advice. `on` means capture ran and
@@ -3919,6 +5506,11 @@ pub async fn get_dbm_query_plans(
         // sentence for both and tells a DBA whose capture is already running
         // to go switch it on.
         "plan_capture": plan_capture_state(&present),
+        // Whether auto_explain ingest is switched on (W-E3). With capture on,
+        // hits empty AND this true, the UI can render the third empty state —
+        // "capture is running; no execution of this query was slow enough" —
+        // which is good news and must not be blamed on config.
+        "explain_enabled": cfg.db_monitoring.explain_enabled,
         // More than one distinct plan in the window. Named `drift_detected`
         // rather than `plan_changed` deliberately: this detects STRUCTURAL DRIFT
         // in the generic plan, and its absence is NOT evidence that no plan
@@ -3931,7 +5523,8 @@ pub async fn get_dbm_query_plans(
 
 // ─── W10 · Table health read API ─────────────────────────────────────────────
 //
-// One row per RELATION, from the `pg_table_stats` feed. See
+// One row per RELATION, from the table-stats recipes (`pg_table_stats` /
+// `mysql_table_stats` / `mariadb_table_stats` — one shared shape). See
 // `server_vantage::KIND_TABLE_STATS` for what this data is; the two properties
 // that bind this module are that the scan/vacuum counters are LIFETIME totals
 // and the tuple counts are PLANNER ESTIMATES, both re-stated on the response
@@ -3939,22 +5532,24 @@ pub async fn get_dbm_query_plans(
 
 /// Which engines this signal is collected for.
 ///
-/// `pg_table_stats` queries `pg_class`/`pg_stat_user_tables`, which exist only
-/// on Postgres. MySQL, MariaDB and SQL Server expose schema statistics through
-/// entirely different catalogs that no shipped recipe reads.
+/// Postgres (`pg_table_stats` over `pg_class`/`pg_stat_user_tables`), MySQL
+/// (`mysql_table_stats` over `information_schema.TABLES` +
+/// `mysql.innodb_table_stats`) and MariaDB (`mariadb_table_stats`, the same
+/// catalogs) all ship recipes. SQL Server exposes schema statistics through
+/// `sys.dm_db_partition_stats`, which no shipped recipe reads yet.
 ///
 /// This exists so the UI can distinguish "no tables have problems" from "this
-/// signal was never collected for your engine". Rendering an empty table for a
-/// MySQL user is the single most dangerous empty state the feature can produce:
-/// it reads as an all-clear about a check that never ran.
+/// signal was never collected for your engine". Rendering an empty table for an
+/// unsupported engine's user is the single most dangerous empty state the
+/// feature can produce: it reads as an all-clear about a check that never ran.
 ///
 /// `""` (no engine filter) answers `unknown` rather than guessing: an unfiltered
 /// request spans every engine in the fleet, so no single verdict is true of it.
 pub(crate) fn table_health_engine_support(engine: &str) -> &'static str {
     match engine {
-        "postgresql" => "supported",
+        "postgresql" | "mysql" | "mariadb" => "supported",
         "" => "unknown",
-        // Named negatively rather than by an allowlist of the three we know:
+        // Named negatively rather than by an allowlist of the engines we know:
         // a fourth engine with no recipe is also unsupported, and defaulting a
         // stranger to `unknown` would render the ambiguous empty state for an
         // engine we are certain about.
@@ -4042,7 +5637,8 @@ pub(crate) fn build_dbm_table_health_sql(
 
 // ─── W11 · Index health read API ─────────────────────────────────────────────
 //
-// One row per INDEX, from the `pg_index_stats` feed. The companion to table
+// One row per INDEX, from the index-stats recipes (`pg_index_stats` /
+// `mysql_index_stats` / `mariadb_index_stats`). The companion to table
 // health, and the source of the never-scanned signal: `idx_scan = 0` on an
 // index means the planner has not chosen it since the counters were last reset.
 //
@@ -4050,12 +5646,15 @@ pub(crate) fn build_dbm_table_health_sql(
 // envelope re-states it so the UI cannot render "never scanned" as a claim
 // about the selected window.
 
-/// Which engines this signal is collected for. `pg_stat_user_indexes` is
-/// Postgres-only; see [`table_health_engine_support`] for why the empty filter
-/// answers `unknown` rather than guessing.
+/// Which engines this signal is collected for. Postgres (`pg_index_stats`),
+/// MySQL (`mysql_index_stats`) and MariaDB (`mariadb_index_stats`) all ship
+/// recipes — MariaDB's honestly omits the usage counter, but size and
+/// definition still make its rows worth collecting. See
+/// [`table_health_engine_support`] for why the empty filter answers `unknown`
+/// rather than guessing.
 pub(crate) fn index_health_engine_support(engine: &str) -> &'static str {
     match engine {
-        "postgresql" => "supported",
+        "postgresql" | "mysql" | "mariadb" => "supported",
         "" => "unknown",
         _ => "unsupported",
     }
@@ -4240,6 +5839,11 @@ pub struct TableHealthQuery {
     pub system: Option<String>,
     pub instance: Option<String>,
     pub limit: Option<usize>,
+    /// Also return the index-health section (`index_hits` and its
+    /// disclosures) in the same response. Off by default: the tab-count badge
+    /// hits this endpoint purely to count tables, and making it pay for index
+    /// rows it discards would tax six pages to spare one round trip on one.
+    pub include_indexes: Option<bool>,
 }
 
 /// GET /{org_id}/traces/db_monitoring/table_health — W10.
@@ -4257,7 +5861,7 @@ pub struct TableHealthQuery {
     tag = "Traces",
     operation_id = "GetDbMonitoringTableHealth",
     summary = "Database Monitoring: table size, bloat and vacuum state",
-    description = "Newest snapshot per relation from the Postgres pg_table_stats feed. Scan and vacuum counters are LIFETIME totals since the last statistics reset; tuple counts and bloat percentage are planner estimates. Postgres only.",
+    description = "Newest snapshot per relation from the table-stats server-vantage feed (pg_table_stats / mysql_table_stats / mariadb_table_stats). Scan and vacuum counters are LIFETIME totals since the last statistics reset; tuple counts and bloat percentage are planner estimates. Postgres, MySQL and MariaDB.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -4267,6 +5871,7 @@ pub struct TableHealthQuery {
         ("system" = Option<String>, Query, description = "Database engine filter"),
         ("instance" = Option<String>, Query, description = "Database instance filter"),
         ("limit" = Option<usize>, Query, description = "Max relations returned (default 100)"),
+        ("include_indexes" = Option<bool>, Query, description = "Also return the index-health section (index_hits, disclosures) in the same response"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -4281,6 +5886,20 @@ pub async fn get_dbm_table_health(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
+    match read_table_health_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The table-health endpoint's whole body as a callable — same extraction as
+/// [`read_databases_body`], for the same badges-agree-with-tabs reason, auth
+/// included.
+async fn read_table_health_body(
+    org_id: &str,
+    user_id: &str,
+    q: &TableHealthQuery,
+) -> Result<Value, HttpResponse> {
     let stream = q
         .stream
         .as_deref()
@@ -4290,12 +5909,14 @@ pub async fn get_dbm_table_health(
     // existence through error-message differences. A LOGS stream — these are
     // server-vantage records, and `StreamType::Traces` here would consult the
     // wrong OFGA object and silently authorize.
-    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
-        return unauthorized_response();
+    if !can_read_stream(org_id, user_id, stream, StreamType::Logs).await {
+        return Err(unauthorized_response());
     }
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
     }
     let limit = q
         .limit
@@ -4309,37 +5930,70 @@ pub async fn get_dbm_table_health(
     // A failed schema read is reported, never absorbed into an empty set — an
     // empty set drops the projection and the page would report a healthy
     // collector as broken. See `present_dbm_columns`.
-    let present = match present_dbm_columns(&org_id, stream).await {
+    let present = match present_dbm_columns(org_id, stream).await {
         Ok(present) => present,
         Err(e) => {
             log::error!(
                 "[DbMonitoring] table health schema read failed for {org_id}/{stream}: {e}"
             );
-            return MetaHttpResponse::internal_error(e);
+            return Err(MetaHttpResponse::internal_error(e));
         }
     };
 
-    let rows =
+    // The two sections are two searches over the same stream, run CONCURRENTLY
+    // when both are wanted — they used to be two endpoints, which the page
+    // called sequentially and paid a full extra round trip for. The merge
+    // keeps their one meaningful independence: tables are the page, so a table
+    // failure is still a 500, while an index failure degrades to an empty
+    // section — the rules that need no index data must keep rendering.
+    let table_search = async {
         match build_dbm_table_health_sql(stream, start_time, end_time, &preds, limit, &present) {
-            Some(sql) => {
-                match run_events_search(&org_id, stream, sql, start_time, end_time).await {
-                    Ok(rows) => rows,
-                    Err(e) => {
-                        log::error!(
-                            "[DbMonitoring] table health read failed for {org_id}/{stream}: {e}"
-                        );
-                        return MetaHttpResponse::internal_error(e);
-                    }
-                }
-            }
-            // The stream has never carried table stats — an empty section, not an
-            // error.
-            None => Vec::new(),
-        };
+            Some(sql) => run_events_search(org_id, stream, sql, start_time, end_time)
+                .await
+                .map(Some),
+            // The stream has never carried table stats — an empty section, not
+            // an error.
+            None => Ok(None),
+        }
+    };
+    let want_indexes = q.include_indexes.unwrap_or(false);
+    let index_search = async {
+        if !want_indexes {
+            return Ok(None);
+        }
+        match build_dbm_index_health_sql(stream, start_time, end_time, &preds, limit, &present) {
+            Some(sql) => run_events_search(org_id, stream, sql, start_time, end_time)
+                .await
+                .map(Some),
+            None => Ok(None),
+        }
+    };
+    let (table_rows, index_rows) = tokio::join!(table_search, index_search);
+
+    let rows = match table_rows {
+        Ok(rows) => rows.unwrap_or_default(),
+        Err(e) => {
+            log::error!("[DbMonitoring] table health read failed for {org_id}/{stream}: {e}");
+            return Err(MetaHttpResponse::internal_error(e));
+        }
+    };
+    let (index_hits, index_read_failed): (Vec<Value>, bool) = match index_rows {
+        Ok(rows) => (
+            rows.unwrap_or_default()
+                .iter()
+                .map(index_health_row_to_dto)
+                .collect(),
+            false,
+        ),
+        Err(e) => {
+            log::error!("[DbMonitoring] index health read failed for {org_id}/{stream}: {e}");
+            (Vec::new(), true)
+        }
+    };
 
     let hits: Vec<Value> = rows.iter().map(table_health_row_to_dto).collect();
 
-    MetaHttpResponse::json(json!({
+    let mut body = json!({
         "hits": hits,
         "stream": stream,
         "total": hits.len(),
@@ -4364,113 +6018,333 @@ pub async fn get_dbm_table_health(
         // Without it a MySQL user sees an empty table and reads it as "no
         // problems found" — an all-clear about a check that never ran.
         "engine_coverage": table_health_engine_support(q.system.as_deref().unwrap_or("")),
-    }))
+    });
+    if want_indexes {
+        let extra = body.as_object_mut().expect("body is an object");
+        extra.insert("index_hits".into(), json!(index_hits));
+        extra.insert("index_total".into(), json!(index_hits.len()));
+        // Same disclosure as the table counters: `idx_scan` counts from the
+        // last `pg_stat_reset()`, so "never scanned" is a lifetime claim.
+        extra.insert("index_counters_are_cumulative".into(), json!(true));
+        extra.insert(
+            "index_engine_coverage".into(),
+            json!(index_health_engine_support(
+                q.system.as_deref().unwrap_or("")
+            )),
+        );
+        // Stated, not implied by emptiness: an empty index list is the honest
+        // answer on a fresh install, but "we could not read" must not wear
+        // that costume — the unused-index rule stays silent instead of
+        // declaring every index healthy.
+        extra.insert("index_read_failed".into(), json!(index_read_failed));
+    }
+    Ok(body)
 }
 
-/// GET /{org_id}/traces/db_monitoring/index_health — W11.
+// ─── Badges (`/badges`) — the tab strip's one fan-in ─────────────────────────
+//
+// Every DBM route renders the SAME seven-tab strip, and the strip's badges
+// describe the same org over the same window whichever tab is open. Filling
+// them from the browser cost six endpoint reads per window — plus, in an org
+// with no traced traffic, up to two more fallback reads — before the page's
+// own table read. This endpoint runs those same reads server-side,
+// CONCURRENTLY, and returns one envelope; a page then costs one badges call
+// plus its own read.
+//
+// The members are the sibling endpoints' OWN bodies (`read_*_body`), not
+// re-implemented counts: a badge computed by a second pipeline can disagree
+// with the tab it labels, and agreement here is by construction. That also
+// means each slice runs under exactly the auth its endpoint enforces — client
+// slices under the trace-stream RBAC inside their window readers,
+// server-vantage slices under the Logs-stream check — so a caller lacking one
+// permission loses that member (null), never the whole response. Only a
+// caller who may read NOTHING gets the 403.
+
+#[derive(Debug, Deserialize)]
+pub struct BadgesQuery {
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    /// Database system filter. Applied only to the slices whose browser
+    /// fan-out applied it (databases, queries and the two server fallbacks) —
+    /// the event slices took the bare window there, and this endpoint must
+    /// answer the same questions the six reads answered.
+    pub system: Option<String>,
+}
+
+/// The six slice outcomes plus the two conditionally-run fallbacks, ready to
+/// fold. A struct rather than parameters so the envelope fold is a callable
+/// the tests drive with real member fixtures.
+pub(crate) struct BadgeSliceResults {
+    pub databases: Result<Value, HttpResponse>,
+    pub queries: Result<Value, HttpResponse>,
+    pub activity: Result<Value, HttpResponse>,
+    pub deadlocks: Result<Value, HttpResponse>,
+    pub blocking: Result<Value, HttpResponse>,
+    pub table_health: Result<Value, HttpResponse>,
+    /// `None` when the fallback condition did not fire — the member is then
+    /// ABSENT from the envelope, which is distinct from "fired and failed"
+    /// (present as null). The reader must be able to tell "not needed" from
+    /// "unknown".
+    pub server_queries: Option<Result<Value, HttpResponse>>,
+    pub server_samples: Option<Result<Value, HttpResponse>>,
+}
+
+impl BadgeSliceResults {
+    /// Whether every slice was DENIED — the only case the whole request 403s.
+    /// A mix of denials and other failures still answers with the members
+    /// that could: each badge owns its own failure, exactly as the browser
+    /// fan-out's `allSettled` did.
+    pub(crate) fn all_forbidden(&self) -> bool {
+        let forbidden = |r: &Result<Value, HttpResponse>| matches!(r, Err(resp) if resp.status() == axum::http::StatusCode::FORBIDDEN);
+        forbidden(&self.databases)
+            && forbidden(&self.queries)
+            && forbidden(&self.activity)
+            && forbidden(&self.deadlocks)
+            && forbidden(&self.blocking)
+            && forbidden(&self.table_health)
+    }
+
+    /// Fold into the response envelope: each member is its endpoint's own
+    /// body on success and `null` on any failure — mirroring the frontend's
+    /// "null is a failed read, never 0" discipline, so a dead slice blanks
+    /// its badges instead of claiming zero.
+    pub(crate) fn into_envelope(self) -> Value {
+        fn member(r: Result<Value, HttpResponse>) -> Value {
+            r.unwrap_or(Value::Null)
+        }
+        let mut body = json!({
+            "databases": member(self.databases),
+            "queries": member(self.queries),
+            "activity": member(self.activity),
+            "deadlocks": member(self.deadlocks),
+            "blocking": member(self.blocking),
+            "table_health": member(self.table_health),
+        });
+        let extra = body.as_object_mut().expect("body is an object");
+        if let Some(r) = self.server_queries {
+            extra.insert("server_queries".into(), member(r));
+        }
+        if let Some(r) = self.server_samples {
+            extra.insert("server_samples".into(), member(r));
+        }
+        body
+    }
+}
+
+/// Whether the client-vantage queries slice answered EXACTLY zero distinct
+/// statements — the condition that arms the `server_queries` fallback. A
+/// failed slice (`Err`) must NOT arm it: unknown is not zero, and firing the
+/// fallback there would put a database-reported claim on a badge whose client
+/// answer may simply have blipped.
+pub(crate) fn queries_slice_reports_zero(queries: &Result<Value, HttpResponse>) -> bool {
+    match queries {
+        // `total` is counted before the row cap, so it is the population —
+        // the body always carries it.
+        Ok(body) => body.get("total").and_then(Value::as_i64) == Some(0),
+        Err(_) => false,
+    }
+}
+
+/// Whether the client-vantage databases slice summed EXACTLY zero finished
+/// calls — the condition that arms the `server_samples` fallback. Same
+/// unknown-is-not-zero rule as [`queries_slice_reports_zero`]. The sum is the
+/// same fold the tab strip performs over these rows (a row without `calls`
+/// contributes 0), so the fallback fires exactly where the badge would have
+/// read 0.
+pub(crate) fn databases_slice_reports_zero_calls(databases: &Result<Value, HttpResponse>) -> bool {
+    match databases {
+        Ok(body) => match body.get("hits").and_then(Value::as_array) {
+            Some(hits) => {
+                hits.iter()
+                    .map(|r| r.get("calls").and_then(as_f64_loose).unwrap_or(0.0))
+                    .sum::<f64>()
+                    == 0.0
+            }
+            // No rows array at all folds like an empty one — the same answer
+            // the strip's own `hits ?? []` fold gives.
+            None => true,
+        },
+        Err(_) => false,
+    }
+}
+
+/// GET /{org_id}/traces/db_monitoring/badges — every tab badge in one read.
 ///
-/// The newest snapshot of every index in the window, largest first.
-///
-/// The scan counters are LIFETIME totals since the last `pg_stat_reset()`, and
-/// the envelope says so: "never scanned" is a statement about the counters'
-/// lifetime, not about the selected window, and the UI cannot phrase it
-/// correctly without being told.
+/// Runs the six sibling endpoints' bodies concurrently and — when the
+/// client-vantage answer is exactly zero — the server-vantage fallbacks the
+/// strip used to fetch itself, so the shell's per-window cost is this call
+/// plus the page's own read. Each member is that endpoint's unchanged
+/// response body, or `null` when its read failed.
 #[utoipa::path(
     get,
-    path = "/{org_id}/traces/db_monitoring/index_health",
+    path = "/{org_id}/traces/db_monitoring/badges",
     context_path = "/api",
     tag = "Traces",
-    operation_id = "GetDbMonitoringIndexHealth",
-    summary = "Database Monitoring: index size and usage",
-    description = "Newest snapshot per index from the Postgres pg_index_stats feed. Scan counters are LIFETIME totals since the last statistics reset. Postgres only.",
+    operation_id = "GetDbMonitoringBadges",
+    summary = "Database Monitoring: all tab badges in one read",
+    description = "One envelope carrying the databases, queries, activity, deadlocks, blocking and table-health response bodies for the window, read concurrently; members are null when their read failed. When the client-vantage answer is exactly zero, the server-vantage fallback members (server_queries, server_samples) are included too.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
-        ("system" = Option<String>, Query, description = "Database engine filter"),
-        ("instance" = Option<String>, Query, description = "Database instance filter"),
-        ("limit" = Option<usize>, Query, description = "Max indexes returned (default 100)"),
+        ("system" = Option<String>, Query, description = "Database system filter (applied to the databases/queries slices and the server fallbacks)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
-pub async fn get_dbm_index_health(
+pub async fn get_dbm_badges(
     Path(org_id): Path<String>,
     user_email: UserEmail,
-    Query(q): Query<TableHealthQuery>,
+    Query(q): Query<BadgesQuery>,
 ) -> HttpResponse {
     let cfg = get_config();
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
-    let stream = q
-        .stream
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or(DEFAULT_SERVER_STREAM);
-    // Checked BEFORE range parsing, so a caller cannot probe stream existence
-    // through error-message differences. A LOGS stream — `StreamType::Traces`
-    // here would consult the wrong OFGA object and silently authorize.
-    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
-        return unauthorized_response();
-    }
-    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
-    if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
-    }
-    let limit = q
-        .limit
-        .unwrap_or(DEFAULT_EVENTS_LIMIT)
-        .clamp(1, MAX_EVENTS_LIMIT);
-    // No `database` filter: this feed carries no database, so accepting one
-    // would silently return nothing for every value a user could pass.
-    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), None);
+    let org = org_id.as_str();
+    let user = user_email.user_id.as_str();
 
-    let present = match present_dbm_columns(&org_id, stream).await {
-        Ok(present) => present,
-        Err(e) => {
-            log::error!(
-                "[DbMonitoring] index health schema read failed for {org_id}/{stream}: {e}"
-            );
-            return MetaHttpResponse::internal_error(e);
-        }
+    // Each slice's query is the EXACT request the tab strip's own fan-out
+    // sent: window + system on databases, window + system + `limit=1` on
+    // queries (the badge needs `total`, counted before the cap, and none of
+    // the rows), and the bare window on the four event slices.
+    let databases_q = DatabasesQuery {
+        start_time: q.start_time,
+        end_time: q.end_time,
+        stream: None,
+        system: q.system.clone(),
+        service: None,
+        baseline_start_time: None,
+        baseline_end_time: None,
+    };
+    let queries_q = QueriesQuery {
+        start_time: q.start_time,
+        end_time: q.end_time,
+        stream: None,
+        system: q.system.clone(),
+        instance: None,
+        namespace: None,
+        env: None,
+        service: None,
+        stmt_class: None,
+        sort: None,
+        limit: Some(1),
+        search: None,
+        baseline_start_time: None,
+        baseline_end_time: None,
+    };
+    let activity_q = ActivityQuery {
+        start_time: q.start_time,
+        end_time: q.end_time,
+        stream: None,
+        system: None,
+        instance: None,
+        database: None,
+        namespace: None,
+        limit: None,
+    };
+    let deadlocks_q = DeadlocksQuery {
+        start_time: q.start_time,
+        end_time: q.end_time,
+        stream: None,
+        system: None,
+        instance: None,
+        database: None,
+        namespace: None,
+        search: None,
+        limit: None,
+    };
+    let blocking_q = BlockingQuery {
+        start_time: q.start_time,
+        end_time: q.end_time,
+        stream: None,
+        system: None,
+        instance: None,
+        database: None,
+        namespace: None,
+        search: None,
+        min_wait_seconds: None,
+        limit: None,
+    };
+    let table_health_q = TableHealthQuery {
+        stream: None,
+        start_time: q.start_time,
+        end_time: q.end_time,
+        system: None,
+        instance: None,
+        limit: None,
+        include_indexes: None,
     };
 
-    let rows =
-        match build_dbm_index_health_sql(stream, start_time, end_time, &preds, limit, &present) {
-            Some(sql) => {
-                match run_events_search(&org_id, stream, sql, start_time, end_time).await {
-                    Ok(rows) => rows,
-                    Err(e) => {
-                        log::error!(
-                            "[DbMonitoring] index health read failed for {org_id}/{stream}: {e}"
-                        );
-                        return MetaHttpResponse::internal_error(e);
-                    }
-                }
+    let (databases, queries, activity, deadlocks, blocking, table_health) = tokio::join!(
+        read_databases_body(org, user, &databases_q),
+        read_queries_body(org, user, &queries_q),
+        read_activity_body(org, user, &activity_q),
+        read_deadlocks_body(org, user, &deadlocks_q),
+        read_blocking_body(org, user, &blocking_q),
+        read_table_health_body(org, user, &table_health_q),
+    );
+
+    // ── The zero-trace fallback, folded server-side ──────────────────────
+    //
+    // A client-vantage zero is truthful about TRACES and false about the ORG
+    // when the databases themselves are reporting: the Top-queries and
+    // Slowest-calls tabs render database-reported lists there, and the strip
+    // must count what those tabs show. Armed only by an EXACT zero — a null
+    // (failed) slice must not fire it, because unknown is not zero.
+    let wants_server_queries = queries_slice_reports_zero(&queries);
+    let wants_server_samples = databases_slice_reports_zero_calls(&databases);
+    let (server_queries, server_samples) = tokio::join!(
+        async {
+            if !wants_server_queries {
+                return None;
             }
-            // The stream has never carried index stats — an empty section, not
-            // an error.
-            None => Vec::new(),
-        };
+            let sq = ServerQueriesQuery {
+                start_time: q.start_time,
+                end_time: q.end_time,
+                stream: None,
+                system: q.system.clone(),
+                instance: None,
+                database: None,
+                namespace: None,
+                limit: None,
+            };
+            Some(read_server_queries_body(org, user, &sq).await)
+        },
+        async {
+            if !wants_server_samples {
+                return None;
+            }
+            let ss = ServerSamplesQuery {
+                start_time: q.start_time,
+                end_time: q.end_time,
+                stream: None,
+                system: q.system.clone(),
+                instance: None,
+                database: None,
+                namespace: None,
+                limit: None,
+            };
+            Some(read_server_samples_body(org, user, &ss).await)
+        },
+    );
 
-    let hits: Vec<Value> = rows.iter().map(index_health_row_to_dto).collect();
-
-    MetaHttpResponse::json(json!({
-        "hits": hits,
-        "stream": stream,
-        "total": hits.len(),
-        // `idx_scan` comes from `pg_stat_user_indexes` and counts from the last
-        // `pg_stat_reset()`. Rendering it under a window filter as "in the last
-        // hour" is a strictly stronger claim than the data supports.
-        "counters_are_cumulative": true,
-        // Without this a MySQL user sees an empty list and reads it as "no
-        // unused indexes" — an all-clear about a check that never ran.
-        "engine_coverage": index_health_engine_support(q.system.as_deref().unwrap_or("")),
-    }))
+    let slices = BadgeSliceResults {
+        databases,
+        queries,
+        activity,
+        deadlocks,
+        blocking,
+        table_health,
+        server_queries,
+        server_samples,
+    };
+    if slices.all_forbidden() {
+        return unauthorized_response();
+    }
+    MetaHttpResponse::json(slices.into_envelope())
 }
 
 #[cfg(test)]
@@ -4707,6 +6581,191 @@ mod tests {
         assert_eq!(escape_ident("a\"b"), "a\"\"b");
     }
 
+    // ── FR-6 global samples ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_samples_sql_shape_and_injection() {
+        let sql = build_samples_sql("otel_demo", 100, 200, "", 100);
+        // Raw-span read: per-span rows, ns duration from the span bounds (the
+        // module's one duration unit — never the µs `duration` column),
+        // DB-span predicate, slowest first, bounded.
+        assert!(sql.contains("end_time - start_time AS duration_ns"));
+        assert!(
+            !sql.contains(" duration DESC"),
+            "must not read the µs column"
+        );
+        assert!(sql.contains("FROM \"otel_demo\""));
+        assert!(sql.contains("WHERE _timestamp >= 100 AND _timestamp < 200"));
+        assert!(sql.contains("AND o2_db_fingerprint IS NOT NULL"));
+        assert!(sql.contains("ORDER BY duration_ns DESC"));
+        assert!(sql.ends_with("LIMIT 100"));
+        // Everything the row needs downstream: trace pivot, detail pivot,
+        // identity and status columns under their rollup-facing aliases.
+        for col in [
+            "trace_id",
+            "o2_db_fingerprint AS fingerprint",
+            "o2_db_query_norm AS query_norm",
+            "o2_db_system AS db_system",
+            "o2_db_instance AS db_instance",
+            "o2_db_env AS env",
+            "service_name",
+            "span_status",
+            "o2_db_status_code AS status_code",
+        ] {
+            assert!(sql.contains(col), "samples SQL must project {col}");
+        }
+
+        // Stream name is identifier-escaped so it cannot break out of the
+        // double-quoted table position.
+        let sql = build_samples_sql("s\" --", 1, 2, "", 10);
+        assert!(sql.contains("FROM \"s\"\" --\""));
+    }
+
+    #[test]
+    fn test_span_sql_preds_exact_and_whitelisted() {
+        let f = ScopeFilters {
+            system: Some("postgresql".into()),
+            instance: Some("db-1".into()),
+            namespace: Some("orders".into()),
+            env: Some("prod".into()),
+            service: Some("cart".into()),
+            // `stream` is NOT a span column — it picks which streams are read,
+            // so it must never appear as a predicate.
+            stream: Some("otel_demo".into()),
+        };
+        assert_eq!(
+            f.span_sql_preds(),
+            "\n    AND o2_db_system = 'postgresql'\n    AND o2_db_instance = 'db-1'\n    AND o2_db_namespace = 'orders'\n    AND o2_db_env = 'prod'\n    AND service_name = 'cart'"
+        );
+
+        // Same injection contract as sql_preds: values are quote-escaped, and
+        // user input can never name a column.
+        let hostile = ScopeFilters {
+            instance: Some("x'; DROP TABLE t;--".into()),
+            ..Default::default()
+        };
+        let preds = hostile.span_sql_preds();
+        assert!(preds.contains("o2_db_instance = 'x''; DROP TABLE t;--'"));
+        assert!(!preds.contains("= 'x';"));
+    }
+
+    #[test]
+    fn test_fold_sample_rows_global_order_and_stream_stamp() {
+        let per_stream = vec![
+            (
+                "stream_a".to_string(),
+                vec![
+                    json!({"_timestamp": 10, "trace_id": "a1", "duration_ns": 900}),
+                    json!({"_timestamp": 11, "trace_id": "a2", "duration_ns": 300}),
+                ],
+            ),
+            (
+                "stream_b".to_string(),
+                vec![json!({"_timestamp": 12, "trace_id": "b1", "duration_ns": 500})],
+            ),
+        ];
+        let (hits, truncated) = fold_sample_rows(per_stream, 10);
+        // Global order by duration, across streams.
+        assert_eq!(
+            hits.iter()
+                .map(|h| get_str(h, "trace_id"))
+                .collect::<Vec<_>>(),
+            vec!["a1", "b1", "a2"]
+        );
+        // Every row says which stream it came from — the trace pivot needs it.
+        assert_eq!(get_str(&hits[0], "trace_stream_name"), "stream_a");
+        assert_eq!(get_str(&hits[1], "trace_stream_name"), "stream_b");
+        // 3 rows, cap 10, no stream cut: the answer is complete and says so.
+        assert!(!truncated);
+    }
+
+    #[test]
+    fn test_fold_sample_rows_truncates_and_discloses() {
+        // Union outgrows the cap → cut to the cap, truncated.
+        let per_stream = vec![
+            (
+                "a".to_string(),
+                vec![
+                    json!({"trace_id": "a1", "duration_ns": 900}),
+                    json!({"trace_id": "a2", "duration_ns": 700}),
+                ],
+            ),
+            (
+                "b".to_string(),
+                vec![json!({"trace_id": "b1", "duration_ns": 800})],
+            ),
+        ];
+        let (hits, truncated) = fold_sample_rows(per_stream, 2);
+        assert_eq!(hits.len(), 2);
+        assert_eq!(get_str(&hits[0], "trace_id"), "a1");
+        assert_eq!(get_str(&hits[1], "trace_id"), "b1");
+        assert!(truncated, "a cut union must be disclosed");
+
+        // A single stream answering EXACTLY its per-stream cap also discloses:
+        // its own read was cut, so spans beyond the returned set exist even
+        // though the union fits the cap.
+        let per_stream = vec![(
+            "a".to_string(),
+            vec![
+                json!({"trace_id": "a1", "duration_ns": 900}),
+                json!({"trace_id": "a2", "duration_ns": 700}),
+            ],
+        )];
+        let (hits, truncated) = fold_sample_rows(per_stream, 2);
+        assert_eq!(hits.len(), 2);
+        assert!(truncated, "a stream that hit its own cap must disclose it");
+
+        // Deterministic tie-break: same duration orders by timestamp desc,
+        // then trace id.
+        let per_stream = vec![(
+            "a".to_string(),
+            vec![
+                json!({"_timestamp": 1, "trace_id": "t2", "duration_ns": 500}),
+                json!({"_timestamp": 2, "trace_id": "t1", "duration_ns": 500}),
+            ],
+        )];
+        let (hits, _) = fold_sample_rows(per_stream, 10);
+        assert_eq!(get_str(&hits[0], "trace_id"), "t1");
+        assert_eq!(get_str(&hits[1], "trace_id"), "t2");
+    }
+
+    #[test]
+    fn test_fold_sample_rows_empty() {
+        let (hits, truncated) = fold_sample_rows(Vec::new(), 100);
+        assert!(hits.is_empty());
+        assert!(!truncated);
+    }
+
+    /// The explicit `?stream=` gate must run BEFORE any raw-span read — same
+    /// invariant (and same source-order pinning, for the same OSS-permissive
+    /// reason) as `test_history_checks_stream_permission_before_backfilling`.
+    #[test]
+    fn test_samples_checks_stream_permission_before_reading() {
+        let src = include_str!("api.rs");
+        let handler = src
+            .split("pub async fn get_dbm_samples(")
+            .nth(1)
+            .expect("handler must exist")
+            .split("\npub ")
+            .next()
+            .unwrap();
+
+        let gate = handler
+            .find("can_read_stream(")
+            .expect("samples must gate an explicit stream param on can_read_stream");
+        let read = handler
+            .find("rollup::run_dbm_search(")
+            .expect("samples must run the raw-span read");
+        assert!(
+            gate < read,
+            "the permission gate must precede the raw-span read"
+        );
+        let range = handler
+            .find("resolve_range(")
+            .expect("samples must resolve a range");
+        assert!(gate < range, "gate must also precede range parsing");
+    }
+
     // ── Merge math ──────────────────────────────────────────────────────────
 
     #[test]
@@ -4776,6 +6835,130 @@ mod tests {
     fn test_merge_rows_empty() {
         let m = merge_rows(std::iter::empty::<&Value>());
         assert!(m.as_object().unwrap().is_empty());
+    }
+
+    // ── Errors-by-code fold (FR-5) ──────────────────────────────────────────
+
+    // Counts sum across windows per status code; largest first; ties break by
+    // code so the order is deterministic; an empty code lands in the rollup's
+    // own `unknown` bucket rather than minting a second nameless one.
+    #[test]
+    fn test_fold_error_code_counts_sums_across_windows() {
+        let rows = vec![
+            json!({"status_code": "57014", "errors": 5}),
+            json!({"status_code": "40P01", "errors": 2}),
+            json!({"status_code": "57014", "errors": 7}),
+            json!({"status_code": "", "errors": 3}),
+            json!({"status_code": "23505", "errors": 3}),
+        ];
+        let out = fold_error_code_counts(&rows);
+        assert_eq!(out.len(), 4);
+        assert_eq!(out[0]["status_code"], "57014");
+        assert_eq!(out[0]["errors"], 12);
+        // 3-count tie: "23505" before "unknown" (code order, deterministic).
+        assert_eq!(out[1]["status_code"], "23505");
+        assert_eq!(out[1]["errors"], 3);
+        assert_eq!(out[2]["status_code"], "unknown");
+        assert_eq!(out[2]["errors"], 3);
+        assert_eq!(out[3]["status_code"], "40P01");
+        assert_eq!(out[3]["errors"], 2);
+    }
+
+    #[test]
+    fn test_fold_error_code_counts_empty() {
+        assert!(fold_error_code_counts(&[]).is_empty());
+    }
+
+    // ── Where-it-runs breakdown fold (FR-5) ─────────────────────────────────
+
+    // Constituent rows group per (instance, namespace), additive metrics sum
+    // across windows, and the output ranks by total time descending with a
+    // deterministic (instance, namespace) tiebreak.
+    #[test]
+    fn test_fold_instance_breakdown_groups_and_sums() {
+        let rows = vec![
+            json!({"db_instance": "db1", "db_namespace": "orders", "calls": 10, "errors": 1, "total_time_ns": 500}),
+            json!({"db_instance": "db1", "db_namespace": "orders", "calls": 5, "errors": 0, "total_time_ns": 300}),
+            json!({"db_instance": "db2", "db_namespace": "orders", "calls": 100, "errors": 2, "total_time_ns": 900}),
+            json!({"db_instance": "db1", "db_namespace": "users", "calls": 1, "errors": 0, "total_time_ns": 900}),
+        ];
+        let out = fold_instance_breakdown(rows.iter());
+        assert_eq!(out.len(), 3);
+        // 900-ns tie: db1 before db2 (instance order, deterministic).
+        assert_eq!(out[0]["db_instance"], "db1");
+        assert_eq!(out[0]["db_namespace"], "users");
+        assert_eq!(out[1]["db_instance"], "db2");
+        assert_eq!(out[1]["db_namespace"], "orders");
+        assert_eq!(out[2]["db_instance"], "db1");
+        assert_eq!(out[2]["db_namespace"], "orders");
+        assert_eq!(out[2]["calls"], 15);
+        assert_eq!(out[2]["errors"], 1);
+        assert_eq!(out[2]["total_time_ns"], 800);
+    }
+
+    // `_o2_db_stats` mixes NULL and "" for an absent dimension — the fold must
+    // coalesce the spellings or one instance splits into two rows.
+    #[test]
+    fn test_fold_instance_breakdown_coalesces_absent_dims() {
+        let rows = vec![
+            json!({"db_instance": "db1", "db_namespace": null, "calls": 3, "total_time_ns": 30}),
+            json!({"db_instance": "db1", "db_namespace": "", "calls": 4, "total_time_ns": 40}),
+            json!({"db_instance": "db1", "calls": 5, "total_time_ns": 50}),
+        ];
+        let out = fold_instance_breakdown(rows.iter());
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0]["db_instance"], "db1");
+        assert_eq!(out[0]["db_namespace"], "");
+        assert_eq!(out[0]["calls"], 12);
+        assert_eq!(out[0]["total_time_ns"], 120);
+    }
+
+    // Percentiles ride merge_rows' request weighting; a metric absent from
+    // every constituent stays absent (never a fabricated 0).
+    #[test]
+    fn test_fold_instance_breakdown_weighted_percentiles_and_absence() {
+        let rows = vec![
+            json!({"db_instance": "db1", "db_namespace": "d", "calls": 1, "p95_ns": 100}),
+            json!({"db_instance": "db1", "db_namespace": "d", "calls": 3, "p95_ns": 500}),
+        ];
+        let out = fold_instance_breakdown(rows.iter());
+        assert_eq!(out.len(), 1);
+        // (100·1 + 500·3) / 4 = 400.
+        assert_eq!(out[0]["p95_ns"], 400);
+        // No constituent carried errors — the key must not appear as 0.
+        assert!(out[0].get("errors").is_none_or(|v| v.is_null()));
+    }
+
+    #[test]
+    fn test_fold_instance_breakdown_empty() {
+        assert!(fold_instance_breakdown(std::iter::empty::<&Value>()).is_empty());
+    }
+
+    // ── QPS stamping (FR-1) ─────────────────────────────────────────────────
+
+    // calls / window_seconds, over the window the CALLER asked for. A row with
+    // no calls metric stays unstamped: it never measured a count, so a 0/s
+    // would be a fabricated exactness.
+    #[test]
+    fn test_stamp_qps_divides_by_window_seconds() {
+        let mut hits = vec![
+            json!({"db_instance": "db1", "calls": 900}),
+            json!({"db_instance": "idle-replica"}),
+            json!({"db_instance": "db2", "calls": 0}),
+        ];
+        // A 15-minute window in microseconds.
+        stamp_qps(&mut hits, 0, 900 * 1_000_000);
+        assert_eq!(hits[0]["qps"], 1.0);
+        assert!(
+            hits[1].get("qps").is_none(),
+            "no calls metric must mean no qps claim"
+        );
+        assert_eq!(hits[2]["qps"], 0.0, "a measured zero IS a 0/s rate");
+
+        // A degenerate window must not divide by zero or stamp anything.
+        let mut degenerate = vec![json!({"calls": 10})];
+        stamp_qps(&mut degenerate, 100, 100);
+        assert!(degenerate[0].get("qps").is_none());
     }
 
     // ── Below-top-N detection ───────────────────────────────────────────────
@@ -5228,7 +7411,7 @@ mod tests {
     #[test]
     fn test_build_dbm_events_sql_exact() {
         let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &all_cols());
-        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version, o2_dbm_relation, o2_dbm_schema, o2_dbm_total_bytes, o2_dbm_heap_bytes, o2_dbm_live_tuples, o2_dbm_dead_tuples, o2_dbm_dead_tup_pct, o2_dbm_mod_since_analyze, o2_dbm_seq_scan_count, o2_dbm_seq_tup_read, o2_dbm_idx_scan_count, o2_dbm_autovacuum_count, o2_dbm_frozen_xid_age, o2_dbm_last_vacuum, o2_dbm_last_autovacuum, o2_dbm_last_analyze, o2_dbm_counters_are_cumulative, o2_dbm_tuples_are_estimated, o2_dbm_index_name, o2_dbm_index_bytes, o2_dbm_idx_tup_read, o2_dbm_idx_tup_fetch, o2_dbm_index_is_unique FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
+        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version, o2_dbm_plan_source, o2_dbm_plan_duration_ms, o2_dbm_plan_rows_actual, o2_dbm_relation, o2_dbm_schema, o2_dbm_total_bytes, o2_dbm_heap_bytes, o2_dbm_live_tuples, o2_dbm_dead_tuples, o2_dbm_dead_tup_pct, o2_dbm_mod_since_analyze, o2_dbm_seq_scan_count, o2_dbm_seq_tup_read, o2_dbm_idx_scan_count, o2_dbm_autovacuum_count, o2_dbm_frozen_xid_age, o2_dbm_last_vacuum, o2_dbm_last_autovacuum, o2_dbm_last_analyze, o2_dbm_counters_are_cumulative, o2_dbm_tuples_are_estimated, o2_dbm_index_name, o2_dbm_index_bytes, o2_dbm_idx_tup_read, o2_dbm_idx_tup_fetch, o2_dbm_index_is_unique, o2_dbm_stmt_duration_ms FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
         assert_eq!(sql, expected);
     }
 
@@ -5330,17 +7513,25 @@ mod tests {
         // literal inside other source-scraping tests, and matching those pulls
         // in a bogus "handler" whose body is the rest of the file.
         let code = src.split("\nmod tests {").next().unwrap_or(src);
-        let guarded: Vec<(&str, &str)> = code
-            .match_indices("pub async fn get_dbm_")
-            .filter_map(|(i, _)| {
-                let rest = &code[i..];
-                let open = rest.find('(')?;
-                let name = rest["pub async fn ".len()..open].trim();
-                let body = rest[open..].split("\n}\n").next()?;
-                body.contains("present_dbm_columns(")
-                    .then_some((name, body))
-            })
-            .collect();
+        // Both spellings a schema-reading pipeline can have: a handler that
+        // still owns its body, and a `read_*_body` fn extracted for the
+        // badges fan-in. Scanning only the first would let an extracted body
+        // silently escape the guard — the failure mode this test must not
+        // have.
+        let discover = |prefix: &'static str| {
+            code.match_indices(prefix)
+                .filter_map(move |(i, _)| {
+                    let rest = &code[i..];
+                    let open = rest.find('(')?;
+                    let name = rest[prefix.len()..open].trim();
+                    let body = rest[open..].split("\n}\n").next()?;
+                    body.contains("present_dbm_columns(")
+                        .then_some((name, body))
+                })
+                .collect::<Vec<(&str, &str)>>()
+        };
+        let mut guarded = discover("pub async fn get_dbm_");
+        guarded.extend(discover("async fn read_"));
         assert!(
             guarded.len() >= 2,
             "expected to discover the schema-reading handlers, found {:?}",
@@ -6620,13 +8811,23 @@ mod tests {
         );
     }
 
-    /// `pg_index_stats` is Postgres-only, and the envelope must say so per
-    /// engine — an empty list for a MySQL user reads as "no problems found".
+    /// Index health is collected for the three engines with index-stats
+    /// recipes, and the envelope must say so per engine — an empty list for an
+    /// unsupported engine's user reads as "no problems found".
     #[test]
-    fn test_index_health_engine_support_is_postgres_only() {
-        assert_eq!(index_health_engine_support("postgresql"), "supported");
-        assert_eq!(index_health_engine_support("mysql"), "unsupported");
-        assert_eq!(index_health_engine_support("mssql"), "unsupported");
+    fn test_index_health_engine_support_names_the_recipe_engines() {
+        for supported in ["postgresql", "mysql", "mariadb"] {
+            assert_eq!(
+                index_health_engine_support(supported),
+                "supported",
+                "`{supported}` ships an index-stats recipe"
+            );
+        }
+        assert_eq!(
+            index_health_engine_support("mssql"),
+            "unsupported",
+            "no mssql index-stats recipe ships yet"
+        );
         assert_eq!(
             index_health_engine_support(""),
             "unknown",
@@ -6763,13 +8964,15 @@ mod tests {
     fn test_activity_response_carries_every_contract_key() {
         let src = include_str!("api.rs");
         let code = src.split("\nmod tests {").next().unwrap_or(src);
+        // The handler is a thin wrapper since the badges extraction — the
+        // envelope is assembled in the body fn, so that is what gets scraped.
         let start = code
-            .find("pub async fn get_dbm_activity")
-            .expect("the activity handler must exist");
+            .find("async fn read_activity_body")
+            .expect("the activity body fn must exist");
         let body = code[start..]
             .split("\n}\n")
             .next()
-            .expect("the handler must have a body");
+            .expect("the body fn must have a body");
 
         for key in [
             "hits",
@@ -6806,17 +9009,19 @@ mod tests {
     fn test_activity_checks_read_permission_against_the_logs_stream() {
         let src = include_str!("api.rs");
         let code = src.split("\nmod tests {").next().unwrap_or(src);
+        // The permission check lives in the body fn, which both the endpoint
+        // and the badges fan-in call — one gate, scraped where it is.
         let start = code
-            .find("pub async fn get_dbm_activity")
-            .expect("the activity handler must exist");
+            .find("async fn read_activity_body")
+            .expect("the activity body fn must exist");
         let body = code[start..]
             .split("\n}\n")
             .next()
-            .expect("the handler must have a body");
+            .expect("the body fn must have a body");
 
         let call = body
             .find("can_read_stream(")
-            .expect("the activity handler must check read permission at all");
+            .expect("the activity body must check read permission at all");
         let args = &body[call..body.len().min(call + 200)];
         assert!(
             args.contains("StreamType::Logs"),
@@ -6911,12 +9116,12 @@ mod tests {
         let src = include_str!("api.rs");
         let code = src.split("\nmod tests {").next().unwrap_or(src);
         let start = code
-            .find("pub async fn get_dbm_activity")
-            .expect("the activity handler must exist");
+            .find("async fn read_activity_body")
+            .expect("the activity body fn must exist");
         let body = code[start..]
             .split("\n}\n")
             .next()
-            .expect("the handler must have a body");
+            .expect("the body fn must have a body");
 
         // Find where the interval reaches the response, and make sure it is not
         // fed by a probe that only ran on the empty branch.
@@ -6954,12 +9159,12 @@ mod tests {
         let src = include_str!("api.rs");
         let code = src.split("\nmod tests {").next().unwrap_or(src);
         let start = code
-            .find("pub async fn get_dbm_activity")
-            .expect("the activity handler must exist");
+            .find("async fn read_activity_body")
+            .expect("the activity body fn must exist");
         let body = code[start..]
             .split("\n}\n")
             .next()
-            .expect("the handler must have a body");
+            .expect("the body fn must have a body");
 
         let line = body
             .lines()
@@ -7130,11 +9335,13 @@ mod tests {
         );
         assert!(
             sql.contains(&format!(
-                "{} = '{}'",
+                "{} IN ('{}', '{}')",
                 server_vantage::O2_DBM_KIND,
-                server_vantage::KIND_TOP_QUERY
+                server_vantage::KIND_TOP_QUERY,
+                server_vantage::KIND_EXPLAIN
             )),
-            "the plans query must read top_query records only: {sql}"
+            "the plans query must read BOTH producers' kinds — top_query \
+             (generic) and explain (executed) — and nothing else: {sql}"
         );
         assert!(
             sql.contains("3a74e60b4bd45cc6"),
@@ -7152,25 +9359,51 @@ mod tests {
         }
     }
 
-    /// **D-H: no per-plan latency, in the SQL or anywhere else.**
+    /// **D-H: no pg_stat_statements latency by plan, in the SQL or anywhere
+    /// else.**
     ///
-    /// The plan was never executed — the receiver EXPLAINs it with every bind
-    /// parameter bound to NULL — while `o2_dbm_exec_time_s` comes from
-    /// `pg_stat_statements` REAL executions. Grouping one by the other fabricates
-    /// causality, and an earlier draft shipped exactly that as
+    /// The generic plan was never executed — the receiver EXPLAINs it with
+    /// every bind parameter bound to NULL — while `o2_dbm_exec_time_s` comes
+    /// from `pg_stat_statements` REAL executions. Grouping one by the other
+    /// fabricates causality, and an earlier draft shipped exactly that as
     /// "the plan that appeared at 03:04 is 8x slower".
+    ///
+    /// **The ban is NARROWED, not lifted, for W-E3**: `o2_dbm_plan_duration_ms`
+    /// is a per-execution wall clock measured by auto_explain on an execution
+    /// that really ran under that plan, so aggregating IT by plan is honest.
+    /// The banned literal is therefore the exec-time family (`AVG(o2_dbm_exec`)
+    /// rather than every `AVG(` — while the `O2_DBM_EXEC_TIME_S` ban stays
+    /// absolute, so no projection, predicate or alias can smuggle the
+    /// pg_stat_statements column in under any aggregate.
     #[test]
-    fn test_plans_sql_never_aggregates_latency_by_plan() {
+    fn test_plans_sql_never_aggregates_pgss_latency_by_plan() {
         let sql =
             build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &all_cols()).expect("plans sql");
         assert!(
             !sql.contains(server_vantage::O2_DBM_EXEC_TIME_S),
-            "per-plan latency attributes execution time to a plan that never ran (D-H): {sql}"
+            "per-plan pg_stat_statements latency attributes execution time to a \
+             plan that never ran (D-H): {sql}"
         );
-        for banned in ["AVG(", "SUM(o2_dbm_exec", "PERCENTILE"] {
+        for banned in [
+            "AVG(o2_dbm_exec",
+            "MAX(o2_dbm_exec",
+            "SUM(o2_dbm_exec",
+            "PERCENTILE",
+        ] {
             assert!(
                 !sql.contains(banned),
                 "`{banned}` in the plans query is latency attribution (D-H): {sql}"
+            );
+        }
+        // The complement, so the narrowing cannot rot into a lift: the ONLY
+        // duration the query may aggregate is the per-execution auto_explain
+        // measurement.
+        for (i, _) in sql.match_indices("AVG(") {
+            let rest = &sql[i..];
+            assert!(
+                rest.starts_with(&format!("AVG({}", server_vantage::O2_DBM_PLAN_DURATION_MS)),
+                "every AVG in the plans query must aggregate the executed \
+                 per-plan duration and nothing else: {sql}"
             );
         }
     }
@@ -7323,10 +9556,136 @@ mod tests {
                 "the plans response must carry `{key}`"
             );
         }
+        // EXTENDED for W-E3, never relaxed: the response-level source is now
+        // DERIVED per window rather than hardcoded — a hardcoded value would
+        // mislabel every executed plan (or, worse, every generic one).
         assert!(
-            body.contains("generic_null_bound"),
-            "the response must declare the plan is a GENERIC, NULL-BOUND estimate (D-H) — \
-             without it the UI cannot honestly label what it renders"
+            body.contains("derived_plan_source"),
+            "the response-level plan_source must be derived from the hits, not a constant — \
+             a window holding both producers is `mixed` and neither single label is honest"
+        );
+        assert!(
+            !body.contains("\"plan_source\": \"generic_null_bound\""),
+            "hardcoding generic_null_bound at the response level mislabels every \
+             executed plan in the window (E-C)"
+        );
+    }
+
+    /// The derivation itself: all-generic, all-executed, mixed, and the empty
+    /// window defaulting to the WEAKER claim.
+    #[test]
+    fn test_derived_plan_source_covers_all_three_states() {
+        let generic = json!({"plan_source": "generic_null_bound"});
+        let executed = json!({"plan_source": "auto_explain"});
+        let legacy = json!({}); // pre-column row: backfilled generic by the DTO
+        assert_eq!(derived_plan_source(&[]), "generic_null_bound");
+        assert_eq!(
+            derived_plan_source(&[generic.clone(), legacy.clone()]),
+            "generic_null_bound"
+        );
+        assert_eq!(
+            derived_plan_source(std::slice::from_ref(&executed)),
+            "auto_explain"
+        );
+        assert_eq!(derived_plan_source(&[executed, generic]), "mixed");
+    }
+
+    /// **E-C at the SQL layer**: provenance joins the GROUP key when the stream
+    /// has the column — the two producers can yield the SAME structural hash
+    /// (that equality is the entire comparison story, proven on rig captures),
+    /// and grouping by hash alone would collapse an executed group into a
+    /// generic one. A stream that predates the column groups by hash alone —
+    /// naming an absent column in GROUP BY fails the whole query.
+    #[test]
+    fn test_plans_sql_groups_by_plan_source_only_when_present() {
+        let sql =
+            build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &all_cols()).expect("plans sql");
+        assert!(
+            sql.contains(&format!(
+                "GROUP BY {}, {}",
+                server_vantage::O2_DBM_PLAN_HASH,
+                server_vantage::O2_DBM_PLAN_SOURCE
+            )),
+            "same hash + different producer must stay two rows: {sql}"
+        );
+
+        let mut without = all_cols();
+        without.remove(server_vantage::O2_DBM_PLAN_SOURCE);
+        without.remove(server_vantage::O2_DBM_PLAN_DURATION_MS);
+        let sql = build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &without)
+            .expect("the query still builds for a pre-W-E3 stream");
+        assert!(
+            !sql.contains(server_vantage::O2_DBM_PLAN_SOURCE),
+            "an absent column must not be named anywhere in the query: {sql}"
+        );
+        assert!(
+            !sql.contains("avg_duration_ms"),
+            "no duration aggregate without the duration column: {sql}"
+        );
+    }
+
+    /// **The absent-not-null invariant, at the DTO**: a duration key appears on
+    /// a hit if and only if that hit is an executed plan carrying a measured
+    /// duration. A null latency on a generic row would imply the column
+    /// APPLIES to it — the exact framing D-H forbids.
+    #[test]
+    fn test_plan_dto_duration_keys_present_iff_executed_and_measured() {
+        // Executed hit with measured durations: keys present, values real.
+        let executed = json!({
+            "plan_hash": "h1", "plan_source": "auto_explain",
+            "avg_duration_ms": 1.25f64, "max_duration_ms": 30.0f64, "executions": 4i64,
+        });
+        let dto = plan_row_to_dto(&executed);
+        assert_eq!(dto["plan_source"], json!("auto_explain"));
+        assert_eq!(dto["avg_duration_ms"], json!(1.25));
+        assert_eq!(dto["max_duration_ms"], json!(30.0));
+        assert_eq!(dto["executions"], json!(4));
+
+        // Generic hit — even if the search layer hands back NULL aggregate
+        // values for the group, the keys must be ABSENT, not null.
+        let generic = json!({
+            "plan_hash": "h2", "plan_source": "generic_null_bound",
+            "avg_duration_ms": Value::Null, "max_duration_ms": Value::Null,
+        });
+        let dto = plan_row_to_dto(&generic);
+        for key in ["avg_duration_ms", "max_duration_ms", "executions"] {
+            assert!(
+                dto.get(key).is_none(),
+                "`{key}` must be ABSENT on a generic hit — null implies the column applies: {dto}"
+            );
+        }
+
+        // Adversarial: a generic group that somehow carries numbers (a future
+        // SQL regression) must STILL not leak them — the gate is plan_source,
+        // not value presence.
+        let leaky = json!({
+            "plan_hash": "h3", "plan_source": "generic_null_bound",
+            "avg_duration_ms": 9.0f64,
+        });
+        assert!(
+            plan_row_to_dto(&leaky).get("avg_duration_ms").is_none(),
+            "a generic hit must never carry a duration, whatever the row says"
+        );
+    }
+
+    /// **The backfill posture (E-C)**: absent `plan_source` ⇒ generic. Rows
+    /// written before the column existed are, with certainty, generic — nothing
+    /// else could have written them — and defaulting the other way would
+    /// silently upgrade history to a claim it cannot support.
+    #[test]
+    fn test_plan_dto_backfills_absent_plan_source_as_generic() {
+        let legacy = json!({ "plan_hash": "h", "calls": 1i64 });
+        let dto = plan_row_to_dto(&legacy);
+        assert_eq!(
+            dto["plan_source"],
+            json!("generic_null_bound"),
+            "absent provenance must read as the WEAKER claim"
+        );
+        let empty = json!({ "plan_hash": "h", "plan_source": "" });
+        assert_eq!(
+            plan_row_to_dto(&empty)["plan_source"],
+            json!("generic_null_bound"),
+            "an empty-string source is absent, not a third state"
         );
     }
 
@@ -7467,7 +9826,7 @@ mod tests {
         let sql = build_dbm_server_metrics_sql(
             "dbm_server",
             "postgresql",
-            "shop",
+            Some("shop"),
             "3a74e60b4bd45cc6",
             100,
             200,
@@ -7506,7 +9865,7 @@ mod tests {
         let sql = build_dbm_server_metrics_sql(
             "dbm_server",
             "postgresql",
-            "shop",
+            Some("shop"),
             "fp",
             100,
             200,
@@ -7523,13 +9882,41 @@ mod tests {
         );
     }
 
+    /// mysql/mariadb top_query records carry no database column, so a
+    /// database predicate against them matches nothing forever — the caller
+    /// passes `None` and the SQL must not constrain on database at all.
+    /// (Verified live: 43k MySQL records, zero matches with the predicate.)
+    #[test]
+    fn test_server_metrics_sql_omits_database_predicate_when_none() {
+        let sql =
+            build_dbm_server_metrics_sql("dbm_server", "mysql", None, "fp", 100, 200, &all_cols())
+                .unwrap();
+        assert!(!sql.contains(server_vantage::O2_DBM_DATABASE));
+        // The identity predicates survive: this is a narrower match, not a
+        // broader one.
+        assert!(sql.contains("o2_dbm_fingerprint = 'fp'"));
+        assert!(sql.contains("o2_dbm_engine = 'mysql'"));
+    }
+
+    /// The envelope states WHOSE numbers these are: one database's, or the
+    /// whole instance's. Without the flag a database-less MySQL match would
+    /// read as per-database figures — a claim the data cannot support.
+    #[test]
+    fn test_server_metrics_envelope_states_attribution() {
+        let rows = vec![json!({"instance": "mysql", "calls": 5})];
+        let instance_wide = server_metrics_envelope(&rows, "mysql", "dbm_server", "on", false);
+        assert_eq!(instance_wide["attribution"], "instance");
+        let scoped = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on", true);
+        assert_eq!(scoped["attribution"], "database");
+    }
+
     /// Only `top_query` records carry these counters.
     #[test]
     fn test_server_metrics_sql_reads_only_top_query_records() {
         let sql = build_dbm_server_metrics_sql(
             "dbm_server",
             "postgresql",
-            "shop",
+            Some("shop"),
             "fp",
             100,
             200,
@@ -7556,7 +9943,7 @@ mod tests {
             build_dbm_server_metrics_sql(
                 "dbm_server",
                 "postgresql",
-                "shop",
+                Some("shop"),
                 "fp",
                 100,
                 200,
@@ -7581,7 +9968,7 @@ mod tests {
             build_dbm_server_metrics_sql(
                 "dbm_server",
                 "postgresql",
-                "shop",
+                Some("shop"),
                 "fp",
                 100,
                 200,
@@ -7598,7 +9985,7 @@ mod tests {
             build_dbm_server_metrics_sql(
                 "dbm_server",
                 "postgresql",
-                "shop",
+                Some("shop"),
                 "fp",
                 100,
                 200,
@@ -7624,7 +10011,7 @@ mod tests {
             "temp_blks_read": 0i64,
             "temp_blks_written": 0i64,
         })];
-        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on");
+        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on", true);
 
         assert_eq!(env["server_metrics_capture"], json!("on"));
         assert_eq!(env["stream"], json!("dbm_server"));
@@ -7655,7 +10042,7 @@ mod tests {
     /// instrumented client issued. The three states must be distinguishable.
     #[test]
     fn test_server_metrics_unmatched_is_distinct_from_capture_off() {
-        let unmatched = server_metrics_envelope(&[], "postgresql", "dbm_server", "on");
+        let unmatched = server_metrics_envelope(&[], "postgresql", "dbm_server", "on", true);
         assert_eq!(unmatched["matched"], json!(false));
         assert_eq!(
             unmatched["server_metrics_capture"],
@@ -7667,7 +10054,7 @@ mod tests {
             "a plain miss blames nothing: {unmatched}"
         );
 
-        let off = server_metrics_envelope(&[], "postgresql", "dbm_server", "off");
+        let off = server_metrics_envelope(&[], "postgresql", "dbm_server", "off", true);
         assert_eq!(off["matched"], json!(false));
         assert_eq!(
             off["server_metrics_capture"],
@@ -7690,7 +10077,7 @@ mod tests {
             json!({ "instance": "pg-a", "calls": 10i64, "exec_time_s": 1.0f64 }),
             json!({ "instance": "pg-b", "calls": 90i64, "exec_time_s": 9.0f64 }),
         ];
-        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on");
+        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on", true);
 
         assert_eq!(
             env["matched"],
@@ -7727,10 +10114,10 @@ mod tests {
     fn test_server_metrics_names_the_measurement_per_engine() {
         let rows = vec![json!({ "instance": "i", "calls": 100i64, "exec_time_s": 5.0f64 })];
 
-        let pg = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on");
+        let pg = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on", true);
         assert_eq!(pg["exec_time_kind"], json!("execution"));
 
-        let mysql = server_metrics_envelope(&rows, "mysql", "dbm_server", "on");
+        let mysql = server_metrics_envelope(&rows, "mysql", "dbm_server", "on", false);
         assert_eq!(
             mysql["exec_time_kind"],
             json!("wait"),
@@ -7747,7 +10134,7 @@ mod tests {
     #[test]
     fn test_server_metrics_envelope_derives_no_client_server_difference() {
         let rows = vec![json!({ "instance": "i", "calls": 100i64, "exec_time_s": 5.0f64 })];
-        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on");
+        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on", true);
         for banned in [
             "network_time_s",
             "network_and_pool_wait_s",
@@ -8057,9 +10444,11 @@ mod tests {
     fn test_table_health_response_declares_cumulative_and_estimated() {
         let src = include_str!("api.rs");
         let code = src.split("\nmod tests {").next().unwrap_or(src);
+        // Assembled in the body fn since the badges extraction; the handler
+        // is a thin wrapper.
         let start = code
-            .find("pub async fn get_dbm_table_health")
-            .expect("the table-health handler must exist");
+            .find("async fn read_table_health_body")
+            .expect("the table-health body fn must exist");
         let body = code[start..].split("\n}\n").next().expect("body");
 
         for key in ["counters_are_cumulative", "tuples_are_estimated"] {
@@ -8077,22 +10466,23 @@ mod tests {
         }
     }
 
-    /// **Postgres-only, and the surface must SAY so per engine.**
+    /// **Per-engine honesty: the surface must SAY which engines collect this.**
     ///
-    /// `pg_table_stats` reads `pg_class`/`pg_stat_user_tables`; MySQL, MariaDB
-    /// and SQL Server have no equivalent in this recipe set. A MySQL user
-    /// filtering to their instance must be told the signal is not collected for
-    /// their engine — an empty table with no explanation reads as "no problems
-    /// found", which is the single most dangerous empty state this feature can
-    /// render.
+    /// Postgres, MySQL and MariaDB all ship table-stats recipes; SQL Server
+    /// has no equivalent in this recipe set. A user filtering to an engine with
+    /// no recipe must be told the signal is not collected for their engine — an
+    /// empty table with no explanation reads as "no problems found", which is
+    /// the single most dangerous empty state this feature can render.
     #[test]
     fn test_table_health_reports_engine_support_rather_than_an_empty_table() {
-        assert_eq!(
-            table_health_engine_support("postgresql"),
-            "supported",
-            "postgres is the engine this recipe queries"
-        );
-        for unsupported in ["mysql", "mariadb", "mssql"] {
+        for supported in ["postgresql", "mysql", "mariadb"] {
+            assert_eq!(
+                table_health_engine_support(supported),
+                "supported",
+                "`{supported}` ships a table-stats recipe"
+            );
+        }
+        for unsupported in ["mssql", "oracle"] {
             assert_eq!(
                 table_health_engine_support(unsupported),
                 "unsupported",
@@ -8117,8 +10507,8 @@ mod tests {
         let src = include_str!("api.rs");
         let code = src.split("\nmod tests {").next().unwrap_or(src);
         let start = code
-            .find("pub async fn get_dbm_table_health")
-            .expect("the table-health handler must exist");
+            .find("async fn read_table_health_body")
+            .expect("the table-health body fn must exist");
         let body = code[start..].split("\n}\n").next().expect("body");
 
         let call = body
@@ -8148,8 +10538,8 @@ mod tests {
         let src = include_str!("api.rs");
         let code = src.split("\nmod tests {").next().unwrap_or(src);
         let start = code
-            .find("pub async fn get_dbm_table_health")
-            .expect("handler");
+            .find("async fn read_table_health_body")
+            .expect("body fn");
         let body = code[start..].split("\n}\n").next().expect("body");
 
         let call = body
@@ -8201,6 +10591,344 @@ mod tests {
         assert!(
             neighbourhood.contains("db_monitoring/deadlocks"),
             "the table-health route must live beside the other ungated DBM routes"
+        );
+    }
+    // ── Server samples (`/server_samples`) ─────────────────────────────────
+
+    /// The SQL pin, schema-complete: BOTH per-execution duration columns
+    /// present, so the duration is their COALESCE (statement first — the
+    /// plainer measurement wins) and both kinds are admitted. Wire aliases
+    /// only; ranked slowest-first; bounded.
+    #[test]
+    fn test_server_samples_sql_pins_the_projection() {
+        let sql = build_dbm_server_samples_sql("dbm_server_logs", 100, 200, "", 100, &all_cols())
+            .unwrap();
+        let expected = "SELECT _timestamp, o2_dbm_kind AS kind, o2_dbm_fingerprint AS fingerprint, \
+                        o2_dbm_activity_query AS query, COALESCE(o2_dbm_stmt_duration_ms, o2_dbm_plan_duration_ms) AS duration_ms, \
+                        o2_dbm_plan_rows_actual AS rows_actual, o2_dbm_engine AS db_system, \
+                        o2_dbm_database AS db_namespace, o2_dbm_instance AS db_instance, \
+                        o2_dbm_session_user AS db_user, o2_dbm_session_pid AS session_pid FROM \"dbm_server_logs\"\n\
+                        WHERE _timestamp >= 100 AND _timestamp < 200\n    \
+                        AND o2_dbm_kind IN ('statement', 'explain')\n    \
+                        AND COALESCE(o2_dbm_stmt_duration_ms, o2_dbm_plan_duration_ms) IS NOT NULL\n\
+                        ORDER BY duration_ms DESC\nLIMIT 100";
+        assert_eq!(sql, expected);
+    }
+
+    /// A stream carrying only ONE duration column (the normal case — the two
+    /// producers land on different streams) names only that column: naming an
+    /// absent one fails the whole query with a schema error.
+    #[test]
+    fn test_server_samples_sql_names_only_present_duration_columns() {
+        let mut present = all_cols();
+        present.remove(server_vantage::O2_DBM_PLAN_DURATION_MS);
+        let sql = build_dbm_server_samples_sql("s", 100, 200, "", 100, &present).unwrap();
+        assert!(sql.contains("o2_dbm_stmt_duration_ms AS duration_ms"));
+        assert!(!sql.contains("COALESCE"));
+        assert!(!sql.contains(server_vantage::O2_DBM_PLAN_DURATION_MS));
+    }
+
+    /// No per-execution duration column has ever landed → no SQL, an empty
+    /// section rather than a 500. The capture state must agree — the SAME
+    /// condition, reported and gated together so they cannot drift.
+    #[test]
+    fn test_server_samples_capture_gate_matches_the_sql_gate() {
+        let mut present = all_cols();
+        present.remove(server_vantage::O2_DBM_STMT_DURATION_MS);
+        present.remove(server_vantage::O2_DBM_PLAN_DURATION_MS);
+        assert!(build_dbm_server_samples_sql("s", 100, 200, "", 100, &present).is_none());
+        assert_eq!(server_samples_capture_state(&present), "off");
+        present.insert(server_vantage::O2_DBM_STMT_DURATION_MS.to_string());
+        assert!(build_dbm_server_samples_sql("s", 100, 200, "", 100, &present).is_some());
+        assert_eq!(server_samples_capture_state(&present), "on");
+    }
+
+    /// The envelope: per-hit fields (user and provenance included), the
+    /// honesty keys, and the truncation claim over the cap.
+    #[test]
+    fn test_server_samples_envelope_shape() {
+        let rows = vec![
+            json!({
+                "_timestamp": 1_786_612_398_267_000i64,
+                "kind": "statement",
+                "fingerprint": "abc123",
+                "query": "SELECT count(*), sum(amount) FROM orders WHERE customer_ref = ?",
+                "duration_ms": 63.149,
+                "db_system": "postgresql",
+                "db_namespace": "dbmlab",
+                "db_instance": "postgres",
+                "db_user": "dbm",
+            }),
+            json!({
+                "_timestamp": 1_786_612_398_000_000i64,
+                "kind": "explain",
+                "fingerprint": "def456",
+                "query": "SELECT owner FROM accounts WHERE id = ?",
+                "duration_ms": 12.5,
+                "rows_actual": 1,
+                "db_system": "postgresql",
+            }),
+        ];
+        let env = server_samples_envelope(&rows, "dbm_server,dbm_server_logs", "on", 100);
+        assert_eq!(env["total"], json!(2));
+        assert_eq!(env["truncated"], json!(false));
+        assert_eq!(env["server_samples_capture"], json!("on"));
+        // Threshold-filtered is UNCONDITIONAL: both producers are gated by the
+        // database's own logging thresholds, so the rows always describe the
+        // captured population.
+        assert_eq!(env["threshold_filtered"], json!(true));
+        let first = &env["hits"][0];
+        assert_eq!(first["duration_ms"], json!(63.149));
+        assert_eq!(first["db_user"], json!("dbm"));
+        assert_eq!(first["source"], json!("statement_log"));
+        assert_eq!(first["rows_actual"], json!(null));
+        let second = &env["hits"][1];
+        assert_eq!(second["source"], json!("auto_explain"));
+        assert_eq!(second["db_user"], json!(null));
+        assert_eq!(second["rows_actual"], json!(1));
+    }
+
+    /// A full page means the read hit its cap — more qualifying executions
+    /// existed than were returned, and the envelope must say so.
+    #[test]
+    fn test_server_samples_envelope_truncation() {
+        let rows: Vec<Value> = (0..3)
+            .map(|i| json!({"_timestamp": i, "duration_ms": i as f64}))
+            .collect();
+        let env = server_samples_envelope(&rows, "s", "on", 3);
+        assert_eq!(env["truncated"], json!(true));
+    }
+
+    /// One execution, one row: with both producers wide open, a completed
+    /// statement writes a `duration:` line AND a plan document, and the merge
+    /// would list it twice (verified live — twins share the prefix timestamp
+    /// and pid, one with a user and one without). The statement row wins; the
+    /// explain twin is absorbed.
+    #[test]
+    fn test_server_samples_dedupes_producer_twins() {
+        let stmt = |ts: i64, pid: i64, fp: &str| {
+            json!({"_timestamp": ts, "session_pid": pid, "fingerprint": fp,
+                   "kind": server_vantage::KIND_STATEMENT, "duration_ms": 25002.2, "db_user": "dbm"})
+        };
+        // Plan documents carry NO pid — verified live; the identity must not
+        // depend on one being there.
+        let explain = |ts: i64, fp: &str| {
+            json!({"_timestamp": ts, "fingerprint": fp,
+                   "kind": server_vantage::KIND_EXPLAIN, "duration_ms": 25001.3})
+        };
+        let mut rows = vec![
+            stmt(1_000, 7, "fp-a"),
+            explain(1_000, "fp-a"), // twin of the row above — absorbed
+            explain(2_000, "fp-a"), // explain-only capture — kept
+            explain(1_000, "fp-b"), // same ms, different statement — kept
+            // A pid-carrying explain row must actually match a statement pid
+            // to be absorbed.
+            json!({"_timestamp": 1_000, "session_pid": 9, "fingerprint": "fp-a",
+                   "kind": server_vantage::KIND_EXPLAIN, "duration_ms": 25001.0}),
+        ];
+        dedupe_producer_twins(&mut rows);
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[0]["kind"], json!(server_vantage::KIND_STATEMENT));
+        assert!(
+            rows.iter()
+                .all(|r| r["kind"] == json!(server_vantage::KIND_STATEMENT)
+                    || r["_timestamp"] != json!(1_000)
+                    || r["fingerprint"] != json!("fp-a")
+                    || r["session_pid"] == json!(9)),
+            "the (1000, fp-a) identity must keep only the statement row and the mismatched-pid explain"
+        );
+    }
+
+    /// Two rows of the SAME kind sharing an identity are two real executions
+    /// — a pid can complete two fast runs of one statement inside the log
+    /// prefix's millisecond — and collapsing them would undercount work.
+    #[test]
+    fn test_server_samples_dedupe_never_merges_same_kind() {
+        let mut rows = vec![
+            json!({"_timestamp": 1, "session_pid": 7, "fingerprint": "fp",
+                   "kind": server_vantage::KIND_STATEMENT, "duration_ms": 0.4}),
+            json!({"_timestamp": 1, "session_pid": 7, "fingerprint": "fp",
+                   "kind": server_vantage::KIND_STATEMENT, "duration_ms": 0.3}),
+        ];
+        dedupe_producer_twins(&mut rows);
+        assert_eq!(rows.len(), 2);
+    }
+
+    /// The route + re-export wiring, source-pinned like its siblings: a
+    /// handler nothing routes to is dead code that reads as a feature.
+    #[test]
+    fn test_server_samples_route_is_registered() {
+        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        assert!(
+            router.contains("db_monitoring/server_samples"),
+            "the server-samples route must be registered"
+        );
+        assert!(router.contains("get_dbm_server_samples"));
+        let reexport = include_str!("../../../../api/search/src/traces/mod.rs");
+        assert!(
+            reexport.contains("get_dbm_server_samples"),
+            "the handler must be re-exported, or the router cannot name it"
+        );
+    }
+
+    // ── Badges (`/badges`) ──────────────────────────────────────────────────
+
+    /// A slice set where everything answered, and no fallback fired.
+    fn all_ok_slices() -> BadgeSliceResults {
+        BadgeSliceResults {
+            databases: Ok(json!({"hits": [{"calls": 12}], "top_n_subset": false})),
+            queries: Ok(json!({"hits": [], "total": 7, "other": []})),
+            activity: Ok(json!({"hits": [], "by_state": [{"state": "active", "sessions": 3}]})),
+            deadlocks: Ok(json!({"hits": [], "total": 0, "truncated": false})),
+            blocking: Ok(json!({"hits": [], "total": 0, "truncated": false})),
+            table_health: Ok(json!({"hits": [], "total": 0})),
+            server_queries: None,
+            server_samples: None,
+        }
+    }
+
+    /// The envelope carries each endpoint's body UNDER ITS OWN KEY, unchanged
+    /// — agreement with the tabs is the whole design, so the member must be
+    /// the body, not a digest of it. Fallback members are ABSENT when their
+    /// condition never fired: absent means "not needed", which the reader
+    /// must be able to tell from "fired and failed" (null).
+    #[test]
+    fn test_badges_envelope_shape() {
+        let env = all_ok_slices().into_envelope();
+        assert_eq!(env["databases"]["hits"][0]["calls"], json!(12));
+        assert_eq!(env["queries"]["total"], json!(7));
+        assert_eq!(env["activity"]["by_state"][0]["sessions"], json!(3));
+        assert_eq!(env["deadlocks"]["truncated"], json!(false));
+        assert_eq!(env["blocking"]["total"], json!(0));
+        assert_eq!(env["table_health"]["total"], json!(0));
+        let obj = env.as_object().expect("envelope is an object");
+        assert!(
+            !obj.contains_key("server_queries") && !obj.contains_key("server_samples"),
+            "an unfired fallback must be absent, not null: {env}"
+        );
+    }
+
+    /// One failed slice nulls ITS member and nothing else — the per-badge
+    /// failure isolation the browser fan-out's `allSettled` provided, kept
+    /// across the move server-side.
+    #[test]
+    fn test_badges_member_failure_is_null_and_isolated() {
+        let mut slices = all_ok_slices();
+        slices.queries = Err(MetaHttpResponse::internal_error("search failed"));
+        let env = slices.into_envelope();
+        assert_eq!(env["queries"], Value::Null, "the failed member reads null");
+        assert_eq!(
+            env["databases"]["hits"][0]["calls"],
+            json!(12),
+            "the other members must be untouched"
+        );
+        assert_eq!(env["activity"]["by_state"][0]["sessions"], json!(3));
+    }
+
+    /// A fallback that FIRED and then failed is `null` — present, unknown —
+    /// while one that fired and answered carries its body.
+    #[test]
+    fn test_badges_fired_fallback_failure_is_null_not_absent() {
+        let mut slices = all_ok_slices();
+        slices.server_queries = Some(Err(MetaHttpResponse::internal_error("read failed")));
+        slices.server_samples = Some(Ok(json!({"hits": [], "total": 0, "truncated": false})));
+        let env = slices.into_envelope();
+        assert_eq!(env["server_queries"], Value::Null);
+        assert_eq!(env["server_samples"]["total"], json!(0));
+    }
+
+    /// The fallback arms on an EXACT zero and never on a failure: unknown is
+    /// not zero, and a blipped client read must not put a database-reported
+    /// claim on the badge.
+    #[test]
+    fn test_badges_fallback_fires_on_zero_not_on_null() {
+        // Queries → server_queries.
+        assert!(queries_slice_reports_zero(&Ok(
+            json!({"hits": [], "total": 0})
+        )));
+        assert!(!queries_slice_reports_zero(&Ok(
+            json!({"hits": [], "total": 5})
+        )));
+        assert!(
+            !queries_slice_reports_zero(&Err(MetaHttpResponse::internal_error("down"))),
+            "a failed slice is unknown, and unknown is not zero"
+        );
+
+        // Databases → server_samples. The sum folds exactly as the strip
+        // does: missing `calls` contributes 0, an empty list sums to 0.
+        assert!(databases_slice_reports_zero_calls(&Ok(json!({"hits": []}))));
+        assert!(databases_slice_reports_zero_calls(&Ok(
+            json!({"hits": [{"db_system": "postgresql"}]})
+        )));
+        assert!(!databases_slice_reports_zero_calls(&Ok(
+            json!({"hits": [{"calls": 3}]})
+        )));
+        assert!(
+            !databases_slice_reports_zero_calls(&Err(MetaHttpResponse::internal_error("down"))),
+            "a failed slice is unknown, and unknown is not zero"
+        );
+    }
+
+    /// The whole request 403s ONLY when every slice was denied; a mix of
+    /// denials and other failures still answers with what it could.
+    #[test]
+    fn test_badges_403_only_when_every_slice_is_denied() {
+        let denied = || -> Result<Value, HttpResponse> { Err(unauthorized_response()) };
+        let all_denied = BadgeSliceResults {
+            databases: denied(),
+            queries: denied(),
+            activity: denied(),
+            deadlocks: denied(),
+            blocking: denied(),
+            table_health: denied(),
+            server_queries: None,
+            server_samples: None,
+        };
+        assert!(all_denied.all_forbidden());
+
+        let mut one_answers = BadgeSliceResults {
+            databases: denied(),
+            queries: denied(),
+            activity: denied(),
+            deadlocks: denied(),
+            blocking: denied(),
+            table_health: Ok(json!({"hits": [], "total": 0})),
+            server_queries: None,
+            server_samples: None,
+        };
+        assert!(
+            !one_answers.all_forbidden(),
+            "one readable slice means the caller gets an answer, not a 403"
+        );
+        one_answers.table_health = Err(MetaHttpResponse::internal_error("down"));
+        assert!(
+            !one_answers.all_forbidden(),
+            "a non-auth failure is not a denial — the caller may retry, not be locked out"
+        );
+    }
+
+    /// The route + re-export wiring, source-pinned like its siblings, and
+    /// ungated beside them — an `#[cfg]` here would 404 the endpoint on OSS.
+    #[test]
+    fn test_badges_route_is_registered() {
+        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        assert!(
+            router.contains("db_monitoring/badges"),
+            "the badges route must be registered"
+        );
+        assert!(router.contains("get_dbm_badges"));
+        let idx = router
+            .find("db_monitoring/badges")
+            .expect("route must exist");
+        let neighbourhood = &router[idx.saturating_sub(2000)..idx];
+        assert!(
+            neighbourhood.contains("db_monitoring/"),
+            "the badges route must live beside the other ungated DBM routes"
+        );
+        let reexport = include_str!("../../../../api/search/src/traces/mod.rs");
+        assert!(
+            reexport.contains("get_dbm_badges"),
+            "the handler must be re-exported, or the router cannot name it"
         );
     }
 }

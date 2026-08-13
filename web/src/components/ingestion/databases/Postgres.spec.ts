@@ -84,6 +84,8 @@ describe("postgresCard builder", () => {
       // and its parser only matches the log_line_prefix set here.
       "dbm-logging",
       "dbm-logging-verify",
+      // Optional real-executed-plans step; shares the logging step's restart.
+      "dbm-auto-explain",
       "dbm-configure",
       "dbm-run",
       "verify-dbm",
@@ -128,10 +130,152 @@ describe("postgresCard builder", () => {
 
     expect(config).toContain(`Basic ${SUBS.token}`);
 
-    // Both configs are passed to one collector.
+    // Both configs are passed to one collector — and the merged run needs the
+    // metrics config's password env TOO: config.yaml reads
+    // ${env:POSTGRESQL_PASSWORD}, so a command setting only PGUSER/PGPASS
+    // breaks the metrics receiver's auth the moment the files merge.
     const run = card.steps.find((s) => s.id === "dbm-run")!;
     expect(run.code!.raw).toContain("--config ./config.yaml");
     expect(run.code!.raw).toContain("--config ./dbm-config.yaml");
+    expect(run.code!.raw).toContain("POSTGRESQL_PASSWORD=");
+    expect(run.code!.raw).toContain("PGUSER=");
+    expect(run.code!.raw).toContain("PGPASS=");
+  });
+
+  /**
+   * THE v0.148.0 EVENTS TRAP. Upstream flipped `db.server.query_sample` /
+   * `db.server.top_query` to default-OFF: without a TOP-LEVEL `events:` block
+   * (a sibling of the collection settings, never nested inside them) the
+   * receiver starts cleanly, reports healthy, and emits zero events with zero
+   * warnings. This is the worst failure shape the card can ship, so the block's
+   * presence and its shape are pinned here.
+   */
+  it("enables the receiver's activity and top-query events via a top-level events: block", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    // The dedicated receiver instance (a same-named `postgresql:` would collide
+    // with the metrics config when the two --config files merge).
+    expect(config).toContain("postgresql/dbm_events:");
+    // Both event names, explicitly enabled.
+    expect(config).toContain("db.server.query_sample: { enabled: true }");
+    expect(config).toContain("db.server.top_query: { enabled: true }");
+    // Postgres spells it top_n_query (mysql says top_query_count) — verified
+    // against v0.158.0, where an unknown key is a fatal config error.
+    expect(config).toContain("top_n_query:");
+    expect(config).toContain("query_sample_collection:");
+
+    // `events:` must be TOP-LEVEL on the receiver: 4-space indent, exactly like
+    // the collection blocks — nesting it deeper is a fatal config error.
+    expect(config).toMatch(/\n {4}events:\n/);
+
+    // The events pipeline must BYPASS filter/dbm: receiver-native events carry
+    // no o2_recipe tag, so the filter would silently drop every one of them.
+    expect(config).toMatch(/logs\/dbm_events:\n\s+receivers: \[postgresql\/dbm_events\]/);
+    expect(config).toMatch(/logs\/dbm_events:[\s\S]*?processors: \[batch\]/);
+
+    // Prerequisites travel with the feature: top queries read
+    // pg_stat_statements, which must be created AND preloaded (restart).
+    const grant = card.steps.find((s) => s.id === "dbm-grant")!;
+    expect(grant.variants!.find((v) => v.id === "psql")!.code.raw).toContain("pg_stat_statements");
+    const logging = card.steps.find((s) => s.id === "dbm-logging")!;
+    expect(logging.code!.raw).toContain("shared_preload_libraries = 'pg_stat_statements'");
+    const loggingVerify = card.steps.find((s) => s.id === "dbm-logging-verify")!;
+    expect(loggingVerify.code!.raw).toContain("SHOW shared_preload_libraries;");
+    // pg_monitor does not include table SELECT, so EXPLAIN-based estimated
+    // plans can silently produce nothing — the card must say so.
+    expect(grant.variants!.find((v) => v.id === "psql")!.note).toMatch(/SELECT/);
+
+    // Collector identity + retention caveat (ship-plan §7 items 5 and 7).
+    const note = configure.note!;
+    expect(note).toMatch(/upstream OpenTelemetry Collector Contrib/i);
+    expect(note).toMatch(/v0\.148\.0/);
+    expect(note).toMatch(/v0\.158\.0/);
+    expect(note).toMatch(/OpenObserve collector build does not include/i);
+    expect(note).toMatch(/retention/i);
+
+    // The verify step now promises the Activity and Table health tabs too.
+    const verify = card.steps.find((s) => s.id === "verify-dbm")!;
+    expect(verify.pills).toEqual(["Deadlocks", "Blocked queries", "Activity", "Table health"]);
+  });
+
+  /**
+   * THE TABLE/INDEX HEALTH CONTRACT. `canonicalize_table_stats` and
+   * `canonicalize_index_stats` (server_vantage.rs) read these exact aliases —
+   * the file header of dbmShared.ts declares them a parser contract, and a
+   * renamed alias ships silent emptiness: the collector stays green, the row
+   * stores, and the Table health tab renders nothing.
+   */
+  it("ships the table and index health recipes with every alias the canonicalizers read", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    // Both receivers defined AND in the logs pipeline — a receiver defined but
+    // not listed collects nothing while looking configured.
+    expect(config).toContain("sqlquery/pg_table_stats:");
+    expect(config).toContain("sqlquery/pg_index_stats:");
+    const pipeline = config.split("service:")[1]!;
+    expect(pipeline).toContain("sqlquery/pg_table_stats");
+    expect(pipeline).toContain("sqlquery/pg_index_stats");
+
+    // The recipe tags detect_engine and the dispatch arms key on.
+    expect(config).toContain("'pg_table_stats'");
+    expect(config).toContain("'pg_index_stats'");
+
+    // The identity split the backend depends on: the table name arrives in
+    // `body` (body_column: table_name), while the index recipe's body carries
+    // the DDL and its identity stays in the index_name ATTRIBUTE.
+    expect(config).toContain("body_column: table_name");
+    expect(config).toContain("body_column: index_def");
+
+    // Every attribute alias canonicalize_table_stats reads. A column selected
+    // but absent from attribute_columns is silently dropped, so each name must
+    // appear in the attribute list too.
+    const tableAttrs = config.match(
+      /body_column: table_name\s+attribute_columns:\s+\[([^\]]+)\]/,
+    )![1];
+    for (const alias of [
+      "schema_name",
+      "total_bytes",
+      "heap_bytes",
+      "seq_scan",
+      "seq_tup_read",
+      "idx_scan",
+      "n_live_tup",
+      "n_dead_tup",
+      "n_mod_since_analyze",
+      "last_vacuum",
+      "last_autovacuum",
+      "last_analyze",
+      "autovacuum_count",
+      "frozen_xid_age",
+      "dead_tup_pct",
+      "server_address",
+      "o2_recipe",
+    ]) {
+      expect(tableAttrs, `table alias ${alias} must ride as an attribute`).toContain(alias);
+    }
+
+    // Every attribute alias canonicalize_index_stats reads.
+    const indexAttrs = config.match(
+      /body_column: index_def\s+attribute_columns:\s+\[([^\]]+)\]/,
+    )![1];
+    for (const alias of [
+      "schema_name",
+      "table_name",
+      "index_name",
+      "idx_scan",
+      "idx_tup_read",
+      "idx_tup_fetch",
+      "index_bytes",
+      "is_unique",
+      "server_address",
+      "o2_recipe",
+    ]) {
+      expect(indexAttrs, `index alias ${alias} must ride as an attribute`).toContain(alias);
+    }
   });
 
   // The Deadlocks tab's whole failure mode is silent: filelog reports healthy
@@ -238,6 +382,263 @@ describe("postgresCard builder", () => {
     // parse, which is the entire reason %q is in the prescribed prefix.
     const background = "2026-08-10 14:22:31.417 UTC [7] LOG:  checkpoint starting: time";
     expect(parser.exec(background)).not.toBeNull();
+  });
+
+  /**
+   * THE AUTO_EXPLAIN CONTRACT. Real executed plans arrive as `duration: N.NNN
+   * ms  plan:` log entries with the JSON document on continuation lines. Two
+   * silent failure shapes are pinned here against REAL captured lines
+   * (tests/dbm-server-vantage, postgres:16.14):
+   *  - a route that fails to match leaves `o2_pg_event = "other"` and
+   *    filter/dbm drops every plan while the collector reports healthy;
+   *  - a route that matches too much steals ordinary `duration: … statement:`
+   *    lines from users running log_min_duration_statement.
+   */
+  it("routes a real auto_explain entry to the explain branch and nothing else", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    // The branch exists, tags the value filter/dbm keeps, and extracts both
+    // attributes the backend canonicalizer reads (ae_duration_ms, ae_plan_json).
+    expect(config).toContain("id: mark_explain");
+    expect(config).toMatch(/id: mark_explain\s+field: attributes\.o2_pg_event\s+value: explain/);
+    expect(config).toContain("(?P<ae_duration_ms>");
+    expect(config).toContain("(?P<ae_plan_json>");
+    // The plan travels as ONE STRING attribute — a json_parser here would emit
+    // a nested value, and a nested value rejects the entire ingest batch (X5).
+    expect(config, "the plan must never be json_parser-expanded").not.toContain("json_parser");
+
+    // The route pattern, exercised against the real first line.
+    const routeLine = config.split("\n").find((l) => l.includes("ms\\\\s+plan:"))!;
+    expect(routeLine, "the explain route must exist in the router").toBeDefined();
+    const routePattern = routeLine.match(/matches "([^"]+)"/)![1].replace(/\\\\/g, "\\");
+    const route = new RegExp(routePattern);
+    // Verbatim rig capture (corpus/auto_explain_rig.json first_line, message part).
+    expect(route.test("duration: 0.009 ms  plan:")).toBe(true);
+    // An ordinary statement-duration line must NOT reach the explain branch.
+    expect(
+      route.test("duration: 0.295 ms  statement: SELECT balance FROM accounts WHERE id = 42;"),
+    ).toBe(false);
+
+    // The extraction regexes, against the real multiline-joined message.
+    const message =
+      'duration: 0.009 ms  plan:\n\t{\n\t  "Query Text": "SELECT balance FROM accounts WHERE id = 42;",\n\t  "Plan": {\n\t    "Node Type": "Seq Scan"\n\t  }\n\t}';
+    const headerLine = config.split("\n").find((l) => l.includes("(?P<ae_duration_ms>"))!;
+    const headerPattern = headerLine.slice(
+      headerLine.indexOf("'") + 1,
+      headerLine.lastIndexOf("'"),
+    );
+    const header = new RegExp(headerPattern.replace(/\\\\/g, "\\").replace(/\(\?P</g, "(?<"));
+    expect(header.exec(message)!.groups!.ae_duration_ms).toBe("0.009");
+
+    const planLine = config.split("\n").find((l) => l.includes("(?P<ae_plan_json>"))!;
+    const planPattern = planLine.slice(planLine.indexOf("'") + 1, planLine.lastIndexOf("'"));
+    const planRe = new RegExp(
+      planPattern
+        .replace(/\\\\/g, "\\")
+        .replace(/\(\?P</g, "(?<")
+        .replace(/\(\?s\)/g, ""),
+      "s",
+    );
+    const planJson = planRe.exec(message)!.groups!.ae_plan_json;
+    expect(() => JSON.parse(planJson)).not.toThrow();
+    expect(JSON.parse(planJson)["Plan"]["Node Type"]).toBe("Seq Scan");
+  });
+
+  /**
+   * THE SILENT-DROP TRAP. filter/dbm drops any record whose o2_pg_event is nil
+   * OR the literal "other" — it tests the VALUE, because every line is stamped
+   * "other" before routing. An explain row must therefore carry a non-"other"
+   * value or every plan is discarded downstream of a branch that looks correct
+   * in isolation. This test runs the SHIPPED filter condition, not a copy.
+   */
+  it("keeps explain rows alive through the shipped filter/dbm condition", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    const condLine = config.split("\n").find((l) => l.includes('attributes["o2_recipe"] == nil'))!;
+    const cond = condLine.trim().replace(/^- '/, "").replace(/'$/, "");
+
+    // Evaluate the OTTL condition with JS semantics: == on strings/null, and/or.
+    const dropped = (attrs: Record<string, string>) => {
+      const js = cond
+        .replace(/attributes\["([^"]+)"\]/g, (_m, k: string) => JSON.stringify(attrs[k] ?? null))
+        .replace(/\bnil\b/g, "null")
+        .replace(/\band\b/g, "&&")
+        .replace(/\bor\b/g, "||");
+      // Evaluating the SHIPPED filter expression is the point of this test.
+      return eval(js) as boolean;
+    };
+
+    // A marked explain row SURVIVES…
+    expect(dropped({ o2_pg_event: "explain" })).toBe(false);
+    // …and so does a marked statement-duration row — the Slowest-calls
+    // fallback reads exactly these.
+    expect(dropped({ o2_pg_event: "statement_duration" })).toBe(false);
+    // …while the stamped-but-unrouted default is dropped (the filter's job),
+    // which is exactly why the route must fire before the default.
+    expect(dropped({ o2_pg_event: "other" })).toBe(true);
+    expect(dropped({})).toBe(true);
+    // Control: the existing recipes' rows keep surviving.
+    expect(dropped({ o2_recipe: "pg_blocking_chain" })).toBe(false);
+    expect(dropped({ o2_pg_event: "deadlock" })).toBe(false);
+  });
+
+  /**
+   * THE STATEMENT-DURATION CONTRACT. `log_min_duration_statement` writes one
+   * line per COMPLETED statement with its exact duration —
+   * `duration: N.NNN ms  statement: …` — and the Slowest-calls fallback is
+   * built from exactly these lines. Pinned against a REAL line from the live
+   * capture rig. Two silent failure shapes:
+   *  - an unrouted line keeps `o2_pg_event = "other"` and filter/dbm drops
+   *    every duration while the collector reports healthy;
+   *  - the route must fire AFTER the explain route — an auto_explain entry
+   *    begins `duration:` too, and claiming it here would steal every plan.
+   */
+  it("routes a real statement-duration line to the duration branch and parses it", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    // The branch exists and tags the value filter/dbm keeps and the backend
+    // canonicalizer dispatches on.
+    expect(config).toContain("id: mark_duration");
+    expect(config).toMatch(
+      /id: mark_duration\s+field: attributes\.o2_pg_event\s+value: statement_duration/,
+    );
+
+    // Route ordering: the explain route must appear BEFORE the duration route
+    // in the router, so plan headers never reach the duration branch.
+    expect(config.indexOf("output: mark_explain")).toBeGreaterThan(-1);
+    expect(config.indexOf("output: mark_explain")).toBeLessThan(
+      config.indexOf("output: mark_duration"),
+    );
+
+    // The extraction regex, against the real captured message (live stream
+    // dbm_server_logs, org dbm_notraces, 2026-08-13) and the extended-protocol
+    // execute form.
+    const regexLine = config.split("\n").find((l) => l.includes("(?P<stmt_duration_ms>"))!;
+    expect(regexLine, "the duration parser must exist").toBeDefined();
+    const pattern = regexLine.slice(regexLine.indexOf("'") + 1, regexLine.lastIndexOf("'"));
+    const re = new RegExp(pattern.replace(/\(\?P</g, "(?<").replace(/\(\?s\)/g, ""), "s");
+    const real =
+      "duration: 63.149 ms  statement: SELECT count(*), sum(amount) FROM orders WHERE customer_ref = 'CUST-00879'";
+    const m = re.exec(real)!;
+    expect(m).not.toBeNull();
+    expect(m.groups!.stmt_duration_ms).toBe("63.149");
+    expect(m.groups!.stmt_kind).toBe("statement");
+    expect(m.groups!.stmt_text).toBe(
+      "SELECT count(*), sum(amount) FROM orders WHERE customer_ref = 'CUST-00879'",
+    );
+    const prepared = re.exec(
+      "duration: 1.234 ms  execute s_1: SELECT owner FROM accounts WHERE id = $1",
+    )!;
+    expect(prepared.groups!.stmt_kind).toBe("execute s_1");
+  });
+
+  /**
+   * The logging step must actually TURN ON the feed the fallback reads: a
+   * recommended nonzero threshold (100ms captures the slow tail; 0 is a
+   * diagnosis setting whose volume is the workload's own statement rate; the
+   * -1 default reports nothing), with the tradeoff stated in the conf
+   * comments and the verify step checking it took effect.
+   */
+  it("ships log_min_duration_statement with a nonzero recommended threshold", () => {
+    const card = postgresCard(SUBS);
+    const logging = card.steps.find((s) => s.id === "dbm-logging")!;
+    expect(logging.code!.raw).toContain("log_min_duration_statement = 100ms");
+    expect(logging.code!.raw).toMatch(/0 logs EVERYTHING/);
+    const verify = card.steps.find((s) => s.id === "dbm-logging-verify")!;
+    expect(verify.code!.raw).toContain("SHOW log_min_duration_statement;");
+  });
+
+  /**
+   * THE %Q LOCKSTEP (T6). The optional auto_explain step rewrites
+   * log_line_prefix to carry `qid=%Q` — the server's own queryid, the exact
+   * join key that survives `= ANY($1)` driver rewrites and >16 KB truncation,
+   * where the text fingerprint provably cannot join (measured on the rig).
+   * The shared parser regex must accept BOTH prefixes: with qid (this step
+   * taken) and without (only the logging step taken).
+   */
+  it("parses both log_line_prefix shapes, capturing the queryid when present", () => {
+    const card = postgresCard(SUBS);
+    const explainStep = card.steps.find((s) => s.id === "dbm-auto-explain")!;
+    // The step prescribes the queryid prefix and the setting that computes it.
+    expect(explainStep.code!.raw).toContain("compute_query_id = on");
+    expect(explainStep.code!.raw).toMatch(/log_line_prefix = .*qid=%Q/);
+
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const collectorConfig = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    const regexLine = collectorConfig.split("\n").find((l) => l.includes("(?P<pg_pid>"))!;
+    const pattern = regexLine.slice(regexLine.indexOf("'") + 1, regexLine.lastIndexOf("'"));
+    const parser = new RegExp(
+      pattern
+        .replace(/\\\\/g, "\\")
+        .replace(/\(\?P</g, "(?<")
+        .replace(/\(\?s\)/g, ""),
+      "s",
+    );
+
+    // With the auto_explain step's prefix: qid is captured (negative queryids
+    // are real — Postgres queryid is a signed 64-bit hash).
+    const withQid =
+      "2026-08-13 02:49:33.262 UTC [497] dbm@dbmlab app=t1probe vxid=16/54 txid=0 line=3 qid=-679379679796231264 LOG:  duration: 0.009 ms  plan:";
+    const parsedQid = parser.exec(withQid);
+    expect(parsedQid).not.toBeNull();
+    expect(parsedQid!.groups!.pg_query_id).toBe("-679379679796231264");
+    expect(parsedQid!.groups!.pg_message).toContain("plan:");
+
+    // Without it (the logging step's prefix, real captured line): still parses,
+    // qid simply absent.
+    const withoutQid =
+      "2026-08-13 02:49:33.262 UTC [497] dbm@dbmlab app=t1probe vxid=16/54 txid=0 line=3 LOG:  duration: 0.009 ms  plan:";
+    const parsedPlain = parser.exec(withoutQid);
+    expect(parsedPlain).not.toBeNull();
+    expect(parsedPlain!.groups!.pg_query_id).toBeUndefined();
+    expect(parsedPlain!.groups!.pg_severity).toBe("LOG");
+
+    // Background workers under the NEW prefix (%q elides the whole session
+    // group, qid included) must keep parsing too.
+    const background = "2026-08-10 14:22:31.417 UTC [7] LOG:  checkpoint starting: time";
+    expect(parser.exec(background)).not.toBeNull();
+  });
+
+  /**
+   * The auto_explain step is OPTIONAL and must say what it costs. The DBA
+   * objection is executor instrumentation on a production primary; a step that
+   * hides that gets recipes disabled by the first incident review.
+   */
+  it("presents auto_explain as optional, after the logging step, with its cost stated", () => {
+    const card = postgresCard(SUBS);
+    const ids = card.steps.map((s) => s.id);
+    expect(ids.indexOf("dbm-auto-explain")).toBeGreaterThan(ids.indexOf("dbm-logging"));
+
+    const step = card.steps.find((s) => s.id === "dbm-auto-explain")!;
+    const conf = step.code!.raw;
+    // The knob set the parser depends on, spelled exactly.
+    expect(conf).toContain("auto_explain.log_format = json");
+    expect(conf).toContain("auto_explain.log_analyze = on");
+    expect(conf).toContain("auto_explain.log_timing = off");
+    expect(conf).toContain("auto_explain.log_buffers = on");
+    // BOTH libraries in the preload list — replacing instead of appending
+    // silently kills the entire pg_stat_statements top-query path.
+    expect(conf).toContain("shared_preload_libraries = 'pg_stat_statements,auto_explain'");
+    // …and only in THIS step: the required logging step must not acquire
+    // auto_explain, or the optional step stops being optional.
+    const loggingConf = card.steps.find((s) => s.id === "dbm-logging")!.code!.raw;
+    expect(loggingConf).toContain("shared_preload_libraries = 'pg_stat_statements'");
+    expect(loggingConf).not.toContain("auto_explain");
+
+    // The cost story: sampling as the cost control, log_min_duration as the
+    // volume control, timing's expense — in the copy a DBA will actually read.
+    expect(step.note).toMatch(/sample_rate/);
+    expect(step.note).toMatch(/log_min_duration/);
+    expect(conf).toMatch(/pg_test_timing|clock/);
+    // And the server-side ingest knob, so "collector configured, page empty"
+    // has a stated cause.
+    expect(step.note).toContain("ZO_DB_MONITORING_EXPLAIN_ENABLED");
   });
 
   it("offers psql / docker / GUI tabs to create the monitoring role", () => {

@@ -115,6 +115,164 @@ describe("mysqlCard builder", () => {
     expect(run.code!.raw).toContain("--config ./dbm-config.yaml");
   });
 
+  /**
+   * THE v0.148.0 EVENTS TRAP — see the Postgres spec for the full story: both
+   * receiver events are default-OFF upstream, and a missing top-level `events:`
+   * block produces zero events with zero warnings.
+   */
+  it("enables the receiver's activity and top-query events via a top-level events: block", () => {
+    const card = mysqlCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    expect(config).toContain("mysql/dbm_events:");
+    expect(config).toContain("db.server.query_sample: { enabled: true }");
+    expect(config).toContain("db.server.top_query: { enabled: true }");
+    // MySQL spells it top_query_count (postgres says top_n_query), and rejects
+    // max_rows_per_query inside top_query_collection — verified at v0.158.0,
+    // where an unknown key is a fatal config error.
+    expect(config).toContain("top_query_count:");
+    expect(config).not.toMatch(/top_query_collection:[\s\S]{0,200}max_rows_per_query/);
+
+    // `events:` must be TOP-LEVEL on the receiver (sibling of the collection
+    // blocks) — nesting it deeper is a fatal config error.
+    expect(config).toMatch(/\n {4}events:\n/);
+
+    // The events pipeline must BYPASS filter/dbm: receiver-native events carry
+    // no o2_recipe tag, so the filter would silently drop every one of them.
+    expect(config).toMatch(/logs\/dbm_events:\n\s+receivers: \[mysql\/dbm_events\]/);
+    expect(config).toMatch(/logs\/dbm_events:[\s\S]*?processors: \[batch\]/);
+
+    // The verify step now promises the Activity and Table health tabs too.
+    const verify = card.steps.find((s) => s.id === "verify-dbm")!;
+    expect(verify.pills).toEqual(["Deadlocks", "Blocked queries", "Activity", "Table health"]);
+  });
+
+  /**
+   * THE CONNECTION-LIMIT RECIPE. mysqlreceiver publishes no max_connections,
+   * so without this sqlquery receiver every MySQL row on the Databases page is
+   * permanently a count with no denominator. The join is dead unless
+   * `mysql_instance_endpoint` is BOTH projected by the SQL and listed in
+   * attribute_columns (instanceMetricsRead.ts marks the stream unreadable when
+   * its identity column is missing), so the shape is pinned, not just the
+   * receiver's presence.
+   */
+  it("ships a metrics-mode limits recipe whose endpoint column can join", () => {
+    const card = mysqlCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    // Defined AND in the metrics pipeline.
+    expect(config).toContain("sqlquery/mysql_limits:");
+    expect(config).toMatch(/metrics:\n\s+receivers: \[mysql, sqlquery\/mysql_limits\]/);
+
+    // The gauge that lands as the `mysql_connection_max` stream — the twin of
+    // postgresql_connection_max in the instance-metrics catalog.
+    expect(config).toContain("metric_name: mysql.connection.max");
+    expect(config).toContain("value_column: max_connections");
+    expect(config).toContain("data_type: gauge");
+    expect(config).toContain("value_type: int");
+
+    // The join key: projected in the SQL and carried as an attribute.
+    expect(config).toMatch(/AS mysql_instance_endpoint/);
+    expect(config).toContain("attribute_columns: [mysql_instance_endpoint]");
+
+    // The datasource reads env the run step must therefore set.
+    const run = card.steps.find((s) => s.id === "run")!;
+    expect(run.code!.raw).toContain("MYSQL_USER=");
+    expect(run.code!.raw).toContain("MYSQL_PASSWORD=");
+  });
+
+  /**
+   * THE TABLE/INDEX HEALTH CONTRACT — the MySQL twins of the Postgres recipes.
+   * Same aliases by design (`canonicalize_table_stats` reads ONE set of names
+   * and the tag names the engine), so each alias is pinned in lockstep exactly
+   * as the Postgres spec pins its own.
+   */
+  it("ships the table and index health recipes with every alias the canonicalizers read", () => {
+    const card = mysqlCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    expect(config).toContain("sqlquery/mysql_table_stats:");
+    expect(config).toContain("sqlquery/mysql_index_stats:");
+    const pipeline = config.split("service:")[1]!;
+    expect(pipeline).toContain("sqlquery/mysql_table_stats");
+    expect(pipeline).toContain("sqlquery/mysql_index_stats");
+
+    // The engine-naming tags — 'mysql_table_stats', never the pg_ ones, or
+    // detect_engine files every MySQL table under Postgres.
+    expect(config).toContain("'mysql_table_stats'");
+    expect(config).toContain("'mysql_index_stats'");
+
+    // The identity split: table name in body, index identity in the attribute.
+    expect(config).toContain("body_column: table_name");
+    expect(config).toContain("body_column: index_def");
+
+    // The table aliases MySQL can honestly emit. NO dead-tuple/vacuum/xid
+    // aliases: InnoDB has no source for them, and a zeroed column would render
+    // "0% bloat" about a measurement that never happened.
+    const tableAttrs = config.match(
+      /body_column: table_name\s+attribute_columns:\s+\[([^\]]+)\]/,
+    )![1];
+    for (const alias of [
+      "schema_name",
+      "total_bytes",
+      "heap_bytes",
+      "n_live_tup",
+      "last_analyze",
+      "server_address",
+      "o2_recipe",
+    ]) {
+      expect(tableAttrs, `table alias ${alias} must ride as an attribute`).toContain(alias);
+    }
+    expect(tableAttrs).not.toContain("dead_tup_pct");
+    expect(tableAttrs).not.toContain("frozen_xid_age");
+
+    // The index aliases, idx_scan included — performance_schema's
+    // table_io_waits summary is ON by default on MySQL 8 (unlike MariaDB).
+    const indexAttrs = config.match(
+      /body_column: index_def\s+attribute_columns:\s+\[([^\]]+)\]/,
+    )![1];
+    for (const alias of [
+      "schema_name",
+      "table_name",
+      "index_name",
+      "idx_scan",
+      "index_bytes",
+      "is_unique",
+      "server_address",
+      "o2_recipe",
+    ]) {
+      expect(indexAttrs, `index alias ${alias} must ride as an attribute`).toContain(alias);
+    }
+  });
+
+  /**
+   * Managed-database honesty (ship-plan §7 item 1): deadlock capture tails the
+   * error log on disk — impossible on RDS/Aurora/Cloud SQL — while everything
+   * else keeps working. The card must say so BEFORE the user spends the setup,
+   * plus the two version/retention caveats that travel with the events.
+   */
+  it("tells a managed-database user which half works for them", () => {
+    const card = mysqlCard(SUBS);
+    const note = card.steps.find((s) => s.id === "dbm-configure")!.note!;
+
+    expect(note).toMatch(/RDS/);
+    expect(note).toMatch(/Cloud SQL/);
+    expect(note).toMatch(/not available/i);
+    // The reason travels with the limit…
+    expect(note).toMatch(/error log|file to read/i);
+    // …and the unaffected signals are named, so the note reads as scope, not
+    // as "DBM does not work on RDS".
+    expect(note).toMatch(/blocking chains/i);
+    // Plans floor + collector identity + retention caveat.
+    expect(note).toContain("8.0.22");
+    expect(note).toMatch(/upstream OpenTelemetry Collector Contrib/i);
+    expect(note).toMatch(/v0\.148\.0/);
+    expect(note).toMatch(/retention/i);
+  });
+
   it("offers mysql / docker / GUI tabs to create the user", () => {
     const prepare = mysqlCard(SUBS, gt).steps.find((s) => s.id === "prepare")!;
     expect(prepare.variants?.map((v) => v.id)).toEqual(["mysql", "docker", "sql-client"]);

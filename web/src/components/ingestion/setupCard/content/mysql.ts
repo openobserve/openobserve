@@ -21,7 +21,12 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
-import { MYSQL_DBM_CONFIG_YAML, MYSQL_DBM_GRANT_SQL, dbmVerifyStep } from "./dbmShared";
+import {
+  DBM_CONTRIB_VERSION,
+  MYSQL_DBM_CONFIG_YAML,
+  MYSQL_DBM_GRANT_SQL,
+  dbmVerifyStep,
+} from "./dbmShared";
 
 const USER_SQL = `CREATE USER 'otel'@'localhost' IDENTIFIED BY 'yourpassword';
 GRANT SELECT, PROCESS, REPLICATION CLIENT ON *.* TO 'otel'@'localhost';
@@ -33,6 +38,16 @@ const applyUser = (connect: string) => `${connect} -e "
 ${USER_SQL}
 "`;
 
+// The `sqlquery/mysql_limits` receiver exists because mysqlreceiver publishes
+// no `max_connections`: without a limit, the Databases page can only show a
+// connection COUNT, never a saturation percentage. One gauge per minute fills
+// that denominator honestly.
+//
+// CRITICAL: `mysql_instance_endpoint` must be BOTH projected in the SQL and
+// listed in `attribute_columns`, spelled to match mysqlreceiver's own
+// `mysql.instance.endpoint` attribute — the Databases page joins the limit to
+// the instance on that column, and the read side rejects the stream as
+// unreadable when its identity column is missing (instanceMetricsRead.ts).
 const CONFIG_YAML = `receivers:
   mysql:
     endpoint: "{host}:{port}"
@@ -41,6 +56,18 @@ const CONFIG_YAML = `receivers:
     database: otel
     collection_interval: 10s
     initial_delay: 1s
+  sqlquery/mysql_limits:
+    driver: mysql
+    datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
+    collection_interval: 60s
+    queries:
+      - sql: "SELECT @@max_connections AS max_connections, '{host}:{port}' AS mysql_instance_endpoint"
+        metrics:
+          - metric_name: mysql.connection.max
+            value_column: max_connections
+            attribute_columns: [mysql_instance_endpoint]
+            value_type: int
+            data_type: gauge
 
 processors:
   batch:
@@ -57,7 +84,7 @@ exporters:
 service:
   pipelines:
     metrics:
-      receivers: [mysql]
+      receivers: [mysql, sqlquery/mysql_limits]
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
@@ -105,7 +132,10 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
           },
         ],
       },
-      collectorInstallStep(t),
+      // Pinned to the DBM-verified contrib release: the Database Monitoring
+      // config below needs upstream contrib >= 0.148.0 (the `events:` block is
+      // an unknown key on older releases) and was verified at this version.
+      collectorInstallStep(t, DBM_CONTRIB_VERSION),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -140,7 +170,10 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
         completeOn: "copy",
         code: {
           lang: "bash",
-          raw: "MYSQL_PASSWORD='yourpassword' ./otelcol-contrib --config ./config.yaml",
+          // MYSQL_USER feeds the sqlquery/mysql_limits datasource; the mysql
+          // receiver names its user inline. Omitting the first breaks the
+          // connection-limit query's auth while the pipeline stays green.
+          raw: "MYSQL_USER='otel' MYSQL_PASSWORD='yourpassword' ./otelcol-contrib --config ./config.yaml",
         },
       },
       {
@@ -230,6 +263,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
             masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
           },
         })),
+        note: "Needs the upstream OpenTelemetry Collector Contrib from the install step, v0.148.0 or newer (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers, so it cannot run this config. Deadlock capture tails the MySQL error log on disk, so it is not available on managed MySQL (RDS, Aurora, Cloud SQL): those platforms give the collector no file to read. Blocking chains, activity samples and top queries work there normally; estimated plans need MySQL 8.0.22 or newer. Activity samples are high-volume and share the dbm_server stream's normal retention; if volume is a concern, set a shorter retention policy on the dbm_server stream.",
       },
       {
         id: "dbm-run",
@@ -243,7 +277,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
         },
         note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
       },
-      dbmVerifyStep(),
+      dbmVerifyStep("full", true),
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mysql", filter: "" },
     docUrl: "https://openobserve.ai/blog/monitor-mysql-metrics-otel",

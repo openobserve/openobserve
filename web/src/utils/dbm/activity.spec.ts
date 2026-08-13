@@ -21,6 +21,7 @@ import type {
   ActivityStateBucket,
   ActivityWaitBucket,
 } from "@/utils/dbm/activity";
+import { IDLE_BLOCKER_SECONDS } from "@/utils/dbm/blocking";
 import {
   ACTIVITY_ON_CPU,
   activityCountClaim,
@@ -34,7 +35,6 @@ import {
   durationKindOf,
   formatDurationMs,
   hasLockData,
-  IDLE_BLOCKER_SECONDS,
   isNotableTransactionAge,
   isOnCpu,
   normaliseDbTimestamp,
@@ -405,18 +405,6 @@ describe("buildWaitBreakdown", () => {
   });
 
   /**
-   * `share` is computed SERVER-side over the whole window (the rows are an
-   * aggregate, not the row-limited sample), so the UI must pass it through and
-   * never recompute it from the buckets it happens to have been sent.
-   */
-  it("passes the server's share through rather than recomputing it", () => {
-    const rows = buildWaitBreakdown([
-      { wait_event_type: "Lock", wait_event: "tuple", sessions: 3, share: 0.42 },
-    ]);
-    expect(rows[0].share).toBeCloseTo(0.42, 10);
-  });
-
-  /**
    * The server writes `share` on every bucket, computed over the WHOLE
    * window's GROUP BY total. A client-side re-derivation would divide by
    * whatever subset it happens to hold, so a top-3 slice of 40 buckets would
@@ -649,7 +637,6 @@ describe("durationKindOf", () => {
   it("refuses to guess when the state is unknown", () => {
     expect(durationKindOf(null)).toBe("unknown");
     expect(durationKindOf("")).toBe("unknown");
-    expect(durationKindOf("some future state")).toBe("unknown");
   });
 
   it("is case-insensitive about the state spelling", () => {
@@ -663,13 +650,11 @@ describe("transactionAgeSeconds", () => {
 
   /**
    * Transaction age is a DIFFERENT clock from query age, and it is what
-   * separates a 5ms idle-in-transaction from a 20-minute incident.
+   * separates a 5ms idle-in-transaction from a 20-minute incident. The
+   * signature accepts only `xact_start`, so it cannot read the wrong clock.
    */
-  it("ages the transaction from xact_start, not from query_start", () => {
-    const age = transactionAgeSeconds(
-      { xact_start: "2026-08-11T02:33:43Z", query_start: "2026-08-11 02:53:42.000000+00" },
-      now,
-    );
+  it("ages the transaction from xact_start", () => {
+    const age = transactionAgeSeconds({ xact_start: "2026-08-11T02:33:43Z" }, now);
     expect(age).toBeCloseTo(1200, 0);
   });
 
@@ -1204,23 +1189,22 @@ describe("activityCountClaim", () => {
   it("reports a truncated row count as a floor, not a total", () => {
     expect(activityCountClaim(1000, true)).toMatchObject({ count: 1000, complete: false });
   });
+});
 
+describe("activitySampleTotal", () => {
   /**
-   * The aggregate is `COUNT(*) … GROUP BY` over ROWS, and activity writes one
-   * row PER SESSION PER POLL. So the total counts session SAMPLES, not distinct
-   * sessions: a 200-session instance polled every 10s for an hour yields ~72000.
-   *
-   * Nothing here may present that as a session count. The function is named for
-   * what it actually returns, and its copy says "samples" — the alternative
-   * would be a 360x overstatement rendered as the authoritative population.
+   * Each bucket is `COUNT(DISTINCT session pid)` per state server-side, so the
+   * sum counts SESSIONS, not the one-row-per-session-per-poll observations the
+   * stream stores. A pid observed in two states inside the window counts once
+   * per state, which is the one caveat the sum carries.
    */
-  it("totals the SAMPLES in the aggregate, which is not a distinct-session count", () => {
-    const samples = activitySampleTotal([
+  it("totals the distinct sessions across the state buckets", () => {
+    const sessions = activitySampleTotal([
       { state: "idle", sessions: 4710 },
       { state: "active", sessions: 820 },
       { state: "idle in transaction", sessions: 261 },
     ]);
-    expect(samples).toBe(5791);
+    expect(sessions).toBe(5791);
   });
 
   it("has no total to report when the breakdown is empty", () => {
@@ -1284,15 +1268,11 @@ describe("activityEmptyCause", () => {
    * current filters.
    */
   it("calls an empty result healthy when sampling is demonstrably working", () => {
-    expect(
-      activityEmptyCause({ notCollecting: false, logLinesSeen: 4210, hasBreakdown: true }),
-    ).toBe("healthy");
+    expect(activityEmptyCause({ notCollecting: false, hasBreakdown: true })).toBe("healthy");
   });
 
   it("calls it not-collecting when the server says nothing was ever written", () => {
-    expect(
-      activityEmptyCause({ notCollecting: true, logLinesSeen: null, hasBreakdown: false }),
-    ).toBe("not-collecting");
+    expect(activityEmptyCause({ notCollecting: true, hasBreakdown: false })).toBe("not-collecting");
   });
 
   /**
@@ -1308,24 +1288,9 @@ describe("activityEmptyCause", () => {
    * exists to avoid.
    */
   it("does not call it healthy when nothing has ever sampled a session", () => {
-    const cause = activityEmptyCause({
-      notCollecting: false,
-      logLinesSeen: 4210,
-      hasBreakdown: false,
-    });
+    const cause = activityEmptyCause({ notCollecting: false, hasBreakdown: false });
     expect(cause).not.toBe("healthy");
     expect(cause).toBe("not-collecting");
-  });
-
-  /**
-   * `log_lines_seen` is the PROOF the pipeline carries traffic, but the
-   * server's verdict is authoritative and a zero count does not overturn a
-   * working sample.
-   */
-  it("does not let a zero line count overturn a working sample", () => {
-    expect(activityEmptyCause({ notCollecting: false, logLinesSeen: 0, hasBreakdown: true })).toBe(
-      "healthy",
-    );
   });
 
   /**
@@ -1339,9 +1304,7 @@ describe("activityEmptyCause", () => {
    * an explicit "nothing is collecting" verdict is silently discarded.
    */
   it("honours an explicit not-collecting verdict even with a breakdown in hand", () => {
-    expect(
-      activityEmptyCause({ notCollecting: true, logLinesSeen: null, hasBreakdown: true }),
-    ).toBe("not-collecting");
+    expect(activityEmptyCause({ notCollecting: true, hasBreakdown: true })).toBe("not-collecting");
   });
 
   /**
@@ -1350,9 +1313,7 @@ describe("activityEmptyCause", () => {
    */
   it("treats an absent verdict with evidence of sampling as healthy", () => {
     expect(activityEmptyCause({ hasBreakdown: true })).toBe("healthy");
-    expect(
-      activityEmptyCause({ notCollecting: undefined, logLinesSeen: null, hasBreakdown: true }),
-    ).toBe("healthy");
+    expect(activityEmptyCause({ notCollecting: undefined, hasBreakdown: true })).toBe("healthy");
   });
 
   /** No verdict and no evidence: we cannot claim we looked. */

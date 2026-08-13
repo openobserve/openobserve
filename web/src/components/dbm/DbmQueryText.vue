@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="border-border-default border-l-sql-accent bg-surface-subtle o2-colorized-query overflow-auto border border-l-3 p-2.5"
     :data-test="dataTest"
   >
-    <!-- eslint-disable-next-line vue/no-v-html -- Monaco colorize output, DOMPurify-sanitized above -->
+    <!-- eslint-disable-next-line vue/no-v-html -- Monaco colorize output, passed through DOMPurify.sanitize in the watcher below -->
     <pre
       v-if="highlighted"
       class="text-compact text-text-body m-0 font-mono break-words whitespace-pre-wrap"

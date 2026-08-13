@@ -1,14 +1,28 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import { describe, it, expect } from "vitest";
 
 import { dbmEmptyAction, DBM_SETUP_ROUTE, type DbmEmptyActionKind } from "./emptyAction";
 import type { DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
 
 /**
- * The regression these tests exist for: on a fresh install `DbmEmptyState`
- * resolves its cause to `not-instrumented` and labels the primary button
- * "Show me how to instrument it" — but both list pages branched only on
- * `filtered` and `not-counted`, so that button did nothing at all. It was the
- * first thing a new user clicked and the first thing that failed.
+ * `DbmEmptyState` labels its primary button from the resolved cause ("Show me
+ * how to instrument it"), so a cause with no mapped action is a dead click on
+ * the most prominent button on the page — and on a fresh install the cause is
+ * `not-instrumented`, the first thing a new user presses.
  */
 describe("dbmEmptyAction", () => {
   it("sends the fresh-install cause to the setup instructions", () => {
@@ -36,10 +50,18 @@ describe("dbmEmptyAction", () => {
     expect(dbmEmptyAction("no-permission")).toBe("none");
   });
 
+  it("maps the bare empty cause to no action", () => {
+    // "empty" is the generic nothing-here cause: there is no filter to clear
+    // and nothing to set up, so the honest outcome is to stay put.
+    expect(dbmEmptyAction("empty")).toBe("none");
+  });
+
   /**
-   * The guard against the original bug reappearing. The old code was a pair of
-   * `if`s, so a new cause silently fell through to doing nothing. Enumerating
-   * every variant here means adding a cause without an action fails this test.
+   * What this sweep actually guarantees: every enumerated cause resolves to an
+   * action the pages implement — a new ACTION kind nobody wired up fails here.
+   * Exhaustiveness over new CAUSES is the compiler's job, not this test's: the
+   * switch in emptyAction.ts has no default and a declared return type, so an
+   * unhandled cause is a type error before it ever reaches this list.
    */
   it("maps every cause to an action, leaving none to fall through", () => {
     const ALL_CAUSES: DbmEmptyCauseId[] = [

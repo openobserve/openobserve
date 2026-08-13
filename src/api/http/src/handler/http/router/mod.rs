@@ -805,15 +805,18 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/traces/db_monitoring/queries", get(traces::get_dbm_queries))
         .route("/{org_id}/traces/db_monitoring/query/history", get(traces::get_dbm_query_history))
         .route("/{org_id}/traces/db_monitoring/query/endpoints", get(traces::get_dbm_query_endpoints))
+        .route("/{org_id}/traces/db_monitoring/samples", get(traces::get_dbm_samples))
         // Server-vantage events (read the canonical o2_dbm_* columns)
         .route("/{org_id}/traces/db_monitoring/deadlocks", get(traces::get_dbm_deadlocks))
         .route("/{org_id}/traces/db_monitoring/blocking", get(traces::get_dbm_blocking))
         .route("/{org_id}/traces/db_monitoring/activity", get(traces::get_dbm_activity))
         .route("/{org_id}/traces/db_monitoring/query/plans", get(traces::get_dbm_query_plans))
         .route("/{org_id}/traces/db_monitoring/query/server_metrics", get(traces::get_dbm_query_server_metrics))
+        .route("/{org_id}/traces/db_monitoring/server_queries", get(traces::get_dbm_server_queries))
+        .route("/{org_id}/traces/db_monitoring/server_samples", get(traces::get_dbm_server_samples))
         .route("/{org_id}/traces/db_monitoring/table_health", get(traces::get_dbm_table_health))
-        .route("/{org_id}/traces/db_monitoring/index_health", get(traces::get_dbm_index_health))
-
+        .route("/{org_id}/traces/db_monitoring/badges", get(traces::get_dbm_badges))
+        
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
         // NOTE: named routes MUST be registered before {model_id} to avoid being matched as a model ID

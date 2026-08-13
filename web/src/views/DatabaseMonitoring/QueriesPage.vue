@@ -50,21 +50,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('dbm.queries.title')"
-    :subtitle="t('dbm.queries.subtitle')"
+    :subtitle="t(serverListShown ? 'dbm.queries.subtitleServer' : 'dbm.queries.subtitle')"
     icon="database"
     title-data-test="dbm-queries-title"
     tabs-below
     bleed
   >
     <template #header-tabs>
-      <DbmSectionTabs
-        :database-count="databaseCount"
-        :query-count="rows.length"
-        :activity-count="activityCount"
-        :deadlock-count="deadlockCount"
-        :blocked-count="blockedCount"
-        :table-health-count="tableHealthCount"
-      />
+      <!-- The sibling badges come from the shell's one shared fan-out; this
+           page substitutes the two counts it measures better itself — see
+           `tabCounts`. -->
+      <DbmSectionTabs v-bind="tabCounts" />
     </template>
 
     <template #actions>
@@ -97,7 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dbm.queries.completionBias.body") }}
       </OBanner>
 
+      <!-- In fallback mode the client table UNMOUNTS: its tall empty-state
+           checklist would otherwise consume the viewport and squeeze the
+           database-reported list to nothing. The section below carries its
+           own toolbar (same search/refresh bindings), and its subtitle states
+           why the usual list is empty. -->
       <OTable
+        v-if="!serverListShown"
         ref="tableRef"
         :data="tableRows"
         :columns="columns"
@@ -142,10 +144,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dbm-queries-stmt-class"
               @update:model-value="onStmtClassChange"
             >
-              <!-- Both halves used to read as "everything" ("Queries" / "All
-                   statements"), so the distinction was invisible. The second
-                   option now names what it ADDS rather than restating the
-                   whole, and the tooltips list the actual statements. -->
+              <!-- The second option names what it ADDS rather than restating
+                   the whole: two halves that both read as "everything"
+                   ("Queries" / "All statements") make the distinction
+                   invisible. The tooltips list the actual statements. -->
               <OToggleGroupItem value="query" size="sm">
                 {{ t("dbm.queries.stmtClass.query") }}
                 <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.queryHint')" />
@@ -205,9 +207,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Coverage, then the cross-row framing. Both inside the table frame
              because both are claims about exactly these rows. -->
         <template #subheader>
-          <!-- The totals that used to be crammed into the page subtitle. They
-               summarise exactly the rows below, so they belong inside the table
-               frame rather than in the header. -->
+          <!-- The window's totals live inside the table frame, not in the page
+               header: they summarise exactly the rows below. -->
           <div
             class="px-page-edge border-table-row-divider border-b py-1.5"
             data-test="dbm-queries-summary"
@@ -339,11 +340,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-else class="text-text-muted">{{ raw("—") }}</span>
         </template>
 
-        <!-- p99 and "worst seen" are hidden by default, which is exactly why
-             they shipped unformatted: without a cell template OTable prints the
-             raw accessor value, so these read as bare nanosecond integers
-             (6008549895) until someone turned the columns on. Any ns column
-             needs its own template — the formatter is not automatic. -->
+        <!-- Any ns column needs its own cell template — the formatter is not
+             automatic. Without one, OTable prints the raw accessor value, so
+             these read as bare nanosecond integers (6008549895). Being hidden
+             by default makes that failure invisible until someone turns the
+             columns on. -->
         <template #cell-p99_ns="{ row }">
           <span
             v-if="!row.isOther && !row.isFold"
@@ -426,6 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!loading"
             :permission-ok="permissionOk"
             :enabled="dbmEnabled"
+            :trace-count="traceCount"
             :never-aggregated="neverAggregated"
             :org="org"
             :filtered="isFiltered"
@@ -433,6 +435,110 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
       </OTable>
+
+      <!-- The database-reported list, ONLY when the client table above is
+           honestly empty. Its own heading and its own table: these counts are
+           measured inside the database over every client, and mixing them into
+           the client table would read as traced traffic that never existed.
+           The empty state above stays — it explains WHY the usual list is
+           empty; this section answers what the databases saw meanwhile. -->
+      <section
+        v-if="!loading && !rows.length && filteredServerRows.length"
+        class="flex min-h-0 flex-1 flex-col gap-2 pt-4"
+        data-test="dbm-server-queries-section"
+      >
+        <div class="px-page-edge flex flex-col gap-0.5">
+          <h2 class="text-text-heading text-sm font-semibold">
+            {{ t("dbm.queries.serverList.title") }}
+          </h2>
+          <p class="text-text-label text-xs">
+            {{ t("dbm.queries.serverList.subtitle") }}
+          </p>
+        </div>
+        <OTable
+          :data="filteredServerRows"
+          :columns="serverColumns"
+          row-key="fingerprint"
+          :frame="false"
+          sorting="client"
+          :show-global-filter="false"
+          table-id="dbm-server-queries"
+          :total-count-exact="!serverTruncated"
+          data-test="dbm-server-queries-table"
+          @row-click="openServerQueryDetail"
+        >
+          <!-- The section owns the page in fallback mode (the client table is
+               unmounted), so it carries the toolbar — same search and refresh
+               bindings, minus the client-only controls (statement-class and
+               baseline toggles describe data this list does not have). -->
+          <template #toolbar>
+            <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+              <div class="w-64 shrink-0">
+                <OSearchInput
+                  v-model="search"
+                  :placeholder="t('dbm.queries.searchPlaceholder')"
+                  clearable
+                  :debounce="400"
+                  data-test="dbm-server-queries-search"
+                />
+              </div>
+            </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              class="shrink-0"
+              data-test="dbm-server-queries-refresh"
+              @click="onRefresh"
+            >
+              <OTooltip side="bottom" :content="t('dbm.common.reload')" />
+            </OButton>
+          </template>
+          <template #cell-query="{ row }">
+            <div class="flex min-w-0 flex-col gap-px">
+              <span
+                class="text-text-code min-w-0 truncate font-mono text-xs"
+                :title="row.query ?? undefined"
+                >{{ raw(row.query || "—") }}</span
+              >
+              <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
+                <OTag type="dbSystem" :value="row.db_system" size="xs" />
+                <template v-if="row.db_instance">
+                  <span class="opacity-45">·</span>
+                  <span>{{ raw(row.db_instance) }}</span>
+                </template>
+                <template v-if="row.db_namespace">
+                  <span class="opacity-45">·</span>
+                  <span>{{ raw(row.db_namespace) }}</span>
+                </template>
+              </div>
+            </div>
+          </template>
+          <template #cell-calls="{ row }">
+            <span class="tabular-nums">{{ formatCount(row.calls) }}</span>
+          </template>
+          <template #cell-totalTime="{ row }">
+            <span v-if="row.exec_time_s !== null" class="tabular-nums">{{
+              formatNs(row.exec_time_s * 1e9)
+            }}</span>
+            <span v-else class="text-text-muted">{{ raw("—") }}</span>
+          </template>
+          <template #cell-meanTime="{ row }">
+            <span v-if="row.mean_exec_time_s !== null" class="tabular-nums">{{
+              formatNs(row.mean_exec_time_s * 1e9)
+            }}</span>
+            <span v-else class="text-text-muted">{{ raw("—") }}</span>
+          </template>
+          <template #bottom>
+            <div v-if="serverTruncated" class="text-text-label px-page-edge py-1.5 text-xs">
+              {{ t("dbm.queries.serverList.truncated", { count: serverRows.length }) }}
+            </div>
+          </template>
+        </OTable>
+      </section>
     </div>
   </OPageLayout>
 </template>
@@ -474,15 +580,19 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
-  type ActivityStateBucket,
   type Freshness,
   type QueryStatsRow,
   type QuerySortKey,
+  type ServerQueryRow,
 } from "@/services/db_monitoring";
 import config from "@/aws-exports";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { setDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
-import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
+import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
+import useStreams from "@/composables/useStreams";
+import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
+import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
@@ -494,6 +604,7 @@ import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import {
+  countClaim,
   discriminatingPart,
   failedCellKind,
   formatCount,
@@ -502,10 +613,7 @@ import {
   formatPercent,
   oneLine,
   showsPerRequest,
-  countClaim,
-  type DbmCountClaim,
 } from "@/utils/dbm/format";
-import { activitySampleTotal } from "@/utils/dbm/activity";
 import {
   callsDropPercent,
   detectCompletionBias,
@@ -548,10 +656,10 @@ const { range, current, baseline, baselineWindow, setBaseline, refresh, setRange
 // once; this is what keeps the last one the reader asked for the one that wins.
 const requestSeq = useDbmRequestSeq();
 
-// The sibling-tab badges are the same numbers on every tab, so they are
-// fetched once per window and shared across the six routes rather than
-// re-fetched on each remount. See useDbmCountCache.
-const countCache = useDbmCountCache("queries");
+// The sibling-tab badges are the same numbers on every tab, so DbmShell
+// fetches them ONCE per window for every route and this page reads the
+// snapshot. See useDbmTabCounts.
+const tabCountsContext = useDbmTabCountsContext();
 
 const rows = ref<QueryRow[]>([]);
 const other = ref<QueryStatsRow[]>([]);
@@ -562,20 +670,197 @@ const error = ref<string | null>(null);
 const permissionOk = ref(true);
 const neverAggregated = ref(false);
 /**
+ * The database-reported fallback list (`/server_queries`). Populated ONLY when
+ * the client read comes back empty: the databases count every statement from
+ * every client, so on a deployment with the collector wired but no traced
+ * application traffic, this is the Top-queries answer that actually exists.
+ * Its rows render under their own heading with their provenance stated — a
+ * server-side call count sitting unlabelled in the client table would read as
+ * traced traffic that never existed. Ranked by call count because that is the
+ * feed's own selection criterion (`ranked_by`); retitling it "most expensive"
+ * would claim a ranking the feed cannot support.
+ */
+const serverRows = ref<ServerQueryRow[]>([]);
+const serverTruncated = ref(false);
+
+const loadServerQueries = async (token: number) => {
+  try {
+    const { data } = await dbMonitoringService.getServerQueries(org.value, {
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+      system: systemFilter.value ?? undefined,
+      instance: instanceFilter.value ?? undefined,
+      namespace: namespaceFilter.value ?? undefined,
+    });
+    if (requestSeq.isStale(token)) return;
+    serverRows.value = data.hits ?? [];
+    serverTruncated.value = Boolean(data.truncated);
+  } catch {
+    // Supplementary: its absence is not a claim, and the empty state above it
+    // already tells the reader whether query data is arriving at all.
+    if (requestSeq.isStale(token)) return;
+    serverRows.value = [];
+    serverTruncated.value = false;
+  }
+};
+
+/**
+ * Whether the page is in fallback mode — the database-reported list is what
+ * the reader sees. The page SUBTITLE follows it: "the queries using the most
+ * database time" describes the client ranking, and the fallback list is
+ * ranked by frequency, so the header must not promise a ranking the table
+ * below does not follow.
+ */
+const serverListShown = computed(
+  () => !loading.value && !rows.value.length && serverRows.value.length > 0,
+);
+
+/** The page's search box narrows this list too — same client-side contract as the main table. */
+const filteredServerRows = computed(() => {
+  const needle = search.value.trim().toLowerCase();
+  if (!needle) return serverRows.value;
+  return serverRows.value.filter((row) =>
+    [row.query, row.db_system, row.db_namespace, row.db_instance]
+      .filter(Boolean)
+      .some((field) => String(field).toLowerCase().includes(needle)),
+  );
+});
+
+const serverColumns = computed<OTableColumnDef<ServerQueryRow>[]>(() => [
+  {
+    id: "query",
+    accessorKey: "query",
+    header: t("dbm.queries.serverList.columns.query"),
+    sortable: false,
+  },
+  {
+    id: "calls",
+    accessorKey: "calls",
+    header: t("dbm.queries.serverList.columns.calls"),
+    size: 110,
+    sortable: true,
+    meta: { align: "right" },
+  },
+  {
+    id: "totalTime",
+    accessorKey: "exec_time_s",
+    header: t("dbm.queries.serverList.columns.totalTime"),
+    size: 150,
+    sortable: true,
+    meta: { align: "right", headerTooltip: t("dbm.queries.serverList.columnHints.time") },
+  },
+  {
+    id: "meanTime",
+    accessorKey: "mean_exec_time_s",
+    header: t("dbm.queries.serverList.columns.meanTime"),
+    size: 130,
+    sortable: true,
+    // A mean over the window's calls — the header says "mean" and never a
+    // percentile, because total/count is the only central tendency this feed
+    // can support.
+    meta: { align: "right", headerTooltip: t("dbm.queries.serverList.columnHints.mean") },
+  },
+]);
+
+/**
+ * Same destination as a client row: the detail page's server-side sections
+ * (plans, database-reported counters) resolve from these URL params alone, so
+ * the drill-down works even when no client row exists anywhere.
+ */
+const openServerQueryDetail = (row: ServerQueryRow) => {
+  // The statement travels as a seed, exactly as the Activity hop does: with
+  // no client row anywhere, the detail header would otherwise paint the bare
+  // hash. Only fields this row truly knows — no stats, no stream.
+  if (row.query) {
+    setDbmQueryDetailSeed({
+      row: {
+        fingerprint: row.fingerprint,
+        query_norm: row.query,
+        db_system: row.db_system,
+        db_instance: row.db_instance ?? "",
+        db_namespace: row.db_namespace ?? undefined,
+      },
+      org: org.value,
+      range: { ...range.value },
+    });
+  }
+  router
+    .push({
+      name: "dbmQueryDetail",
+      query: {
+        ...route.query,
+        org_identifier: route.query.org_identifier ?? org.value,
+        ...queryParams.value,
+        fingerprint: row.fingerprint,
+        system: row.db_system,
+        ...(row.db_instance ? { instance: row.db_instance } : {}),
+        ...(row.db_namespace ? { namespace: row.db_namespace } : {}),
+        from: "queries",
+      },
+    })
+    .catch(() => {});
+};
+
+const { getStreams } = useStreams(t);
+/**
+ * Whether this org has EVER sent a trace, for the empty state's checklist.
+ * Without it a never-instrumented org reads the "we haven't finished counting"
+ * row — a promise of numbers in "a few minutes" that will never arrive —
+ * instead of being told database monitoring is built from traces it has not
+ * sent. Probed only when a load ends with nothing to show; see `load`.
+ */
+const { traceCount, probeTracePresence } = useDbmTracePresence(getStreams);
+/**
  * Set when this window's calls collapsed while its failures rose — the shape a
  * lock storm makes in data that can only count queries that FINISHED. `null`
  * when the pattern is absent, so the banner is `v-if`-gated on the detector
  * rather than on a page state that merely looks quiet.
  */
 const completionBias = ref<{ dropPercent: number } | null>(null);
+/**
+ * The distinct instances in THIS page's result, which is not the shared
+ * fan-out's database count and must not be replaced by it: this page's rows are
+ * narrowed by up to five filters, so the number beside the Overview tab has
+ * always described what the reader is looking at here. `null` until the first
+ * load answers, so the badge stays bare rather than claiming zero.
+ */
 const databaseCount = ref<number | null>(null);
-const deadlockCount = ref<DbmCountClaim | null>(null);
-const blockedCount = ref<DbmCountClaim | null>(null);
-const tableHealthCount = ref<number | null>(null);
-/** `null` until read, and again if the read fails — so the badge stays bare. */
-const activityStates = ref<ActivityStateBucket[] | null>(null);
-/** Sessions in the window. See `activitySampleTotal` for why not `hits.length`. */
-const activityCount = computed(() => activitySampleTotal(activityStates.value));
+
+/**
+ * The sibling badges from the shell's shared fan-out, with the TWO this page
+ * counts better than the fan-out can substituted in.
+ *
+ * `queryCount` is `rows.length` — what the table is showing after this page's
+ * filters — and `databaseCount` the distinct instances within it. Both differ
+ * from the unfiltered shared read by design.
+ */
+const tabCounts = computed(() =>
+  tabCountProps(
+    withOwnCount(
+      withOwnCount(
+        tabCountsContext.counts.value,
+        "queryCount",
+        // In fallback mode the table beneath the badge is the
+        // database-reported list, so the badge counts THAT — a `0` from the
+        // empty client read directly above rendered rows would deny working
+        // data (the same false-zero the fleet badge fix removed). The claim
+        // carries the cap, so a full page renders `50+`, never the cap as a
+        // total. While loading — and while the fallback read is still out —
+        // `undefined` lets the shared snapshot's own zero-trace fallback
+        // stand instead of stamping a transient 0 over it.
+        loading.value || (!rows.value.length && !serverRows.value.length)
+          ? undefined
+          : rows.value.length
+            ? rows.value.length
+            : countClaim(serverRows.value.length, serverTruncated.value),
+      ),
+      "databaseCount",
+      // 0 here means "no client traffic", not "no databases" — the shared
+      // snapshot's fleet fallback is the better number then.
+      databaseCount.value || undefined,
+    ),
+  ),
+);
 
 const search = ref("");
 /**
@@ -717,6 +1002,7 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => [
     options: optionsFrom(rows.value.map((r) => r.db_instance)),
     onChange: (value) => {
       instanceFilter.value = (value as string) || null;
+      syncUrl();
       load();
     },
   },
@@ -728,6 +1014,7 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => [
     options: optionsFrom(rows.value.flatMap((r) => r.envs ?? [r.env])),
     onChange: (value) => {
       envFilter.value = (value as string) || null;
+      syncUrl();
       load();
     },
   },
@@ -739,6 +1026,7 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => [
     options: optionsFrom(rows.value.map((r) => r.db_system)),
     onChange: (value) => {
       systemFilter.value = (value as string) || null;
+      syncUrl();
       load();
     },
   },
@@ -750,6 +1038,7 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => [
     options: optionsFrom(rows.value.flatMap((r) => r.services ?? [r.service_name])),
     onChange: (value) => {
       serviceFilter.value = (value as string) || null;
+      syncUrl();
       load();
     },
   },
@@ -761,6 +1050,7 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => [
     options: optionsFrom(rows.value.flatMap((r) => r.namespaces ?? [r.db_namespace])),
     onChange: (value) => {
       namespaceFilter.value = (value as string) || null;
+      syncUrl();
       load();
     },
   },
@@ -804,12 +1094,11 @@ const errorCount = computed(() =>
 );
 
 /**
- * `force` reaches the badge cache, not the main table: the table is always
- * fetched live. It is what makes the refresh button mean "the numbers may have
- * moved" rather than "re-read the same window", which is the one case where the
- * cache's same-window-same-answer premise does not hold.
+ * This page's OWN read. It takes no `force`: the table was always fetched live,
+ * so the flag only ever reached the badge cache — and the badges are the
+ * shell's now. `onRefresh` forces them directly.
  */
-const load = async (force = false) => {
+const load = async () => {
   if (!org.value) return;
   const token = requestSeq.begin();
   loading.value = true;
@@ -817,43 +1106,39 @@ const load = async (force = false) => {
   refresh();
 
   try {
-    // The baseline window is fetched with the SAME filters and sort so the two
-    // sets are comparable row-for-row; anything else makes the delta a
-    // comparison between two different questions. WHICH window it is depends on
-    // the reader's baseline choice, and every insight names the one it used.
-    const [currentResponse, previousResponse] = await Promise.all([
-      dbMonitoringService.getQueries(org.value, {
-        ...requestParams(),
-        startTime: current.value.startTime,
-        endTime: current.value.endTime,
-        sort: sortBy.value,
-      }),
-      dbMonitoringService.getQueries(org.value, {
-        ...requestParams(),
-        startTime: baselineWindow.value.startTime,
-        endTime: baselineWindow.value.endTime,
-        sort: sortBy.value,
-      }),
-    ]);
+    // Both windows in ONE request — the server fetches the baseline
+    // concurrently under the SAME filters and sort so the two sets are
+    // comparable row-for-row; anything else makes the delta a comparison
+    // between two different questions. WHICH window it is depends on the
+    // reader's baseline choice, and every insight names the one it used.
+    const { data } = await dbMonitoringService.getQueries(org.value, {
+      ...requestParams(),
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+      sort: sortBy.value,
+      baselineStartTime: baselineWindow.value.startTime,
+      baselineEndTime: baselineWindow.value.endTime,
+    });
 
     // A newer load already owns the page; painting these rows would put the
     // previous window's data under the current window's toolbar.
     if (requestSeq.isStale(token)) return;
 
-    const hits = currentResponse.data.hits ?? [];
-    const previousHits = previousResponse.data.hits ?? [];
-    other.value = currentResponse.data.other ?? [];
-    freshness.value = currentResponse.data.freshness;
-    topNSubset.value = currentResponse.data.top_n_subset;
-    neverAggregated.value = currentResponse.data.freshness?.data_through === 0;
+    const hits = data.hits ?? [];
+    // A server-side baseline failure degrades the Δ features to "no baseline"
+    // rather than comparing against an empty set it would misread as change.
+    const previousHits = data.baseline_read_failed ? [] : (data.baseline_hits ?? []);
+    other.value = data.other ?? [];
+    freshness.value = data.freshness;
+    topNSubset.value = data.top_n_subset;
+    neverAggregated.value = data.freshness?.data_through === 0;
     databaseCount.value = new Set(hits.map((r) => r.db_instance)).size;
 
     // Shares are measured against the WHOLE scope (shown + remainder), not just
     // what is on screen — otherwise every row's share inflates as the ranking
     // cut bites, and the number silently changes meaning with the filter.
     const scopeTotal = sumTotalTime(hits) + sumTotalTime(other.value);
-    const previousScopeTotal =
-      sumTotalTime(previousHits) + sumTotalTime(previousResponse.data.other ?? []);
+    const previousScopeTotal = sumTotalTime(previousHits) + sumTotalTime(data.baseline_other ?? []);
 
     insights.value = detectInsights({
       rows: hits,
@@ -866,13 +1151,28 @@ const load = async (force = false) => {
     // measuring the collapse over the ranked rows alone would read a shift in
     // the ranking cut as a drop in volume.
     const currentCalls = [...hits, ...other.value];
-    const previousCalls = [...previousHits, ...(previousResponse.data.other ?? [])];
+    const previousCalls = [...previousHits, ...(data.baseline_other ?? [])];
     completionBias.value = detectCompletionBias(currentCalls, previousCalls)
       ? { dropPercent: callsDropPercent(currentCalls, previousCalls) }
       : null;
 
     const flagged = new Set(insights.value.flatMap((insight) => insight.fingerprints));
     const previousIndex = indexByKey(previousHits);
+
+    // The database-reported fallback list exists only for the page whose
+    // client vantage is honestly empty; a populated table clears it so stale
+    // server rows can never sit under a live client ranking. Awaited, so the
+    // skeleton covers the read: the empty client answer arrives in
+    // milliseconds on an org with no trace streams, and clearing `loading`
+    // then would pop the empty state with no visible loading at all, only for
+    // the fallback table to appear beneath it half a second later. A load
+    // that produced rows never fires it, so it still costs those nothing.
+    if (hits.length) {
+      serverRows.value = [];
+      serverTruncated.value = false;
+    } else {
+      await loadServerQueries(token);
+    }
 
     rows.value = hits.map((row) => {
       const traces = row.traces ?? 0;
@@ -920,6 +1220,11 @@ const load = async (force = false) => {
     // one doing it would report "done" while the current fetch is in flight.
     if (!requestSeq.isStale(token)) {
       loading.value = false;
+      // The trace-presence probe answers a question only the empty state asks,
+      // so it runs exactly when the empty state is about to render — a load
+      // that produced rows never pays for it. Unawaited: the checklist gains
+      // its trace row when the (session-cached) catalog answers.
+      if (!rows.value.length) void probeTracePresence();
       // A reload replaces the ranking, so the offset the user was parked at now
       // points at a different query. Worse, the insight strip is a claim about
       // rank ("moved to #1") that the reader cannot check while #1 is scrolled
@@ -928,88 +1233,10 @@ const load = async (force = false) => {
       tableRef.value?.scrollToTop?.();
     }
   }
-  if (requestSeq.isStale(token)) return;
-  void loadLockCounts(token, force);
-};
-
-/**
- * Counts for the other tabs' badges. Every DBM page fills in all of them so the
- * tab bar reads the same everywhere — a badge that appears on one tab and
- * vanishes on the next reads as "no data", not "not fetched here".
- */
-const loadLockCounts = async (token: number = requestSeq.current(), force = false) => {
-  if (!org.value) return;
-  const window = {
-    startTime: current.value.startTime,
-    endTime: current.value.endTime,
-  };
-  // Through the SHARED cache, keyed on the range: these four badges are the
-  // same four numbers on every DBM tab, and the six tabs are separate routes,
-  // so without this each switch re-fetches all of them. `force` is the refresh
-  // button asking for a live read.
-  const badges = await badgesFrom(
-    countCache.read(
-      org.value,
-      range.value,
-      async () => {
-        // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
-        // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE
-        // badge instead of abandoning the rest.
-        const [deadlocks, blocking, tableHealth, activity] = await Promise.allSettled([
-          dbMonitoringService.getDeadlocks(org.value, window),
-          dbMonitoringService.getBlocking(org.value, window),
-          dbMonitoringService.getTableHealth(org.value, window),
-          dbMonitoringService.getActivity(org.value, window),
-        ]);
-        // A blank badge is the honest rendering when we could not count. The
-        // claim objects are built HERE, inside the cached value, so the server's
-        // `truncated` survives a hit and the badge still renders `65+`.
-        const value = {
-          deadlockCount:
-            deadlocks.status === "fulfilled"
-              ? countClaim(
-                  deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
-                  deadlocks.value.data.truncated,
-                )
-              : null,
-          blockedCount:
-            blocking.status === "fulfilled"
-              ? countClaim(
-                  blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
-                  blocking.value.data.truncated,
-                )
-              : null,
-          // `null`, never 0: a failed read has measured nothing, and a zero badge
-          // would claim this deployment has no tables.
-          tableHealthCount:
-            tableHealth.status === "fulfilled"
-              ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
-              : null,
-          // The STATE BREAKDOWN, never `total`/`hits.length`: those are a
-          // row-limited sample of sessions and would render a constant cap as the
-          // population.
-          activityStates:
-            activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null,
-        };
-        // `allSettled` never rejects, so a fan-out in which a badge failed would
-        // otherwise be CACHED — remembering "we could not count" as the answer
-        // for the whole window. Throwing keeps the failure out of the cache and
-        // lets the next reader try again; the badges below still render blank.
-        if ([deadlocks, blocking, tableHealth, activity].some((r) => r.status === "rejected")) {
-          throw new DbmPartialCounts(value);
-        }
-        return value;
-      },
-      { force },
-    ),
-  );
-
-  if (requestSeq.isStale(token) || !badges) return;
-
-  deadlockCount.value = badges.deadlockCount;
-  blockedCount.value = badges.blockedCount;
-  tableHealthCount.value = badges.tableHealthCount;
-  activityStates.value = badges.activityStates;
+  // The sibling badges are NOT fetched here. DbmShell watches the window in
+  // the URL — which `syncUrl` publishes — and refetches them itself, once for
+  // every tab. The one thing it cannot infer is a REFRESH, since the URL does
+  // not change: `onRefresh` forces those explicitly.
 };
 
 /**
@@ -1060,19 +1287,19 @@ const revealRow = async (fingerprint: string) => {
  *     cannot be seen by scanning. That one earns the strip, because the strip
  *     is the only way the reader learns it exists without scrolling.
  *
- * The first cut of this sent every single-row insight to a chip, which was
- * correct about duplication and wrong about discovery: on real data every rule
- * fired on exactly one row, so the strip never rendered at all and a finding
- * about row 28 was invisible until the user happened to scroll past it.
+ * Sending every single-row insight to a chip would be correct about
+ * duplication and wrong about discovery: on real data every rule routinely
+ * fires on exactly one row, so the strip would never render and a finding
+ * about row 28 would be invisible until the user happened to scroll past it.
  *
  * `stripFingerprints` is what the chip builder consults, so the two surfaces
  * are guaranteed to be disjoint by construction rather than by two predicates
  * that could drift apart.
  *
- * "Visible" asks the FOLD, not a row-count constant. It used to be a fixed
- * fourteen, which was a second copy of an assumption the fold already owns — so
- * once the fold started cutting at six, a single-row insight about row 9 was
- * being called visible and demoted to a chip on a row nobody could see.
+ * "Visible" asks the FOLD, not a row-count constant. A fixed row count here
+ * would be a second copy of an assumption the fold already owns — the moment
+ * the fold cuts shorter, a single-row insight below the cut would be called
+ * visible and demoted to a chip on a row nobody can see.
  */
 const headFingerprints = computed(
   () => new Set(tailSplit.value.head.map((row) => row.fingerprint)),
@@ -1232,11 +1459,11 @@ const foldedRows = computed<QueryRow[]>(() => {
  * never sorted among real rows, because it is a bucket, not a query.
  *
  * The backend emits ONE remainder per (engine, instance), so a fleet of three
- * databases produces three of them. They shipped all labelled "All other
- * queries", which stacked three identical rows carrying different counts and
- * left no way to tell which database each belonged to. Each now names its own
- * database, and the sentence explaining what a remainder IS appears on the
- * first one only — repeating it three times is what made the block unreadable.
+ * databases produces three of them. Each names its own database — three rows
+ * all labelled "All other queries" would carry different counts with no way to
+ * tell which database each belongs to — and the sentence explaining what a
+ * remainder IS appears on the first one only, because repeating it per row is
+ * what makes the block unreadable.
  */
 /** Names the database a remainder belongs to, so three of them stay tellable apart. */
 const otherRowLabel = (row: QueryStatsRow): string =>
@@ -1305,18 +1532,14 @@ const rowClass = (row: QueryRow) => {
 /**
  * The Failed cell.
  *
- * The total-failure row used to read `all`, which is a category word sitting in
- * a column of numbers — and on the row it fired on, the row chip was already
- * shouting ALL 769 FAILED two inches to the left. So the column stated the
- * chip's claim in vaguer words and threw the count away in the process.
+ * The column carries the QUANTITY and the chip carries the REASON — the split
+ * each surface is actually good at: a number is scannable down a column and
+ * comparable between rows; a category word like `all` is not, and on the
+ * total-failure row the chip is already shouting ALL 769 FAILED two inches to
+ * the left. The row keeps its red rail and bold weight, so the total-failure
+ * case is still legible without the word.
  *
- * Now the column carries the QUANTITY and the chip carries the REASON, which is
- * the split each surface is actually good at: a number is scannable down a
- * column and comparable between rows; "failed" is not. The row keeps its
- * red rail and bold weight, so the total-failure case is still legible without
- * the word.
- *
- * `none` survives because zero is the one value where the reader's question
+ * `none` stays because zero is the one value where the reader's question
  * genuinely is yes/no rather than how-many, and "0" in a column of counts reads
  * as a measurement where "none" reads as an all-clear.
  */
@@ -1382,10 +1605,11 @@ const onRowAction = async (id: string, row: QueryRow) => {
     return;
   }
   if (id === "copy") {
-    // The shared helper both confirms the copy and falls back to execCommand on
-    // non-secure origins, where navigator.clipboard is unavailable — the old
-    // direct call failed silently there, so the user pasted stale content with
-    // nothing to suggest the copy had not happened.
+    // Through the shared helper, never navigator.clipboard directly: it both
+    // confirms the copy and falls back to execCommand on non-secure origins,
+    // where navigator.clipboard is unavailable and a direct call fails
+    // SILENTLY — the user pastes stale content with nothing to suggest the
+    // copy never happened.
     await copyToClipboard(row.queryText, t, {
       successMessage: t("dbm.queries.actions.copied"),
       errorMessage: t("dbm.queries.actions.copyFailed"),
@@ -1562,6 +1786,12 @@ const onSortChange = (columnId: string) => {
  */
 const openQueryDetail = (row: QueryRow, tab?: string) => {
   if (row.isOther) return;
+  // The clicked row already holds everything the detail header paints —
+  // statement, dimensions, the six headline values — so it travels as a
+  // one-shot seed for the detail page's instant first paint. The RANGE goes
+  // with it (copied, because this kept-alive page's scope lives on and can
+  // move): the detail page ignores a seed fetched under any other window.
+  setDbmQueryDetailSeed({ row, org: org.value, range: { ...range.value } });
   router
     .push({
       name: "dbmQueryDetail",
@@ -1580,20 +1810,21 @@ const openQueryDetail = (row: QueryRow, tab?: string) => {
     .catch(() => {});
 };
 
-/**
- * The refresh button. A named handler rather than `@click="load"`: that passes
- * the click EVENT as the first argument, which would arrive as a truthy
- * `force` and quietly make every refresh bypass the cache — and every other
- * caller look like it was refreshing too.
- */
+// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
+// badge cache alongside the page's own load — the URL does not change on a
+// refresh, so the shell cannot see one on its own.
 const onRefresh = () => {
-  void load(true);
+  void load();
+  tabCountsContext.refresh({ force: true });
 };
 
 const onDateChange = (value: DbmDateChange) => {
   setRange(value);
   syncUrl();
-  load();
+  // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
+  // mount replay would otherwise double every request. See
+  // `DbmDateChange.userChangedValue`.
+  if (value?.userChangedValue !== false) load();
 };
 
 /**

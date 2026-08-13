@@ -23,7 +23,6 @@ import {
   formatLagBytes,
   formatLagSeconds,
   failedCellKind,
-  formatCallsPerTrace,
   formatNs,
   formatPercent,
   formatRate,
@@ -114,18 +113,6 @@ describe("formatRate", () => {
   it("does not round a slow-but-real query to zero", () => {
     expect(formatRate(0.005)).toBe("<0.01");
     expect(formatRate(0)).toBe("0");
-  });
-});
-
-describe("formatCallsPerTrace", () => {
-  it("always carries the ≈ that the trace upper bound forces", () => {
-    // traces is an upper bound, so this ratio is a LOWER bound — never exact.
-    expect(formatCallsPerTrace(47.2)).toBe("≈ ×47");
-    expect(formatCallsPerTrace(2.5)).toBe("≈ ×2.5");
-  });
-
-  it("returns an em dash when there is no ratio", () => {
-    expect(formatCallsPerTrace(null)).toBe("—");
   });
 });
 

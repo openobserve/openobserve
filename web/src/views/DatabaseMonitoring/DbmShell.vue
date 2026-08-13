@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   The DBM parent route's host, and deliberately nothing else.
 
-  The six DBM tabs are separate ROUTES, so every switch destroyed the outgoing
+  The DBM tabs are separate ROUTES, so every switch destroyed the outgoing
   page and mounted the incoming one from scratch — re-running its whole fan-out
   and discarding its filters, sort and scroll. Measured on one landing: eight
   requests, seven sharing a `start_time` and an eighth 22ms later, because the
@@ -38,6 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   push the child's header down — the bug the router comment warns about at
   Functions.vue:18-22, which is exactly why this parent had no component before.
   A bare `<router-view>` adds no DOM of its own, so that reasoning still holds.
+
+  It does, however, own the TAB BADGE COUNTS. Every page renders the shared tab
+  strip, and the strip takes every tab's count, so each page used to fan out to
+  the sibling endpoints to fill them in — once per tab for numbers that are
+  identical on every tab. That fan-out now happens here, once per (org, window,
+  filters), and the pages inject the result. The MARKUP stays on the pages: the
+  strip belongs to each page's own header slot, and hoisting it here would move
+  it above their titles, which is the layout bug above. See useDbmTabCounts.ts.
 -->
 <template>
   <router-view v-slot="{ Component }">
@@ -48,8 +56,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { computed, watch } from "vue";
+import { useRoute } from "vue-router";
+import { useStore } from "vuex";
+
+import { provideDbmTabCounts } from "@/composables/dbm/dbmTabCounts";
+import { useDbmTabCounts, type DbmTabCountsLoadOptions } from "@/composables/dbm/useDbmTabCounts";
+import { rangeFromQuery, periodToMinutes } from "@/composables/dbm/useDbmScope";
+
 /**
- * The six list tabs, by COMPONENT name (each page declares its own via
+ * The list tabs, by COMPONENT name (each page declares its own via
  * `defineOptions`, so a file rename cannot silently drop it from this list).
  *
  * QueryDetailPage is absent on purpose. It is opened per fingerprint, so
@@ -59,9 +75,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 const CACHED_DBM_VIEWS = [
   "DbmDatabasesPage",
   "DbmQueriesPage",
+  "DbmSamplesPage",
   "DbmActivityPage",
   "DbmDeadlocksPage",
   "DbmBlockedQueriesPage",
   "DbmTableHealthPage",
 ];
+
+/**
+ * The routes that actually RENDER the tab strip, by route name — what the
+ * shell can see, where `CACHED_DBM_VIEWS` above names components.
+ *
+ * `dbmQueryDetail` is absent here too, and for a different reason than the
+ * cache list: the detail page renders no `DbmSectionTabs`, so a fan-out on
+ * that route spends its reads on badges nobody paints. It was not
+ * hypothetical — opening a row ADDS the row's engine as `?system=` to the URL,
+ * which re-keyed the watcher below and fired every count on every detail
+ * entry (and again on every window change made there). The strip routes fetch
+ * as before; returning to one re-triggers the watcher, which serves the cached
+ * snapshot when the window is unchanged and refetches when it moved.
+ */
+const DBM_TAB_STRIP_ROUTES = new Set([
+  "dbmDatabases",
+  "dbmQueries",
+  "dbmSamples",
+  "dbmActivity",
+  "dbmDeadlocks",
+  "dbmBlocking",
+  "dbmTableHealth",
+]);
+
+const route = useRoute();
+const store = useStore();
+
+const rendersTabStrip = computed(() => DBM_TAB_STRIP_ROUTES.has(String(route.name ?? "")));
+
+const { counts, load } = useDbmTabCounts();
+
+const org = computed(() => (store.state.selectedOrganization?.identifier as string) ?? "");
+
+/**
+ * The window, read from the URL rather than from a lifted `useDbmScope`.
+ *
+ * The route query is ALREADY how the tabs agree on a window — each page
+ * seeds its scope from it and writes its picks back (see `useDbmScopeSync`), so
+ * it is the section's existing source of truth and not a new one invented here.
+ * Reading it means the shell needs no ownership of the pages' scope objects,
+ * and a page changing the range publishes that change to the shell by the same
+ * `router.replace` it already performed.
+ */
+const range = computed(() => rangeFromQuery(route.query));
+
+/**
+ * The only page-level filter that narrows the badge counts: DatabasesPage's
+ * `system`, which it also writes to the URL. Read from the route for the same
+ * reason the window is.
+ */
+const systemFilter = computed(() => (route.query.system as string) ?? null);
+
+const MINUTE_US = 60_000_000;
+
+/**
+ * The bounds the endpoints take.
+ *
+ * A relative range is resolved against `Date.now()` HERE rather than against
+ * `useDbmScope`'s shared anchor. The anchor exists so that every request in one
+ * page's refresh cycle describes one instant; this fan-out is its own cycle and
+ * has no delta to corrupt. Resolving here also keeps the shell from having to
+ * instantiate a scope whose `refresh()` would re-pin the anchor behind the
+ * active page's back.
+ */
+const window = computed(() => {
+  if (range.value.type === "absolute") {
+    return { startTime: range.value.startTime, endTime: range.value.endTime };
+  }
+  const end = Date.now() * 1000;
+  return {
+    startTime: end - periodToMinutes(range.value.relativeTimePeriod) * MINUTE_US,
+    endTime: end,
+  };
+});
+
+/**
+ * Refetch under whatever the URL currently says.
+ *
+ * The pages' refresh buttons call this. They pass `force` and nothing else —
+ * the scope is the shell's, so a page cannot ask for a window other than the
+ * one on screen.
+ */
+const refresh = (options: DbmTabCountsLoadOptions = {}) => {
+  // Guarded HERE rather than only in the watcher so no caller — present or
+  // future — can spend the fan-out's reads on a route with no badges to fill.
+  if (!rendersTabStrip.value) return;
+  void load(org.value, range.value, window.value, { system: systemFilter.value }, options);
+};
+
+/**
+ * Fetch on arrival and whenever the QUESTION changes.
+ *
+ * Keyed on the org, the chosen range and the filter — never on `window`, whose
+ * relative bounds are recomputed from the clock on every access and would fire
+ * this watcher forever. `immediate` covers the initial landing, so no page has
+ * to trigger the first fan-out. `rendersTabStrip` is in the key so LEAVING the
+ * detail route re-fires it: the counts skipped while there are fetched the
+ * moment a strip is back on screen to show them (a cache hit when the window
+ * did not move).
+ */
+watch(
+  () => [
+    org.value,
+    range.value.type,
+    range.value.relativeTimePeriod,
+    range.value.startTime,
+    range.value.endTime,
+    systemFilter.value,
+    rendersTabStrip.value,
+  ],
+  () => refresh(),
+  { immediate: true },
+);
+
+provideDbmTabCounts({ counts, refresh });
 </script>

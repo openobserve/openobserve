@@ -16,7 +16,7 @@
 /**
  * W10's table health columns, rendered through a REAL OTable.
  *
- * Why this spec mounts, when its eight siblings in this directory deliberately
+ * Why this spec mounts, when its siblings in this directory deliberately
  * do not. Those read the page source because they assert a DECISION the page
  * makes — a default sort, an empty-state branch — and the source is where a
  * decision is legible. This one asserts that the page uses OTable's API

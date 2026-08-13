@@ -15,6 +15,7 @@
 
 import { describe, it, expect } from "vitest";
 
+import i18n from "@/locales";
 import { readServerMetrics, serverMetricsTiles, type DbmServerMetrics } from "./serverMetrics";
 
 const matched = {
@@ -29,7 +30,6 @@ const matched = {
   mean_exec_time_s: 0.02,
   shared_blks_hit: 900,
   shared_blks_read: 100,
-  temp_blks_read: 0,
   temp_blks_written: 0,
 };
 
@@ -166,12 +166,18 @@ describe("serverMetricsTiles", () => {
   });
 
   // No subtraction of a server mean from a client percentile, over different
-  // populations, over windows that do not even align.
-  it("derives no client/server difference figure", () => {
-    const rendered = JSON.stringify(tiles(readServerMetrics(matched))).toLowerCase();
-    for (const banned of ["network", "overhead", "difference", "delta", "pool wait"]) {
-      expect(rendered).not.toContain(banned);
-    }
+  // populations, over windows that do not even align. The tile set is CLOSED:
+  // exactly these six, so no cross-vantage figure can appear without failing
+  // this pin.
+  it("emits exactly the six server-side tiles and derives nothing across vantages", () => {
+    expect(tiles(readServerMetrics(matched)).map((t) => t.id)).toEqual([
+      "calls",
+      "rows",
+      "mean",
+      "shared_blks_hit",
+      "shared_blks_read",
+      "temp_blks_written",
+    ]);
   });
 
   it("emits no tiles when there is nothing to show", () => {
@@ -182,10 +188,12 @@ describe("serverMetricsTiles", () => {
   });
 
   // The unit must be stated in the header rather than left for the reader to
-  // infer from the magnitude.
-  it("states the unit for block counters", () => {
-    const t = tiles(readServerMetrics(matched)).find((x) => x.id === "shared_blks_read");
-    expect(t).toBeDefined();
-    expect(t?.value).not.toBe("");
+  // infer from the magnitude — asserted against the resolved en-US copy, so a
+  // relabel that drops the unit fails here.
+  it("states the unit in the block counter's own label", () => {
+    const tile = tiles(readServerMetrics(matched)).find((x) => x.id === "shared_blks_read");
+    expect(tile).toBeDefined();
+    const label = i18n.global.t(`dbm.detail.serverMetrics.${tile?.labelKey}`);
+    expect(label.toLowerCase()).toContain("block");
   });
 });

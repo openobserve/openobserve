@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The line itself. `min-h-6.5` holds the 26px budget the space plan
          allocates it, so a healthy page spends no more than that. -->
     <div
-      class="px-page-edge flex min-h-[1.625rem] min-w-0 items-center gap-2 py-1"
+      class="px-page-edge flex min-h-6.5 min-w-0 items-center gap-2 py-1"
       :class="toneSurface"
       data-test="dbm-coverage-line"
     >
@@ -53,18 +53,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
 
       <!-- The bar is the same claim as the number beside it, drawn. It appears
-           only when there IS a share to draw. -->
-      <span
+           only when there IS a share to draw — and `showBar` requires a healthy
+           line, so it is always the success variant: a degraded line already
+           speaks through its sentence and wash, not through a bar. -->
+      <OProgressBar
         v-if="showBar"
-        class="bg-surface-subtle h-1 w-12 shrink-0 overflow-hidden rounded-full"
+        :value="coverage ?? 0"
+        variant="success"
+        size="xs"
+        class="w-12 shrink-0"
         data-test="dbm-coverage-bar"
-      >
-        <span
-          class="block h-full rounded-full"
-          :class="barTone"
-          :style="{ width: barWidth }"
-        ></span>
-      </span>
+      />
 
       <template v-if="countedTo">
         <span class="text-text-muted text-2xs shrink-0" aria-hidden="true">·</span>
@@ -77,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { Freshness, QueryStatsRow } from "@/services/db_monitoring";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatCount, formatPercent } from "@/utils/dbm/format";
@@ -261,12 +261,7 @@ const dotTone = computed(() => {
   return "bg-status-success-text";
 });
 
-const barTone = computed(() =>
-  degraded.value ? "bg-status-warning-text" : "bg-status-success-text",
-);
-
 const showBar = computed(() => !degraded.value && coverage.value !== null);
-const barWidth = computed(() => `${Math.round((coverage.value ?? 0) * 100)}%`);
 
 /** Wall-clock time our counting reaches, for "counted up to 16:11:53". */
 const countedTo = computed<I18nText | null>(() => {

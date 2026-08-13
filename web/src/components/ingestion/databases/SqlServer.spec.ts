@@ -140,9 +140,38 @@ describe("sqlServerCard builder", () => {
     expect(config).toContain("mssql_spid");
     expect(config).toContain("mssql_query");
 
-    // Both pills now: this config can populate both tabs.
+    // Both pills now: this config can populate both tabs. NOT Activity — the
+    // upstream sqlserverreceiver's events are unadopted, so promising a third
+    // tab would be the "collecting but empty" trap.
     const verify = card.steps.find((s) => s.id === "verify-dbm")!;
     expect(verify.pills).toEqual(["Deadlocks", "Blocked queries"]);
+    // And no receiver-native events block for the same reason: on SQL Server
+    // there is no receiver to enable, so an events: key here would be a lie
+    // the collector cannot even validate.
+    expect(config).not.toContain("db.server.query_sample");
+    expect(config).not.toContain("db.server.top_query");
+  });
+
+  /**
+   * The honesty copy §7 of the ship plan makes a release requirement: SQL
+   * Server's capture polls SQL views (works on managed instances, EXCEPT Azure
+   * SQL Database), its deadlock text is the whole client batch, and manual runs
+   * via sqlcmd hit the QUOTED_IDENTIFIER default-off trap.
+   */
+  it("states the managed-instance scope and the deadlock-text limits", () => {
+    const card = sqlServerCard(SUBS);
+    const note = card.steps.find((s) => s.id === "dbm-configure")!.note!;
+
+    // Opposite of the PG/MySQL/MariaDB caveat: SQL polling DOES work managed…
+    expect(note).toMatch(/managed SQL Server/i);
+    // …except Azure SQL Database, and the reason travels with the limit.
+    expect(note).toContain("Azure SQL Database");
+    expect(note).toContain("sys.fn_xe_file_target_read_file");
+    // Query-text honesty: whole batch, and procs reduce to the EXEC call.
+    expect(note).toMatch(/whole batch/i);
+    expect(note).toMatch(/EXEC/);
+    // The silent sqlcmd trap — the shipped SQL sets it, a manual run must too.
+    expect(note).toContain("QUOTED_IDENTIFIER");
   });
 
   it("writes the config via a shell command with the org's exporter filled in", () => {
@@ -218,9 +247,12 @@ describe("sqlServerCard builder", () => {
       "darwin-amd64",
       "windows-amd64",
     ]);
-    // Each variant's command targets its own platform asset.
+    // Each variant's command targets its own platform asset, pinned to the
+    // DBM-verified upstream contrib release (v0.158.0) — the version every
+    // Tier-1 recipe was verified against. The OpenObserve collector distro is
+    // NOT an option here: it bundles zero database receivers.
     const linux = install.variants!.find((v) => v.id === "linux-amd64")!;
-    expect(linux.code.raw).toContain("otelcol-contrib_0.115.1_linux_amd64.tar.gz");
+    expect(linux.code.raw).toContain("otelcol-contrib_0.158.0_linux_amd64.tar.gz");
     const win = install.variants!.find((v) => v.id === "windows-amd64")!;
     expect(win.code.lang).toBe("powershell");
     expect(win.code.raw).toContain("windows_amd64");

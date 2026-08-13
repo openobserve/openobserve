@@ -1274,9 +1274,13 @@ fn recipe_tags_dispatched_by_backend() -> std::collections::BTreeSet<String> {
             out.insert(tag.to_string());
         }
     }
-    // `canonicalize_record` also compares o2_*_event fields to "deadlock"; that
-    // is an event value, not a recipe tag, and is pinned separately below.
+    // `canonicalize_record` also compares o2_*_event fields to "deadlock",
+    // "explain" and "statement_duration"; those are event VALUES, not recipe
+    // tags, and are pinned separately below (and by the W-E3 / W-S1 dispatch
+    // tests).
     out.remove("deadlock");
+    out.remove("explain");
+    out.remove("statement_duration");
     out
 }
 
@@ -1749,12 +1753,15 @@ fn reserving_event_name_keeps_every_pre_existing_reserved_field() {
     }
     assert_eq!(
         server_vantage::ALL_DBM_FIELDS.len(),
-        79,
+        83,
         "23 pre-existing (22 + o2_event_name from W1) + 19 activity columns (W2) \
-         + 14 top-query columns (W3) + 18 table-health columns (W10) + 5 index-health \
+         + 14 top-query columns (W3) + 3 executed-plan columns (W-E3: plan_source, \
+         plan_duration_ms, plan_rows_actual) + 18 table-health columns (W10) + 5 index-health \
          columns (W11: index_name, index_bytes, idx_tup_read, idx_tup_fetch, \
-         index_is_unique — relation, schema and idx_scan_count are SHARED with W10); bump this \
-         deliberately — the length is the compile-time forcing function"
+         index_is_unique — relation, schema and idx_scan_count are SHARED with W10) \
+         + 1 statement-duration column (W-S1: stmt_duration_ms — pid/user/app/query/fingerprint \
+         are SHARED with W2); bump this deliberately — the length is the compile-time forcing \
+         function"
     );
 }
 
@@ -5746,8 +5753,8 @@ fn table_stats_canonicalizes_through_the_ingest_entry_point() {
     assert_eq!(
         rec.get(server_vantage::O2_DBM_ENGINE),
         Some(&json!("postgresql")),
-        "these are Postgres-only recipes and the row must say so, or a fleet \
-         view cannot tell which engines it is missing"
+        "the pg_ tag names Postgres, and the row must say so — a fleet view \
+         cannot otherwise tell which engines it is missing"
     );
 }
 
@@ -6479,6 +6486,453 @@ fn index_stats_without_an_index_name_is_dropped() {
     );
 }
 
+// ─── WP2 · MySQL / MariaDB table & index health twins ────────────────────────
+//
+// The MySQL and MariaDB recipes emit the SAME aliased columns as Postgres's
+// (the `mariadb_lock_waits` precedent: no engine-conditional canonicalizer
+// branch — the recipe TAG is what names the engine, via `detect_engine`). What
+// differs per engine is which columns EXIST at all: MySQL/MariaDB have no
+// dead-tuple, vacuum or xid state, and MariaDB ships with performance_schema
+// OFF so its index rows carry no `idx_scan`. Absent must STAY absent — a
+// fabricated zero would read as a finding (a never-scanned index, a
+// never-vacuumed table) that was never measured.
+//
+// Every fixture below is the VERBATIM wire shape captured off the live
+// dbm-server-vantage rig on 2026-08-13 (MySQL 8.4 / MariaDB 11.8, contrib
+// 0.158.0) — `tests/dbm-server-vantage/captures/{mysql,mariadb}-{table,index}-
+// stats.jsonl`, flattened as logs ingest stores it. That rig pass was the
+// release gate the plan flags for these recipes; the previously recipe-shaped
+// fixtures here are replaced by the measured rows. Note `server_address`
+// carries NO port: the shipped recipes stamp the bare `{host}`.
+
+/// One real `mysql_table_stats` row (`orders`, mysql-table-stats.jsonl).
+fn mysql_table_stats_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_500_000_000_000i64,
+        "o2_recipe": "mysql_table_stats",
+        "o2_vantage": "server",
+        "o2_rig": "dbm-server-vantage",
+        "deployment_environment_name": "dbm-sv",
+        // The TABLE NAME, in `body` — it is the recipe's body_column.
+        "body": "orders",
+        "schema_name": "dbmlab",
+        "total_bytes": "12107776",
+        "heap_bytes": "8929280",
+        "n_live_tup": "39546",
+        "last_analyze": "2026-08-13 02:24:46",
+        "server_address": "mysql",
+    }))
+}
+
+/// The MariaDB twin — same aliases, its own tag. This is the rig's
+/// `STATS_PERSISTENT=0` table (mariadb-table-stats.jsonl): no
+/// `innodb_table_stats` row exists, so `last_analyze` arrives as the empty
+/// string and `n_live_tup` is the `TABLE_ROWS` fallback.
+fn mariadb_table_stats_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_500_060_000_000i64,
+        "o2_recipe": "mariadb_table_stats",
+        "o2_vantage": "server",
+        "o2_rig": "dbm-server-vantage",
+        "deployment_environment_name": "dbm-sv",
+        "body": "session_scratch",
+        "schema_name": "dbmlab",
+        "total_bytes": "16384",
+        "heap_bytes": "16384",
+        "n_live_tup": "3",
+        // Stats never recalculated — arrives as the empty string, reads as
+        // absent, exactly like a never-analyzed Postgres table.
+        "last_analyze": "",
+        "server_address": "mariadb",
+    }))
+}
+
+/// One real `mysql_index_stats` row: a scanned secondary index
+/// (mysql-index-stats.jsonl). `body` carries the GROUP_CONCAT-built DDL,
+/// `index_name` the identity — the same split the PG recipe established.
+fn mysql_index_stats_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_500_000_000_000i64,
+        "o2_recipe": "mysql_index_stats",
+        "o2_vantage": "server",
+        "o2_rig": "dbm-server-vantage",
+        "deployment_environment_name": "dbm-sv",
+        "body": "INDEX idx_orders_acct_sku ON dbmlab.orders (account_id, sku)",
+        "index_name": "idx_orders_acct_sku",
+        "table_name": "orders",
+        "schema_name": "dbmlab",
+        "idx_scan": "800",
+        "index_bytes": "1589248",
+        "is_unique": "false",
+        "server_address": "mysql",
+    }))
+}
+
+/// A never-scanned MySQL index — the rig's `orders` PRIMARY KEY, verbatim.
+/// `idx_scan: "0"` here is a MEASURED zero from performance_schema.
+fn mysql_index_stats_unused_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_500_000_000_000i64,
+        "o2_recipe": "mysql_index_stats",
+        "o2_vantage": "server",
+        "o2_rig": "dbm-server-vantage",
+        "deployment_environment_name": "dbm-sv",
+        "body": "INDEX PRIMARY ON dbmlab.orders (id)",
+        "index_name": "PRIMARY",
+        "table_name": "orders",
+        "schema_name": "dbmlab",
+        "idx_scan": "0",
+        "index_bytes": "8929280",
+        "is_unique": "true",
+        "server_address": "mysql",
+    }))
+}
+
+/// A FUNCTIONAL index (`(LOWER(customer_ref))`), verbatim from the rig — the
+/// row that exposed the recipe bug: an expression key part has NULL
+/// `COLUMN_NAME`, which nulled GROUP_CONCAT and then the whole `index_def`
+/// (the body_column). The shipped fix COALESCEs to `(EXPRESSION)`, and this
+/// is what the fixed recipe emits.
+fn mysql_index_stats_functional_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_500_000_000_000i64,
+        "o2_recipe": "mysql_index_stats",
+        "o2_vantage": "server",
+        "o2_rig": "dbm-server-vantage",
+        "deployment_environment_name": "dbm-sv",
+        "body": "INDEX idx_orders_lower_ref ON dbmlab.orders ((lower(`customer_ref`)))",
+        "index_name": "idx_orders_lower_ref",
+        "table_name": "orders",
+        "schema_name": "dbmlab",
+        "idx_scan": "41",
+        "index_bytes": "1589248",
+        "is_unique": "false",
+        "server_address": "mysql",
+    }))
+}
+
+/// The MariaDB index twin (mariadb-index-stats.jsonl). NO `idx_scan` key at
+/// all: MariaDB ships with performance_schema OFF, so the recipe deliberately
+/// omits the usage join rather than selecting a zero it never measured.
+fn mariadb_index_stats_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_500_060_000_000i64,
+        "o2_recipe": "mariadb_index_stats",
+        "o2_vantage": "server",
+        "o2_rig": "dbm-server-vantage",
+        "deployment_environment_name": "dbm-sv",
+        "body": "INDEX PRIMARY ON dbmlab.accounts (id)",
+        "index_name": "PRIMARY",
+        "table_name": "accounts",
+        "schema_name": "dbmlab",
+        "index_bytes": "16384",
+        "is_unique": "true",
+        "server_address": "mariadb",
+    }))
+}
+
+/// **Through `apply_to_record`, the production entry point** — the same B19
+/// discipline every fixture in this file follows.
+#[test]
+fn mysql_table_stats_canonicalizes_as_mysql() {
+    let mut rec = mysql_table_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_TABLE_STATS)),
+        "a mysql_table_stats record must canonicalize through the real ingest path: {rec:?}"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_RELATION),
+        Some(&json!("orders")),
+        "the table name arrives in `body`, exactly as the PG recipe's does"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SCHEMA),
+        Some(&json!("dbmlab"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_ENGINE),
+        Some(&json!("mysql")),
+        "the tag names the engine — stamped postgresql, every MySQL table \
+         would file under the wrong engine on the fleet view"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INSTANCE),
+        Some(&json!("mysql")),
+        "the shipped recipe stamps the bare {{host}} — nothing to port-strip, \
+         and the value must survive unmangled"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_TOTAL_BYTES),
+        Some(&json!(12_107_776i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_HEAP_BYTES),
+        Some(&json!(8_929_280i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_LIVE_TUPLES),
+        Some(&json!(39_546i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_LAST_ANALYZE),
+        Some(&json!("2026-08-13 02:24:46")),
+        "innodb_table_stats.last_update rides the last_analyze alias"
+    );
+}
+
+/// **The Postgres-only columns are ABSENT, never zero.** MySQL reports no
+/// dead-tuple, vacuum or xid state; a zero would claim "0% bloat, wraparound
+/// age 0" about measurements that never happened.
+#[test]
+fn mysql_table_stats_leaves_postgres_only_columns_absent() {
+    let mut rec = mysql_table_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    for pg_only in [
+        server_vantage::O2_DBM_DEAD_TUPLES,
+        server_vantage::O2_DBM_DEAD_TUP_PCT,
+        server_vantage::O2_DBM_MOD_SINCE_ANALYZE,
+        server_vantage::O2_DBM_SEQ_SCAN_COUNT,
+        server_vantage::O2_DBM_SEQ_TUP_READ,
+        server_vantage::O2_DBM_IDX_SCAN_COUNT,
+        server_vantage::O2_DBM_AUTOVACUUM_COUNT,
+        server_vantage::O2_DBM_FROZEN_XID_AGE,
+        server_vantage::O2_DBM_LAST_VACUUM,
+        server_vantage::O2_DBM_LAST_AUTOVACUUM,
+    ] {
+        assert_eq!(
+            rec.get(pg_only),
+            None,
+            "`{pg_only}` has no MySQL source and must stay absent, not zero"
+        );
+    }
+    // The honesty disclosures still ride on every row: MySQL's TABLE_ROWS /
+    // innodb_table_stats.n_rows are estimates too, and its counters (where an
+    // engine has any) are lifetime totals.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE),
+        Some(&json!(true))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_TUPLES_ARE_ESTIMATED),
+        Some(&json!(true))
+    );
+}
+
+#[test]
+fn mariadb_table_stats_canonicalizes_as_mariadb() {
+    let mut rec = mariadb_table_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_TABLE_STATS))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_ENGINE),
+        Some(&json!("mariadb")),
+        "the mariadb_ tag must not file under mysql — the ?system= filter and \
+         the fleet view both key on the engine"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_RELATION),
+        Some(&json!("session_scratch"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SCHEMA),
+        Some(&json!("dbmlab"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INSTANCE),
+        Some(&json!("mariadb"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_LAST_ANALYZE),
+        None,
+        "a STATS_PERSISTENT=0 table has no innodb_table_stats row — `\"\"` is \
+         'never', exactly as the PG recipe's empty timestamp reads"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_LIVE_TUPLES),
+        Some(&json!(3i64)),
+        "with no persistent stats, n_live_tup is the TABLE_ROWS fallback — \
+         measured live on the rig"
+    );
+}
+
+#[test]
+fn mysql_index_stats_canonicalizes_as_mysql() {
+    let mut rec = mysql_index_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_INDEX_STATS)),
+        "a mysql_index_stats record must canonicalize through the real ingest path: {rec:?}"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_ENGINE),
+        Some(&json!("mysql"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_NAME),
+        Some(&json!("idx_orders_acct_sku")),
+        "the identity comes from `index_name`, never from the DDL in `body`"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_RELATION),
+        Some(&json!("orders"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        Some(&json!(800)),
+        "performance_schema COUNT_READ rides the idx_scan alias — 800 measured \
+         reads through the index on the rig"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_BYTES),
+        Some(&json!(1_589_248i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_IS_UNIQUE),
+        Some(&json!(false)),
+        "the recipe renders MIN(NON_UNIQUE)=0 as 'true'/'false' strings, and \
+         the string parse must land as a boolean"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE),
+        Some(&json!(true)),
+        "table_io_waits counters are lifetime totals, same disclosure as PG"
+    );
+}
+
+/// **A measured zero survives as the never-scanned FINDING.** The rig's
+/// `orders` PRIMARY KEY, verbatim: performance_schema reported COUNT_READ=0,
+/// which is a measurement, not an absence.
+#[test]
+fn mysql_index_stats_keeps_a_measured_zero_idx_scan() {
+    let mut rec = mysql_index_stats_unused_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_INDEX_STATS))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        Some(&json!(0)),
+        "a measured zero from performance_schema is the never-scanned FINDING \
+         and must survive"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_IS_UNIQUE),
+        Some(&json!(true)),
+        "a PRIMARY KEY reaches the wire flagged as a constraint"
+    );
+}
+
+/// **The functional-index row canonicalizes with its definition intact** —
+/// the regression the rig pass caught: an expression key part has NULL
+/// `COLUMN_NAME` in `information_schema.STATISTICS`, which nulled
+/// GROUP_CONCAT and then the entire `index_def` (the recipe's body_column).
+/// The shipped COALESCE-to-`(EXPRESSION)` fix makes this row possible; this
+/// fixture is the fixed recipe's verbatim output.
+#[test]
+fn mysql_index_stats_functional_index_keeps_its_identity_and_definition() {
+    let raw = mysql_index_stats_functional_record();
+    assert!(
+        raw.get("body")
+            .and_then(Value::as_str)
+            .is_some_and(|b| b.contains("(lower(`customer_ref`))")),
+        "the capture must carry the expression where columns would be — an \
+         empty body here means the recipe regressed to the NULL index_def bug"
+    );
+
+    let mut rec = raw;
+    server_vantage::apply_to_record(&mut rec);
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_INDEX_STATS))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_NAME),
+        Some(&json!("idx_orders_lower_ref")),
+        "the identity is the index name, not the expression DDL in body"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        Some(&json!(41))
+    );
+}
+
+/// **The MariaDB shape's missing `idx_scan` stays missing.** performance_schema
+/// is OFF by default on MariaDB, so the recipe omits the usage join entirely —
+/// and a zero invented here would BE the never-scanned finding, fabricated for
+/// every index on every MariaDB server.
+#[test]
+fn mariadb_index_stats_leaves_absent_idx_scan_absent() {
+    let mut rec = mariadb_index_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_INDEX_STATS)),
+        "the row must still canonicalize — size and definition are worth \
+         collecting without the usage counter: {rec:?}"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_ENGINE),
+        Some(&json!("mariadb"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        None,
+        "no idx_scan was measured; absent is honestly unknown, zero is the \
+         never-scanned finding fabricated"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_BYTES),
+        Some(&json!(16_384i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_IS_UNIQUE),
+        Some(&json!(true)),
+        "a PRIMARY KEY must reach the wire flagged as a constraint, or the \
+         unused-index rule recommends reviewing it"
+    );
+}
+
+/// **The other kinds must not regress** — the widened `||` chains sit beside
+/// five existing dispatch arms, and the cheapest way to break them is a tag
+/// that overlaps. Same pattern as `adding_table_stats_leaves_the_other_
+/// recipes_dispatching`.
+#[test]
+fn adding_the_engine_twins_leaves_the_others_dispatching() {
+    let dl = canonicalize_record(&pg_deadlock_record()).expect("pg deadlock still dispatches");
+    assert_eq!(dl.get("o2_dbm_kind").unwrap(), &json!("deadlock"));
+
+    let bl = canonicalize_record(&pg_blocking_record()).expect("blocking still dispatches");
+    assert_eq!(bl.get("o2_dbm_kind").unwrap(), &json!("blocking"));
+
+    let pg_tbl =
+        canonicalize_record(&pg_table_stats_record()).expect("pg table stats still dispatches");
+    assert_eq!(pg_tbl.get("o2_dbm_kind").unwrap(), &json!("table_stats"));
+    assert_eq!(pg_tbl.get("o2_dbm_engine").unwrap(), &json!("postgresql"));
+
+    let pg_idx = canonicalize_record(&pg_index_stats_unused_record())
+        .expect("pg index stats still dispatches");
+    assert_eq!(pg_idx.get("o2_dbm_kind").unwrap(), &json!("index_stats"));
+    assert_eq!(pg_idx.get("o2_dbm_engine").unwrap(), &json!("postgresql"));
+
+    // An engine still without a recipe stays unconsumed rather than falling
+    // into a widened arm.
+    let unknown = obj(json!({"o2_recipe": "oracle_table_stats", "body": "orders"}));
+    assert!(canonicalize_record(&unknown).is_none());
+}
+
 // ─── W8 · An unrecognized recipe must not vanish without trace ───────────────
 //
 // The defect: a user writes a custom `sqlquery` recipe, tags it
@@ -6594,6 +7048,10 @@ fn w8_never_reports_a_recognized_recipe() {
         ),
         ("pg_table_stats", pg_table_stats_record()),
         ("pg_index_stats", pg_index_stats_unused_record()),
+        ("mysql_table_stats", mysql_table_stats_record()),
+        ("mysql_index_stats", mysql_index_stats_record()),
+        ("mariadb_table_stats", mariadb_table_stats_record()),
+        ("mariadb_index_stats", mariadb_index_stats_record()),
     ] {
         server_vantage::apply_to_record(&mut rec);
         assert_eq!(
@@ -6842,4 +7300,882 @@ fn w8_a_tag_just_under_the_budget_is_still_named() {
         WarnDecision::NameIt,
         "the budget is 32 distinct tags; the 32nd must still be named"
     );
+}
+
+// ═══ W-E1/W-E3 · auto_explain — real executed plans ══════════════════════════
+//
+// Every string below is VERBATIM rig capture (`corpus/auto_explain_rig.json`,
+// captured 2026-08-13: postgres:16.14, contrib collector v0.158.0, auto_explain
+// lab profile). The T1 tests pin the two load-bearing measurements the whole
+// package stands on — wrapper-hash behavior and the fingerprint join — so a
+// normalizer or walker change that silently breaks either fails HERE, loudly,
+// against real data.
+
+fn ae_fixture() -> Value {
+    serde_json::from_str(include_str!("corpus/auto_explain_rig.json"))
+        .expect("corpus/auto_explain_rig.json parses")
+}
+
+fn ae_str<'a>(fx: &'a Value, path: &[&str]) -> &'a str {
+    let mut v = fx;
+    for p in path {
+        v = &v[*p];
+    }
+    v.as_str()
+        .unwrap_or_else(|| panic!("fixture path {path:?} is a string"))
+}
+
+fn pg_fp(text: &str) -> Option<String> {
+    fingerprint_statement(text, Some("postgresql")).1
+}
+
+/// **T1 measurement (a), first half: the wrapper IS part of the hash.**
+///
+/// The design doc hoped `walk_plan_structure` would hash auto_explain's
+/// object-wrapped `{"Query Text":…, "Plan":{…}}` identically to the receiver's
+/// array-wrapped `[{"Plan":{…}}]` and demanded proof. Measured: it does NOT —
+/// the walker emits `[`/`]` delimiters, so the two wrappers of the SAME
+/// Seq Scan structure hash differently. This test pins the measured divergence
+/// so nobody "simplifies" `canonicalize_pg_auto_explain` back to hashing the
+/// raw document — that would silently split every logical plan into two hashes.
+#[test]
+fn t1_wrapper_shape_is_part_of_plan_hash() {
+    let fx = ae_fixture();
+    let ae_doc = ae_str(&fx, &["auto_explain", "literal", "doc"]);
+    let rx_plan = ae_str(&fx, &["receiver_top_query", "literal", "plan"]);
+
+    let h_ae = server_vantage::plan_hash(ae_doc).expect("the auto_explain document hashes");
+    let h_rx = server_vantage::plan_hash(rx_plan).expect("the receiver plan hashes");
+    assert_ne!(
+        h_ae, h_rx,
+        "measured divergence: if these ever hash equal, the walker's shape \
+         semantics changed and the rewrap below may be redundant — re-run T1"
+    );
+}
+
+/// **T1 measurement (a), second half: the contingency closes the gap.**
+///
+/// Rewrapping the auto_explain `Plan` subtree into the receiver's array shape
+/// reproduces the receiver's hash EXACTLY — for the flat Seq Scan pair (both
+/// sides verbatim rig captures of the same statement) and for a 17-node nested
+/// tree. This is the property `canonicalize_pg_auto_explain` builds on: one
+/// wrapper shape on disk, hashes comparable across producers by construction.
+#[test]
+fn t1_rewrapped_auto_explain_doc_hashes_identically_to_the_receiver_plan() {
+    let fx = ae_fixture();
+    let ae_doc: Value =
+        serde_json::from_str(ae_str(&fx, &["auto_explain", "literal", "doc"])).unwrap();
+    let rx_plan = ae_str(&fx, &["receiver_top_query", "literal", "plan"]);
+
+    let rewrapped = server_vantage::rewrap_auto_explain_plan(&ae_doc)
+        .expect("a real auto_explain document rewraps");
+    assert_eq!(
+        server_vantage::plan_hash(&rewrapped),
+        server_vantage::plan_hash(rx_plan),
+        "the rewrapped executed plan must hash identically to the receiver's \
+         generic plan of the same structure — this equality is the entire \
+         plan-comparison story"
+    );
+
+    // The nested case: a deep tree must survive the rewrap with its structure
+    // (and its hash-relevant fields) intact.
+    let nested: Value = serde_json::from_str(ae_str(&fx, &["auto_explain_nested", "doc"])).unwrap();
+    let nested_rw = server_vantage::rewrap_auto_explain_plan(&nested)
+        .expect("the 17-node nested document rewraps");
+    let h1 = server_vantage::plan_hash(&nested_rw).expect("nested rewrapped doc hashes");
+    let h2 = server_vantage::plan_hash(&nested_rw).unwrap();
+    assert_eq!(h1, h2, "the hash is stable");
+
+    // Documents with no Plan subtree must refuse rather than mint a hash.
+    assert_eq!(
+        server_vantage::rewrap_auto_explain_plan(&json!({"Query Text": "SELECT 1"})),
+        None,
+        "no Plan subtree ⇒ no rewrap, never a fabricated document"
+    );
+}
+
+/// **T1 measurement (b): the fingerprint join holds, proven on captured text.**
+///
+/// The same logical statement seen four ways — auto_explain's raw literal text
+/// (simple protocol, trailing `;`), auto_explain's `$1` text (extended
+/// protocol, trailing space), `pg_stat_statements`' jumbled `$1` text, and the
+/// receiver's re-spaced obfuscated `?` text — lands on ONE fingerprint. This
+/// is the join that puts an executed plan on the right query detail page.
+#[test]
+fn t1_auto_explain_raw_text_and_pgss_text_share_one_fingerprint() {
+    let fx = ae_fixture();
+    let literal = pg_fp(ae_str(&fx, &["auto_explain", "literal", "query_text"]));
+    assert!(literal.is_some(), "the captured literal text fingerprints");
+    for (side, path) in [
+        (
+            "auto_explain $1 bind",
+            ["auto_explain", "bind", "query_text"],
+        ),
+        (
+            "pg_stat_statements",
+            ["pg_stat_statements", "literal_and_bind", ""],
+        ),
+        (
+            "receiver obfuscated",
+            ["receiver_top_query", "literal", "db_query_text"],
+        ),
+    ] {
+        let p: Vec<&str> = path.iter().copied().filter(|s| !s.is_empty()).collect();
+        assert_eq!(
+            pg_fp(ae_str(&fx, &p)),
+            literal,
+            "{side} must fingerprint identically to the raw literal text"
+        );
+    }
+}
+
+/// **T1 measurement (b), IN-lists: arity and style collapse to one group.**
+///
+/// `IN (1,2,3,4,5)`, `IN ($1..$5)`, the receiver's `IN ( ? )` and a 700-literal
+/// list against pgss's `IN ($1..$700)` all fold to one `(?)` group and ONE
+/// fingerprint. Without this collapse every arity would be its own fingerprint
+/// and the join would silently fail for the most common query shape there is.
+#[test]
+fn t1_in_list_arity_and_style_collapse_to_one_fingerprint() {
+    let fx = ae_fixture();
+    let base = pg_fp(ae_str(&fx, &["auto_explain", "in_literals", "query_text"]));
+    assert!(base.is_some());
+    for (side, text) in [
+        (
+            "auto_explain $n binds",
+            ae_str(&fx, &["auto_explain", "in_binds", "query_text"]),
+        ),
+        ("pgss arity 5", ae_str(&fx, &["pg_stat_statements", "in_5"])),
+        (
+            "receiver collapsed",
+            ae_str(&fx, &["receiver_top_query", "in", "db_query_text"]),
+        ),
+        (
+            "auto_explain 700 literals (5.6 KB)",
+            ae_str(&fx, &["auto_explain", "in_5kb", "query_text"]),
+        ),
+        (
+            "pgss arity 700 (4.1 KB)",
+            ae_str(&fx, &["pg_stat_statements", "in_700"]),
+        ),
+    ] {
+        assert_eq!(
+            pg_fp(text),
+            base,
+            "{side} must join the arity-5 literal fingerprint"
+        );
+    }
+}
+
+/// **T1 measurement (b), the documented divergence: `= ANY($1)` is NOT an
+/// IN-list.** A driver that rewrites `IN (…)` to `= ANY($1)` produces a
+/// different token stream before our lexer ever sees it, so the two forms MUST
+/// NOT converge — and the cast variant `ANY($1::int[])` is a third stream.
+/// Each form still self-joins across producers (auto_explain ↔ pgss ↔
+/// receiver), so the failure is bounded: a mixed-driver fleet splits one
+/// logical query into two rows rather than losing the plan. The `%Q` queryid
+/// join key exists because of exactly this case.
+#[test]
+fn t1_any_array_predicate_diverges_from_in_lists_by_construction() {
+    let fx = ae_fixture();
+    let in_form = pg_fp(ae_str(&fx, &["auto_explain", "in_literals", "query_text"]));
+    let any_form = pg_fp(ae_str(&fx, &["auto_explain", "any_bind", "query_text"]));
+    let any_cast = pg_fp(ae_str(
+        &fx,
+        &["auto_explain", "any_literal_array", "query_text"],
+    ));
+    assert_ne!(
+        in_form, any_form,
+        "measured: IN-lists and = ANY($1) are different token streams; if they \
+         ever converge the normalizer gained a rewrite and this doc is stale"
+    );
+    assert_ne!(any_form, any_cast, "the ::int[] cast is part of the stream");
+
+    // Bounded failure: each form joins ITSELF across all three producers.
+    assert_eq!(
+        any_form,
+        pg_fp(ae_str(&fx, &["pg_stat_statements", "any"])),
+        "= ANY($1) self-joins pgss"
+    );
+    assert_eq!(
+        any_form,
+        pg_fp(ae_str(&fx, &["receiver_top_query", "any", "db_query_text"])),
+        "= ANY($1) self-joins the receiver text"
+    );
+    assert_eq!(
+        any_cast,
+        pg_fp(ae_str(&fx, &["pg_stat_statements", "any_cast"])),
+        "= ANY($1::int[]) self-joins pgss"
+    );
+}
+
+/// **T1 measurement (b), the truncation divergence: statements past
+/// `MAX_NORM_INPUT` (16 KB) orphan the join.** The 20.8 KB literal IN-list and
+/// its 17.1 KB pgss `$n` twin are BOTH cut at 16 KB — at different content, so
+/// the unterminated IN-groups cannot collapse and the fingerprints diverge.
+/// The record still ingests (orphaned, invisible on the detail page), and the
+/// `%Q` queryid key is the mitigation. Pinned so the boundary is documented
+/// truth, not folklore.
+#[test]
+fn t1_statements_over_max_norm_input_orphan_the_fingerprint_join() {
+    let fx = ae_fixture();
+    let big_ae = ae_str(&fx, &["auto_explain", "big_in_20kb", "query_text"]);
+    let big_pgss = ae_str(&fx, &["pg_stat_statements", "big_in_2600"]);
+    assert!(big_ae.len() > super::MAX_NORM_INPUT);
+    assert!(big_pgss.len() > super::MAX_NORM_INPUT);
+    let fp_ae = pg_fp(big_ae);
+    let fp_pgss = pg_fp(big_pgss);
+    assert!(
+        fp_ae.is_some() && fp_pgss.is_some(),
+        "truncated statements still fingerprint — they are orphaned, not dropped"
+    );
+    assert_ne!(
+        fp_ae, fp_pgss,
+        "measured: both sides truncate at 16 KB over DIFFERENT content, so the \
+         join breaks for >16 KB statements; if this ever passes as equal, the \
+         input cap moved and the boundary doc below is stale"
+    );
+    // The small-side control: 5.6 KB (over the 4 KB DISPLAY cap, under the
+    // 16 KB INPUT cap) still joins — display truncation never affects the
+    // fingerprint, which is computed before it.
+    assert_eq!(
+        pg_fp(ae_str(&fx, &["auto_explain", "in_5kb", "query_text"])),
+        pg_fp(ae_str(&fx, &["pg_stat_statements", "in_700"])),
+        "under the input cap the join must hold regardless of the display cap"
+    );
+}
+
+/// A prepared statement's auto_explain `Query Text` is the PREPARE source, not
+/// the underlying SELECT — it joins the pgss `PREPARE …` row, not the bare
+/// statement's row. Consistent on both sides, so nothing is lost; pinned so
+/// the behavior is documented rather than rediscovered.
+#[test]
+fn t1_prepared_statement_text_fingerprints_as_the_prepare_row() {
+    let fx = ae_fixture();
+    let prep = pg_fp(ae_str(&fx, &["auto_explain", "prepared", "query_text"]));
+    assert!(prep.is_some());
+    assert_ne!(
+        prep,
+        pg_fp("SELECT owner FROM accounts WHERE id = $1"),
+        "the PREPARE wrapper is part of the fingerprint on BOTH producers"
+    );
+}
+
+// ── W-E3 · canonicalization, through `apply_to_record` ──────────────────────
+
+/// Force the explain ingest knob on for the duration of a test (the
+/// `with_top_query_enabled` pattern; own mutex, own env var).
+fn with_explain_enabled<T>(f: impl FnOnce() -> T) -> T {
+    let _guard = EXPLAIN_KNOB.lock().unwrap_or_else(|e| e.into_inner());
+    let prev = std::env::var("ZO_DB_MONITORING_EXPLAIN_ENABLED").ok();
+    unsafe { std::env::set_var("ZO_DB_MONITORING_EXPLAIN_ENABLED", "true") };
+    config::refresh_config().expect("config refresh");
+    let out = f();
+    match prev {
+        Some(v) => unsafe { std::env::set_var("ZO_DB_MONITORING_EXPLAIN_ENABLED", v) },
+        None => unsafe { std::env::remove_var("ZO_DB_MONITORING_EXPLAIN_ENABLED") },
+    }
+    config::refresh_config().expect("config refresh");
+    out
+}
+
+static EXPLAIN_KNOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// A flattened auto_explain filelog record, exactly as the T2 recipe produces
+/// it: the prefix fields from `pg_prefix`, the tag from `mark_explain`, and the
+/// two guarded extractions — `ae_duration_ms` as a STRING (regex captures are
+/// strings) and `ae_plan_json` as the whole document STRING (X5: never an
+/// object). Values verbatim from the captured entry.
+fn pg_auto_explain_flattened() -> Map<String, Value> {
+    let fx = ae_fixture();
+    obj(json!({
+        "_timestamp": 1_786_935_573_262_000i64,
+        "o2_pg_event": "explain",
+        "pg_pid": "497",
+        "pg_user": "dbm",
+        "pg_db": "dbmlab",
+        "pg_app": "t1probe",
+        "pg_severity": "LOG",
+        "ae_duration_ms": "0.009",
+        "ae_plan_json": ae_str(&fx, &["auto_explain", "literal", "doc"]),
+        "o2_capability": "explain_event",
+    }))
+}
+
+/// D-G: the knob defaults OFF, and the dispatch arm must be unreachable
+/// without it — an upgrade must not silently acquire auto_explain ingest.
+#[test]
+fn explain_dispatch_is_gated_off_by_default() {
+    if config::get_config().db_monitoring.explain_enabled {
+        return; // an env override is present; the default-off pin lives in config tests
+    }
+    let mut rec = pg_auto_explain_flattened();
+    server_vantage::apply_to_record(&mut rec);
+    assert!(
+        !rec.contains_key(server_vantage::O2_DBM_KIND),
+        "with ZO_DB_MONITORING_EXPLAIN_ENABLED unset an explain record must \
+         pass through un-canonicalized"
+    );
+}
+
+/// The happy path over the real captured entry, THROUGH `apply_to_record`.
+///
+/// The flagship assertions are the two cross-producer joins: the stored
+/// `plan_hash` equals the hash of the receiver's generic plan for the same
+/// statement, and the stored fingerprint equals the receiver text's
+/// fingerprint. Together they are T1's two measurements, restated as the
+/// shipped behavior of the shipped entry point.
+#[test]
+fn pg_auto_explain_canonicalizes_through_apply_to_record() {
+    let fx = ae_fixture();
+    let mut rec = pg_auto_explain_flattened();
+    with_explain_enabled(|| server_vantage::apply_to_record(&mut rec));
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::KIND_EXPLAIN)
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_ENGINE)
+            .and_then(|v| v.as_str()),
+        Some("postgresql")
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_DATABASE)
+            .and_then(|v| v.as_str()),
+        Some("dbmlab")
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_PLAN_SOURCE)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::PLAN_SOURCE_AUTO_EXPLAIN),
+        "the executed producer stamps its provenance per record (E-C)"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_PLAN_DURATION_MS)
+            .and_then(|v| v.as_f64()),
+        Some(0.009),
+        "the header duration is the executed wall clock of THIS execution"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_PLAN_ROWS_ACTUAL)
+            .and_then(|v| v.as_i64()),
+        Some(1),
+        "root-node Actual Rows under log_analyze = on"
+    );
+
+    // The stored plan is the REWRAPPED receiver-shaped string…
+    let plan_str = rec
+        .get(server_vantage::O2_DBM_PLAN)
+        .and_then(|v| v.as_str())
+        .expect("the plan is stored as a string (D-B)");
+    assert!(
+        plan_str.starts_with("[{\"Plan\""),
+        "one wrapper shape on disk: the receiver's array form"
+    );
+    // …so the cross-producer hash equality holds ON THE STORED RECORD.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_PLAN_HASH)
+            .and_then(|v| v.as_str()),
+        server_vantage::plan_hash(ae_str(&fx, &["receiver_top_query", "literal", "plan"]))
+            .as_deref(),
+        "the stored hash must equal the generic producer's hash for the same \
+         plan structure — the whole comparison story"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_FINGERPRINT)
+            .and_then(|v| v.as_str()),
+        pg_fp(ae_str(
+            &fx,
+            &["receiver_top_query", "literal", "db_query_text"]
+        ))
+        .as_deref(),
+        "the stored fingerprint must join the top_query row for the same statement"
+    );
+    // Simple protocol has no %Q here, and 'absent' must stay absent.
+    assert!(!rec.contains_key(server_vantage::O2_DBM_SERVER_QUERY_ID));
+}
+
+/// `log_analyze = off` is a legitimate, recommended configuration: the plan is
+/// still the real executed plan (real binds, real plan_cache_mode decision) but
+/// carries NO actuals. The columns must be ABSENT, not zero — a fabricated 0
+/// reads as "instant" and "returned nothing". Entry verbatim from the rig with
+/// `SET auto_explain.log_analyze = off`.
+#[test]
+fn pg_auto_explain_without_analyze_omits_duration_columns_it_cannot_support() {
+    let fx = ae_fixture();
+    let mut rec = pg_auto_explain_flattened();
+    rec.insert(
+        "ae_plan_json".into(),
+        json!(ae_str(&fx, &["auto_explain", "analyze_off", "doc"])),
+    );
+    // The header duration still exists (it is measured by auto_explain, not by
+    // the executor instrumentation) — but the ROWS actual cannot.
+    with_explain_enabled(|| server_vantage::apply_to_record(&mut rec));
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::KIND_EXPLAIN)
+    );
+    assert!(
+        !rec.contains_key(server_vantage::O2_DBM_PLAN_ROWS_ACTUAL),
+        "no Actual Rows in the document ⇒ the column is ABSENT, never 0"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_PLAN_SOURCE)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::PLAN_SOURCE_AUTO_EXPLAIN),
+        "provenance does not imply timings: plan_source cannot be a boolean"
+    );
+}
+
+/// A record whose plan extraction failed upstream (`on_error: send` leaves
+/// `ae_plan_json` absent) is nothing — an auto_explain record with no plan
+/// must not canonicalize into a plan-less explain row.
+#[test]
+fn pg_auto_explain_without_a_plan_document_is_skipped() {
+    let mut rec = pg_auto_explain_flattened();
+    rec.remove("ae_plan_json");
+    with_explain_enabled(|| server_vantage::apply_to_record(&mut rec));
+    assert!(
+        !rec.contains_key(server_vantage::O2_DBM_KIND),
+        "no document ⇒ no record; a truncated capture must fail silently and locally"
+    );
+}
+
+/// `%Q` (T6): a `pg_query_id` from the log prefix becomes the SECOND join key,
+/// in the same identifier space as top_query's `postgresql.queryid` — and the
+/// `0` sentinel ("queryid not computed") must read as absent, or every
+/// unfingerprintable statement would join every other one.
+#[test]
+fn pg_auto_explain_query_id_joins_and_zero_reads_as_absent() {
+    let mut rec = pg_auto_explain_flattened();
+    rec.insert("pg_query_id".into(), json!("-679379679796231264"));
+    with_explain_enabled(|| server_vantage::apply_to_record(&mut rec));
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SERVER_QUERY_ID)
+            .and_then(|v| v.as_str()),
+        Some("-679379679796231264"),
+        "the %Q queryid is stored verbatim in the shared identifier column"
+    );
+
+    let mut zero = pg_auto_explain_flattened();
+    zero.insert("pg_query_id".into(), json!("0"));
+    with_explain_enabled(|| server_vantage::apply_to_record(&mut zero));
+    assert!(
+        !zero.contains_key(server_vantage::O2_DBM_SERVER_QUERY_ID),
+        "%Q prints 0 for uncomputed queryids; a literal '0' key would glue \
+         every such statement together"
+    );
+}
+
+/// D-I for the new columns: a caller POSTing canonical `o2_dbm_plan_*` names
+/// must have them stripped — provenance is an OUTPUT. A forged
+/// `plan_source = auto_explain` is a worse lie than a forged generic one,
+/// because §4.3 grants executed plans stronger claims.
+#[test]
+fn spoofed_plan_source_and_duration_are_stripped() {
+    let mut rec = obj(json!({
+        "some_unrelated": "record",
+        "o2_dbm_plan_source": "auto_explain",
+        "o2_dbm_plan_duration_ms": 0.001,
+        "o2_dbm_plan_rows_actual": 1,
+    }));
+    server_vantage::apply_to_record(&mut rec);
+    for k in [
+        server_vantage::O2_DBM_PLAN_SOURCE,
+        server_vantage::O2_DBM_PLAN_DURATION_MS,
+        server_vantage::O2_DBM_PLAN_ROWS_ACTUAL,
+    ] {
+        assert!(
+            !rec.contains_key(k),
+            "{k} is an ALL_DBM_FIELDS member and must be stripped from caller input"
+        );
+    }
+}
+
+/// E-C on the EXISTING producer: `canonicalize_top_query` now stamps its
+/// provenance whenever it stores a plan — and never on plan-less rows, where a
+/// provenance claim about a plan that does not exist would be noise.
+#[test]
+fn top_query_rows_stamp_generic_plan_source_alongside_the_plan() {
+    let with_plan = server_vantage::canonicalize_top_query(&pg_top_query())
+        .expect("top_query")
+        .to_record();
+    assert_eq!(
+        with_plan
+            .get(server_vantage::O2_DBM_PLAN_SOURCE)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::PLAN_SOURCE_GENERIC),
+        "the generic producer names its plans generic, per record"
+    );
+
+    let mut record = pg_top_query();
+    record.insert("postgresql_query_plan".into(), json!(""));
+    let no_plan = server_vantage::canonicalize_top_query(&record)
+        .expect("top_query without a plan still canonicalizes")
+        .to_record();
+    assert!(
+        !no_plan.contains_key(server_vantage::O2_DBM_PLAN_SOURCE),
+        "no plan ⇒ no provenance claim; plan, hash, version and source travel together"
+    );
+}
+
+/// **The end-to-end proof, on a record the COLLECTOR actually emitted.**
+///
+/// `corpus/auto_explain_rig.json` `collector_flattened` is a real record from
+/// the rig's post-`filter/dbm` raw sink (`file/raw_recipes`) — so its very
+/// existence proves an explain row SURVIVES the shipped filter — captured
+/// under the auto_explain step's `%Q` prefix via the extended protocol, attrs
+/// flattened the way logs ingest flattens them. This pins the whole chain:
+/// collector route → filter survival → flattening → dispatch → canonical
+/// record, including the `%Q` queryid equalling the live `pg_stat_statements`
+/// queryid for the same statement (verified against the pgss dump at capture
+/// time), which is the exact join the fingerprint cannot make for
+/// `= ANY($1)` rewrites and >16 KB statements.
+#[test]
+fn a_real_collector_emitted_explain_record_canonicalizes_end_to_end() {
+    let fx = ae_fixture();
+    let mut rec = obj(fx["collector_flattened"]["record"].clone());
+    with_explain_enabled(|| server_vantage::apply_to_record(&mut rec));
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::KIND_EXPLAIN),
+        "the collector-emitted record must reach the explain arm"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_PLAN_SOURCE)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::PLAN_SOURCE_AUTO_EXPLAIN)
+    );
+    // %Q → the engine's own statement id, same identifier space as top_query's
+    // postgresql.queryid.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SERVER_QUERY_ID)
+            .and_then(|v| v.as_str()),
+        fx["collector_flattened"]["pgss_queryid"].as_str(),
+        "the %Q queryid must equal the pg_stat_statements queryid measured live"
+    );
+    // The extended-protocol Query Text ("… id = $1") must land on the SAME
+    // fingerprint as the pgss text — the row joins its query detail page.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_FINGERPRINT)
+            .and_then(|v| v.as_str()),
+        pg_fp(ae_str(&fx, &["pg_stat_statements", "literal_and_bind"])).as_deref()
+    );
+    // Stored plan is the rewrapped receiver shape, and the extended-protocol
+    // extras ("Query Parameters" — real bind values) do NOT survive into it:
+    // parameters are data, and the stored plan is structure + measurements.
+    let plan = rec
+        .get(server_vantage::O2_DBM_PLAN)
+        .and_then(|v| v.as_str())
+        .expect("plan stored as a string");
+    assert!(plan.starts_with("[{\"Plan\""));
+    assert!(
+        !plan.contains("Query Parameters"),
+        "bind values must not ride into the stored plan document"
+    );
+}
+
+// ── W-S1 · Completed-statement durations (log_min_duration_statement) ────────
+//
+// Fixtures are REAL rows copied from the live `dbm_server_logs` stream
+// (org dbm_notraces, 2026-08-13): the demo tailer's `mark_duration` operator
+// stamped `o2_pg_event = statement_duration` and pre-parsed
+// `stmt_duration_ms` / `stmt_kind` / `stmt_text`; the pg_prefix parser
+// supplied the `user@db app=…` fields. If the tailer's regex changes shape,
+// these fail loudly.
+
+/// The captured slow-aggregate line, verbatim from the live stream.
+fn pg_statement_duration_flattened() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_612_398_267_000i64,
+        "body": "2026-08-13 09:13:18.267 UTC [129] dbm@dbmlab app=dbm-sv-oltp vxid=16/131209 txid=0 line=2011855 qid=3703636288641591934 LOG:  duration: 63.149 ms  statement: SELECT count(*), sum(amount) FROM orders WHERE customer_ref = 'CUST-00879'",
+        "log_file_name": "postgresql.log",
+        "o2_pg_event": "statement_duration",
+        "pg_app": "dbm-sv-oltp",
+        "pg_db": "dbmlab",
+        "pg_line": "2011855",
+        "pg_message": "duration: 63.149 ms  statement: SELECT count(*), sum(amount) FROM orders WHERE customer_ref = 'CUST-00879'",
+        "pg_pid": "129",
+        "pg_query_id": "3703636288641591934",
+        "pg_severity": "LOG",
+        "pg_txid": "0",
+        "pg_user": "dbm",
+        "pg_vxid": "16/131209",
+        "server_address": "postgres",
+        "severity": "LOG",
+        "stmt_duration_ms": "63.149",
+        "stmt_kind": "statement",
+        "stmt_text": "SELECT count(*), sum(amount) FROM orders WHERE customer_ref = 'CUST-00879'",
+        "ts": "2026-08-13 09:13:18.267 UTC"
+    }))
+}
+
+// ── the message parser ──
+
+/// The simple-protocol form, from the live line above.
+#[test]
+fn ws1_parser_reads_a_statement_line() {
+    let (dur, text) = server_vantage::parse_statement_duration_message(
+        "duration: 63.149 ms  statement: SELECT count(*), sum(amount) FROM orders WHERE customer_ref = 'CUST-00879'",
+    )
+    .expect("a completed-statement line must parse");
+    assert_eq!(dur, 63.149);
+    assert_eq!(
+        text,
+        "SELECT count(*), sum(amount) FROM orders WHERE customer_ref = 'CUST-00879'"
+    );
+}
+
+/// The extended-protocol EXECUTE form — Postgres logs the prepared statement's
+/// name between `execute` and the colon.
+#[test]
+fn ws1_parser_reads_an_execute_line() {
+    let (dur, text) = server_vantage::parse_statement_duration_message(
+        "duration: 1.234 ms  execute s_1: SELECT owner FROM accounts WHERE id = $1",
+    )
+    .expect("an execute line is a completed execution");
+    assert_eq!(dur, 1.234);
+    assert_eq!(text, "SELECT owner FROM accounts WHERE id = $1");
+}
+
+/// `parse`/`bind` lines are protocol PHASES, not executions: under the
+/// extended protocol one logical query can log up to three duration lines,
+/// and admitting the other two would count one call three times.
+#[test]
+fn ws1_parser_rejects_phase_lines() {
+    for line in [
+        "duration: 0.021 ms  parse s_1: SELECT owner FROM accounts WHERE id = $1",
+        "duration: 0.011 ms  bind s_1: SELECT owner FROM accounts WHERE id = $1",
+    ] {
+        assert_eq!(
+            server_vantage::parse_statement_duration_message(line),
+            None,
+            "phase line must be rejected: {line}"
+        );
+    }
+}
+
+/// An auto_explain entry ALSO begins `duration: N.NNN ms` — but its kind is
+/// `plan`, which is not an execution record for THIS path (the explain arm
+/// owns it, with the plan attached).
+#[test]
+fn ws1_parser_rejects_auto_explain_headers() {
+    assert_eq!(
+        server_vantage::parse_statement_duration_message(
+            "duration: 0.009 ms  plan: {\"Query Text\": \"SELECT 1\"}"
+        ),
+        None
+    );
+}
+
+// ── canonicalization, through `apply_to_record` ──
+
+/// The happy path over the real captured row, THROUGH `apply_to_record` — the
+/// knob defaults ON, so no env juggling. Every canonical column is asserted
+/// against the live values.
+#[test]
+fn ws1_statement_duration_canonicalizes_through_apply_to_record() {
+    if !config::get_config().db_monitoring.statement_enabled {
+        return; // an env override is present; the default-on pin lives in config tests
+    }
+    let mut rec = pg_statement_duration_flattened();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::KIND_STATEMENT)
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_STMT_DURATION_MS)
+            .and_then(|v| v.as_f64()),
+        Some(63.149),
+        "the engine's own completed-statement duration, milliseconds"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_ENGINE)
+            .and_then(|v| v.as_str()),
+        Some("postgresql")
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_DATABASE)
+            .and_then(|v| v.as_str()),
+        Some("dbmlab"),
+        "db from the user@db prefix segment (pg_db)"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INSTANCE)
+            .and_then(|v| v.as_str()),
+        Some("postgres"),
+        "instance from server_address, the identity tag every filelog recipe stamps"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SESSION_USER)
+            .and_then(|v| v.as_str()),
+        Some("dbm")
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SESSION_APP)
+            .and_then(|v| v.as_str()),
+        Some("dbm-sv-oltp")
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SESSION_PID)
+            .and_then(|v| v.as_i64()),
+        Some(129)
+    );
+    // %Q queryid — the exact join key to top_query rows.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SERVER_QUERY_ID)
+            .and_then(|v| v.as_str()),
+        Some("3703636288641591934")
+    );
+    // The statement runs through the SAME normalizer as every other path, so
+    // this row JOINs the client spans and the top_query rows for the same
+    // statement.
+    let (expected_norm, expected_fp) = fingerprint_statement(
+        "SELECT count(*), sum(amount) FROM orders WHERE customer_ref = 'CUST-00879'",
+        Some("postgresql"),
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_FINGERPRINT)
+            .and_then(|v| v.as_str()),
+        expected_fp.as_deref()
+    );
+    let stored_query = rec
+        .get(server_vantage::O2_DBM_ACTIVITY_QUERY)
+        .and_then(|v| v.as_str())
+        .expect("normalized text stored");
+    assert_eq!(Some(stored_query.to_string()), expected_norm);
+    assert!(
+        !stored_query.contains("CUST-00879"),
+        "the literal must not survive into the canonical text"
+    );
+    // NO raw copy: the record's own body/pg_message already hold the evidence,
+    // and o2_dbm_raw on the highest-volume feed would double the stored text
+    // while putting raw literals under a canonical column.
+    assert!(
+        !rec.contains_key(server_vantage::O2_DBM_RAW),
+        "statement rows must not copy the raw line into o2_dbm_raw"
+    );
+}
+
+/// The privacy rule, STRICTER than the receiver-event canonicalizers: the
+/// logged text carries raw literals, so a lexer failure yields NO normalized
+/// text and NO fingerprint — and the raw text is NEVER stored as fallback in
+/// any canonical column. The duration row itself survives: "a call took this
+/// long" is honest without its statement.
+#[test]
+fn ws1_lexer_failure_stores_no_raw_text_in_canonical_fields() {
+    if !config::get_config().db_monitoring.statement_enabled {
+        return;
+    }
+    let mut rec = pg_statement_duration_flattened();
+    rec.insert("stmt_text".into(), json!("SELECT 'unterminated"));
+    rec.insert(
+        "pg_message".into(),
+        json!("duration: 63.149 ms  statement: SELECT 'unterminated"),
+    );
+    rec.insert(
+        "body".into(),
+        json!("2026-08-13 09:13:18.267 UTC [129] dbm@dbmlab LOG:  duration: 63.149 ms  statement: SELECT 'unterminated"),
+    );
+    server_vantage::apply_to_record(&mut rec);
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::KIND_STATEMENT),
+        "the measured duration is still a fact"
+    );
+    assert!(rec.get(server_vantage::O2_DBM_ACTIVITY_QUERY).is_none());
+    assert!(rec.get(server_vantage::O2_DBM_FINGERPRINT).is_none());
+    for field in server_vantage::ALL_DBM_FIELDS {
+        if let Some(v) = rec.get(field).and_then(|v| v.as_str()) {
+            assert!(
+                !v.contains("unterminated"),
+                "raw text leaked into canonical field {field}: {v}"
+            );
+        }
+    }
+}
+
+/// A tailer that classified the line but did not parse it (regex `on_error:
+/// send` drops captures silently) degrades to the same row: the message is
+/// the fallback source.
+#[test]
+fn ws1_message_fallback_parses_without_stmt_attributes() {
+    if !config::get_config().db_monitoring.statement_enabled {
+        return;
+    }
+    let mut rec = pg_statement_duration_flattened();
+    rec.remove("stmt_duration_ms");
+    rec.remove("stmt_kind");
+    rec.remove("stmt_text");
+    server_vantage::apply_to_record(&mut rec);
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_STMT_DURATION_MS)
+            .and_then(|v| v.as_f64()),
+        Some(63.149)
+    );
+    let (expected_norm, _) = fingerprint_statement(
+        "SELECT count(*), sum(amount) FROM orders WHERE customer_ref = 'CUST-00879'",
+        Some("postgresql"),
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_ACTIVITY_QUERY)
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        expected_norm
+    );
+}
+
+/// The pre-parsed route must apply the SAME phase filter as the message
+/// parser: the tailer's regex also captures `parse`/`bind` lines.
+#[test]
+fn ws1_pre_parsed_phase_lines_are_rejected() {
+    if !config::get_config().db_monitoring.statement_enabled {
+        return;
+    }
+    let mut rec = pg_statement_duration_flattened();
+    rec.insert("stmt_kind".into(), json!("parse s_1"));
+    server_vantage::apply_to_record(&mut rec);
+    assert!(
+        !rec.contains_key(server_vantage::O2_DBM_KIND),
+        "a parse-phase line is not an execution"
+    );
+}
+
+/// D1 condition 1: a `/_json` caller cannot hand us a fabricated duration —
+/// canonical names are outputs, and the strip removes caller-supplied values
+/// on records the dispatch does not claim.
+#[test]
+fn ws1_caller_supplied_duration_is_stripped() {
+    let mut rec = obj(json!({
+        "_timestamp": 1_786_612_398_267_000i64,
+        "log": "an ordinary application log line",
+        "o2_dbm_stmt_duration_ms": 99999.0,
+        "o2_dbm_kind": "statement",
+    }));
+    server_vantage::apply_to_record(&mut rec);
+    assert!(!rec.contains_key(server_vantage::O2_DBM_STMT_DURATION_MS));
+    assert!(!rec.contains_key(server_vantage::O2_DBM_KIND));
+}
+
+/// The `%Q` zero sentinel: qid=0 means "queryid not computed", and a literal
+/// "0" join key would glue every such statement together — same filter as the
+/// auto_explain path.
+#[test]
+fn ws1_zero_query_id_is_not_a_join_key() {
+    if !config::get_config().db_monitoring.statement_enabled {
+        return;
+    }
+    let mut rec = pg_statement_duration_flattened();
+    rec.insert("pg_query_id".into(), json!("0"));
+    server_vantage::apply_to_record(&mut rec);
+    assert!(rec.get(server_vantage::O2_DBM_SERVER_QUERY_ID).is_none());
 }

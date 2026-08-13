@@ -60,14 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #header-tabs>
-      <DbmSectionTabs
-        :database-count="trafficRowCount"
-        :query-count="queryCount"
-        :activity-count="activityCount"
-        :deadlock-count="deadlockCount"
-        :blocked-count="blockedCount"
-        :table-health-count="tableHealthCount"
-      />
+      <!-- The sibling badges come from the shell's one shared fan-out; this
+           page's own is counted from the rows it already loaded. -->
+      <DbmSectionTabs v-bind="tabCounts" />
     </template>
 
     <template #actions>
@@ -108,8 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @row-click="onRowClick"
       >
         <!-- ONE toolbar row, the same one Top queries uses. The engine select
-             used to sit here bare and full-width; it is now a dimension inside
-             the shared filter popover, so both tabs filter the same way. -->
+             is a dimension inside the shared filter popover rather than a bare
+             full-width select, so both tabs filter the same way. -->
         <template #toolbar>
           <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
             <div class="w-64 shrink-0">
@@ -143,9 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #subheader>
-          <!-- The totals that used to be crammed into the page subtitle. They
-               summarise exactly the rows below, so they belong inside the table
-               frame rather than in the header. -->
+          <!-- The window's totals live inside the table frame, not in the page
+               header: they summarise exactly the rows below. -->
           <div
             class="px-page-edge border-table-row-divider border-b py-1.5"
             data-test="dbm-databases-summary"
@@ -232,6 +226,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
 
+        <!-- FR-1: the same traffic as a RATE, so a 15-minute view and a 4-hour
+             view stay comparable at a glance — a raw count doubles when the
+             window doubles; a rate does not. Server-computed over the exact
+             window this response answered; a breakdown child derives the same
+             division from its own calls. -->
+        <template #cell-qps="{ row }">
+          <span
+            class="font-mono text-xs tabular-nums"
+            :class="isStatusRow(row) ? 'text-text-muted' : 'text-text-body'"
+          >
+            {{ noQueryFigures(row) ? raw("—") : formatRate(rowQps(row)) }}
+          </span>
+        </template>
+
         <!-- A failure rate, not a count: on a database row the question is what
              fraction of traffic is failing, and 454 means nothing without the
              26,177 it came out of.
@@ -309,11 +317,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              a weighted number nobody can decompose is one a reader will not
              act on — so it is the worst single saturation ratio, named.
 
-             An instance with no ratio says so rather than showing 0%: every
-             MySQL instance is permanently here, because mysqlreceiver
-             publishes no max_connections and dividing by an invented
-             denominator would rank a saturated MySQL host as the calmest
-             thing on the page. -->
+             An instance with no ratio says so rather than showing 0%: a
+             MySQL instance sits here until the setup card's connection-limit
+             recipe (mysql_connection_max) is installed, because mysqlreceiver
+             publishes no max_connections on its own and dividing by an
+             invented denominator would rank a saturated MySQL host as the
+             calmest thing on the page. -->
         <template #cell-attention="{ row }">
           <span v-if="isBreakdownRow(row)" class="text-text-muted block text-right">{{
             raw("—")
@@ -335,16 +344,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- A child's share is of its own parent level, which is exactly the
              reading the split exists to give: what fraction of this database
-             (or this schema) the row accounts for. -->
+             (or this schema) the row accounts for. Number and share only, no
+             bar — on this page the share is context for the duration, not a
+             magnitude to compare visually row-to-row, so a bar per row was
+             ink without a reading. -->
         <template #cell-load="{ row }">
-          <DbmLoadCell
+          <span
             v-if="!noQueryFigures(row)"
-            :total-time-ns="row.total_time_ns"
-            :share="row.share"
-            :flagged="!isBreakdownRow(row) && row.drowning"
-            :critical="!isBreakdownRow(row) && row.critical"
+            class="flex items-baseline justify-end gap-1 leading-tight"
             data-test="dbm-databases-load"
-          />
+          >
+            <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
+              {{ formatNs(row.total_time_ns) }}
+            </span>
+            <span class="text-text-label text-3xs font-mono tabular-nums">
+              {{ formatPercent(row.share, 0) }}
+            </span>
+          </span>
           <span v-else class="text-text-muted block text-right">{{ raw("—") }}</span>
         </template>
 
@@ -378,6 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!loading"
             :permission-ok="permissionOk"
             :enabled="dbmEnabled"
+            :trace-count="traceCount"
             :never-aggregated="neverAggregated"
             :org="org"
             :filtered="isFiltered"
@@ -402,7 +419,6 @@ import { useStore } from "vuex";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
-import DbmLoadCell from "@/components/dbm/DbmLoadCell.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
@@ -419,14 +435,12 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import dbMonitoringService, {
-  type ActivityStateBucket,
-  type DbTotalsRow,
-  type Freshness,
-} from "@/services/db_monitoring";
+import dbMonitoringService, { type DbTotalsRow, type Freshness } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
-import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
+import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
+import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
+import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
@@ -434,7 +448,6 @@ import {
   createDbmContextProvider,
   DBM_CONTEXT_KEY,
 } from "@/composables/contextProviders";
-import { activitySampleTotal } from "@/utils/dbm/activity";
 import { buildDatabaseBreakdown, type DbmBreakdown } from "@/utils/dbm/breakdown";
 import {
   isBreakdownRow,
@@ -443,18 +456,20 @@ import {
   type DbmBreakdownRow,
 } from "@/utils/dbm/breakdownRows";
 import {
-  countClaim,
+  computeQps,
   errorRate,
   formatCount,
   formatNs,
   formatPercent,
-  type DbmCountClaim,
+  formatRate,
 } from "@/utils/dbm/format";
 import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
 import searchService from "@/services/search";
-import { collectInstanceMetrics } from "@/utils/dbm/instanceMetricsRead";
+import useStreams from "@/composables/useStreams";
+import streamService from "@/services/stream";
+import { collectInstanceMetrics, DBM_METRIC_STREAM_NAMES } from "@/utils/dbm/instanceMetricsRead";
 import type { DbmInstanceMetricSet, DbmRowMetrics } from "@/utils/dbm/instanceMetrics";
-import { unionFleetRows } from "@/utils/dbm/fleetRows";
+import { unionFleetRows, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
 import { healthScalar, healthSortValue } from "@/utils/dbm/healthScalar";
 import { detectDrowningDatabases, isCriticalErrorRate, totalsKey } from "@/utils/dbm/insights";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
@@ -472,10 +487,11 @@ const { range, current, previous, refresh, setRange, queryParams } = useDbmScope
 // are invalidated by the NEXT load along with the load itself.
 const requestSeq = useDbmRequestSeq();
 
-// The sibling-tab badges are the same numbers on every tab, so they are
-// fetched once per window and shared across the six routes rather than
-// re-fetched on each remount. See useDbmCountCache.
-const countCache = useDbmCountCache("databases");
+// The sibling-tab badges are the same numbers on every tab, so DbmShell fetches
+// them ONCE per window for every route and this page reads the snapshot.
+// This page's `system` filter is written to the URL by `syncUrl`, which is how
+// the shell learns to refetch under it. See useDbmTabCounts.
+const tabCountsContext = useDbmTabCountsContext();
 
 const rows = ref<DatabaseRow[]>([]);
 const freshness = ref<Freshness | null>(null);
@@ -491,15 +507,28 @@ const search = ref("");
 const systemFilter = ref<string | null>((route.query.system as string) ?? null);
 /** Kept so the empty state can say "we haven't finished counting" rather than "no data". */
 const neverAggregated = ref(false);
-/** Fetched alongside the table so the Top-queries tab badge carries a number. */
-const queryCount = ref<number | null>(null);
-const deadlockCount = ref<DbmCountClaim | null>(null);
-const blockedCount = ref<DbmCountClaim | null>(null);
-const tableHealthCount = ref<number | null>(null);
-/** `null` until read, and again if the read fails — so the badge stays bare. */
-const activityStates = ref<ActivityStateBucket[] | null>(null);
-/** Sessions in the window. See `activitySampleTotal` for why not `hits.length`. */
-const activityCount = computed(() => activitySampleTotal(activityStates.value));
+/**
+ * The sibling badges, from the shell's shared fan-out, plus THIS tab's own
+ * count in place of the shared one.
+ *
+ * `fleetRowCount` is not the same number the shared fan-out produces, and the
+ * difference is the point: it counts the rows this page is SHOWING — the
+ * fleet union, trafficless instances included — never the raw `hits.length`,
+ * which cannot see the instances the metrics join discovered.
+ */
+const tabCounts = computed(() =>
+  // `undefined` while loading: the page has no better number YET, and stamping
+  // a transient 0 over the shared snapshot's zero-trace fallback would flash
+  // the badge wrong on every first paint. The exact fleet count takes over the
+  // moment the union settles.
+  tabCountProps(
+    withOwnCount(
+      tabCountsContext.counts.value,
+      "databaseCount",
+      loading.value ? undefined : fleetRowCount.value,
+    ),
+  ),
+);
 
 const org = computed(() => store.state.selectedOrganization?.identifier as string);
 const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
@@ -561,12 +590,14 @@ interface DatabaseRow extends Partial<DbTotalsRow> {
 type TableRow = (DatabaseRow & { children: DbmBreakdownRow[] }) | DbmBreakdownRow;
 
 /**
- * Databases applications actually talked to. The tab badge uses this rather
- * than the row count, because the other three badges all count query-vantage
- * things — a badge that silently included idle replicas would not be
- * comparable with the tabs beside it.
+ * Every database this page shows — trafficless rows INCLUDED. The badge and
+ * the Databases tile must count the rows beneath them: on a fleet the
+ * applications never queried (a server-vantage-only org), a traffic-only
+ * count reads "0" directly above rendered rows, which denies working data.
+ * The neighbouring query-vantage badges legitimately read 0 there; an idle
+ * replica is still a database, so it counts here and nowhere else.
  */
-const trafficRowCount = computed(() => rows.value.filter((row) => !row.trafficless).length);
+const fleetRowCount = computed(() => rows.value.length);
 
 const totalCalls = computed(() => rows.value.reduce((acc, row) => acc + (row.calls ?? 0), 0));
 const totalTime = computed(() =>
@@ -583,11 +614,11 @@ const summaryStats = computed<StatItem[]>(() => [
   {
     key: "databases",
     label: t("dbm.databases.summary.databases"),
-    // The same count the tab badge shows, for the same reason: the three tiles
-    // beside this one are all query-vantage totals, so a figure here that
-    // silently included idle replicas would not be comparable with them — and
-    // two different numbers under one word on one screen is worse than either.
-    value: trafficRowCount.value,
+    // The same count the tab badge shows: two different numbers under one
+    // word on one screen is worse than either. Trafficless rows count — see
+    // fleetRowCount — while the three query-vantage tiles beside this one
+    // honestly read 0 for them.
+    value: fleetRowCount.value,
     icon: "database",
     tone: "primary",
     dataTest: "dbm-databases-summary-databases",
@@ -741,9 +772,9 @@ const treeRows = computed<TableRow[]>(() =>
 // instances we cannot assess at the top rather than burying them under healthy
 // ones — an instance we cannot see is the risk.
 //
-// Left empty this fell through to server response order, which carries no
-// ranking meaning and made the top row look arbitrary. `load` keeps its column
-// and its own sort; this is a change of default, not a removal.
+// The default must be explicit: left empty, the order falls through to server
+// response order, which carries no ranking meaning and makes the top row look
+// arbitrary. `load` keeps its column and its own sort.
 const sortBy = ref("attention");
 const sortOrder = ref<"asc" | "desc">("desc");
 
@@ -788,6 +819,8 @@ const sortValue = (row: DatabaseRow, column: string): string | number | null => 
       return row.db_instance ?? "";
     case "calls":
       return row.calls ?? 0;
+    case "qps":
+      return rowQps(row) ?? 0;
     case "errorRate":
       return row.errorRate ?? -1;
     case "p50":
@@ -956,6 +989,34 @@ const fillOpenBreakdowns = (token: number = requestSeq.current()) => {
 watch(expandedIds, () => fillOpenBreakdowns());
 
 /**
+ * Every instance the SERVER vantage has named, read off the shell's shared
+ * badge snapshot — the activity and blocking samples are `dbm_server` rows and
+ * each carries the instance it was sampled on. No new request: the shell
+ * already paid for these to draw the tab badges, and a second read over the
+ * same window could disagree with the badge beside it.
+ *
+ * Identity only. The union must not carry any figure from these rows onto the
+ * overview — the server vantage measured no query traffic, and the fleet union
+ * marks what it adds as `trafficless` for exactly that reason.
+ */
+const serverKnownInstances = computed<DbmServerInstanceRef[]>(() => {
+  const counts = tabCountsContext.counts.value;
+  return [...counts.sessions, ...counts.blockingSamples].map((row) => ({
+    db_system: row.db_system,
+    db_instance: row.db_instance,
+  }));
+});
+
+// The shell's fan-out lands on its own schedule — often after this page's own
+// read. Rebuild the union when it does, so server-known instances appear
+// without a refresh. Mid-load the rebuild is skipped: `load()` re-runs the
+// union itself when it settles, and rebuilding here would pair the new
+// snapshot with the OLD window's client rows.
+watch(serverKnownInstances, () => {
+  if (!loading.value) applyInstanceMetrics();
+});
+
+/**
  * Build the table from the query rows plus whatever the receiver has told us
  * so far. Runs once with no metrics, then again if and when they land.
  *
@@ -976,6 +1037,12 @@ const applyInstanceMetrics = () => {
     // default install reads as "your collector sent no metric", which accuses a
     // receiver that was never asked and sends the reader to debug nothing.
     enabled: instanceMetricsEnabled.value,
+    // The instances the SERVER vantage knows, from data the shell already
+    // fetched for the tab badges. This is what keeps the overview honest for
+    // the user who wired up collector recipes but has no APM: their fleet is
+    // one no application ever queried, and without this source the page would
+    // be empty while working server-vantage data sits one tab away.
+    serverInstances: serverKnownInstances.value,
   }).map((row) => {
     const idle = row.trafficless;
     return {
@@ -987,6 +1054,75 @@ const applyInstanceMetrics = () => {
       chips: idle ? [] : databaseChips(row as DbTotalsRow),
     };
   });
+};
+
+const { getStreams } = useStreams(t);
+
+/**
+ * Whether this org has EVER sent a trace, for the empty state's checklist.
+ * Without it a never-instrumented org reads the "we haven't finished counting"
+ * row — a promise of numbers in "a few minutes" that will never arrive —
+ * instead of being told database monitoring is built from traces it has not
+ * sent. Probed only when a load ends with nothing to show; see `load`.
+ */
+const { traceCount, probeTracePresence } = useDbmTracePresence(getStreams);
+
+/**
+ * The metric streams that exist here, from the session-cached catalog. `null`
+ * on failure or an empty catalog — both mean "we don't know", and the caller
+ * falls back to sweeping the full spec list rather than trusting a blank.
+ */
+const metricStreamNames = async (): Promise<ReadonlySet<string> | null> => {
+  try {
+    const response = (await getStreams("metrics", false, false)) as { list?: { name: string }[] };
+    const names = (response?.list ?? []).map((stream) => stream.name).filter(Boolean);
+    return names.length ? new Set(names) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Each existing metric stream's actual columns, so the sweep's SQL is built
+ * from what the collector REALLY writes rather than from the spec's claim
+ * about it — the claim has been wrong before (`db_namespace` vs the
+ * receiver's `postgresql_database_name`), and a renamed column then fails as
+ * a 400 on every load. Cached per (org, stream) for the session: schemas move
+ * on collector upgrades, not between refreshes. A failed fetch caches as
+ * `null` and that stream keeps the trust-then-retry path.
+ */
+const metricSchemaCache = new Map<string, Promise<ReadonlySet<string> | null>>();
+
+const metricStreamFields = async (
+  existingStreams: ReadonlySet<string> | null,
+): Promise<ReadonlyMap<string, ReadonlySet<string>> | null> => {
+  if (!existingStreams?.size) return null;
+  const wanted = DBM_METRIC_STREAM_NAMES.filter((stream) => existingStreams.has(stream));
+  if (!wanted.length) return null;
+  const entries = await Promise.all(
+    wanted.map(async (stream) => {
+      const key = `${org.value}|${stream}`;
+      let pending = metricSchemaCache.get(key);
+      if (!pending) {
+        pending = streamService
+          .schema(org.value, stream, "metrics")
+          .then((response: { data?: { schema?: { name?: string }[] } }) => {
+            const fields = (response.data?.schema ?? [])
+              .map((field) => field.name)
+              .filter((name): name is string => Boolean(name));
+            return fields.length ? new Set(fields) : null;
+          })
+          .catch(() => null);
+        metricSchemaCache.set(key, pending);
+      }
+      return [stream, await pending] as const;
+    }),
+  );
+  const byStream = new Map<string, ReadonlySet<string>>();
+  for (const [stream, fields] of entries) {
+    if (fields) byStream.set(stream, fields);
+  }
+  return byStream.size ? byStream : null;
 };
 
 /**
@@ -1001,23 +1137,35 @@ const applyInstanceMetrics = () => {
 const loadInstanceMetrics = async (token: number) => {
   if (!org.value || !instanceMetricsEnabled.value) return;
   const window = { startTime: current.value.startTime, endTime: current.value.endTime };
+  // Ask the (session-cached) stream catalog which of the eight metric streams
+  // exist before sweeping, so a deployment carrying two of them fires two
+  // searches instead of two hits and six guaranteed 400s on every load. On any
+  // catalog failure the sweep runs unfiltered — see collectInstanceMetrics.
+  const existingStreams = await metricStreamNames();
+  // Then ask each existing stream's schema (also session-cached) which columns
+  // it really carries, so the SQL never names a field the collector renamed.
+  const fieldsByStream = await metricStreamFields(existingStreams);
   try {
-    const collected = await collectInstanceMetrics(async (_stream, sql) => {
-      const response = await searchService.search({
-        org_identifier: org.value,
-        query: {
+    const collected = await collectInstanceMetrics(
+      async (_stream, sql) => {
+        const response = await searchService.search({
+          org_identifier: org.value,
           query: {
-            sql,
-            start_time: window.startTime,
-            end_time: window.endTime,
-            from: 0,
-            size: METRIC_SAMPLE_LIMIT,
+            query: {
+              sql,
+              start_time: window.startTime,
+              end_time: window.endTime,
+              from: 0,
+              size: METRIC_SAMPLE_LIMIT,
+            },
           },
-        },
-        page_type: "metrics",
-      });
-      return (response.data?.hits ?? []) as Record<string, unknown>[];
-    }, window);
+          page_type: "metrics",
+        });
+        return (response.data?.hits ?? []) as Record<string, unknown>[];
+      },
+      window,
+      { existingStreams, fieldsByStream },
+    );
     if (requestSeq.isStale(token)) return;
     instanceMetrics.value = collected.metricsByKey;
     failedMetricStreams.value = collected.failedStreams;
@@ -1041,12 +1189,11 @@ const loadInstanceMetrics = async (token: number) => {
 const METRIC_SAMPLE_LIMIT = 5000;
 
 /**
- * `force` reaches the BADGE cache, not the table: the table is always fetched
- * live. It is what makes the refresh button mean "the numbers may have moved"
- * rather than "re-read the same window" — the one case where the badge cache's
- * same-window-same-answer premise does not hold.
+ * This page's OWN read. It takes no `force`: the table was always fetched live,
+ * so the flag only ever reached the badge cache — and the badges are the
+ * shell's now. `onRefresh` forces them directly.
  */
-const load = async (force = false) => {
+const load = async () => {
   if (!org.value) return;
   // Claimed BEFORE the cache is cleared, so any breakdown still in flight is
   // already stale by the time it tries to write back into it.
@@ -1063,31 +1210,31 @@ const load = async (force = false) => {
   failedMetricStreams.value = [];
 
   try {
-    // Both windows in one round trip: the previous one is what makes the
-    // "slowing down against its own normal" claim possible at all.
-    const [currentResponse, previousResponse] = await Promise.all([
-      dbMonitoringService.getDatabases(org.value, {
-        startTime: current.value.startTime,
-        endTime: current.value.endTime,
-        system: systemFilter.value ?? undefined,
-      }),
-      dbMonitoringService.getDatabases(org.value, {
-        startTime: previous.value.startTime,
-        endTime: previous.value.endTime,
-        system: systemFilter.value ?? undefined,
-      }),
-    ]);
+    // Both windows in ONE request — the server reads them concurrently and
+    // returns the baseline as `baseline_hits`. The previous window is what
+    // makes the "slowing down against its own normal" claim possible at all;
+    // if its read failed server-side the drowning detection goes quiet rather
+    // than comparing against an empty set it would misread as recovery.
+    const { data } = await dbMonitoringService.getDatabases(org.value, {
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+      system: systemFilter.value ?? undefined,
+      baselineStartTime: previous.value.startTime,
+      baselineEndTime: previous.value.endTime,
+    });
 
     if (requestSeq.isStale(token)) return;
 
-    const hits = currentResponse.data.hits ?? [];
-    freshness.value = currentResponse.data.freshness;
-    topNSubset.value = currentResponse.data.top_n_subset;
-    neverAggregated.value = currentResponse.data.freshness?.data_through === 0;
+    const hits = data.hits ?? [];
+    freshness.value = data.freshness;
+    topNSubset.value = data.top_n_subset;
+    neverAggregated.value = data.freshness?.data_through === 0;
 
-    const drowning = new Set(
-      detectDrowningDatabases(hits, previousResponse.data.hits ?? []).map((d) => totalsKey(d.row)),
-    );
+    const drowning = data.baseline_read_failed
+      ? new Set<string>()
+      : new Set(
+          detectDrowningDatabases(hits, data.baseline_hits ?? []).map((d) => totalsKey(d.row)),
+        );
 
     clientHits.value = hits;
     drowningKeys.value = drowning;
@@ -1099,13 +1246,12 @@ const load = async (force = false) => {
     // is already correct, so it must not be ahead of the breakdown fetches in
     // the browser's connection queue.
     void loadInstanceMetrics(token);
-    // The sibling tabs' badges describe the SAME window as this table, so they
-    // have to be re-read when it moves. They were previously fetched only once
-    // at mount, which left every badge stating the mount-time window while the
-    // table beside them stated the new one. Unawaited and token-joined, for the
-    // same reason as the metrics read: additive to a table that is already
-    // correct, and voided together with it if the window moves again.
-    void loadQueryCount(token, force);
+    // The sibling badges are NOT fetched here. DbmShell watches the window
+    // and the `system` filter in the URL — both of which this page publishes
+    // via `syncUrl` — and refetches them itself, once for every tab. A call
+    // here would restore the per-page fan-out. The one thing the shell cannot
+    // infer is a REFRESH, since the URL does not change: that is why
+    // `onRefresh` forces explicitly.
   } catch (err: unknown) {
     // A superseded request's failure is not this page's failure.
     if (requestSeq.isStale(token)) return;
@@ -1119,19 +1265,26 @@ const load = async (force = false) => {
     }
     rows.value = [];
   } finally {
-    if (!requestSeq.isStale(token)) loading.value = false;
+    if (!requestSeq.isStale(token)) {
+      loading.value = false;
+      // The trace-presence probe answers a question only the empty state asks,
+      // so it runs exactly when the empty state is about to render — a load
+      // that produced rows never pays for it. Unawaited: the checklist gains
+      // its trace row when the (session-cached) catalog answers.
+      if (!rows.value.length) void probeTracePresence();
+    }
   }
 };
 
 /**
  * Only exceptions get a chip.
  *
- * The chip used to say DEADLOCKS for any error class at all, which put "N
- * DEADLOCKS" on Redis — an engine with no transactions, which cannot deadlock.
- * `db_totals` carries a single undifferentiated `errors` count and nothing that
- * identifies a deadlock, so the truthful word is the generic one. A clean row
- * gets no chip: the absence of a problem chip already says it is healthy, and a
- * permanent HEALTHY badge on the majority of rows is decoration, not signal.
+ * `db_totals` carries a single undifferentiated `errors` count and nothing
+ * that identifies a deadlock, so the truthful word is the generic one — a
+ * DEADLOCKS chip here would put "N DEADLOCKS" on Redis, an engine with no
+ * transactions, which cannot deadlock. A clean row gets no chip: the absence
+ * of a problem chip already says it is healthy, and a permanent HEALTHY badge
+ * on the majority of rows is decoration, not signal.
  */
 const databaseChips = (row: DbTotalsRow): DbmRowChip[] =>
   (row.errors ?? 0) > 0
@@ -1165,6 +1318,17 @@ const isStatusRow = (row: TableRow): boolean => isBreakdownRow(row) && row.kind 
  */
 const noQueryFigures = (row: TableRow): boolean =>
   isStatusRow(row) || (!isBreakdownRow(row) && row.trafficless);
+
+/**
+ * Calls-per-second for one row. Database rows carry the server-computed rate
+ * (`qps`, stamped over the exact window the response answered); a breakdown
+ * child carries only its calls, so the same division runs here over the same
+ * window. `null` — never 0 — when there is no count to divide.
+ */
+const rowQps = (row: DatabaseRow | TableRow): number | null => {
+  if (!isBreakdownRow(row) && row.qps !== undefined) return row.qps;
+  return computeQps(row.calls, current.value.startTime, current.value.endTime);
+};
 
 /** Amber only where the warning was actually calculated — on a database row. */
 const p95Tone = (row: TableRow): string => {
@@ -1234,6 +1398,16 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
     meta: { align: "right" },
   },
   {
+    id: "qps",
+    header: t("dbm.databases.columns.qps"),
+    size: 84,
+    sortable: true,
+    meta: {
+      align: "right",
+      headerTooltip: t("dbm.databases.columnHints.qps"),
+    },
+  },
+  {
     id: "errorRate",
     header: t("dbm.databases.columns.errorRate"),
     accessorKey: "errorRate",
@@ -1286,17 +1460,19 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
   // What the SERVER says about itself, beside what the applications
   // experienced.
   //
-  // Rendered ALWAYS, including when the join is switched off. It used to be
-  // dropped from the column set in that case, on the reasoning that a
-  // permanently empty column is worse than no column. That is true of a column
-  // that says nothing — but a feature the user paid for and cannot see reads as
+  // Rendered ALWAYS, including when the join is switched off. Dropping the
+  // column in that case sounds right — a permanently empty column is worse
+  // than no column — but a feature the user paid for and cannot see reads as
   // a feature nobody built, and the knob is off by DEFAULT, so on a fresh
-  // install that was every user. The cell now states the reason and names the
+  // install that is every user. The cell states the reason and names the
   // setting, which is the same discipline the four unmatched causes follow.
   {
     id: "instanceHealth",
     header: t("dbm.instanceMetrics.columnHeader"),
-    size: 150,
+    // Width 200: the cell carries a sparkline, the ratio, the "N of M
+    // connections" line AND the secondary chips (cache hit, lag, deadlocks);
+    // at 150 the chips wrap into a third line.
+    size: 200,
     sortable: true,
     meta: {
       align: "right" as const,
@@ -1344,19 +1520,22 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
 /** Every column in the mockup's set is on: at two rows there is room for all. */
 const defaultColumnVisibility = {};
 
-/**
- * The refresh button. A named handler rather than `@click="load"`: that passes
- * the click EVENT as the first argument, which would arrive as a truthy
- * `force` and quietly make every refresh bypass the badge cache.
- */
+// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
+// badge cache alongside the page's own load — the URL does not change on a
+// refresh, so the shell cannot see one on its own.
 const onRefresh = () => {
-  void load(true);
+  void load();
+  tabCountsContext.refresh({ force: true });
 };
 
 const onDateChange = (value: DbmDateChange) => {
   setRange(value);
   syncUrl();
-  load();
+  // The window is adopted either way — it is the picker's resolved state. Only
+  // the FETCH is conditional: `onMounted` below already loads, so fetching on
+  // the picker's mount replay too would issue every request twice on first
+  // paint. See `DbmDateChange.userChangedValue`.
+  if (value?.userChangedValue !== false) load();
 };
 
 const clearScope = () => {
@@ -1445,9 +1624,11 @@ const openQueries = (
  */
 const onRowClick = (row: TableRow) => {
   if (!isBreakdownRow(row)) {
-    // Nothing queried this instance in the window, so its query list is empty
-    // by construction — handing off to it would look like a broken link.
-    if (row.trafficless) return;
+    // A trafficless row navigates too: the query list is no longer empty by
+    // construction for it — Top queries falls back to the database-reported
+    // list, and the system/instance scope this handoff carries filters that
+    // list to exactly this row. The earlier early-return here predates the
+    // fallback and had turned the whole fleet into dead rows on a no-APM org.
     openQueries(row);
     return;
   }
@@ -1456,112 +1637,6 @@ const onRowClick = (row: TableRow) => {
   if (row.kind === "status") return;
   const parent = rows.value.find((candidate) => row.rowKey.startsWith(`${candidate.rowKey}/`));
   if (parent) openQueries(parent, { namespace: row.namespace, service: row.service });
-};
-
-/**
- * The Top-queries tab badge. A separate call because the databases endpoint is
- * a different grain and cannot count fingerprints; `limit: 1` because only the
- * server's uncapped `total` is wanted, not the rows.
- */
-/**
- * Counts for the *other* tabs' badges. Every DBM page fills in all of them so
- * the tab bar reads the same everywhere — a badge that appears on one tab and
- * vanishes on the next reads as "no data", not "not fetched here".
- */
-const loadQueryCount = async (token: number = requestSeq.current(), force = false) => {
-  if (!org.value) return;
-  const window = {
-    startTime: current.value.startTime,
-    endTime: current.value.endTime,
-  };
-  // Through the SHARED cache, keyed on the range. These five badges are the
-  // same five numbers on every DBM tab, and the six tabs are separate ROUTES,
-  // so before this each switch re-fetched all of them — ~30 requests over six
-  // switches for numbers that had not changed. A count is not cheap either:
-  // `/activity` measures 1880ms full and 1739ms at `size=1`, because the cost
-  // is the scan, not the rows.
-  //
-  // `token` joins the load that started this rather than claiming the page
-  // (`current()`, not `begin()`) — same rule as `loadBreakdown`. The write
-  // below re-checks it, so a window change mid-flight discards these counts
-  // instead of painting the previous window's badges beside the new table.
-  const badges = await badgesFrom(
-    countCache.read(
-      org.value,
-      range.value,
-      async () => {
-        // CONCURRENT, not sequential. These five badges have no data dependency
-        // on each other, and awaited in series their latencies add: measured
-        // against a live backend the five took 2967ms serially, and the slowest
-        // (activity) is 1600ms of that on its own. `allSettled`, not `all`,
-        // because each badge owns its own failure — one endpoint being down
-        // must blank ONE badge, not abandon the other four.
-        const [queries, deadlocks, blocking, tableHealth, activity] = await Promise.allSettled([
-          dbMonitoringService.getQueries(org.value, { ...window, limit: 1 }),
-          dbMonitoringService.getDeadlocks(org.value, window),
-          dbMonitoringService.getBlocking(org.value, window),
-          dbMonitoringService.getTableHealth(org.value, window),
-          dbMonitoringService.getActivity(org.value, window),
-        ]);
-        // A blank badge is the honest rendering when we could not count. The
-        // claim objects are built HERE, inside the cached value, so the
-        // server's `truncated` survives a hit and the badge still shows `65+`.
-        const value = {
-          queryCount:
-            queries.status === "fulfilled"
-              ? (queries.value.data.total ?? queries.value.data.hits?.length ?? 0)
-              : null,
-          deadlockCount:
-            deadlocks.status === "fulfilled"
-              ? countClaim(
-                  deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
-                  deadlocks.value.data.truncated,
-                )
-              : null,
-          blockedCount:
-            blocking.status === "fulfilled"
-              ? countClaim(
-                  blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
-                  blocking.value.data.truncated,
-                )
-              : null,
-          // `null`, never 0: a failed read has measured nothing, and a zero
-          // badge would claim this deployment has no tables.
-          tableHealthCount:
-            tableHealth.status === "fulfilled"
-              ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
-              : null,
-          // The STATE BREAKDOWN, never `total`/`hits.length`: those are a
-          // row-limited sample and would render a constant cap as the
-          // population.
-          activityStates:
-            activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null,
-        };
-        // `allSettled` never rejects, so a fan-out in which a badge failed
-        // would otherwise be CACHED — remembering "we could not count" as the
-        // answer for the whole window. Throwing keeps it out of the cache; the
-        // partial result still reaches the badges below.
-        if (
-          [queries, deadlocks, blocking, tableHealth, activity].some((r) => r.status === "rejected")
-        ) {
-          throw new DbmPartialCounts(value);
-        }
-        return value;
-      },
-      // `system` narrows the REQUEST, so it is part of the key. `search` is not:
-      // it filters rows already in hand, and keying on it would miss on every
-      // keystroke while changing nothing about what was fetched.
-      { force, filters: [systemFilter.value] },
-    ),
-  );
-
-  if (requestSeq.isStale(token) || !badges) return;
-
-  queryCount.value = badges.queryCount;
-  deadlockCount.value = badges.deadlockCount;
-  blockedCount.value = badges.blockedCount;
-  tableHealthCount.value = badges.tableHealthCount;
-  activityStates.value = badges.activityStates;
 };
 
 // This page carries no "suggest a fix" button — "make my database faster" has no
@@ -1583,8 +1658,8 @@ const dbmContext = createDbmContextProvider(
 onMounted(() => {
   contextRegistry.register(DBM_CONTEXT_KEY, dbmContext);
   contextRegistry.setActive(DBM_CONTEXT_KEY);
-  // `load()` fans out to the badge counts itself, so calling `loadQueryCount`
-  // here as well would issue all five a second time on every mount.
+  // Only this page's OWN read. The badges are DbmShell's, fetched once for
+  // every tab — a call here would put the fan-out back on every mount.
   load();
 });
 

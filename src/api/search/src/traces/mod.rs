@@ -37,9 +37,10 @@ use openobserve_core::ingestion::check_ingestion_allowed;
 pub use openobserve_core::traces::agent_signals::{compare_agent_versions, get_agent_signals};
 // Re-export Database Monitoring read API handlers (OSS, ungated — design §6)
 pub use openobserve_core::traces::db_monitoring::api::{
-    get_dbm_activity, get_dbm_blocking, get_dbm_databases, get_dbm_deadlocks, get_dbm_index_health,
+    get_dbm_activity, get_dbm_badges, get_dbm_blocking, get_dbm_databases, get_dbm_deadlocks,
     get_dbm_queries, get_dbm_query_endpoints, get_dbm_query_history, get_dbm_query_plans,
-    get_dbm_query_server_metrics, get_dbm_table_health,
+    get_dbm_query_server_metrics, get_dbm_samples, get_dbm_server_queries, get_dbm_server_samples,
+    get_dbm_table_health,
 };
 // Re-export service graph API handlers
 pub use openobserve_core::traces::service_graph::{self, get_current_topology, get_edge_history};

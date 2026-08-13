@@ -16,16 +16,16 @@
 /**
  * Re-sync a kept-alive DBM page with the URL scope when the reader returns.
  *
- * The six DBM tabs are held by one `<keep-alive>` in DbmShell.vue, so a tab
- * switch no longer destroys them: `onMounted` runs ONCE, for the whole session
+ * The DBM tabs are held by one `<keep-alive>` in DbmShell.vue, so a tab
+ * switch does not destroy them: `onMounted` runs ONCE, for the whole session
  * on that tab. That is the point — it is what stops the refetch.
  *
- * But it removes the mechanism the pages were quietly relying on. Each reads
- * `route.query` at setup and writes the range back to the URL on change, so the
- * URL is how the tabs agree on a window. Before keep-alive, a remount re-read
- * it; now nothing does, and a page the reader comes back to would still show
- * the window it was left with — silently, with a stale timestamp beside fresh
- * numbers on the neighbouring tab.
+ * But it also means nothing re-reads the URL on return. Each page reads
+ * `route.query` at setup and writes the range back to the URL on change, so
+ * the URL is how the tabs agree on a window — yet under keep-alive no
+ * lifecycle hook re-reads it, and a page the reader comes back to would still
+ * show the window it was left with — silently, with a stale timestamp beside
+ * fresh numbers on the neighbouring tab.
  *
  * So this reloads on activation IF AND ONLY IF the scope in the URL differs
  * from the one the page currently holds. Reloading unconditionally (what RUM's
@@ -33,7 +33,7 @@
  * tab switch and give back exactly the behaviour keep-alive was added to fix.
  *
  * Not a `watch` on `route.query`: an inactive kept-alive page still has live
- * watchers, so all six would react to one tab's range change and fire five
+ * watchers, so every tab would react to one tab's range change and fire
  * background fan-outs nobody asked for. Activation is the moment the answer is
  * about to be looked at, and the only moment it needs to be right.
  */

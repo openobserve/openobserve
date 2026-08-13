@@ -17,8 +17,8 @@
  * The anchor must survive a remount.
  *
  * "Once loaded, data should stay the same unless I change the time range or
- * filters." A DBM tab switch is a full remount — the six views are separate
- * ROUTES — and every remount used to construct a fresh `useDbmScope`, which
+ * filters." The DBM views are separate ROUTES, and every remount used to
+ * construct a fresh `useDbmScope`, which
  * pinned `anchor` to `Date.now()` in its initialiser. So a relative window's
  * resolved microsecond bounds were DIFFERENT on every landing, and two things
  * followed:
@@ -223,8 +223,7 @@ describe("the properties the anchor already guaranteed", () => {
   /**
    * Regression guard. Both windows must describe ONE instant: recomputing the
    * clock per access would let them drift apart by the duration of the fetch
-   * and silently corrupt the delta. Green before this change and expected to
-   * stay green — the anchor moved scope, it did not stop existing.
+   * and silently corrupt the delta.
    */
   it("keeps current and previous adjacent and equal in length", () => {
     const { current, previous } = useDbmScope({ period: "30m" });

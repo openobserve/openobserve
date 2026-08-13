@@ -295,13 +295,144 @@ describe("unionFleetRows", () => {
   });
 });
 
+// ── the server vantage's instances ────────────────────────────────────────────
+//
+// The user who did all the collector setup — recipes, DB grants — but has no
+// APM has instances no application ever queried AND no metric stream may name
+// (the metrics join is off by default). Their `dbm_server` rows are the one
+// place their fleet is written down, so the union takes those identities as a
+// second discovery source. The two-vantage honesty rule holds throughout: a
+// server-known row carries identity and nothing else — no query figure, no
+// metric figure the metrics read never made.
+
+describe("unionFleetRows with server-vantage instances", () => {
+  it("adds an instance known only from dbm_server rows as a trafficless row", () => {
+    const rows = unionFleetRows([], new Map(), {
+      serverInstances: [{ db_system: "postgresql", db_instance: "pgprod-1" }],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      db_system: "postgresql",
+      db_instance: "pgprod-1",
+      trafficless: true,
+    });
+  });
+
+  it("fabricates no trace-vantage figure onto a server-known row", () => {
+    const [row] = unionFleetRows([], new Map(), {
+      serverInstances: [{ db_system: "postgresql", db_instance: "pgprod-1" }],
+    });
+    expect(row.calls).toBeUndefined();
+    expect(row.total_time_ns).toBeUndefined();
+    expect(row.p95_ns).toBeUndefined();
+    expect(row.errors).toBeUndefined();
+  });
+
+  it("fabricates no metric figure either — the cell states why there is none", () => {
+    const [row] = unionFleetRows([], new Map(), {
+      serverInstances: [{ db_system: "postgresql", db_instance: "pgprod-1" }],
+    });
+    // No metric stream was read for this instance, so the row goes through the
+    // same resolver a client row would and reports the read's own state.
+    expect(row.metrics?.state).toBe("no-data");
+    expect(row.metrics?.saturation).toEqual({
+      state: "absent",
+      used: null,
+      limit: null,
+      ratio: null,
+    });
+    expect(row.metrics?.connectionSeries).toEqual([]);
+  });
+
+  it("merges an instance both the metrics read and dbm_server know into one row", () => {
+    const rows = unionFleetRows([], new Map([["postgresql|pgprod-1", metrics()]]), {
+      serverInstances: [{ db_system: "postgresql", db_instance: "pgprod-1" }],
+    });
+    expect(rows).toHaveLength(1);
+    // The metric set wins — it is real data, and the server ref adds nothing.
+    expect(rows[0].metrics?.state).toBe("matched");
+    expect(rows[0].metrics?.saturation.ratio).toBeCloseTo(0.2, 10);
+  });
+
+  it("folds a server-known instance into the client row that already names it", () => {
+    const rows = unionFleetRows([totalsRow({ db_instance: "pgprod-1" })], new Map(), {
+      serverInstances: [{ db_system: "postgresql", db_instance: "pgprod-1" }],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].trafficless).toBe(false);
+  });
+
+  it("matches through the port and case the two vantages disagree on", () => {
+    const rows = unionFleetRows([totalsRow({ db_instance: "pgprod-1" })], new Map(), {
+      serverInstances: [{ db_system: "PostgreSQL", db_instance: "PGProd-1:5432" }],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].trafficless).toBe(false);
+  });
+
+  it("adds one row however many dbm_server rows name the same instance", () => {
+    const rows = unionFleetRows([], new Map(), {
+      serverInstances: [
+        { db_system: "postgresql", db_instance: "pgprod-1" },
+        { db_system: "postgresql", db_instance: "pgprod-1:5432" },
+      ],
+    });
+    expect(rows).toHaveLength(1);
+  });
+
+  it("skips a server row whose instance identity cannot be resolved", () => {
+    const rows = unionFleetRows([], new Map(), {
+      serverInstances: [
+        { db_system: "postgresql", db_instance: null },
+        { db_system: "", db_instance: "pgprod-1" },
+      ],
+    });
+    expect(rows).toEqual([]);
+  });
+
+  it("honours the engine filter for server-known instances too", () => {
+    const rows = unionFleetRows([], new Map(), {
+      system: "postgresql",
+      serverInstances: [
+        { db_system: "postgresql", db_instance: "pgprod-1" },
+        { db_system: "mysql", db_instance: "myprod-1" },
+      ],
+    });
+    expect(rows.map((r) => r.db_instance)).toEqual(["pgprod-1"]);
+  });
+
+  it("keeps the trafficless block in one stable order across both sources", () => {
+    const rows = unionFleetRows([], new Map([["postgresql|b", metrics()]]), {
+      serverInstances: [
+        { db_system: "postgresql", db_instance: "c" },
+        { db_system: "postgresql", db_instance: "a" },
+      ],
+    });
+    expect(rows.map((r) => r.db_instance)).toEqual(["a", "b", "c"]);
+  });
+
+  it("changes nothing when no server rows are supplied", () => {
+    const withOption = unionFleetRows(
+      [totalsRow({ db_instance: "busy-1" })],
+      new Map([["postgresql|idle-replica", metrics()]]),
+      { serverInstances: [] },
+    );
+    const without = unionFleetRows(
+      [totalsRow({ db_instance: "busy-1" })],
+      new Map([["postgresql|idle-replica", metrics()]]),
+    );
+    expect(withOption).toEqual(without);
+  });
+});
+
 // ── the join switched off ────────────────────────────────────────────────────
 //
-// The metrics read is the ONLY thing that discovers a trafficless instance:
-// the query vantage cannot see an instance nobody queried, by construction. So
-// with the join off the union is honestly the client rows and nothing else,
-// and the health column has to SAY that rather than leaving a blank cell that
-// reads as "this feature is broken".
+// The metric-stream read is one of TWO things that discover a trafficless
+// instance — the other is the server vantage's own `dbm_server` rows. The
+// query vantage cannot see an instance nobody queried, by construction. So
+// with the join off the union is the client rows plus whatever the server
+// vantage named, and the health column has to SAY the read never ran rather
+// than leaving a blank cell that reads as "this feature is broken".
 
 describe("unionFleetRows when the join is switched off", () => {
   it("marks the client rows disabled rather than accusing the receiver", () => {
@@ -313,14 +444,28 @@ describe("unionFleetRows when the join is switched off", () => {
     expect(rows[0].metrics?.unmatchedReason).toBeNull();
   });
 
-  // The honest consequence of the knob being off: discovery is exactly what
-  // was switched off, so no trafficless row can exist. Inventing one from any
-  // other source would be a discovery mechanism nobody built.
+  // The honest consequence of the knob being off: METRIC discovery is exactly
+  // what was switched off, so no metric stream can contribute a trafficless
+  // row. Only the server vantage's own rows can.
   it("discovers no trafficless instance, because the read that finds them never ran", () => {
     const rows = unionFleetRows([totalsRow({ db_instance: "busy-1" })], new Map(), {
       enabled: false,
     });
     expect(rows.every((row) => !row.trafficless)).toBe(true);
+  });
+
+  // The server vantage's discovery never depended on the metrics knob — its
+  // rows arrived regardless. What the knob being off changes is the metrics
+  // CELL, which must say the read was never made rather than accuse a
+  // collector nobody asked.
+  it("still surfaces a server-known instance, its metrics cell saying disabled", () => {
+    const rows = unionFleetRows([], new Map(), {
+      enabled: false,
+      serverInstances: [{ db_system: "postgresql", db_instance: "pgprod-1" }],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].trafficless).toBe(true);
+    expect(rows[0].metrics?.state).toBe("disabled");
   });
 
   it("leaves the union unchanged when the join is on", () => {

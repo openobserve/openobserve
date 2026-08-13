@@ -38,9 +38,10 @@
  *
  * The engine asymmetries are upstream's, and all three bite: postgresqlreceiver
  * puts the endpoint in `service.instance.id` while mysqlreceiver puts a UUID
- * there and the endpoint in `mysql.instance.endpoint`; MySQL publishes no
- * `max_connections` at all; and replication lag is BYTES on one engine and
- * SECONDS on the other.
+ * there and the endpoint in `mysql.instance.endpoint`; mysqlreceiver publishes
+ * no `max_connections` (the setup card's `sqlquery/mysql_limits` recipe fills
+ * the gap); and replication lag is BYTES on one engine and SECONDS on the
+ * other.
  */
 
 import type { DbTotalsRow } from "@/services/db_monitoring";
@@ -88,7 +89,7 @@ export interface DbmMetricRow {
   value: number;
   service_instance_id?: string;
   mysql_instance_endpoint?: string;
-  db_namespace?: string;
+  postgresql_database_name?: string;
   [column: string]: unknown;
 }
 
@@ -179,10 +180,22 @@ const MYSQL_IDENTITY = "mysql_instance_endpoint";
  * outside `[A-Za-z0-9_:]` becomes `_`), so a typo here reads an empty stream
  * forever and is indistinguishable from a receiver that is switched off.
  *
- * There is deliberately no MySQL `connectionLimit`: mysqlreceiver publishes no
- * `max_connections`. `mysql.connection.count` counts attempts and
+ * Every column name below is a CLAIM about the collector, not a fact about the
+ * stream: collectors rename attributes across versions, so a spec'd name — and
+ * especially a semconv-promised one — is never trusted ahead of the stream's
+ * own schema. The labels name RECEIVER attributes for that reason (the
+ * receiver writes `postgresql_database_name` where semconv promises
+ * `db.namespace`), and the read layer intersects the spec with the live schema
+ * before building SQL (`DbmMetricsCollectOptions.fieldsByStream`).
+ *
+ * The MySQL `connectionLimit` does NOT come from mysqlreceiver — it publishes
+ * no `max_connections`, and its `mysql.connection.count` counts attempts while
  * `mysql.max_used_connections` is a high-water mark, so either under a
- * saturation percentage would be a fabricated denominator.
+ * saturation percentage would be a fabricated denominator. The limit comes
+ * from the MySQL setup card's `sqlquery/mysql_limits` recipe (`SELECT
+ * @@max_connections` emitted as `mysql.connection.max`), so the stream exists
+ * only where that recipe is installed — `defaultEnabled: false`, and a MySQL
+ * row without it renders the honest count-with-no-denominator state.
  */
 export const DBM_INSTANCE_METRICS: readonly DbmMetricSpec[] = [
   {
@@ -191,9 +204,11 @@ export const DBM_INSTANCE_METRICS: readonly DbmMetricSpec[] = [
     stream: "postgresql_backends",
     defaultEnabled: true,
     cumulative: false,
-    // Carries db.namespace: one row per database per scrape.
+    // One row per database per scrape. The label is the RECEIVER's attribute
+    // (`postgresql.database.name`, sanitised), NOT semconv `db.namespace` —
+    // see the catalog comment above on trusting schemas over specs.
     aggregate: "sum",
-    seriesColumns: ["db_namespace"],
+    seriesColumns: ["postgresql_database_name"],
     identityColumn: PG_IDENTITY,
   },
   {
@@ -223,7 +238,7 @@ export const DBM_INSTANCE_METRICS: readonly DbmMetricSpec[] = [
     defaultEnabled: false,
     cumulative: true,
     aggregate: "sum",
-    seriesColumns: ["db_namespace"],
+    seriesColumns: ["postgresql_database_name"],
     identityColumn: PG_IDENTITY,
   },
   {
@@ -233,7 +248,7 @@ export const DBM_INSTANCE_METRICS: readonly DbmMetricSpec[] = [
     defaultEnabled: false,
     cumulative: true,
     aggregate: "sum",
-    seriesColumns: ["db_namespace"],
+    seriesColumns: ["postgresql_database_name"],
     identityColumn: PG_IDENTITY,
   },
   {
@@ -243,7 +258,7 @@ export const DBM_INSTANCE_METRICS: readonly DbmMetricSpec[] = [
     defaultEnabled: false,
     cumulative: true,
     aggregate: "sum",
-    seriesColumns: ["db_namespace"],
+    seriesColumns: ["postgresql_database_name"],
     identityColumn: PG_IDENTITY,
   },
   {
@@ -265,6 +280,20 @@ export const DBM_INSTANCE_METRICS: readonly DbmMetricSpec[] = [
     defaultEnabled: false,
     cumulative: false,
     aggregate: "max",
+    identityColumn: MYSQL_IDENTITY,
+  },
+  {
+    system: MYSQL,
+    role: "connectionLimit",
+    // `mysql.connection.max` from the setup card's sqlquery/mysql_limits
+    // recipe (see the module note above) — the twin of
+    // `postgresql_connection_max`, and `single` for the same reason: one
+    // reading per instance, and summing repeats of it would multiply the
+    // denominator and halve every saturation figure.
+    stream: "mysql_connection_max",
+    defaultEnabled: false,
+    cumulative: false,
+    aggregate: "single",
     identityColumn: MYSQL_IDENTITY,
   },
 ];

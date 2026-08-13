@@ -4,11 +4,8 @@ import i18n from "@/locales";
 import DbmEmptyState from "./DbmEmptyState.vue";
 
 /**
- * These tests describe the CHECKLIST contract, which replaced the earlier
- * one-cause contract.
- *
- * The old component picked a single most-blocking cause and rendered only that.
- * It now renders every check with a pass/fail verdict, because the checks that
+ * These tests describe the CHECKLIST contract: every check renders with its own
+ * pass/fail verdict, never a single most-blocking cause alone. The checks that
  * PASS are the reassurance — a user who can see "traces arriving ✓, access ✓,
  * no database spans ✗" knows which team to talk to, where a lone failure leaves
  * them wondering whether the rest is also broken. So the assertions here are
@@ -195,6 +192,51 @@ describe("DbmEmptyState", () => {
       const wrapper = mountWith({ traceCount: null, neverAggregated: true });
       expect(verdictOf(wrapper, "counted")).toBe("fail");
       expect(verdictOf(wrapper, "traces")).toBe("absent");
+    });
+  });
+
+  /**
+   * The zero-trace org, as the pages actually render it: a never-instrumented
+   * org's rollup offset is 0, so `neverAggregated` arrives `true` alongside
+   * `traceCount: 0`. Before this contract the count was never wired, and the
+   * only row such an org ever saw was "We haven't finished counting yet …
+   * a few minutes" — indefinitely — framing a missing integration as a lagging
+   * pipeline. `hasDbSpans` stays unsupplied here because the pages never probe
+   * it, so these mounts are the shipped prop shape, not a convenient one.
+   */
+  describe("a zero-trace org is uninstrumented, not lagging", () => {
+    const zeroTraceOrg = {
+      traceCount: 0,
+      neverAggregated: true,
+      hasDbSpans: undefined,
+    } as const;
+
+    it("says monitoring is built from traces it has not sent, not that counting is slow", () => {
+      const text = mountWith(zeroTraceOrg).text();
+      expect(text).toContain("hasn't sent any yet");
+      expect(text).not.toContain("haven't finished counting");
+    });
+
+    it("fails the trace check and drops the contradictory counting row", () => {
+      const wrapper = mountWith(zeroTraceOrg);
+      expect(verdictOf(wrapper, "traces")).toBe("fail");
+      // The counting row's copy opens "Database calls have arrived" — the
+      // opposite of the verdict one line above it.
+      expect(verdictOf(wrapper, "counted")).toBe("absent");
+    });
+
+    it("offers instrumentation, not a retry of counting nothing", async () => {
+      const wrapper = mountWith(zeroTraceOrg);
+      await wrapper.find("[data-test='dbm-empty-state-instrument']").trigger("click");
+      expect(wrapper.emitted("action")).toEqual([["not-instrumented"]]);
+    });
+
+    it("keeps the counting diagnosis for an org whose traces exist", () => {
+      // The other side of the same coin: traces arriving + nothing counted IS
+      // the lagging pipeline, and must keep saying so.
+      const wrapper = mountWith({ neverAggregated: true });
+      expect(verdictOf(wrapper, "traces")).toBe("ok");
+      expect(verdictOf(wrapper, "counted")).toBe("fail");
     });
   });
 });

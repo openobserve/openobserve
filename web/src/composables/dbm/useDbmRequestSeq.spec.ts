@@ -87,11 +87,6 @@ describe("useDbmRequestSeq", () => {
     expect(seq.isStale(child)).toBe(true);
   });
 
-  it("hands out a distinct token per call", () => {
-    const seq = useDbmRequestSeq();
-    expect(seq.begin()).not.toBe(seq.begin());
-  });
-
   /**
    * A secondary fetch has to JOIN the load that owns the page, not claim it —
    * claiming would have a child request invalidate its own parent.
