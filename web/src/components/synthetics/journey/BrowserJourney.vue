@@ -571,11 +571,40 @@ function onRecordBefore(row: BrowserStep) {
 }
 
 /**
+ * Say what a finished recording added, and where.
+ *
+ * The one case that genuinely satisfies this file's toast convention (see
+ * `revealStep`): the author spent the whole recording in the extension's incognito
+ * window, so the steps land in a table they were not looking at — with no flash, no
+ * scroll and no row marker to find them by. It fires once per SESSION, not once per
+ * step, so it cannot stack the way a per-step message would.
+ *
+ * Numbers come from the splice rather than a lookup: a recording is inserted as one
+ * contiguous block, so it occupies exactly `insertAt + 1 … insertAt + count`, 1-based
+ * like the row numbering. The range is named instead of the anchor
+ * (record-from-step-design.md §7.2's "inserted before step 5") because after the
+ * splice the new steps ARE step 5 onwards, so the anchor's old number points at one
+ * of them.
+ */
+function announceRecordedSteps(insertAt: number, count: number) {
+  const first = insertAt + 1;
+  toast({
+    variant: "success",
+    message: t(
+      "synthetics.journey.recordedStepsAdded",
+      { count, first, last: insertAt + count },
+      count,
+    ),
+  });
+}
+
+/**
  * Splice `steps` in at the anchor and invalidate everything after them.
  *
  * The single commit path for every way a recording can end — the Stop button, the
  * route guard, and the extension window being closed — so the ordering rule and the
- * invalidation rule cannot drift apart between them.
+ * invalidation rule cannot drift apart between them. The toast lives here for that
+ * same reason: hung off the Stop button it would have missed the other two.
  */
 function commitRecordedSteps(steps: BrowserStep[]) {
   if (steps.length === 0) {
@@ -587,6 +616,9 @@ function commitRecordedSteps(steps: BrowserStep[]) {
   next.splice(insertAt, 0, ...steps);
   emit("update:modelValue", next);
   anchorStepId.value = null;
+  // After the reset: `currentInsertAt` reads the anchor, so the position has to be
+  // captured while it still points at one.
+  announceRecordedSteps(insertAt, steps.length);
 }
 
 async function stopRecording() {

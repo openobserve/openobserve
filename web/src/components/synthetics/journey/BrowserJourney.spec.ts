@@ -16,8 +16,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 
+// `t` still returns the bare key — every existing assertion compares against one.
+// It is a spy as well so the interpolation params can be asserted, which is the
+// only place the step NUMBERS in a message are observable.
+const mockT = vi.fn((key: string, ..._args: unknown[]) => key);
 vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({ t: mockT }),
 }));
 
 // Validation raises toasts, so the call has to be observable. The real
@@ -1483,6 +1487,9 @@ describe("BrowserJourney restore-then-record", () => {
     postMessageSpy = vi.fn();
     vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
     vi.useFakeTimers();
+    // Declared at module scope, so it carries calls in from earlier describes.
+    mockToast.mockClear();
+    mockT.mockClear();
   });
 
   afterEach(() => {
@@ -1610,5 +1617,114 @@ describe("BrowserJourney restore-then-record", () => {
     expect(next[1].id).toBe("s2");
     expect(next[2].name).toBe("Accept cookies");
     expect(next[3].id).toBe("s3");
+  });
+
+  // ── "N steps added — steps X–Y" ─────────────────────────────────────────────
+  //
+  // The only feedback a finished recording gives. The author spent it in the
+  // extension's incognito window, so the steps land in a table they were not
+  // looking at — nothing flashes, scrolls or marks the rows. See
+  // docs/synthetics/recorded-steps-toast.md.
+
+  /** The interpolation params the added-steps message was last built with. */
+  function addedToastParams(): Record<string, unknown> | undefined {
+    const calls = mockT.mock.calls as unknown as unknown[][];
+    const call = [...calls].reverse().find((c) => c[0] === "synthetics.journey.recordedStepsAdded");
+    return call?.[1] as Record<string, unknown> | undefined;
+  }
+
+  /** Feed `names` in as captured steps on an already-started recording. */
+  function captureSteps(names: string[]) {
+    emitStreamEvent({
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/cart",
+      mode: "insert",
+      baselineStepCount: 0,
+    });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: names.map((name, i) => ({
+        id: `n${i + 1}`,
+        action: "click",
+        selector: `#${i}`,
+        name,
+      })),
+    });
+  }
+
+  // Appended at the end of a 3-step journey, two recorded steps become 4 and 5.
+  it("should announce the numbers an appended recording takes", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await clickRecord();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    captureSteps(["Checkout", "Pay"]);
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "success",
+      message: "synthetics.journey.recordedStepsAdded",
+    });
+    expect(addedToastParams()).toEqual({ count: 2, first: 4, last: 5 });
+  });
+
+  // Anchored before step 3, a single recorded step IS step 3 — the number the
+  // anchor held a moment ago, which is why the message names the new range and
+  // not the anchor.
+  it("should announce the numbers an anchored recording takes", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await wrapper.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[2]);
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    captureSteps(["Accept cookies"]);
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(addedToastParams()).toEqual({ count: 1, first: 3, last: 3 });
+  });
+
+  // The extension window being closed commits through the same path as the Stop
+  // button. Hung off the button instead, this recording would have been silent.
+  it("should announce steps committed by an external stop", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await clickRecord();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    captureSteps(["Checkout"]);
+    await flushPromises();
+
+    emitStreamEvent({ method: "recordingStopped" });
+    await flushPromises();
+
+    expect(addedToastParams()).toEqual({ count: 1, first: 4, last: 4 });
+  });
+
+  // Nothing was captured, so nothing was added. A message claiming otherwise —
+  // or a "0 steps added" — is worse than the silence.
+  it("should stay silent when a recording captured nothing", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await clickRecord();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    // The session is live — the author just never acted in it.
+    captureSteps([]);
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    expect(mockToast).not.toHaveBeenCalled();
   });
 });

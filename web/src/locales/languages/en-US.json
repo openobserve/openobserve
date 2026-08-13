@@ -11422,6 +11422,7 @@
       "reRunToHere": "Re-run steps 1–{step}",
       "fidelityLabel": "The preview could not reproduce",
       "record": "Record",
+      "recordedStepsAdded": "1 step added — step {first} | {count} steps added — steps {first}–{last}",
       "recordJourney": "Record journey",
       "recording": "Recording",
       "recordingIncognitoInfo": "Recording in a separate incognito window",
