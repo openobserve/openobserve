@@ -461,10 +461,6 @@ mod tests {
             .up(&manager)
             .await
             .unwrap();
-        super::super::m20260811_000002_repair_oncall_schema_drift::Migration
-            .up(&manager)
-            .await
-            .unwrap();
         super::super::m20260812_000001_create_oncall_routing_config::Migration
             .up(&manager)
             .await

@@ -253,10 +253,6 @@ mod tests {
             .up(&manager)
             .await
             .unwrap();
-        super::super::m20260811_000002_repair_oncall_schema_drift::Migration
-            .up(&manager)
-            .await
-            .unwrap();
         assert!(
             !manager.has_table(TABLE).await.unwrap(),
             "precondition: the upgraded database has no overrides table yet"
