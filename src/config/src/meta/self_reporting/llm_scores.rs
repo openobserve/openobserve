@@ -62,6 +62,8 @@ pub enum LlmScoreStatus {
     #[default]
     Success,
     Skipped,
+    /// The scorer exhausted its bounded attempts without producing a value.
+    Error,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
