@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- select folder or create new folder and select -->
         <SelectFolderDropdown @folder-selected="selectedFolder = $event"  :activeFolderId="activeFolderId"/>
 
-        <div class="flex justify-start q-mt-sm">
+        <div class="flex justify-start q-mt-lg">
           <q-btn
             v-close-popup="true"
             class="o2-secondary-button tw:h-[36px]"
@@ -175,10 +175,19 @@ export default defineComponent({
 
 <style scoped lang="scss">
 :deep(.flex.justify-center.items-start) {
-  align-items: center !important;
+  align-items: flex-start !important;
+}
+// Use the app-standard 36px control height (reports/alerts move dialogs use 36px)
+// instead of the wider 2.7rem from o2-custom-select-dashboard, so both dialogs match.
+:deep(.o2-custom-select-dashboard .q-field__control),
+:deep(.o2-custom-select-dashboard .q-field__append) {
+  min-height: 36px !important;
+  max-height: 36px !important;
+  height: 36px !important;
 }
 :deep(.add-folder-btn) {
+  height: 36px !important;
+  margin-top: 32px !important;
   margin-bottom: 0 !important;
-  margin-top: 30px !important;
 }
 </style>
