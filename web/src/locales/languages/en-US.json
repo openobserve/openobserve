@@ -9225,7 +9225,7 @@
       "taskProgress": "Tasks: {completed}/{total} complete · {skipped} skipped",
       "scoringProgress": "Scores: {completed}/{total} complete · {skipped} skipped",
       "skipTiers": "Rows skipped: {full} fully · {partial} partially",
-      "scoreEvidence": "{scorer} · v{version}: {samples} samples, {skipped} skipped",
+      "scoreEvidence": "{scorer} · v{version}: {samples} samples, {noReference} no reference, {noTrace} no trace",
       "scorerApplicability": "{scorer} · v{version}: {eligible} eligible slots, {noReference} without reference",
       "loadError": "Failed to load experiments",
       "previewError": "Failed to preview experiment slots",

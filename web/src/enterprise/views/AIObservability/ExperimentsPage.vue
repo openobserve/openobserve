@@ -163,7 +163,8 @@
                     scorer: summary.scorerId,
                     version: summary.scorerVersion,
                     samples: summary.sampleCount,
-                    skipped: summary.skippedCount,
+                    noReference: summary.noReferenceCount,
+                    noTrace: summary.noTraceCount,
                   })
                 }}
               </li>
@@ -519,6 +520,11 @@ function formatValue(value: unknown) {
 
 function scoreLabel(score: Record<string, unknown>) {
   const name = String(score.name ?? "score");
+  const status = String(score.status ?? "success");
+  if (status === "skipped") {
+    const reason = String(score.skip_reason ?? score.skipReason ?? "unknown");
+    return `${name}: ${status} (${reason})`;
+  }
   const value = score.value_numeric ?? score.value_categorical ?? score.value_boolean ?? "—";
   return `${name}: ${String(value)}`;
 }

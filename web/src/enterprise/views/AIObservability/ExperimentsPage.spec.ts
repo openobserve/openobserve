@@ -39,7 +39,7 @@ vi.mock("vue-i18n", () => ({
     t: (key: string, params?: Record<string, unknown>) => {
       const template =
         key === "aiObservability.experiments.scoreEvidence"
-          ? "{scorer} · v{version}: {samples} samples, {skipped} skipped"
+          ? "{scorer} · v{version}: {samples} samples, {noReference} no reference, {noTrace} no trace"
           : key;
 
       return template.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
@@ -113,7 +113,20 @@ describe("ExperimentsPage navigation", () => {
               timestamp: 1,
             },
           ],
-          scores: [],
+          scores: [
+            {
+              id: "score-reference",
+              name: "reference-quality",
+              status: "skipped",
+              skip_reason: "no_reference",
+            },
+            {
+              id: "score-trace",
+              name: "trace-quality",
+              status: "skipped",
+              skip_reason: "no_trace",
+            },
+          ],
           taskProgress: { completed: 0, total: 1, skipped: 1 },
           scoringProgress: { completed: 0, total: 1, skipped: 1 },
           skipSummary: {
@@ -124,7 +137,14 @@ describe("ExperimentsPage navigation", () => {
             noTraceDimensions: 0,
           },
           scoreSummaries: [
-            { scorerId: "quality", scorerVersion: 2, sampleCount: 0, skippedCount: 1 },
+            {
+              scorerId: "quality",
+              scorerVersion: 2,
+              sampleCount: 0,
+              noReferenceCount: 1,
+              noTraceCount: 1,
+              skippedCount: 2,
+            },
           ],
         },
       }),
@@ -148,7 +168,12 @@ describe("ExperimentsPage navigation", () => {
       "aiObservability.experiments.taskProgress",
     );
     expect(wrapper.get('[data-test="ai-experiment-results"]').text()).toContain("no_reference");
-    expect(wrapper.get('[data-test="ai-experiment-score-summaries"]').text()).toContain("quality");
+    const results = wrapper.get('[data-test="ai-experiment-results"]').text();
+    expect(results).toContain("reference-quality: skipped (no_reference)");
+    expect(results).toContain("trace-quality: skipped (no_trace)");
+    expect(wrapper.get('[data-test="ai-experiment-score-summaries"]').text()).toContain(
+      "quality · v2: 0 samples, 1 no reference, 1 no trace",
+    );
   });
 
   it("updates the selected detail when Back/Forward changes the deep link", async () => {
