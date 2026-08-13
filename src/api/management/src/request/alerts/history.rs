@@ -558,9 +558,11 @@ pub async fn get_alert_history(
         }
     };
 
-    // Build SQL WHERE clause for the _meta organization's triggers stream
+    // Build SQL WHERE clause for the _meta organization's triggers stream.
+    // Composites publish with module = "composite" and share the ordinary
+    // alert outcome vocabulary, so include them in the same history read.
     let mut where_clause = format!(
-        "module = 'alert' AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+        "module IN ('alert', 'composite') AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
 
     // Add alert ID filter if provided

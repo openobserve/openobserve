@@ -111,7 +111,7 @@
         </OTabs>
         <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
           <OTabPanel name="history" stretch>
-            <AlertEvaluationHistory :alert-id="alertId" />
+            <AlertEvaluationHistory :alert-id="alertId" :is-composite="isCompositeAlert" />
           </OTabPanel>
           <OTabPanel name="configuration" stretch>
             <OContent class="h-full overflow-y-auto py-4">
