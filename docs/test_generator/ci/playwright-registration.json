@@ -1,0 +1,6 @@
+{
+  "group": "Dashboards-Core",
+  "spec_filename": "dashboard-deeplink.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

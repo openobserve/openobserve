@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Dashboards/dashboard-deeplink.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-share-link.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-tabs-setting.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_target": "tests/ui-testing/ci-matrix/ci_matrix.json (add to the \"Dashboards-Core\" shard's run_files array)",
+  "rationale": "No existing Dashboards spec exercises deep-link default-tab resolution on load (valid / missing / invalid tab query param -> active tab + URL normalization). dashboard-share-link.spec.js covers short-link/share-URL GENERATION (clipboard + /short/ redirect), not loading a /dashboards/view deep link and asserting which tab resolves; dashboard-tabs-setting.spec.js covers tab CRUD in settings. The production change is a null-safety guard in ViewDashboard.vue addPanelData() (route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId), a distinct behavior area (deep-link tab resolution + the add-panel guard) with no fitting spec, so a dedicated new spec (as named by run-context spec_path) is the least-duplicative option."
+}

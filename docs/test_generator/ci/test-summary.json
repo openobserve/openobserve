@@ -1,0 +1,7 @@
+[
+  { "title": "should activate the matching tab when deep-linking to a valid non-default tab", "action": "new", "verifies": "a deep link with a valid tab id activates that tab and retains tab=<id> in the URL" },
+  { "title": "should fall back to the default tab and normalize the URL when deep-linking without a tab param", "action": "new", "verifies": "a tab-less deep link activates the first (default) tab and writes tab=default back into the URL" },
+  { "title": "should fall back to the default tab and normalize the URL when deep-linking with an invalid tab param", "action": "new", "verifies": "a stale deep link (nonexistent tab id) falls back to the default tab and rewrites the URL to tab=default" },
+  { "title": "should resolve a tab when clicking add panel from a tab-less deep link (null-safety regression)", "action": "new", "verifies": "clicking Add panel from a tab-less deep link navigates to add_panel carrying tab=default (the null-safety guard)" },
+  { "title": "should fall back to the default tab when deep-linking with an empty tab param", "action": "new", "verifies": "an empty tab= param matches no tab id and falls back to the default tab, normalizing the URL to tab=default" }
+]

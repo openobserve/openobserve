@@ -1,0 +1,1988 @@
+===== COMPLETE LIST OF CHANGED FILES (26 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/pages/dashboardPages/dashboard-chart.js
+tests/ui-testing/pages/dashboardPages/dashboard-create.js
+tests/ui-testing/pages/dashboardPages/dashboard-list.js
+tests/ui-testing/pages/dashboardPages/dashboard-panel-actions.js
+tests/ui-testing/pages/dashboardPages/dashboard-panel-configs.js
+tests/ui-testing/pages/dashboardPages/dashboard-panel-edit.js
+tests/ui-testing/pages/dashboardPages/dashboard-variables.js
+tests/ui-testing/pages/dashboardPages/dashboardPage.js
+tests/ui-testing/pages/dashboardPages/visualise.js
+tests/ui-testing/playwright-tests/Dashboards/custom-charts.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-create-alert.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-geoMap.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-html-chart.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-maps.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-metric-camelcase.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-multi-y-axis.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-pie-donut.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-sankey.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-global.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-tab-level.spec.js
+tests/ui-testing/playwright-tests/Dashboards/dashboard.spec.js
+tests/ui-testing/playwright-tests/Dashboards/utils/dashCreation.js
+tests/ui-testing/playwright-tests/Dashboards/utils/dashIngestion.js
+tests/ui-testing/playwright-tests/Dashboards/visualize-vrl.spec.js
+tests/ui-testing/playwright-tests/Dashboards/visualize.spec.js
+web/src/views/Dashboards/ViewDashboard.vue
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-chart.js b/tests/ui-testing/pages/dashboardPages/dashboard-chart.js
+index 270d6366fc2..9a22b4f17bc 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-chart.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-chart.js
+@@ -237,30 +237,41 @@ export default class ChartTypeSelector {
+     }
+ 
+     // New data-test format: o-field-list-row-{fieldName}
++    // NOTE: no waitFor here — the retry loop below already waits for the row,
++    // and duplicating the wait outside the loop meant a slow schema/field-list
++    // load threw before the loop ever got its first attempt, collapsing the
++    // 3-attempt budget down to one.
+     const fieldItem = this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
+-    await fieldItem.first().waitFor({ state: "visible", timeout: 10000 });
+ 
+-    // hover() auto-scrolls into view — scrollIntoViewIfNeeded() is not needed.
+-    // Retry for DOM stability: Vue re-renders the field list multiple times after
+-    // search input changes (debounce / virtual scroll), which detaches the element
+-    // between waitFor and the action. Re-waiting after each detachment lets the
+-    // list settle before the next attempt.
++    // Use .first() — in join panels the same field name can appear multiple times
++    // (once per joined stream), which would cause a strict mode violation.
++    const button = fieldItem.first().locator(`[data-test="${buttonTestId}"]`);
++
++    // The add-to-axis buttons are CSS-hidden until the row is hovered
++    // (OFieldRow .__actions { display: none }), and hover() auto-scrolls into view
++    // so scrollIntoViewIfNeeded() is not needed.
++    //
++    // Hovering ONCE and then waiting for the button is not enough. Vue re-renders the
++    // field list after search input changes (debounce / virtual scroll); a re-render
++    // landing between the hover and the button check either detaches the row or
++    // shifts it out from under the cursor, dropping :hover. The button then stays
++    // hidden and the wait burns its full timeout on an element that can no longer
++    // become visible — the "15 x locator resolved to hidden" failure signature.
++    // Re-hover on every attempt so a re-render costs one retry, not the whole call.
+     const maxAttempts = 3;
++    let lastError;
+     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+       try {
++        await fieldItem.first().waitFor({ state: "visible", timeout: 10000 });
+         await fieldItem.first().hover({ timeout: 5000 });
++        await button.waitFor({ state: "visible", timeout: 5000 });
+         break;
+       } catch (e) {
+-        if (attempt === maxAttempts) throw e;
+-        await fieldItem.first().waitFor({ state: "visible", timeout: 5000 });
++        lastError = e;
++        if (attempt === maxAttempts) throw lastError;
+       }
+     }
+ 
+-    // Now locate and click the button within the field item.
+-    // Use .first() — in join panels the same field name can appear multiple times
+-    // (once per joined stream), which would cause a strict mode violation.
+-    const button = fieldItem.first().locator(`[data-test="${buttonTestId}"]`);
+-    await button.waitFor({ state: "visible", timeout: 5000 });
+     await button.click();
+     await searchInput.fill(""); // Clear the search input
+   }
+@@ -347,6 +358,42 @@ export default class ChartTypeSelector {
+       },
+       { timeout: 15000 }
+     );
++
++    // The check above is satisfied by a STALE table. Re-applying a query leaves the
++    // previous result set on screen while the new one loads, so "some row has text"
++    // is instantly true and callers go on to measure the OLD data — a filter that
++    // narrows 77 rows to fewer still reads 77. The same gap in reverse lets a caller
++    // sample during a transient re-render and read zero rows.
++    //
++    // Wait for the row count to stop changing so the new result set has actually
++    // rendered. State is parked on window and reset first so repeated calls within a
++    // test do not inherit a previous call's sample.
++    await this.page.evaluate(() => {
++      delete window.__o2TableSettle;
++    });
++
++    await this.page.waitForFunction(
++      (settleMs) => {
++        const table = document.querySelector(
++          '[data-test="dashboard-panel-table"]'
++        );
++        const count = table ? table.querySelectorAll("tbody tr").length : 0;
++
++        if (!window.__o2TableSettle) {
++          window.__o2TableSettle = { count: -1, since: 0 };
++        }
++        const state = window.__o2TableSettle;
++
++        if (state.count !== count) {
++          state.count = count;
++          state.since = Date.now();
++          return false;
++        }
++        return count > 0 && Date.now() - state.since >= settleMs;
++      },
++      750,
++      { timeout: 20000 }
++    );
+   }
+ 
+   // ===== Y-AXIS FUNCTION CONFIGURATION METHODS =====
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-create.js b/tests/ui-testing/pages/dashboardPages/dashboard-create.js
+index 9fda23e149d..42b2995eec4 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-create.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-create.js
+@@ -86,14 +86,37 @@ export default class DashboardCreate {
+       // Ignore timeout - continue anyway
+     });
+ 
+-    // Click the "New Dashboard" button
+-    await this.dashCreateBtn.click();
+-
+-    // Wait for the dialog to appear by checking for the input field to be attached
+-    await this.dashName.waitFor({ state: "attached", timeout: 30000 });
+-
+-    // Wait for the input to be visible and editable
+-    await this.dashName.waitFor({ state: "visible", timeout: 30000 });
++    // Opening the dialog is itself flaky: the list behind this button re-renders
++    // as folders/dashboards settle, and a click landing on a button that is
++    // being torn down silently no-ops. The dialog is client-side, so a click
++    // that lands always opens it — a 30s wait expiring means the CLICK was lost,
++    // and waiting longer cannot help. Re-click with a fresh lookup instead.
++    const dialogAttempts = 3;
++    let dialogError;
++    for (let attempt = 1; attempt <= dialogAttempts; attempt++) {
++      try {
++        // Re-click ONLY when the dialog is genuinely absent. Once it is open,
++        // ODialog renders a `fixed inset-0` overlay that covers this button, so
++        // a second click cannot land — it fails the actionability check and
++        // burns the attempt. Without this guard a dialog that merely opened
++        // slowly (just past the per-attempt window) would be turned into a hard
++        // failure with a perfectly usable dialog on screen.
++        if (!(await this.dashName.isVisible().catch(() => false))) {
++          await this.dashCreateBtn.click({ timeout: 10000 });
++        }
++        await this.dashName.waitFor({ state: "attached", timeout: 15000 });
++        await this.dashName.waitFor({ state: "visible", timeout: 15000 });
++        dialogError = undefined;
++        break;
++      } catch (e) {
++        dialogError = e;
++      }
++    }
++    if (dialogError) {
++      throw new Error(
++        `createDashboard: "New Dashboard" dialog did not open after ${dialogAttempts} clicks. Last error: ${dialogError.message}`
++      );
++    }
+ 
+     // Wait for the input to be enabled (not disabled)
+     await this.page.waitForFunction(
+@@ -105,12 +128,67 @@ export default class DashboardCreate {
+       { timeout: 10000 }
+     );
+ 
+-    // Fill the dashboard name
+-    await this.dashName.fill(dashboardName);
++    // Submitting is where this flakes, in two ways that look identical from the
++    // outside — an opaque waitForURL timeout with no navigation in the log:
++    //
++    //   1. AddDashboard.vue seeds OForm from :default-values, and a fill that
++    //      lands before that seeding is overwritten with an empty name.
++    //   2. The dialog's primary button submits the form by id, and a click
++    //      issued while that wiring is still settling silently no-ops.
++    //
++    // Either way submit is gated by the form's Zod schema, so onSubmit never
++    // runs, no POST goes out, and updateDashboardList() — the only thing that
++    // routes to /dashboards/view — is never called. Re-assert the name and
++    // watch for the create POST, so a lost submit is retried rather than
++    // waited out, and a rejected one fails with the actual status.
++    //
++    // The retry gate matches on the REQUEST, not the response: a request that
++    // has been sent but not yet answered still proves the click landed, so a
++    // slow server can never be mistaken for a lost submit and re-submitted
++    // into a duplicate dashboard.
++    const isCreateCall = (target) =>
++      /\/api\/[^/]+\/dashboards(?:\?|$)/.test(target.url()) &&
++      (target.method?.() ?? target.request().method()) === "POST";
++
++    let createRequest = null;
++    let createResponse = null;
++
++    for (let attempt = 1; attempt <= 2; attempt++) {
++      // Re-assert on every attempt: if the form seeded over our value, the
++      // retry has to repair the field, not just click again.
++      if ((await this.dashName.inputValue()) !== dashboardName) {
++        await this.dashName.fill(dashboardName);
++      }
++
++      const requestPromise = this.page
++        .waitForRequest(isCreateCall, { timeout: 10000 })
++        .catch(() => null);
++      const responsePromise = this.page
++        .waitForResponse(isCreateCall, { timeout: 30000 })
++        .catch(() => null);
++
++      await this.submitBtn.waitFor({ state: "visible", timeout: 30000 });
++      await this.submitBtn.click();
++
++      createRequest = await requestPromise;
++      if (createRequest) {
++        createResponse = await responsePromise;
++        break;
++      }
++
++      // Nothing hit the wire. Only retry while the dialog is still open — if it
++      // closed, the submit did land and the URL wait below is the right gate.
++      const dialogStillOpen = await this.submitBtn
++        .isVisible()
++        .catch(() => false);
++      if (!dialogStillOpen) break;
++    }
+ 
+-    // Wait for and click the submit button
+-    await this.submitBtn.waitFor({ state: "visible", timeout: 30000 });
+-    await this.submitBtn.click();
++    if (createResponse && !createResponse.ok()) {
++      throw new Error(
++        `Dashboard creation failed: POST ${createResponse.url()} returned ${createResponse.status()}`
++      );
++    }
+ 
+     // Wait for the success notification to confirm dashboard was created
+     // OToast root carries both data-test="o-toast-success" and data-test-message="<text>"
+@@ -134,8 +212,57 @@ export default class DashboardCreate {
+ 
+   //back to dashboard list
+   async backToDashboardList() {
+-    await this.backBtn.waitFor({ state: "visible", timeout: 50000 });
+-    await this.backBtn.click();
++    // "Back" is not one hop from everywhere. The panel editor and the
++    // dashboard view both render data-test="dashboard-back-btn", but
++    // AddPanel.vue's goBack() pushes /dashboards/view while ViewDashboard.vue's
++    // goBackToDashboardList() pushes /dashboards — so reaching the list from
++    // the editor genuinely takes TWO clicks. On top of that, a click issued
++    // mid page-transition can land on a header that is being torn down and
++    // silently no-op. Click, re-check the URL, and repeat with a fresh locator
++    // lookup until we're on the list.
++    //
++    // Leaving add_panel with unsaved panel edits fires AddPanel.vue's
++    // onBeforeRouteLeave native window.confirm. Playwright auto-dismisses
++    // dialogs by default, and a dismissed confirm means next(false) — the
++    // route change is cancelled, so every back click no-ops and the loop
++    // burns all its attempts still sitting on add_panel. Accept the dialog
++    // for the duration of the navigation (same handling as
++    // dashboard-multi-sql.js discardPanel()).
++    const LIST_URL = /\/dashboards(?:\?|$)/;
++    const maxClicks = 4;
++    let lastError;
++
++    const dialogHandler = (dialog) => dialog.accept();
++    this.page.on("dialog", dialogHandler);
++    try {
++      for (let attempt = 1; attempt <= maxClicks; attempt++) {
++        if (LIST_URL.test(this.page.url())) return;
++
++        const backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
++        try {
++          await backBtn.waitFor({ state: "visible", timeout: 20000 });
++          await backBtn.click({ timeout: 10000 });
++        } catch (e) {
++          // Header may be remounting between the editor and view pages — fall
++          // through to the URL check and try again with a fresh lookup.
++          lastError = e;
++        }
++
++        try {
++          await this.page.waitForURL(LIST_URL, { timeout: 8000 });
++          return;
++        } catch (e) {
++          lastError = e;
++        }
++      }
++    } finally {
++      this.page.off("dialog", dialogHandler);
++    }
++
++    if (LIST_URL.test(this.page.url())) return;
++    throw new Error(
++      `backToDashboardList: still at ${this.page.url()} after ${maxClicks} back clicks. Last error: ${lastError?.message}`
++    );
+   }
+ 
+   //wait for back button to be visible (no click)
+@@ -174,6 +301,20 @@ export default class DashboardCreate {
+ 
+   //Add Panel to dashboard (when dashboard is empty)
+   async addPanel() {
++    // The empty-state "add panel" button renders as soon as the dashboard has
++    // no panels — which is also true while the dashboard GET is still loading.
++    // Clicking it that early makes ViewDashboard.vue's addPanelData() read
++    // tabs[0] before tabs exist, which throws inside the handler so router.push
++    // never runs: the click reports success and the URL never changes, burning
++    // every retry below. The tab strip only renders once tabs have loaded, so
++    // waiting for it gates the click on the data it depends on.
++    await this.defaultDashboardTab
++      .waitFor({ state: "visible", timeout: 30000 })
++      .catch(() => {
++        // Non-fatal: some dashboards legitimately render no tab strip. The
++        // retry loop below is still the real gate on navigation succeeding.
++      });
++
+     // Retry pattern for clicking add panel button
+     const maxRetries = 3;
+     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-list.js b/tests/ui-testing/pages/dashboardPages/dashboard-list.js
+index f3884d6894f..eef16ee765e 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-list.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-list.js
+@@ -72,9 +72,26 @@ export default class DashboardListPage {
+   // Menu Items — menu-link data-test contains a literal "/" (route prefix);
+   // CSS attribute selectors accept "/" verbatim, no escape needed.
+   async menuItem(item) {
++    const targetPath = item.replace('-item', '');
+     const menuItem = this.page.locator(`[data-test="menu-link-/${item}"]`);
+     await menuItem.click();
+-    await this.page.waitForURL(`**/${item.replace('-item', '')}**`, { timeout: 15000 }).catch(() => {});
++
++    // The sidebar click can silently fail to navigate (page stays on its
++    // current route instead of moving to the target) — seen previously on
++    // traces/metrics on cloud. Verify the URL actually changed and fall back
++    // to a direct goto if not, instead of swallowing the failure. Prefer the
++    // intended env org over whatever org is in the current URL — the current
++    // page may itself be stuck on the wrong (e.g. personal/default) org, and
++    // extracting from it would just perpetuate that mistake.
++    try {
++      await this.page.waitForURL(`**/${targetPath}**`, { timeout: 15000 });
++    } catch (e) {
++      const orgId = process.env['ORGNAME'] ?? this.page.url().match(/org_identifier=([^&]+)/)?.[1];
++      // Dashboards.vue expects a `folder` query param (goBackToDashboardList
++      // in ViewDashboard.vue always sends one) — without it the list can
++      // fail to render. Harmless extra param for other sidebar sections.
++      await this.page.goto(`${process.env['ZO_BASE_URL']}/web/${targetPath}?org_identifier=${orgId}&folder=default`);
++    }
+     await this.page.waitForLoadState('domcontentloaded');
+   }
+ 
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-panel-actions.js b/tests/ui-testing/pages/dashboardPages/dashboard-panel-actions.js
+index 0594fba7c5d..fb9b9917ade 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-panel-actions.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-panel-actions.js
+@@ -131,10 +131,47 @@ export default class DashboardactionPage {
+ 
+   // Add panel name
+   async addPanelName(panelName) {
+-    // Open the inline editor, then fill the revealed input.
+-    await this.panelNameTrigger.click();
+-    await this.panelNameInput.waitFor({ state: "visible" });
+-    await this.panelNameInput.fill(panelName);
++    // The panel name input is NOT a plain text box — when left untouched it
++    // mirrors an auto-generated name derived from the chart config ("Count of
++    // Kubernetes Namespace Name, Count of ... by ..."). Every config change
++    // recomputes that name and re-renders the input, replacing the DOM node.
++    //
++    // A fill() issued while such a re-render is in flight hits a node that is
++    // detached mid-action; Playwright retries internally but keeps resolving
++    // into nodes that are themselves replaced, so it burns the full timeout
++    // ("element was detached from the DOM, retrying"). A re-render landing
++    // just AFTER a successful fill is equally bad: it silently restores the
++    // auto-generated name and the panel saves under the wrong title.
++    //
++    // Re-open and re-fill until the value actually sticks, so a re-render
++    // costs one attempt rather than the whole call, and verify the result
++    // instead of assuming the fill held.
++    const maxAttempts = 3;
++    let lastError;
++
++    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
++      try {
++        // The trigger is only present while the editor is closed — clicking it
++        // when the input is already open would toggle the editor shut.
++        if (!(await this.panelNameInput.isVisible().catch(() => false))) {
++          await this.panelNameTrigger.click({ timeout: 10000 });
++        }
++        await this.panelNameInput.waitFor({ state: "visible", timeout: 10000 });
++        await this.panelNameInput.fill(panelName, { timeout: 10000 });
++
++        // Confirm the value survived any re-render that raced the fill.
++        if ((await this.panelNameInput.inputValue()) === panelName) return;
++        lastError = new Error(
++          `panel name reverted after fill (auto-generated name won the race)`
++        );
++      } catch (e) {
++        lastError = e;
++      }
++    }
++
++    throw new Error(
++      `addPanelName: could not set panel name to "${panelName}" after ${maxAttempts} attempts. Last error: ${lastError?.message}`
++    );
+   }
+ 
+   // Save panel button locator (for callers that only need a raw click)
+@@ -162,6 +199,33 @@ export default class DashboardactionPage {
+     ]).catch(() => {});
+   }
+ 
++  /**
++   * Discard the current panel and return to the dashboard view page.
++   * Use this for teardown when the panel intentionally holds an
++   * incomplete/invalid config (which cannot pass save validation) or when the
++   * test does not need to persist the panel. Discarding an edited panel fires
++   * a native window.confirm — Playwright auto-dismisses dialogs by default,
++   * which would cancel the navigation and leave the page on add_panel — so
++   * accept it for the duration of the discard.
++   * (Same handling as dashboard-multi-sql.js discardPanel; this is the
++   * generic home for it since discard is not a multi-SQL-specific action.)
++   */
++  async discardPanel() {
++    const discardBtn = this.page.locator('[data-test="dashboard-panel-discard"]');
++    const dialogHandler = (dialog) => dialog.accept();
++    this.page.on("dialog", dialogHandler);
++    try {
++      await discardBtn.waitFor({ state: "visible", timeout: 15000 });
++      await discardBtn.click();
++      // Discard navigates to the dashboard view page (/dashboards/view).
++      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
++        timeout: 30000,
++      });
++    } finally {
++      this.page.off("dialog", dialogHandler);
++    }
++  }
++
+   //Apply dashboard button
+   async applyDashboardBtn() {
+     // Wait for the apply button to exist and be visible. If a stale picker
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-panel-configs.js b/tests/ui-testing/pages/dashboardPages/dashboard-panel-configs.js
+index 23b5a10995c..e003944fd0d 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-panel-configs.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-panel-configs.js
+@@ -1446,7 +1446,12 @@ export default class DashboardPanelConfigs {
+    * Toggle the pagination switch in the config panel.
+    */
+   async togglePagination() {
+-    await this.paginationToggle.waitFor({ state: "visible" });
++    await this.paginationToggle.waitFor({ state: "visible", timeout: 30000 });
++    // The toggle lives near the bottom of the collapsible "Table" config section,
++    // so on a short viewport it can sit outside the scrolled config pane right
++    // after the panel opens. Bring it into view before clicking — a bare click on
++    // an off-screen target burns the whole action timeout waiting for stability.
++    await this.paginationToggle.scrollIntoViewIfNeeded().catch(() => {});
+     await this.paginationToggle.click();
+   }
+ 
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-panel-edit.js b/tests/ui-testing/pages/dashboardPages/dashboard-panel-edit.js
+index b6b868e86c6..68a55b4635f 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-panel-edit.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-panel-edit.js
+@@ -68,6 +68,9 @@ export default class DashboardPanel {
+ 
+     // VERIFIED: Chart renderer (ChartRenderer.vue:19)
+     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
++    // VERIFIED: no-data empty-state overlay (PanelSchemaRenderer.vue) — same
++    // locator dashboard-panel-actions.js exposes as noDataElement/getNoDataLocator().
++    this.noDataElement = page.locator('[data-test="no-data"]');
+   }
+ 
+   // Click the in-editor "data view" query inspector button
+@@ -204,6 +207,20 @@ export default class DashboardPanel {
+   async rightClickChartForAlert(maxRetries = 3) {
+     const chartCanvas = this.chartRendererCanvas.first();
+     await chartCanvas.waitFor({ state: "visible", timeout: 15000 });
++
++    // savePanel() triggers a fresh panel query; chart-renderer's DOM node stays
++    // "visible" the whole time, but a same-sized "no-data" empty-state overlay
++    // (absolute inset-0 sibling) covers it and intercepts clicks until that
++    // re-query resolves. A waitForResponse on the search-stream call isn't
++    // enough here (the caller already awaits one) — the DOM/no-data state
++    // updates a beat after the network response resolves, via Vue reactivity.
++    // Wait for the overlay to clear before right-clicking, otherwise the
++    // click lands on the overlay instead of the chart.
++    await this.noDataElement
++      .first()
++      .waitFor({ state: "hidden", timeout: 20000 })
++      .catch(() => {});
++
+     const box = await chartCanvas.boundingBox();
+     const position = box
+       ? { x: Math.floor(box.width / 2), y: Math.floor(box.height / 2) }
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboard-variables.js b/tests/ui-testing/pages/dashboardPages/dashboard-variables.js
+index 1cd05fed80c..3ba19ea8aba 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboard-variables.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboard-variables.js
+@@ -3,6 +3,7 @@
+ //addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
+ import { expect } from "@playwright/test";
+ import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-stream-field-utils.js";
++import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
+ 
+ export default class DashboardVariables {
+   constructor(page) {
+@@ -259,11 +260,44 @@ export default class DashboardVariables {
+     const hasSearch = await searchInput.count() > 0;
+     if (hasSearch) {
+       await searchInput.waitFor({ state: "visible", timeout: 5000 });
++      // The values list is fetched via a real HTTP fetch() to /_values_stream
++      // (useStreamingSearch, SSE-style: progress events then a final
++      // "data: [[DONE]]"), triggered by this search-term fill. Register the
++      // listener before filling so we don't miss the response, and treat it
++      // as a best-effort signal — reading a streaming body via CDP isn't
++      // always reliable, so a timeout here just falls through rather than
++      // failing (the poll below is the real backstop).
++      const valuesStreamPromise = waitForValuesStreamComplete(this.page, 10000);
+       await searchInput.fill(value);
++      await valuesStreamPromise;
+     }
+ 
+     const option = this.variableOptionByValue(label, value);
+-    await option.waitFor({ state: "visible", timeout: 10000 });
++
++    // The option list comes from a backend query over data that may have
++    // been ingested via a raw HTTP POST moments earlier in this test — a 200
++    // response there confirms accepted, not yet queryable/indexed. The
++    // values-stream wait above is the primary signal; on top of it, close
++    // and reopen the dropdown (forcing a fresh values query) until the
++    // option shows up or we've given indexing a generous window to catch up.
++    await expect.poll(async () => {
++      if (await option.isVisible()) return true;
++      await this.page.keyboard.press("Escape");
++      await trigger.click();
++      await this.variablePopover(label)
++        .waitFor({ state: "visible", timeout: 5000 })
++        .catch(() => {});
++      if (hasSearch) {
++        await searchInput
++          .waitFor({ state: "visible", timeout: 5000 })
++          .catch(() => {});
++        const retryValuesPromise = waitForValuesStreamComplete(this.page, 5000);
++        await searchInput.fill(value).catch(() => {});
++        await retryValuesPromise;
++      }
++      return await option.isVisible();
++    }, { timeout: 40000, intervals: [1000, 2000, 3000, 5000, 5000, 5000, 5000] }).toBe(true);
++
+     await option.click();
+   }
+ 
+diff --git a/tests/ui-testing/pages/dashboardPages/dashboardPage.js b/tests/ui-testing/pages/dashboardPages/dashboardPage.js
+index 3bc6c7277e5..e7a80bb0e90 100644
+--- a/tests/ui-testing/pages/dashboardPages/dashboardPage.js
++++ b/tests/ui-testing/pages/dashboardPages/dashboardPage.js
+@@ -160,8 +160,43 @@ export class DashboardPage {
+ 
+   // Hover the warning button and return the tooltip text locator matching `text`.
+   async getPanelErrorTooltipText(text) {
+-    await this.panelErrorDataBtn.hover();
+-    return this.page.locator('[data-test="o-tooltip-content"] div').getByText(text);
++    const tooltipText = this.page
++      .locator('[data-test="o-tooltip-content"] div')
++      .getByText(text);
++
++    // The tooltip only exists in the DOM while the button is hovered, and it
++    // unmounts the moment :hover is lost. Hovering ONCE and returning the
++    // locator races the panel's post-Apply re-render: a re-render landing
++    // between the hover and the caller's assertion shifts the button out from
++    // under the cursor, the tooltip never mounts (or unmounts again), and the
++    // assertion fails against an element that is no longer reachable.
++    // Re-hover each attempt so a re-render costs one retry, not the assertion.
++    // The panel header lays its buttons out right-aligned and flex-nowrap, and
++    // the partial-data/cap warning button is appended AFTER the query response
++    // finishes processing. Appending to a right-aligned row shifts the error
++    // button left, out from under a stationary cursor: the error tooltip
++    // unmounts and the newly-arrived warning button opens its own tooltip
++    // instead — the test then reads the wrong tooltip's text.
++    //
++    // Each attempt must therefore BLOCK long enough to straddle that re-render.
++    // locator.isVisible({timeout}) cannot do that — the option is documented as
++    // ignored and the call returns immediately, so a poll built on it retries
++    // several times within a few milliseconds, always before the second button
++    // has arrived. waitFor() actually waits, so a re-render costs one attempt
++    // and the next hover re-acquires the button at its new position.
++    const maxAttempts = 4;
++    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
++      await this.panelErrorDataBtn.hover({ timeout: 5000 }).catch(() => {});
++      const shown = await tooltipText
++        .waitFor({ state: "visible", timeout: 5000 })
++        .then(() => true)
++        .catch(() => false);
++      if (shown) break;
++    }
++
++    // Returned (not asserted) so the caller keeps ownership of the assertion
++    // and its failure message.
++    return tooltipText;
+   }
+ 
+   // Get the "Unsafe code detected" text locator.
+@@ -503,17 +538,30 @@ export class DashboardPage {
+     }
+   }
+ 
+-  async addCustomChart() {
++  async addCustomChart(dashboardName = "Customcharts") {
+     await this.dashboardsMenuItem.waitFor({ state: 'visible', timeout: 10000 });
+     await this.dashboardsMenuItem.click();
+ 
++    // The sidebar click can silently fail to navigate on cloud (page stays on
++    // its current route) — verify the URL actually changed and fall back to a
++    // direct goto (with the org explicitly forced) if not, instead of hanging
++    // on addDashboardButton until timeout.
++    try {
++      await this.page.waitForURL('**/dashboards**', { timeout: 10000 });
++    } catch (e) {
++      const orgId = process.env['ORGNAME'];
++      await this.page.goto(
++        `${process.env['ZO_BASE_URL']}/web/dashboards?org_identifier=${orgId}&folder=default`
++      );
++    }
++
+     await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
+     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+     await this.addDashboardButton.click();
+ 
+     // Wait for dialog and fill name
+     await this.dashboardNameInput.waitFor({ state: 'visible', timeout: 10000 });
+-    await this.dashboardNameInput.fill("Customcharts");
++    await this.dashboardNameInput.fill(dashboardName);
+ 
+     // Wait for submit button to be enabled
+     await expect(this.dashboardSubmitButton).toBeEnabled({ timeout: 15000 });
+diff --git a/tests/ui-testing/pages/dashboardPages/visualise.js b/tests/ui-testing/pages/dashboardPages/visualise.js
+index f0eb6b4a45d..f8ed7467105 100644
+--- a/tests/ui-testing/pages/dashboardPages/visualise.js
++++ b/tests/ui-testing/pages/dashboardPages/visualise.js
+@@ -691,6 +691,17 @@ export default class LogsVisualise {
+   // Click the dashboard back button
+   async clickDashboardBackBtn() {
+     await this.page.locator('[data-test="dashboard-back-btn"]').click();
++
++    // Both the panel-editor and dashboard-view page render an element with
++    // the same data-test="dashboard-back-btn" — a click right after saving
++    // can land on a stale instance mid page-transition and silently no-op.
++    // Verify the URL actually changed and retry once if not.
++    try {
++      await this.page.waitForURL(/\/dashboards(?:\?|$)/, { timeout: 8000 });
++    } catch (e) {
++      await this.page.locator('[data-test="dashboard-back-btn"]').click();
++      await this.page.waitForURL(/\/dashboards(?:\?|$)/, { timeout: 15000 });
++    }
+   }
+ 
+   // Get chart renderer canvas locator
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/custom-charts.spec.js b/tests/ui-testing/playwright-tests/Dashboards/custom-charts.spec.js
+index 3a1d1159a35..327cc02abca 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/custom-charts.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/custom-charts.spec.js
+@@ -6,9 +6,13 @@ const {
+ import path from "path";
+ import fs from "fs";
+ import { ingestion } from "./utils/dashIngestion.js";
++import { deleteDashboard } from "./utils/dashCreation.js";
+ import PageManager from "../../pages/page-manager";
+ const testLogger = require('../utils/test-logger.js');
+ 
++const generateDashboardName = (prefix) =>
++  `${prefix}_` + Math.random().toString(36).substr(2, 9);
++
+ // Function to read JSON test files
+ function readJsonFile(filename) {
+   const filePath = path.join(__dirname, `../../../test-data/${filename}`);
+@@ -30,6 +34,15 @@ test.describe("Custom Charts Tests", () => {
+   test.beforeEach(async ({ page }) => {
+     await navigateToBase(page);
+     await ingestion(page);
++
++    // navigateToBase() alone can land on the wrong org's page on cloud (the
++    // stored session's "last active org" wins over the org_identifier query
++    // param on a bare root load) — force the correct org context with an
++    // explicit navigation to a real feature page.
++    await page.goto(
++      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
++    );
++    await page.waitForLoadState("domcontentloaded");
+   });
+ 
+   test("Add Pictorial JSON in Monaco Editor", async ({ page }) => {
+@@ -41,7 +54,8 @@ test.describe("Custom Charts Tests", () => {
+       return;
+     }
+ 
+-    await pm.dashboardPage.addCustomChart();
++    const dashboardName = generateDashboardName("Customcharts_Pictorial");
++    await pm.dashboardPage.addCustomChart(dashboardName);
+ 
+     // Set both editors via Monaco API — .inputarea.fill() stopped overriding the
+     // panel's auto-generated query, leaving panelSchema.query empty so Apply
+@@ -59,6 +73,11 @@ test.describe("Custom Charts Tests", () => {
+         "Unsafe code detected: Access to 'document' is not allowed"
+       )
+     ).toBeVisible({ timeout: 5000 });
++
++    await page.goto(
++      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
++    );
++    await deleteDashboard(page, dashboardName);
+   });
+ 
+   test("Add line JSON in Monaco Editor", async ({ page }) => {
+@@ -69,7 +88,8 @@ test.describe("Custom Charts Tests", () => {
+       return;
+     }
+ 
+-    await pm.dashboardPage.addCustomChart();
++    const dashboardName = generateDashboardName("Customcharts_Line");
++    await pm.dashboardPage.addCustomChart(dashboardName);
+ 
+     // Set both editors via Monaco API (see Pictorial test above)
+     await pm.dashboardPage.setCustomChartCode(lineJSON);
+@@ -82,5 +102,10 @@ test.describe("Custom Charts Tests", () => {
+     await pm.dashboardPanelActions.expectCustomChartRendered(expect);
+     await expect(pm.dashboardPage.getUnsafeCodeText()).toBeHidden();
+     await expect(pm.dashboardPage.getPleaseEnterQueryText()).toBeHidden();
++
++    await page.goto(
++      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
++    );
++    await deleteDashboard(page, dashboardName);
+   });
+ });
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-create-alert.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-create-alert.spec.js
+index 9afb87edf4c..578a5f09189 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-create-alert.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-create-alert.spec.js
+@@ -24,7 +24,14 @@ const randomDashboardName =
+ // Favorites for any account that has some. Select the folder the dashboard was
+ // created in so the row is on screen no matter what the account has starred.
+ const returnToDashboardFolder = async (page, pm, folderName = "default") => {
+-  await pm.dashboardList.menuItem("dashboards-item");
++  // Visiting the Alerts page can reset the app's active-org state, so a plain
++  // sidebar click here can land on the wrong org's dashboards (which then
++  // redirects to billing) — force the org explicitly rather than trusting
++  // menuItem()'s sidebar-click navigation.
++  await page.goto(
++    `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=${folderName}`
++  );
++  await page.waitForLoadState("domcontentloaded");
+   await waitForDashboardPage(page);
+ 
+   // waitForDashboardPage settles on the folders API response, which lands well
+@@ -43,6 +50,15 @@ test.describe("Dashboard Create Alert testcases", () => {
+   test.beforeEach(async ({ page }) => {
+     await navigateToBase(page);
+     await ingestion(page);
++
++    // navigateToBase() alone can land on the wrong org's page on cloud (the
++    // stored session's "last active org" wins over the org_identifier query
++    // param on a bare root load) — force the correct org context with an
++    // explicit navigation to a real feature page.
++    await page.goto(
++      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
++    );
++    await page.waitForLoadState("domcontentloaded");
+   });
+ 
+   // ===== P0: SMOKE TESTS =====
+@@ -153,11 +169,13 @@ test.describe("Dashboard Create Alert testcases", () => {
+       await streamPromise;
+       await pm.dashboardPanelActions.waitForChartToRender();
+ 
+-      // Save the panel and wait for dashboard to reload chart data
+-      const dashboardStreamPromise = page.waitForResponse(
+-        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
+-        { timeout: 30000 }
+-      );
++      // Save the panel and wait for dashboard to reload chart data.
++      // _search_stream is SSE/chunked (progress events, then a final
++      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
++      // the first response event (headers), which fires as soon as the
++      // stream opens, not when it actually finishes. waitForStreamComplete
++      // reads the body and waits for the real [[DONE]] marker instead.
++      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
+       await pm.dashboardPanelActions.savePanel();
+       await dashboardStreamPromise;
+       await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
+@@ -245,11 +263,13 @@ test.describe("Dashboard Create Alert testcases", () => {
+       await streamPromise;
+       await pm.dashboardPanelActions.waitForChartToRender();
+ 
+-      // Save the panel and wait for dashboard to reload chart data
+-      const dashboardStreamPromise = page.waitForResponse(
+-        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
+-        { timeout: 30000 }
+-      );
++      // Save the panel and wait for dashboard to reload chart data.
++      // _search_stream is SSE/chunked (progress events, then a final
++      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
++      // the first response event (headers), which fires as soon as the
++      // stream opens, not when it actually finishes. waitForStreamComplete
++      // reads the body and waits for the real [[DONE]] marker instead.
++      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
+       await pm.dashboardPanelActions.savePanel();
+       await dashboardStreamPromise;
+       await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
+@@ -322,11 +342,13 @@ test.describe("Dashboard Create Alert testcases", () => {
+       await streamPromise;
+       await pm.dashboardPanelActions.waitForChartToRender();
+ 
+-      // Save the panel and wait for dashboard to reload chart data
+-      const dashboardStreamPromise = page.waitForResponse(
+-        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
+-        { timeout: 30000 }
+-      );
++      // Save the panel and wait for dashboard to reload chart data.
++      // _search_stream is SSE/chunked (progress events, then a final
++      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
++      // the first response event (headers), which fires as soon as the
++      // stream opens, not when it actually finishes. waitForStreamComplete
++      // reads the body and waits for the real [[DONE]] marker instead.
++      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
+       await pm.dashboardPanelActions.savePanel();
+       await dashboardStreamPromise;
+       await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-geoMap.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-geoMap.spec.js
+index 1e73966e964..c3870666094 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-geoMap.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-geoMap.spec.js
+@@ -1,5 +1,4 @@
+-import { test, expect } from "../baseFixtures.js";
+-import { login } from "./utils/dashLogin.js";
++const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+ import { ingestionForMaps } from "./utils/dashIngestion.js";
+ 
+ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+@@ -7,7 +6,10 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
+ import PageManager from "../../pages/page-manager";
+ const testLogger = require('../utils/test-logger.js');
+ 
+-const randomDashboardName =
++// Each test runs in parallel (mode: "parallel" below), so the name must be
++// generated fresh per test — a single shared name causes cross-test races
++// where one test's create/delete collides with another's mid-flight.
++const generateDashboardName = () =>
+   "Dashboard_" + Math.random().toString(36).substr(2, 9);
+ 
+ test.describe.configure({ mode: "parallel" });
+@@ -15,10 +17,20 @@ test.describe.configure({ mode: "parallel" });
+ test.describe("dashboard maps testcases", () => {
+   test.beforeEach(async ({ page }) => {
+     testLogger.debug("Test setup - beforeEach hook executing");
+-    await login(page);
++    await navigateToBase(page);
+     await page.waitForTimeout(1000);
+     await ingestionForMaps(page);
+     await page.waitForTimeout(2000);
++
++    // navigateToBase() alone can land on the wrong org's page on cloud (the
++    // stored session's "last active org" wins over the org_identifier query
++    // param on a bare root load) — force the correct org context with an
++    // explicit navigation to a real feature page, same as dashboard.spec.js's
++    // beforeEach does via its post-ingestion page.goto(logsUrl).
++    await page.goto(
++      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
++    );
++    await page.waitForLoadState("domcontentloaded");
+   });
+ 
+   test("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
+@@ -26,6 +38,7 @@ test.describe("dashboard maps testcases", () => {
+   }) => {
+     // Instantiate PageManager with the current page
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     // select dashboard
+     await pm.dashboardList.menuItem("dashboards-item");
+@@ -113,6 +126,7 @@ test.describe("dashboard maps testcases", () => {
+   }) => {
+     //instantiate PageManager with the current page
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     // select dashboard
+     await pm.dashboardList.menuItem("dashboards-item");
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-html-chart.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-html-chart.spec.js
+index 7923b96a6d4..57f61593032 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-html-chart.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-html-chart.spec.js
+@@ -8,8 +8,10 @@ import logData from "../../fixtures/log.json";
+ import { ingestion } from "./utils/dashIngestion.js";
+ import PageManager from "../../pages/page-manager";
+ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+-import { waitForValuesStreamComplete } from "../utils/streaming-helpers.js";
+-const randomDashboardName =
++// Each test runs in parallel (mode: "parallel" below), so the name must be
++// generated fresh per test — a single shared name caused cross-test races
++// where one test's create/delete collided with another's mid-flight.
++const generateDashboardName = () =>
+   "Dashboard_" + Math.random().toString(36).substr(2, 9);
+ 
+ // Basic HTML snippet for the first test
+@@ -67,6 +69,7 @@ test.describe("HTML chart dashboard", () => {
+   }) => {
+     // Instantiate PageManager with the current page
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+ 
+@@ -104,6 +107,7 @@ test.describe("HTML chart dashboard", () => {
+   }) => {
+     // Instantiate PageManager with the current page
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+ 
+@@ -139,17 +143,13 @@ test.describe("HTML chart dashboard", () => {
+       pm.chartTypeSelector.getHtmlHeading("Openobserve")
+     ).toBeVisible();
+ 
+-    // Wait for values stream API to complete before selecting variable value
+-    const valuesStreamPromise = waitForValuesStreamComplete(page);
+-
++    // selectValueFromVariableDropDown itself waits for the /_values_stream
++    // response (see dashboard-variables.js) before checking the option.
+     await pm.dashboardVariables.selectValueFromVariableDropDown(
+       "variablename",
+       "controller"
+     );
+ 
+-    // Wait for the API call to complete
+-    await valuesStreamPromise;
+-
+     await expect(
+       pm.chartTypeSelector.getHtmlRendererText("controller")
+     ).toBeVisible();
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-maps.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-maps.spec.js
+index 951953f2a8e..d7e28c981e1 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-maps.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-maps.spec.js
+@@ -1,5 +1,4 @@
+-import { test, expect } from "../baseFixtures.js";
+-import { login } from "./utils/dashLogin.js";
++const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+ import { ingestionForMaps } from "./utils/dashIngestion.js";
+ 
+ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+@@ -7,7 +6,10 @@ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+ import PageManager from "../../pages/page-manager";
+ const testLogger = require('../utils/test-logger.js');
+ 
+-const randomDashboardName =
++// Each test runs in parallel (mode: "parallel" below), so the name must be
++// generated fresh per test — a single shared name causes cross-test races
++// where one test's create/delete collides with another's mid-flight.
++const generateDashboardName = () =>
+   "Dashboard_" + Math.random().toString(36).substr(2, 9);
+ 
+ test.describe.configure({ mode: "parallel" });
+@@ -15,8 +17,20 @@ test.describe.configure({ mode: "parallel" });
+ test.describe("dashboard maps testcases", () => {
+   test.beforeEach(async ({ page }) => {
+     testLogger.debug("Test setup - beforeEach hook executing");
+-    await login(page);
++    await navigateToBase(page);
++    await page.waitForTimeout(1000);
+     await ingestionForMaps(page);
++    await page.waitForTimeout(2000);
++
++    // navigateToBase() alone can land on the wrong org's page on cloud (the
++    // stored session's "last active org" wins over the org_identifier query
++    // param on a bare root load) — force the correct org context with an
++    // explicit navigation to a real feature page, same as dashboard.spec.js's
++    // beforeEach does via its post-ingestion page.goto(logsUrl).
++    await page.goto(
++      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
++    );
++    await page.waitForLoadState("domcontentloaded");
+   });
+ 
+   test("Should display the correct location when entering latitude and longitude values", async ({
+@@ -24,6 +38,7 @@ test.describe("dashboard maps testcases", () => {
+   }) => {
+     // Instantiate PageManager with the current page
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     // select dashboard
+     await pm.dashboardList.menuItem("dashboards-item");
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-metric-camelcase.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-metric-camelcase.spec.js
+index 5d9a0485b5e..cd6a29b2d83 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-metric-camelcase.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-metric-camelcase.spec.js
+@@ -29,6 +29,39 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
+     await pm.chartTypeSelector.switchToCustomQueryMode();
+   }
+ 
++  /**
++   * Helper: leave the panel with exactly one Y-axis field, `alias`.
++   *
++   * Entering custom SQL makes the builder auto-seed the Y axis FROM THE SQL ALIAS, and
++   * that seeding is asynchronous. The tests used to assume the placeholder `y_axis_1` was
++   * still there and did removeField("y_axis_1") + searchAndAddField(alias), which races
++   * the seeding two ways:
++   *   - seeding not done yet -> y_axis_1 present, remove succeeds, alias added: fine
++   *   - seeding already done -> Y is already `alias`, so removeField("y_axis_1") waits
++   *     for an element that will never exist and times out
++   * and when the Y config is left wrong the panel renders nothing, which shows up as the
++   * "No Data" failure. Reconcile against whatever the panel actually holds instead of
++   * assuming which of the two states we are in.
++   */
++  async function ensureSingleYField(page, alias) {
++    const desired = page.locator(`[data-test="dashboard-y-item-${alias}-remove"]`);
++    const anyY = page.locator('[data-test^="dashboard-y-item-"][data-test$="-remove"]');
++
++    // Let the SQL-driven seeding settle before deciding what to reconcile.
++    await anyY.first().waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
++
++    if ((await desired.count()) > 0) {
++      testLogger.info(`Y-axis already seeded from SQL alias "${alias}" — nothing to do`);
++      return;
++    }
++
++    // Drop whatever placeholder the builder seeded, then add the alias under test.
++    for (let guard = 0; guard < 5 && (await anyY.count()) > 0; guard++) {
++      await anyY.first().click({ timeout: 5000 }).catch(() => {});
++    }
++    await pm.chartTypeSelector.searchAndAddField(alias, "y");
++  }
++
+   /**
+    * Helper: Apply dashboard and set a wide time range for data availability.
+    */
+@@ -49,7 +82,44 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
+     const chartRenderer = pm.dashboardPanelActions.getChartRendererCanvas();
+     await expect(chartRenderer).toBeVisible({ timeout: 15000 });
+ 
++    // Safety net: re-run the query if the panel is still showing "No Data".
++    //
++    // The panel does not re-query itself after its configuration changes — it surfaces
++    // the banner "Chart Configuration / Variables has been updated, but the chart was
++    // not updated automatically. Click on the 'Apply' button to run the query again".
++    // So a panel left showing "No Data" is a FINISHED render that never updates on its
++    // own, and only a fresh Apply can change it.
++    //
++    // That is why waiting cannot fix this, measured on alpha with 12 executions each:
++    //   - waitFor({state:"hidden"})  -> no-op; the element is ABSENT (not hidden) when
++    //                                   data renders, and waitFor("hidden") resolves
++    //                                   instantly against a selector matching nothing
++    //   - DOM poll for 15s           -> 7/12 passed
++    //   - waitForStreamComplete()    -> 5/12 passed, and slower: it reads the SSE body
++    //                                   via response.text(), which mostly fails on a
++    //                                   stream, so it silently rides its 15s fallback
++    //                                   ("Stream completed" logged just once in 12 runs)
++    //   - re-apply the query         -> 12/12 passed, always on the first retry
++    //
++    // The primary fix is ensureSingleYField() above, which stops the panel being
++    // misconfigured in the first place; this loop only covers the residual case (it
++    // fired once in 12 executions after that fix landed). The assertion below is
++    // unchanged: if the panel never renders data the loop gives up, the read still
++    // returns "No Data", and the test fails as it should.
+     const noDataElement = pm.dashboardPanelActions.getNoDataLocator();
++    const stillEmpty = async () => {
++      if ((await noDataElement.count()) === 0) return false;
++      const text = (await noDataElement.first().textContent().catch(() => "")) || "";
++      return text.trim() === "No Data";
++    };
++
++    for (let attempt = 1; attempt <= 4 && (await stillEmpty()); attempt++) {
++      testLogger.info(`Metric panel still empty — re-applying query (attempt ${attempt})`);
++      await pm.dashboardPanelActions.applyDashboardBtn();
++      await pm.dashboardPanelActions.waitForChartToRender();
++      await page.waitForTimeout(3000);
++    }
++
+     const noDataText = await noDataElement.textContent({ timeout: 5000 }).catch(() => "");
+     expect(noDataText.trim()).not.toBe("No Data");
+   }
+@@ -119,10 +189,9 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
+       `SELECT count(*) AS totalcount FROM "${STREAM_NAME}"`
+     );
+ 
+-    // Remove the default seeded Y (count) before adding ours — metric allows one Y.
+-    await pm.chartTypeSelector.removeField("y_axis_1", "y");
+-    // Add the lowercase alias as Y-axis field (metric chart requires Y-axis to render)
+-    await pm.chartTypeSelector.searchAndAddField("totalcount", "y");
++    // Metric allows one Y. Reconcile with whatever the SQL seeding left behind rather
++    // than assuming the y_axis_1 placeholder survived (see ensureSingleYField).
++    await ensureSingleYField(page, "totalcount");
+     testLogger.info("Custom SQL with lowercase alias entered");
+ 
+     // Apply with time range and verify
+@@ -157,10 +226,9 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
+       `SELECT count(*) AS metricValue FROM "${STREAM_NAME}" WHERE kubernetes_container_name = 'nonexistent_container_xyz_99999'`
+     );
+ 
+-    // Remove the default seeded Y (count) before adding ours — metric allows one Y.
+-    await pm.chartTypeSelector.removeField("y_axis_1", "y");
+-    // Add Y-axis field (metric chart requires Y-axis to render)
+-    await pm.chartTypeSelector.searchAndAddField("metricValue", "y");
++    // Metric allows one Y. Reconcile with whatever the SQL seeding left behind rather
++    // than assuming the y_axis_1 placeholder survived (see ensureSingleYField).
++    await ensureSingleYField(page, "metricValue");
+     testLogger.info("Custom SQL with non-existent filter entered");
+ 
+     // Apply and set narrow time range
+@@ -219,10 +287,9 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
+       `SELECT count(*) AS countRecords FROM "${STREAM_NAME}"`
+     );
+ 
+-    // Remove the default seeded Y (count) before adding ours — metric allows one Y.
+-    await pm.chartTypeSelector.removeField("y_axis_1", "y");
+-    // Add the camelCase alias as Y-axis field (metric chart requires Y-axis to render)
+-    await pm.chartTypeSelector.searchAndAddField("countRecords", "y");
++    // Metric allows one Y. Reconcile with whatever the SQL seeding left behind rather
++    // than assuming the y_axis_1 placeholder survived (see ensureSingleYField).
++    await ensureSingleYField(page, "countRecords");
+     testLogger.info("Custom SQL with camelCase alias entered");
+ 
+     // Apply with time range and verify
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-multi-y-axis.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-multi-y-axis.spec.js
+index 4bcfb5efc6c..79de7005a58 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-multi-y-axis.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-multi-y-axis.spec.js
+@@ -1,13 +1,15 @@
+-import { test, expect } from "../baseFixtures.js";
++const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+ import logData from "../../fixtures/log.json";
+ import logsdata from "../../../test-data/logs_data.json";
+-import { login } from "./utils/dashLogin.js";
+ import { ingestion } from "./utils/dashIngestion.js";
+ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+ import PageManager from "../../pages/page-manager";
+ const testLogger = require('../utils/test-logger.js');
+ 
+-const randomDashboardName =
++// Each test runs in parallel (mode: "parallel" below), so the name must be
++// generated fresh per test — a single shared name causes cross-test races
++// where one test's create/delete collides with another's mid-flight.
++const generateDashboardName = () =>
+   "Dashboard_" + Math.random().toString(36).substr(2, 9);
+ 
+ test.describe.configure({ mode: "parallel" });
+@@ -15,7 +17,7 @@ test.describe.configure({ mode: "parallel" });
+ test.describe("dashboard multi y axis testcases", () => {
+   test.beforeEach(async ({ page }) => {
+     testLogger.debug("Test setup - beforeEach hook executing");
+-    await login(page);
++    await navigateToBase(page);
+     await page.waitForTimeout(1000);
+     await ingestion(page);
+     await page.waitForTimeout(2000);
+@@ -32,6 +34,7 @@ test.describe("dashboard multi y axis testcases", () => {
+   }) => {
+     // Instantiate PageManager with the current page
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     // Generate a unique panel name
+     const panelName =
+@@ -93,6 +96,7 @@ test.describe("dashboard multi y axis testcases", () => {
+   }) => {
+     // Instantiate PageManager with the current page
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("Test_Panel");
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-pie-donut.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-pie-donut.spec.js
+index 1e5a2c2f986..c12ed815200 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-pie-donut.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-pie-donut.spec.js
+@@ -4,6 +4,7 @@ const {
+   navigateToBase,
+ } = require("../utils/enhanced-baseFixtures.js");
+ import PageManager from "../../pages/page-manager";
++import { ingestion } from "./utils/dashIngestion.js";
+ import { cleanupTestDashboard, setupTestDashboard } from "./utils/dashCreation.js";
+ import {
+   generateDashboardName,
+@@ -49,6 +50,12 @@ async function getPlottedPixelCount(page) {
+ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () => {
+   test.beforeEach(async ({ page }) => {
+     await navigateToBase(page);
++    // This file never sets an explicit panel time range, so every panel
++    // relies on the editor's default window covering whenever e2e_automate
++    // was last ingested. Ingest fresh data every test (matching every other
++    // dashboard spec file) instead of depending on another file's ingest
++    // still being within that window.
++    await ingestion(page);
+   });
+ 
+   // ---------------------------------------------------------------------------
+@@ -278,6 +285,13 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", ()
+     // Save panel first to access legend button on dashboard view
+     await pm.dashboardPanelActions.savePanel();
+ 
++    // ShowLegendsPopup derives its legend list from the panel's live
++    // panelData/series prop — clicking the legend button before the
++    // freshly re-rendered dashboard-view panel has fully repainted can
++    // read a stale/empty series list even though the canvas already shows
++    // colored pixels. Wait for the chart to finish rendering post-save.
++    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
++
+     // Hover over panel bar to reveal legend button
+     const panelBar = pm.dashboardPanelTime.getPanelBar().first();
+     await panelBar.waitFor({ state: "visible", timeout: 10000 });
+@@ -491,9 +505,13 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", ()
+     await expect(pm.dashboardPanelEdit.getPanelNameLocator()).toBeVisible();
+     testLogger.info("Page remains functional after apply without Y-axis field", { coloredPixels: await getPlottedPixelCount(page) });
+ 
+-    // Navigate to dashboard list (skip savePanel — no valid config to save)
+-    await navigateToBase(page);
+-    await pm.dashboardPanelActions.waitForDashboardSearchVisible().catch(() => {});
++    // The panel intentionally holds an invalid config, so savePanel() cannot
++    // pass validation — use the editor's own Discard exit instead of forcing a
++    // page.goto through the unsaved-changes beforeunload guard. Discard lands
++    // on the dashboard view, from where the normal cleanup path deletes the
++    // dashboard (previously this test navigated away and leaked it).
++    await pm.dashboardPanelActions.discardPanel();
++    await cleanupTestDashboard(page, pm, dashboardName);
+     testLogger.info("Edge case cleanup complete");
+   });
+ 
+@@ -553,9 +571,13 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", ()
+     await expect(pm.dashboardPanelEdit.getPanelNameLocator()).toBeVisible();
+     testLogger.info("Page remains functional after apply without stream selection", { coloredPixels: await getPlottedPixelCount(page) });
+ 
+-    // Navigate to dashboard list (skip savePanel — no valid config to save)
+-    await navigateToBase(page);
+-    await pm.dashboardPanelActions.waitForDashboardSearchVisible().catch(() => {});
++    // The panel intentionally holds an invalid config, so savePanel() cannot
++    // pass validation — use the editor's own Discard exit instead of forcing a
++    // page.goto through the unsaved-changes beforeunload guard. Discard lands
++    // on the dashboard view, from where the normal cleanup path deletes the
++    // dashboard (previously this test navigated away and leaked it).
++    await pm.dashboardPanelActions.discardPanel();
++    await cleanupTestDashboard(page, pm, dashboardName);
+     testLogger.info("Edge case cleanup complete");
+   });
+ });
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-sankey.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-sankey.spec.js
+index bff182d0bde..a3533e5f86b 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-sankey.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-sankey.spec.js
+@@ -260,12 +260,23 @@ test.describe("Sankey chart testcases", () => {
+       // Select Sankey chart type
+       await pm.chartTypeSelector.selectChartType("sankey");
+ 
+-      // Switch to custom query mode
+-      await pm.chartTypeSelector.switchToCustomQueryMode();
++      // Select the stream explicitly before switching to custom SQL — without
++      // this, the panel's stream metadata never resolves to "sankey_data"
++      // (unlike e2e_automate, which is already the panel's auto-selected
++      // default stream), so the field list kept showing the unrelated
++      // default-stream fields (client_service, error_rate, etc.) no matter
++      // how many times the query was re-applied.
++      await pm.chartTypeSelector.selectStreamType("logs");
++      await pm.chartTypeSelector.selectStream("sankey_data");
+ 
+-      // Enter custom SQL for Sankey
++      // Switch to SQL + custom query mode and enter the query. Using the
++      // combined setCustomSQL() helper (used by every other passing
++      // custom-SQL test) instead of switchToCustomQueryMode() +
++      // enterCustomSQL() separately — the latter skips the "SQL query type"
++      // click that setCustomSQL() does first, which left the field list
++      // never populating on alpha1.
+       const customSQL = `SELECT source, target, sum(value) as flow FROM "sankey_data" GROUP BY source, target`;
+-      await pm.chartTypeSelector.enterCustomSQL(customSQL);
++      await pm.chartTypeSelector.setCustomSQL(customSQL);
+ 
+       // Apply first to populate field list from query result
+       await pm.dashboardPanelActions.applyDashboardBtn();
+@@ -274,6 +285,23 @@ test.describe("Sankey chart testcases", () => {
+       // Wait for field list to populate from query result
+       await pm.chartTypeSelector.getFieldSearchInput().waitFor({ state: "visible", timeout: 10000 });
+ 
++      // A freshly-added panel auto-runs a DEFAULT-stream query when it first
++      // opens, BEFORE the custom-SQL query fires on Apply. If that default
++      // query's response arrives AFTER the custom query's, it overwrites the
++      // field list with the default stream's fields (verified: client_service,
++      // error_rate, p50_latency_ns, etc.) instead of our query's actual
++      // columns (source/target/flow) — a last-writer race. Re-apply until the
++      // real field shows up (the default query only fires once on panel open,
++      // so re-Apply only fires the custom query).
++      const sourceFieldRow = page.locator('[data-test="o-field-list-row-source"]').first();
++      await expect(async () => {
++        if (!(await sourceFieldRow.isVisible().catch(() => false))) {
++          await pm.dashboardPanelActions.applyDashboardBtn();
++          await pm.dashboardPanelActions.waitForChartToRender();
++        }
++        await expect(sourceFieldRow).toBeVisible({ timeout: 8000 });
++      }).toPass({ timeout: 60000, intervals: [1000] });
++
+       // Assign fields from custom query result to Sankey axes
+       await pm.chartTypeSelector.searchAndAddField("source", "source");
+       await pm.chartTypeSelector.searchAndAddField("target", "target");
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-global.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-global.spec.js
+index 091ae6b1cb5..d49ea25128a 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-global.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-global.spec.js
+@@ -23,6 +23,47 @@ const testLogger = require("../utils/test-logger.js");
+ 
+ test.describe.configure({ mode: "parallel" });
+ 
++/**
++ * Blocks until the variable's in-flight load has finished.
++ *
++ * loadVariableOptions() in VariablesValueSelector.vue early-returns while
++ * variableItem.isLoading is true, so opening the dropdown mid-load is dropped
++ * silently — no request is sent and none is retried. A monitored click landing in
++ * that window therefore observes "0 calls, 0/1 matched" and the test fails.
++ *
++ * isLoading is rendered as an OSpinner (role="status") inside the selector, which is
++ * the only reliable signal for it. Two things that look like signals are not:
++ *   - [data-test*="loading-indicator"] matches NOTHING in the dashboard components,
++ *     and waitFor({state:"hidden"}) on a non-matching selector resolves immediately.
++ *   - the displayed text is not usable either: the selector renders "(No Data Found)"
++ *     while the load is still in flight, so waiting for text settles too early.
++ * Both were measured returning in single-digit milliseconds with the spinner still up.
++ */
++const waitForVariableIdle = async (
++  page,
++  variableName,
++  { quietMs = 1000, timeout = 25000 } = {}
++) => {
++  const spinner = page.locator(
++    `[data-test="variable-selector-${variableName}"] [role="status"]`
++  );
++  const deadline = Date.now() + timeout;
++
++  // A single "spinner gone" check is NOT enough. Refreshing / changing the time
++  // range kicks off a cascade, so a second load can start a few hundred ms after
++  // the first spinner clears — and a click landing in that gap is dropped just the
++  // same. Require the idle state to HOLD for a quiet period before proceeding.
++  while (Date.now() < deadline) {
++    await spinner
++      .first()
++      .waitFor({ state: "detached", timeout: Math.max(1000, deadline - Date.now()) })
++      .catch(() => {});
++
++    await page.waitForTimeout(quietMs);
++    if ((await spinner.count()) === 0) return;
++  }
++};
++
+ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@dashboardVariables', '@globalVariables', '@smoke', '@P0'] }, () => {
+   test.beforeEach(async ({ page }) => {
+     await navigateToBase(page);
+@@ -142,9 +183,9 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
+     const variableDropdown = scopedVars.getVariableDropdown(variableName);
+     await variableDropdown.waitFor({ state: "visible", timeout: 10000 });
+ 
+-    // Wait for any loading indicators to disappear
+-    const loadingIndicator = scopedVars.getVariableLoadingIndicator(variableName);
+-    await loadingIndicator.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
++    // Wait for the variable's initial load to actually finish before clicking —
++    // a click landing mid-load is silently dropped (see waitForVariableIdle).
++    await waitForVariableIdle(page, variableName);
+ 
+     // Ensure network is idle after variable initialization
+     await safeWaitForNetworkIdle(page, { timeout: 3000 });
+@@ -472,6 +513,10 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
+     // Wait for variable to refresh after time range change
+     await safeWaitForNetworkIdle(page, { timeout: 5000 });
+ 
++    // The refresh kicks off a fresh load; the monitored click below must not land
++    // while it is still in flight or it is dropped silently and no request fires.
++    await waitForVariableIdle(page, variableName);
++
+     // Monitor API call when clicking dropdown again
+     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
+     await variableDropdown.click();
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-tab-level.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-tab-level.spec.js
+index 83e30ee6ec8..2ae0d151156 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-tab-level.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-tab-level.spec.js
+@@ -26,6 +26,44 @@ const testLogger = require("../utils/test-logger.js");
+ 
+ test.describe.configure({ mode: "parallel" });
+ 
++/**
++ * Blocks until the variable's in-flight load has finished.
++ *
++ * loadVariableOptions() in VariablesValueSelector.vue early-returns while
++ * variableItem.isLoading is true. Opening the dropdown in that window still shows
++ * the popover (onPopupShow runs) but the options are never fetched, so the list
++ * stays empty and any wait for options times out.
++ *
++ * isLoading is rendered as an OSpinner (role="status") inside the selector, which is
++ * the only reliable signal for it — [data-test*="loading-indicator"] matches nothing,
++ * and the displayed text is not usable either because the selector renders
++ * "(No Data Found)" while the load is still in flight.
++ *
++ * A single "spinner gone" check is not enough: switching tabs / changing the time
++ * range kicks off a cascade, so a second load can begin shortly after the first
++ * spinner clears. Require the idle state to HOLD for a quiet period.
++ */
++const waitForVariableIdle = async (
++  page,
++  variableName,
++  { quietMs = 1000, timeout = 25000 } = {}
++) => {
++  const spinner = page.locator(
++    `[data-test="variable-selector-${variableName}"] [role="status"]`
++  );
++  const deadline = Date.now() + timeout;
++
++  while (Date.now() < deadline) {
++    await spinner
++      .first()
++      .waitFor({ state: "detached", timeout: Math.max(1000, deadline - Date.now()) })
++      .catch(() => {});
++
++    await page.waitForTimeout(quietMs);
++    if ((await spinner.count()) === 0) return;
++  }
++};
++
+ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashboardVariables', '@tabVariables', '@P1'] }, () => {
+   test.beforeEach(async ({ page }) => {
+     await navigateToBase(page);
+@@ -160,6 +198,8 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
+     const varTrigger1 = scopedVars.getVariableTriggerLocator(variableName);
+     await varTrigger1.waitFor({ state: "visible", timeout: 5000 });
+     await safeWaitForNetworkIdle(page, { timeout: 3000 });
++    // Opening mid-load shows the popover but never fetches options (see waitForVariableIdle)
++    await waitForVariableIdle(page, variableName);
+     await varTrigger1.click();
+     // Wait for dropdown menu to open
+     const popover1 = scopedVars.getVariablePopoverLocator(variableName);
+@@ -182,6 +222,8 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
+     const varTrigger2 = scopedVars.getVariableTriggerLocator(variableName);
+     await varTrigger2.waitFor({ state: "visible", timeout: 5000 });
+     await safeWaitForNetworkIdle(page, { timeout: 3000 });
++    // Opening mid-load shows the popover but never fetches options (see waitForVariableIdle)
++    await waitForVariableIdle(page, variableName);
+     await varTrigger2.click();
+     // Wait for dropdown menu to open
+     const popover2 = scopedVars.getVariablePopoverLocator(variableName);
+@@ -592,6 +634,8 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
+     const varDropdown = scopedVars.getVariableSelectorLocator(variableName);
+     await varDropdown.waitFor({ state: "visible", timeout: 5000 });
+     await safeWaitForNetworkIdle(page, { timeout: 3000 });
++    // Opening mid-load shows the popover but never fetches options (see waitForVariableIdle)
++    await waitForVariableIdle(page, variableName);
+     await varDropdown.click();
+     // Wait for dropdown menu to open
+     await scopedVars.getVariablePopoverLocator(variableName).waitFor({ state: "visible", timeout: 5000 });
+@@ -602,6 +646,18 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
+     await option.click();
+     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
+ 
++    // Selecting a value does not update the URL synchronously — useVariablesManager
++    // writes var-<name>.t.<tabId> via a router push once the value has propagated.
++    // Reading page.url() straight after the click races that push. Wait for the param
++    // to appear (the assertion below still fails properly if it never does).
++    await page
++      .waitForFunction(
++        (name) => window.location.href.includes(`var-${name}.t.default=`),
++        variableName,
++        { timeout: 10000 }
++      )
++      .catch(() => {});
++
+     // Get current URL
+     const currentURL = page.url();
+ 
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/dashboard.spec.js b/tests/ui-testing/playwright-tests/Dashboards/dashboard.spec.js
+index dc7b3f9d958..2bd6a6c7b0b 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/dashboard.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/dashboard.spec.js
+@@ -13,7 +13,10 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
+ import PageManager from "../../pages/page-manager";
+ import { waitForStreamComplete, waitForTableWithData } from "../utils/streaming-helpers.js";
+ 
+-const randomDashboardName =
++// Each test runs in parallel (mode: "parallel" below), so the name must be
++// generated fresh per test — a single shared name caused cross-test races
++// where one test's create/delete collided with another's mid-flight.
++const generateDashboardName = () =>
+   "Dashboard_" + Math.random().toString(36).substr(2, 9);
+ 
+ test.describe.configure({ mode: "parallel" });
+@@ -32,6 +35,7 @@ test.describe("dashboard UI testcases", () => {
+   });
+   test("should add and delete the dashboard", async ({ page }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     // Navigate to the dashboard list
+     await pm.dashboardList.menuItem("dashboards-item");
+@@ -51,6 +55,7 @@ test.describe("dashboard UI testcases", () => {
+   test("should create a duplicate of the dashboard", async ({ page }) => {
+     // Initialize Page Objects
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     //navigate to the dashboard list
+     await pm.dashboardList.menuItem("dashboards-item");
+@@ -82,6 +87,7 @@ test.describe("dashboard UI testcases", () => {
+   test("should create a dashboard and add the breakdown", async ({ page }) => {
+     // Initialize Page Objects
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     // Generate a unique panel name
+     const panelName =
+@@ -129,6 +135,7 @@ test.describe("dashboard UI testcases", () => {
+   }) => {
+     // Initialize only the used Page Objects
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     // Generate a unique panel name
+     const panelName =
+@@ -175,6 +182,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     // Generate unique panel name
+     const panelName =
+@@ -194,6 +202,11 @@ test.describe("dashboard UI testcases", () => {
+       'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
+     );
+ 
++    // Wait for the SQL parser to extract fields and render them in the field
++    // list before adding them — on alpha1 this parse can take longer than the
++    // 10s default in searchAndAddField's own waitFor, causing a race.
++    await pm.chartTypeSelector.waitForFieldListRow("y_axis_1", 20000);
++
+     // Map query results to chart axes
+     await pm.chartTypeSelector.searchAndAddField("y_axis_1", "y");
+     await pm.chartTypeSelector.searchAndAddField("breakdown_1", "b");
+@@ -213,6 +226,7 @@ test.describe("dashboard UI testcases", () => {
+   }) => {
+     // Initialize Page Objects
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     // Generate a unique panel name
+     const panelName =
+@@ -259,6 +273,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+ 
+@@ -316,6 +331,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+ 
+@@ -368,6 +384,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+     // const dateTimeHelper = new DateTimeHelper(page);
+@@ -421,6 +438,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+ 
+@@ -472,6 +490,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+ 
+@@ -527,6 +546,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+ 
+@@ -599,6 +619,7 @@ test.describe("dashboard UI testcases", () => {
+   }) => {
+     // Initialize only the necessary Page Objects
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+ 
+     // Generate a unique panel name
+     const panelName =
+@@ -644,6 +665,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+     // Navigate to dashboards
+@@ -686,6 +708,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+ 
+@@ -707,6 +730,11 @@ test.describe("dashboard UI testcases", () => {
+       'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+     );
+ 
++    // Wait for the SQL parser to extract fields and render them in the field
++    // list before adding them — avoids a race on alpha1 where parsing takes
++    // longer than searchAndAddField's own 10s waitFor.
++    await pm.chartTypeSelector.waitForFieldListRow("xAxis1", 20000);
++
+     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
+     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
+     await pm.dashboardPanelActions.applyDashboardBtn();
+@@ -735,6 +763,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("line-panel-test");
+ 
+@@ -753,6 +782,11 @@ test.describe("dashboard UI testcases", () => {
+       'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+     );
+ 
++    // Wait for the SQL parser to extract fields and render them in the field
++    // list before adding them — avoids a race on alpha1 where parsing takes
++    // longer than searchAndAddField's own 10s waitFor.
++    await pm.chartTypeSelector.waitForFieldListRow("xAxis1", 20000);
++
+     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
+     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
+ 
+@@ -827,6 +861,7 @@ test.describe("dashboard UI testcases", () => {
+     page,
+   }) => {
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
+     const panelName =
+       pm.dashboardPanelActions.generateUniquePanelName("complex-case-panel-test");
+ 
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/utils/dashCreation.js b/tests/ui-testing/playwright-tests/Dashboards/utils/dashCreation.js
+index 95ba5f75801..372065bfb44 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/utils/dashCreation.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/utils/dashCreation.js
+@@ -74,11 +74,36 @@ export async function deleteDashboard(page, dashboardName) {
+ 
+   // The dashboard list is paginated and is not sorted newest-first. Narrow it
+   // to the generated dashboard when its row is not on the current page.
+-  if (!(await nameCell.isVisible().catch(() => false))) {
+-    const searchInput = page.locator('[data-test="dashboard-search-field"]');
++  //
++  // Filling the search ONCE and then waiting 15s is not enough: this runs right
++  // after returning from the panel editor, so the list is often still loading
++  // and re-rendering. A fill landing mid-render is discarded (the input remounts
++  // empty), leaving the search unapplied and the row on some other page — the
++  // wait then expires against a row that was never going to appear. Re-assert
++  // the filter until the row shows up.
++  const searchInput = page.locator('[data-test="dashboard-search-field"]').first();
++  const findAttempts = 3;
++  for (let attempt = 1; attempt <= findAttempts; attempt++) {
++    if (await nameCell.isVisible().catch(() => false)) break;
++
+     if (await searchInput.count()) {
+-      await searchInput.first().fill(dashboardName);
++      // Re-fill only when the filter did not stick, so a slow-but-applied
++      // search is left alone rather than being retyped underneath itself.
++      if ((await searchInput.inputValue().catch(() => "")) !== dashboardName) {
++        await searchInput.fill(dashboardName).catch(() => {});
++      }
+     }
++
++    // waitFor() blocks; isVisible({timeout}) does NOT — that option is
++    // documented as ignored and the call returns immediately. Polling with
++    // isVisible here made all three attempts complete in microseconds, so the
++    // loop never actually gave the filtered list time to render and was a
++    // no-op versus the single waitFor below.
++    const found = await nameCell
++      .waitFor({ state: 'visible', timeout: 5000 })
++      .then(() => true)
++      .catch(() => false);
++    if (found) break;
+   }
+ 
+   await nameCell.waitFor({ state: 'visible', timeout: 15000 });
+@@ -249,7 +274,13 @@ export async function setupTestDashboard(page, pm, dashboardName, options = {})
+   await pm.dashboardCreate.createDashboard(dashboardName);
+ 
+   if (waitForAddPanelBtn) {
+-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 10000 });
++    // createDashboard() returns as soon as /dashboards/view is reachable and the
++    // header's back button has mounted, but the empty-state add-panel button
++    // lives in RenderDashboardCharts (v-if="!panels.length"), which only renders
++    // once the dashboard GET and variables init have finished. Under parallel CI
++    // load that lands well after the header, so this wait needs the same budget
++    // as the other post-navigation waits here rather than a tight 10s.
++    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 30000 });
+   }
+ 
+   testLogger.info('Test dashboard setup complete', { dashboardName });
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/utils/dashIngestion.js b/tests/ui-testing/playwright-tests/Dashboards/utils/dashIngestion.js
+index 88fe84db4da..f26361a276f 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/utils/dashIngestion.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/utils/dashIngestion.js
+@@ -5,6 +5,7 @@ import dashboardChartJsonData from "../../../../test-data/dashboard_chart_json.j
+ import sankeyData from "../../../../test-data/sankey_data.json";
+ // Fixed testLogger path - updated to use correct relative path
+ const testLogger = require('../../utils/test-logger.js');
++const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
+ 
+ // Exported function to remove UTF characters
+ const removeUTFCharacters = (text) => {
+@@ -22,17 +23,14 @@ const getAuthToken = async () => {
+ 
+ // page is passed here to access the page object (currently not used)
+ export const ingestion = async (page, streamName = "e2e_automate") => {
+-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
++  if (!process.env["INGESTION_URL"]) {
+     throw new Error("Required environment variables are not set");
+   }
+ 
+-  const orgId = process.env["ORGNAME"];
++  const orgId = getOrgIdentifier();
+ 
+   try {
+-    const headers = {
+-      "Content-Type": "application/json",
+-      Authorization: await getAuthToken(),
+-    };
++    const headers = getAuthHeaders();
+ 
+     const fetchResponse = await fetch(
+       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+@@ -60,17 +58,14 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
+ 
+ // Ingestion function for Geomap and Maps chart
+ const ingestionForMaps = async (page, streamName = "geojson") => {
+-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
++  if (!process.env["INGESTION_URL"]) {
+     throw new Error("Required environment variables are not set");
+   }
+ 
+-  const orgId = process.env["ORGNAME"];
++  const orgId = getOrgIdentifier();
+ 
+   try {
+-    const headers = {
+-      "Content-Type": "application/json",
+-      Authorization: await getAuthToken(),
+-    };
++    const headers = getAuthHeaders();
+ 
+     const fetchResponse = await fetch(
+       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+@@ -96,17 +91,14 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
+ 
+ // Ingestion function for Dashboard Chart JSON data
+ const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") => {
+-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
++  if (!process.env["INGESTION_URL"]) {
+     throw new Error("Required environment variables are not set");
+   }
+ 
+-  const orgId = process.env["ORGNAME"];
++  const orgId = getOrgIdentifier();
+ 
+   try {
+-    const headers = {
+-      "Content-Type": "application/json",
+-      Authorization: await getAuthToken(),
+-    };
++    const headers = getAuthHeaders();
+ 
+     const fetchResponse = await fetch(
+       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+@@ -132,17 +124,14 @@ const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") =
+ 
+ // Ingestion function for Sankey chart data
+ const ingestionForSankey = async (streamName = "sankey_data") => {
+-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
++  if (!process.env["INGESTION_URL"]) {
+     throw new Error("Required environment variables are not set");
+   }
+ 
+-  const orgId = process.env["ORGNAME"];
++  const orgId = getOrgIdentifier();
+ 
+   try {
+-    const headers = {
+-      "Content-Type": "application/json",
+-      Authorization: await getAuthToken(),
+-    };
++    const headers = getAuthHeaders();
+ 
+     const fetchResponse = await fetch(
+       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/visualize-vrl.spec.js b/tests/ui-testing/playwright-tests/Dashboards/visualize-vrl.spec.js
+index 566cb7a417b..bca7ed82ffb 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/visualize-vrl.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/visualize-vrl.spec.js
+@@ -8,6 +8,7 @@ import testLogger from '../utils/test-logger.js';
+ import logData from "../../fixtures/log.json";
+ import PageManager from "../../pages/page-manager";
+ import { deleteDashboard } from "./utils/dashCreation.js";
++const { isCloudEnvironment } = require("../../pages/cloudPages/cloud-env.js");
+ 
+ // Dashboard and panel names - using slice() instead of deprecated substr()
+ const randomDashboardName =
+@@ -61,6 +62,11 @@ async function enableVrlEditor(page) {
+ test.describe("VRL visualization support testcases", () => {
+   test.beforeEach(async ({ page }, testInfo) => {
+     testLogger.testStart(testInfo.title, testInfo.file);
++    // Every test in this file opens the Visualize tab via openVisualiseTabWithVrl(),
++    // which is gated behind store.state.zoConfig.timechart_enabled — confirmed
++    // false on alpha1 (verified via /config). No test code can enable a
++    // disabled backend flag, so skip the whole file on cloud.
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     await navigateToBase(page);
+     await ingestion(page);
+ 
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/visualize.spec.js b/tests/ui-testing/playwright-tests/Dashboards/visualize.spec.js
+index f14e50a3dc0..a182b228b81 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/visualize.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/visualize.spec.js
+@@ -11,13 +11,15 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
+ import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
+ 
+ import { deleteDashboard } from "./utils/dashCreation.js";
++const { isCloudEnvironment } = require("../../pages/cloudPages/cloud-env.js");
+ 
+-//Dashboard name
+-const randomDashboardName =
++// Tests run in parallel (mode: "parallel" below), so dashboard/panel names
++// must be generated fresh per test — a single shared name caused cross-test
++// races where one test's create/delete collided with another's mid-flight.
++const generateDashboardName = () =>
+   "Dashboard_" + Math.random().toString(36).slice(2, 11);
+-
+-// Panel name
+-const panelName = "Panel_" + Math.random().toString(36).slice(2, 11);
++const generatePanelName = () =>
++  "Panel_" + Math.random().toString(36).slice(2, 11);
+ 
+ test.describe.configure({ mode: "parallel" });
+ 
+@@ -83,6 +85,10 @@ test.describe("logs testcases", () => {
+   test("should handle large datasets and complex SQL queries without showing an error on the chart", {
+     tag: ["@logs", "@visualize", "@P1", "@all"],
+   }, async ({ page }) => {
++    // The Visualize tab (logs-visualize-toggle) is gated behind
++    // store.state.zoConfig.timechart_enabled, which is disabled on alpha1
++    // (verified via /config) — no test code can enable a disabled backend flag.
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     const pm = new PageManager(page);
+ 
+     await pm.logsVisualise.openLogs();
+@@ -102,6 +108,7 @@ test.describe("logs testcases", () => {
+   test("should redirect the correct chart type when added the aggregation query", {
+     tag: ["@logs", "@visualize", "@P1", "@all"],
+   }, async ({ page }) => {
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     const pm = new PageManager(page);
+ 
+     await pm.logsVisualise.openLogs();
+@@ -127,6 +134,7 @@ test.describe("logs testcases", () => {
+   test("should not show dashboard errors when changing chart types with aggregation query", {
+     tag: ["@logs", "@visualize", "@P1", "@all"],
+   }, async ({ page }) => {
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     const pm = new PageManager(page);
+ 
+     await pm.logsVisualise.openLogs();
+@@ -173,6 +181,7 @@ test.describe("logs testcases", () => {
+   test("should set line chart as default when using histogram query", {
+     tag: ["@logs", "@visualize", "@P1", "@all"],
+   }, async ({ page }) => {
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     const pm = new PageManager(page);
+ 
+     await pm.logsVisualise.openLogs();
+@@ -205,7 +214,10 @@ test.describe("logs testcases", () => {
+   test("Should display the correct query in the dashboard when saved from a Table chart.", {
+     tag: ["@logs", "@visualize", "@dashboard", "@P1", "@all"],
+   }, async ({ page }) => {
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
++    const panelName = generatePanelName();
+ 
+     await pm.logsVisualise.openLogs();
+ 
+@@ -243,7 +255,10 @@ test.describe("logs testcases", () => {
+   test("should display the correct query in the dashboard when saved from a Line chart.", {
+     tag: ["@logs", "@visualize", "@dashboard", "@P1", "@all"],
+   }, async ({ page }) => {
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
++    const panelName = generatePanelName();
+ 
+     await pm.logsVisualise.openLogs();
+ 
+@@ -279,7 +294,10 @@ test.describe("logs testcases", () => {
+   test("should save SELECT * query panel to dashboard successfully", {
+     tag: ["@logs", "@visualize", "@dashboard", "@P1", "@all"],
+   }, async ({ page }) => {
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     const pm = new PageManager(page);
++    const randomDashboardName = generateDashboardName();
++    const panelName = generatePanelName();
+ 
+     await pm.logsVisualise.openLogs();
+ 
+@@ -318,6 +336,7 @@ test.describe("logs testcases", () => {
+   test("should show error message when using aggregation functions without aliases in SQL query", {
+     tag: ["@logs", "@visualize", "@P2", "@all"],
+   }, async ({ page }) => {
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     const pm = new PageManager(page);
+ 
+     await pm.logsVisualise.openLogs();
+@@ -338,6 +357,7 @@ test.describe("logs testcases", () => {
+   test("should show quick mode toggle accessible in visualize tab", {
+     tag: ["@logs", "@visualize", "@P2", "@all"],
+   }, async ({ page }) => {
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     const pm = new PageManager(page);
+ 
+     await pm.logsVisualise.openLogs();
+@@ -364,6 +384,7 @@ test.describe("logs testcases", () => {
+   test("should show connect null values toggle as true by default when visualizing histogram query with HAVING clause", {
+     tag: ["@logs", "@visualize", "@P2", "@all"],
+   }, async ({ page }) => {
++    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
+     const pm = new PageManager(page);
+ 
+     await pm.logsVisualise.openLogs();
+diff --git a/web/src/views/Dashboards/ViewDashboard.vue b/web/src/views/Dashboards/ViewDashboard.vue
+index 3b413ce6ba8..815c7eca413 100644
+--- a/web/src/views/Dashboards/ViewDashboard.vue
++++ b/web/src/views/Dashboards/ViewDashboard.vue
+@@ -1230,7 +1230,7 @@ export default defineComponent({
+           org_identifier: store.state.selectedOrganization.identifier,
+           dashboard: route.query.dashboard,
+           folder: route.query.folder ?? "default",
+-          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
++          tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
+         },
+       });
+     };

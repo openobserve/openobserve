@@ -1,4 +1,5 @@
 // methods: createDashboard, searchDashboard, AddPanel, applyButton
+import { expect } from "@playwright/test";
 
 export default class DashboardCreate {
   /**
@@ -28,11 +29,29 @@ export default class DashboardCreate {
     this.defaultDashboardTab = this.page.locator(
       '[data-test="dashboard-tab-default"]'
     );
+    this.tabStripList = this.page.locator('[data-test="dashboard-tab-list"]');
+    this.getActiveTabTrigger = (tabId) =>
+      this.page.locator(
+        `[data-test="dashboard-tab-${tabId}"][data-state="active"]`
+      );
   }
 
   // Wait for the default tab inside an opened dashboard to be visible
   async waitForDefaultDashboardTabVisible() {
     await this.defaultDashboardTab.waitFor({ state: "visible" });
+  }
+
+  // Wait for the dashboard tab strip (OTabs) to be visible. The strip renders
+  // only after selectedDate + selectedTabId resolve in loadDashboard, so this
+  // is the deterministic gate before asserting an active tab on a deep link.
+  async waitForTabStripVisible() {
+    await this.tabStripList.waitFor({ state: "visible", timeout: 30000 });
+  }
+
+  // Assert a specific tab trigger is the active tab. Reka stamps
+  // data-state="active" on the selected TabsTrigger (OTab.vue).
+  async expectTabActive(tabId) {
+    await expect(this.getActiveTabTrigger(tabId)).toBeVisible({ timeout: 15000 });
   }
 
   // Wait for the "add panel" button on an empty dashboard to be visible
