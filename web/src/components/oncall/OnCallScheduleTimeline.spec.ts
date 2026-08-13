@@ -120,6 +120,16 @@ describe("OnCallScheduleTimeline", () => {
     expect(band.ariaLabel).toContain("Primary");
   });
 
+  /// A cover is "Sam is covering Tuesday", never "the rotation changed" — the
+  /// displaced layer is still the lane it belongs to.
+  it("marks a covered span without moving it out of its rotation", () => {
+    const wrapper = render({ segments: [seg({ override_id: "ov_1" })] });
+    const track = tracksOf(wrapper)[0];
+
+    expect(track.key).toBe("Primary");
+    expect(track.bands[0].ariaLabel).toContain("covering");
+  });
+
   it("offers to fill the first gap, and stays quiet when there is none", () => {
     expect(render().find('[data-test="oncall-timeline-fill-gap"]').exists()).toBe(false);
 

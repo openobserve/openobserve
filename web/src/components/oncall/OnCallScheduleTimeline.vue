@@ -194,6 +194,9 @@ const zoneLine = computed<I18nText>(() =>
   }),
 );
 
+/// Marks a span somebody is covering rather than one the rotation produced.
+const COVER_MARK = "⤺";
+
 const share = (micros: number) => (micros - from.value) / span.value;
 
 /// One lane per rotation, in the order the schedule lists them. Driven by the
@@ -217,8 +220,10 @@ const tracks = computed<ScheduleTrack[]>(() => {
           key: `${name}-${segment.from}`,
           offset: share(start),
           width: (end - start) / span.value,
-          label: raw(who),
-          ariaLabel: t("oncall.timelineBandAria", {
+          // A cover reads as "Sam is covering Tuesday", never as "the rotation
+          // changed" — the layer it displaced is still the one it belongs to.
+          label: raw(segment.override_id ? `${who} ${COVER_MARK}` : who),
+          ariaLabel: t(segment.override_id ? "oncall.timelineCoverAria" : "oncall.timelineBandAria", {
             who: who ? raw(who) : t("oncall.calendarNobody"),
             rotation: raw(name),
             from: raw(fmt(start, { weekday: "short", hour: "2-digit", minute: "2-digit" })),

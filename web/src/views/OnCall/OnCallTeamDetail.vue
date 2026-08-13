@@ -285,6 +285,16 @@
     </OTabPanels>
 
     <OnCallTeamForm v-model:open="editOpen" :team="team" @saved="onTeamSaved" />
+
+    <OnCallCoverForm
+      v-model:open="coverOpen"
+      :members="members"
+      :timezone="team?.timezone ?? 'UTC'"
+      :saving="coverSaving"
+      :current-holder="onCallNow[0]?.user_email ?? null"
+      :gap="coverGap"
+      @save="saveCover"
+    />
   </OPageLayout>
 </template>
 
@@ -308,6 +318,7 @@ import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
 import OnCallContactReadiness from "@/components/oncall/OnCallContactReadiness.vue";
+import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import OnCallLoadBalance from "@/components/oncall/OnCallLoadBalance.vue";
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
 import OnCallTeamReach from "@/components/oncall/OnCallTeamReach.vue";
@@ -370,6 +381,9 @@ const segments = ref<ResolvedSegment[]>([]);
 const segmentsLoading = ref(false);
 /// Read or edit, never both — the editor brings its own calendar and table.
 const editingSchedule = ref(false);
+const coverOpen = ref(false);
+const coverSaving = ref(false);
+const coverGap = ref<{ from: number; to: number } | null>(null);
 /// Owned by the timeline, which decides the visible range; the fetch follows it.
 const scheduleWindow = ref({ from: 0, to: 0 });
 const ruleCount = ref(0);
@@ -662,10 +676,37 @@ async function fetchSegments() {
   }
 }
 
-/// Covering a gap is an override, which needs a person and a window — the
-/// editor is where that is chosen until the cover dialog lands.
-function onFillGap() {
-  editingSchedule.value = true;
+/// The gap the chart offered to fill pre-fills the window, so the common case
+/// is choosing a person and pressing save.
+function onFillGap(gap: ResolvedSegment) {
+  coverGap.value = { from: gap.from, to: gap.to };
+  coverOpen.value = true;
+}
+
+/// A cover takes a slot for a window; outside it the rotation resolves exactly
+/// as before, which is what makes taking one safe.
+async function saveCover(value: { user_email: string; start_at: number; end_at: number }) {
+  coverSaving.value = true;
+  try {
+    await oncallService.createOverride({
+      org_identifier: orgId.value,
+      team_id: teamId.value,
+      data: value,
+    });
+    coverOpen.value = false;
+    coverGap.value = null;
+    toast({ variant: "success", message: t("oncall.coverSaved") });
+    await fetchSegments();
+  } catch (err: any) {
+    // A 409 is the server saying somebody already covers that window — worth
+    // the reader seeing verbatim, since it names them.
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.coverSaveFailed"),
+    });
+  } finally {
+    coverSaving.value = false;
+  }
 }
 
 /// Back to the resolved view on save: the point of saving is to see what the

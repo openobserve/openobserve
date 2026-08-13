@@ -560,7 +560,18 @@ const oncall = {
   }: {
     org_identifier: string;
     team_id: string;
-    data: { user_email: string; starts_at: number; ends_at: number; note?: string };
+    /// `start_at` / `end_at`, NOT `starts_at` / `ends_at` — the server rejects
+    /// the plural form with a 422. `end_at` is exclusive, so a cover ending
+    /// exactly when the next begins does not overlap it.
+    data: {
+      user_email: string;
+      start_at: number;
+      end_at: number;
+      /** Whose shift is being covered. Optional — "cover tonight" is a real
+       *  request even when nobody has worked out whose shift tonight is. */
+      covering_for?: string;
+      note?: string;
+    };
   }) =>
     http().post<Override>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/overrides`,
