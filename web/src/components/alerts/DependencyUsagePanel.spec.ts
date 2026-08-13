@@ -95,6 +95,20 @@ describe("DependencyUsagePanel", () => {
     } as any);
     wrapper = mountPanel({ kind: "destination", name: "slack" });
     await flushPromises();
+    // Opts in to the destinations/template fields the backend now gates behind
+    // include_dependencies=true (the trailing arg) — without it the graph is empty.
+    expect(alertsService.listByFolderId).toHaveBeenCalledWith(
+      1,
+      0,
+      "name",
+      false,
+      "",
+      expect.any(String),
+      undefined,
+      undefined,
+      undefined,
+      true,
+    );
     expect(wrapper.find('[data-test="dependency-usage-templates"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="dependency-usage-alerts"]').exists()).toBe(true);
     // The template is a clickable row (not a static chip) with its own actions.
