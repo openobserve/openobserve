@@ -194,6 +194,8 @@ mod tests {
         assert!(obj.contains_key("row_id"));
         assert!(obj.contains_key("trial_index"));
         assert!(obj.contains_key("record_ts"));
+        assert!(obj.contains_key("status"));
+        assert!(obj.contains_key("skip_reason"));
         assert!(obj.contains_key("level"));
         assert!(obj.contains_key("name"));
         assert!(obj.contains_key("value_numeric"));
@@ -228,6 +230,8 @@ mod tests {
         assert!(schema.field_with_name("row_id").is_ok());
         assert!(schema.field_with_name("trial_index").is_ok());
         assert!(schema.field_with_name("record_ts").is_ok());
+        assert!(schema.field_with_name("status").is_ok());
+        assert!(schema.field_with_name("skip_reason").is_ok());
         assert!(schema.field_with_name("score_config_row_id").is_ok());
         assert!(schema.field_with_name("review_submission_id").is_ok());
         assert!(schema.field_with_name("queue_id").is_ok());

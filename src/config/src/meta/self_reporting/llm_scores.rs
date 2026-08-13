@@ -50,6 +50,18 @@ pub enum LlmScoreDataType {
     Boolean,
 }
 
+/// Outcome of one scorer dimension for one target.
+///
+/// Older score records predate this field, so successful scoring remains the
+/// deserialization default.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LlmScoreStatus {
+    #[default]
+    Success,
+    Skipped,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmScoreTargetScope {
@@ -189,6 +201,11 @@ pub struct LlmScoreRecord {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value_boolean: Option<bool>,
     pub data_type: LlmScoreDataType,
+    #[serde(default)]
+    pub status: LlmScoreStatus,
+    /// Permanent reason this dimension was intentionally not scored.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skip_reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scorer_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -272,6 +289,8 @@ impl Default for LlmScoreRecord {
             value_categorical: None,
             value_boolean: None,
             data_type: LlmScoreDataType::Numeric,
+            status: LlmScoreStatus::Success,
+            skip_reason: None,
             scorer_id: None,
             scorer_version: None,
             score_config_id: None,
@@ -330,6 +349,7 @@ impl LlmScoreRecord {
             job_id: Some(String::new()),
             job_version: Some(0),
             reasoning: Some(String::new()),
+            skip_reason: Some(String::new()),
             metadata: Some(serde_json::json!({})),
             author: Some(String::new()),
             ..Self::default()
@@ -367,6 +387,31 @@ where
 mod tests {
     use super::*;
 
+    #[test]
+    fn legacy_score_records_default_to_success() {
+        let value = serde_json::json!({
+            "id": "score-1",
+            "task_id": "task-1",
+            "eval_run_id": "run-1",
+            "evaluator_trace_id": "trace-1",
+            "org_id": "org-1",
+            "target_scope": "experiment",
+            "target_id": "target-1",
+            "evaluation_key": "key-1",
+            "score_version": 1,
+            "level": "experiment",
+            "name": "quality",
+            "data_type": "numeric",
+            "source_type": "experiment",
+            "_timestamp": 1
+        });
+
+        let record: LlmScoreRecord = serde_json::from_value(value).unwrap();
+
+        assert_eq!(record.status, LlmScoreStatus::Success);
+        assert!(record.skip_reason.is_none());
+    }
+
     fn test_score_record(
         id: &str,
         evaluation_key: &str,
@@ -399,6 +444,8 @@ mod tests {
             value_categorical: None,
             value_boolean: None,
             data_type: LlmScoreDataType::Numeric,
+            status: LlmScoreStatus::Success,
+            skip_reason: None,
             scorer_id: Some("scorer-1".to_string()),
             scorer_version: Some("1".to_string()),
             score_config_id: Some("cfg-1".to_string()),
@@ -533,6 +580,8 @@ mod tests {
         assert!(obj.contains_key("value_categorical"));
         assert!(obj.contains_key("value_boolean"));
         assert!(obj.contains_key("data_type"));
+        assert!(obj.contains_key("status"));
+        assert!(obj.contains_key("skip_reason"));
         assert!(obj.contains_key("scorer_id"));
         assert!(obj.contains_key("scorer_version"));
         assert!(obj.contains_key("score_config_id"));
