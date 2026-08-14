@@ -641,6 +641,46 @@ describe("SpanBlock", () => {
       );
     });
 
+    // Regression: `spanBlockWidth` starts at 0 and was only ever set by the
+    // 300ms-debounced observer callback, so a row that scrolled into view spent
+    // a third of a second with a cluster threshold of 0 — every event its own
+    // overlapping tick — before collapsing.
+    it("clusters on first render rather than after the debounce", async () => {
+      const widthSpy = vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(900);
+      let earlyWrapper: any;
+
+      try {
+        earlyWrapper = mount(SpanBlock, {
+          props: {
+            span: mockSpan,
+            baseTracePosition: mockBaseTracePosition,
+            depth: 0,
+            styleObj: mockStyle,
+            showCollapse: true,
+            isCollapsed: false,
+            spanDimensions: mockSpanDimensions,
+            spanData: {
+              ...mockSpanData,
+              events: JSON.stringify([
+                { name: "a", _timestamp: eventNsAt(0.5) },
+                { name: "b", _timestamp: eventNsAt(0.5001) },
+                { name: "c", _timestamp: eventNsAt(0.5002) },
+              ]),
+            },
+          },
+          global: { plugins: [i18n, router], provide: { store: mockStore } },
+        });
+        await flushPromises();
+
+        const earlyMarkers = earlyWrapper.findAll('[data-test="span-event-marker"]');
+        expect(earlyMarkers).toHaveLength(1);
+        expect(earlyMarkers[0].attributes("data-event-count")).toBe("3");
+      } finally {
+        earlyWrapper?.unmount();
+        widthSpy.mockRestore();
+      }
+    });
+
     it("positions markers across the trace window and flags exceptions", async () => {
       await setEvents([
         { name: "cache.miss", _timestamp: eventNsAt(0.25) },

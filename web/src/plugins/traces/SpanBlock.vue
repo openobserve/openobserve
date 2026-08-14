@@ -291,6 +291,14 @@ export default defineComponent({
       // pre-selected span is owned by TraceTree (virtualizer scrollToIndex).
 
       if (spanBlock.value) {
+        // Measure once, synchronously. The observer's callback is debounced by
+        // 300ms, so without this the row spends a third of a second at
+        // `spanBlockWidth === 0`, where the cluster threshold is 0 and every
+        // event renders as its own overlapping tick. Rows are virtualized and
+        // remount on scroll, so that burst would repeat for every row that
+        // scrolls into view.
+        onResize();
+
         _resizeObserver = new ResizeObserver(() => {
           if (_debounceTimer) clearTimeout(_debounceTimer);
           _debounceTimer = setTimeout(() => onResize(), 300);
