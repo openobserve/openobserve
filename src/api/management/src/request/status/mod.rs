@@ -373,12 +373,10 @@ pub async fn zo_config() -> impl IntoResponse {
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
-    // Composite alerts are available for creation when writes are not gated off
-    // and the deployment is not running super-cluster mode (§18, §19.2).
-    let composite_alerts_available = std::env::var("ZO_ALERT_COMPOSITE_WRITES_ENABLED")
-        .ok()
-        .is_none_or(|value| !matches!(value.to_ascii_lowercase().as_str(), "0" | "false" | "no"))
-        && !super_cluster_enabled;
+    // Composite alerts are available for creation when writes are enabled
+    // (opt-in) and the deployment is not running super-cluster mode (§18, §19.2).
+    let composite_alerts_available =
+        config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
     let synthetics_recorder_extension_url =

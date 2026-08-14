@@ -751,6 +751,7 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub enrichment_table: EnrichmentTable,
     pub slo: Slo,
+    pub alert_composite: AlertComposite,
 }
 
 /// Feature 5 — SLO measurement (`alerts_2.md` §6b).
@@ -810,6 +811,38 @@ pub struct Slo {
         help = "Max distinct (long, short) burn-rate window pairs precomputed per SLO per pass. Alerts share these, so the cost is per SLO, not per alert."
     )]
     pub max_burn_window_pairs: i64,
+}
+
+/// Composite alerts tunables (§19.2).
+///
+/// Writes are opt-in: until delivery-failure outcomes and metrics land,
+/// composite mutation stays OFF unless explicitly enabled.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct AlertComposite {
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_WRITES_ENABLED",
+        default = false,
+        help = "Enable composite-alert mutation (create/update/move/trigger). Opt-in: default OFF until observability lands."
+    )]
+    pub writes_enabled: bool,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_STALE_K",
+        default = 3,
+        help = "Multiplier on a child's evaluation cadence that marks it stale."
+    )]
+    pub stale_k: i64,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_SWEEP_SECS",
+        default = 300,
+        help = "Composite scheduler sweep interval in seconds."
+    )]
+    pub sweep_secs: i64,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_DEBOUNCE_SECS",
+        default = 15,
+        help = "Minimum seconds between composite evaluations (coalescing debounce)."
+    )]
+    pub debounce_secs: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]

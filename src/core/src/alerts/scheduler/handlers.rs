@@ -594,27 +594,15 @@ pub async fn handle_triggers(
 }
 
 fn composite_debounce_secs() -> i64 {
-    std::env::var("ZO_ALERT_COMPOSITE_DEBOUNCE_SECS")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(15)
-        .max(1)
+    config::get_config().alert_composite.debounce_secs.max(1)
 }
 
 fn composite_sweep_secs() -> i64 {
-    std::env::var("ZO_ALERT_COMPOSITE_SWEEP_SECS")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(300)
-        .max(1)
+    config::get_config().alert_composite.sweep_secs.max(1)
 }
 
 fn composite_stale_k() -> i64 {
-    std::env::var("ZO_ALERT_COMPOSITE_STALE_K")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(3)
-        .max(1)
+    config::get_config().alert_composite.stale_k.max(1)
 }
 
 /// Advance composite parents after a committed rollup write that changes what
@@ -736,16 +724,8 @@ async fn handle_composite_alert_trigger(
         .collect::<std::collections::HashMap<_, _>>();
     let resolved =
         infra::table::alert_composites::resolve_many(db, &trigger.org, &child_ids).await?;
-    let stale_k = std::env::var("ZO_ALERT_COMPOSITE_STALE_K")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(3)
-        .max(1);
-    let composite_sweep_seconds = std::env::var("ZO_ALERT_COMPOSITE_SWEEP_SECS")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(300)
-        .max(1);
+    let stale_k = composite_stale_k();
+    let composite_sweep_seconds = composite_sweep_secs();
     let mut children = Vec::with_capacity(definition.children.len());
     for child in &definition.children {
         let state = states.get(&child.child_alert_id);
@@ -861,13 +841,7 @@ async fn handle_composite_alert_trigger(
     }) {
         transaction.rollback().await?;
         trigger.status = db::scheduler::TriggerStatus::Waiting;
-        trigger.next_run_at = now
-            + std::env::var("ZO_ALERT_COMPOSITE_DEBOUNCE_SECS")
-                .ok()
-                .and_then(|value| value.parse::<i64>().ok())
-                .unwrap_or(15)
-                .max(1)
-                * 1_000_000;
+        trigger.next_run_at = now + composite_debounce_secs() * 1_000_000;
         let _ = infra::scheduler::complete_claim(trigger).await?;
         return Ok(());
     }

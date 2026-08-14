@@ -580,19 +580,11 @@ async fn resolve_child_inputs(
 }
 
 fn composite_stale_k() -> i64 {
-    std::env::var("ZO_ALERT_COMPOSITE_STALE_K")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(3)
-        .max(1)
+    config::get_config().alert_composite.stale_k.max(1)
 }
 
 fn composite_sweep_secs() -> i64 {
-    std::env::var("ZO_ALERT_COMPOSITE_SWEEP_SECS")
-        .ok()
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(300)
-        .max(1)
+    config::get_config().alert_composite.sweep_secs.max(1)
 }
 
 /// Evaluate a composite definition over its persisted children and current
@@ -743,9 +735,9 @@ fn map_update_error(error: sea_orm::DbErr) -> CompositeServiceError {
 
 /// Gates every composite write (create/update/move/trigger).
 ///
-/// `ZO_ALERT_COMPOSITE_WRITES_ENABLED` is an opt-out flag: when unset (or set
-/// to any value other than the falsy set below) writes stay enabled. Set it to
-/// `0`, `false`, or `no` to disable composite mutation.
+/// `ZO_ALERT_COMPOSITE_WRITES_ENABLED` is opt-in: composite mutation is OFF by
+/// default and only enabled when the flag is explicitly set (see
+/// [`config::AlertComposite::writes_enabled`]).
 fn ensure_mutation_allowed() -> Result<(), CompositeServiceError> {
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -754,10 +746,7 @@ fn ensure_mutation_allowed() -> Result<(), CompositeServiceError> {
     {
         return Err(CompositeServiceError::SuperClusterUnsupported);
     }
-    let writes_enabled = std::env::var("ZO_ALERT_COMPOSITE_WRITES_ENABLED")
-        .ok()
-        .is_none_or(|value| !matches!(value.to_ascii_lowercase().as_str(), "0" | "false" | "no"));
-    if writes_enabled {
+    if config::get_config().alert_composite.writes_enabled {
         Ok(())
     } else {
         Err(CompositeServiceError::WritesDisabled)

@@ -193,6 +193,71 @@ pub async fn list_parents<C: ConnectionTrait>(
         .await
 }
 
+/// Bulk reverse-reference lookup: map child ID -> referencing composite
+/// definitions. Replaces N per-row `list_parents` calls on the list/enrich
+/// paths with a fixed pair of queries.
+pub async fn list_parents_for_many<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    kind: ChildKind,
+    child_ids: &[String],
+) -> Result<HashMap<String, Vec<alert_composites::Model>>, sea_orm::DbErr> {
+    let mut grouped: HashMap<String, Vec<alert_composites::Model>> = HashMap::new();
+    if child_ids.is_empty() {
+        return Ok(grouped);
+    }
+    let links = alert_composite_children::Entity::find()
+        .filter(alert_composite_children::Column::ChildKind.eq(kind as i16))
+        .filter(alert_composite_children::Column::ChildAlertId.is_in(child_ids.iter().cloned()))
+        .all(conn)
+        .await?;
+    if links.is_empty() {
+        return Ok(grouped);
+    }
+    let parents = alert_composites::Entity::find()
+        .filter(alert_composites::Column::Org.eq(org))
+        .filter(
+            alert_composites::Column::Id
+                .is_in(links.iter().map(|link| link.composite_id.clone())),
+        )
+        .order_by_asc(alert_composites::Column::Id)
+        .all(conn)
+        .await?;
+    let parents_by_id: HashMap<String, alert_composites::Model> = parents
+        .into_iter()
+        .map(|parent| (parent.id.clone(), parent))
+        .collect();
+    for link in links {
+        if let Some(parent) = parents_by_id.get(&link.composite_id) {
+            grouped
+                .entry(link.child_alert_id)
+                .or_default()
+                .push(parent.clone());
+        }
+    }
+    Ok(grouped)
+}
+
+/// Bulk child count for a set of composite IDs (`child_count` on the unified
+/// alert list). Replaces N per-row `get_by_id` calls.
+pub async fn children_count_for_many<C: ConnectionTrait>(
+    conn: &C,
+    composite_ids: &[String],
+) -> Result<HashMap<String, usize>, sea_orm::DbErr> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    if composite_ids.is_empty() {
+        return Ok(counts);
+    }
+    let children = alert_composite_children::Entity::find()
+        .filter(alert_composite_children::Column::CompositeId.is_in(composite_ids.iter().cloned()))
+        .all(conn)
+        .await?;
+    for child in children {
+        *counts.entry(child.composite_id).or_default() += 1;
+    }
+    Ok(counts)
+}
+
 pub async fn load_graph<C: ConnectionTrait>(
     conn: &C,
     org: &str,

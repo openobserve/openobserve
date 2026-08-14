@@ -3621,7 +3621,7 @@ pub(super) fn to_float(val: &Value) -> f64 {
     }
 }
 #[cfg(not(feature = "enterprise"))]
-async fn permitted_alerts(
+pub async fn permitted_alerts(
     _org_id: &str,
     _user_id: Option<&str>,
     _folder_id: Option<&str>,
@@ -3630,7 +3630,7 @@ async fn permitted_alerts(
 }
 
 #[cfg(feature = "enterprise")]
-async fn permitted_alerts(
+pub async fn permitted_alerts(
     org_id: &str,
     user_id: Option<&str>,
     folder_id: Option<&str>,

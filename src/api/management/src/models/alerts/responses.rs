@@ -187,7 +187,16 @@ pub struct CompositeValidationResponse {
     /// Advisory severity of the result.
     pub result_level: Option<String>,
     /// Advisory warnings (e.g. disabled or never-evaluated children).
-    pub warnings: Vec<String>,
+    pub warnings: Vec<CompositeValidationWarning>,
+}
+
+/// One advisory warning on a composite validation/preview.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeValidationWarning {
+    /// Machine-readable warning code.
+    pub code: String,
+    /// Alert ID the warning refers to.
+    pub alert_id: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -206,6 +215,31 @@ pub struct CompositeReferencesResponse {
     pub references: Vec<CompositeReferenceItem>,
     /// Number of referencing composites hidden from the caller by permissions.
     pub hidden_reference_count: usize,
+}
+
+/// One conflict reported by bulk alert deletion: an alert that could not be
+/// deleted because one or more composite alerts still reference it.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct BulkDeleteConflict {
+    /// Alert ID that could not be deleted.
+    pub alert_id: String,
+    /// Machine-readable conflict code (e.g. "child_referenced").
+    pub code: String,
+    /// Referencing composites the caller can read.
+    pub references: Vec<serde_json::Value>,
+    /// Number of referencing composites hidden from the caller by permissions.
+    pub hidden_reference_count: usize,
+}
+
+/// Bulk alert deletion result. Carries a `conflicts` field that the shared
+/// `BulkDeleteResponse` does not, so generated clients can see which IDs were
+/// retained because they are referenced by composite alerts.
+#[derive(Default, Serialize, ToSchema)]
+pub struct BulkDeleteAlertResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+    pub conflicts: Vec<BulkDeleteConflict>,
 }
 
 /// One child-level change inside a composite status timeline window. `to_level`

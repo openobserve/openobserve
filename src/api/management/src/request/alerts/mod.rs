@@ -59,14 +59,15 @@ use crate::{
         },
         responses::{
             AlertBulkEnableResponse, AlertGroupLabel, AlertGroupResponseItem,
-            AlertGroupTransitionItem, CompositeTimelineLane, CompositeTimelineResponse,
-            CompositeTimelineTransition, EnableAlertResponseBody, GenerateSqlMetadata,
-            GenerateSqlResponseBody, GetAlertResponseBody, ListAlertGroupTransitionsResponseBody,
-            ListAlertGroupsResponseBody, ListAlertsResponseBody, ListAlertsResponseBodyItem,
+            AlertGroupTransitionItem, BulkDeleteAlertResponse, CompositeTimelineLane,
+            CompositeTimelineResponse, CompositeTimelineTransition, EnableAlertResponseBody,
+            GenerateSqlMetadata, GenerateSqlResponseBody, GetAlertResponseBody,
+            ListAlertGroupTransitionsResponseBody, ListAlertGroupsResponseBody,
+            ListAlertsResponseBody, ListAlertsResponseBodyItem,
         },
     },
     request::{
-        BulkDeleteRequest, BulkDeleteResponse,
+        BulkDeleteRequest,
         dashboards::{get_folder, is_overwrite},
     },
 };
@@ -433,6 +434,7 @@ async fn composite_detail_response(
 
 fn composite_list_item(
     definition: infra::table::entity::alert_composites::Model,
+    folder_name: &str,
 ) -> Option<ListAlertsResponseBodyItem> {
     let alert_id = Ksuid::from_str(&definition.id).ok()?;
     let tags = definition
@@ -442,7 +444,7 @@ fn composite_list_item(
     Some(ListAlertsResponseBodyItem {
         alert_id,
         folder_id: definition.folder_id.clone(),
-        folder_name: definition.folder_id,
+        folder_name: folder_name.to_string(),
         name: definition.name,
         owner: definition.owner,
         description: definition.description,
@@ -738,10 +740,13 @@ pub async fn validate_composite_alert(
         }
     }
 
-    let (result, result_level) = evaluation
-        .as_ref()
-        .map(|evaluation| (evaluation.result, evaluation.level.to_string()))
-        .unwrap_or((false, "ok".to_string()));
+    let (result, result_level) = match evaluation.as_ref() {
+        Some(evaluation) => (
+            Some(evaluation.result),
+            Some(evaluation.level.to_string()),
+        ),
+        None => (None, None),
+    };
 
     MetaHttpResponse::json(serde_json::json!({
         "valid": true,
@@ -755,7 +760,7 @@ pub async fn validate_composite_alert(
 
 #[utoipa::path(
     get,
-    path = "/v2/{org_id}/alerts/{id}/composite-references",
+    path = "/v2/{org_id}/alerts/{alert_id}/composite-references",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetCompositeReferences",
@@ -764,7 +769,7 @@ pub async fn validate_composite_alert(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Alert or composite alert ID"),
+        ("alert_id" = String, Path, description = "Alert or composite alert ID"),
     ),
     responses((status = 200, body = crate::models::alerts::responses::CompositeReferencesResponse))
 )]
@@ -811,6 +816,7 @@ pub async fn get_composite_references(
                 references.push(serde_json::json!({
                     "alert_id": parent.id,
                     "name": parent.name,
+                    "folder_id": parent.folder_id,
                 }));
             }
             MetaHttpResponse::json(serde_json::json!({
@@ -1894,7 +1900,7 @@ async fn reference_conflict_response(
     ),
     request_body(content = BulkDeleteRequest, description = "Alert ids", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteAlertResponse),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
@@ -2103,6 +2109,13 @@ pub async fn list_alert_tags(
     };
 
     let mut counts = db::alerts::alert::tag_counts_for_alerts(&org_id, &visible_ids).await;
+
+    // Resolve composite visibility in bulk (one query), mirroring the
+    // regular-alert `visible_ids` path, rather than a per-composite
+    // `check_permissions` call.
+    #[cfg(feature = "enterprise")]
+    let visibility = permitted_alert_visibility(&org_id, user_email.user_id.as_str()).await;
+
     let mut composite_counts = std::collections::BTreeMap::<String, u64>::new();
     if let Ok(composites) = infra::table::alert_composites::list_by_org(client, &org_id).await {
         for composite in composites.into_iter().filter(|composite| {
@@ -2112,19 +2125,7 @@ pub async fn list_alert_tags(
                 .is_none_or(|folder| &composite.folder_id == folder)
         }) {
             #[cfg(feature = "enterprise")]
-            if !check_permissions(
-                &composite.id,
-                &org_id,
-                user_email.user_id.as_str(),
-                "alerts",
-                "GET",
-                Some(&composite.folder_id),
-                false,
-                true,
-                false,
-            )
-            .await
-            {
+            if !visible_alert(&visibility, &composite.id, &composite.folder_id, &composite.name) {
                 continue;
             }
             let tags: Vec<String> = composite
@@ -2240,13 +2241,45 @@ pub async fn list_alerts(
     #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
     let requested_sort = (params.sort_by, params.sort_desc);
 
-    // Only force a full fetch when composite/anomaly rows are merged in after
-    // the SQL query. A single-kind list keeps SQL LIMIT/OFFSET so we don't
-    // fetch and sort every row in memory.
-    let merges_extra = matches!(
+    // Composite definitions are fetched once here — used both to decide whether
+    // the `All` filter must merge (and so drop SQL pagination) and to build the
+    // merged rows below.
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let composite_definitions = if matches!(
         alert_type,
-        AlertTypeFilter::All | AlertTypeFilter::Composite | AlertTypeFilter::AnomalyDetection
-    );
+        AlertTypeFilter::All | AlertTypeFilter::Composite
+    ) {
+        infra::table::alert_composites::list_by_org(db, &org_id)
+            .await
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    // Only force a full fetch when an extra kind is actually being merged in.
+    // A single-kind list keeps SQL LIMIT/OFFSET so we don't fetch and sort
+    // every row in memory. `All` merges composites (and, in enterprise, anomaly
+    // configs) only when they exist.
+    let merges_extra = match alert_type {
+        AlertTypeFilter::Composite | AlertTypeFilter::AnomalyDetection => true,
+        AlertTypeFilter::All => {
+            !composite_definitions.is_empty()
+                || {
+                    #[cfg(feature = "enterprise")]
+                    {
+                        openobserve_core::anomaly_detection::list_configs(&org_id, None, None)
+                            .await
+                            .map(|configs| !configs.is_empty())
+                            .unwrap_or(false)
+                    }
+                    #[cfg(not(feature = "enterprise"))]
+                    {
+                        false
+                    }
+                }
+        }
+        _ => false,
+    };
     if merges_extra {
         params.page_size_and_idx = None;
     }
@@ -2292,57 +2325,73 @@ pub async fn list_alerts(
     } else {
         vec![]
     };
-    // In enterprise builds, anomaly configs will be appended — we need mutability.
+    // Merge composite rows. Folder display names are resolved once (like the
+    // regular-alert folder join) rather than one lookup per row.
     if matches!(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::Composite
-    ) {
-        let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-        if let Ok(definitions) = infra::table::alert_composites::list_by_org(db, &org_id).await {
-            for definition in definitions {
-                if !folder_slug
-                    .as_ref()
-                    .is_none_or(|folder| &definition.folder_id == folder)
-                    || !name_substring.as_ref().is_none_or(|name| {
-                        definition
-                            .name
-                            .to_lowercase()
-                            .contains(&name.to_lowercase())
-                    })
-                    || !enabled_filter.is_none_or(|enabled| definition.enabled == enabled)
-                {
-                    continue;
-                }
-                #[cfg(feature = "enterprise")]
-                if !check_permissions(
-                    &definition.id,
-                    &org_id,
-                    user_email.user_id.as_str(),
-                    "alerts",
-                    "GET",
-                    Some(&definition.folder_id),
-                    false,
-                    true,
-                    false,
-                )
-                .await
-                {
-                    continue;
-                }
-                let Some(item) = composite_list_item(definition) else {
-                    continue;
-                };
-                let priority_matches = match &priority_filter {
-                    None => true,
-                    Some(wanted) => item.priority.is_some_and(|priority| {
-                        wanted.iter().any(|value| value.to_i32() as u8 == priority)
-                    }),
-                };
-                if priority_matches
-                    && config::meta::alerts::tags::matches_all_tags(&item.tags, &tag_filter)
-                {
-                    list.push(item);
-                }
+    ) && !composite_definitions.is_empty()
+    {
+        let folder_names: HashMap<String, String> = infra::table::folders::list_folders(
+            &org_id,
+            config::meta::folder::FolderType::Alerts,
+        )
+        .await
+        .map(|folders| {
+            folders
+                .into_iter()
+                .map(|folder| (folder.folder_id, folder.name))
+                .collect()
+        })
+        .unwrap_or_default();
+
+        for definition in composite_definitions {
+            if !folder_slug
+                .as_ref()
+                .is_none_or(|folder| &definition.folder_id == folder)
+                || !name_substring.as_ref().is_none_or(|name| {
+                    definition
+                        .name
+                        .to_lowercase()
+                        .contains(&name.to_lowercase())
+                })
+                || !enabled_filter.is_none_or(|enabled| definition.enabled == enabled)
+            {
+                continue;
+            }
+            #[cfg(feature = "enterprise")]
+            if !check_permissions(
+                &definition.id,
+                &org_id,
+                user_email.user_id.as_str(),
+                "alerts",
+                "GET",
+                Some(&definition.folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                continue;
+            }
+            let folder_name = folder_names
+                .get(&definition.folder_id)
+                .cloned()
+                .unwrap_or_else(|| definition.folder_id.clone());
+            let Some(item) = composite_list_item(definition, &folder_name) else {
+                continue;
+            };
+            let priority_matches = match &priority_filter {
+                None => true,
+                Some(wanted) => item.priority.is_some_and(|priority| {
+                    wanted.iter().any(|value| value.to_i32() as u8 == priority)
+                }),
+            };
+            if priority_matches
+                && config::meta::alerts::tags::matches_all_tags(&item.tags, &tag_filter)
+            {
+                list.push(item);
             }
         }
     }
@@ -2418,6 +2467,39 @@ pub async fn list_alerts(
     MetaHttpResponse::json(ListAlertsResponseBody { list })
 }
 
+#[cfg(feature = "enterprise")]
+async fn permitted_alert_visibility(
+    org_id: &str,
+    user_id: &str,
+) -> Option<(bool, hashbrown::HashSet<String>)> {
+    let permitted = alert::permitted_alerts(org_id, Some(user_id), None)
+        .await
+        .ok()
+        .flatten()?;
+    let is_all_permitted = permitted
+        .iter()
+        .any(|object| object == &format!("alert:_all_{org_id}"));
+    Some((is_all_permitted, permitted.into_iter().collect()))
+}
+
+#[cfg(feature = "enterprise")]
+fn visible_alert(
+    visibility: &Option<(bool, hashbrown::HashSet<String>)>,
+    id: &str,
+    folder_id: &str,
+    name: &str,
+) -> bool {
+    match visibility {
+        None => true,
+        Some((is_all_permitted, permitted)) => {
+            *is_all_permitted
+                || permitted.contains(&format!("alert:{}", name))
+                || permitted.contains(&format!("alert:{}/{}", folder_id, id))
+                || permitted.contains(&format!("alert:{}", id))
+        }
+    }
+}
+
 async fn enrich_with_composite_metadata(
     org_id: &str,
     user_id: Option<&str>,
@@ -2426,50 +2508,85 @@ async fn enrich_with_composite_metadata(
     #[cfg(not(feature = "enterprise"))]
     let _ = user_id;
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    for item in list {
+
+    // Split the page by kind and resolve everything in bulk: one child-count
+    // query for composites and two reverse-reference queries, instead of a
+    // per-row `get_by_id` + `list_parents`.
+    let mut composite_ids = Vec::new();
+    let mut alert_ids = Vec::new();
+    for item in list.iter() {
         if !matches!(item.alert_type.as_str(), "scheduled" | "slo" | "composite") {
             continue;
         }
         let id = item.alert_id.to_string();
-        let kind = if item.alert_type == "composite" {
-            if let Ok(Some(composite)) =
-                infra::table::alert_composites::get_by_id(db, org_id, &id).await
-            {
-                item.child_count = Some(composite.children.len());
-            }
-            infra::table::alert_composites::ChildKind::Composite
+        if item.alert_type == "composite" {
+            composite_ids.push(id);
         } else {
-            infra::table::alert_composites::ChildKind::Alert
-        };
-        if let Ok(parents) =
-            infra::table::alert_composites::list_parents(db, org_id, kind, &id).await
-        {
-            #[cfg(feature = "enterprise")]
-            let mut readable = 0;
-            #[cfg(not(feature = "enterprise"))]
-            let readable = parents.len();
-            #[cfg(feature = "enterprise")]
-            if let Some(user_id) = user_id {
-                for parent in parents {
-                    if check_permissions(
-                        &parent.id,
-                        org_id,
-                        user_id,
-                        "alerts",
-                        "GET",
-                        Some(&parent.folder_id),
-                        false,
-                        true,
-                        false,
-                    )
-                    .await
-                    {
-                        readable += 1;
-                    }
-                }
-            }
-            item.referenced_by_composite_count = Some(readable);
+            alert_ids.push(id);
         }
+    }
+
+    let child_counts =
+        infra::table::alert_composites::children_count_for_many(db, &composite_ids)
+            .await
+            .unwrap_or_default();
+    let parents_for_composites = infra::table::alert_composites::list_parents_for_many(
+        db,
+        org_id,
+        infra::table::alert_composites::ChildKind::Composite,
+        &composite_ids,
+    )
+    .await
+    .unwrap_or_default();
+    let parents_for_alerts = infra::table::alert_composites::list_parents_for_many(
+        db,
+        org_id,
+        infra::table::alert_composites::ChildKind::Alert,
+        &alert_ids,
+    )
+    .await
+    .unwrap_or_default();
+
+    #[cfg(feature = "enterprise")]
+    let visibility = match user_id {
+        Some(user_id) => permitted_alert_visibility(org_id, user_id).await,
+        None => None,
+    };
+
+    for item in list.iter_mut() {
+        if !matches!(item.alert_type.as_str(), "scheduled" | "slo" | "composite") {
+            continue;
+        }
+        let id = item.alert_id.to_string();
+        if item.alert_type == "composite" {
+            // Every listed composite exists; a composite with no child rows
+            // still reports zero, matching the old per-row `children.len()`.
+            item.child_count = Some(child_counts.get(&id).copied().unwrap_or(0));
+        }
+        let parents = if item.alert_type == "composite" {
+            &parents_for_composites
+        } else {
+            &parents_for_alerts
+        };
+        let readable = parents
+            .get(&id)
+            .map(|parents| {
+                #[cfg(feature = "enterprise")]
+                {
+                    parents
+                        .iter()
+                        .filter(|parent| {
+                            visible_alert(&visibility, &parent.id, &parent.folder_id, &parent.name)
+                        })
+                        .count()
+                }
+                #[cfg(not(feature = "enterprise"))]
+                {
+                    parents.len()
+                }
+            })
+            .unwrap_or(0);
+        item.referenced_by_composite_count = Some(readable);
     }
 }
 
@@ -2988,16 +3105,23 @@ pub async fn move_alerts(
     let total_ids = req_body.alert_ids.len() + req_body.anomaly_config_ids.len();
 
     // anomaly_config_ids is now a required Vec (defaults to empty), so no
-    // per-ID DB lookups are needed to classify IDs.
+    // per-ID DB lookups are needed to classify those. Composite IDs are
+    // resolved once into a set so the bulk move doesn't pay a per-ID
+    // `get_composite` lookup.
+    let composite_id_set: std::collections::HashSet<String> =
+        infra::table::alert_composites::list_by_org(client, &org_id)
+            .await
+            .map(|definitions| {
+                definitions
+                    .into_iter()
+                    .map(|definition| definition.id)
+                    .collect()
+            })
+            .unwrap_or_default();
     let mut alert_ids: Vec<Ksuid> = Vec::new();
     let mut composite_ids = Vec::new();
     for id in req_body.alert_ids {
-        if openobserve_core::alerts::composite::get_composite(&org_id, &id.to_string())
-            .await
-            .ok()
-            .flatten()
-            .is_some()
-        {
+        if composite_id_set.contains(&id.to_string()) {
             composite_ids.push(id);
         } else {
             alert_ids.push(id);
