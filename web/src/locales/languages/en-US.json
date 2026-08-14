@@ -13100,6 +13100,7 @@
     "timelineFillGap": "Fill this gap",
     "timelineZone": "{zone} · your local time is {local}",
     "timelineBandAria": "{who} on {rotation}, {from} to {to}",
+    "timelineSlotNotResolved": "The {slot} slot is not shown on this calendar yet — see the rotation below for who holds it.",
     "timelineGapAt": "Gap — {rotation} has nobody {range}",
     "rotationsTitle": "Rotations",
     "rotationsHint": "what feeds the ladder",

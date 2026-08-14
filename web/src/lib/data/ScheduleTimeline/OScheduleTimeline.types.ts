@@ -51,6 +51,14 @@ export interface ScheduleTrack {
   /** Row label in the left gutter (a rotation name, a weekday, a ladder step). */
   label: I18nText;
   bands: ScheduleBand[];
+  /**
+   * Why this track is empty, when empty does not mean "nothing happens here".
+   *
+   * An empty strip is read as an answer — "nobody, all week". Set this when the
+   * row has no bands because the data was never fetched for it, so the reader
+   * is told the difference between an absence and a gap.
+   */
+  note?: I18nText;
 }
 
 /** One labelled mark on the shared time axis above the tracks. */

@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
 
       <template v-if="holder">
-        <span class="flex flex-wrap items-center gap-2">
+        <span class="flex flex-wrap items-center gap-2" data-test="oncall-pulse-holder">
           <OUserCell :value="holder.user_email" />
           <OTag variant="success-soft" size="sm">{{ raw(holder.rotation) }}</OTag>
         </span>
@@ -75,9 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="section">{{ t("oncall.teamBackingUp") }}</OText>
       </span>
 
-      <template v-if="holder?.next_user_email">
+      <template v-if="backupWho">
         <span class="flex flex-wrap items-center gap-2">
-          <OUserCell :value="holder.next_user_email" />
+          <OUserCell :value="backupWho" />
           <span class="text-text-secondary text-xs">{{ backupLine }}</span>
         </span>
         <p class="text-text-secondary text-xs" data-test="oncall-pulse-next">
@@ -201,6 +201,7 @@ import type {
   TeamReachability,
   TeamRungSummary,
 } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -232,8 +233,15 @@ const props = withDefaults(
 const { t } = useI18nTyped();
 const nowMicros = useOnCallClock();
 
+/// The primary slot, named rather than taken as "the first one with somebody in
+/// it". A two-slot team returns two staffed slots and the order is the server's
+/// business, so first-non-empty would eventually show the secondary under a
+/// heading that says "On call now".
 const holder = computed<OnCallSlot | null>(
-  () => props.slots.find((slot) => !!slot.user_email) ?? null,
+  () =>
+    props.slots.find((slot) => sameSlot(slot.slot, DEFAULT_SLOT) && !!slot.user_email) ??
+    props.slots.find((slot) => !!slot.user_email) ??
+    null,
 );
 
 /// The rotation actually in force, resolved the way the engine resolves it.
@@ -310,17 +318,45 @@ function channelLabel(entry: ChannelReadiness): I18nText {
   return raw(`${entry.deliverable ? "✓" : "✗"} ${name}`);
 }
 
-/// When the ladder actually reaches the second person — read off the policy's
-/// P1 rungs rather than assumed, because "secondary" is a rung, not a role.
-const backupLine = computed<I18nText>(() => {
+/// The second rung of the P1 ladder: when it fires, and **what it names**.
+///
+/// The label is read off the rung's target rather than fixed to "Secondary".
+/// It used to say Secondary on the grounds that secondary was a rung and not a
+/// role — true until slots landed. Now a team can staff a real `secondary`
+/// slot, and on such a team `next_on_call` and the secondary are *different
+/// people*: this panel said "Secondary — mei" while the Schedule tab said
+/// "Secondary → priya", and both were right about different things. Naming the
+/// target is what keeps the two screens telling one story.
+const backupTarget = computed(() => {
   const steps = props.policy?.rungs.find((rung) => rung.priority === 1)?.steps ?? [];
   const second = [...steps].sort((a, b) => a.after_micros - b.after_micros)[1];
-  const role = String(t("oncall.roleSecondary"));
-  return second
-    ? raw(
-        `${role} · ${t("oncall.teamPagedAt", { delay: formatMicrosDuration(second.after_micros) })}`,
-      )
-    : raw(role);
+  // `targets` is required on the wire, but a rung that somehow arrives without
+  // one must not take the whole team overview down with it.
+  return second ? { step: second, target: second.targets?.[0] ?? null } : null;
+});
+
+const backupLine = computed<I18nText>(() => {
+  const found = backupTarget.value;
+  if (!found?.target) return raw("");
+  const label = String(t(`oncall.target_${found.target.kind}`));
+  return raw(
+    `${label} · ${t("oncall.teamPagedAt", { delay: formatMicrosDuration(found.step.after_micros) })}`,
+  );
+});
+
+/// Who that rung reaches. `next_on_call` stays **within** the primary slot, so
+/// the slot holder's own `next_user_email` is the answer — not the first
+/// non-empty slot, which on a two-slot team is a coin toss.
+const backupWho = computed<string | null>(() => {
+  const target = backupTarget.value?.target;
+  if (!target) return null;
+  if (target.kind === "user") return target.email;
+  if (target.kind === "next_on_call") return holder.value?.next_user_email ?? null;
+  if (target.kind === "on_call_now") return holder.value?.user_email ?? null;
+  // whole_team / everyone_on_schedule reach a room, not a person — the ladder
+  // on the Escalation tab names them, and one avatar here would misrepresent
+  // how many people that rung wakes.
+  return null;
 });
 
 const nextPrimaryLine = computed<I18nText>(() => {

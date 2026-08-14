@@ -86,6 +86,16 @@ const inlineStart = (offset: number) => ({ insetInlineStart: `${offset * 100}%` 
           aria-hidden="true"
         />
 
+        <!-- An empty strip reads as "nobody, all week". When the row is empty
+             because nothing was fetched for it, say that instead. -->
+        <span
+          v-if="track.note && !track.bands.length"
+          class="text-text-muted absolute inset-0 flex items-center px-2 text-xs italic"
+          :data-test="`o2-schedule-track-note-${track.key}`"
+        >
+          {{ track.note }}
+        </span>
+
         <template v-for="band in track.bands" :key="band.key">
           <slot name="band" :band="band" :track="track">
             <OScheduleBand :band="band" />

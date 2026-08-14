@@ -112,7 +112,7 @@ import type {
 import { SCHEDULE_BAND_TONE_COUNT } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { colorIndexFor, formatInZone } from "@/utils/oncall";
@@ -202,14 +202,34 @@ const share = (micros: number) => (micros - from.value) / span.value;
 /// One lane per rotation, in the order the schedule lists them. Driven by the
 /// rotations rather than by the segments so a layer that resolves to nobody all
 /// week still gets a lane — an absent lane reads as "no such rotation".
-const tracks = computed<ScheduleTrack[]>(() => {
-  const names = props.rotations.length
-    ? props.rotations.map((rotation) => rotation.name)
-    : [...new Set(props.segments.map((segment) => segment.rotation))];
+/// Which slots the segments actually answer for.
+///
+/// `resolved-schedule` resolves **one slot** — a team with a staffed
+/// `secondary` gets no `secondary` segments back. Drawing that rotation a lane
+/// and filling it from these left a blank week under the word "Secondary",
+/// which reads as "nobody is backing you up" when the truth is "this view did
+/// not ask". Lanes for an unanswered slot say so instead.
+const answeredSlots = computed(
+  () => new Set(props.segments.map((segment) => (segment.slot ?? DEFAULT_SLOT).toLowerCase())),
+);
 
-  return names.map((name) => ({
+const tracks = computed<ScheduleTrack[]>(() => {
+  const lanes = props.rotations.length
+    ? props.rotations.map((rotation) => ({ name: rotation.name, slot: rotation.slot }))
+    : [...new Set(props.segments.map((segment) => segment.rotation))].map((name) => ({
+        name,
+        slot: undefined as string | undefined,
+      }));
+
+  return lanes.map(({ name, slot }) => ({
     key: name,
     label: raw(name),
+    // Only for a slot nothing was resolved for — a slot that WAS resolved and
+    // genuinely has nobody on it is a coverage gap, and must keep reading as
+    // one rather than being excused as "not shown".
+    note: answeredSlots.value.has((slot ?? DEFAULT_SLOT).toLowerCase())
+      ? undefined
+      : t("oncall.timelineSlotNotResolved", { slot: raw(slot ?? DEFAULT_SLOT) }),
     bands: props.segments
       .filter((segment) => segment.rotation === name && segment.to > from.value && segment.from < to.value)
       .map<ScheduleBand>((segment) => {

@@ -112,20 +112,69 @@ describe("OnCallTeamPulse", () => {
     expect(wrapper.find('[data-test="oncall-pulse-no-backup"]').exists()).toBe(true);
   });
 
-  /// "Secondary" is a RUNG, not a role — the delay comes from the policy.
+  /// The delay AND the wording come from the policy: the second rung is named
+  /// by what it targets, never assumed to be "Secondary". `targets` is required
+  /// on the wire, so the fixture carries it — a step without one is a shape the
+  /// server rejects, and pinning it here would test a policy nobody can save.
   it("reads the backup's paging delay off the policy", () => {
     const wrapper = render({
       policy: {
         rungs: [
           {
             priority: 1,
-            steps: [{ after_micros: 0 }, { after_micros: 5 * MICROS_PER_MINUTE }],
+            steps: [
+              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "next_on_call" }] },
+            ],
             channels: [],
           },
         ],
       },
     });
     expect(wrapper.text()).toContain("paged at +5m");
+  });
+
+  /// The bug this guards: with a staffed `secondary` slot, the Overview said
+  /// "Secondary — mei" (the next primary) while the Schedule tab said
+  /// "Secondary → priya" (the slot). Both were right; one word meant two
+  /// people. A rung that targets `next_on_call` must say so.
+  it("calls the second rung what it targets, not 'Secondary'", () => {
+    const wrapper = render({
+      slots: [
+        { slot: "primary", rotation: "Primary", user_email: "ana@o2.ai", next_user_email: "bo@o2.ai" },
+        { slot: "secondary", rotation: "Secondary", user_email: "cy@o2.ai", next_user_email: "dee@o2.ai" },
+      ],
+      policy: {
+        rungs: [
+          {
+            priority: 1,
+            steps: [
+              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "next_on_call" }] },
+            ],
+            channels: [],
+          },
+        ],
+      },
+    });
+    const text = wrapper.text();
+    expect(text).toContain("Next on call");
+    // cy holds the secondary SLOT and this rung does not name it, so cy must
+    // not appear as the backup.
+    expect(text).not.toContain("cy@o2.ai");
+    expect(text).toContain("bo@o2.ai");
+  });
+
+  /// The primary slot is named, not guessed at as "the first staffed one" —
+  /// a two-slot team returns two, in whatever order the server likes.
+  it("shows the primary slot under 'on call now', whatever order the slots arrive in", () => {
+    const wrapper = render({
+      slots: [
+        { slot: "secondary", rotation: "Secondary", user_email: "cy@o2.ai", next_user_email: "dee@o2.ai" },
+        { slot: "primary", rotation: "Primary", user_email: "ana@o2.ai", next_user_email: "bo@o2.ai" },
+      ],
+    });
+    expect(wrapper.find('[data-test="oncall-pulse-holder"]').text()).toContain("ana@o2.ai");
   });
 
   /// The ladder summary is the server's, including the priorities it says wake

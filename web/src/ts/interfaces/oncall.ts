@@ -137,9 +137,19 @@ export interface TimeWindow {
 }
 
 export interface Rotation {
-  /** What this rotation is called — rotations are named shifts now, not slots
-   *  in an escalation ladder. */
+  /** What this rotation is called — a label for a shift, not a rung of the
+   *  ladder. Two rotations in different slots may share a name. */
   name: string;
+  /**
+   * Which slot this rotation staffs. Absent means {@link DEFAULT_SLOT}.
+   *
+   * Rotations **sharing** a slot are layers and compete by priority and
+   * restriction. Rotations in **different** slots do not compete at all: both
+   * resolve, at the same instant, each with its own members and handover day.
+   * That is what makes a secondary a separate pool rather than next week's
+   * primary.
+   */
+  slot?: string;
   /** Participants in handover order. */
   members: string[];
   /** Shift length in microseconds. */
@@ -165,11 +175,31 @@ export interface OnCallSchedule {
   updated_at: number;
 }
 
+/**
+ * The slot a rotation, cover or ladder rung belongs to. Absent means
+ * {@link DEFAULT_SLOT} — every rotation written before slots existed is the
+ * team's primary, and reading it any other way would silently rewire a stored
+ * ladder the day somebody added a second pool.
+ *
+ * Slots resolve **independently and at the same time**: two slots are two
+ * answers to "who is on call", not two candidates for one answer. Layering —
+ * priority, restrictions, validity windows — happens *within* a slot.
+ */
+export const DEFAULT_SLOT = "primary";
+
+/** Server-side comparison is case- and whitespace-insensitive; match it. */
+export function sameSlot(a: string | null | undefined, b: string | null | undefined): boolean {
+  return (a ?? DEFAULT_SLOT).trim().toLowerCase() === (b ?? DEFAULT_SLOT).trim().toLowerCase();
+}
+
 export interface OnCallSlot {
+  /** Absent means the default slot. See {@link DEFAULT_SLOT}. */
+  slot?: string | null;
   /** The rotation that produced this. */
   rotation: string;
   user_email: string;
-  /** Who it hands over to. Absent for a one-person rotation. */
+  /** Who it hands over to — **within this slot**, not the next slot. Absent
+   *  for a one-person rotation. */
   next_user_email?: string | null;
 }
 
@@ -423,6 +453,15 @@ export interface TeamOverview {
  * to ask the server rather than resolve the rotation on this side.
  */
 export interface ResolvedSegment {
+  /**
+   * Which slot this span resolves. Absent means the default slot.
+   *
+   * **The endpoint answers for one slot at a time.** A team with a staffed
+   * `secondary` gets no `secondary` segments back, so a lane drawn for one and
+   * filled from these will be empty — which is why the timeline says so rather
+   * than rendering a blank week that reads as "nobody".
+   */
+  slot?: string | null;
   /** Micros. */
   from: number;
   /** Micros. */
