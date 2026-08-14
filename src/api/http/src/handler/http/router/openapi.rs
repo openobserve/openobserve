@@ -75,6 +75,8 @@ use crate::{
         openobserve_api_search::traces::session::get_latest_sessions,
         openobserve_api_search::traces::session::get_session_details,
         openobserve_api_search::traces::user::get_latest_users,
+        openobserve_api_search::traces::details::get_trace_details,
+        openobserve_api_search::traces::time_index::get_trace_time_range,
         openobserve_api_search::traces::dag::get_trace_dag,
         metrics::ingest::json,
         openobserve_api_search::promql::remote_write,

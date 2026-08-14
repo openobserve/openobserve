@@ -319,6 +319,29 @@ const search = {
     const url = `/api/${org_identifier}/${stream_name}/traces/latest?filter=${encodeURIComponent(filter)}&start_time=${start_time}&end_time=${end_time}&from=${from}&size=${size}`;
     return http().get(url);
   },
+  get_trace_details: ({
+    org_identifier,
+    stream_name,
+    trace_id,
+    start_time,
+    end_time,
+    hint_ts,
+  }: {
+    org_identifier: string;
+    stream_name: string;
+    trace_id: string;
+    start_time?: number;
+    end_time?: number;
+    hint_ts?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (start_time != null) params.set("start_time", String(start_time));
+    if (end_time != null) params.set("end_time", String(end_time));
+    if (hint_ts != null) params.set("hint_ts", String(hint_ts));
+    const query = params.toString();
+    const url = `/api/${org_identifier}/${stream_name}/traces/${encodeURIComponent(trace_id)}/details${query ? `?${query}` : ""}`;
+    return http().get(url);
+  },
   getTraceDAG: (
     org_identifier: string,
     stream_name: string,
