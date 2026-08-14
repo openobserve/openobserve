@@ -161,6 +161,10 @@ export default class DashboardVariablesScoped {
       await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     } catch { /* acceptable if timeout */ }
 
+    // Opening the dropdown mid-load is a silent no-op — loadVariableOptions() early-returns
+    // while isLoading is true, so no request is sent and none is retried.
+    await this.waitForVariableIdle(variableName);
+
     await varTrigger.click();
 
     // Wait for the variable's own inner popover to open
@@ -196,6 +200,13 @@ export default class DashboardVariablesScoped {
       selectedValue = await targetOption.textContent();
       selectedValue = selectedValue?.trim() || null;
     }
+
+    // Nothing may still be loading when the new value is committed, or any dependent
+    // variable's reload is silently dropped: canVariableLoad() bails on
+    // `if (variable.isLoading) return false` and the child is never queued. Callers that
+    // assert on downstream effects (a dependent variable reloading, a panel turning its
+    // refresh button to warning because its variable changed) see nothing happen at all.
+    await this.waitForValuesQuiet({ timeout: Math.max(10000, timeout) });
 
     // Click the specified option
     await targetOption.click();
