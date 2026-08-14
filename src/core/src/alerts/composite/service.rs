@@ -739,7 +739,11 @@ pub async fn startup_preflight() -> anyhow::Result<()> {
 
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let definition_count = alert_composites::count_all(db).await? as usize;
-    let job_count = scheduler::len_module(TriggerModule::CompositeAlert).await;
+    // `list` (not `len_module`) so a scheduler read failure fails the preflight
+    // closed rather than silently reporting zero jobs.
+    let job_count = scheduler::list(Some(TriggerModule::CompositeAlert))
+        .await?
+        .len();
     if definition_count == 0 && job_count == 0 {
         Ok(())
     } else {
