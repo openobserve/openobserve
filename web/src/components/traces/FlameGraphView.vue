@@ -301,7 +301,7 @@ const severityColor = (severity: SpanEventSeverity): string =>
     .getPropertyValue(SEVERITY_MARKER_TOKEN[severity])
     .trim();
 
-defineExpose({ buildSpanEventMarkers });
+defineExpose({ buildSpanEventMarkers, severityColor });
 
 const GRID_LEFT = 10;
 const GRID_RIGHT = 10;

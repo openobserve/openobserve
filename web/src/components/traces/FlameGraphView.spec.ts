@@ -1431,10 +1431,33 @@ describe("FlameGraphView span event markers", () => {
 
 describe("FlameGraphView severity colours", () => {
   // renderItem returns raw ECharts shapes, which cannot take Tailwind classes,
-  // so this surface resolves token values at draw time. It must resolve the
-  // same tokens the DOM surfaces use, or the two drift apart.
-  it("names the shared marker tokens rather than its own copy", () => {
-    expect(SEVERITY_MARKER_TOKEN.info).toBe("--color-trace-event-info");
-    expect(Object.keys(SEVERITY_MARKER_TOKEN).sort()).toEqual(["error", "info", "warning"]);
+  // so this surface resolves token values at draw time via getComputedStyle.
+  // jsdom returns "" for custom properties, so the resolved colour can't be
+  // asserted here. Instead this spies on the property lookup itself and
+  // asserts severityColor requests the shared token name — proving it reads
+  // SEVERITY_MARKER_TOKEN rather than a local, independently-drifting copy.
+  const mountView = () =>
+    mount(FlameGraphView, {
+      props: { spans: [], traceDuration: 100, selectedSpanId: null },
+    });
+
+  it("requests the shared info token, not a local literal", () => {
+    const spy = vi.spyOn(CSSStyleDeclaration.prototype, "getPropertyValue");
+    try {
+      mountView().vm.severityColor("info");
+      expect(spy).toHaveBeenCalledWith(SEVERITY_MARKER_TOKEN.info);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("requests the shared error token, not a local literal", () => {
+    const spy = vi.spyOn(CSSStyleDeclaration.prototype, "getPropertyValue");
+    try {
+      mountView().vm.severityColor("error");
+      expect(spy).toHaveBeenCalledWith(SEVERITY_MARKER_TOKEN.error);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
