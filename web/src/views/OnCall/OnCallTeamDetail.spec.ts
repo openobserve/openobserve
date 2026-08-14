@@ -58,7 +58,6 @@ const stubs = {
   },
   OTable: { name: "OTable", props: ["data", "columns"], template: "<div />" },
   OnCallScheduleTimeline: true,
-  OnCallRotationsTable: true,
   OnCallScheduleEditor: true,
   OnCallEscalationLadder: true,
   OnCallEscalationDryRun: true,
@@ -156,7 +155,7 @@ describe("OnCallTeamDetail", () => {
       const wrapper = await openSchedule();
 
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallRotationsTable" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallRotationRail" }).exists()).toBe(true);
       const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
       expect(editor.exists()).toBe(true);
       expect(editor.props("drawerOnly")).toBe(true);
@@ -166,13 +165,13 @@ describe("OnCallTeamDetail", () => {
     /// the editor, and the read view stays underneath it.
     it("hands the clicked rotation to the editor without unmounting the view", async () => {
       const wrapper = await openSchedule();
-      wrapper.findComponent({ name: "OnCallRotationsTable" }).vm.$emit("edit", "Primary");
+      wrapper.findComponent({ name: "OnCallRotationRail" }).vm.$emit("edit", "Primary");
       await flushPromises();
 
       const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
       expect(editor.props("intent")).toEqual({ mode: "edit", name: "Primary" });
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallRotationsTable" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallRotationRail" }).exists()).toBe(true);
     });
 
     /// The point of saving is to see what the engine now says.

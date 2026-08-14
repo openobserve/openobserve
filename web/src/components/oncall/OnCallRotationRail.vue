@@ -1,13 +1,11 @@
 <!--
-  One card per rotation, beside the chart rather than under it.
-
-  The table below the chart answers "what are the rotations"; this answers "which
-  one is carrying the pager right now, and what do I do about it". Those are
-  different questions and the second one is the reason somebody opened the tab,
-  so it gets the actions.
+  One card per rotation, beside the chart. The only list of rotations on the
+  tab — a table below the chart repeated every fact here in a second shape, so
+  the reader had to check whether the two agreed.
 
   Every figure is read off the schedule and the resolved segments the chart is
   already drawing, so a card cannot claim something the lane beside it denies.
+  The one exception is the fairness verdict, which is the SERVER's.
 -->
 <template>
   <aside class="flex flex-col gap-2" data-test="oncall-rotation-rail">
@@ -47,6 +45,19 @@
       </span>
 
       <p class="text-text-secondary mt-1 text-xs">{{ entry.summary }}</p>
+
+      <!-- The server's verdict, not a local computation: an uneven split may be
+           deliberate, and nothing on this side can tell a weighted rotation
+           from an unfair one. Kept when the table below the chart went. -->
+      <OTag
+        v-if="entry.fairness"
+        :variant="entry.fairnessTone"
+        size="sm"
+        class="mt-1 self-start"
+        :data-test="`oncall-rail-fairness-${entry.rotation.name}`"
+      >
+        {{ raw(entry.fairness) }}
+      </OTag>
 
       <span v-if="entry.onNow" class="mt-2 flex flex-wrap items-center gap-2">
         <OUserCell :value="entry.onNow" />
@@ -110,7 +121,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { SCHEDULE_BAND_TONE_COUNT } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
-import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ResolvedSegment, Rotation, TeamLoad } from "@/ts/interfaces/oncall";
 import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -123,10 +135,12 @@ const props = withDefaults(
     /** The window the chart is drawing, so a card cannot disagree with a lane. */
     segments?: ResolvedSegment[];
     timezone?: string;
+    /** `GET .../load` — carries the server's per-rotation fairness verdict. */
+    load?: TeamLoad | null;
     /** Micros. Defaults to now; injectable so the spec is not clock-dependent. */
     now?: number;
   }>(),
-  { rotations: () => [], segments: () => [], timezone: "UTC", now: 0 },
+  { rotations: () => [], segments: () => [], timezone: "UTC", load: null, now: 0 },
 );
 
 const emit = defineEmits<{
@@ -153,14 +167,19 @@ interface RailCard {
   onNow: string;
   leftLabel: I18nText;
   hasGap: boolean;
+  fairness: string;
+  fairnessTone: BadgeVariant;
 }
 
 const cards = computed<RailCard[]>(() =>
   props.rotations.map((rotation) => {
     const mine = props.segments.filter((s) => s.rotation === rotation.name);
     const current = mine.find((s) => s.from <= nowMicros.value && s.to > nowMicros.value);
+    const fairness = props.load?.rotations.find((entry) => entry.rotation === rotation.name);
 
     return {
+      fairness: fairness?.summary ?? "",
+      fairnessTone: (fairness?.verdict === "even" ? "default-soft" : "amber-soft") as BadgeVariant,
       rotation,
       slot: sameSlot(rotation.slot, DEFAULT_SLOT) ? "" : (rotation.slot ?? ""),
       summary: t("oncall.railSummary", {

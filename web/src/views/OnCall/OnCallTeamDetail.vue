@@ -247,6 +247,7 @@
               <OnCallRotationRail
                 :rotations="schedule?.rotations ?? []"
                 :segments="segments"
+                :load="teamLoad"
                 :timezone="team?.timezone ?? 'UTC'"
                 @edit="openScheduleEditor({ mode: 'edit', name: $event })"
                 @add="openScheduleEditor({ mode: 'new' })"
@@ -263,14 +264,6 @@
                 @fill-gap="onFillGap"
               />
             </div>
-
-            <OnCallRotationsTable
-              :rotations="schedule?.rotations ?? []"
-              :timezone="team?.timezone ?? 'UTC'"
-              :load="teamLoad"
-              @edit="openScheduleEditor({ mode: 'edit', name: $event })"
-              @add="openScheduleEditor({ mode: 'new' })"
-            />
 
             <!-- Drawer only: the read view stays underneath. Swapping the tab
                  into a separate editing mode meant "Add rotation" first landed
@@ -371,7 +364,6 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
-import OnCallRotationsTable from "@/components/oncall/OnCallRotationsTable.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
 import OnCallRotationRail from "@/components/oncall/OnCallRotationRail.vue";
 import OnCallGapBanner from "@/components/oncall/OnCallGapBanner.vue";
