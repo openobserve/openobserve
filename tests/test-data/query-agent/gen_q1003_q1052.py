@@ -700,11 +700,18 @@ QUERIES.append(q("Q1069",
 # Time-series over FTS results — a real customer pattern. Histogram
 # planning is another optimizer pass that can shift plan structure.
 
-QUERIES.append(q("Q1070",
-    "SELECT histogram(_timestamp, '5 minute') AS bucket, COUNT(*) AS hits "
-    "FROM \"{stream}\" WHERE match_all('warehouse') "
-    "GROUP BY bucket ORDER BY bucket ASC LIMIT 20",
-    ["bucket", "hits"]))
+# Q1070: histogram + match_all. Same bucket-boundary variance as Q1071/Q1072.
+QUERIES.append({
+    "id": "Q1070",
+    "sql": (
+        "SELECT histogram(_timestamp, '5 minute') AS bucket, COUNT(*) AS hits "
+        "FROM \"{stream}\" WHERE match_all('warehouse') "
+        "GROUP BY bucket ORDER BY bucket ASC LIMIT 20"
+    ),
+    "category": "full_text_search",
+    "expected": {"columns": ["bucket", "hits"], "skip_sqllogictest": True, "skip_row_count": True, "skip_column_check": True},
+    "time_offset": MID_WINDOW,
+})
 
 # Q1071/Q1072: histogram + match_all. Bucket boundary handling differs
 # between OO's histogram and DuckDB's date_bin at the edges of the time

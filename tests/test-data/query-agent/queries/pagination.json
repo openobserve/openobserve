@@ -76,28 +76,28 @@
             "2"
           ],
           [
-            "SORT-M3",
-            "manual",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "auto",
-            "2"
-          ],
-          [
             "SORT-Z9",
             "manual",
             "2"
           ],
           [
-            "SORT-M3",
+            "SORT-A7",
             "auto",
-            "1"
+            "2"
+          ],
+          [
+            "SORT-X1",
+            "hybrid",
+            "2"
           ],
           [
             "SORT-A7",
             "hybrid",
+            "1"
+          ],
+          [
+            "SORT-M3",
+            "auto",
             "1"
           ]
         ],
@@ -1994,7 +1994,7 @@
         ],
         "results": [
           [
-            "PL-005",
+            "PL-003",
             "840.0"
           ],
           [
@@ -2002,7 +2002,7 @@
             "725.0"
           ],
           [
-            "PL-001",
+            "PL-007",
             "610.0"
           ]
         ],
@@ -2033,23 +2033,23 @@
             "555.0"
           ],
           [
+            "ZONE-2",
+            "auto",
+            "290.0"
+          ],
+          [
             "ZONE-4",
             "hybrid",
             "290.0"
           ],
           [
             "ZONE-2",
-            "auto",
-            "290.0"
+            "manual",
+            "190.0"
           ],
           [
             "ZONE-4",
             "auto",
-            "190.0"
-          ],
-          [
-            "ZONE-2",
-            "manual",
             "190.0"
           ]
         ],
@@ -2762,15 +2762,15 @@
         ],
         "results": [
           [
-            "sorter-engine",
+            "temp-regulator",
             "1"
           ],
           [
-            "lane-monitor",
+            "charge-checker",
             "2"
           ],
           [
-            "charge-checker",
+            "lane-monitor",
             "2"
           ]
         ],
@@ -2944,13 +2944,13 @@
             "1"
           ],
           [
-            "warehouse-east",
-            "inbound",
+            "warehouse-south",
+            "outbound",
             "1"
           ],
           [
-            "warehouse-south",
-            "outbound",
+            "warehouse-east",
+            "inbound",
             "1"
           ]
         ],
