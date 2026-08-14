@@ -846,6 +846,31 @@ pub async fn get_composite_references(
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
+    #[cfg(feature = "enterprise")]
+    if subject.is_none() {
+        // The subject is a regular alert (or missing): authorize it too, so a
+        // caller who cannot read it doesn't learn which composites reference it.
+        match infra::table::alert_composites::resolve_by_id(db, &org_id, &alert_id).await {
+            Ok(infra::table::alert_composites::Resolution::Alert(alert)) => {
+                if !check_permissions(
+                    &alert_id,
+                    &org_id,
+                    &user_email.user_id,
+                    "alerts",
+                    "GET",
+                    Some(&alert.folder_id),
+                    false,
+                    true,
+                    false,
+                )
+                .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
+            }
+            _ => {}
+        }
+    }
     let kind = if subject.is_some() {
         infra::table::alert_composites::ChildKind::Composite
     } else {
