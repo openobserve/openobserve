@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="span-marker"
         >
           <div
-            class="rounded-default h-full w-[calc(100%-0.375rem)]"
+            class="rounded-default h-full w-full"
             :style="{
               backgroundColor: span.style?.color || DEFAULT_SPAN_COLOR,
             }"
@@ -114,6 +114,17 @@ import {
 // slate-purple, not a status/surface/accent role. Needs e.g.
 // --color-trace-span-unassigned; this const is then the only site to change.
 const DEFAULT_SPAN_COLOR = "#58508d";
+
+/**
+ * Gap, in pixels, between the bar's right edge and its duration label.
+ *
+ * This used to be subtracted from the bar fill's own width
+ * (`calc(100% - 6px)`) — originally `21px`, reserving room for an inline
+ * expand chevron that was removed in Oct 2024. Subtracting it from the fill
+ * made every bar render 6px shorter than the span it represents and clamped
+ * sub-6px spans to zero width. It belongs to the label, not the bar.
+ */
+const BAR_LABEL_GUTTER_PX = 6;
 
 export default defineComponent({
   name: "SpanBlock",
@@ -313,7 +324,7 @@ export default defineComponent({
         style.left =
           (left * onePercent - leftPosition.value * onePercent < 19
             ? leftPosition.value * onePercent + 19
-            : left * onePercent) + "px";
+            : left * onePercent + BAR_LABEL_GUTTER_PX) + "px";
       }
 
       return style;
