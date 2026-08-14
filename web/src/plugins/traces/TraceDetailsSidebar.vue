@@ -1452,6 +1452,17 @@ export default defineComponent({
       row?.toggleExpanded?.(true);
     };
 
+    // The highlight names a row of *this* span's events table. Carrying it to
+    // the next span highlights an unrelated row that happens to share the index.
+    // `focusEventIndex` arrives a tick later (see TraceDetails.onSelectSpanEvent),
+    // so a marker-driven span change still lands on its event.
+    watch(
+      () => props.span?.span_id,
+      () => {
+        selectedEventIndex.value = null;
+      },
+    );
+
     watch(
       () => props.focusEventIndex,
       (index) => {
