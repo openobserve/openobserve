@@ -860,6 +860,31 @@ describe("TraceDetailsSidebar", async () => {
         }
       });
 
+      // Regression: the highlight named a row index, not an event, so selecting
+      // a different span left the same index lit on an unrelated row.
+      it("clears the selected event when the span changes", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+        await timelineMarkers()[1].trigger("click");
+        expect((wrapper.vm as any).selectedEventIndex).toBe(1);
+
+        await wrapper.setProps({
+          span: {
+            ...mockSpan,
+            span_id: "a-different-span",
+            events: JSON.stringify([
+              { name: "other first", _timestamp: eventNsAt(0.25) },
+              { name: "other second", _timestamp: eventNsAt(0.75) },
+            ]),
+          },
+        });
+        await flushPromises();
+
+        expect((wrapper.vm as any).selectedEventIndex).toBeNull();
+      });
+
       // Regression: `duration` is truncated integer microseconds, so an event
       // firing at the real span end landed past 100% and was dropped here.
       it("shows an event that fires at the exact span end", async () => {
