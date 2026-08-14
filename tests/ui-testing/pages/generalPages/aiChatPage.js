@@ -21,7 +21,7 @@ export class AiChatPage {
         this.aiChatNavButton = page.locator('[data-test="menu-link-ai-item"]');
 
         // ===== PANEL ROOT & CONTROLS (VERIFIED from web/src/components/O2AIChat.vue) =====
-        this.panelRoot = page.locator('.chat-container');
+        this.panelRoot = page.locator('.chat-container.chat-open');
         // RichTextInput is a contenteditable div inside the stable .unified-input-box wrapper.
         this.chatInput = page.locator('.unified-input-box [contenteditable="true"]');
         this.sendButton = page.locator('.send-button');

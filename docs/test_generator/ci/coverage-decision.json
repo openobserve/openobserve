@@ -1,9 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/ai-chat-session-restore.spec.js",
-  "existing_tests_considered": [
-    "web/src/components/O2AIChat.spec.ts (Vitest unit test — NOT E2E, does not count)"
-  ],
-  "needs_registration": true,
-  "rationale": "No Playwright E2E spec touches the O2AIChat assistant panel or its session-restore flow. The only existing test file is web/src/components/O2AIChat.spec.ts, a Vitest unit test that mocks useAiChat at the composable boundary — it does not exercise the live panel, the chat_stream/confirm HTTP endpoints, or the renderered RESTORED_NOTICE / error blocks. Grep for 'ai.?chat|o2ai|assistant|ai/chat' across tests/ui-testing/ only matches homePage.js (the nav button locator [data-test=menu-link-ai-item], unused by any restore spec), editionFeaturesPage.js (the ai_assistant edition feature listing), and model-pricing.spec.js (LLM pricing, unrelated). The GeneralTests area already hosts general/assistant UI specs (model-pricing.spec.js, theme-management.spec.js) and the O2AIChat panel is a cross-cutting surface, so a new spec in GeneralTests with @aiChatSessionRestore tags is the correct home. needs_registration=true because a brand-new spec must be added to the GeneralTests run_files in playwright.yml / ci_matrix.json."
-}

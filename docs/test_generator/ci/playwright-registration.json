@@ -1,6 +1,0 @@
-{
-  "group": "GeneralTests",
-  "spec_filename": "ai-chat-session-restore.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

@@ -123,7 +123,7 @@ test.describe("AI Chat Session Restore (HA) testcases", () => {
       await route.fulfill({
         status: 500,
         contentType: 'application/json',
-        body: JSON.stringify({ message: 'Server error (503)' }),
+        body: JSON.stringify({}),
       });
     });
 
@@ -131,7 +131,7 @@ test.describe("AI Chat Session Restore (HA) testcases", () => {
     await pm.aiChatPage.sendMessage();
 
     // The generic failure surfaces as a normal error; it must NOT claim a restore.
-    await pm.aiChatPage.expectTranscriptText('Server error (503)');
+    await pm.aiChatPage.expectTranscriptText('Server error (500)');
     await pm.aiChatPage.expectNoRecoverableNotice();
     expect(chatStreamCalls).toBe(1);
 
