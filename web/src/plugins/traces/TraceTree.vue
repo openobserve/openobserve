@@ -773,7 +773,10 @@ export default defineComponent({
      */
     const getEventCountLabel = (span: any): string => {
       const { total, errors } = getEventSummary(span);
-      if (!errors) return t("traces.spanEventCount", { count: total });
+      if (!errors)
+        return total === 1
+          ? t("traces.spanEventCount", { count: total })
+          : t("traces.spanEventCountPlural", { count: total });
       return errors === 1
         ? t("traces.spanEventCountWithErrors", { count: total, errors })
         : t("traces.spanEventCountWithErrorsPlural", { count: total, errors });

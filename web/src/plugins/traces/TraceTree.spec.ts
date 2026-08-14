@@ -1420,4 +1420,20 @@ describe("TraceTree span event count badge", () => {
 
     expect(badges(wrapper)[0].text()).toContain("1");
   });
+
+  // The badge's title is its accessible description; "1 events" reads as broken.
+  it("titles a single event in the singular", () => {
+    const wrapper = mountWithEvents([{ name: "a", _timestamp: 1752490492900000000 }]);
+
+    expect(badges(wrapper)[0].attributes("title")).toBe("1 event");
+  });
+
+  it("titles multiple events in the plural", () => {
+    const wrapper = mountWithEvents([
+      { name: "a", _timestamp: 1752490492900000000 },
+      { name: "b", _timestamp: 1752490492950000000 },
+    ]);
+
+    expect(badges(wrapper)[0].attributes("title")).toBe("2 events");
+  });
 });
