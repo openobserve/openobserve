@@ -1010,17 +1010,17 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "2",
-            "1",
-            "0",
-            "66.66999816894531"
-          ],
-          [
             "ZONE-3",
             "2",
             "0",
             "1",
+            "66.66999816894531"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "1",
+            "0",
             "66.66999816894531"
           ],
           [
@@ -1232,24 +1232,24 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "4",
-            "483.0"
-          ],
-          [
             "ZONE-1",
             "4",
             "258.0"
           ],
           [
-            "ZONE-3",
-            "3",
-            "94.0"
+            "ZONE-4",
+            "4",
+            "483.0"
           ],
           [
             "ZONE-2",
             "3",
             "620.0"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "94.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1561,16 +1561,16 @@
             "66.0"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
@@ -1754,12 +1754,12 @@
         ],
         "results": [
           [
-            "NetworkException: connection to batch sync failed",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
             "2",
             "1"
           ],
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "NetworkException: connection to batch sync failed",
             "2",
             "1"
           ],
@@ -1820,13 +1820,13 @@
             "2"
           ],
           [
-            "performanceMetric",
-            "itemPage",
+            "interaction",
+            "searchPage",
             "2"
           ],
           [
-            "interaction",
-            "searchPage",
+            "performanceMetric",
+            "itemPage",
             "2"
           ],
           [
@@ -2035,11 +2035,11 @@
         ],
         "results": [
           [
-            "E003",
+            "E001",
             "2"
           ],
           [
-            "E001",
+            "E003",
             "2"
           ],
           [
@@ -2143,6 +2143,11 @@
         ],
         "results": [
           [
+            "navigation",
+            "itemPage",
+            "1"
+          ],
+          [
             "performanceMetric",
             "searchPage",
             "1"
@@ -2153,18 +2158,13 @@
             "1"
           ],
           [
-            "navigation",
-            "itemPage",
+            "performanceMetric",
+            "cartPage",
             "1"
           ],
           [
             "performanceMetric",
             "checkoutPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "cartPage",
             "1"
           ]
         ],
@@ -2194,13 +2194,13 @@
             "2"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1",
             "1"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1",
             "1"
@@ -2288,16 +2288,16 @@
         ],
         "results": [
           [
-            "itemPage",
-            "2",
-            "1",
-            "89.0"
-          ],
-          [
             "checkoutPage",
             "1",
             "1",
             "567.0"
+          ],
+          [
+            "itemPage",
+            "2",
+            "1",
+            "89.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -2945,16 +2945,22 @@
         ],
         "results": [
           [
+            "warehouse-south",
+            "2",
+            "45.0",
+            "2"
+          ],
+          [
             "warehouse-west",
             "2",
             "15.0",
             "0"
           ],
           [
-            "warehouse-south",
-            "2",
-            "45.0",
-            "2"
+            "warehouse-east",
+            "1",
+            "1900.0",
+            "0"
           ],
           [
             "warehouse-central",
@@ -2967,12 +2973,6 @@
             "1",
             "12.0",
             "1"
-          ],
-          [
-            "warehouse-east",
-            "1",
-            "1900.0",
-            "0"
           ]
         ],
         "results_mode": "rowsort"
@@ -4548,14 +4548,14 @@
             "610.0"
           ],
           [
-            "ZONE-2",
-            "auto",
+            "ZONE-4",
+            "hybrid",
             "1",
             "480.0"
           ],
           [
-            "ZONE-4",
-            "hybrid",
+            "ZONE-2",
+            "auto",
             "1",
             "480.0"
           ],
@@ -4788,15 +4788,15 @@
             "0"
           ],
           [
-            "lane-monitor",
-            "567.0",
+            "batch-sync",
+            "1450.0",
             "None",
             "1",
             "0"
           ],
           [
-            "batch-sync",
-            "1450.0",
+            "lane-monitor",
+            "567.0",
             "None",
             "1",
             "0"
@@ -4853,15 +4853,15 @@
             "437.5"
           ],
           [
-            "ZONE-2",
-            "PL-008",
+            "ZONE-4",
+            "PL-006",
             "190.0",
             "150.0",
             "170.0"
           ],
           [
-            "ZONE-4",
-            "PL-006",
+            "ZONE-2",
+            "PL-008",
             "190.0",
             "150.0",
             "170.0"
@@ -4886,14 +4886,14 @@
         ],
         "results": [
           [
-            "track-router",
-            "2",
-            "230.0"
-          ],
-          [
             "zone-controller",
             "2",
             "12.0"
+          ],
+          [
+            "track-router",
+            "2",
+            "230.0"
           ],
           [
             "batch-sync",
@@ -5004,7 +5004,7 @@
             "ZONE-1",
             "2",
             "1455.0",
-            "auto",
+            "manual",
             "1"
           ],
           [
@@ -5018,14 +5018,7 @@
             "ZONE-1",
             "2",
             "1455.0",
-            "manual",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "2",
-            "440.0",
-            "hybrid",
+            "auto",
             "1"
           ],
           [
@@ -5033,6 +5026,13 @@
             "2",
             "440.0",
             "auto",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "440.0",
+            "hybrid",
             "1"
           ],
           [
@@ -5133,13 +5133,13 @@
             "725.0"
           ],
           [
-            "ZONE-3",
-            "hybrid",
+            "ZONE-1",
+            "auto",
             "610.0"
           ],
           [
-            "ZONE-1",
-            "auto",
+            "ZONE-3",
+            "hybrid",
             "610.0"
           ],
           [

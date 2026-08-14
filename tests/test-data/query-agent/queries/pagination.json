@@ -71,33 +71,33 @@
         ],
         "results": [
           [
-            "SORT-A7",
-            "auto",
-            "2"
-          ],
-          [
-            "SORT-X1",
-            "manual",
-            "2"
-          ],
-          [
             "SORT-Z9",
             "manual",
             "2"
           ],
           [
+            "SORT-M3",
+            "manual",
+            "2"
+          ],
+          [
+            "SORT-A7",
+            "auto",
+            "2"
+          ],
+          [
             "SORT-X1",
             "hybrid",
             "2"
           ],
           [
-            "SORT-A7",
-            "hybrid",
+            "SORT-M3",
+            "auto",
             "1"
           ],
           [
-            "SORT-M3",
-            "auto",
+            "SORT-A7",
+            "hybrid",
             "1"
           ]
         ],
@@ -2002,7 +2002,7 @@
             "725.0"
           ],
           [
-            "PL-007",
+            "PL-001",
             "610.0"
           ]
         ],
@@ -2043,13 +2043,13 @@
             "290.0"
           ],
           [
-            "ZONE-2",
-            "manual",
+            "ZONE-4",
+            "auto",
             "190.0"
           ],
           [
-            "ZONE-4",
-            "auto",
+            "ZONE-2",
+            "manual",
             "190.0"
           ]
         ],
@@ -2939,8 +2939,8 @@
         ],
         "results": [
           [
-            "warehouse-east",
-            "inbound",
+            "warehouse-south",
+            "outbound",
             "1"
           ],
           [
@@ -2949,8 +2949,8 @@
             "1"
           ],
           [
-            "warehouse-south",
-            "outbound",
+            "warehouse-east",
+            "inbound",
             "1"
           ]
         ],
