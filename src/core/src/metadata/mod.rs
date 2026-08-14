@@ -20,23 +20,19 @@ use std::{
 
 use arrow_schema::Schema;
 use serde::{Deserialize, Serialize};
-use tokio::try_join;
 
-use crate::metadata::{distinct_values::DvItem, trace_list_index::TraceListItem};
+use crate::metadata::distinct_values::DvItem;
 
 pub mod distinct_values;
-pub mod trace_list_index;
 
 static METADATA_MANAGER: Lazy<MetadataManager> = Lazy::new(MetadataManager::new);
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
 pub enum MetadataItem {
-    TraceListIndexer(TraceListItem),
     DistinctValues(DvItem),
 }
 
 pub enum MetadataType {
-    TraceListIndexer,
     DistinctValues,
 }
 
@@ -65,14 +61,8 @@ impl MetadataManager {
     }
 
     pub async fn close(&self) -> infra::errors::Result<()> {
-        match try_join!(
-            trace_list_index::INSTANCE.stop(),
-            distinct_values::INSTANCE.stop()
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                log::error!("[METADATA] error while closing: {e}");
-            }
+        if let Err(e) = distinct_values::INSTANCE.stop().await {
+            log::error!("[METADATA] error while closing: {e}");
         }
 
         Ok(())
@@ -85,7 +75,6 @@ pub async fn write(
     data: Vec<MetadataItem>,
 ) -> infra::errors::Result<()> {
     match mt {
-        MetadataType::TraceListIndexer => trace_list_index::INSTANCE.write(org_id, data).await,
         MetadataType::DistinctValues => distinct_values::INSTANCE.write(org_id, data).await,
     }
 }
@@ -111,9 +100,7 @@ mod tests {
 
     #[test]
     fn test_metadata_type_variants() {
-        let t1 = MetadataType::TraceListIndexer;
-        let t2 = MetadataType::DistinctValues;
-        assert!(matches!(t1, MetadataType::TraceListIndexer));
-        assert!(matches!(t2, MetadataType::DistinctValues));
+        let t = MetadataType::DistinctValues;
+        assert!(matches!(t, MetadataType::DistinctValues));
     }
 }
