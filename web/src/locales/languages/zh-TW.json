@@ -3710,7 +3710,12 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
+    "configSectionFieldOverridesAliases": [
+      "欄位覆寫",
+      "覆寫設定",
+      "覆寫",
+      "欄位格式化"
+    ],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
@@ -11186,6 +11191,14 @@
         "assert": "斷言",
         "screenshot": "螢幕截圖"
       },
+      "clickTypeLabel": "點擊類型",
+      "clickTypeHelp": "右鍵點擊會開啟上下文選單；雙擊會傳送兩次點擊。",
+      "clickTypes": {
+        "left": "左鍵點擊",
+        "right": "右鍵點擊",
+        "middle": "中鍵點擊",
+        "double": "雙擊"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "要輸入的文字",
@@ -11319,6 +11332,14 @@
       "hideStackTrace": "隱藏",
       "incognitoDescription": "重播在乾淨的無痕會話中運行。OpenObserve Recorder 擴充功能需要允許在無痕模式下運行。",
       "incognitoTitle": "無法開啟無痕視窗",
+      "restoringState": "正在還原狀態 — 第 {done} 步，共 {total} 步",
+      "restoreFailed": "無法到達錄製點 — 步驟 {step} 失敗",
+      "restoreCancelledWindowClosed": "錄製已取消 — 錄製器視窗已關閉",
+      "restoreFailedHint": "在此步驟通過之前，旅程無法到達您選擇的點。",
+      "recordBeforeFailedStep": "在步驟 {step} 之前錄製",
+      "recordingHere": "在此錄製",
+      "recordBeforeStep": "在此步驟之前錄製",
+      "recordBeforeStepHint": "重播旅程直到此點，然後在此點之前錄製新步驟。",
       "insertStepBelow": "在下方插入步驟",
       "journeyHeading": "旅程",
       "noSteps": "尚無步驟",
@@ -11332,6 +11353,7 @@
       "reRunToHere": "重新執行步驟 1–{step}",
       "fidelityLabel": "預覽無法重現",
       "record": "錄製",
+      "recordedStepsAdded": "已新增 1 個步驟 — 步驟 {first} | 已新增 {count} 個步驟 — 步驟 {first}–{last}",
       "recordJourney": "錄製旅程",
       "recording": "錄製中",
       "recordingIncognitoInfo": "在單獨的無痕視窗中錄製",

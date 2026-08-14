@@ -11191,6 +11191,14 @@
         "assert": "Validar",
         "screenshot": "Captura de tela"
       },
+      "clickTypeLabel": "Tipo de clique",
+      "clickTypeHelp": "O clique direito abre um menu de contexto; o clique duplo envia dois cliques.",
+      "clickTypes": {
+        "left": "Clique esquerdo",
+        "right": "Clique direito",
+        "middle": "Clique do meio",
+        "double": "Clique duplo"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Texto para digitar",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "Ocultar",
       "incognitoDescription": "As reproduções são executadas em uma sessão anônima limpa. A extensão OpenObserve Recorder precisa de permissão para ser executada no modo anônimo.",
       "incognitoTitle": "Não é possível abrir a janela anônima",
+      "restoringState": "Restaurando estado — etapa {done} de {total}",
+      "restoreFailed": "Não foi possível alcançar o ponto de gravação — a etapa {step} falhou",
+      "restoreCancelledWindowClosed": "Gravação cancelada — a janela do gravador foi fechada",
+      "restoreFailedHint": "a jornada não consegue alcançar o ponto que você escolheu até que esta etapa passe",
+      "recordBeforeFailedStep": "Gravar antes da etapa {step}",
+      "recordingHere": "Gravar aqui",
+      "recordBeforeStep": "Gravar antes desta etapa",
+      "recordBeforeStepHint": "Reproduza a jornada até este ponto e depois grave novas etapas antes dela.",
       "insertStepBelow": "Inserir etapa abaixo",
       "journeyHeading": "Jornada",
       "noSteps": "Nenhuma etapa ainda",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "Reexecutar etapas 1–{step}",
       "fidelityLabel": "A pré-visualização não pôde reproduzir",
       "record": "Gravar",
+      "recordedStepsAdded": "1 etapa adicionada — etapa {first} | {count} etapas adicionadas — etapas {first}–{last}",
       "recordJourney": "Gravar jornada",
       "recording": "Gravando",
       "recordingIncognitoInfo": "Gravando em uma janela anônima separada",

@@ -11191,6 +11191,14 @@
         "assert": "Verificar",
         "screenshot": "Captura de pantalla"
       },
+      "clickTypeLabel": "Tipo de clic",
+      "clickTypeHelp": "El clic derecho abre un menú contextual; el doble clic envía dos clics.",
+      "clickTypes": {
+        "left": "Clic izquierdo",
+        "right": "Clic derecho",
+        "middle": "Clic central",
+        "double": "Doble clic"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Texto a escribir",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "Ocultar",
       "incognitoDescription": "Las repeticiones se ejecutan en una sesión de Incógnito limpia. La extensión OpenObserve Recorder necesita permiso para ejecutarse en modo Incógnito.",
       "incognitoTitle": "No se puede abrir la ventana de Incógnito",
+      "restoringState": "Restaurando estado — paso {done} de {total}",
+      "restoreFailed": "No se pudo llegar al punto de grabación — el paso {step} falló",
+      "restoreCancelledWindowClosed": "Grabación cancelada — la ventana del grabador se cerró",
+      "restoreFailedHint": "el recorrido no puede llegar al punto que elegiste hasta que este paso se complete",
+      "recordBeforeFailedStep": "Grabar antes del paso {step}",
+      "recordingHere": "Grabar aquí",
+      "recordBeforeStep": "Grabar antes de este paso",
+      "recordBeforeStepHint": "Reproduce el recorrido hasta este punto, luego graba nuevos pasos antes de él.",
       "insertStepBelow": "Insertar paso debajo",
       "journeyHeading": "Recorrido",
       "noSteps": "Aún no hay pasos",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "Volver a ejecutar los pasos 1–{step}",
       "fidelityLabel": "La vista previa no pudo reproducir",
       "record": "Grabar",
+      "recordedStepsAdded": "1 paso añadido — paso {first} | {count} pasos añadidos — pasos {first}–{last}",
       "recordJourney": "Grabar recorrido",
       "recording": "Grabando",
       "recordingIncognitoInfo": "Grabando en una ventana de incógnito separada",

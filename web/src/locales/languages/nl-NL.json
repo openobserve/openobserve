@@ -11191,6 +11191,14 @@
         "assert": "Verifiëren",
         "screenshot": "Screenshot"
       },
+      "clickTypeLabel": "Kliktype",
+      "clickTypeHelp": "Rechtsklik opent een contextmenu; dubbelklik verzendt twee klikken.",
+      "clickTypes": {
+        "left": "Linkerklik",
+        "right": "Rechterklik",
+        "middle": "Middenklik",
+        "double": "Dubbelklik"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Tekst om te typen",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "Verbergen",
       "incognitoDescription": "Herhalingen worden uitgevoerd in een schone incognitosessie. De OpenObserve Recorder-extensie heeft toestemming nodig om in incognitomodus te werken.",
       "incognitoTitle": "Kan het incognitovenster niet openen",
+      "restoringState": "Status herstellen — stap {done} van {total}",
+      "restoreFailed": "Het opnamepunt kon niet worden bereikt — stap {step} mislukt",
+      "restoreCancelledWindowClosed": "Opname geannuleerd — het recorder-venster is gesloten",
+      "restoreFailedHint": "de reis kan het gekozen punt niet bereiken totdat deze stap is voltooid",
+      "recordBeforeFailedStep": "Opnemen vóór stap {step}",
+      "recordingHere": "Hier opnemen",
+      "recordBeforeStep": "Opnemen vóór deze stap",
+      "recordBeforeStepHint": "Speel de reis af tot dit punt en neem daarna nieuwe stappen op vóór dit punt.",
       "insertStepBelow": "Stap hieronder invoegen",
       "journeyHeading": "Reis",
       "noSteps": "Nog geen stappen",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "Voer stappen 1–{step} opnieuw uit",
       "fidelityLabel": "De preview kon het niet reproduceren",
       "record": "Opnemen",
+      "recordedStepsAdded": "1 stap toegevoegd — stap {first} | {count} stappen toegevoegd — stappen {first}–{last}",
       "recordJourney": "Reis opnemen",
       "recording": "Opnemen",
       "recordingIncognitoInfo": "Opnemen in een apart incognitovenster",

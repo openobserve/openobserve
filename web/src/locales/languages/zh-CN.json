@@ -11191,6 +11191,14 @@
         "assert": "断言",
         "screenshot": "截图"
       },
+      "clickTypeLabel": "点击类型",
+      "clickTypeHelp": "右键单击打开上下文菜单；双击发送两次单击。",
+      "clickTypes": {
+        "left": "左键单击",
+        "right": "右键单击",
+        "middle": "中键单击",
+        "double": "双击"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "要输入的文本",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "隐藏",
       "incognitoDescription": "回放会在干净的隐私窗口中运行。OpenObserve 记录器扩展需要获得在隐私模式下运行的权限。",
       "incognitoTitle": "无法打开隐私窗口",
+      "restoringState": "正在恢复状态 — 第 {done} 步，共 {total} 步",
+      "restoreFailed": "无法到达录制点 — 步骤 {step} 失败",
+      "restoreCancelledWindowClosed": "录制已取消 — 录制窗口已关闭",
+      "restoreFailedHint": "在通过此步骤之前，旅程无法到达您选择的点",
+      "recordBeforeFailedStep": "在步骤 {step} 之前录制",
+      "recordingHere": "在此处录制",
+      "recordBeforeStep": "在此步骤之前录制",
+      "recordBeforeStepHint": "重放旅程到此为止，然后在其之前录制新步骤。",
       "insertStepBelow": "在下方插入步骤",
       "journeyHeading": "流程",
       "noSteps": "暂无步骤",
@@ -11338,6 +11354,7 @@
       "fidelityLabel": "预览无法重现",
       "record": "录制",
       "recordJourney": "录制流程",
+      "recordedStepsAdded": "已添加 1 个步骤 — 步骤 {first} | 已添加 {count} 个步骤 — 步骤 {first}–{last}",
       "recording": "正在录制",
       "recordingIncognitoInfo": "在单独的隐私窗口中录制",
       "replay": "回放",

@@ -11191,6 +11191,14 @@
         "assert": "Khẳng định",
         "screenshot": "Chụp màn hình"
       },
+      "clickTypeLabel": "Loại nhấp chuột",
+      "clickTypeHelp": "Nhấp chuột phải mở menu ngữ cảnh; nhấp đúp sẽ gửi hai cú nhấp.",
+      "clickTypes": {
+        "left": "Nhấp chuột trái",
+        "right": "Nhấp chuột phải",
+        "middle": "Nhấp chuột giữa",
+        "double": "Nhấp đúp"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Văn bản cần nhập",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "Ẩn",
       "incognitoDescription": "Phát lại chạy trong phiên Ẩn danh sạch. Tiện ích mở rộng Trình ghi OpenObserve cần quyền để chạy ở chế độ Ẩn danh.",
       "incognitoTitle": "Không thể mở cửa sổ Ẩn danh",
+      "restoringState": "Đang khôi phục trạng thái — bước {done} trong {total}",
+      "restoreFailed": "Không thể đến điểm ghi hình — bước {step} thất bại",
+      "restoreCancelledWindowClosed": "Đã hủy ghi hình — cửa sổ ghi hình đã bị đóng",
+      "restoreFailedHint": "hành trình không thể đến điểm bạn đã chọn cho đến khi bước này hoàn tất",
+      "recordBeforeFailedStep": "Ghi trước bước {step}",
+      "recordingHere": "Ghi hình tại đây",
+      "recordBeforeStep": "Ghi hình trước bước này",
+      "recordBeforeStepHint": "Phát lại hành trình đến điểm này, sau đó ghi các bước mới trước đó.",
       "insertStepBelow": "Chèn bước bên dưới",
       "journeyHeading": "Hành trình",
       "noSteps": "Chưa có bước nào",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "Chạy lại các bước 1–{step}",
       "fidelityLabel": "Bản xem trước không thể tái tạo",
       "record": "Ghi",
+      "recordedStepsAdded": "Đã thêm 1 bước — bước {first} | Đã thêm {count} bước — các bước {first}–{last}",
       "recordJourney": "Ghi hành trình",
       "recording": "Đang ghi",
       "recordingIncognitoInfo": "Đang ghi trong cửa sổ ẩn danh riêng biệt",
