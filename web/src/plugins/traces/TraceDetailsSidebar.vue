@@ -1427,7 +1427,10 @@ export default defineComponent({
     const clusterAriaLabel = (cluster: SpanEventCluster) => {
       if (cluster.events.length === 1) return eventMarkerLabel(cluster.events[0]);
       const errors = cluster.events.filter((event) => event.severity === "error").length;
-      return t("traces.eventClusterAriaLabel", { count: cluster.events.length, errors });
+      const count = cluster.events.length;
+      return errors === 1
+        ? t("traces.eventClusterAriaLabel", { count, errors })
+        : t("traces.eventClusterAriaLabelPlural", { count, errors });
     };
 
     // Rows are keyed by array index (see `eventsRowsWithKey`), and normalized
