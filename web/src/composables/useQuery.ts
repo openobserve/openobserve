@@ -107,15 +107,12 @@ const useQuery = () => {
         parsedParams.query = parsedParams.query.replace(/`/g, '"');
       }
     } else {
-      const parseQuery = parsedParams.query.split("|");
-      let queryFunctions = "";
-      let whereClause = "";
-      if (parseQuery.length > 1) {
-        queryFunctions = "," + parseQuery[0].trim();
-        whereClause = parseQuery[1].trim();
-      } else {
-        whereClause = parseQuery[0].trim();
-      }
+      // The whole query IS the where clause. Do not split on "|": the legacy
+      // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
+      // inside a term such as match_all('text | error') would push half the term into
+      // the [QUERY_FUNCTIONS] slot before FROM and leave a broken where clause.
+      const queryFunctions = "";
+      let whereClause = parsedParams.query.trim();
 
       if (whereClause.trim() != "") {
         // More efficient approach: replace operators only when not inside quotes or parentheses

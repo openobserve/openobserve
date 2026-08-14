@@ -409,9 +409,9 @@ export default defineComponent({
     };
 
     const buildFieldValuesSql = (fieldName: string): string => {
-      const query = searchObj.data.editorValue;
-      const parts = query.split("|");
-      let whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+      // The whole editor value is the where clause — never split it on "|", the
+      // split is quote-unaware and would truncate match_all('text | error').
+      let whereClause = searchObj.data.editorValue.trim();
 
       const durationParseResult = parseDurationWhereClause(
         whereClause,

@@ -308,7 +308,7 @@ test.describe("Cross-Linking testcases", () => {
 
         // Modify the URL
         await pm.crossLinkPage.fillCrossLinkUrl('https://updated.example.com/${field.__value}');
-        await pm.crossLinkPage.clickSave();
+        await pm.crossLinkPage.clickSaveAndWait();
 
         // Verify the update is reflected
         const itemText = await pm.crossLinkPage.getCrossLinkItemText(0);
@@ -1020,7 +1020,7 @@ test.describe("Cross-Linking testcases", () => {
 
         // Modify the URL
         await pm.crossLinkPage.fillCrossLinkUrl('https://org-updated.example.com/${field.__value}');
-        await pm.crossLinkPage.clickSave();
+        await pm.crossLinkPage.clickSaveAndWait();
 
         // Verify update is reflected
         const itemText = await pm.crossLinkPage.getCrossLinkItemText(0);

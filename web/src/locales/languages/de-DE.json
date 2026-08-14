@@ -240,6 +240,18 @@
       "import": "Pipeline importieren",
       "importDesc": "Laden Sie eine Pipeline-Definition hoch"
     },
+    "noQueues": {
+      "title": "Erstelle deine erste Warteschlange",
+      "description": "Warteschlangen sind zustandsbehaftete Review-Aufgabenlisten — binde Score-Konfigurationen, einen Zieldatensatz und einen Filter, der Elemente zur menschlichen Überprüfung einspeist.",
+      "action": "Neue Warteschlange",
+      "actionDesc": "Leere Warteschlange starten"
+    },
+    "noDatasets": {
+      "title": "Erstelle deinen ersten Datensatz",
+      "description": "Golden-Datensätze sammeln annotierte Traces und Reviews in versionierte Evaluationssätze. Erstelle einen, um mit dem Kuratieren zu beginnen.",
+      "action": "Neuer Datensatz",
+      "actionDesc": "Leeren Datensatz starten"
+    },
     "noFunctions": {
       "title": "Erstelle deine erste Funktion",
       "description": "Funktionen bereichern und gestalten Ihre Daten bei der Aufnahme oder Abfrage neu. Fügen Sie eine hinzu, um loszulegen.",
@@ -318,6 +330,16 @@
       "title": "Hier ist noch nichts",
       "description": "Im Moment gibt es keine Daten zum Anzeigen."
     },
+    "noDatasetItems": {
+      "title": "Noch keine Elemente",
+      "description": "Ein Golden-Element paart eine Eingabe mit der erwarteten Ausgabe. Füge eines hinzu, um mit dem Aufbau dieses Datensatzes zu beginnen.",
+      "action": "Element hinzufügen",
+      "actionDesc": "Gib eine Golden-Eingabe und deren erwartete Ausgabe ein"
+    },
+    "noDiscoveryItems": {
+      "title": "Nichts Ungesundes hier",
+      "description": "Keine ungesunden Elemente in diesem Zeitfenster. Erweitere den Zeitbereich oder ändere den Warteschlangenfilter, um Elemente zu sehen, die du bereits bewertet hast."
+    },
     "noTraces": {
       "title": "Keine Spuren gefunden",
       "description": "Keine Spuren stimmen mit dem ausgewählten Service und Zeitraum überein. Versuchen Sie es mit einem breiteren Zeitraum oder einem anderen Dienst."
@@ -382,6 +404,8 @@
       "alerts": "Warnungen",
       "incidents": "Vorfälle",
       "traces": "Spuren",
+      "discoveryItems": "ungesunde Elemente",
+      "datasetItems": "Elemente",
       "searches": "sucht",
       "searchJobs": "Suchaufträge",
       "users": "Benutzer",
@@ -434,6 +458,7 @@
     }
   },
   "common": {
+    "copiedToClipboard": "In die Zwischenablage kopiert",
     "inlineEdit": {
       "autoHint": "Zum Umbenennen klicken. Bis du das tust, wird dieser Name aus deiner Konfiguration generiert und passt sich bei Änderungen an."
     },
@@ -481,6 +506,7 @@
     "loading": "Wird geladen...",
     "getStartedRUM": "Erste Schritte mit RUM",
     "beta": "Beta",
+    "optional": "optional",
     "play": "Abspielen",
     "pause": "Pause",
     "close": "Schließen",
@@ -929,6 +955,7 @@
     "queryRangeRestrictionMsg": "Der Abfragebereich ist auf {range} beschränkt. Bitte passen Sie den Datumsbereich entsprechend an. Andernfalls wird das Startdatum automatisch so angepasst, dass es innerhalb des zulässigen Limits liegt.",
     "cancel": "Anfrage abbrechen",
     "viewTrace": "Trace ansehen",
+    "viewTraceUnavailable": "Der Trace für diesen Logdatensatz konnte nicht geöffnet werden.",
     "viewRelated": "Verwandtes anzeigen",
     "viewRelatedTooltip": "Verwandte Traces und Metriken anzeigen",
     "flattened": "Abgeflacht",
@@ -5306,7 +5333,11 @@
       "invalidVrlFunction": "Ungültige VRL-Funktion",
       "invalidSqlQuery": "Ungültige SQL-Abfrage",
       "errorFetchingStreams": "Fehler beim Abrufen der Streams",
-      "sqlValidationError": "SQL-Validierungsfehler: {error}"
+      "sqlValidationError": "SQL-Validierungsfehler: {error}",
+      "nameUnsupportedChars": "Alertnamen dürfen keine Leerzeichen oder : # ? ' \" % & / enthalten.",
+      "linkUrlUnsupportedScheme": "Nicht unterstütztes URL-Schema \"{scheme}\". Verwenden Sie http, https oder mailto — ein relativer Pfad oder eine {'{'}Variable{'}'} funktioniert ebenfalls.",
+      "linkUrlInvalid": "Link \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Geben Sie eine gültige URL ein — z. B. https://example.com/runbook, einen Pfad wie /web/logs oder eine {'{'}Variable{'}'}."
     },
     "header": "Warnmeldungen",
     "subtitle": "Alarmregeln und Benachrichtigungskanäle",
@@ -6251,7 +6282,16 @@
         "sqlModeFilterDropped": "Ihre SQL-Abfrage wurde nicht übernommen — der Alert stimmt nur mit den ausgewählten Mustern überein.",
         "patternsUnusable": "Keines der Muster auf dieser Seite hat markanten Text, mit dem abgeglichen werden kann, daher verwendet der Alert nur Ihre Suche."
       }
-    }
+    },
+    "saveFailed": "Der Alert konnte nicht gespeichert werden.",
+    "loadFailed": "Der Alert konnte nicht geladen werden.",
+    "sloAlertUnplaceable": "Diesem SLO-Alert fehlt sein SLO-Verweis und er kann hier nicht bearbeitet werden.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Bedingungstyp",
+    "sloLongWindow": "Langes Zeitfenster",
+    "sloShortWindow": "Kurzes Zeitfenster",
+    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden."
   },
   "alert_templates": {
     "exportTemplate": "Vorlage exportieren",
@@ -7072,20 +7112,23 @@
     "dangerZone": "Gefahrenzone",
     "deleteOrganization": "Organisation löschen",
     "deleteOrganizationTitle": "Diese Organisation löschen",
-    "deleteOrganizationDescription": "Jeder, einschließlich Ihnen, verliert sofort den Zugriff auf {name}. Während der Gnadenfrist kann nur der OpenObserve-Support es wiederherstellen; danach werden alle Daten dauerhaft gelöscht.",
+    "deleteOrganizationDescription": "Alle, dich eingeschlossen, verlieren sofort den Zugriff auf {name}. Während des Wiederherstellungszeitraums kann nur der OpenObserve-Support sie wiederherstellen; danach werden alle Daten dauerhaft gelöscht.",
     "deleteOrganizationScopeLoading": "Inhalt dieser Organisation wird geprüft…",
     "deleteOrganizationScope": "{dashboards} Dashboards · {streams} Streams · {size} Daten",
-    "deleteFactGracePeriod": "Schonfrist",
+    "deleteFactGracePeriod": "Wiederherstellungszeitraum",
     "deleteFactGracePeriodDetail": "Der Support kann sie bis zur Löschung wiederherstellen",
+    "deleteFactRecoveryWindowDetail": "Support kann sie für {n} Tag wiederherstellen | Support kann sie für {n} Tage wiederherstellen",
+    "deleteFactNoRecoveryWindow": "Kein Wiederherstellungszeitraum",
+    "deleteFactNoRecoveryWindowDetail": "Die Löschung ist sofort und dauerhaft",
     "deleteFactEverything": "Löscht alles",
     "deleteFactEverythingDetail": "Alle Dashboards, Streams und aufgenommenen Daten",
     "deleteFactMembers": "Betrifft {n} Mitglied | Betrifft {n} Mitglieder",
     "deleteFactMembersDetail": "Alle Zugriffe werden sofort entzogen",
     "deleteOrganizationConfirm": "Dadurch werden \"{name}\" und alle zugehörigen Streams, Dashboards, Alerts, Pipelines, Benutzer und Einstellungen zur Löschung eingeplant.",
     "deleteOrganizationWarning": "Die Organisation ist sofort nicht mehr verfügbar und wird für alle Nutzer ausgeblendet. Die Datenaufnahme wird blockiert und geplante Alerts, Pipelines und Berichte werden angehalten, sodass keine Benachrichtigungen gesendet werden, solange die Löschung eingeplant ist.",
-    "deleteOrganizationRecoverable": "Während der Schonfrist bleibt sie wiederherstellbar, aber Sie können sie nicht selbst wiederherstellen — Sie verlieren den Zugriff auf diese Organisation, sobald die Löschung beginnt, und nur der OpenObserve-Support kann sie zurückholen. Nach Ablauf der Schonfrist werden die Daten endgültig gelöscht und können von niemandem wiederhergestellt werden.",
+    "deleteOrganizationRecoverable": "Während des Wiederherstellungszeitraums kann sie noch zurückgebracht werden, aber nicht von dir – du verlierst den Zugriff auf diese Organisation, sobald die Löschung beginnt, und nur der OpenObserve-Support kann sie wiederherstellen. Sobald das Zeitfenster schließt, werden ihre Daten dauerhaft gelöscht und können von niemandem wiederhergestellt werden.",
     "deleteOrganizationTypeToConfirm": "Geben Sie zur Bestätigung {name} unten ein:",
-    "deleteOrganizationInitiated": "Organisation zur Löschung eingeplant. Sie ist jetzt ausgeblendet; wenden Sie sich an den Support, um sie vor Ablauf der Schonfrist wiederherzustellen.",
+    "deleteOrganizationInitiated": "Organisation zur Löschung vorgemerkt. Sie ist jetzt ausgeblendet; kontaktiere den Support, um sie vor Ablauf des Wiederherstellungszeitraums wiederherzustellen.",
     "somethingWentWrong": "Etwas ist schief gelaufen",
     "logoUpdatedSuccessfully": "Das {mode} -Logo wurde erfolgreich aktualisiert.",
     "errorUploadingImage": "Fehler beim Hochladen des Bilds.",
@@ -8551,6 +8594,8 @@
     "alertDeduplicationMessage": "Alarme mit den gleichen Werten für diese Felder werden dedupliziert (z. B. derselbe Fingerabdruck = gleiche Feldwerte)",
     "atLeastOneDeduplicationField": "Für die Deduplizierung ist mindestens eine Feldzuordnung erforderlich",
     "noSemanticGroupsInCategory": "Keine semantischen Gruppen in der Kategorie: {category}",
+    "searchGroupsPlaceholder": "Gruppen nach Name oder Feld durchsuchen",
+    "noSearchResults": "Keine Gruppen entsprechen \"{query}\". Die Suche umfasst Gruppennamen, IDs und Feldnamen.",
     "importSemanticGroups": {
       "title": "Semantische Gruppen importieren",
       "selectJsonFile": "JSON-Datei auswählen",
@@ -8659,6 +8704,7 @@
     "urlTemplate": "URL-Vorlage",
     "urlRequired": "URL ist erforderlich",
     "urlPlaceholder": "z. B. https://example.com/trace/{'${field.__value}'}?von={'${start_time}'}&bis={'${end_time}'}",
+    "urlInvalid": "Geben Sie eine gültige http(s)-URL ein",
     "urlHint": "Verwenden Sie {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Felder",
     "fieldsHint": "Link nur anzeigen, wenn mindestens ein Feld im Datensatz vorhanden ist",
@@ -8874,6 +8920,7 @@
     },
     "sections": {
       "monitor": "Überwachen",
+      "annotate": "Annotieren",
       "evaluate": "Evaluieren"
     },
     "nav": {
@@ -8881,6 +8928,9 @@
       "sessions": "Sitzungen",
       "agentGraph": "Agenten-Graph",
       "agentBehavior": "Agentenverhalten",
+      "discovery": "Entdeckung",
+      "queues": "Warteschlangen",
+      "datasets": "Datensätze",
       "quality": "Qualität",
       "evalJobs": "Stellenangebote evaluieren",
       "scorers": "Torschützen",
@@ -8891,10 +8941,377 @@
       "sessions": "Agentensitzungen nacheinander durchsuchen und überprüfen",
       "agentGraph": "Sehen Sie, womit Ihre Agenten interagieren — Tools, Modelle, Dienste und Datenspeicher",
       "agentBehavior": "Erkennen Sie Agenten, die in Schleifen stecken, und die Fehler, die zum Scheitern führen.",
+      "discovery": "Finde ungesunde Traces, die eine Überprüfung lohnen",
+      "queues": "Zustandsbehaftete Review-Aufgabenlisten",
+      "datasets": "Kuratiere Golden-Datensätze aus annotierten Traces und Reviews",
       "quality": "Bewertungsqualität über Span-, Trace- und Session-Evaluierungen verfolgen",
       "evalJobs": "Führen Sie Evaluierungsaufträge in Ihren Sitzungen aus und überwachen Sie sie",
       "scorers": "Erstellen und verwalten Sie die Scorer, die LLM-Ergebnisse bewerten",
       "scoreConfigs": "Konfigurieren Sie die Bewertungsrubriken, die für Ihre Bewertungen verwendet werden"
+    },
+    "annotate": {
+      "button": "Annotieren",
+      "title": "Annotieren · {scope}",
+      "scope": {
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Session"
+      },
+      "viaAnnotation": "Annotation",
+      "addDimension": "Dimension zum Bewerten hinzufügen",
+      "addDimensionHint": "Wähle beliebige Dimensionen aus — fülle jede einzelne unten aus, überprüfe sie gemeinsam und speichere sie dann alle auf einmal.",
+      "searchDimensions": "Dimensionen suchen...",
+      "toScore": "In dieser Annotation zu bewerten",
+      "toScoreFilled": "In dieser Annotation zu bewerten · {filled}/{total} ausgefüllt",
+      "emptyTitle": "Noch keine Dimensionen hinzugefügt.",
+      "emptyBody": "Wähle oben so viele aus, wie du möchtest, und überprüfe sie hier, bevor du speicherst.",
+      "version": "v{version}",
+      "range": "{min} – {max}",
+      "reasonPlaceholder": "Warum diese Bewertung? (optional)",
+      "save": "Annotation speichern",
+      "success": "Annotation gespeichert mit {count} Bewertung | Annotation gespeichert mit {count} Bewertungen",
+      "loadError": "Fehler beim Laden der Bewertungskonfigurationen",
+      "error": "Fehler beim Speichern der Annotation"
+    },
+    "traceActions": {
+      "annotate": {
+        "button": "Zur Review-Warteschlange hinzufügen",
+        "title": "Zur Review-Warteschlange hinzufügen",
+        "hint": "Stelle {ref} zur manuellen Überprüfung in die Warteschlange. Es bleibt an seinem Platz — der Überprüfungsstatus befindet sich in der Warteschlange.",
+        "queueLabel": "Warteschlange",
+        "queuePlaceholder": "Warteschlange auswählen...",
+        "noQueues": "Keine Warteschlange akzeptiert einen {scope} — erstelle zuerst eine auf der Seite „Warteschlangen“.",
+        "confirm": "Zur Warteschlange hinzufügen",
+        "success": "Zu {queue} hinzugefügt",
+        "error": "Fehler beim Hinzufügen dieses Elements zur Warteschlange"
+      },
+      "dataset": {
+        "button": "Zum Dataset hinzufügen",
+        "title": "Zum Dataset hinzufügen",
+        "hint": "Verwandle {ref} in ein Golden. Die Eingabe wird aus dem Trace zurückgelesen — du schreibst die erwartete Ausgabe.",
+        "errors": {
+          "dataset": "Wähle ein Dataset",
+          "expectedOutput": "Schreibe die erwartete Ausgabe"
+        },
+        "datasetLabel": "Dataset",
+        "datasetPlaceholder": "Dataset auswählen...",
+        "noDatasets": "Noch keine Datasets — erstelle zuerst eines auf der Seite „Datasets“.",
+        "inputLabel": "Eingabe",
+        "inputReadOnly": "aus dem Trace gelesen",
+        "expectedLabel": "Erwartete Ausgabe",
+        "expectedPlaceholder": "Schreibe die Ausgabe, die dies hätte erzeugen sollen...",
+        "confirm": "Zum Dataset hinzufügen",
+        "success": "Zum Dataset hinzugefügt",
+        "loadError": "Fehler beim Laden der Datasets",
+        "error": "Fehler beim Hinzufügen dieses Elements zum Dataset"
+      }
+    },
+    "discovery": {
+      "loadError": "Fehler beim Laden der Discovery-Ergebnisse",
+      "searchPlaceholder": "Service, Eingabe, Qualität suchen...",
+      "searchFooter": "{matched} von {loaded} auf dieser Seite stimmen überein",
+      "scope": {
+        "span": "Spans",
+        "trace": "Traces",
+        "session": "Sessions"
+      },
+      "scopeNoun": {
+        "span": "spans",
+        "trace": "traces",
+        "session": "sessions"
+      },
+      "inQueueFilter": {
+        "label": "In Warteschlange",
+        "notEnqueued": "In Warteschlange: Nicht eingereiht",
+        "enqueued": "In Warteschlange: Beliebige Warteschlange",
+        "pending": "In Warteschlange: Ausstehend",
+        "reviewed": "In Warteschlange: Geprüft",
+        "all": "In Warteschlange: Alle"
+      },
+      "columns": {
+        "timestamp": "Zeitstempel",
+        "started": "Gestartet",
+        "type": "Typ",
+        "kind": "Art",
+        "span": "Span",
+        "session": "Sitzung",
+        "topic": "Topic",
+        "traces": "Traces",
+        "duration": "Dauer",
+        "service": "Service",
+        "input": "Eingabe",
+        "quality": "Qualität",
+        "inQueue": "In Warteschlange?",
+        "actions": "Aktionen"
+      },
+      "spanParent": "In {trace}",
+      "quality": {
+        "issue": "Problem",
+        "multiple": "Mehrere",
+        "issueCount": "({count})"
+      },
+      "inQueue": {
+        "none": "Nicht eingereiht",
+        "reviewed": "Bereits geprüft",
+        "multiple": "In {count} Warteschlangen"
+      },
+      "addToQueue": "Zur Warteschlange hinzufügen",
+      "addToQueueMenu": {
+        "loading": "Warteschlangen werden geladen...",
+        "noQueues": "Noch keine Warteschlangen — erstelle zuerst eine auf der Seite 'Warteschlangen'.",
+        "dimensions": "{count} Dimension | {count} Dimensionen",
+        "accepts": "Akzeptiert nur {types}",
+        "sectionTitle": "Zur Warteschlange hinzufügen",
+        "manageQueues": "Warteschlangen verwalten"
+      },
+      "bulkAdd": "{count} zur Warteschlange hinzufügen",
+      "selectedCount": "{selected} von {total} ausgewählt",
+      "footerTitle": "Nicht gesund {scope}",
+      "addSuccess": "Zu {queue} hinzugefügt — die Zeile bleibt in Discovery, ihr Zustand befindet sich in der Warteschlange.",
+      "addError": "Fehler beim Hinzufügen der Elemente zur Warteschlange",
+      "openQueue": "Warteschlange öffnen",
+      "queuesError": "Fehler beim Laden der Warteschlangen"
+    },
+    "queues": {
+      "listTitle": "Warteschlangen",
+      "searchPlaceholder": "Warteschlangen suchen...",
+      "newButton": "Neue Warteschlange",
+      "loadError": "Fehler beim Laden der Warteschlangen",
+      "optionsLoadError": "Fehler beim Laden der Score-Konfigurationen",
+      "review": "Prüfen",
+      "cleared": "Bereinigt",
+      "reviewedCount": "{reviewed} / {total} geprüft",
+      "columns": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "scoreConfigs": "Score-Konfigurationen",
+        "targetDataset": "Zieldatensatz",
+        "progress": "Fortschritt",
+        "updated": "Aktualisiert"
+      },
+      "create": {
+        "title": "Neue Warteschlange",
+        "errors": {
+          "name": "Name ist erforderlich",
+          "scoreConfigs": "Binden Sie mindestens eine Score-Konfiguration"
+        },
+        "nameLabel": "Name",
+        "namePlaceholder": "z. B. hallucination_review",
+        "descriptionLabel": "Beschreibung",
+        "descriptionPlaceholder": "Wofür diese Warteschlange gedacht ist und wer sie überprüft...",
+        "scoreConfigsLabel": "Score-Konfigurationen",
+        "scoreConfigsHint": "Eine Warteschlange bewertet Elemente in einer oder mehreren Dimensionen. Jede Score-Konfiguration ist eine einzelne Dimension — wählen Sie die zu bindenden Konfigurationen aus und heften Sie jede an eine Version.",
+        "scoreConfigsEmpty": "Wählen Sie die zu bindenden Score-Konfigurationen aus.",
+        "addScoreConfig": "Score-Konfiguration hinzufügen",
+        "allScoreConfigsAdded": "Alle Score-Konfigurationen sind hinzugefügt.",
+        "loadingScoreConfigs": "Score-Konfigurationen werden geladen...",
+        "noScoreConfigs": "Noch keine Score-Konfigurationen — erstellen Sie zuerst eine in Score-Konfigurationen.",
+        "targetDatasetLabel": "Zieldatensatz",
+        "targetDatasetNone": "Keine (nur Überprüfung)",
+        "targetDatasetHint": "Nur-Überprüfungs-Warteschlange — überprüfte Elemente werden nicht in einen Datensatz destilliert.",
+        "autoRoutingLabel": "Automatische Weiterleitung",
+        "autoRoutingHint": "Objekte, deren Bewertungen einer Bedingung entsprechen, automatisch in die Warteschlange aufnehmen. Leer lassen, um diese Warteschlange manuell aus Discovery zu speisen.",
+        "autoRoutingEmpty": "Keine automatische Weiterleitung — diese Warteschlange wird manuell gespeist.",
+        "addCondition": "Bedingung hinzufügen",
+        "conditionAnd": "UND",
+        "operatorIs": "ist",
+        "operatorIsNot": "ist nicht",
+        "conditionScorePlaceholder": "Score-Konfiguration",
+        "conditionValuePlaceholder": "Wert",
+        "pin": "Version anheften",
+        "versionLatest": "v{version} (neueste)",
+        "success": "Warteschlange erstellt",
+        "error": "Fehler beim Erstellen der Warteschlange"
+      },
+      "detail": {
+        "fallbackTitle": "Warteschlange",
+        "loadError": "Fehler beim Laden der Warteschlangenelemente",
+        "startReviewing": "Überprüfung starten",
+        "scoreConfigs": "Score-Konfigurationen ({count})",
+        "targetDataset": "Zieldatensatz",
+        "noTargetDataset": "Kein Zieldatensatz",
+        "searchPlaceholder": "Elemente suchen...",
+        "footerTitle": "Elemente",
+        "allItems": "Alle",
+        "inTrace": "Im Trace {traceId}",
+        "reviewAgain": "Erneut überprüfen",
+        "emptyTitle": "Nichts zu überprüfen",
+        "emptyBody": "Fügen Sie dieser Warteschlange Traces, Spans oder Sessions aus Discovery oder einer Trace-Ansicht hinzu.",
+        "columns": {
+          "refType": "Ref",
+          "refId": "Referenz",
+          "added": "Hinzugefügt",
+          "status": "Status"
+        },
+        "status": {
+          "pending": "Ausstehend",
+          "reviewed": "Geprüft"
+        }
+      },
+      "workbench": {
+        "subtitle": "{reviewed} von {total} geprüft",
+        "itemCounter": "Element {index} von {total} zu prüfen",
+        "prev": "Vorheriges Element",
+        "next": "Nächstes Element",
+        "collapseNav": "Elementliste einklappen",
+        "expandNav": "Elementliste ausklappen",
+        "openTrace": "Vollständigen Trace öffnen",
+        "openTraceSoon": "Die vollständige Trace-Ansicht kommt im nächsten Update.",
+        "input": "Eingabe",
+        "output": "Ausgabe",
+        "retrievedContext": "Abgerufener Kontext",
+        "systemScores": "Systembewertungen",
+        "systemScoresHint": "Automatisch von Prüfern bewertet — zur Referenz",
+        "copyContent": "Kopieren {label}",
+        "enterFullscreen": "Erweitern",
+        "exitFullscreen": "Vollbild beenden",
+        "fullscreenError": "Vollbild ist in diesem Browser nicht verfügbar",
+        "showContext": "Abgerufenen Kontext anzeigen",
+        "hideContext": "Abgerufenen Kontext ausblenden",
+        "scoreTitle": "Bewertung",
+        "dimensionsBound": "{count} Dimensionen",
+        "appendOnlyNote": "Ihre Bewertungen werden neben denen anderer Prüfer hinzugefügt — nichts wird überschrieben.",
+        "numericScale": "0.0 – 1.0",
+        "healthyLabel": "gesund ≥ {threshold}",
+        "notScored": "Nicht bewertet",
+        "dragToScore": "Zum Bewerten ziehen",
+        "priorScores": "Andere Prüfer",
+        "priorScoresHint": "Wie andere Prüfer bewertet haben — öffnen Sie es erst, nachdem Sie sich Ihre eigene Meinung gebildet haben",
+        "commentLabel": "Kommentar",
+        "commentPlaceholder": "Notizen für andere Prüfer...",
+        "dimensionsScored": "{scored}/{total} Dimensionen bewertet",
+        "skip": "Überspringen",
+        "submit": "Abschließen & Weiter",
+        "submitted": "Bewertung übermittelt",
+        "submitError": "Bewertung konnte nicht übermittelt werden",
+        "distill": {
+          "title": "In den Datensatz destillieren",
+          "action": "Datensatz",
+          "hint": "Schreiben Sie die Antwort, die dieses Element hätte produzieren sollen. Sie wird zur goldenen Ausgabe; die Eingabe wird aus dem geprüften Trace übernommen.",
+          "datasetLabel": "Datensatz",
+          "datasetPlaceholder": "Datensatz auswählen...",
+          "noDatasets": "Noch keine Datensätze vorhanden — erstellen Sie zuerst einen auf der Seite Datensätze.",
+          "expectedLabel": "Erwartete Ausgabe",
+          "expectedPlaceholder": "Schreiben Sie die Ausgabe, die dieses Element hätte produzieren sollen...",
+          "useOutput": "Modellausgabe verwenden",
+          "confirm": "Zum Datensatz hinzufügen",
+          "success": "In den Datensatz destilliert",
+          "updated": "Goldene Ausgabe aktualisiert — dieses Element war bereits in diesem Datensatz",
+          "openDataset": "Datensatz öffnen",
+          "needsReview": "Schließen Sie zuerst die Überprüfung ab — ein goldenes Element benötigt ein begutachtetes Urteil",
+          "sessionUnsupported": "Session-Elemente können nicht destilliert werden — nur Traces und Spans",
+          "loadError": "Fehler beim Laden der Datensätze",
+          "error": "Das Element konnte dem Datensatz nicht hinzugefügt werden"
+        },
+        "true": "Wahr",
+        "false": "Falsch",
+        "allReviewedTitle": "Alle Elemente überprüft",
+        "allReviewedBody": "Jedes Element in dieser Warteschlange hat eine abgeschlossene Überprüfung."
+      }
+    },
+    "datasets": {
+      "listTitle": "Datensätze",
+      "searchPlaceholder": "Datensätze suchen...",
+      "newButton": "Neuer Datensatz",
+      "loadError": "Fehler beim Laden der Datensätze",
+      "columns": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "tags": "Tags",
+        "sources": "Quellen",
+        "items": "Elemente",
+        "version": "Version",
+        "updated": "Aktualisiert",
+        "actions": "Aktionen"
+      },
+      "source": {
+        "trace": "Trace",
+        "annotation": "Annotation",
+        "manual": "Manuell"
+      },
+      "editTitle": "Datensatz bearbeiten",
+      "editSuccess": "Datensatz aktualisiert",
+      "editError": "Datensatz konnte nicht aktualisiert werden",
+      "deleteTitle": "Datensatz löschen",
+      "deleteMessage": "„{name}“ und alle zugehörigen Elemente löschen? Dies kann nicht rückgängig gemacht werden.",
+      "deleteSuccess": "Datensatz gelöscht",
+      "deleteError": "Datensatz konnte nicht gelöscht werden",
+      "create": {
+        "title": "Neuer Datensatz",
+        "errors": {
+          "name": "Name ist erforderlich"
+        },
+        "nameLabel": "Name",
+        "namePlaceholder": "z. B. Qualität der Support-Antworten",
+        "descriptionLabel": "Beschreibung",
+        "descriptionPlaceholder": "Wofür dieser Datensatz gedacht ist...",
+        "tagsLabel": "Tags",
+        "tagsPlaceholder": "Tag eingeben und Enter drücken...",
+        "success": "Datensatz erstellt",
+        "error": "Datensatz konnte nicht erstellt werden"
+      },
+      "detail": {
+        "fallbackTitle": "Datensatz",
+        "meta": "{count} Elemente · aktualisiert {updated}",
+        "loadError": "Fehler beim Laden des Datensatzes",
+        "footerTitle": "Elemente",
+        "searchPlaceholder": "Elemente suchen...",
+        "columns": {
+          "input": "Eingabe (bereinigt)",
+          "expectedOutput": "Erwartete Ausgabe",
+          "source": "Quelle",
+          "tags": "Tags",
+          "version": "Version",
+          "actions": "Aktionen"
+        },
+        "deleteItemTitle": "Element löschen",
+        "deleteItemMessage": "Dieses Element aus dem Datensatz löschen? Dies kann nicht rückgängig gemacht werden.",
+        "deleteItemSuccess": "Element gelöscht",
+        "deleteItemError": "Element konnte nicht gelöscht werden",
+        "itemDetail": {
+          "eyebrow": "Datensatzelement",
+          "versionLabel": "v{version}",
+          "tabs": {
+            "item": "Element",
+            "versions": "Versionen"
+          },
+          "versionPill": "v{version} · {count} Version | v{version} · {count} Versionen",
+          "sourceSection": "Quelle",
+          "sourceTrace": "Trace",
+          "sourceSpan": "Span",
+          "sourceReview": "Einreichung überprüfen",
+          "sourceImport": "Importiert von",
+          "inputSection": "Eingabe",
+          "expectedSection": "Erwartete Ausgabe",
+          "editNewVersion": "Bearbeiten · Neue Version",
+          "tagsSection": "Tags",
+          "noTags": "Keine Tags",
+          "metadataSection": "Metadaten",
+          "metadataNote": "Teilmengen-Filterdimensionen",
+          "deleteButton": "Element löschen",
+          "versionsIntro": "Jede Bearbeitung fügt eine unveränderliche Version hinzu. Die neueste ist das aktive Element.",
+          "versionCurrent": "Aktuell",
+          "versionMeta": "{user} · {time}",
+          "versionsEmpty": "Keine Versionshistorie",
+          "versionsError": "Elementversionen konnten nicht geladen werden"
+        },
+        "addItem": {
+          "button": "Element hinzufügen",
+          "title": "Element hinzufügen",
+          "editTitle": "Element bearbeiten",
+          "inputLabel": "Eingabe",
+          "inputPlaceholder": "Die Eingabe, die dem Modell gegeben wird...",
+          "expectedLabel": "Erwartete Ausgabe",
+          "expectedPlaceholder": "Die goldene Antwort, die diese Eingabe erzeugen soll...",
+          "versionNote": "Das Ändern der erwarteten Ausgabe erstellt eine neue Version dieses Elements.",
+          "errors": {
+            "input": "Eingabe ist erforderlich",
+            "expectedOutput": "Erwartete Ausgabe ist erforderlich"
+          },
+          "success": "Element gespeichert",
+          "error": "Element konnte nicht gespeichert werden"
+        }
+      }
     },
     "scope": {
       "env": "Umgebung",
@@ -10508,6 +10925,29 @@
       "variableValuePlaceholder": "Wert",
       "variables": "Variablen"
     },
+    "variablesPanel": {
+      "title": "Variablen",
+      "referenceHint": "In jedem Schrittwert oder in einer URL als {token} referenzieren.",
+      "emptyTitle": "Noch keine Variablen",
+      "emptyBody": "Wiederverwenden Sie Werte über Schritte hinweg — wie eine Basis-URL oder einen Benutzernamen — und halten Sie Geheimnisse aus Schrittwerten heraus.",
+      "newVariable": "Neue Variable",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "Name ist erforderlich.",
+      "nameInvalid": "Namen beginnen mit einem Buchstaben oder Unterstrich und verwenden nur Buchstaben, Ziffern und Unterstriche.",
+      "nameDuplicate": "Eine Variable mit diesem Namen existiert bereits.",
+      "usedInSteps": "Verwendet in {count} Schritt | Verwendet in {count} Schritten",
+      "notReferenced": "Noch von keinem Schritt referenziert",
+      "removed": "Entfernt {name}",
+      "undo": "Rückgängig",
+      "editVariable": "Variable {name} bearbeiten",
+      "removeVariable": "Variable {name} entfernen",
+      "secretTooltip": "Geheim — der Wert wird maskiert und sicher gesendet.",
+      "collapsePanel": "Variablen einklappen",
+      "openPanel": "Variablen anzeigen",
+      "removeTitle": "Variable entfernen?",
+      "removeBody": "{name} wird aus diesem Check entfernt.",
+      "removeWarning": "Es wird von {count} Schritt referenziert, der nicht mehr aufgelöst wird. | Es wird von {count} Schritten referenziert, die nicht mehr aufgelöst werden."
+    },
     "browserDevices": {
       "desktop": "Desktop",
       "mobile": "Mobilgerät",
@@ -10558,28 +10998,44 @@
       "loading": "Prüfung wird geladen…",
       "nameHint": "Automatisch von der Seite ausgefüllt – bearbeiten Sie es, wenn Sie möchten.",
       "newBrowserCheck": "Neuer Browser-Check",
+      "setupConnectAlt": "klicken Sie auf {name} im Menü {icon} {menu} oder",
+      "setupConnectDescription": "Ein kurzes Neuladen lässt den Recorder an dieser Seite andocken.",
+      "setupConnectDone": "Verbunden",
+      "setupConnectRefreshCta": "Diese Seite aktualisieren",
+      "setupConnectTitle": "Den Recorder mit diesem Tab verbinden",
+      "setupConnectWaiting": "Warten auf den Recorder — das wechselt von selbst zu {connected}.",
+      "setupCtaLocked": "{action} — erledigen Sie zuerst die Aufgaben oben.",
       "setupDescription": "Wir öffnen {url} in einem neuen Inkognito-Tab und erfassen Ihre Klicks und Eingaben – kein Code.",
-      "setupIncognitoDone": "Fertig",
+      "setupDetectedAuto": "Automatisch erkannt",
+      "setupHintConnect": "{action} wird freigeschaltet, sobald der Recorder sich mit diesem Tab verbindet.",
+      "setupHintIncognito": "Bestätigen Sie {setting} (Aufgabe 2), um fortzufahren.",
+      "setupHintInstall": "Installieren Sie den Recorder, um die nächste Aufgabe freizuschalten.",
+      "setupIncognitoAckLabel": "Ich habe {setting} aktiviert",
+      "setupIncognitoAckNote": "Chrome erlaubt es uns nicht, diese Einstellung zu prüfen, also bestätigen Sie sie selbst, sobald sie aktiviert ist.",
+      "setupIncognitoCalloutStep1": "Klicken Sie in der Symbolleiste auf das Menü {icon} {menu} → {more} neben {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "{setting} aktivieren.",
+      "setupIncognitoCalloutTitle": "Tun Sie dies in Chrome",
+      "setupIncognitoDescription": "Aufnahmen laufen in einem sauberen Inkognito-Fenster, und Chrome blockiert dort Erweiterungen, es sei denn, Sie erlauben es. Dies ist eine Chrome-Einstellung — Sie schalten sie um, nicht wir.",
+      "setupIncognitoDoneTitle": "Im Inkognitomodus erlaubt",
+      "setupIncognitoTitle": "Recorder im Inkognitomodus erlauben",
+      "setupInstallAckLabel": "Ich habe es zu Chrome hinzugefügt",
+      "setupInstallAckNote": "Die Installation findet in einem anderen Tab statt, den diese Seite nicht sehen kann. Bestätigen Sie sie daher hier, sobald Chrome fertig ist.",
+      "setupInstallCta": "Aus dem Chrome Web Store installieren",
+      "setupInstallDescription": "Eine leichtgewichtige Chrome-Erweiterung, die Ihre Klicks und Eingaben erfasst.",
+      "setupInstallDone": "Recorder installiert",
+      "setupInstallTitle": "OpenObserve-Recorder installieren",
       "setupOpenRecord": "Öffnen und aufzeichnen",
+      "setupProgress": "{done} von {total} erledigt",
       "setupRecorder": "Rekorder einrichten",
       "setupSkip": "Überspringen – ich erstelle die Schritte manuell",
-      "setupInstallCta": "Aus dem Chrome Web Store installieren",
-      "setupStep1Description": "Eine leichte Chrome-Erweiterung, die Ihre Aktionen erfasst.",
-      "setupStep1Title": "Installieren Sie den OpenObserve-Rekorder",
+      "setupSubtitleRecord": "3 Dinge vor der ersten Aufnahme zu erledigen — dauert etwa eine Minute.",
+      "setupSubtitleReplay": "3 Dinge vor der ersten Wiedergabe zu erledigen — dauert etwa eine Minute.",
+      "setupUndo": "Rückgängig",
       "startingUrl": "Start-URL",
       "stepConfigure": "Konfigurieren",
       "stepJourney": "Reise",
       "untitledCheck": "Unbenannte Prüfung",
-      "variablesHint": "Unterstützt {variables} wie {baseUrl}.",
-      "setupStep2Title": "Verbinden Sie den Recorder mit diesem Tab",
-      "setupStep2Point1": "Klicken Sie in der Chrome-Symbolleiste (oben rechts) auf das {icon} {menu}-Menü und wählen Sie {name}.",
-      "setupStep2Point2": "Oder laden Sie einfach diese Seite neu.",
-      "setupStep2Point3": "Der Status unten wechselt automatisch auf {connected}.",
-      "setupStep3Title": "Inkognito-Modus aktivieren",
-      "setupStep3Description": "Journeys werden in einem Inkognito-Fenster aufgezeichnet und wiedergegeben, daher muss {setting} für den Recorder in Chrome aktiviert sein.",
-      "setupStep3Point1": "Klicken Sie in der Chrome-Symbolleiste auf das {icon} {menu}-Menü, klicken Sie dann neben {name} auf {more} und wählen Sie {manage}.",
-      "setupStep3Point2": "Aktivieren Sie {setting} — der Recorder kann nicht mit Seiten interagieren, die ohne diese Einstellung geöffnet werden.",
-      "setupConnected": "Verbunden ✓"
+      "variablesHint": "Unterstützt {variables} wie {baseUrl}."
     },
     "dialog": {
       "bulkDeleteBody": "Möchten Sie wirklich {count} Check löschen? Diese Aktion kann nicht rückgängig gemacht werden. | Möchten Sie wirklich {count} Checks löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
@@ -10736,8 +11192,8 @@
       "zeroAssertionAdd": "Assertion hinzufügen",
       "testIdMissingTitle": "Keine Testattribute in dieser Aufzeichnung gefunden",
       "testIdMissingDescription": "Der Rekorder suchte nach \"{attr}\" und kein Schritt entsprach einem, daher verwendet jeder Schritt als Fallback Rollen-, Text- oder CSS-Selektoren — diejenigen, die am ehesten brechen, wenn sich die Seite ändert. Wenn diese Anwendung Elemente mit einem anderen Attribut markiert, legen Sie es vor der erneuten Aufzeichnung fest.",
-      "testIdMissingDismiss": "Verwerfen",
-      "zeroAssertionDismiss": "Jetzt nicht",
+      "suggestionCount": "1 Vorschlag für diese Reise | {count} Vorschläge für diese Reise",
+      "suggestionsNonBlocking": "Vorschläge blockieren niemals das Speichern oder Ausführen der Reise.",
       "actionLabel": "Aktion",
       "actionChangedNotice": "Wenn Sie die Aktion ändern, wird dieser Schritt aus den unten stehenden Feldern neu aufgebaut. Das aufgezeichnete Replay-Detail wird nicht wiederverwendet.",
       "timeoutHelpInteraction": "Leer verwendet die Standardeinstellung des Runners, {seconds} s. Maximum {max} s.",
@@ -10771,7 +11227,6 @@
       "noSteps": "Noch keine Schritte",
       "filterClearedForErrors": "Filter gelöscht, damit die Schritte, die korrigiert werden müssen, sichtbar sind.",
       "filterClearedForNewStep": "Filter gelöscht, damit der neue Schritt sichtbar ist.",
-      "openExtensions": "chrome://extensions öffnen",
       "preflightDescription": "Die Rekorder-Erweiterung wurde vor der Ausführung des ersten Schritts beendet. Ihr Bericht befindet sich unten.",
       "preflightTitle": "Replay konnte nicht gestartet werden",
       "replayInProgressDescription": "In der Rekorder-Erweiterung läuft noch ein anderes Replay. Warten Sie, bis es beendet ist, oder laden Sie die Erweiterung neu, und versuchen Sie es dann erneut.",
@@ -10779,7 +11234,6 @@
       "reRun": "Erneut ausführen",
       "reRunToHere": "Schritte 1–{step} erneut ausführen",
       "fidelityLabel": "Die Vorschau konnte nicht reproduzieren",
-      "extensionDialogDescription": "Das Aufzeichnen und Wiedergeben von Journeys verwendet die OpenObserve Recorder Chrome-Erweiterung. Führen Sie die folgenden Schritte aus, um fortzufahren.",
       "record": "Aufzeichnen",
       "recordJourney": "Journey aufzeichnen",
       "recording": "Aufzeichnung läuft",
@@ -10813,12 +11267,8 @@
       "timeoutLabel": "Timeout (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Wert",
-      "waitingForActions": "Warte auf Aktionen im Browser…",
-      "incognitoStep1Full": "chrome://extensions öffnen",
-      "incognitoStep2Full": "Finden Sie die {name}-Erweiterung",
-      "incognitoStep3Full": "Klicken Sie auf {button}",
-      "incognitoStep4Full": "Aktivieren Sie {setting}",
-      "incognitoStep5Full": "Kehren Sie hierher zurück und klicken Sie auf {button}"
+      "showSetupSteps": "Einrichtungsschritte anzeigen",
+      "waitingForActions": "Warte auf Aktionen im Browser…"
     },
     "labels": {
       "copyOf": "Kopie von {name}",
@@ -12284,7 +12734,7 @@
   },
   "slos": {
     "title": "SLOs",
-    "subtitle": "Service-Level-Ziele — Zielwerte, Fehlerbudgets, Burn-Rate-Alarme",
+    "subtitle": "Service-Level-Ziele: Ziele, Fehlerbudgets, Burn-Rate-Alarme",
     "new": "Neues SLO",
     "newTitle": "Neues SLO",
     "editTitle": "SLO bearbeiten",
@@ -12300,7 +12750,7 @@
     "deleted": "SLO gelöscht",
     "rolling": "gleitend",
     "totalSlos": "SLOs gesamt",
-    "noGrouping": "Keine — eine einzige Gesamtserie",
+    "noGrouping": "Keine (eine einzelne Gesamtserie)",
     "generation": "Generation {n}",
     "newAlert": "Neuer Alarm",
     "overRolling": "über gleitende {window}",
@@ -12311,13 +12761,16 @@
     "deleteFailed": "Das SLO konnte nicht gelöscht werden",
     "deleteConfirmTitle": "Dieses SLO löschen?",
     "deleteConfirmBody": "\"{name}\" und seine Messhistorie werden entfernt.",
+    "deleteAlertsChecking": "Prüfe auf zugeordnete Alarme…",
+    "deleteAlertsNote": "Das Löschen dieses SLO löscht auch den zugeordneten Alarm. | Das Löschen dieses SLO löscht auch die {count} zugeordneten Alarme.",
+    "deleteAlertsUnknown": "Konnte nicht prüfen, welche Alarme zugeordnet sind. Das Löschen dieses SLO löscht alle.",
     "deleteBudgetNote": "Die bereits geschriebenen Zeitscheiben bleiben auf der Festplatte, bis sie auslaufen; die Zeilenreservierung dieses SLOs wird dann statt jetzt freigegeben.",
     "groupedSliceNote": "Gruppierte SLOs verwenden 5-Minuten-Zeitscheiben.",
     "sliceNote": {
-      "count": "Die Zeitscheibenbreite ändert die Zahlen dieses SLOs nicht — dieselben Ereignisse werden auf beide Arten gezählt. 5-Minuten-Zeitscheiben speichern ein Fünftel der Historie.",
-      "perSlice": "Jede Zeitscheibe wird als Ganzes als gut oder schlecht bewertet, daher ist die Breite der kleinste Budgetbetrag, den ein Fehler verbrauchen kann. Bei 99,9 % über 7 Tage verbraucht eine einzelne schlechte 5-Minuten-Zeitscheibe etwa die Hälfte des Budgets — wählen Sie 1 Minute für enge Ziele bei kurzen Fenstern."
+      "count": "Die Slice-Breite ändert nichts an den Zahlen dieses SLO. Die gleichen Ereignisse werden in beiden Fällen gezählt. 5-Minuten-Slices speichern ein Fünftel so viel Verlauf.",
+      "perSlice": "Jeder Slice wird als Ganzes gut oder schlecht bewertet, daher ist die Breite der kleinste Budgetbetrag, den ein Fehler verbrauchen kann. Bei 99,9 % über 7 Tage verbraucht ein einzelner schlechter 5-Minuten-Slice etwa die Hälfte des Budgets. Wählen Sie 1 Minute für enge Ziele in kurzen Zeitfenstern."
     },
-    "backfillNote": "Backfill wird beim Speichern ausgeführt — blockweise, neueste Historie zuerst. Alarme bleiben eingefroren, bis die Abdeckung die Mindestgrenze überschreitet.",
+    "backfillNote": "Backfill läuft beim Speichern: in Blöcken, neueste zuerst. Alerts bleiben eingefroren, bis die Abdeckung die Untergrenze überschreitet.",
     "budgetHint": "Fehlerbudget = {budget}",
     "budgetDays": "{n} Tage",
     "budgetHours": "{n} Stunden",
@@ -12335,10 +12788,9 @@
       "count": "Anzahl",
       "countDescription": "gute Ereignisse / gesamte Ereignisse aus einer Abfrage",
       "timeSlice": "Zeitscheibe",
-      "timeSliceDescription": "eine Bedingung pro Zeitscheibe, z. B. p95 < 500 ms — Verfügbarkeit = gute Zeitscheiben",
+      "timeSliceDescription": "eine Bedingung pro Slice, z. B. p95 < 500 ms; Verfügbarkeit = gute Slices",
       "alert": "Alarmbasiert",
-      "alertDescription": "Verfügbarkeit eines bestehenden Alarms",
-      "alertUnavailable": "Alarmbasierte SLIs sind noch nicht verfügbar"
+      "alertDescription": "Verfügbarkeit eines bestehenden Alarms"
     },
     "window": {
       "7d": "7 Tage",
@@ -12378,7 +12830,7 @@
     },
     "section": {
       "identity": "Details",
-      "sli": "SLI — was „gut“ bedeutet",
+      "sli": "SLI: was \"gut\" bedeutet",
       "objective": "Ziel",
       "grouping": "Gruppierung",
       "summary": "Zusammenfassung"
@@ -12388,14 +12840,24 @@
       "namePlaceholder": "z. B. Checkout-Verfügbarkeit",
       "description": "Beschreibung",
       "tags": "Tags",
+      "tagsPlaceholder": "Tag hinzufügen und Enter drücken",
       "streamType": "Stream-Typ",
       "stream": "Stream",
+      "queryLanguage": "Abfragesprache",
       "scope": "Bereich",
       "scopeHint": "Optionaler Filter, der auf den Nenner angewendet wird. Für alle Zeilen leer lassen.",
       "goodWhen": "Gut, wenn",
       "goodWhenHint": "Boolesches Prädikat über eine Zeile, z. B. status_code < 500",
       "aggregate": "Aggregat",
       "aggregateHint": "Aggregiert über jeden Slice und dann mit dem untenstehenden Schwellenwert verglichen, z. B. approx_percentile_cont(duration_ms, 0.95)",
+      "aggregatePromql": "PromQL-Ausdruck",
+      "aggregatePromqlHint": "Ein Metrik-Stream wird in PromQL abgefragt. Der Ausdruck wird am Ende jedes Slices ausgewertet und mit dem unten angegebenen Schwellenwert verglichen. Geben Sie daher seinem Bereichsselektor die Breite eines Slices und reduzieren Sie ihn auf eine einzelne Zeitreihe: histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
+      "countGoodPromql": "Gute Ereignisse (PromQL)",
+      "countGoodPromqlHint": "Der Zähler: der Zähleranstieg über die Ereignisse, die als gut gelten — normalerweise der Gesamtzähler, eingegrenzt durch einen Label-Matcher.",
+      "countTotalPromql": "Gesamtereignisse (PromQL)",
+      "countTotalPromqlHint": "Der Nenner, nicht das Komplement des Zählers: derselbe Zähler ohne den Gut-Filter. Der SLI ist gut geteilt durch Gesamt.",
+      "countPromqlRangeHint": "Geben Sie beiden Ausdrücken einen Bereichsselektor von einem Slice Breite — increase(http_requests_total[{range}]) für ein {range}-Slice. Ein breiteres oder schmaleres Fenster zählt stillschweigend zu viel oder zu wenig.",
+      "promqlAbsentHint": "Eine Metrik, die nicht mehr geschrieben wird, antwortet noch einige Minuten lang, sodass eine sofortige Abfrage Stille erst spät bemerkt. Aggregieren Sie über ein Fenster, das dem Slice entspricht — avg_over_time(metric[5m]) für ein 5-Minuten-Slice — sodass ein Slice ohne Stichproben überhaupt nichts zurückgibt, was als schlecht aufgezeichnet wird.",
       "comparator": "Vergleichsoperator",
       "threshold": "Schwellenwert",
       "target": "Zielwert",
@@ -12415,35 +12877,57 @@
     },
     "empty": {
       "title": "Noch keine SLOs",
-      "description": "Ein SLO misst, welcher Anteil der Anfragen oder der Zeit ein Ziel erreicht hat – und gibt Alerts ein Fehlerbudget zum Verbrauchen."
+      "description": "Ein SLO misst, welcher Anteil der Anfragen oder der Zeit ein Ziel erreicht hat, und gibt Alerts ein Fehlerbudget zum Verbrauchen."
     },
     "groups": {
       "emptyTitle": "Noch keine Gruppen gemessen",
       "emptyDescription": "Gruppen erscheinen, sobald der erste Ingest-Durchlauf sie gemessen hat."
     },
     "frozen": {
-      "title": "Eingefroren – nicht genügend Abdeckung",
-      "body": "Nur {coverage} dieses Zeitfensters wurde gemessen, unter der {floor}-Untergrenze. Das SLO wird als keine Daten gelesen und seine Alerts werden weder ausgelöst noch aufgelöst, sodass ungemessene Zeit nie als Betriebszeit gemeldet wird."
+      "title": "Eingefroren: nicht genügend Abdeckung",
+      "body": "Nur {coverage} dieses Zeitfensters wurde gemessen, unter der {floor}-Untergrenze. Das SLO wird als keine Daten gelesen und seine Alerts werden weder ausgelöst noch aufgelöst, sodass ungemessene Zeit nie als Betriebszeit gemeldet wird.",
+      "alertGapsBody": "Nur {coverage} dieses Fensters wurde gemessen, unter der {floor}-Untergrenze: Das Quell-Alert hat für den Rest davon nicht ausgewertet, sei es pausiert, stummgeschaltet oder fehlgeschlagen. Das SLO wird als keine Daten interpretiert und seine Alerts lösen weder aus noch auf, sodass ungemessene Zeit niemals als Verfügbarkeit gemeldet wird.",
+      "alertStaleTitle": "Eingefroren: Das Quell-Alert hat die Auswertung eingestellt",
+      "alertStaleBody": "Das Quell-Alert hat seit {since} nicht mehr ausgewertet, daher ist die Messung eingefroren: Das Fenster bleibt, wo es war, und die Alerts des SLO lösen weder aus noch auf. Die folgenden Werte sind die letzte echte Messung, nicht der aktuelle Zustand.",
+      "measuringSinceTitle": "Messung seit {since}",
+      "measuringSinceBody": "Dieses SLO hat {measured} von {window} Tagen Verlauf: Es gibt keine brauchbare Aufzeichnung seines Quell-Alerts vor {since}. Jede unten stehende Zahl beschreibt die tatsächlich gemessenen Tage, nicht das vollständige Fenster, und das Fenster füllt sich im Laufe der Zeit."
     },
     "regenerate": {
       "title": "Diese Bearbeitung startet die Messung neu",
-      "body": "Sie haben geändert, was ein Slice bedeutet, daher beginnt eine neue Generation und die Messungen des aktuellen Fensters werden verworfen. Nur das Ziel zu ändern würde dies nicht tun – das Ziel wird beim Lesen des SLO angewendet."
+      "body": "Sie haben geändert, was ein Slice bedeutet, daher beginnt eine neue Generation und die Messungen des aktuellen Fensters werden verworfen. Nur das Ziel zu ändern würde dies nicht bewirken; das Ziel wird beim Lesen des SLO angewendet."
     },
     "alertSli": {
-      "unavailable": "Alert-basierte SLIs sind noch nicht verfügbar: Die Unterscheidung zwischen \"der Alert war 3h lang OK\" und \"der Alert war 3h lang pausiert\" erfordert Abdeckungsdaten, die noch eingerichtet werden."
+      "source": "Quell-Alert",
+      "sourcePlaceholder": "Ein Alert auswählen",
+      "sourceHint": "Verfügbarkeit ist der Anteil der gemessenen Zeit, in der dieses Alert nicht ausgelöst hat. Zeit, in der es nicht ausgewertet hat — pausiert, stummgeschaltet oder fehlgeschlagen — ist ungemessen und wird nie als Verfügbarkeit gezählt.",
+      "loadFailed": "Die geeigneten Alerts konnten nicht geladen werden",
+      "noneEligible": "In dieser Organisation kann noch kein Alert als Quelle verwendet werden.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "Ein alert-basiertes SLI kann nicht gruppiert werden: Das Verfügbarkeitsprotokoll erfasst einen Lauf pro Alert, nicht pro Gruppe, daher gibt es keine Abdeckung pro Gruppe, auf die man sich stützen kann.",
+      "sourceLink": "Quell-Alert",
+      "preview": {
+        "title": "Gemessene Verfügbarkeit",
+        "tally": "{sli}% gut über {coverage} des Fensters",
+        "wouldFreeze": "Zu wenig von diesem Fenster wurde gemessen, daher liest sich ein SLO auf dieser Quelle als keine Daten und seine Alerts lösen weder aus noch auf. Der obige Prozentsatz bezieht sich nur auf den gemessenen Teil.",
+        "noHistory": "Noch keine Auswertungshistorie für dieses Alert. Die Messung beginnt, sobald es ausgeführt wurde.",
+        "loadFailed": "Die Auswertungshistorie konnte nicht geladen werden",
+        "legendGood": "OK",
+        "legendBad": "Ausgelöst",
+        "legendUnmeasured": "Nicht gemessen"
+      }
     },
     "alert": {
       "sloLabel": "Service-Level-Ziel",
       "sloSummary": "Ziel {target} · Gleitendes Fenster {window} · {slice} Slices · max. Burn-Rate ×{max}",
       "suggested": "Vorgeschlagene Konfigurationen",
-      "suggestedFor": "Datadogs vorgeschlagene Zeilen für ein {window} SLO",
+      "suggestedFor": "Vorgeschlagene Zeilen für ein {window}-SLO",
       "presetDetail": "{long} lang / {short} kurz · feuert bei {budget}% Budget",
       "shortIsLongOverTwelve": "Kurz = lang ÷ 12 (Google SRE Workbook) in jedem vorgeschlagenen Paar.",
       "criticalIf": "Kritisch wenn",
       "warningIf": "Warnung wenn",
       "burnRate": "Burn-Rate",
       "budgetConsumed": "Budget verbraucht",
-      "inBothWindows": "in beiden Fenstern –",
+      "inBothWindows": "in beiden Fenstern:",
       "long": "lang",
       "short": "kurz",
       "none": "keine",
@@ -12452,16 +12936,14 @@
       "exhaustNote": "Bei dieser Rate ist das Budget in ~{time} aufgebraucht.",
       "multiAlert": "Ein Alert pro Gruppe",
       "multiAlertHint": "Verteilt den Alert auf die Gruppen des SLO, jede mit eigenem Zustand.",
-      "noCountGate": "Kein Count-Gate.",
-      "noCountGateBody": "Im Gegensatz zu Aggregations- und PromQL-Alerts gibt es hier keine Zeile \"für mindestens N Gruppen\" – diese Familie hat keine Anzahl-Achse, und ein nicht standardmäßiger Wert in den Legacy-Schwellenwertfeldern wird abgelehnt statt ignoriert.",
       "kind": {
         "burnRate": "Burn-Rate",
         "errorBudget": "Fehlerbudget"
       },
       "preset": {
-        "fast": "Schneller Burn – Alarm",
-        "mid": "Mittlerer Burn – Benachrichtigung",
-        "slow": "Langsamer Burn – Ticket"
+        "fast": "Schneller Aufbrauch: Pager",
+        "mid": "Mittlerer Aufbrauch: Benachrichtigung",
+        "slow": "Langsamer Aufbrauch: Ticket"
       }
     },
     "move": "Verschieben",
@@ -12473,13 +12955,17 @@
       "title": "Vorschau",
       "goodEvents": "Gute Ereignisse",
       "badEvents": "Schlechte Ereignisse",
+      "totalEvents": "Gesamtereignisse",
       "needsDefinition": "Wählen Sie einen Stream und definieren Sie \"gut wenn\", um eine Vorschau zu erhalten.",
+      "needsPromqlDefinition": "Definieren Sie beide PromQL-Ausdrücke, um eine Vorschau zu erhalten",
       "sliceValues": "Slice-Wert vs. Schwellenwert",
       "sliceValue": "Slice-Wert",
-      "sliceTally": "{sli}% gut — {good}/{total} Slices",
-      "sliceGaps": "{n}/{total} Slots in diesem Bereich haben keine Daten geliefert — nicht gemessen, nicht schlecht. Der Prozentsatz oben bezieht sich auf den Rest.",
+      "sliceTally": "{sli}% gut ({good}/{total} Slices)",
+      "sliceGaps": "{n}/{total} Slots in diesem Bereich erzeugten keine Daten: nicht gemessen, nicht schlecht. Der obige Prozentsatz bezieht sich auf den Rest.",
       "thresholdLabel": "Schwellenwert {value}",
       "noSlices": "Noch keine Slices in diesem Bereich",
+      "multiSeries": "Dieser Ausdruck gibt {n} Zeitreihen zurück und das SLO ist nicht gruppiert. Ein Slice enthält einen Wert, daher werden Zeitreihen, die auf demselben Slice landen, verworfen und es bleibt ungemessen. Reduzieren Sie den Ausdruck auf eine einzelne Zeitreihe oder gruppieren Sie das SLO nach den Labels, die sie unterscheiden.",
+      "multiSeriesGrouped": "Dieser Ausdruck gibt {n} Zeitreihen zurück, eine pro Gruppe, und das SLO bewertet jede von ihnen separat. Die Vorschau liest einen einzelnen Wert pro Slice, daher kann sie sie nicht zusammen darstellen.",
       "loadFailed": "Die Vorschauabfrage konnte nicht ausgeführt werden"
     },
     "chart": {
@@ -12492,6 +12978,7 @@
       "exhausted": "Budget erschöpft (0%)",
       "neutralBurn": "Budgetneutral (×1)",
       "empty": "Noch keine Slices in diesem Zeitfenster gemessen.",
+      "sparseCoverage": "Nur {measured} von {total} Buckets in diesem Fenster haben Ereignisse aufgezeichnet; der Rest hat nichts gemessen. Einzelne Messungen werden als Punkte dargestellt, damit sie sichtbar bleiben.",
       "loadFailed": "Messverlauf konnte nicht geladen werden",
       "about": "Über dieses Diagramm",
       "formulaLabel": "Formel",
@@ -12500,12 +12987,23 @@
       "errorsAffordable": "Fehler noch tolerierbar",
       "slicesAffordable": "Schlechte Slices noch tolerierbar",
       "budgetExplain": "Wie viel des Fehlerbudgets noch unverbraucht ist, kumulativ über das Zeitfenster betrachtet. Jeder Bucket addiert seine schlechten Ereignisse zu einem laufenden Gesamtwert, sodass die Linie nur fällt.",
-      "budgetFormula": "verbleibend % = 100 × (1 − bisherige Fehler ÷ Budget)\nBudget = Gesamtereignisse im Zeitfenster × (100% − Zielwert)\nFehler = Gesamt − Gut\n\nrechte Achse — noch tolerierbare Fehler:\n= Budget × verbleibend % ÷ 100",
-      "budgetFormulaPerSlice": "verbleibend % = 100 × (1 − bisherige Fehler ÷ Budget)\nBudget = gemessene Sekunden im Zeitfenster × (100% − Zielwert)\n\nEin ganzer Slice wird als gut oder schlecht bewertet, daher zählt dieser SLI SEKUNDEN.\n\nrechte Achse — noch tolerierbare schlechte Slices:\n= Budget × verbleibend % ÷ 100 ÷ Slice-Intervall",
-      "budgetNote": "Der letzte Punkt entspricht der Kachel Verbleibendes Budget oben. Die gestrichelte Linie bei 0% ist die Erschöpfung — darunter hat das SLO mehr Fehler verbraucht, als das Ziel erlaubt. Lücken sind Buckets, für die nichts gemessen wurde, was nicht dasselbe wie Null ist.",
+      "budgetFormula": "Verbleibende % = 100 × (1 − bisherige Fehler ÷ Budget)\nBudget = Gesamtereignisse im Fenster × (100% − Ziel)\nFehler = Gesamt − gut\n\nrechte Achse (noch erschwingliche Fehler):\n= Budget × Verbleibende % ÷ 100",
+      "budgetFormulaPerSlice": "verbleibende % = 100 × (1 − bisher schlecht ÷ Budget)\nBudget = gemessene Sekunden im Fenster × (100% − Ziel)\n\nEin ganzer Slice wird als gut oder schlecht bewertet, daher zählt dieser SLI SEKUNDEN.\n\nrechte Achse (schlechte Slices noch im Rahmen):\n= Budget × verbleibende % ÷ 100 ÷ Slice-Intervall",
+      "budgetNote": "Der letzte Punkt entspricht der Kachel „Verbleibendes Budget“ oben. Die gestrichelte Linie bei 0% bedeutet Erschöpfung; darunter hat das SLO mehr Fehler verbraucht, als das Ziel erlaubt. Lücken sind Buckets ohne Messwerte, was nicht dasselbe wie Null ist.",
       "burnExplain": "Wie schnell das Budget in jedem einzelnen Bucket verbraucht wird, als Vielfaches der budgetneutralen Rate.",
-      "burnFormula": "Verbrauchsrate = (100% − SLI) ÷ (100% − Zielwert)\nSLI = 100 × Gut ÷ Gesamt, nur für diesen Bucket\n\nrechte Achse — dieselbe Linie als SLI gelesen:\nSLI = 100% − Verbrauchsrate × (100% − Zielwert)",
+      "burnFormula": "Verbrennungsrate = (100% − SLI) ÷ (100% − Ziel)\nSLI = 100 × gut ÷ gesamt, nur für diesen Bucket\n\nrechte Achse (dieselbe Linie als SLI gelesen):\nSLI = 100% − Verbrennungsrate × (100% − Ziel)",
       "burnNote": "×1 verbraucht das Budget genau am Ende des Zeitfensters, ×2 zur Hälfte; unter ×1 wird das Budget angespart. Da es pro Bucket und nicht kumulativ ist, bleibt eine Spitze hier sichtbar, anstatt weggemittelt zu werden. Die rechte Achse zählt abwärts: weiter oben im Diagramm bedeutet mehr Verbrauch, was einem niedrigeren SLI entspricht."
+    },
+    "alerts": {
+      "title": "Alarme",
+      "add": "Alarm hinzufügen",
+      "disabled": "Deaktiviert",
+      "emptyTitle": "Noch keine Alarme für dieses SLO",
+      "emptyHint": "Burn-Rate-Alarme warnen Sie, solange noch Budget übrig ist, um das SLO zu schützen.",
+      "loadFailed": "Die Alarme für dieses SLO konnten nicht geladen werden.",
+      "editTargetMissing": "Dieser Alarm ist diesem SLO nicht mehr zugeordnet.",
+      "describeBurn": "Burn-Rate > {critical} über {long} und {short}",
+      "describeBudget": "Fehlerbudget verbraucht > {critical}%"
     }
   }
 }

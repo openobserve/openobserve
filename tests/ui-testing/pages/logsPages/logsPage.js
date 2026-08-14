@@ -14,6 +14,16 @@ const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment, authedRequest } = 
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 export class LogsPage {
+    /**
+     * Escape a value for embedding inside a double-quoted CSS attribute selector.
+     * Backslashes must be escaped first, otherwise a literal `\` in the text would
+     * be emitted unescaped and swallow the character that follows it (and a
+     * trailing `\` would escape the closing quote and break the whole selector).
+     */
+    static escapeCssAttrValue(text) {
+        return String(text).replace(/["\\]/g, '\\$&');
+    }
+
     constructor(page) {
         this.page = page;
         
@@ -3790,7 +3800,7 @@ export class LogsPage {
     }
 
     async expectNotificationMessage(text) {
-        const escaped = String(text).replace(/"/g, '\\"');
+        const escaped = LogsPage.escapeCssAttrValue(text);
         const selector = [
             `[data-test-variant="success"][data-test-message*="${escaped}"]`,
             `[data-test-variant="error"][data-test-message*="${escaped}"]`,
@@ -3818,7 +3828,7 @@ export class LogsPage {
         // Some validations in the UX-revamp moved from $q.notify toasts to inline
         // OInput error messages (rendered as `[data-test="<name>-error"]`).
         // Cover both surfaces so the wait succeeds for either feedback channel.
-        const escaped = String(text).replace(/"/g, '\\"');
+        const escaped = LogsPage.escapeCssAttrValue(text);
         const selector = [
             `[data-test-variant="success"][data-test-message*="${escaped}"]`,
             `[data-test-variant="error"][data-test-message*="${escaped}"]`,
@@ -7432,6 +7442,32 @@ export class LogsPage {
             testLogger.info('Converted HTTP to HTTPS', { url: sharedUrl });
         }
 
+        // Re-point the short URL at the host the tests authenticated against (ZO_BASE_URL).
+        // On deployed/cloud envs the app builds the share link from its PUBLIC base URL
+        // (e.g. *.external.zinclabs.dev) which differs from the ingress the tests use
+        // (e.g. *.internal.zinclabs.dev). Navigating cross-origin drops the auth cookies
+        // and bounces to Dex, so the redirected page reads back an empty/logged-out state.
+        // The /short/<id> id resolves identically on the backend regardless of ingress
+        // host, so swapping only the origin keeps the session valid and the test intent
+        // (verify state preservation through the short-URL redirect) unchanged. Same-origin
+        // envs (localhost, matching deployed host) fall through untouched.
+        const baseUrl = process.env.ZO_BASE_URL;
+        if (baseUrl && !sharedUrl.includes('localhost')) {
+            try {
+                const shared = new URL(sharedUrl);
+                const base = new URL(baseUrl);
+                if (shared.origin !== base.origin) {
+                    shared.protocol = base.protocol;
+                    shared.host = base.host;
+                    const rewritten = shared.toString();
+                    testLogger.info('Re-pointed share URL to ZO_BASE_URL origin', { from: sharedUrl, to: rewritten });
+                    sharedUrl = rewritten;
+                }
+            } catch (e) {
+                testLogger.warn('Could not re-point share URL origin', { error: e.message });
+            }
+        }
+
         testLogger.info('Share link URL captured', { url: sharedUrl });
 
         return sharedUrl;
@@ -9152,7 +9188,7 @@ export class LogsPage {
      * @returns {Promise<number>} Number of wildcard chip elements
      */
     async getPatternCardWildcardChipCount(index = 0) {
-        const count = await this.page.locator(this.patternCardWildcardChips(index)).count().catch(() => 0);
+        const count = await this.patternCardAt(index).locator(this.wildcardChip).count().catch(() => 0);
         testLogger.info(`Pattern ${index} wildcard chips: ${count}`);
         return count;
     }
@@ -9201,7 +9237,10 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if anomaly badge is visible
      */
     async isPatternAnomaly(index = 0) {
-        const isAnomaly = await this.page.locator(this.patternCardAnomalyBadge(index)).isVisible({ timeout: 500 }).catch(() => false);
+        const isAnomaly = await this.patternCardAt(index)
+            .locator('[data-test$="-anomaly-badge"]')
+            .isVisible({ timeout: 500 })
+            .catch(() => false);
         testLogger.info(`Pattern ${index} is anomaly: ${isAnomaly}`);
         return isAnomaly;
     }
@@ -9212,7 +9251,10 @@ export class LogsPage {
      * @returns {Promise<string>} Badge text, or empty string if not visible
      */
     async getPatternAnomalyBadgeText(index = 0) {
-        const text = await this.page.locator(this.patternCardAnomalyBadge(index)).textContent().catch(() => '');
+        const text = await this.patternCardAt(index)
+            .locator('[data-test$="-anomaly-badge"]')
+            .textContent()
+            .catch(() => '');
         return text.trim();
     }
 
@@ -9239,17 +9281,22 @@ export class LogsPage {
     }
 
     /**
-     * Click the Nth *rendered* pattern card to open its details dialog.
-     * Uses patternCardAt() (rendered position) rather than the absolute-index
-     * selector: OVirtualScroll mounts only the visible window, so `pattern-card-0`
-     * can be absent even when cards are on screen, which made this click hang for
-     * the full timeout in CI while getPatternCardCount() (also rendered-position)
-     * reported cards present.
+     * Click the Nth rendered pattern card and return its absolute list index.
      * @param {number} index - Position among rendered cards (0-based)
+     * @returns {Promise<number>} Absolute pattern index (0-based)
      */
     async clickPatternDetailsIcon(index = 0) {
-        await this.patternCardAt(index).click();
-        testLogger.info(`Clicked details icon on pattern ${index}`);
+        const card = this.patternCardAt(index);
+        const dataTest = await card.getAttribute('data-test');
+        const absoluteIndex = Number.parseInt(dataTest?.match(/^pattern-card-(\d+)$/)?.[1] ?? '', 10);
+
+        if (!Number.isInteger(absoluteIndex)) {
+            throw new Error(`Unable to determine absolute pattern index from ${dataTest}`);
+        }
+
+        await card.click();
+        testLogger.info(`Clicked rendered pattern ${index} (absolute index ${absoluteIndex})`);
+        return absoluteIndex;
     }
 
     /**

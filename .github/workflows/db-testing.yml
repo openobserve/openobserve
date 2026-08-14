@@ -98,6 +98,7 @@ jobs:
 
       - name: Setup Python
         uses: actions/setup-python@v7
+        id: setup-python
         with:
           python-version: "3.11.6"
 
@@ -139,6 +140,9 @@ jobs:
 
       - name: Setup rye
         uses: eifinger/setup-rye@v4
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: false
           working-directory: "tests/db-testing/"

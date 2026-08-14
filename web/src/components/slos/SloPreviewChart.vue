@@ -34,6 +34,16 @@
 
   The queries use the same CASE-SUM shape the ingest pass uses, so what the
   preview draws is what the SLO will measure.
+
+  Over a METRICS stream the pair is good and TOTAL instead, because that is what
+  `CountSource::PromQl` is: two independent expressions where total is the
+  denominator, not the complement. Nothing there is one scan, so there is no
+  "bad" to derive — `total - good` is a subtraction between two separately
+  evaluated counters, and it goes negative on any reset or float drift between
+  them. Those two run as range evaluations here rather than through the panel
+  renderer, so the step and the slice attribution are the ingest pass's own
+  (`prom_query`); the range is not snapped to the slice grid, so the boundaries
+  are phase-shifted against the stored ones while the shape is the same.
 -->
 <template>
   <div class="flex flex-col gap-2" data-test="slos-slopreviewchart-root">
@@ -74,8 +84,39 @@
         {{ panel.label }}
       </PanelBar>
       <div class="h-45 w-full">
+        <!-- PromQL owns its own request lifecycle, where the SQL branch hands
+             that to the panel renderer — so this side has the states the
+             renderer would otherwise have drawn. -->
+        <template v-if="isPromql">
+          <div
+            v-if="loading"
+            class="flex h-full items-center justify-center"
+            :data-test="`slos-slopreviewchart-${panel.key}-loading`"
+          >
+            <OSpinner size="sm" />
+          </div>
+          <div
+            v-else-if="error"
+            class="flex h-full items-center justify-center px-4 text-center"
+            :data-test="`slos-slopreviewchart-${panel.key}-error`"
+          >
+            <span class="text-text-secondary text-sm">{{ error }}</span>
+          </div>
+          <ChartRenderer
+            v-else-if="panel.options"
+            :data="{ options: panel.options }"
+            :data-test="`slos-slopreviewchart-${panel.key}-chart`"
+          />
+          <div
+            v-else
+            class="flex h-full items-center justify-center px-4 text-center"
+            :data-test="`slos-slopreviewchart-${panel.key}-empty`"
+          >
+            <span class="text-text-secondary text-sm">{{ promqlEmptyNotice }}</span>
+          </div>
+        </template>
         <PanelSchemaRenderer
-          v-if="panel.schema"
+          v-else-if="panel.schema"
           :height="4"
           :width="5"
           :panelSchema="panel.schema"
@@ -100,26 +141,58 @@
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useStore } from "vuex";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { chartAxisLine, chartColor, chartTextColor } from "@/utils/chartTheme";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
+import searchService from "@/services/search";
 import { getDefaultDashboardPanelData } from "@/utils/alerts/aggregationPreviewQuery";
-import { buildSloPreviewQuery } from "@/utils/slos/previewQuery";
+import {
+  buildSloPreviewQuery,
+  buildSloPromqlPreviewRange,
+  promqlCountSeriesPoints,
+  type SloPreviewPoint,
+  type SloPromqlPreviewRange,
+} from "@/utils/slos/previewQuery";
 
-const props = defineProps<{
-  streamType: string;
-  stream: string;
-  /** SQL predicate; empty = all rows. */
-  scope?: string;
-  /** SQL predicate defining a good event. Required for a drawable preview. */
-  goodExpr?: string;
-}>();
+const ChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/ChartRenderer.vue"),
+);
+
+const props = withDefaults(
+  defineProps<{
+    streamType: string;
+    /** Optional because `CountSource::PromQl` has no stream: an SLO stored in
+     *  that arm hydrates the form without one. */
+    stream?: string;
+    /** SQL predicate; empty = all rows. */
+    scope?: string;
+    /** SQL predicate defining a good event. Required for a drawable preview. */
+    goodExpr?: string;
+    /** `CountSource::PromQl`'s numerator. */
+    good?: string;
+    /** `CountSource::PromQl`'s DENOMINATOR — not the complement of `good`. */
+    total?: string;
+    /** The API's discriminator. `prom_ql` is a range evaluation, not a scan. */
+    queryLanguage?: "sql" | "prom_ql";
+    /** Sets the evaluation step AND the slice each sample is attributed to.
+     *  Optional because the SQL branch has no use for it: its `histogram()`
+     *  carries no interval. */
+    sliceIntervalSecs?: number;
+  }>(),
+  { stream: "", queryLanguage: "sql", sliceIntervalSecs: 300 },
+);
 
 const { t } = useI18nTyped();
+const store = useStore();
 
 // Semantic series colours. Literal hex because this is chart data, not
 // component styling: the renderer takes colour strings, not utility classes,
@@ -129,16 +202,118 @@ const { t } = useI18nTyped();
 const GOOD_COLOR = "#34d399";
 const BAD_COLOR = "#f87171";
 
+// The PromQL bars resolve their colours through `chartTheme`, the sanctioned
+// seam for handing a token's value to a renderer that takes colour strings.
+// series-2 is the same green as GOOD_COLOR above; the denominator is blue and
+// not a second green, because total is not "more good" — it is what good is
+// measured against.
+const GOOD_TOKEN = "--color-chart-series-2";
+const TOTAL_TOKEN = "--color-chart-series-1";
+
 const goodSchema = ref<any>(null);
 const badSchema = ref<any>(null);
 const selectedTimeObj = ref<any>(null);
 const range = ref<string>("1h");
 
-// Good first, bad below — the order the user reads them in.
-const panels = computed(() => [
-  { key: "good", label: t("slos.preview.goodEvents"), schema: goodSchema.value },
-  { key: "bad", label: t("slos.preview.badEvents"), schema: badSchema.value },
-]);
+const isPromql = computed(() => props.queryLanguage === "prom_ql");
+
+const goodPoints = ref<SloPreviewPoint[]>([]);
+const totalPoints = ref<SloPreviewPoint[]>([]);
+const loading = ref(false);
+const error = ref("");
+
+/** A panel carries a SCHEMA on the SQL branch and chart OPTIONS on the PromQL
+ *  one: the first is rendered by the dashboard stack, the second is drawn from
+ *  points this component fetched itself. */
+interface PreviewPanel {
+  key: string;
+  label: I18nText;
+  schema?: unknown;
+  /** `null` until there is something to draw. */
+  options?: unknown;
+}
+
+/**
+ * ONE axis for both panels, from the union of the slices either side answered.
+ *
+ * They are stacked, which invites reading bar N of one against bar N of the
+ * other — and the two are separate evaluations that need not cover the same
+ * slices (a label-filtered numerator whose series churns is the ordinary case).
+ * Per-panel axes would put different slices in the same column.
+ */
+const alignedSlices = computed(() => {
+  const all = new Set<number>();
+  for (const point of [...goodPoints.value, ...totalPoints.value]) all.add(point.ts);
+  return [...all].sort((a, b) => a - b);
+});
+
+/** Formatted once for both panels — the shared axis is the point. */
+const sliceLabels = computed(() =>
+  alignedSlices.value.map((ts) => format(toZonedTime(ts, store.state.timezone), "HH:mm")),
+);
+
+const byTs = (points: SloPreviewPoint[]) => new Map(points.map((p) => [p.ts, p.value]));
+
+/**
+ * The numerator's bar for every slice on the axis.
+ *
+ * A slice the DENOMINATOR answered and the numerator did not is a ZERO, not a
+ * gap: `promql_rows` iterates totals and defaults the numerator to `0.0`, so
+ * the SLO records that slice at 0% — traffic continued and none of it was good,
+ * which is the most important thing a count preview can show. Drawing it as a
+ * gap is exactly the "nothing was good" / "no traffic" confusion the SQL
+ * branch's CASE-SUM exists to avoid.
+ *
+ * `has`, not `??`: a slice the numerator answered UNREADABLY is already `null`
+ * and must stay a gap rather than being promoted to a confident zero.
+ */
+const goodValues = computed<Array<number | null>>(() => {
+  const good = byTs(goodPoints.value);
+  const total = byTs(totalPoints.value);
+  return alignedSlices.value.map((ts) => {
+    if (good.has(ts)) return good.get(ts) ?? null;
+    return total.has(ts) ? 0 : null;
+  });
+});
+
+/** The reverse has no such rule: `promql_rows` emits no row at all for a slice
+ *  only the numerator answered, so the denominator is honestly a gap there. */
+const totalValues = computed<Array<number | null>>(() => {
+  const total = byTs(totalPoints.value);
+  return alignedSlices.value.map((ts) => total.get(ts) ?? null);
+});
+
+// Numerator first, denominator below — the order the user reads them in, and
+// the order the SLI is written in.
+const panels = computed<PreviewPanel[]>(() =>
+  isPromql.value
+    ? [
+        {
+          key: "good",
+          label: t("slos.preview.goodEvents"),
+          options: chartOptionsFor(goodValues.value, GOOD_TOKEN),
+        },
+        {
+          key: "total",
+          label: t("slos.preview.totalEvents"),
+          options: chartOptionsFor(totalValues.value, TOTAL_TOKEN),
+        },
+      ]
+    : [
+        { key: "good", label: t("slos.preview.goodEvents"), schema: goodSchema.value },
+        { key: "bad", label: t("slos.preview.badEvents"), schema: badSchema.value },
+      ],
+);
+
+/** Both expressions, or there is no SLI to preview — `total` is the
+ *  denominator, so half a definition previews nothing. */
+const hasPromqlPair = computed(() => !!props.good?.trim() && !!props.total?.trim());
+
+/** "Nothing typed yet" and "ran, and the range was empty" are different
+ *  answers, and only one of them is the user's cue to keep typing. */
+const promqlEmptyNotice = computed(() =>
+  hasPromqlPair.value ? t("slos.preview.noSlices") : t("slos.preview.needsPromqlDefinition"),
+);
 
 const rangeOptions = computed(() => [
   { value: "1h", label: t("alerts.groups.range1h") },
@@ -205,7 +380,134 @@ function panelFor(series: "good" | "bad", color: string) {
   return panel.data;
 }
 
+/** `null` when neither evaluation produced anything — the caller draws a notice
+ *  rather than an empty pair of axes. */
+function chartOptionsFor(values: Array<number | null>, colorToken: `--${string}`) {
+  if (!alignedSlices.value.length) return null;
+  void store.state.theme; // The resolved values are cached — re-read on a flip.
+  const axisColor = chartTextColor();
+  const gridColor = chartAxisLine();
+
+  return {
+    grid: { left: 8, right: 12, top: 16, bottom: 8, containLabel: true },
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+    xAxis: {
+      type: "category",
+      data: sliceLabels.value,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: gridColor } },
+      axisLabel: { hideOverlap: true, color: axisColor },
+    },
+    yAxis: {
+      type: "value",
+      axisLabel: { color: axisColor },
+      splitLine: { lineStyle: { color: gridColor, type: "dashed" } },
+    },
+    // Bars for the same reason the SQL panels use them: a count per slice is a
+    // discrete quantity, and a line between two of them means nothing.
+    series: [{ type: "bar", data: values, itemStyle: { color: chartColor(colorToken) } }],
+  };
+}
+
+// An abandoned evaluation holds a slot in the server's work-group queue until
+// it completes, so a superseded preview has to abort rather than just drop the
+// result. One controller for both sides: they are one reading.
+let controller: AbortController | null = null;
+
+function clearPromql() {
+  controller?.abort();
+  controller = null;
+  goodPoints.value = [];
+  totalPoints.value = [];
+  error.value = "";
+  loading.value = false;
+}
+
+async function runRange(
+  org: string,
+  request: SloPromqlPreviewRange,
+  /** Taken from the caller, NOT re-read from props after the await: the slice
+   *  width can change while the pair is in flight, and folding a response with
+   *  an interval the request was not stepped at shifts every bar. */
+  sliceIntervalSecs: number,
+  signal: AbortSignal,
+): Promise<SloPreviewPoint[]> {
+  const res = await searchService.metrics_query_range({
+    org_identifier: org,
+    ...request,
+    signal,
+  });
+  return promqlCountSeriesPoints(res?.data?.data?.result ?? [], sliceIntervalSecs);
+}
+
+async function loadPromql() {
+  const org = store.state.selectedOrganization?.identifier;
+  const endSecs = Math.floor(Date.now() / 1000);
+  const startSecs = endSecs - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) / 1000;
+  // Read once, so the request and the reading of its response cannot be built
+  // from two different slice widths.
+  const sliceIntervalSecs = props.sliceIntervalSecs;
+  const rangeFor = (expr: string | undefined) =>
+    buildSloPromqlPreviewRange({ expr, startSecs, endSecs, sliceIntervalSecs });
+  const good = rangeFor(props.good);
+  const total = rangeFor(props.total);
+
+  if (!org || !good || !total) {
+    // Aborted, not merely dropped: without this the requests already in flight
+    // would still recognise themselves as current and repaint the panels they
+    // just cleared. Their `finally` goes with them, so the spinner is cleared
+    // here.
+    clearPromql();
+    return;
+  }
+
+  controller?.abort();
+  const mine = new AbortController();
+  controller = mine;
+  loading.value = true;
+  error.value = "";
+
+  try {
+    const [goodRun, totalRun] = await Promise.all([
+      runRange(org, good, sliceIntervalSecs, mine.signal),
+      runRange(org, total, sliceIntervalSecs, mine.signal),
+    ]);
+    if (controller !== mine) return;
+    goodPoints.value = goodRun;
+    totalPoints.value = totalRun;
+  } catch (e: unknown) {
+    const failure = e as {
+      name?: string;
+      code?: string;
+      response?: { data?: { message?: string } };
+    };
+    // An abort is this component tidying up after itself, not a failure.
+    if (failure?.name === "CanceledError" || failure?.code === "ERR_CANCELED") return;
+    if (controller !== mine) return;
+    // `Promise.all` rejects on the first failure and leaves the sibling running
+    // — holding a work-group slot for a result nothing will draw.
+    mine.abort();
+    goodPoints.value = [];
+    totalPoints.value = [];
+    error.value = failure?.response?.data?.message || t("slos.preview.loadFailed");
+  } finally {
+    // Only the CURRENT request may clear the spinner: a superseded one's
+    // `finally` would otherwise drop it while the new evaluation is running.
+    if (controller === mine) loading.value = false;
+  }
+}
+
 function build() {
+  if (isPromql.value) {
+    // Cleared so a flip back to PromQL cannot show the last SQL definition's
+    // panels for a frame.
+    goodSchema.value = null;
+    badSchema.value = null;
+    loadPromql();
+    return;
+  }
+
+  clearPromql();
   goodSchema.value = panelFor("good", GOOD_COLOR);
   badSchema.value = panelFor("bad", BAD_COLOR);
 
@@ -224,7 +526,18 @@ function build() {
 // worth previewing.
 let timer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  () => [props.stream, props.streamType, props.scope, props.goodExpr],
+  () => [
+    props.stream,
+    props.streamType,
+    props.scope,
+    props.goodExpr,
+    props.good,
+    props.total,
+    props.queryLanguage,
+    // Only PromQL reads the slice width. Unconditionally, flipping the toggle
+    // would re-run two SQL searches for a byte-identical pair of panels.
+    isPromql.value ? props.sliceIntervalSecs : 0,
+  ],
   () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(build, 500);
@@ -232,6 +545,7 @@ watch(
 );
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer);
+  controller?.abort();
 });
 onMounted(build);
 </script>

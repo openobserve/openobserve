@@ -18,9 +18,9 @@
 use serde_json::{Value, json};
 
 use super::{
-    DEFAULT_LINK_LABEL, clamp,
+    DEFAULT_LINK_LABEL, clamp, dispatchable_url,
     markdown::{escape_mrkdwn, guard_leading_blockquote, markdown_to_mrkdwn},
-    safe_url, severity_color,
+    severity_color,
 };
 use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
 
@@ -39,16 +39,13 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     // Datadog-style clickable title: a bold mrkdwn link section that opens
     // the alert (user-picked over the plain header in a live A/B on a real
     // channel). mrkdwn link syntax breaks on `|` (terminates the label) and
-    // `>` (terminates the link), so a title containing either — and a
-    // missing/blocked alert URL — falls back to the plain `header` block.
-    // The label is escape_mrkdwn'd (entity-encoding `&`/`<`/`>`); the URL is
-    // scheme-checked via `safe_url`.
-    let title_url = safe_url(&ctx.alert_url);
-    if !title_url.is_empty()
-        && !title_url.contains(['|', '>', '<'])
-        && !c.title.contains('|')
-        && title_url != super::BLOCKED_URL
-    {
+    // `>` (terminates the link), so a title containing either — and an
+    // undispatchable alert URL — falls back to the plain `header` block.
+    // The label is escape_mrkdwn'd (entity-encoding `&`/`<`/`>`); the URL must
+    // be an absolute http(s) one (`dispatchable_url`), which also rules out the
+    // blocked placeholder, an empty `ZO_WEB_URL` and relative paths.
+    let title_url = dispatchable_url(&ctx.alert_url).unwrap_or_default();
+    if !title_url.is_empty() && !title_url.contains(['|', '>', '<']) && !c.title.contains('|') {
         blocks.push(json!({
             "type": "section",
             "text": {"type": "mrkdwn", "text": format!(
@@ -133,15 +130,26 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     // user-picked "full stripe" layout).
     let mut tail_blocks: Vec<Value> = Vec::new();
 
-    if !c.links.is_empty() {
+    // Slack validates every button `url` server-side and rejects the WHOLE
+    // message with `400 invalid_attachments` if one is not an absolute
+    // http(s) URL — losing the alert entirely (#13742). A link that cannot be
+    // dispatched is therefore DROPPED here rather than emitted: the alert is
+    // worth more than the button. This filter runs BEFORE the 5-element cap
+    // so a dropped link frees its slot for a deliverable one.
+    let deliverable: Vec<(&String, &str)> = c
+        .links
+        .iter()
+        .filter_map(|(label, url)| dispatchable_url(url).map(|url| (label, url)))
+        .collect();
+
+    if !deliverable.is_empty() {
         // The appended "View in OpenObserve" link (empty label, always last —
         // resolve.rs) is the notification's primary action: it must survive
         // the 5-element cap, so author links only fill the remaining slots.
-        let default_count = c.links.iter().filter(|(l, _)| l.is_empty()).count();
+        let default_count = deliverable.iter().filter(|(l, _)| l.is_empty()).count();
         let author_cap = MAX_ACTION_ELEMENTS.saturating_sub(default_count.min(MAX_ACTION_ELEMENTS));
         let mut authored_kept = 0usize;
-        let elements: Vec<Value> = c
-            .links
+        let elements: Vec<Value> = deliverable
             .iter()
             .filter(|(label, _)| {
                 if label.is_empty() {
@@ -162,7 +170,7 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
                 let mut button = json!({
                     "type": "button",
                     "text": {"type": "plain_text", "text": clamp(label, 75)},
-                    "url": safe_url(url),
+                    "url": url,
                 });
                 // The default "View in OpenObserve" link is the notification's
                 // primary action — Slack's "primary" button style renders it
@@ -240,17 +248,76 @@ pub fn images_undeliverable(now_secs: u64) -> bool {
     at != 0 && now_secs.saturating_sub(at) < IMAGES_RETRY_SECS
 }
 
+/// Outcome of stripping a payload's image blocks.
+pub struct StrippedPayload {
+    /// The payload with every `image` block removed.
+    pub msg: String,
+    /// Whether any stripped image pointed at OUR `web_url`.
+    ///
+    /// Only such an image is evidence about *this deployment's* reachability
+    /// from Slack's proxy. A custom template embedding a third-party image
+    /// that Slack rejects says nothing about `ZO_WEB_URL`, so it must not
+    /// trip the process-wide suppression flag or claim that diagnosis in the
+    /// log — see `mark_images_undeliverable`.
+    pub had_web_url_image: bool,
+}
+
+/// True when `url` sits under `base` — matching at a component boundary, not
+/// as a bare prefix.
+///
+/// `starts_with` alone would treat `https://o2.example.attacker.test/x` as
+/// living under `https://o2.example`, mis-attributing someone else's image to
+/// this deployment. The character after the base must therefore end the
+/// authority (`/`, `?`, `#`) or the URL must be exactly the base.
+///
+/// Scheme and host are ASCII case-insensitive (RFC 3986), so the comparison is
+/// too — otherwise `ZO_WEB_URL=https://O2.example` would never match the chart
+/// URL and image suppression would silently never engage.
+fn url_has_base(url: &str, base: &str) -> bool {
+    let base = base.trim_end_matches('/');
+    // `get` rather than slicing: a multi-byte character straddling
+    // `base.len()` would panic on a raw index.
+    let Some(head) = url.get(..base.len()) else {
+        return false;
+    };
+    // Only the scheme+authority is case-insensitive; the path is not. `base`
+    // is a bare origin in practice, so comparing its whole length is correct.
+    if !head.eq_ignore_ascii_case(base) {
+        return false;
+    }
+    let rest = &url[base.len()..];
+    rest.is_empty() || rest.starts_with(['/', '?', '#'])
+}
+
 /// Remove every `image` block from a Slack payload — top-level `blocks` and
 /// each attachment's `blocks` — dropping any attachment left with no blocks
 /// (an empty-`blocks` attachment renders a bare color stripe fragment).
 /// Returns `None` when the payload isn't JSON or has no image block, i.e.
 /// when stripping cannot change the outcome.
-pub fn strip_image_blocks(msg: &str) -> Option<String> {
+pub fn strip_image_blocks(msg: &str) -> Option<StrippedPayload> {
+    strip_image_blocks_with_base(msg, &config::get_config().common.web_url)
+}
+
+/// [`strip_image_blocks`] with the `web_url` injected, so tests need no global
+/// config. `web_url_base` empty ⇒ no image can be attributed to us.
+pub fn strip_image_blocks_with_base(msg: &str, web_url_base: &str) -> Option<StrippedPayload> {
     let mut v: Value = serde_json::from_str(msg).ok()?;
     let mut removed = false;
+    let mut had_web_url_image = false;
     let mut strip = |blocks: &mut Vec<Value>| {
         let before = blocks.len();
-        blocks.retain(|b| b.get("type").and_then(Value::as_str) != Some("image"));
+        blocks.retain(|b| {
+            let is_image = b.get("type").and_then(Value::as_str) == Some("image");
+            if is_image
+                && !web_url_base.is_empty()
+                && b.get("image_url")
+                    .and_then(Value::as_str)
+                    .is_some_and(|u| url_has_base(u, web_url_base))
+            {
+                had_web_url_image = true;
+            }
+            !is_image
+        });
         removed |= blocks.len() != before;
     };
     if let Some(blocks) = v.get_mut("blocks").and_then(Value::as_array_mut) {
@@ -269,12 +336,21 @@ pub fn strip_image_blocks(msg: &str) -> Option<String> {
                 .is_none_or(|b| !b.is_empty())
         });
     }
-    removed.then(|| v.to_string())
+    removed.then(|| StrippedPayload {
+        msg: v.to_string(),
+        had_web_url_image,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const BASE: &str = "https://o2.example";
+
+    fn strip(msg: &str) -> Option<StrippedPayload> {
+        strip_image_blocks_with_base(msg, BASE)
+    }
 
     #[test]
     fn strip_removes_image_blocks_but_keeps_attachments_with_content() {
@@ -282,7 +358,7 @@ mod tests {
             {"color":"#c00","blocks":[{"type":"section"}]},
             {"color":"#c00","blocks":[{"type":"actions"},{"type":"image","image_url":"http://x/c.png","alt_text":"t"}]}
         ]}"##;
-        let out = strip_image_blocks(msg).unwrap();
+        let out = strip(msg).unwrap().msg;
         let v: Value = serde_json::from_str(&out).unwrap();
         let attachments = v["attachments"].as_array().unwrap();
         assert_eq!(attachments.len(), 2, "actions attachment must survive");
@@ -296,7 +372,7 @@ mod tests {
             {"color":"#c00","blocks":[{"type":"section"}]},
             {"color":"#c00","blocks":[{"type":"image","image_url":"http://x/c.png","alt_text":"t"}]}
         ]}"##;
-        let v: Value = serde_json::from_str(&strip_image_blocks(msg).unwrap()).unwrap();
+        let v: Value = serde_json::from_str(&strip(msg).unwrap().msg).unwrap();
         assert_eq!(v["attachments"].as_array().unwrap().len(), 1);
     }
 
@@ -304,17 +380,66 @@ mod tests {
     fn strip_handles_top_level_blocks_from_custom_templates() {
         let msg =
             r#"{"blocks":[{"type":"section"},{"type":"image","image_url":"u","alt_text":"t"}]}"#;
-        let v: Value = serde_json::from_str(&strip_image_blocks(msg).unwrap()).unwrap();
+        let v: Value = serde_json::from_str(&strip(msg).unwrap().msg).unwrap();
         assert_eq!(v["blocks"].as_array().unwrap().len(), 1);
     }
 
     #[test]
     fn strip_returns_none_when_nothing_to_do() {
-        assert!(
-            strip_image_blocks(r#"{"attachments":[{"blocks":[{"type":"section"}]}]}"#).is_none()
+        assert!(strip(r#"{"attachments":[{"blocks":[{"type":"section"}]}]}"#).is_none());
+        assert!(strip("not json").is_none());
+        assert!(strip(r#"{"text":"plain"}"#).is_none());
+    }
+
+    /// The process-wide chart suppression may only engage on evidence about
+    /// THIS deployment: an image we generated, pointing at our `web_url`.
+    ///
+    /// Attributing a third-party image's rejection to `ZO_WEB_URL` would both
+    /// suppress legitimate charts for an hour across every alert and send the
+    /// operator to "fix" a `web_url` that was never broken.
+    #[test]
+    fn only_our_own_image_url_is_evidence_about_web_url_reachability() {
+        // Our chart render URL: attributable.
+        let ours = format!(
+            r#"{{"attachments":[{{"blocks":[{{"type":"image","image_url":"{BASE}/api/v2/default/alerts/charts/render?d=x","alt_text":"c"}}]}}]}}"#
         );
-        assert!(strip_image_blocks("not json").is_none());
-        assert!(strip_image_blocks(r#"{"text":"plain"}"#).is_none());
+        assert!(strip(&ours).unwrap().had_web_url_image);
+
+        // A custom template's third-party image: NOT attributable.
+        let theirs = r#"{"attachments":[{"blocks":[{"type":"image","image_url":"https://cdn.example/logo.png","alt_text":"c"}]}]}"#;
+        assert!(!strip(theirs).unwrap().had_web_url_image);
+
+        // A lookalike host must not be mistaken for ours.
+        let lookalike = r#"{"attachments":[{"blocks":[{"type":"image","image_url":"https://o2.example.attacker.test/x.png","alt_text":"c"}]}]}"#;
+        assert!(
+            !strip(lookalike).unwrap().had_web_url_image,
+            "prefix match must not be fooled by a lookalike host"
+        );
+
+        // Mixed payload: one of ours among others still counts as evidence.
+        let mixed = format!(
+            r#"{{"blocks":[{{"type":"image","image_url":"https://cdn.example/a.png","alt_text":"a"}},{{"type":"image","image_url":"{BASE}/api/v2/x","alt_text":"b"}}]}}"#
+        );
+        assert!(strip(&mixed).unwrap().had_web_url_image);
+
+        // An unset web_url can attribute nothing to us.
+        let unset = strip_image_blocks_with_base(&ours, "").unwrap();
+        assert!(!unset.had_web_url_image);
+
+        // Scheme and host are case-insensitive (RFC 3986): a `ZO_WEB_URL`
+        // written with different casing must still match, or suppression
+        // would silently never engage on that deployment.
+        let cased = strip_image_blocks_with_base(&ours, "HTTPS://O2.example").unwrap();
+        assert!(cased.had_web_url_image, "host comparison must ignore case");
+
+        // A trailing slash on the configured base must not break matching.
+        let slashed = strip_image_blocks_with_base(&ours, &format!("{BASE}/")).unwrap();
+        assert!(slashed.had_web_url_image);
+
+        // A multi-byte character where the base boundary falls must not panic.
+        let multibyte =
+            r#"{"blocks":[{"type":"image","image_url":"https://o2.exampleé/x","alt_text":"c"}]}"#;
+        assert!(!strip(multibyte).unwrap().had_web_url_image);
     }
 
     #[test]

@@ -63,28 +63,55 @@ export const applyQueryButton = async function (page) {
 export async function deleteDashboard(page, dashboardName) {
   testLogger.info('Deleting dashboard', { dashboardName });
 
-  // Wait for page to be fully loaded
-// ✅ Wait for either the Dashboard API or Folder API (whichever comes first)
-  await Promise.race([
-    page.waitForResponse(
-      (response) => {
-        const url = response.url();
-        return (
-          ( /\/api\/.*\/dashboards/.test(url) ||
-            /\/api\/.*\/folders/.test(url) ) &&
-          response.status() === 200
-        );
-      },
-      { timeout: 20000 }
-    ),
-    page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
-  ]);
+  await page.locator('[data-test="dashboard-table"]').waitFor({
+    state: 'visible',
+    timeout: 20000,
+  });
 
-  const deleteButton = page
+  const nameCell = page
     .locator(`[data-test="dashboard-name-cell-${dashboardName}"]`)
-    .first()
+    .first();
+
+  // The dashboard list is paginated and is not sorted newest-first. Narrow it
+  // to the generated dashboard when its row is not on the current page.
+  //
+  // Filling the search ONCE and then waiting 15s is not enough: this runs right
+  // after returning from the panel editor, so the list is often still loading
+  // and re-rendering. A fill landing mid-render is discarded (the input remounts
+  // empty), leaving the search unapplied and the row on some other page — the
+  // wait then expires against a row that was never going to appear. Re-assert
+  // the filter until the row shows up.
+  const searchInput = page.locator('[data-test="dashboard-search-field"]').first();
+  const findAttempts = 3;
+  for (let attempt = 1; attempt <= findAttempts; attempt++) {
+    if (await nameCell.isVisible().catch(() => false)) break;
+
+    if (await searchInput.count()) {
+      // Re-fill only when the filter did not stick, so a slow-but-applied
+      // search is left alone rather than being retyped underneath itself.
+      if ((await searchInput.inputValue().catch(() => "")) !== dashboardName) {
+        await searchInput.fill(dashboardName).catch(() => {});
+      }
+    }
+
+    // waitFor() blocks; isVisible({timeout}) does NOT — that option is
+    // documented as ignored and the call returns immediately. Polling with
+    // isVisible here made all three attempts complete in microseconds, so the
+    // loop never actually gave the filtered list time to render and was a
+    // no-op versus the single waitFor below.
+    const found = await nameCell
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (found) break;
+  }
+
+  await nameCell.waitFor({ state: 'visible', timeout: 15000 });
+
+  const deleteButton = nameCell
     .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]')
     .locator('[data-test="dashboard-delete"]');
+  await deleteButton.waitFor({ state: 'visible', timeout: 10000 });
   await deleteButton.click();
 
   // Wait for the confirmation dialog to ensure it is fully rendered
@@ -247,7 +274,13 @@ export async function setupTestDashboard(page, pm, dashboardName, options = {}) 
   await pm.dashboardCreate.createDashboard(dashboardName);
 
   if (waitForAddPanelBtn) {
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 10000 });
+    // createDashboard() returns as soon as /dashboards/view is reachable and the
+    // header's back button has mounted, but the empty-state add-panel button
+    // lives in RenderDashboardCharts (v-if="!panels.length"), which only renders
+    // once the dashboard GET and variables init have finished. Under parallel CI
+    // load that lands well after the header, so this wait needs the same budget
+    // as the other post-navigation waits here rather than a tight 10s.
+    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 30000 });
   }
 
   testLogger.info('Test dashboard setup complete', { dashboardName });
