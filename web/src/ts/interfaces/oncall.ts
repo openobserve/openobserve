@@ -96,7 +96,15 @@ export type ResponseEventKind =
    * Carries the severity asked for beside the one applied: a clamped promotion
    * is two different facts, and a responder woken by one is owed both.
    */
-  | "severity_promoted";
+  | "severity_promoted"
+  /**
+   * The condition fired again so soon after recovering that the engine treated
+   * it as the same unstable firing and did not page (storage id 13).
+   *
+   * "This was dampened" is the one thing a smoothed record must not hide — the
+   * responder has to see that the condition came back and nobody was woken.
+   */
+  | "flapped";
 
 /**
  * Why this team was paged. The owner fixes the thing; an impacted team contains

@@ -12740,6 +12740,7 @@
     "eventKind_delivery": "Delivery",
     "eventKind_ai_verdict": "AI verdict",
     "eventKind_severity_promoted": "Severity raised",
+    "eventKind_flapped": "Flapped — not re-paged",
     "channel_email": "Email",
     "channel_webhook": "Chat / webhook",
     "channel_sms": "SMS",

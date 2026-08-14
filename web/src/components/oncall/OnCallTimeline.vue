@@ -119,6 +119,9 @@ const DEFAULT_KINDS: ResponseEventKind[] = [
   "rca",
   "ai_verdict",
   "severity_promoted",
+  // A record that quietly absorbed four cycles lies about the night — the
+  // dampened re-fires belong in the default view, not behind the toggle.
+  "flapped",
 ];
 
 const visibleEvents = computed(() =>
@@ -139,6 +142,7 @@ function dotClass(kind: ResponseEventKind): string {
       return "bg-icon-chip-success-text";
     case "rca":
     case "ai_verdict":
+    case "flapped":
       return "bg-icon-chip-warning-text";
     default:
       return "bg-border-strong";
@@ -156,9 +160,11 @@ function kindVariant(kind: ResponseEventKind): BadgeVariant {
     case "state":
       return "success-soft";
     // The agent's verdict reads as analysis, the same family as an RCA — the
-    // label says which of the two wrote it.
+    // label says which of the two wrote it. A flap is the same amber: worth
+    // seeing, deliberately not a page.
     case "rca":
     case "ai_verdict":
+    case "flapped":
       return "amber-soft";
     case "handoff":
       return "orange-soft";

@@ -127,6 +127,7 @@ describe("OnCallTimeline", () => {
       delivery: true,
       ai_verdict: true,
       severity_promoted: true,
+      flapped: true,
     };
     for (const kind of Object.keys(ALL_KINDS) as OnCallResponseEvent["kind"][]) {
       const wrapper = render([event(kind, 0, `body for ${kind}`)]);
