@@ -1406,7 +1406,9 @@ describe("TraceTree span event count badge", () => {
   });
 
   it("shows a plain count when no event is an error", () => {
-    const wrapper = mountWithEvents([{ name: "a", level: "INFO", _timestamp: 1752490492900000000 }]);
+    const wrapper = mountWithEvents([
+      { name: "a", level: "INFO", _timestamp: 1752490492900000000 },
+    ]);
 
     expect(badges(wrapper)[0].text()).not.toMatch(/error/i);
   });
