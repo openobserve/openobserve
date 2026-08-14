@@ -496,7 +496,15 @@ const deleteTemplate = () => {
           }),
         });
 
-        getTemplates();
+        // Drop the row from the cache first so it disappears now, not when the
+        // refetch lands. The forced reload matters as much: this query
+        // persists, so without it the deleted template would come back on a
+        // browser reload, hydrated from localStorage.
+        const deletedName = confirmDelete.value.data.name;
+        templatesQuery.patchAll(store.state.selectedOrganization.identifier, (list: any) =>
+          Array.isArray(list) ? list.filter((tpl: any) => tpl.name !== deletedName) : list,
+        );
+        getTemplates(true);
       })
       .catch((err) => {
         if (err.response.data.code === 409) {

@@ -387,6 +387,12 @@ export default defineComponent({
               message: t("settings.cipherKeysPage.deleteSuccess"),
             });
 
+            // Drop the row from the cache first so it disappears now, not when
+            // the refetch lands.
+            const deletedName = confirmDelete.value.data.name;
+            cipherKeysQuery.patchAll(store.state.selectedOrganization.identifier, (list: any) =>
+              Array.isArray(list) ? list.filter((k: any) => k.name !== deletedName) : list,
+            );
             getData(true);
           })
           .catch((err) => {

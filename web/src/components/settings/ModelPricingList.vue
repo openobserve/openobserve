@@ -825,6 +825,11 @@ function confirmDelete(model: any) {
           variant: "success",
           message: t("modelPricing.modelPricingDeleted"),
         });
+        // Drop the row from the cache first so it disappears now, not when the
+        // refetch lands; the forced reload re-persists the corrected list.
+        modelPricingQuery.patchAll(orgIdentifier.value, (list: any) =>
+          Array.isArray(list) ? list.filter((m: any) => m.id !== model.id) : list,
+        );
         await fetchModels(true);
       } catch (e: any) {
         notifyError(t("modelPricing.errDelete"), e);

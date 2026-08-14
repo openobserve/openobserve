@@ -580,7 +580,15 @@ export default defineComponent({
                 name: confirmDelete.value.data.name,
               }),
             });
-            getDestinations();
+            // Drop the row from every cached module list first, so it
+            // disappears now rather than when the refetch lands. Then reload
+            // with `force`: this query persists, so only a real fetch rewrites
+            // the localStorage copy that a browser reload would hydrate from.
+            const deletedName = confirmDelete.value.data.name;
+            destinationsQuery.patchAll(store.state.selectedOrganization.identifier, (list: any) =>
+              Array.isArray(list) ? list.filter((d: any) => d.name !== deletedName) : list,
+            );
+            getDestinations(true);
           })
           .catch((err) => {
             if (err.response.data.code === 409) {

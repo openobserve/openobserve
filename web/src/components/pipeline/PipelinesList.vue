@@ -1087,6 +1087,11 @@ const deletePipeline = async () => {
         message: t("toastMessages.pipeline.pipelineDeletedSuccessfully"),
         variant: "success",
       });
+      // Drop the row from the cache first so it disappears now, not when the
+      // reload in `finally` lands.
+      pipelinesQuery.patchAll(org_id, (list: any) =>
+        Array.isArray(list) ? list.filter((p: any) => p.pipeline_id !== pipeline_id) : list,
+      );
     })
     .catch((error) => {
       if (error.response.status != 403) {

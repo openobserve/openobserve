@@ -411,6 +411,14 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           deleteDialog.value.data,
         );
+        // Drop the row from the cache first so it disappears now, not when the
+        // refetch lands; the forced reload re-persists the corrected list.
+        const deletedId = deleteDialog.value.data;
+        regexPatternsQuery.patchAll(store.state.selectedOrganization.identifier, (list: any) =>
+          Array.isArray(list)
+            ? list.filter((p: any) => p.id !== deletedId && p.name !== deletedId)
+            : list,
+        );
         getRegexPatterns(true);
         toast({
           message: t("settings.regexPatternList.deletedSuccess"),

@@ -388,6 +388,11 @@ export default defineComponent({
         .delete(store.state.selectedOrganization.identifier, row.id)
         .then(() => {
           toast({ variant: "success", message: t("aiToolset.deletedSuccessfully") });
+          // Drop the row from the cache first so it disappears now, not when
+          // the refetch lands; the forced reload re-persists the list.
+          aiToolsetsQuery.patchAll(store.state.selectedOrganization.identifier, (list: any) =>
+            Array.isArray(list) ? list.filter((tool: any) => tool.id !== row.id) : list,
+          );
           getData(true);
         })
         .catch((err) => {
