@@ -1,0 +1,2957 @@
+===== COMPLETE LIST OF CHANGED FILES (35 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+src/api/http/src/handler/http/router/mod.rs
+src/api/http/src/handler/http/router/openapi.rs
+src/api/search/src/search/mod.rs
+src/api/search/src/traces/dag.rs
+src/api/search/src/traces/details.rs
+src/api/search/src/traces/mod.rs
+src/api/search/src/traces/session.rs
+src/api/search/src/traces/time_index.rs
+src/api/search/src/traces/user.rs
+src/config/src/config.rs
+src/config/src/meta/traces.rs
+src/config/src/metrics.rs
+src/config/src/router.rs
+src/config/src/utils/util.rs
+src/core/src/metadata/distinct_values.rs
+src/core/src/traces/mod.rs
+src/core/src/traces/session.rs
+src/core/src/traces/time_index.rs
+src/infra/src/coordinator/synthetics.rs
+src/infra/src/db/mod.rs
+src/infra/src/db/tantivy_index.rs
+src/infra/src/db/trace_time_index.rs
+src/ingester/src/writer.rs
+src/jobs/src/job/mod.rs
+src/search/src/datafusion/merge/mod.rs
+src/stream/src/lib.rs
+web/src/plugins/traces/SearchResult.spec.ts
+web/src/plugins/traces/SearchResult.vue
+web/src/plugins/traces/TraceDetails.all-missing-fields.spec.ts
+web/src/plugins/traces/TraceDetails.missing-span-kind.spec.ts
+web/src/plugins/traces/TraceDetails.spec.ts
+web/src/plugins/traces/TraceDetails.vue
+web/src/services/search.spec.ts
+web/src/services/search.ts
+o2_openfga/src/meta/route_permissions.rs
+===== END CHANGED FILES =====
+
+diff --git a/src/api/http/src/handler/http/router/mod.rs b/src/api/http/src/handler/http/router/mod.rs
+index 349cfc98caa..3b6a67e54aa 100644
+--- a/src/api/http/src/handler/http/router/mod.rs
++++ b/src/api/http/src/handler/http/router/mod.rs
+@@ -790,6 +790,8 @@ pub fn service_routes() -> Router {
+         .route("/{org_id}/{stream_name}/traces/session", get(traces::session::get_latest_sessions))
+         .route("/{org_id}/{stream_name}/traces/session/details", get(traces::session::get_session_details))
+         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
++        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
++        .route("/{org_id}/{stream_name}/traces/{trace_id}/time_range", get(traces::time_index::get_trace_time_range))
+         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
+ 
+         // LLM Model Pricing
+diff --git a/src/api/http/src/handler/http/router/openapi.rs b/src/api/http/src/handler/http/router/openapi.rs
+index 950f1b9bc40..a05a9c953e2 100644
+--- a/src/api/http/src/handler/http/router/openapi.rs
++++ b/src/api/http/src/handler/http/router/openapi.rs
+@@ -75,6 +75,8 @@ use crate::{
+         openobserve_api_search::traces::session::get_latest_sessions,
+         openobserve_api_search::traces::session::get_session_details,
+         openobserve_api_search::traces::user::get_latest_users,
++        openobserve_api_search::traces::details::get_trace_details,
++        openobserve_api_search::traces::time_index::get_trace_time_range,
+         openobserve_api_search::traces::dag::get_trace_dag,
+         metrics::ingest::json,
+         openobserve_api_search::promql::remote_write,
+diff --git a/src/api/search/src/search/mod.rs b/src/api/search/src/search/mod.rs
+index 6bc97eed403..2e770b60845 100644
+--- a/src/api/search/src/search/mod.rs
++++ b/src/api/search/src/search/mod.rs
+@@ -307,7 +307,6 @@ pub async fn search(
+             return map_error_to_http_response(&(e.into()), Some(trace_id));
+         }
+     };
+-
+     #[cfg(feature = "enterprise")]
+     for stream in stream_names.iter() {
+         {
+@@ -1069,7 +1068,7 @@ pub async fn build_search_request_per_field(
+     };
+ 
+     let distinct_prefix = if can_use_distinct_stream {
+-        format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
++        format!("{}{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
+     } else {
+         "".to_string()
+     };
+@@ -1338,7 +1337,7 @@ async fn values_v1(
+         let actual_stream_type;
+ 
+         if use_distinct_stream {
+-            distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
++            distinct_prefix = format!("{}{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
+             // if we are using distinct stream, we have already partially aggregated
+             // the counts, so we need to sum over that field
+             count_fn = "SUM(count)";
+diff --git a/src/api/search/src/traces/dag.rs b/src/api/search/src/traces/dag.rs
+index 8b16556b15c..3b2db3a61e1 100644
+--- a/src/api/search/src/traces/dag.rs
++++ b/src/api/search/src/traces/dag.rs
+@@ -110,44 +110,8 @@ pub async fn get_trace_dag(
+     };
+     let user_id = &user_email.user_id;
+ 
+-    // Check permissions on stream
+-    #[cfg(feature = "enterprise")]
+-    {
+-        use o2_openfga::meta::mapping::OFGA_MODELS;
+-
+-        use crate::service::{auth::AuthExtractor, users::get_user};
+-        if !db::user::is_root_user(user_id) {
+-            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
+-            let stream_type_str = StreamType::Traces.as_str();
+-
+-            if !openobserve_core::authz::check_permissions(
+-                user_id,
+-                AuthExtractor {
+-                    auth: "".to_string(),
+-                    method: "GET".to_string(),
+-                    o2_type: format!(
+-                        "{}:{}",
+-                        OFGA_MODELS
+-                            .get(stream_type_str)
+-                            .map_or(stream_type_str, |model| model.key),
+-                        stream_name
+-                    ),
+-                    org_id: org_id.clone(),
+-                    bypass_check: false,
+-                    parent_id: "".to_string(),
+-                    use_all_org: false,
+-                    use_self_context: false,
+-                    use_self_parent: true,
+-                },
+-                user.role,
+-                user.is_external,
+-            )
+-            .await
+-            {
+-                return MetaHttpResponse::forbidden("Unauthorized Access");
+-            }
+-        }
+-        // Check permissions on stream ends
++    if let Some(response) = super::check_stream_permissions(&org_id, &stream_name, user_id).await {
++        return response;
+     }
+ 
+     // Parse required start_time and end_time from query parameters
+diff --git a/src/api/search/src/traces/details.rs b/src/api/search/src/traces/details.rs
+new file mode 100644
+index 00000000000..986748451cf
+--- /dev/null
++++ b/src/api/search/src/traces/details.rs
+@@ -0,0 +1,280 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++use axum::{
++    Json,
++    extract::Path,
++    http::HeaderMap,
++    response::{IntoResponse, Response},
++};
++use config::{
++    get_config,
++    meta::{
++        search::{Query, Request, RequestEncoding, Response as SearchResponse, SearchEventType},
++        stream::StreamType,
++        traces::session::{quote_identifier, quote_sql_string},
++    },
++};
++use hashbrown::HashMap;
++use openobserve_api_common::extractors::Headers;
++use openobserve_core::auth::UserEmail;
++use search_service as SearchService;
++use tracing::{Instrument, Span};
++
++use super::time_index::{TraceTimeRange, check_stream_permission};
++use crate::{
++    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
++    search::error_utils::map_error_to_http_response,
++};
++
++fn parse_optional_time_range(
++    params: &HashMap<String, String>,
++) -> std::result::Result<Option<TraceTimeRange>, Response> {
++    match (params.get("start_time"), params.get("end_time")) {
++        (None, None) => Ok(None),
++        (Some(start), Some(end)) => {
++            let start_time = start
++                .parse::<i64>()
++                .map_err(|_| MetaHttpResponse::bad_request("Invalid start_time parameter"))?;
++            let end_time = end
++                .parse::<i64>()
++                .map_err(|_| MetaHttpResponse::bad_request("Invalid end_time parameter"))?;
++            if start_time == 0 && end_time == 0 {
++                return Ok(None);
++            }
++            if start_time == 0 || end_time == 0 {
++                return Err(MetaHttpResponse::bad_request(
++                    "start_time and end_time must both be zero or non-zero",
++                ));
++            }
++            if start_time > end_time {
++                return Err(MetaHttpResponse::bad_request(
++                    "start_time must not be greater than end_time",
++                ));
++            }
++            Ok(Some(TraceTimeRange {
++                start_time,
++                end_time,
++            }))
++        }
++        _ => Err(MetaHttpResponse::bad_request(
++            "start_time and end_time must be provided together",
++        )),
++    }
++}
++
++fn union_ranges(
++    caller_range: Option<TraceTimeRange>,
++    index_range: Option<TraceTimeRange>,
++) -> Option<TraceTimeRange> {
++    match (caller_range, index_range) {
++        (Some(caller), Some(index)) => Some(TraceTimeRange {
++            start_time: caller.start_time.min(index.start_time),
++            end_time: caller.end_time.max(index.end_time),
++        }),
++        (Some(range), None) | (None, Some(range)) => Some(range),
++        (None, None) => None,
++    }
++}
++
++/// GetTraceDetails
++///
++/// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
++#[utoipa::path(
++    get,
++    path = "/{org_id}/{stream_name}/traces/{trace_id}/details",
++    context_path = "/api",
++    tag = "Traces",
++    operation_id = "GetTraceDetails",
++    summary = "Get all spans for a trace",
++    security(("Authorization" = [])),
++    params(
++        ("org_id" = String, Path, description = "Organization name"),
++        ("stream_name" = String, Path, description = "Traces stream name"),
++        ("trace_id" = String, Path, description = "Trace ID"),
++        ("start_time" = Option<i64>, Query, description = "Caller range start in microseconds"),
++        ("end_time" = Option<i64>, Query, description = "Caller range end in microseconds"),
++        ("hint_ts" = Option<i64>, Query, description = "Optional time hint in microseconds"),
++        ("timeout" = Option<i64>, Query, description = "Query timeout in seconds"),
++    ),
++    responses(
++        (status = 200, description = "Success", body = SearchResponse),
++        (status = 400, description = "Invalid time range"),
++        (status = 403, description = "Forbidden"),
++        (status = 500, description = "Failure")
++    )
++)]
++pub async fn get_trace_details(
++    Path((org_id, stream_name, trace_id)): Path<(String, String, String)>,
++    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
++    headers: HeaderMap,
++    Headers(user_email): Headers<UserEmail>,
++) -> Response {
++    if let Err(response) = check_stream_permission(&org_id, &stream_name, &user_email.user_id).await
++    {
++        return response;
++    }
++    let caller_range = match parse_optional_time_range(&params) {
++        Ok(range) => range,
++        Err(response) => return response,
++    };
++    let hint_ts = match params.get("hint_ts") {
++        Some(value) => match value.parse::<i64>() {
++            Ok(0) => None,
++            Ok(value) => Some(value),
++            Err(_) => return MetaHttpResponse::bad_request("Invalid hint_ts parameter"),
++        },
++        None => caller_range.map(|range| {
++            range
++                .start_time
++                .saturating_add(range.end_time.saturating_sub(range.start_time) / 2)
++        }),
++    };
++    let http_span = Span::none();
++    let request_trace_id = get_or_create_trace_id(&headers, &http_span);
++    let index_range = match super::time_index::query(&org_id, &stream_name, &trace_id, hint_ts)
++        .await
++    {
++        Ok(range) => range,
++        Err(e) => {
++            log::error!(
++                "[trace_id {request_trace_id}] trace time index query failed for {org_id}/{stream_name}: {e}"
++            );
++            None
++        }
++    };
++    let effective_range = match union_ranges(caller_range, index_range) {
++        Some(range) => range,
++        None => {
++            return MetaHttpResponse::bad_request(
++                "A caller time range is required when the trace time index has no result",
++            );
++        }
++    };
++
++    let timeout = match params.get("timeout") {
++        Some(value) => match value.parse::<i64>() {
++            Ok(value) if value > 0 => value,
++            _ => return MetaHttpResponse::bad_request("Invalid timeout parameter"),
++        },
++        None => get_config().limit.query_timeout as i64,
++    };
++    let request = Request {
++        query: Query {
++            sql: format!(
++                "SELECT * FROM {} WHERE trace_id = {} ORDER BY start_time",
++                quote_identifier(&stream_name),
++                quote_sql_string(&trace_id),
++            ),
++            from: 0,
++            size: 50_000,
++            start_time: effective_range.start_time,
++            end_time: effective_range.end_time.saturating_add(1),
++            quick_mode: false,
++            query_type: String::new(),
++            track_total_hits: false,
++            uses_zo_fn: false,
++            query_fn: None,
++            action_id: None,
++            skip_wal: false,
++            sampling_config: None,
++            sampling_ratio: None,
++            streaming_output: false,
++            streaming_id: None,
++            histogram_interval: 0,
++            timezone: None,
++        },
++        encoding: RequestEncoding::Empty,
++        regions: vec![],
++        clusters: vec![],
++        timeout,
++        search_type: Some(SearchEventType::UI),
++        search_event_context: None,
++        use_cache: true,
++        clear_cache: false,
++        local_mode: None,
++        agent_options: None,
++    };
++    let response = SearchService::cache::search(
++        &request_trace_id,
++        &org_id,
++        StreamType::Traces,
++        Some(user_email.user_id),
++        &request,
++        String::new(),
++        false,
++        None,
++        false,
++    )
++    .instrument(http_span)
++    .await;
++    let mut response = match response {
++        Ok(response) => response,
++        Err(error) => return map_error_to_http_response(&error, Some(request_trace_id)),
++    };
++    response
++        .new_start_time
++        .get_or_insert(effective_range.start_time);
++    response
++        .new_end_time
++        .get_or_insert(effective_range.end_time);
++    Json(response).into_response()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn parses_complete_optional_range() {
++        let params = HashMap::from([
++            ("start_time".to_string(), "10".to_string()),
++            ("end_time".to_string(), "20".to_string()),
++        ]);
++        assert_eq!(
++            parse_optional_time_range(&params).unwrap(),
++            Some(TraceTimeRange {
++                start_time: 10,
++                end_time: 20,
++            })
++        );
++    }
++
++    #[test]
++    fn rejects_half_of_a_range() {
++        let params = HashMap::from([("start_time".to_string(), "10".to_string())]);
++        assert!(parse_optional_time_range(&params).is_err());
++    }
++
++    #[test]
++    fn union_never_narrows_the_caller_range() {
++        let caller = TraceTimeRange {
++            start_time: 10,
++            end_time: 20,
++        };
++        assert_eq!(
++            union_ranges(
++                Some(caller),
++                Some(TraceTimeRange {
++                    start_time: 12,
++                    end_time: 18,
++                })
++            ),
++            Some(caller)
++        );
++        assert_eq!(union_ranges(Some(caller), None), Some(caller));
++        assert_eq!(union_ranges(None, None), None);
++    }
++}
+diff --git a/src/api/search/src/traces/mod.rs b/src/api/search/src/traces/mod.rs
+index 6d1d2ed42fe..720058a5f50 100644
+--- a/src/api/search/src/traces/mod.rs
++++ b/src/api/search/src/traces/mod.rs
+@@ -52,10 +52,36 @@ use crate::{
+ };
+ 
+ pub mod dag;
++pub mod details;
+ pub(crate) mod schema_compat;
+ pub mod session;
++pub mod time_index;
+ pub mod user;
+ 
++pub(crate) async fn check_stream_permissions(
++    org_id: &str,
++    stream_name: &str,
++    user_id: &str,
++) -> Option<Response> {
++    #[cfg(feature = "enterprise")]
++    {
++        return openobserve_core::authz::check_stream_permissions(
++            stream_name,
++            org_id,
++            user_id,
++            &StreamType::Traces,
++            openobserve_core::authz::StreamPermissionResourceType::Search,
++        )
++        .await;
++    }
++
++    #[cfg(not(feature = "enterprise"))]
++    {
++        let _ = (org_id, stream_name, user_id);
++        None
++    }
++}
++
+ /// TracesIngest
+ #[utoipa::path(
+     post,
+@@ -210,44 +236,8 @@ pub async fn get_latest_traces(
+     };
+     let user_id = &user_email.user_id;
+ 
+-    // Check permissions on stream
+-    #[cfg(feature = "enterprise")]
+-    {
+-        use o2_openfga::meta::mapping::OFGA_MODELS;
+-
+-        use crate::service::{auth::AuthExtractor, users::get_user};
+-        if !db::user::is_root_user(user_id) {
+-            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
+-            let stream_type_str = StreamType::Traces.as_str();
+-
+-            if !openobserve_core::authz::check_permissions(
+-                user_id,
+-                AuthExtractor {
+-                    auth: "".to_string(),
+-                    method: "GET".to_string(),
+-                    o2_type: format!(
+-                        "{}:{}",
+-                        OFGA_MODELS
+-                            .get(stream_type_str)
+-                            .map_or(stream_type_str, |model| model.key),
+-                        openobserve_core::auth::into_ofga_supported_format(&stream_name)
+-                    ),
+-                    org_id: org_id.clone(),
+-                    bypass_check: false,
+-                    parent_id: "".to_string(),
+-                    use_all_org: false,
+-                    use_self_context: false,
+-                    use_self_parent: true,
+-                },
+-                user.role,
+-                user.is_external,
+-            )
+-            .await
+-            {
+-                return MetaHttpResponse::forbidden("Unauthorized Access");
+-            }
+-        }
+-        // Check permissions on stream ends
++    if let Some(response) = check_stream_permissions(&org_id, &stream_name, user_id).await {
++        return response;
+     }
+ 
+     let filter = match query.get("filter") {
+@@ -944,43 +934,8 @@ pub async fn get_latest_traces_stream(
+     };
+     let user_id = &user_email.user_id;
+ 
+-    // Check permissions on stream
+-    #[cfg(feature = "enterprise")]
+-    {
+-        use o2_openfga::meta::mapping::OFGA_MODELS;
+-
+-        use crate::service::{auth::AuthExtractor, users::get_user};
+-        if !db::user::is_root_user(user_id) {
+-            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
+-            let stream_type_str = StreamType::Traces.as_str();
+-
+-            if !openobserve_core::authz::check_permissions(
+-                user_id,
+-                AuthExtractor {
+-                    auth: "".to_string(),
+-                    method: "GET".to_string(),
+-                    o2_type: format!(
+-                        "{}:{}",
+-                        OFGA_MODELS
+-                            .get(stream_type_str)
+-                            .map_or(stream_type_str, |model| model.key),
+-                        openobserve_core::auth::into_ofga_supported_format(&stream_name)
+-                    ),
+-                    org_id: org_id.clone(),
+-                    bypass_check: false,
+-                    parent_id: "".to_string(),
+-                    use_all_org: false,
+-                    use_self_context: false,
+-                    use_self_parent: true,
+-                },
+-                user.role,
+-                user.is_external,
+-            )
+-            .await
+-            {
+-                return MetaHttpResponse::forbidden("Unauthorized Access");
+-            }
+-        }
++    if let Some(response) = check_stream_permissions(&org_id, &stream_name, user_id).await {
++        return response;
+     }
+ 
+     let filter = match query.get("filter") {
+diff --git a/src/api/search/src/traces/session.rs b/src/api/search/src/traces/session.rs
+index 50125677cf8..bf349fc5b4d 100644
+--- a/src/api/search/src/traces/session.rs
++++ b/src/api/search/src/traces/session.rs
+@@ -140,43 +140,8 @@ pub async fn get_latest_sessions(
+     };
+     let user_id = &user_email.user_id;
+ 
+-    // Check permissions on stream
+-    #[cfg(feature = "enterprise")]
+-    {
+-        use o2_openfga::meta::mapping::OFGA_MODELS;
+-
+-        use crate::service::{auth::AuthExtractor, users::get_user};
+-        if !db::user::is_root_user(user_id) {
+-            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
+-            let stream_type_str = StreamType::Traces.as_str();
+-
+-            if !openobserve_core::authz::check_permissions(
+-                user_id,
+-                AuthExtractor {
+-                    auth: "".to_string(),
+-                    method: "GET".to_string(),
+-                    o2_type: format!(
+-                        "{}:{}",
+-                        OFGA_MODELS
+-                            .get(stream_type_str)
+-                            .map_or(stream_type_str, |model| model.key),
+-                        stream_name
+-                    ),
+-                    org_id: org_id.clone(),
+-                    bypass_check: false,
+-                    parent_id: "".to_string(),
+-                    use_all_org: false,
+-                    use_self_context: false,
+-                    use_self_parent: true,
+-                },
+-                user.role,
+-                user.is_external,
+-            )
+-            .await
+-            {
+-                return MetaHttpResponse::forbidden("Unauthorized Access");
+-            }
+-        }
++    if let Some(response) = super::check_stream_permissions(&org_id, &stream_name, user_id).await {
++        return response;
+     }
+ 
+     let filter = match query.get("filter") {
+@@ -516,42 +481,8 @@ pub async fn get_session_details(
+         _ => return MetaHttpResponse::bad_request("session_id is empty"),
+     };
+ 
+-    #[cfg(feature = "enterprise")]
+-    {
+-        use o2_openfga::meta::mapping::OFGA_MODELS;
+-
+-        use crate::service::{auth::AuthExtractor, users::get_user};
+-        if !db::user::is_root_user(user_id) {
+-            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
+-            let stream_type_str = StreamType::Traces.as_str();
+-
+-            if !openobserve_core::authz::check_permissions(
+-                user_id,
+-                AuthExtractor {
+-                    auth: "".to_string(),
+-                    method: "GET".to_string(),
+-                    o2_type: format!(
+-                        "{}:{}",
+-                        OFGA_MODELS
+-                            .get(stream_type_str)
+-                            .map_or(stream_type_str, |model| model.key),
+-                        stream_name
+-                    ),
+-                    org_id: org_id.clone(),
+-                    bypass_check: false,
+-                    parent_id: "".to_string(),
+-                    use_all_org: false,
+-                    use_self_context: false,
+-                    use_self_parent: true,
+-                },
+-                user.role,
+-                user.is_external,
+-            )
+-            .await
+-            {
+-                return MetaHttpResponse::forbidden("Unauthorized Access");
+-            }
+-        }
++    if let Some(response) = super::check_stream_permissions(&org_id, &stream_name, user_id).await {
++        return response;
+     }
+ 
+     let from = query
+diff --git a/src/api/search/src/traces/time_index.rs b/src/api/search/src/traces/time_index.rs
+new file mode 100644
+index 00000000000..13cacf5e792
+--- /dev/null
++++ b/src/api/search/src/traces/time_index.rs
+@@ -0,0 +1,557 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++use std::{collections::HashSet, time::Duration};
++
++use axum::{
++    Json,
++    extract::Path,
++    http::HeaderMap,
++    response::{IntoResponse, Response},
++};
++use config::{
++    get_config,
++    meta::{
++        search::{Query, Request, RequestEncoding, SearchEventType},
++        stream::StreamType,
++        traces::session::{quote_identifier, quote_sql_string},
++    },
++    utils::{json, time::now_micros, util::get_trace_time_index_stream_name},
++};
++use hashbrown::HashMap;
++use infra::errors::{Error, Result};
++use openobserve_api_common::extractors::Headers;
++use openobserve_core::auth::UserEmail;
++use search_service as SearchService;
++use serde::Serialize;
++use tokio::time::Instant;
++use utoipa::ToSchema;
++
++use crate::common::{
++    meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
++};
++
++const EXPAND_WINDOW: i64 = 24 * 60 * 60 * 1_000_000;
++const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, ToSchema)]
++pub struct TraceTimeRange {
++    pub start_time: i64,
++    pub end_time: i64,
++}
++
++impl TraceTimeRange {
++    fn merge(self, other: Self) -> Self {
++        Self {
++            start_time: self.start_time.min(other.start_time),
++            end_time: self.end_time.max(other.end_time),
++        }
++    }
++}
++
++#[derive(Debug, Serialize, ToSchema)]
++pub struct TraceTimeRangeResponse {
++    pub stream: String,
++    pub trace_id: String,
++    pub range: Option<TraceTimeRange>,
++}
++
++#[derive(Clone, Copy, Debug)]
++struct CoveredRange {
++    start: i64,
++    end: i64,
++}
++
++#[derive(Default)]
++struct TimerStats {
++    locate_rounds: u64,
++    expand_rounds: u64,
++    timed_out: bool,
++}
++
++struct TimerContext<'a> {
++    org_id: &'a str,
++    index_stream: &'a str,
++    trace_id: &'a str,
++    query_start: i64,
++    query_end: i64,
++    deadline: Instant,
++}
++
++enum WindowResult {
++    Hit(TraceTimeRange),
++    Miss,
++    TimedOut,
++}
++
++fn locate_batch_sizes() -> impl Iterator<Item = i64> {
++    [1, 2, 7, 14, 28]
++        .into_iter()
++        .chain(std::iter::successors(Some(56_i64), |days| {
++            Some(days.saturating_mul(2))
++        }))
++        .map(|days| days.saturating_mul(DAY_MICROS))
++}
++
++fn probe_range(candidate: i64, query_start: i64, query_end: i64) -> CoveredRange {
++    CoveredRange {
++        start: candidate.saturating_sub(EXPAND_WINDOW).max(query_start),
++        end: candidate.saturating_add(EXPAND_WINDOW).min(query_end),
++    }
++}
++
++async fn query_window(
++    org_id: &str,
++    index_stream: &str,
++    trace_id: &str,
++    start_time: i64,
++    end_time: i64,
++    deadline: Instant,
++) -> Result<WindowResult> {
++    if start_time >= end_time {
++        return Ok(WindowResult::Miss);
++    }
++    let remaining = deadline.saturating_duration_since(Instant::now());
++    if remaining.is_zero() {
++        return Ok(WindowResult::TimedOut);
++    }
++
++    let sql = format!(
++        "SELECT MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM {} WHERE trace_id = {}",
++        quote_identifier(index_stream),
++        quote_sql_string(trace_id),
++    );
++    let request = Request {
++        query: Query {
++            sql,
++            from: 0,
++            size: 1,
++            start_time,
++            // Timer windows use closed endpoints; search ranges are half-open.
++            end_time: end_time.saturating_add(1),
++            quick_mode: false,
++            query_type: String::new(),
++            track_total_hits: false,
++            uses_zo_fn: false,
++            query_fn: None,
++            action_id: None,
++            skip_wal: false,
++            sampling_config: None,
++            sampling_ratio: None,
++            streaming_output: false,
++            streaming_id: None,
++            histogram_interval: 0,
++            timezone: None,
++        },
++        encoding: RequestEncoding::Empty,
++        regions: vec![],
++        clusters: vec![],
++        timeout: remaining.as_secs().max(1) as i64,
++        search_type: Some(SearchEventType::UI),
++        search_event_context: None,
++        use_cache: true,
++        clear_cache: false,
++        local_mode: None,
++        agent_options: None,
++    };
++    let internal_trace_id = config::ider::generate_trace_id();
++    let search = SearchService::cache::search(
++        &internal_trace_id,
++        org_id,
++        StreamType::Metadata,
++        None,
++        &request,
++        String::new(),
++        false,
++        None,
++        false,
++    );
++    let response = match tokio::time::timeout(remaining, search).await {
++        Ok(response) => {
++            response.map_err(|e| Error::Message(format!("query trace time index: {e}")))?
++        }
++        Err(_) => return Ok(WindowResult::TimedOut),
++    };
++    let Some(hit) = response.hits.first() else {
++        return Ok(WindowResult::Miss);
++    };
++    let Some(min_ts) = hit.get("min_ts").map(json::get_int_value) else {
++        return Ok(WindowResult::Miss);
++    };
++    let Some(max_ts) = hit.get("max_ts").map(json::get_int_value) else {
++        return Ok(WindowResult::Miss);
++    };
++    Ok(WindowResult::Hit(TraceTimeRange {
++        start_time: min_ts,
++        end_time: max_ts,
++    }))
++}
++
++async fn locate(
++    context: &TimerContext<'_>,
++    hint_ts: Option<i64>,
++    stats: &mut TimerStats,
++) -> Result<Option<(TraceTimeRange, CoveredRange)>> {
++    let mut candidates = Vec::with_capacity(2);
++    if let Some(hint) = hint_ts {
++        candidates.push(hint);
++    }
++    if let Some(uuid_time) = config::ider::get_start_time_from_trace_id(context.trace_id) {
++        candidates.push(uuid_time);
++    }
++    let mut seen = HashSet::new();
++    for candidate in candidates {
++        if !seen.insert(candidate) {
++            continue;
++        }
++        let CoveredRange { start, end } =
++            probe_range(candidate, context.query_start, context.query_end);
++        stats.locate_rounds += 1;
++        match query_window(
++            context.org_id,
++            context.index_stream,
++            context.trace_id,
++            start,
++            end,
++            context.deadline,
++        )
++        .await?
++        {
++            WindowResult::Hit(range) => {
++                return Ok(Some((range, CoveredRange { start, end })));
++            }
++            WindowResult::Miss => {}
++            WindowResult::TimedOut => {
++                stats.timed_out = true;
++                return Ok(None);
++            }
++        }
++    }
++
++    let mut cursor = context.query_end;
++    for batch_size in locate_batch_sizes() {
++        if cursor <= context.query_start {
++            break;
++        }
++        let start = cursor.saturating_sub(batch_size).max(context.query_start);
++        stats.locate_rounds += 1;
++        match query_window(
++            context.org_id,
++            context.index_stream,
++            context.trace_id,
++            start,
++            cursor,
++            context.deadline,
++        )
++        .await?
++        {
++            WindowResult::Hit(range) => {
++                return Ok(Some((range, CoveredRange { start, end: cursor })));
++            }
++            WindowResult::Miss => cursor = start,
++            WindowResult::TimedOut => {
++                stats.timed_out = true;
++                return Ok(None);
++            }
++        }
++    }
++    Ok(None)
++}
++
++async fn expand(
++    context: &TimerContext<'_>,
++    mut range: TraceTimeRange,
++    mut covered: CoveredRange,
++    stats: &mut TimerStats,
++) -> Result<TraceTimeRange> {
++    // expand left
++    loop {
++        let target = range
++            .start_time
++            .saturating_sub(EXPAND_WINDOW)
++            .max(context.query_start);
++        if target >= covered.start {
++            break;
++        }
++        stats.expand_rounds += 1;
++        match query_window(
++            context.org_id,
++            context.index_stream,
++            context.trace_id,
++            target,
++            covered.start,
++            context.deadline,
++        )
++        .await?
++        {
++            WindowResult::Hit(found) => range = range.merge(found),
++            WindowResult::Miss => {}
++            WindowResult::TimedOut => {
++                stats.timed_out = true;
++                return Ok(range);
++            }
++        }
++        covered.start = target;
++    }
++
++    // expand right
++    loop {
++        let target = range
++            .end_time
++            .saturating_add(EXPAND_WINDOW)
++            .min(context.query_end);
++        if target <= covered.end {
++            break;
++        }
++        stats.expand_rounds += 1;
++        match query_window(
++            context.org_id,
++            context.index_stream,
++            context.trace_id,
++            covered.end,
++            target,
++            context.deadline,
++        )
++        .await?
++        {
++            WindowResult::Hit(found) => range = range.merge(found),
++            WindowResult::Miss => {}
++            WindowResult::TimedOut => {
++                stats.timed_out = true;
++                return Ok(range);
++            }
++        }
++        covered.end = target;
++    }
++    Ok(range)
++}
++
++pub async fn query(
++    org_id: &str,
++    stream_name: &str,
++    trace_id: &str,
++    hint_ts: Option<i64>,
++) -> Result<Option<TraceTimeRange>> {
++    let started = std::time::Instant::now();
++    let mut stats = TimerStats::default();
++    let result = query_inner(org_id, stream_name, trace_id, hint_ts, &mut stats).await;
++    let status = match &result {
++        Ok(Some(_)) => "hit",
++        Ok(None) => "miss",
++        Err(_) => "error",
++    };
++    config::metrics::TRACE_TIME_INDEX_OPERATIONS
++        .with_label_values(&[org_id, "query", status])
++        .inc();
++    if stats.timed_out {
++        config::metrics::TRACE_TIME_INDEX_OPERATIONS
++            .with_label_values(&[org_id, "query", "timeout"])
++            .inc();
++    }
++    let elapsed = started.elapsed();
++    config::metrics::TRACE_TIME_INDEX_QUERY_DURATION
++        .with_label_values(&[org_id, status])
++        .observe(elapsed.as_secs_f64());
++    config::metrics::TRACE_TIME_INDEX_QUERY_ROUNDS
++        .with_label_values(&[org_id, "locate"])
++        .observe(stats.locate_rounds as f64);
++    config::metrics::TRACE_TIME_INDEX_QUERY_ROUNDS
++        .with_label_values(&[org_id, "expand"])
++        .observe(stats.expand_rounds as f64);
++    log::info!(
++        "[trace_time_index] query org_id={org_id:?} stream={stream_name:?} trace_id={trace_id:?} hint_ts={hint_ts:?} status={status} timed_out={} locate_rounds={} expand_rounds={} took={} ms",
++        stats.timed_out,
++        stats.locate_rounds,
++        stats.expand_rounds,
++        elapsed.as_millis(),
++    );
++    result
++}
++
++async fn query_inner(
++    org_id: &str,
++    stream_name: &str,
++    trace_id: &str,
++    hint_ts: Option<i64>,
++    stats: &mut TimerStats,
++) -> Result<Option<TraceTimeRange>> {
++    let cfg = get_config();
++    if !cfg.common.trace_time_index_enabled {
++        return Ok(None);
++    }
++
++    let query_start = infra::db::trace_time_index::get_or_create_coverage_start()
++        .await
++        .map_err(|e| Error::Message(format!("read trace time index coverage marker: {e}")))?;
++    let query_end = now_micros().saturating_add(cfg.limit.ingest_allowed_in_future_micro);
++    if query_start >= query_end {
++        return Ok(None);
++    }
++    let deadline = Instant::now() + Duration::from_secs(cfg.limit.query_timeout);
++    let index_stream = get_trace_time_index_stream_name(stream_name);
++    if !infra::schema::exists(org_id, StreamType::Metadata, &index_stream).await {
++        return Ok(None);
++    }
++    let context = TimerContext {
++        org_id,
++        index_stream: &index_stream,
++        trace_id,
++        query_start,
++        query_end,
++        deadline,
++    };
++    let Some((range, covered)) = locate(&context, hint_ts, stats).await? else {
++        return Ok(None);
++    };
++    expand(&context, range, covered, stats).await.map(Some)
++}
++
++pub(crate) async fn check_stream_permission(
++    org_id: &str,
++    stream_name: &str,
++    user_id: &str,
++) -> std::result::Result<(), Response> {
++    #[cfg(feature = "enterprise")]
++    if let Err(e) = search_service::check_search_allowed(org_id, Some(stream_name)) {
++        return Err(MetaHttpResponse::too_many_requests(e.to_string()));
++    }
++    if let Some(response) = super::check_stream_permissions(org_id, stream_name, user_id).await {
++        return Err(response);
++    }
++    Ok(())
++}
++
++/// GetTraceTimeRange
++///
++/// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
++#[utoipa::path(
++    get,
++    path = "/{org_id}/{stream_name}/traces/{trace_id}/time_range",
++    context_path = "/api",
++    tag = "Traces",
++    operation_id = "GetTraceTimeRange",
++    summary = "Get the indexed time range for a trace",
++    security(("Authorization" = [])),
++    params(
++        ("org_id" = String, Path, description = "Organization name"),
++        ("stream_name" = String, Path, description = "Traces stream name"),
++        ("trace_id" = String, Path, description = "Trace ID"),
++        ("hint_ts" = Option<i64>, Query, description = "Optional time hint in microseconds"),
++    ),
++    responses(
++        (status = 200, description = "Success", body = TraceTimeRangeResponse),
++        (status = 403, description = "Forbidden"),
++        (status = 500, description = "Failure")
++    )
++)]
++pub async fn get_trace_time_range(
++    Path((org_id, stream_name, trace_id)): Path<(String, String, String)>,
++    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
++    headers: HeaderMap,
++    Headers(user_email): Headers<UserEmail>,
++) -> Response {
++    if let Err(response) = check_stream_permission(&org_id, &stream_name, &user_email.user_id).await
++    {
++        return response;
++    }
++    let hint_ts = match params.get("hint_ts") {
++        Some(value) => match value.parse::<i64>() {
++            Ok(value) => Some(value),
++            Err(_) => return MetaHttpResponse::bad_request("Invalid hint_ts parameter"),
++        },
++        None => None,
++    };
++    let request_trace_id = get_or_create_trace_id(&headers, &tracing::Span::none());
++    match query(&org_id, &stream_name, &trace_id, hint_ts).await {
++        Ok(range) => Json(TraceTimeRangeResponse {
++            stream: stream_name,
++            trace_id,
++            range,
++        })
++        .into_response(),
++        Err(e) => {
++            log::error!(
++                "[trace_id {request_trace_id}] trace time index query failed for {org_id}/{stream_name}: {e}"
++            );
++            MetaHttpResponse::internal_error("Failed to query trace time index")
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn locate_batches_are_monotonic() {
++        let batches = locate_batch_sizes().take(8).collect::<Vec<_>>();
++        assert_eq!(batches[0], DAY_MICROS);
++        assert!(batches.windows(2).all(|pair| pair[1] > pair[0]));
++    }
++
++    #[test]
++    fn time_ranges_merge_outward() {
++        let range = TraceTimeRange {
++            start_time: 10,
++            end_time: 20,
++        }
++        .merge(TraceTimeRange {
++            start_time: 5,
++            end_time: 30,
++        });
++        assert_eq!(range.start_time, 5);
++        assert_eq!(range.end_time, 30);
++    }
++
++    #[test]
++    fn probe_uses_expand_window_and_clamps_to_query_bounds() {
++        let range = probe_range(EXPAND_WINDOW, EXPAND_WINDOW / 2, EXPAND_WINDOW * 3 / 2);
++        assert_eq!(range.start, EXPAND_WINDOW / 2);
++        assert_eq!(range.end, EXPAND_WINDOW * 3 / 2);
++    }
++
++    #[tokio::test]
++    async fn expansion_timeout_returns_the_partial_range() {
++        let original = TraceTimeRange {
++            start_time: EXPAND_WINDOW * 10,
++            end_time: EXPAND_WINDOW * 10 + 1,
++        };
++        let context = TimerContext {
++            org_id: "org",
++            index_stream: "trace_time_index_stream",
++            trace_id: "trace",
++            query_start: 0,
++            query_end: EXPAND_WINDOW * 20,
++            deadline: Instant::now(),
++        };
++        let mut stats = TimerStats::default();
++
++        let resolved = expand(
++            &context,
++            original,
++            CoveredRange {
++                start: original.start_time,
++                end: original.end_time,
++            },
++            &mut stats,
++        )
++        .await
++        .unwrap();
++
++        assert_eq!(resolved, original);
++        assert!(stats.timed_out);
++        assert_eq!(stats.expand_rounds, 1);
++    }
++}
+diff --git a/src/api/search/src/traces/user.rs b/src/api/search/src/traces/user.rs
+index 05fef0a9f05..66254c8e720 100644
+--- a/src/api/search/src/traces/user.rs
++++ b/src/api/search/src/traces/user.rs
+@@ -115,43 +115,8 @@ pub async fn get_latest_users(
+     };
+     let user_id = &user_email.user_id;
+ 
+-    // Check permissions on stream
+-    #[cfg(feature = "enterprise")]
+-    {
+-        use o2_openfga::meta::mapping::OFGA_MODELS;
+-
+-        use crate::service::{auth::AuthExtractor, users::get_user};
+-        if !db::user::is_root_user(user_id) {
+-            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
+-            let stream_type_str = StreamType::Traces.as_str();
+-
+-            if !openobserve_core::authz::check_permissions(
+-                user_id,
+-                AuthExtractor {
+-                    auth: "".to_string(),
+-                    method: "GET".to_string(),
+-                    o2_type: format!(
+-                        "{}:{}",
+-                        OFGA_MODELS
+-                            .get(stream_type_str)
+-                            .map_or(stream_type_str, |model| model.key),
+-                        stream_name
+-                    ),
+-                    org_id: org_id.clone(),
+-                    bypass_check: false,
+-                    parent_id: "".to_string(),
+-                    use_all_org: false,
+-                    use_self_context: false,
+-                    use_self_parent: true,
+-                },
+-                user.role,
+-                user.is_external,
+-            )
+-            .await
+-            {
+-                return MetaHttpResponse::forbidden("Unauthorized Access");
+-            }
+-        }
++    if let Some(response) = super::check_stream_permissions(&org_id, &stream_name, user_id).await {
++        return response;
+     }
+ 
+     let filter = match query.get("filter") {
+diff --git a/src/config/src/config.rs b/src/config/src/config.rs
+index 998e2c3ada2..ecd96d7a2a6 100644
+--- a/src/config/src/config.rs
++++ b/src/config/src/config.rs
+@@ -1481,6 +1481,12 @@ pub struct Common {
+     pub tracing_enabled: bool,
+     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
+     pub tracing_search_enabled: bool,
++    #[env_config(
++        name = "ZO_TRACE_TIME_INDEX_ENABLED",
++        default = true,
++        help = "Enable per-stream trace time indexes and trace time-range lookup"
++    )]
++    pub trace_time_index_enabled: bool,
+     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
+     pub otel_otlp_url: String,
+     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]
+diff --git a/src/config/src/meta/traces.rs b/src/config/src/meta/traces.rs
+index 21de6ffe1e3..7303f6731fb 100644
+--- a/src/config/src/meta/traces.rs
++++ b/src/config/src/meta/traces.rs
+@@ -80,10 +80,10 @@ pub mod session {
+         session_id: &str,
+         ingest_cutoff_us: Option<i64>,
+     ) -> String {
+-        let escaped_session_id = escape_sql_string(session_id);
++        let quoted_session_id = quote_sql_string(session_id);
+         let predicate = session_columns
+             .iter()
+-            .map(|column| format!("{} = '{}'", quote_identifier(column), escaped_session_id))
++            .map(|column| format!("{} = {}", quote_identifier(column), quoted_session_id))
+             .collect::<Vec<_>>()
+             .join(" OR ");
+         format!(
+@@ -128,7 +128,7 @@ pub mod session {
+     pub fn trace_id_predicate(trace_ids: &[String]) -> String {
+         let values = trace_ids
+             .iter()
+-            .map(|trace_id| format!("'{}'", escape_sql_string(trace_id)))
++            .map(|trace_id| quote_sql_string(trace_id))
+             .collect::<Vec<_>>()
+             .join(", ");
+         format!("{} IN ({values})", quote_identifier("trace_id"))
+@@ -152,6 +152,10 @@ pub mod session {
+         format!("\"{}\"", value.replace('"', "\"\""))
+     }
+ 
++    pub fn quote_sql_string(value: &str) -> String {
++        format!("'{}'", escape_sql_string(value))
++    }
++
+     pub fn escape_sql_string(value: &str) -> String {
+         value.replace('\'', "''")
+     }
+diff --git a/src/config/src/metrics.rs b/src/config/src/metrics.rs
+index d8c92a97de7..c796db2fba5 100644
+--- a/src/config/src/metrics.rs
++++ b/src/config/src/metrics.rs
+@@ -1143,6 +1143,46 @@ pub static QUERY_CANCELED_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
+     .expect("Metric created")
+ });
+ 
++pub static TRACE_TIME_INDEX_OPERATIONS: Lazy<IntCounterVec> = Lazy::new(|| {
++    IntCounterVec::new(
++        Opts::new(
++            "trace_time_index_operations_total",
++            "Trace time index operations by outcome",
++        )
++        .namespace(NAMESPACE)
++        .const_labels(create_const_labels()),
++        &["organization", "operation", "status"],
++    )
++    .expect("Metric created")
++});
++
++pub static TRACE_TIME_INDEX_QUERY_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
++    HistogramVec::new(
++        HistogramOpts::new(
++            "trace_time_index_query_duration_seconds",
++            "Trace time index query duration in seconds",
++        )
++        .namespace(NAMESPACE)
++        .const_labels(create_const_labels()),
++        &["organization", "status"],
++    )
++    .expect("Metric created")
++});
++
++pub static TRACE_TIME_INDEX_QUERY_ROUNDS: Lazy<HistogramVec> = Lazy::new(|| {
++    HistogramVec::new(
++        HistogramOpts::new(
++            "trace_time_index_query_rounds",
++            "Trace time index query rounds by phase",
++        )
++        .namespace(NAMESPACE)
++        .const_labels(create_const_labels())
++        .buckets(vec![1.0, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0, 34.0]),
++        &["organization", "phase"],
++    )
++    .expect("Metric created")
++});
++
+ // This corresponds to pgsql queries, not sqlite as that is local and can be ignored
+ pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
+     IntCounterVec::new(
+@@ -2250,7 +2290,15 @@ fn register_metrics(registry: &Registry) {
+     registry
+         .register(Box::new(QUERY_CANCELED_NUMS.clone()))
+         .expect("Metric registered");
+-
++    registry
++        .register(Box::new(TRACE_TIME_INDEX_OPERATIONS.clone()))
++        .expect("Metric registered");
++    registry
++        .register(Box::new(TRACE_TIME_INDEX_QUERY_DURATION.clone()))
++        .expect("Metric registered");
++    registry
++        .register(Box::new(TRACE_TIME_INDEX_QUERY_ROUNDS.clone()))
++        .expect("Metric registered");
+     // compactor stats
+     registry
+         .register(Box::new(COMPACT_USED_TIME.clone()))
+diff --git a/src/config/src/router.rs b/src/config/src/router.rs
+index f8c8b209b1b..5d3e6c0fab6 100644
+--- a/src/config/src/router.rs
++++ b/src/config/src/router.rs
+@@ -14,7 +14,7 @@
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ /// usize indicates the number of parts to skip based on their actual paths.
+-const QUERIER_ROUTES: [(&str, usize); 30] = [
++const QUERIER_ROUTES: [(&str, usize); 32] = [
+     ("config", 0),               // /config
+     ("summary", 2),              // /api/{org_id}/summary
+     ("organizations", 1),        // /api/organizations
+@@ -26,6 +26,8 @@ const QUERIER_ROUTES: [(&str, usize); 30] = [
+     ("traces/session", 3),       // /api/{org_id}/{stream_name}/traces/session
+     ("traces/user", 3),          // /api/{org_id}/{stream_name}/traces/user
+     ("dag", 5),                  // /api/{org_id}/{stream_name}/traces/{trace_id}/dag
++    ("details", 5),              // /api/{org_id}/{stream_name}/traces/{trace_id}/details
++    ("time_range", 5),           // /api/{org_id}/{stream_name}/traces/{trace_id}/time_range
+     ("clusters", 1),             // /api/clusters
+     ("query_manager", 2),        // /api/{org_id}/query_manager/...
+     ("_search", 2),              // /api/{org_id}/_search
+@@ -158,6 +160,14 @@ mod tests {
+         assert!(is_querier_route("/api/org1/service_streams/_analytics"));
+         assert!(is_querier_route("/api/org1/service_streams/_correlate"));
+         assert!(is_querier_route("/api/org1/service_streams/_grouped"));
++
++        // Test trace detail routes
++        assert!(is_querier_route(
++            "/api/org1/default/traces/trace-id/details"
++        ));
++        assert!(is_querier_route(
++            "/api/org1/default/traces/trace-id/time_range"
++        ));
+     }
+ 
+     #[test]
+diff --git a/src/config/src/utils/util.rs b/src/config/src/utils/util.rs
+index 7dc67a16cbd..5e5a2fbf041 100644
+--- a/src/config/src/utils/util.rs
++++ b/src/config/src/utils/util.rs
+@@ -15,7 +15,8 @@
+ 
+ use crate::meta::stream::StreamType;
+ 
+-pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values";
++pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values_";
++pub const TRACE_TIME_INDEX_STREAM_PREFIX: &str = "trace_time_index_";
+ 
+ pub fn zero_or<T>(v: T, def: T) -> T
+ where
+@@ -29,7 +30,15 @@ pub fn is_power_of_two(n: u64) -> bool {
+ }
+ 
+ pub fn get_distinct_stream_name(st: StreamType, s: &str) -> String {
+-    format!("{}_{}_{}", DISTINCT_STREAM_PREFIX, st.as_str(), s)
++    format!("{DISTINCT_STREAM_PREFIX}{st}_{s}")
++}
++
++pub fn get_trace_time_index_stream_name(s: &str) -> String {
++    format!("{TRACE_TIME_INDEX_STREAM_PREFIX}{s}")
++}
++
++pub fn is_trace_time_index_stream(s: &str) -> bool {
++    s.starts_with(TRACE_TIME_INDEX_STREAM_PREFIX)
+ }
+ 
+ #[cfg(test)]
+@@ -108,7 +117,12 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn test_distinct_stream_prefix_constant() {
+-        assert_eq!(DISTINCT_STREAM_PREFIX, "distinct_values");
++    fn test_trace_time_index_stream_name() {
++        assert_eq!(
++            get_trace_time_index_stream_name("default"),
++            "trace_time_index_default"
++        );
++        assert!(is_trace_time_index_stream("trace_time_index_default"));
++        assert!(!is_trace_time_index_stream("default"));
+     }
+ }
+diff --git a/src/core/src/metadata/distinct_values.rs b/src/core/src/metadata/distinct_values.rs
+index 23f3951ab7a..0218bbe2865 100644
+--- a/src/core/src/metadata/distinct_values.rs
++++ b/src/core/src/metadata/distinct_values.rs
+@@ -233,8 +233,8 @@ impl Metadata for DistinctValues {
+                     }
+                 };
+ 
+-                if let Some(ret) =
+-                    stream::get_stream_retention(&org_id, stream_type, &stream_name).await
++                if let Some(source_settings) =
++                    infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+                 {
+                     // local editable copy; persisted via save_stream_settings below
+                     let mut new_settings = infra::schema::get_settings(
+@@ -245,7 +245,9 @@ impl Metadata for DistinctValues {
+                     .await
+                     .map(|s| (*s).clone())
+                     .unwrap_or_default();
+-                    new_settings.data_retention = ret;
++                    new_settings.data_retention = source_settings.data_retention;
++                    new_settings.extended_retention_days =
++                        source_settings.extended_retention_days.clone();
+                     if let Err(e) = stream::save_stream_settings(
+                         &org_id,
+                         &distinct_stream_name,
+diff --git a/src/core/src/traces/mod.rs b/src/core/src/traces/mod.rs
+index 98f8587de0e..dc8b0b5e1a8 100644
+--- a/src/core/src/traces/mod.rs
++++ b/src/core/src/traces/mod.rs
+@@ -58,6 +58,7 @@ pub mod inferred;
+ pub mod otel;
+ pub mod service_graph;
+ pub mod session;
++pub mod time_index;
+ 
+ #[cfg(feature = "cloud")]
+ use ::stream::get_stream;
+@@ -1475,6 +1476,13 @@ async fn write_traces(
+     let record_schema = Arc::new(record_schema);
+     let schema_key = record_schema.hash_key();
+ 
++    if let Err(e) = time_index::write(org_id, stream_name, &json_data).await {
++        metrics::TRACE_TIME_INDEX_OPERATIONS
++            .with_label_values(&[org_id, "write", "error"])
++            .inc();
++        log::error!("[TRACE_TIME_INDEX] failed to write index for {org_id}/{stream_name}: {e}");
++    }
++
+     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
+     let mut distinct_values = Vec::with_capacity(16);
+ 
+diff --git a/src/core/src/traces/session.rs b/src/core/src/traces/session.rs
+index 293d864be01..82f23e487c3 100644
+--- a/src/core/src/traces/session.rs
++++ b/src/core/src/traces/session.rs
+@@ -8,6 +8,6 @@
+ //! Shared session-to-trace query contract.
+ 
+ pub use config::meta::traces::session::{
+-    SESSION_ID_COLUMNS, escape_sql_string, quote_identifier, session_id_columns, span_rows_sql,
+-    trace_id_predicate, trace_ids_from_hits, trace_ids_sql,
++    SESSION_ID_COLUMNS, escape_sql_string, quote_identifier, quote_sql_string, session_id_columns,
++    span_rows_sql, trace_id_predicate, trace_ids_from_hits, trace_ids_sql,
+ };
+diff --git a/src/core/src/traces/time_index.rs b/src/core/src/traces/time_index.rs
+new file mode 100644
+index 00000000000..31188dd7b5a
+--- /dev/null
++++ b/src/core/src/traces/time_index.rs
+@@ -0,0 +1,332 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++use std::{collections::HashMap, sync::Arc};
++
++use arrow_schema::{DataType, Field, Schema};
++use config::{
++    TIMESTAMP_COL_NAME, get_config,
++    meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
++    utils::{json, schema_ext::SchemaExt, util::get_trace_time_index_stream_name},
++};
++use infra::errors::{Error, Result};
++use serde_json::{Map, Value};
++
++use crate::{
++    common::meta::stream::SchemaRecords,
++    ingestion::{get_thread_id, get_write_partition_key, write_file},
++};
++
++const HOUR_MICROS: i64 = 3_600_000_000;
++
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct TraceTimeIndexRecord {
++    pub timestamp: i64,
++    pub trace_id: String,
++    pub min_ts: i64,
++    pub max_ts: i64,
++}
++
++fn nanos_floor_micros(value: i64) -> i64 {
++    value.div_euclid(1_000)
++}
++
++fn nanos_ceil_micros(value: i64) -> i64 {
++    let quotient = value.div_euclid(1_000);
++    if value.rem_euclid(1_000) == 0 {
++        quotient
++    } else {
++        quotient.saturating_add(1)
++    }
++}
++
++fn hour_start(timestamp: i64) -> i64 {
++    timestamp - timestamp.rem_euclid(HOUR_MICROS)
++}
++
++pub fn generate_records(records: &[(i64, Map<String, Value>)]) -> Vec<TraceTimeIndexRecord> {
++    let mut aggregated: HashMap<(i64, String), TraceTimeIndexRecord> = HashMap::new();
++
++    for (_, record) in records {
++        let Some(trace_id) = record.get("trace_id").and_then(Value::as_str) else {
++            continue;
++        };
++        let Some(start_ns) = record.get("start_time").map(json::get_int_value) else {
++            continue;
++        };
++        let Some(end_ns) = record.get("end_time").map(json::get_int_value) else {
++            continue;
++        };
++
++        let min_ts = nanos_floor_micros(start_ns);
++        let raw_max_ts = nanos_ceil_micros(end_ns);
++        let max_ts = raw_max_ts.max(min_ts);
++        let start_hour = hour_start(min_ts);
++        merge_record(
++            &mut aggregated,
++            start_hour,
++            min_ts,
++            trace_id,
++            min_ts,
++            max_ts,
++        );
++
++        let end_position = max_ts.saturating_sub(1).max(min_ts);
++        let end_hour = hour_start(end_position);
++        if end_hour != start_hour {
++            merge_record(
++                &mut aggregated,
++                end_hour,
++                end_hour,
++                trace_id,
++                min_ts,
++                max_ts,
++            );
++        }
++    }
++
++    aggregated.into_values().collect()
++}
++
++fn merge_record(
++    records: &mut HashMap<(i64, String), TraceTimeIndexRecord>,
++    hour_bucket: i64,
++    timestamp: i64,
++    trace_id: &str,
++    min_ts: i64,
++    max_ts: i64,
++) {
++    let entry = records
++        .entry((hour_bucket, trace_id.to_string()))
++        .or_insert_with(|| TraceTimeIndexRecord {
++            timestamp,
++            trace_id: trace_id.to_string(),
++            min_ts,
++            max_ts,
++        });
++    entry.timestamp = entry.timestamp.min(timestamp);
++    entry.min_ts = entry.min_ts.min(min_ts);
++    entry.max_ts = entry.max_ts.max(max_ts);
++}
++
++fn index_schema() -> Schema {
++    Schema::new(vec![
++        Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
++        Field::new("trace_id", DataType::Utf8, false),
++        Field::new("min_ts", DataType::Int64, false),
++        Field::new("max_ts", DataType::Int64, false),
++    ])
++}
++
++async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String> {
++    let index_stream = get_trace_time_index_stream_name(source_stream);
++    let schema_cache = infra::schema::get_cache(org_id, &index_stream, StreamType::Metadata)
++        .await
++        .map_err(|e| Error::Message(format!("load trace time index schema: {e}")))?;
++    let is_new = !schema_cache.fields_map().contains_key(TIMESTAMP_COL_NAME);
++
++    if is_new {
++        let expected = index_schema();
++        crate::db::schema::merge(
++            org_id,
++            &index_stream,
++            StreamType::Metadata,
++            &expected,
++            Some(config::utils::time::now_micros()),
++        )
++        .await
++        .map_err(|e| Error::Message(format!("create trace time index schema: {e}")))?;
++    }
++
++    let source_settings = infra::schema::get_settings(org_id, source_stream, StreamType::Traces)
++        .await
++        .unwrap_or_default();
++    let mut index_settings =
++        infra::schema::get_settings(org_id, &index_stream, StreamType::Metadata)
++            .await
++            .map(|settings| (*settings).clone())
++            .unwrap_or_else(|| StreamSettings {
++                enable_distinct_fields: false,
++                ..Default::default()
++            });
++    let needs_settings_update = !index_settings
++        .bloom_filter_fields
++        .iter()
++        .any(|field| field == "trace_id")
++        || !index_settings
++            .index_fields
++            .iter()
++            .any(|field| field == "trace_id")
++        || index_settings.data_retention != source_settings.data_retention
++        || index_settings.extended_retention_days != source_settings.extended_retention_days;
++    if needs_settings_update {
++        if !index_settings
++            .bloom_filter_fields
++            .iter()
++            .any(|field| field == "trace_id")
++        {
++            index_settings
++                .bloom_filter_fields
++                .push("trace_id".to_string());
++        }
++        if !index_settings
++            .index_fields
++            .iter()
++            .any(|field| field == "trace_id")
++        {
++            index_settings.index_fields.push("trace_id".to_string());
++        }
++        index_settings.data_retention = source_settings.data_retention;
++        index_settings.extended_retention_days = source_settings.extended_retention_days.clone();
++        index_settings.enable_distinct_fields = false;
++        schema::save_stream_settings(org_id, &index_stream, StreamType::Metadata, index_settings)
++            .await
++            .map_err(|e| Error::Message(format!("save trace time index settings: {e}")))?;
++    }
++
++    Ok(index_stream)
++}
++
++pub async fn write(
++    org_id: &str,
++    source_stream: &str,
++    source_records: &[(i64, Map<String, Value>)],
++) -> Result<()> {
++    if !get_config().common.trace_time_index_enabled {
++        return Ok(());
++    }
++
++    let records = generate_records(source_records);
++    if records.is_empty() {
++        return Ok(());
++    }
++
++    let index_stream = ensure_index_stream(org_id, source_stream).await?;
++    let schema = Arc::new(index_schema());
++    let schema_key = schema.hash_key();
++    let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
++
++    for record in records {
++        let mut value = Map::new();
++        value.insert(TIMESTAMP_COL_NAME.to_string(), record.timestamp.into());
++        value.insert("trace_id".to_string(), record.trace_id.into());
++        value.insert("min_ts".to_string(), record.min_ts.into());
++        value.insert("max_ts".to_string(), record.max_ts.into());
++        let partition = get_write_partition_key(
++            record.timestamp,
++            &vec![],
++            PartitionTimeLevel::Hourly,
++            &value,
++            Some(&schema_key),
++        );
++        let value = Value::Object(value);
++        let value_size = json::estimate_json_bytes(&value);
++        let entry = data_buf.entry(partition).or_insert_with(|| SchemaRecords {
++            schema_key: schema_key.clone(),
++            schema: Arc::clone(&schema),
++            records: Vec::new(),
++            records_size: 0,
++        });
++        entry.records.push(Arc::new(value));
++        entry.records_size += value_size;
++    }
++
++    let writer = ingester::get_writer(
++        get_thread_id(),
++        org_id,
++        StreamType::Metadata.as_str(),
++        &index_stream,
++    )
++    .await;
++    write_file(
++        &writer,
++        org_id,
++        &index_stream,
++        data_buf,
++        !get_config().common.wal_fsync_disabled,
++    )
++    .await
++    .map_err(|e| Error::Message(format!("write trace time index: {e}")))?;
++    config::metrics::TRACE_TIME_INDEX_OPERATIONS
++        .with_label_values(&[org_id, "write", "success"])
++        .inc();
++    Ok(())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn span(trace_id: &str, start_ns: i64, end_ns: i64) -> (i64, Map<String, Value>) {
++        let mut value = Map::new();
++        value.insert("trace_id".to_string(), trace_id.into());
++        value.insert("start_time".to_string(), start_ns.into());
++        value.insert("end_time".to_string(), end_ns.into());
++        (start_ns / 1_000, value)
++    }
++
++    #[test]
++    fn same_hour_span_generates_one_record() {
++        let records = generate_records(&[span("trace", 10_000_000_000, 20_000_000_000)]);
++        assert_eq!(records.len(), 1);
++        assert_eq!(records[0].min_ts, 10_000_000);
++        assert_eq!(records[0].max_ts, 20_000_000);
++    }
++
++    #[test]
++    fn cross_hour_span_generates_two_records() {
++        let records = generate_records(&[span("trace", 3_500_000_000_000, 3_700_000_000_000)]);
++        assert_eq!(records.len(), 2);
++        assert!(records.iter().all(|record| record.min_ts == 3_500_000_000));
++        assert!(records.iter().all(|record| record.max_ts == 3_700_000_000));
++    }
++
++    #[test]
++    fn month_long_span_still_generates_only_two_records() {
++        let records = generate_records(&[span("trace", 1_000_000_000, 31 * 86_400_000_000_000)]);
++        assert_eq!(records.len(), 2);
++    }
++
++    #[test]
++    fn exact_hour_end_stays_in_previous_hour() {
++        let records = generate_records(&[span("trace", 3_500_000_000_000, 3_600_000_000_000)]);
++        assert_eq!(records.len(), 1);
++    }
++
++    #[test]
++    fn inverted_span_is_clamped_to_zero_duration() {
++        let records = generate_records(&[span("trace", 20_000_000_000, 10_000_000_000)]);
++        assert_eq!(records.len(), 1);
++        assert_eq!(records[0].min_ts, records[0].max_ts);
++    }
++
++    #[test]
++    fn zero_duration_span_generates_one_record() {
++        let records = generate_records(&[span("trace", 20_000_000_000, 20_000_000_000)]);
++        assert_eq!(records.len(), 1);
++        assert_eq!(records[0].min_ts, records[0].max_ts);
++    }
++
++    #[test]
++    fn request_local_records_are_aggregated_by_trace_and_hour() {
++        let records = generate_records(&[
++            span("trace", 10_000_000_000, 20_000_000_000),
++            span("trace", 5_000_000_000, 30_000_000_000),
++        ]);
++        assert_eq!(records.len(), 1);
++        assert_eq!(records[0].min_ts, 5_000_000);
++        assert_eq!(records[0].max_ts, 30_000_000);
++    }
++}
+diff --git a/src/infra/src/coordinator/synthetics.rs b/src/infra/src/coordinator/synthetics.rs
+index 589683d2537..fefde4ebc53 100644
+--- a/src/infra/src/coordinator/synthetics.rs
++++ b/src/infra/src/coordinator/synthetics.rs
+@@ -13,43 +13,6 @@
+ // You should have received a copy of the GNU Affero General Public License
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-//! Cluster-coordinator events for the synthetics in-memory caches.
+-//!
+-//! Each node keeps its own copy of the synthetics configuration caches
+-//! (`table::synthetics_checks`, `synthetics_locations`, `synthetics_probe_tokens`,
+-//! `synthetics_agents`). A write only clears the cache on the node that
+-//! performed it, so without a cross-node signal every other node keeps serving
+-//! the old value until its TTL expires.
+-//!
+-//! This module is that signal, modelled on [`super::alerts`] and
+-//! [`super::pipelines`]: writers call an `emit_*` function after committing to
+-//! the database, and every node runs [`watch`], which invalidates the matching
+-//! cache entry the moment the event arrives.
+-//!
+-//! # Key layout
+-//!
+-//! One watch prefix, with a `kind` segment so a single watcher serves all four
+-//! caches:
+-//!
+-//! ```text
+-//! /synthetics/check/{org_id}/{synthetics_id}   one check definition changed
+-//! /synthetics/location/all                     the location registry changed
+-//! /synthetics/token/{org_id}                   an org's probe tokens changed
+-//! /synthetics/agent/{agent_id}                 one agent re-registered
+-//! ```
+-//!
+-//! `location` and `token` events are coarse on purpose. Both back whole-set
+-//! caches that are cheap to rebuild (tens of rows), so naming the exact row
+-//! would add parsing for no benefit.
+-//!
+-//! # Why the handler lives here rather than being passed in
+-//!
+-//! [`super::alerts::watch_events`] takes callbacks because its handler lives in
+-//! the `db` crate, which `infra` cannot reference. The synthetics caches are in
+-//! `infra::table`, the same crate as this module, so [`watch`] calls the
+-//! invalidation functions directly — same pattern, one less layer of
+-//! indirection.
+-
+ use crate::{db::Event, errors::Error};
+ 
+ pub const SYNTHETICS_WATCHER_PREFIX: &str = "/synthetics/";
+diff --git a/src/infra/src/db/mod.rs b/src/infra/src/db/mod.rs
+index 00651cf8d1a..a02e3f1d42f 100644
+--- a/src/infra/src/db/mod.rs
++++ b/src/infra/src/db/mod.rs
+@@ -28,6 +28,7 @@ pub mod nats;
+ pub mod postgres;
+ pub mod sqlite;
+ pub mod tantivy_index;
++pub mod trace_time_index;
+ 
+ pub static NEED_WATCH: bool = true;
+ pub static NO_NEED_WATCH: bool = false;
+diff --git a/src/infra/src/db/tantivy_index.rs b/src/infra/src/db/tantivy_index.rs
+index cbe654f3cc4..2af3c24d5fd 100644
+--- a/src/infra/src/db/tantivy_index.rs
++++ b/src/infra/src/db/tantivy_index.rs
+@@ -4,6 +4,14 @@
+ // it under the terms of the GNU Affero General Public License as published by
+ // the Free Software Foundation, either version 3 of the License, or
+ // (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ use tokio::sync::OnceCell;
+ 
+diff --git a/src/infra/src/db/trace_time_index.rs b/src/infra/src/db/trace_time_index.rs
+new file mode 100644
+index 00000000000..b2d636b482e
+--- /dev/null
++++ b/src/infra/src/db/trace_time_index.rs
+@@ -0,0 +1,103 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++use bytes::Bytes;
++use tokio::sync::OnceCell;
++
++use crate::errors::{DbError, Error, Result};
++
++pub const COVERAGE_MARKER_KEY: &str = "/traces/time_index/updated_at";
++
++static COVERAGE_START: OnceCell<i64> = OnceCell::const_new();
++
++pub async fn initialize(enabled: bool) -> Result<Option<i64>> {
++    if !enabled {
++        let db = super::get_db().await;
++        db.delete_if_exists(COVERAGE_MARKER_KEY, false, false)
++            .await?;
++        return Ok(None);
++    }
++
++    get_or_create_coverage_start().await.map(Some)
++}
++
++pub async fn get_coverage_start() -> Result<Option<i64>> {
++    let db = super::get_db().await;
++    let value = match db.get(COVERAGE_MARKER_KEY).await {
++        Ok(value) => value,
++        Err(Error::DbError(DbError::KeyNotExists(_))) => return Ok(None),
++        Err(error) => return Err(error),
++    };
++    if value.is_empty() {
++        return Ok(None);
++    }
++    let value = String::from_utf8_lossy(&value);
++    value
++        .parse::<i64>()
++        .map(Some)
++        .map_err(|e| Error::Message(format!("invalid trace time index coverage marker: {e}")))
++}
++
++pub async fn get_or_create_coverage_start() -> Result<i64> {
++    let coverage_start = COVERAGE_START
++        .get_or_try_init(load_or_create_coverage_start)
++        .await?;
++    Ok(*coverage_start)
++}
++
++async fn load_or_create_coverage_start() -> Result<i64> {
++    if let Some(value) = get_coverage_start().await? {
++        return Ok(value);
++    }
++
++    let cfg = config::get_config();
++    let coverage_start = config::utils::time::now_micros() - cfg.limit.ingest_allowed_upto_micro;
++    let db = super::get_db().await;
++    db.put(
++        COVERAGE_MARKER_KEY,
++        Bytes::from(coverage_start.to_string()),
++        false,
++        None,
++    )
++    .await?;
++    Ok(coverage_start)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[tokio::test]
++    async fn test_coverage_start_cache() {
++        super::super::create_table().await.unwrap();
++        initialize(false).await.unwrap();
++
++        let db = super::super::get_db().await;
++        db.put(COVERAGE_MARKER_KEY, Bytes::from_static(b"123"), false, None)
++            .await
++            .unwrap();
++        assert_eq!(get_or_create_coverage_start().await.unwrap(), 123);
++
++        db.put(COVERAGE_MARKER_KEY, Bytes::from_static(b"456"), false, None)
++            .await
++            .unwrap();
++        assert_eq!(get_coverage_start().await.unwrap(), Some(456));
++        assert_eq!(get_or_create_coverage_start().await.unwrap(), 123);
++
++        db.delete_if_exists(COVERAGE_MARKER_KEY, false, false)
++            .await
++            .unwrap();
++    }
++}
+diff --git a/src/ingester/src/writer.rs b/src/ingester/src/writer.rs
+index 66e915e0c64..f4ba4efc232 100644
+--- a/src/ingester/src/writer.rs
++++ b/src/ingester/src/writer.rs
+@@ -25,7 +25,9 @@ use std::{
+ use arrow_schema::Schema;
+ use chrono::{Duration, Utc};
+ use config::{
+-    MEM_TABLE_INDIVIDUAL_STREAMS, get_config, metrics,
++    MEM_TABLE_INDIVIDUAL_STREAMS, get_config,
++    meta::stream::StreamType,
++    metrics,
+     stats::MemorySize,
+     utils::hash::{Sum64, gxhash},
+ };
+@@ -406,7 +408,9 @@ impl Writer {
+         let processed_batch = self.preprocess_batch(entries)?;
+ 
+         let cfg = get_config();
+-        if !cfg.common.wal_write_queue_enabled {
++        if self.key.stream_type.as_ref() == StreamType::Metadata.as_str()
++            || !cfg.common.wal_write_queue_enabled
++        {
+             return self.consume_processed(processed_batch, fsync).await;
+         }
+ 
+diff --git a/src/jobs/src/job/mod.rs b/src/jobs/src/job/mod.rs
+index 4617e84af1a..6d1cd6e811b 100644
+--- a/src/jobs/src/job/mod.rs
++++ b/src/jobs/src/job/mod.rs
+@@ -401,6 +401,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
+     _ = infra::db::tantivy_index::get_ttv_timestamp_updated_at().await;
+     // check tantivy secondary index update time
+     _ = infra::db::tantivy_index::get_ttv_secondary_index_updated_at().await;
++    if let Err(e) = infra::db::trace_time_index::initialize(
++        config::get_config().common.trace_time_index_enabled,
++    )
++    .await
++    {
++        log::warn!("failed to initialize trace time index coverage marker: {e}");
++    }
+ 
+     // Auth auditing should be done by router also
+     #[cfg(feature = "enterprise")]
+diff --git a/src/search/src/datafusion/merge/mod.rs b/src/search/src/datafusion/merge/mod.rs
+index 597d640f831..ed64d8e8d15 100644
+--- a/src/search/src/datafusion/merge/mod.rs
++++ b/src/search/src/datafusion/merge/mod.rs
+@@ -21,7 +21,7 @@ use config::{
+     meta::stream::{FileMeta, StreamType},
+     utils::{
+         parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
+-        util::DISTINCT_STREAM_PREFIX,
++        util::{DISTINCT_STREAM_PREFIX, is_trace_time_index_stream},
+     },
+ };
+ use datafusion::{
+@@ -104,7 +104,11 @@ pub async fn merge_parquet_files(
+     }
+ 
+     // get all sorted data
+-    let sql = if cfg.limit.distinct_values_hourly
++    let sql = if stream_type == StreamType::Metadata && is_trace_time_index_stream(stream_name) {
++        format!(
++            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, trace_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM tbl GROUP BY trace_id ORDER BY {TIMESTAMP_COL_NAME} DESC"
++        )
++    } else if cfg.limit.distinct_values_hourly
+         && stream_type == StreamType::Metadata
+         && stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+     {
+@@ -327,7 +331,11 @@ pub fn append_metadata(
+ mod tests {
+     use std::sync::Arc;
+ 
++    use arrow::array::{Int64Array, StringArray};
+     use arrow_schema::{DataType, Field, Schema};
++    use bytes::Bytes;
++    use datafusion::datasource::MemTable;
++    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+     use vortex::file::OpenOptionsSessionExt;
+ 
+     use super::*;
+@@ -393,9 +401,95 @@ mod tests {
+     }
+ 
+     #[tokio::test]
+-    async fn test_write_vortex_carries_file_meta() {
+-        use arrow::array::{Int64Array, StringArray};
++    async fn test_trace_time_index_merge_aggregates_by_trace_id() {
++        let schema = Arc::new(Schema::new(vec![
++            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
++            Field::new("trace_id", DataType::Utf8, false),
++            Field::new("min_ts", DataType::Int64, false),
++            Field::new("max_ts", DataType::Int64, false),
++        ]));
++        let batch = RecordBatch::try_new(
++            schema.clone(),
++            vec![
++                Arc::new(Int64Array::from(vec![100, 110, 120, 130])),
++                Arc::new(StringArray::from(vec!["a", "a", "b", "a"])),
++                Arc::new(Int64Array::from(vec![100, 90, 120, 80])),
++                Arc::new(Int64Array::from(vec![101, 115, 125, 140])),
++            ],
++        )
++        .unwrap();
++        let table = Arc::new(MemTable::try_new(schema.clone(), vec![vec![batch]]).unwrap());
+ 
++        let merged = merge_parquet_files(
++            StreamType::Metadata,
++            "trace_time_index_test",
++            schema,
++            vec![table],
++            &[],
++            FileMeta {
++                min_ts: 80,
++                max_ts: 140,
++                records: 4,
++                ..Default::default()
++            },
++            true,
++        )
++        .await
++        .unwrap();
++        let MergeParquetResult::Single { buf, .. } = merged else {
++            panic!("trace time index merge must produce a single parquet file");
++        };
++        let batches = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(buf))
++            .unwrap()
++            .build()
++            .unwrap()
++            .collect::<Result<Vec<_>, _>>()
++            .unwrap();
++        let batch = arrow::compute::concat_batches(&batches[0].schema(), &batches).unwrap();
++        assert_eq!(batch.num_rows(), 2);
++
++        let trace_ids = batch
++            .column_by_name("trace_id")
++            .unwrap()
++            .as_any()
++            .downcast_ref::<StringArray>()
++            .unwrap();
++        let timestamps = batch
++            .column_by_name(TIMESTAMP_COL_NAME)
++            .unwrap()
++            .as_any()
++            .downcast_ref::<Int64Array>()
++            .unwrap();
++        let min_ts = batch
++            .column_by_name("min_ts")
++            .unwrap()
++            .as_any()
++            .downcast_ref::<Int64Array>()
++            .unwrap();
++        let max_ts = batch
++            .column_by_name("max_ts")
++            .unwrap()
++            .as_any()
++            .downcast_ref::<Int64Array>()
++            .unwrap();
++        let rows = (0..batch.num_rows())
++            .map(|index| {
++                (
++                    trace_ids.value(index).to_string(),
++                    (
++                        timestamps.value(index),
++                        min_ts.value(index),
++                        max_ts.value(index),
++                    ),
++                )
++            })
++            .collect::<std::collections::HashMap<_, _>>();
++        assert_eq!(rows["a"], (100, 80, 140));
++        assert_eq!(rows["b"], (120, 120, 125));
++    }
++
++    #[tokio::test]
++    async fn test_write_vortex_carries_file_meta() {
+         let schema = create_test_schema();
+         let batch = RecordBatch::try_new(
+             schema.clone(),
+diff --git a/src/stream/src/lib.rs b/src/stream/src/lib.rs
+index dece66b1d9c..59f1fbe7d91 100644
+--- a/src/stream/src/lib.rs
++++ b/src/stream/src/lib.rs
+@@ -40,7 +40,12 @@ use config::{
+             StreamType, TimeRange, UpdateStreamSettings,
+         },
+     },
+-    utils::{flatten::format_label_name, json, time::now_micros, util::get_distinct_stream_name},
++    utils::{
++        flatten::format_label_name,
++        json,
++        time::now_micros,
++        util::{get_distinct_stream_name, get_trace_time_index_stream_name},
++    },
+ };
+ #[cfg(feature = "vectorscan")]
+ use db::re_pattern::process_association_changes;
+@@ -400,56 +405,75 @@ pub async fn save_stream_settings(
+     };
+     let settings = saved.settings;
+ 
+-    // skip metadata, as we should never do distinct values stream for
+-    // metadata streams
+-    if matches!(stream_type, StreamType::Logs | StreamType::Traces)
+-        && let Some(original_settings) = saved.previous_settings
+-    {
+-        let existing = original_settings.data_retention;
+-        let new = settings.data_retention;
+-        if existing != new {
+-            let distinct_stream = get_distinct_stream_name(stream_type, stream_name);
+-
+-            match infra::schema::get(org_id, &distinct_stream, StreamType::Metadata).await {
+-                Ok(distinct_schema) => {
+-                    let mut distinct_settings =
+-                        unwrap_stream_settings(&distinct_schema).unwrap_or_default();
+-                    distinct_settings.data_retention = new;
+-
+-                    let mut metadata = distinct_schema.metadata.clone();
+-                    metadata.insert(
+-                        "settings".to_string(),
+-                        json::to_string(&distinct_settings).unwrap(),
+-                    );
+-                    if !metadata.contains_key("created_at") {
+-                        metadata.insert("created_at".to_string(), now_micros().to_string());
+-                    }
++    sync_associated_metadata_stream_retention(org_id, stream_name, stream_type, &settings).await;
+ 
+-                    if let Err(e) = db::schema::update_setting(
+-                        org_id,
+-                        &distinct_stream,
+-                        StreamType::Metadata,
+-                        metadata,
+-                    )
+-                    .await
+-                    {
+-                        log::warn!(
+-                            "error in updating retention setting for distinct stream : {org_id}/{distinct_stream} : {e}"
+-                        );
+-                    }
+-                }
++    Ok(MetaHttpResponse::ok(""))
++}
++
++async fn sync_associated_metadata_stream_retention(
++    org_id: &str,
++    stream_name: &str,
++    stream_type: StreamType,
++    settings: &StreamSettings,
++) {
++    for metadata_stream in associated_metadata_streams(stream_type, stream_name) {
++        if !infra::schema::exists(org_id, StreamType::Metadata, &metadata_stream).await {
++            continue;
++        }
++
++        let metadata_schema =
++            match infra::schema::get(org_id, &metadata_stream, StreamType::Metadata).await {
++                Ok(schema) => schema,
+                 Err(e) => {
+-                    // We have already updated the main stream settings, and this is just for
+-                    // retention, so no point in failing the api call if this fails.
+                     log::warn!(
+-                        "error getting schema for distinct stream {org_id}/{distinct_stream} : {e}"
++                        "error getting associated metadata stream {org_id}/{metadata_stream}: {e}"
+                     );
++                    continue;
+                 }
+-            }
++            };
++        let mut metadata_settings = unwrap_stream_settings(&metadata_schema).unwrap_or_default();
++        if metadata_settings.data_retention == settings.data_retention
++            && metadata_settings.extended_retention_days == settings.extended_retention_days
++        {
++            continue;
++        }
++
++        metadata_settings.data_retention = settings.data_retention;
++        metadata_settings.extended_retention_days = settings.extended_retention_days.clone();
++        let mut metadata = metadata_schema.metadata.clone();
++        metadata.insert(
++            "settings".to_string(),
++            json::to_string(&metadata_settings).unwrap(),
++        );
++        if !metadata.contains_key("created_at") {
++            metadata.insert("created_at".to_string(), now_micros().to_string());
++        }
++        if let Err(e) =
++            db::schema::update_setting(org_id, &metadata_stream, StreamType::Metadata, metadata)
++                .await
++        {
++            // The source stream settings have already been saved. A failure to update an
++            // associated metadata stream must not fail the original request.
++            log::warn!(
++                "error updating retention for associated metadata stream {org_id}/{metadata_stream}: {e}"
++            );
+         }
+     }
++}
+ 
+-    Ok(MetaHttpResponse::ok(""))
++fn associated_metadata_streams(stream_type: StreamType, stream_name: &str) -> Vec<String> {
++    if !matches!(
++        stream_type,
++        StreamType::Logs | StreamType::Metrics | StreamType::Traces
++    ) {
++        return Vec::new();
++    }
++
++    let mut streams = vec![get_distinct_stream_name(stream_type, stream_name)];
++    if stream_type == StreamType::Traces {
++        streams.push(get_trace_time_index_stream_name(stream_name));
++    }
++    streams
+ }
+ 
+ #[tracing::instrument(skip(new_settings))]
+@@ -865,6 +889,8 @@ where
+             .into_response());
+     }
+ 
++    delete_associated_metadata_streams(org_id, stream_name, stream_type).await;
++
+     // delete related resource
+     if let Err(e) = stream_delete_inner(org_id, stream_type, stream_name).await {
+         return Ok((
+@@ -893,6 +919,43 @@ where
+     Ok(MetaHttpResponse::ok("stream deleted"))
+ }
+ 
++async fn delete_associated_metadata_streams(
++    org_id: &str,
++    source_stream: &str,
++    stream_type: StreamType,
++) {
++    for metadata_stream in associated_metadata_streams(stream_type, source_stream) {
++        if !infra::schema::exists(org_id, StreamType::Metadata, &metadata_stream).await {
++            continue;
++        }
++
++        if let Err(e) =
++            db::schema::delete(org_id, &metadata_stream, Some(StreamType::Metadata)).await
++        {
++            log::warn!(
++                "failed to delete associated metadata stream schema {org_id}/{metadata_stream}: {e}"
++            );
++        }
++        if let Err(e) = db::compact::retention::delete_stream(
++            org_id,
++            StreamType::Metadata,
++            &metadata_stream,
++            None,
++        )
++        .await
++        {
++            log::warn!(
++                "failed to schedule associated metadata stream deletion {org_id}/{metadata_stream}: {e}"
++            );
++        }
++        if let Err(e) = stream_delete_inner(org_id, StreamType::Metadata, &metadata_stream).await {
++            log::warn!(
++                "failed to clean associated metadata stream caches {org_id}/{metadata_stream}: {e}"
++            );
++        }
++    }
++}
++
+ pub async fn stream_delete_inner(
+     org_id: &str,
+     stream_type: StreamType,
+@@ -1125,6 +1188,23 @@ mod tests {
+ 
+     use super::*;
+ 
++    #[test]
++    fn test_associated_metadata_streams() {
++        assert_eq!(
++            associated_metadata_streams(StreamType::Logs, "app"),
++            vec!["distinct_values_logs_app"]
++        );
++        assert_eq!(
++            associated_metadata_streams(StreamType::Metrics, "cpu"),
++            vec!["distinct_values_metrics_cpu"]
++        );
++        assert_eq!(
++            associated_metadata_streams(StreamType::Traces, "default"),
++            vec!["distinct_values_traces_default", "trace_time_index_default"]
++        );
++        assert!(associated_metadata_streams(StreamType::Metadata, "internal").is_empty());
++    }
++
+     #[test]
+     fn test_stream_res() {
+         let stats = StreamStats::default();
+diff --git a/web/src/plugins/traces/SearchResult.spec.ts b/web/src/plugins/traces/SearchResult.spec.ts
+index 70493d5888f..dd8b0bd926c 100644
+--- a/web/src/plugins/traces/SearchResult.spec.ts
++++ b/web/src/plugins/traces/SearchResult.spec.ts
+@@ -279,6 +279,23 @@ describe("SearchResult", () => {
+       expect(wrapper.vm.expandRowDetail).toBeDefined();
+       expect(typeof wrapper.vm.expandRowDetail).toBe("function");
+     });
++
++    it("uses the exact aggregated trace range without padding", async () => {
++      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
++      const trace = mockSearchObj.data.queryResults.hits[0];
++
++      wrapper.vm.expandRowDetail(trace);
++
++      expect(push).toHaveBeenCalledWith(
++        expect.objectContaining({
++          query: expect.objectContaining({
++            from: trace.trace_start_time,
++            to: trace.trace_end_time,
++          }),
++        }),
++      );
++      push.mockRestore();
++    });
+   });
+ 
+   describe("Time boxed search", () => {
+diff --git a/web/src/plugins/traces/SearchResult.vue b/web/src/plugins/traces/SearchResult.vue
+index aba8cca712a..b2d957ad852 100644
+--- a/web/src/plugins/traces/SearchResult.vue
++++ b/web/src/plugins/traces/SearchResult.vue
+@@ -373,8 +373,8 @@ export default defineComponent({
+         from = spanStart - 60_000_000; // -1 min in µs
+         to = spanEnd + 3_600_000_000; // +1 hr in µs
+       } else {
+-        from = props.trace_start_time - 10000000;
+-        to = props.trace_end_time + 10000000;
++        from = props.trace_start_time;
++        to = props.trace_end_time;
+       }
+ 
+       router.push({
+diff --git a/web/src/plugins/traces/TraceDetails.all-missing-fields.spec.ts b/web/src/plugins/traces/TraceDetails.all-missing-fields.spec.ts
+index 93b4759b5f4..22dfafa4fa5 100644
+--- a/web/src/plugins/traces/TraceDetails.all-missing-fields.spec.ts
++++ b/web/src/plugins/traces/TraceDetails.all-missing-fields.spec.ts
+@@ -123,6 +123,10 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
+ 
+     // Mock API to return problematic data
+     globalThis.server.use(
++      http.get(
++        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
++        () => HttpResponse.json(mockSpansWithManyMissingFields),
++      ),
+       http.post(
+         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+         async ({ request }) => {
+diff --git a/web/src/plugins/traces/TraceDetails.missing-span-kind.spec.ts b/web/src/plugins/traces/TraceDetails.missing-span-kind.spec.ts
+index c73f160bb6d..72fdd95f813 100644
+--- a/web/src/plugins/traces/TraceDetails.missing-span-kind.spec.ts
++++ b/web/src/plugins/traces/TraceDetails.missing-span-kind.spec.ts
+@@ -190,6 +190,10 @@ describe("TraceDetails - Missing span_kind Field", () => {
+ 
+     // Mock API to return data without span_kind
+     globalThis.server.use(
++      http.get(
++        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
++        () => HttpResponse.json(mockSpansWithoutSpanKind),
++      ),
+       http.post(
+         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+         async ({ request }) => {
+diff --git a/web/src/plugins/traces/TraceDetails.spec.ts b/web/src/plugins/traces/TraceDetails.spec.ts
+index 1b93bab19ce..14301769f3a 100644
+--- a/web/src/plugins/traces/TraceDetails.spec.ts
++++ b/web/src/plugins/traces/TraceDetails.spec.ts
+@@ -142,6 +142,10 @@ describe("TraceDetails", () => {
+     } as any);
+ 
+     globalThis.server.use(
++      http.get(
++        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
++        () => HttpResponse.json(tracesMockData.tracesDetails.traceSpans),
++      ),
+       http.post(
+         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+         async ({ request }) => {
+@@ -2322,6 +2326,10 @@ describe("TraceDetails", () => {
+ 
+       // Register the search API handler that returns real trace spans
+       globalThis.server.use(
++        http.get(
++          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
++          () => HttpResponse.json(tracesMockData.tracesDetails.traceSpans),
++        ),
+         http.post(
+           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+           async ({ request }) => {
+@@ -2390,6 +2398,10 @@ describe("TraceDetails", () => {
+       const spanId = response.hits[0].span_id;
+ 
+       globalThis.server.use(
++        http.get(
++          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
++          () => HttpResponse.json(response),
++        ),
+         http.post(
+           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+           async ({ request }) => {
+@@ -2415,6 +2427,10 @@ describe("TraceDetails", () => {
+       const spanId = response.hits[0].span_id;
+ 
+       globalThis.server.use(
++        http.get(
++          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
++          () => HttpResponse.json(response),
++        ),
+         http.post(
+           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+           async ({ request }) => {
+diff --git a/web/src/plugins/traces/TraceDetails.vue b/web/src/plugins/traces/TraceDetails.vue
+index afe309696a4..1fd27eb6364 100644
+--- a/web/src/plugins/traces/TraceDetails.vue
++++ b/web/src/plugins/traces/TraceDetails.vue
+@@ -2025,7 +2025,13 @@ export default defineComponent({
+ 
+       // Fetch from API — standalone mode, or embedded with no pre-fetched spans
+       await loadLogStreams();
+-      await getTraceMeta();
++      const timeRange = effectiveTimeRange.value;
++      await getTraceDetails({
++        stream: effectiveStreamName.value,
++        trace_id: effectiveTraceId.value,
++        from: timeRange.from,
++        to: timeRange.to,
++      });
+     };
+ 
+     onMounted(async () => {
+@@ -2100,77 +2106,6 @@ export default defineComponent({
+       hoveredSpanId.value = "";
+     };
+ 
+-    const getTraceMeta = () => {
+-      try {
+-        searchObj.data.traceDetails.isLoadingTraceMeta = true;
+-
+-        let filter = (router.currentRoute.value.query.filter as string) || "";
+-
+-        if (filter?.length) filter += ` and trace_id='${effectiveTraceId.value}'`;
+-        else filter += `trace_id='${effectiveTraceId.value}'`;
+-
+-        const timeRange = effectiveTimeRange.value;
+-
+-        searchService
+-          .get_traces({
+-            org_identifier: effectiveOrgIdentifier.value,
+-            start_time: timeRange.from - 10000,
+-            end_time: timeRange.to + 10000,
+-            filter: filter || "",
+-            size: 1,
+-            from: 0,
+-            stream_name: effectiveStreamName.value,
+-          })
+-          .then(async (res: any) => {
+-            const trace = getTracesMetaData(res.data.hits)[0];
+-            if (!trace) {
+-              showTraceDetailsError();
+-              return;
+-            }
+-            searchObj.data.traceDetails.selectedTrace = trace;
+-
+-            let startTime = Number(router.currentRoute.value.query.from);
+-            let endTime = Number(router.currentRoute.value.query.to);
+-            if (
+-              res.data.hits.length === 1 &&
+-              res.data.hits[0].start_time &&
+-              res.data.hits[0].end_time
+-            ) {
+-              startTime = Math.floor(res.data.hits[0].start_time / 1000);
+-              endTime = Math.ceil(res.data.hits[0].end_time / 1000);
+-
+-              // If the trace is not in the current time range, update the time range
+-              if (!(
+-                startTime >= Number(router.currentRoute.value.query.from) &&
+-                endTime <= Number(router.currentRoute.value.query.to)
+-              )) {
+-                updateUrlQueryParams({
+-                  from: startTime,
+-                  to: endTime,
+-                });
+-              }
+-            }
+-
+-            getTraceDetails({
+-              stream: effectiveStreamName.value,
+-              trace_id: trace.trace_id,
+-              from: startTime - 10000,
+-              to: endTime + 10000,
+-            });
+-          })
+-          .catch(() => {
+-            showTraceDetailsError();
+-          })
+-          .finally(() => {
+-            searchObj.data.traceDetails.isLoadingTraceMeta = false;
+-          });
+-      } catch (error) {
+-        console.error("Error fetching trace meta:", error);
+-        searchObj.data.traceDetails.isLoadingTraceMeta = false;
+-        showTraceDetailsError();
+-      }
+-    };
+-
+     /**
+      * Update the query parameters in the URL
+      * @param newParams - object containing new parameters
+@@ -2184,36 +2119,6 @@ export default defineComponent({
+       });
+     };
+ 
+-    const getDefaultRequest = () => {
+-      return {
+-        query: {
+-          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time/1000) as trace_start_time, max(end_time/1000) as trace_end_time, min(service_name) as service_name, min(operation_name) as operation_name, count(trace_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
+-          start_time: (new Date().getTime() - 900000) * 1000,
+-          end_time: new Date().getTime() * 1000,
+-          from: 0,
+-          size: 0,
+-        },
+-        encoding: "base64",
+-      };
+-    };
+-
+-    const sanitizeTraceId = (id: string): string => String(id).replace(/['"\\]/g, "");
+-
+-    const buildTraceSearchQuery = (trace: any) => {
+-      const req = getDefaultRequest();
+-      req.query.from = 0;
+-      // TODO : Handle this with _search_stream instead of adding size
+-      req.query.size = 50000;
+-      req.query.start_time = trace.from;
+-      req.query.end_time = trace.to;
+-
+-      req.query.sql = b64EncodeUnicode(
+-        `SELECT * FROM "${trace.stream}" WHERE trace_id = '${sanitizeTraceId(trace.trace_id)}' ORDER BY start_time`,
+-      ) as string;
+-
+-      return req;
+-    };
+-
+     const { fetchRumEventsForTrace, formatRumEventsAsSpans } = useRumSpanBuilder(
+       logStreams,
+       searchObj,
+@@ -2224,84 +2129,60 @@ export default defineComponent({
+       try {
+         searchObj.data.traceDetails.isLoadingTraceDetails = true;
+         searchObj.data.traceDetails.spanList = [];
+-        const req = buildTraceSearchQuery(data);
+-
+-        const tracePromise = searchService.search(
+-          {
+-            org_identifier: effectiveOrgIdentifier.value,
+-            query: req,
+-            page_type: "traces",
+-          },
+-          "ui",
+-        );
++        const traceRes = await searchService.get_trace_details({
++          org_identifier: effectiveOrgIdentifier.value,
++          stream_name: data.stream,
++          trace_id: data.trace_id,
++          start_time: data.from,
++          end_time: data.to,
++          hint_ts: data.from + Math.floor((data.to - data.from) / 2),
++        });
++        if (!traceRes.data?.hits?.length) {
++          showTraceDetailsError();
++          return;
++        }
+ 
+-        const rumPromise = fetchRumEventsForTrace(
+-          data.trace_id,
+-          req.query.start_time,
+-          req.query.end_time,
++        const effectiveStart = traceRes.data.new_start_time ?? data.from;
++        const effectiveEnd = traceRes.data.new_end_time ?? data.to;
++        if (effectiveStart !== data.from || effectiveEnd !== data.to) {
++          updateUrlQueryParams({ from: effectiveStart, to: effectiveEnd });
++        }
++        const rumData = await fetchRumEventsForTrace(data.trace_id, effectiveStart, effectiveEnd);
++        const traceSpans = traceRes.data.hits;
++        const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
++        const rumSpans = formatRumEventsAsSpans(
++          tracedResources,
++          viewEvents,
++          actionEvents,
++          allViewEvents,
+         );
+-
+-        Promise.all([tracePromise, rumPromise])
+-          .then(([traceRes, rumData]) => {
+-            if (!traceRes.data?.hits?.length) {
+-              showTraceDetailsError();
+-              return;
+-            }
+-
+-            const traceSpans = traceRes.data?.hits || [];
+-            const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
+-            const rumSpans = formatRumEventsAsSpans(
+-              tracedResources,
+-              viewEvents,
+-              actionEvents,
+-              allViewEvents,
+-            );
+-            // RUM spans take priority over trace spans with the same span_id
+-            const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
+-            const deduplicatedTraceSpans = traceSpans.filter(
+-              (s: any) => !rumSpanIds.has(s.span_id),
+-            );
+-            // spanList is never[] in useTraces state; widen container to accept spans.
+-            (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
+-              ...rumSpans,
+-              ...deduplicatedTraceSpans,
+-            ];
+-            updateServiceColors();
+-            buildTracesTree();
+-          })
+-          .catch((error) => {
+-            console.error("Error fetching trace details:", error);
+-            searchObj.data.traceDetails.isLoadingTraceDetails = false;
+-            showTraceDetailsError();
+-          })
+-          .finally(() => {
+-            searchObj.data.traceDetails.isLoadingTraceDetails = false;
+-          });
++        // RUM spans take priority over trace spans with the same span_id
++        const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
++        const deduplicatedTraceSpans = traceSpans.filter((s: any) => !rumSpanIds.has(s.span_id));
++        // spanList is never[] in useTraces state; widen container to accept spans.
++        (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
++          ...rumSpans,
++          ...deduplicatedTraceSpans,
++        ];
++        updateSelectedTrace(data.trace_id, spanList.value);
++        updateServiceColors();
++        buildTracesTree();
+       } catch (error) {
+         console.error("Error fetching trace details:", error);
+-        searchObj.data.traceDetails.isLoadingTraceDetails = false;
+         showTraceDetailsError();
++      } finally {
++        searchObj.data.traceDetails.isLoadingTraceDetails = false;
+       }
+     };
+ 
+-    const getTracesMetaData = (traces: any[]) => {
+-      if (!traces.length) return [];
+-
+-      return traces.map((trace) => {
+-        const _trace = {
+-          trace_id: trace.trace_id,
+-          trace_start_time: Math.round(trace.start_time / 1000),
+-          trace_end_time: Math.round(trace.end_time / 1000),
+-          service_name: trace.service_name,
+-          operation_name: trace.operation_name,
+-          spans: trace.spans[0],
+-          errors: trace.spans[1],
+-          duration: trace.duration,
+-          services: {} as any,
+-          zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
+-        };
+-        return _trace;
+-      });
++    const updateSelectedTrace = (traceId: string, spans: any[]) => {
++      searchObj.data.traceDetails.selectedTrace = {
++        trace_id: traceId,
++        trace_start_time: Math.floor(Math.min(...spans.map((span) => span.start_time)) / 1000),
++        trace_end_time: Math.ceil(Math.max(...spans.map((span) => span.end_time)) / 1000),
++        service_name: extractServiceNames(spans),
++        services: {},
++      };
+     };
+ 
+     const updateServiceColors = () => {
+diff --git a/web/src/services/search.spec.ts b/web/src/services/search.spec.ts
+index a117b4ee2b1..6b82ee8caf2 100644
+--- a/web/src/services/search.spec.ts
++++ b/web/src/services/search.spec.ts
+@@ -632,6 +632,23 @@ describe("Search Service", () => {
+     });
+   });
+ 
++  describe("get_trace_details", () => {
++    it("should build the trace details URL with a caller range and hint", async () => {
++      await search.get_trace_details({
++        org_identifier: "test-org",
++        stream_name: "traces",
++        trace_id: "trace/id",
++        start_time: 10,
++        end_time: 20,
++        hint_ts: 15,
++      });
++
++      expect(mockHttp.get).toHaveBeenCalledWith(
++        "/api/test-org/traces/traces/trace%2Fid/details?start_time=10&end_time=20&hint_ts=15",
++      );
++    });
++  });
++
+   describe("partition", () => {
+     it("should build correct URL for partition search", async () => {
+       const params = {
+diff --git a/web/src/services/search.ts b/web/src/services/search.ts
+index cebb306fc65..e9ee97224fb 100644
+--- a/web/src/services/search.ts
++++ b/web/src/services/search.ts
+@@ -319,6 +319,29 @@ const search = {
+     const url = `/api/${org_identifier}/${stream_name}/traces/latest?filter=${encodeURIComponent(filter)}&start_time=${start_time}&end_time=${end_time}&from=${from}&size=${size}`;
+     return http().get(url);
+   },
++  get_trace_details: ({
++    org_identifier,
++    stream_name,
++    trace_id,
++    start_time,
++    end_time,
++    hint_ts,
++  }: {
++    org_identifier: string;
++    stream_name: string;
++    trace_id: string;
++    start_time?: number;
++    end_time?: number;
++    hint_ts?: number;
++  }) => {
++    const params = new URLSearchParams();
++    if (start_time != null) params.set("start_time", String(start_time));
++    if (end_time != null) params.set("end_time", String(end_time));
++    if (hint_ts != null) params.set("hint_ts", String(hint_ts));
++    const query = params.toString();
++    const url = `/api/${org_identifier}/${stream_name}/traces/${encodeURIComponent(trace_id)}/details${query ? `?${query}` : ""}`;
++    return http().get(url);
++  },
+   getTraceDAG: (
+     org_identifier: string,
+     stream_name: string,
+
+
+===== LINKED / SISTER PR: openobserve/o2-enterprise #2432 (combined for full feature context) =====
+
+diff --git a/o2_openfga/src/meta/route_permissions.rs b/o2_openfga/src/meta/route_permissions.rs
+index ca9acb622..41be3e4bf 100644
+--- a/o2_openfga/src/meta/route_permissions.rs
++++ b/o2_openfga/src/meta/route_permissions.rs
+@@ -5794,6 +5794,36 @@ static ROUTE_PERMISSIONS: LazyLock<Vec<RoutePermission>> = LazyLock::new(|| {
+             use_self_parent: false,
+             bypass: true,
+         },
++        RoutePermission {
++            path: &["{org}", "{stream}", "traces", "{id}", "details"],
++            methods: &[MethodMapping {
++                http_method: "GET",
++                ofga_permission: None,
++            }],
++            resource: "",
++            entity: EntitySource::Org,
++            check_kind: CheckKind::Standard,
++            parent_from_folder: false,
++            resolve_stream_type: false,
++            use_self_context: false,
++            use_self_parent: false,
++            bypass: true,
++        },
++        RoutePermission {
++            path: &["{org}", "{stream}", "traces", "{id}", "time_range"],
++            methods: &[MethodMapping {
++                http_method: "GET",
++                ofga_permission: None,
++            }],
++            resource: "",
++            entity: EntitySource::Org,
++            check_kind: CheckKind::Standard,
++            parent_from_folder: false,
++            resolve_stream_type: false,
++            use_self_context: false,
++            use_self_parent: false,
++            bypass: true,
++        },
+         // /{org}/{stream}/traces/{id}/dag
+         RoutePermission {
+             path: &["{org}", "{stream}", "traces", "{id}", "dag"],

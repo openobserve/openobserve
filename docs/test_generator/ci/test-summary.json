@@ -1,0 +1,16 @@
+[
+  { "title": "P0: Open trace renders the span waterfall via the /details endpoint", "action": "append", "verifies": "the trace-details view renders the header and waterfall tree via GET /traces/{id}/details with a non-empty operation name and >=1 span" },
+  { "title": "P0: Selecting a span opens the details sidebar with matching operation name", "action": "append", "verifies": "clicking a span opens the sidebar and its operation name matches the clicked span" },
+  { "title": "P1: Switching tabs renders the flame-graph and service map views", "action": "extend", "verifies": "the tab bar replaces the removed timeline toggle and each tab renders its view (flame-graph, service map, waterfall)" },
+  { "title": "P1: In-trace search updates the match counter", "action": "extend", "verifies": "searching 'HTTP' updates the match counter to a total >= 2" },
+  { "title": "P1: Copy trace ID shows a success toast", "action": "extend", "verifies": "copying the trace ID shows the 'Trace ID copied' success toast" },
+  { "title": "P1: Share link runs the share flow and shows feedback", "action": "extend", "verifies": "the share button is enabled and clicking it produces a share toast" },
+  { "title": "P1: View related logs redirects to /logs filtered by trace_id", "action": "extend", "verifies": "the View Logs button is enabled and redirects to /logs with type=trace_explorer" },
+  { "title": "P1: Error-span badge appears for a deterministic error trace", "action": "append", "verifies": "an ingested error trace renders a populated error-span count badge (>=1)" },
+  { "title": "P2: Trace not found redirects back to the traces list", "action": "append", "verifies": "a non-existent trace id shows the 'Trace not found' toast and redirects back to /traces" },
+  { "title": "P2: Search input is hidden on non-waterfall tabs", "action": "append", "verifies": "the search input is hidden on flame-graph/map tabs and visible again on waterfall" },
+  { "title": "DAG tab (LLM traces) — not wired: seed spans have no gen_ai_* attrs (TraceDetails.vue:1740-1741)", "action": "append", "verifies": "parked fixme: DAG tab appears for LLM traces" },
+  { "title": "Thread tab (LLM traces) — not wired: config.showLLMUI !== 'false' && hasLLMSpans (TraceDetails.vue:1745)", "action": "append", "verifies": "parked fixme: Thread tab appears for LLM traces" },
+  { "title": "Session replay button (RUM) — not wired: no rum_session_id spans (TraceDetails.vue:1432-1434)", "action": "append", "verifies": "parked fixme: session-replay button appears for RUM spans" },
+  { "title": "Enterprise annotate / dataset / evaluate buttons — not wired: gated on isEnterprise/isCloud (TraceDetails.vue:1589-1666)", "action": "append", "verifies": "parked fixme: annotate/dataset/evaluate buttons appear in enterprise/cloud" }
+]

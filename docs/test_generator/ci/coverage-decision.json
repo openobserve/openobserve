@@ -1,0 +1,11 @@
+{
+  "action": "extend",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/traceErrorFilter.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/tracesAnalyzeDimensions.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The area spec tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js already covers the open-trace happy path, view-logs, search, copy-ID and share, but it is stale and weak: (1) its 'toggle timeline view' step drives removed selectors (trace-details-toggle-timeline-btn / trace-details-timeline-chart) — the timeline toggle was replaced by the tab bar in this PR — so that step must be REWRITTEN into a tab-switch assertion (extend); (2) the copy-ID / search / share steps only assert button visibility, never a real outcome (extend); (3) the PR's core user-visible change (spans now load via GET /traces/{trace_id}/details) plus several WIRED workflows are entirely uncovered: span-selection -> sidebar, error-span badge, trace-not-found redirect, and search-input hidden on non-waterfall tabs. Those are ADDED as new test() blocks inside the same already-registered spec (append-in-place). No new spec and no playwright.yml registration is needed because the Traces shard already runs traceDetails.spec.js. LLM-only tabs (dag/thread), RUM session replay, and enterprise annotate/dataset/evaluate remain UNWIRED for OSS seed data and are parked as test.fixme, not asserted."
+}

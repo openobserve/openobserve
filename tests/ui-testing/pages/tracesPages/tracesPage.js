@@ -68,13 +68,26 @@ export class TracesPage {
     this.traceDetailsCopyTraceIdButton = '[data-test="trace-details-copy-trace-id-btn"]';
     this.traceDetailsShareLinkButton = '[data-test="trace-details-share-link-btn"]';
     this.traceDetailsTree = '[data-test="trace-details-tree"]';
-    this.traceDetailsTimelineChart = '[data-test="trace-details-timeline-chart"]';
-    this.traceDetailsToggleTimelineButton = '[data-test="trace-details-toggle-timeline-btn"]';
     this.traceDetailsViewLogsButton = '[data-test="trace-details-view-logs-btn"]';
     this.traceDetailsLogStreamsSelect = '[data-test="trace-details-log-streams-select"]';
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+    // Trace Details header/summary (verified against TraceDetails.vue)
+    this.traceDetailsOperationName = '[data-test="trace-details-operation-name"]';
+    this.traceDetailsTraceId = '[data-test="trace-details-trace-id"]';
+    this.traceDetailsSpansCount = '[data-test="trace-details-spans-count"]';
+    this.traceDetailsErrorSpansCount = '[data-test="trace-details-error-spans-count"]';
+    this.traceDetailsSearchResults = '[data-test="trace-details-search-results"]';
+    this.traceDetailsServiceMapChart = '[data-test="trace-details-service-map-chart"]';
+    // Trace tree span selectors (dynamic suffix = span_id)
+    this.traceTreeSpanSelectBtnPrefix = '[data-test^="trace-tree-span-select-btn-"]';
+    this.traceTreeSpanOperationNamePrefix = '[data-test^="trace-tree-span-operation-name-"]';
+    this.traceTreeSpanContainerPrefix = '[data-test^="trace-tree-span-container-"]';
+    // Trace details sidebar header (verified against TraceDetailsSidebar.vue)
+    this.traceDetailsSidebarHeaderOperationName = '[data-test="trace-details-sidebar-header-operation-name"]';
+    // Toast notifications (OToast.vue)
+    this.toastMessage = '[data-test="o-toast-message"]';
 
     // Service Graph (Enterprise)
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
@@ -373,14 +386,6 @@ export class TracesPage {
     }
 
     return false;
-  }
-
-  async toggleTimelineView() {
-    await this.page.locator(this.traceDetailsToggleTimelineButton).click();
-  }
-
-  async expectTimelineVisible() {
-    await expect(this.page.locator(this.traceDetailsTimelineChart)).toBeVisible();
   }
 
   async viewRelatedLogs() {
@@ -1313,22 +1318,6 @@ export class TracesPage {
   }
 
   /**
-   * Check if timeline toggle button is visible
-   * @returns {Promise<boolean>}
-   */
-  async isTimelineToggleVisible() {
-    return await this.page.locator(this.traceDetailsToggleTimelineButton).isVisible({ timeout: 5000 }).catch(() => false);
-  }
-
-  /**
-   * Check if timeline chart is visible
-   * @returns {Promise<boolean>}
-   */
-  async isTimelineChartVisible() {
-    return await this.page.locator(this.traceDetailsTimelineChart).isVisible({ timeout: 5000 }).catch(() => false);
-  }
-
-  /**
    * Check if copy trace ID button is visible
    * @returns {Promise<boolean>}
    */
@@ -1637,6 +1626,241 @@ export class TracesPage {
     await tab.click();
     await this.page.waitForTimeout(1000);
     return true;
+  }
+
+  /**
+   * Assert that a trace-details tab is the active tab (OToggleGroupItem marks
+   * the active item with data-state="on").
+   * @param {string} tabValue - waterfall | flame-graph | map | dag | thread
+   */
+  async expectTraceDetailsTabActive(tabValue) {
+    await expect(
+      this.page.locator(`[data-test="trace-details-${tabValue}-tab"][data-state="on"]`).first(),
+    ).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Expect the trace-details header (operation name) to be visible — the stable
+   * anchor that signals the /details fetch finished and the view mounted.
+   */
+  async expectTraceDetailsHeaderVisible() {
+    await expect(this.page.locator(this.traceDetailsOperationName).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Read the root span operation name from the trace-details header.
+   * @returns {Promise<string>}
+   */
+  async getTraceOperationName() {
+    const text = await this.page.locator(this.traceDetailsOperationName).first().textContent().catch(() => '');
+    return (text || '').trim();
+  }
+
+  /**
+   * Read the trace ID text from the trace-details header.
+   * @returns {Promise<string>}
+   */
+  async getTraceId() {
+    const text = await this.page.locator(this.traceDetailsTraceId).first().textContent().catch(() => '');
+    return (text || '').trim();
+  }
+
+  /**
+   * Read the span-count badge text (e.g. "20 spans").
+   * @returns {Promise<string>}
+   */
+  async getSpanCount() {
+    const text = await this.page.locator(this.traceDetailsSpansCount).first().textContent().catch(() => '');
+    return (text || '').trim();
+  }
+
+  /**
+   * Read the error-span count badge text (e.g. "1 errors").
+   * @returns {Promise<string>}
+   */
+  async getErrorSpansCount() {
+    const text = await this.page.locator(this.traceDetailsErrorSpansCount).first().textContent().catch(() => '');
+    return (text || '').trim();
+  }
+
+  /**
+   * Count rendered span containers in the waterfall tree.
+   * @returns {Promise<number>}
+   */
+  async getSpanContainerCount() {
+    return await this.page.locator(this.traceTreeSpanContainerPrefix).count();
+  }
+
+  /**
+   * Read the first span's operation name from the waterfall tree.
+   * @returns {Promise<string>}
+   */
+  async getFirstSpanOperationName() {
+    const text = await this.page.locator(this.traceTreeSpanOperationNamePrefix).first().textContent().catch(() => '');
+    return (text || '').trim();
+  }
+
+  /**
+   * Click the first span's select button to open the details sidebar.
+   */
+  async selectFirstSpan() {
+    await this.page.locator(this.traceTreeSpanSelectBtnPrefix).first().click();
+  }
+
+  /**
+   * Expect the span details sidebar to be visible.
+   */
+  async expectSidebarVisible() {
+    await expect(this.page.locator(this.traceDetailsSidebar)).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Read the selected span's operation name from the sidebar header.
+   * @returns {Promise<string>}
+   */
+  async getSidebarOperationName() {
+    const text = await this.page.locator(this.traceDetailsSidebarHeaderOperationName).first().textContent().catch(() => '');
+    return (text || '').trim();
+  }
+
+  /**
+   * Expect the service-map chart to be visible (rendered on the map tab).
+   */
+  async expectServiceMapChartVisible() {
+    await expect(this.page.locator(this.traceDetailsServiceMapChart)).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Read the in-trace search match counter ("current / total") and return the
+   * total. Polls until the counter shows a positive total so the search has
+   * finished computing matches (the counter renders "0 / 0" while idle).
+   * @returns {Promise<number>}
+   */
+  async getSearchResultTotal() {
+    const el = this.page.locator(this.traceDetailsSearchResults);
+    await el.waitFor({ state: 'visible', timeout: 5000 });
+    await expect
+      .poll(
+        async () => {
+          const txt = ((await el.textContent().catch(() => '')) || '').trim();
+          const parts = txt.split('/');
+          if (parts.length !== 2) return -1;
+          const total = parseInt(parts[1].trim(), 10);
+          return Number.isInteger(total) ? total : -1;
+        },
+        { timeout: 10000 },
+      )
+      .toBeGreaterThan(0);
+    const txt = ((await el.textContent().catch(() => '')) || '').trim();
+    const total = parseInt(txt.split('/')[1].trim(), 10);
+    return Number.isInteger(total) ? total : 0;
+  }
+
+  /**
+   * Expect the trace-details search input wrapper to be visible.
+   */
+  async expectTraceDetailsSearchInputVisible() {
+    await expect(this.page.locator(this.traceDetailsSearchInput)).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Expect the trace-details search input wrapper to be hidden (removed via
+   * v-if on the flame-graph / map / thread tabs).
+   */
+  async expectTraceDetailsSearchInputHidden() {
+    await expect(this.page.locator(this.traceDetailsSearchInput)).toBeHidden({ timeout: 10000 });
+  }
+
+  /**
+   * Expect the View Logs button to be enabled.
+   */
+  async expectViewLogsButtonEnabled() {
+    const button = this.page.locator(this.traceDetailsViewLogsButton);
+    await expect(button).toBeVisible({ timeout: 10000 });
+    await expect(button).toBeEnabled({ timeout: 10000 });
+  }
+
+  /**
+   * Expect the share link button to be visible and enabled.
+   */
+  async expectShareLinkButtonEnabled() {
+    const button = this.page.locator(this.traceDetailsShareLinkButton);
+    await expect(button).toBeVisible({ timeout: 10000 });
+    await expect(button).toBeEnabled({ timeout: 10000 });
+  }
+
+  /**
+   * Expect a toast whose message contains the given substring to be visible.
+   * @param {string} substring
+   */
+  async expectToastVisible(substring) {
+    await expect(
+      this.page.locator(this.toastMessage).filter({ hasText: substring }).first(),
+    ).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Expect ANY toast message to be visible (used for actions whose terminal
+   * signal is a success OR error toast, e.g. the share flow).
+   */
+  async expectAnyToastVisible() {
+    await expect(this.page.locator(this.toastMessage).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Navigate directly to the standalone trace-details route.
+   * @param {object} opts - { stream, traceId, from, to } (from/to in µs)
+   */
+  async navigateToTraceDetailsDirect({ stream, traceId, from, to }) {
+    const org = process.env["ORGNAME"] || 'default';
+    const baseUrl = (process.env["ZO_BASE_URL"] || '').replace(/\/+$/, '');
+    const url = `${baseUrl}/web/traces/trace-details?stream=${encodeURIComponent(stream)}&trace_id=${encodeURIComponent(traceId)}&from=${from}&to=${to}&org_identifier=${encodeURIComponent(org)}`;
+    await this.page.goto(url);
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  /**
+   * Expect the "Trace not found" toast and the redirect back to /traces
+   * (trace-details route and trace_id query are both dropped).
+   */
+  async expectTraceNotFoundToast() {
+    await expect(
+      this.page.locator(this.toastMessage).filter({ hasText: 'not found' }).first(),
+    ).toBeVisible({ timeout: 15000 });
+    await this.page.waitForURL(
+      (url) => {
+        const u = new URL(url);
+        return u.pathname.includes('/traces') && !u.pathname.includes('trace-details') && !u.search.includes('trace_id');
+      },
+      { timeout: 15000 },
+    );
+  }
+
+  // ===== UNWIRED (feature-incomplete) assertions — used by test.fixme bodies =====
+  // These selectors exist in the source but are unreachable for the OSS seed
+  // data / edition; the fixme bodies keep them so they go green when wired.
+
+  /**
+   * Expect the DAG view container to be visible (LLM traces only).
+   */
+  async expectDagViewVisible() {
+    await expect(this.page.locator('[data-test="trace-details-dag"]')).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Expect the RUM session-replay button to be visible (requires a RUM span).
+   */
+  async expectSessionReplayButtonVisible() {
+    await expect(this.page.locator('[data-test="trace-details-view-session-replay-btn"]')).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Expect the enterprise-only annotate/dataset/evaluate action buttons.
+   */
+  async expectEnterpriseActionButtonsVisible() {
+    await expect(this.page.locator('[data-test="trace-details-annotate-trace-btn"]')).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator('[data-test="trace-details-dataset-trace-btn"]')).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator('[data-test="trace-details-evaluate-trace-btn"]')).toBeVisible({ timeout: 10000 });
   }
 
   /**
