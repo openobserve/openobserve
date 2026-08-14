@@ -11357,9 +11357,12 @@
       "statusConnecting": "Conectando",
       "statusOffline": "Offline",
       "statusDown": "Fora do ar",
+      "statusUnknown": "Desconhecido",
       "connectingMessage": "Aguardando o primeiro agente se conectar — ele chegará logo após a instalação.",
       "offlineMessage": "O agente caiu recentemente — a verificação não será executada daqui até ele se reconectar.",
       "downMessage": "Nenhum agente há mais de um dia — este local não executará a verificação até um agente se reconectar.",
+      "unknownMessage": "Os agentes reportam sua saúde apenas para o cluster com o qual se registraram, então este não pode confirmar. O local pode muito bem estar em execução.",
+      "unknownAgents": "Status do agente indisponível aqui",
       "noSearchResults": "Nenhum local corresponde à sua pesquisa",
       "noPublicMatches": "Nenhum local público corresponde à sua pesquisa",
       "noPrivateMatches": "Nenhum local privado corresponde à sua pesquisa",
@@ -11887,7 +11890,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "Pendente"
+        "pending": "Pendente",
+        "unknown": "Desconhecido",
+        "unknownHint": "Os agentes reportam sua saúde apenas para o cluster com o qual se registraram, então este não pode confirmar. O local pode muito bem estar em execução."
       },
       "table": {
         "name": "Nome",
@@ -11943,6 +11948,7 @@
         "agentName": "Agente",
         "restartConfig": "Configuração de reinício — copie o comando de configuração deste agente para reexecutar a instalação / reinício do docker (por exemplo, após uma rotação de token)",
         "noAgents": "Nenhum agente se registrou para este local ainda.",
+        "agentsUnavailable": "Os agentes deste local se registraram em outro cluster e não estão visíveis aqui.",
         "checksTitle": "Verificações em execução a partir deste local",
         "checkName": "Nome",
         "noChecks": "Nenhuma verificação está atribuída a este local ainda.",

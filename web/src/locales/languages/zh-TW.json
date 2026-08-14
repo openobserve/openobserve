@@ -3710,7 +3710,12 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
+    "configSectionFieldOverridesAliases": [
+      "欄位覆寫",
+      "覆寫設定",
+      "覆寫",
+      "欄位格式化"
+    ],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
@@ -11352,9 +11357,12 @@
       "statusConnecting": "連線中",
       "statusOffline": "離線",
       "statusDown": "故障",
+      "statusUnknown": "未知",
       "connectingMessage": "等待第一個代理程式上線 — 安裝後不久就會到達。",
       "offlineMessage": "代理程式最近中斷連線 — 在重新連線之前，檢查不會從此處執行。",
       "downMessage": "超過一天沒有代理程式 — 在有代理程式重新連線之前，此位置不會執行檢查。",
+      "unknownMessage": "代理程式只會向它們註冊的叢集回報健康狀態，因此此處無法確認其狀態。該位置可能仍在運行。",
+      "unknownAgents": "此處無法取得代理程式狀態",
       "noSearchResults": "沒有符合搜尋條件的位置",
       "noPublicMatches": "沒有符合搜尋條件的公開位置",
       "noPrivateMatches": "沒有符合搜尋條件的私人位置",
@@ -11882,7 +11890,9 @@
       "status": {
         "online": "線上",
         "offline": "離線",
-        "pending": "待處理"
+        "pending": "待處理",
+        "unknown": "未知",
+        "unknownHint": "代理程式只會向它們註冊的叢集回報健康狀態，因此此處無法確認其狀態。該位置可能仍在運行。"
       },
       "table": {
         "name": "名稱",
@@ -11938,6 +11948,7 @@
         "agentName": "代理程式",
         "restartConfig": "重新啟動設定 — 複製此代理程式的設定命令，以重新執行安裝 / docker restart（例如在 Token 輪替之後）",
         "noAgents": "此位置尚未有代理程式註冊。",
+        "agentsUnavailable": "此位置的代理程式已向另一個叢集註冊，因此在此處看不到它們。",
         "checksTitle": "從此位置執行的檢查",
         "checkName": "名稱",
         "noChecks": "此位置尚未分配任何檢查。",

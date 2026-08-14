@@ -11357,9 +11357,12 @@
       "statusConnecting": "Wird verbunden",
       "statusOffline": "Offline",
       "statusDown": "Nicht erreichbar",
+      "statusUnknown": "Unbekannt",
       "connectingMessage": "Warten auf den ersten Agenten, der sich meldet — er wird kurz nach der Installation eintreffen.",
       "offlineMessage": "Agent wurde kürzlich getrennt — der Check wird von hier aus nicht ausgeführt, bis er sich wieder verbindet.",
       "downMessage": "Kein Agent seit über einem Tag — dieser Standort führt den Check nicht aus, bis sich ein Agent wieder verbindet.",
+      "unknownMessage": "Agenten melden ihren Status nur an den Cluster, bei dem sie registriert sind, daher kann dieser ihn nicht bestätigen. Der Standort läuft möglicherweise.",
+      "unknownAgents": "Agentenstatus hier nicht verfügbar",
       "noSearchResults": "Keine Standorte entsprechen Ihrer Suche",
       "noPublicMatches": "Keine öffentlichen Standorte entsprechen Ihrer Suche",
       "noPrivateMatches": "Keine privaten Standorte entsprechen Ihrer Suche",
@@ -11887,7 +11890,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "Ausstehend"
+        "pending": "Ausstehend",
+        "unknown": "Unbekannt",
+        "unknownHint": "Agenten melden ihren Status nur an den Cluster, bei dem sie registriert sind, daher kann dieser ihn nicht bestätigen. Der Standort läuft möglicherweise."
       },
       "table": {
         "name": "Name",
@@ -11943,6 +11948,7 @@
         "agentName": "Agent",
         "restartConfig": "Neustartkonfiguration – kopieren Sie den Setup-Befehl dieses Agenten, um die Installation / den Docker-Neustart erneut auszuführen (z. B. nach einer Token-Rotation).",
         "noAgents": "Es haben sich noch keine Agenten für diesen Standort registriert.",
+        "agentsUnavailable": "Die Agenten dieses Standorts sind bei einem anderen Cluster registriert und hier nicht sichtbar.",
         "checksTitle": "Von diesem Standort ausgeführte Prüfungen",
         "checkName": "Name",
         "noChecks": "Diesem Standort sind noch keine Prüfungen zugewiesen.",

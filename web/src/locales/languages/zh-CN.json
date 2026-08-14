@@ -11357,9 +11357,12 @@
       "statusConnecting": "连接中",
       "statusOffline": "离线",
       "statusDown": "故障",
+      "statusUnknown": "未知",
       "connectingMessage": "等待第一个代理报到——安装后不久它就会上线。",
       "offlineMessage": "代理最近掉线——在重新连接之前，检查不会从这里运行。",
       "downMessage": "超过一天没有代理——在代理重新连接之前，此位置不会运行检查。",
+      "unknownMessage": "代理仅向其注册的集群报告其健康状态，因此此集群无法确认该状态。该位置很可能仍在运行。",
+      "unknownAgents": "代理状态在此处不可用",
       "noSearchResults": "没有位置符合你的搜索",
       "noPublicMatches": "没有公共位置符合你的搜索",
       "noPrivateMatches": "没有私有位置符合你的搜索",
@@ -11887,7 +11890,9 @@
       "status": {
         "online": "在线",
         "offline": "离线",
-        "pending": "待定"
+        "pending": "待定",
+        "unknown": "未知",
+        "unknownHint": "代理仅向其注册的集群报告其健康状态，因此此集群无法确认该状态。该位置很可能仍在运行。"
       },
       "table": {
         "name": "名称",
@@ -11943,6 +11948,7 @@
         "agentName": "代理",
         "restartConfig": "重启配置 — 复制此代理的设置命令以重新运行安装 / docker 重启（例如在令牌轮换后）",
         "noAgents": "尚无代理为此位置注册。",
+        "agentsUnavailable": "此位置的代理已注册到另一个集群，因此在此处不可见。",
         "checksTitle": "从此位置运行的检查",
         "checkName": "名称",
         "noChecks": "尚未为此位置分配任何检查。",

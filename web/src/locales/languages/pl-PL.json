@@ -11357,9 +11357,12 @@
       "statusConnecting": "Łączenie",
       "statusOffline": "Offline",
       "statusDown": "Niedostępny",
+      "statusUnknown": "Nieznany",
       "connectingMessage": "Oczekiwanie na pierwsze zgłoszenie agenta — pojawi się wkrótce po instalacji.",
       "offlineMessage": "Agent niedawno się rozłączył — sprawdzenie nie będzie uruchamiane z tego miejsca, dopóki się nie połączy.",
       "downMessage": "Brak agenta od ponad dnia — ta lokalizacja nie uruchomi sprawdzenia, dopóki agent nie połączy się ponownie.",
+      "unknownMessage": "Agenci raportują swój stan tylko do klastra, z którym się zarejestrowali, więc ten nie może tego potwierdzić. Lokalizacja może działać.",
+      "unknownAgents": "Status agenta niedostępny tutaj",
       "noSearchResults": "Żadne lokalizacje nie odpowiadają Twojemu wyszukiwaniu",
       "noPublicMatches": "Żadne lokalizacje publiczne nie odpowiadają Twojemu wyszukiwaniu",
       "noPrivateMatches": "Żadne lokalizacje prywatne nie odpowiadają Twojemu wyszukiwaniu",
@@ -11887,7 +11890,9 @@
       "status": {
         "online": "Online",
         "offline": "Offline",
-        "pending": "Oczekujący"
+        "pending": "Oczekujący",
+        "unknown": "Nieznany",
+        "unknownHint": "Agenci raportują swój stan tylko do klastra, z którym się zarejestrowali, więc ten nie może tego potwierdzić. Lokalizacja może działać."
       },
       "table": {
         "name": "Nazwa",
@@ -11943,6 +11948,7 @@
         "agentName": "Agent",
         "restartConfig": "Konfiguracja restartu — skopiuj polecenie konfiguracji tego agenta, aby ponownie uruchomić instalację / restart dockera (np. po rotacji tokenu)",
         "noAgents": "Żaden agent nie zarejestrował się jeszcze dla tej lokalizacji.",
+        "agentsUnavailable": "Agenci tej lokalizacji zarejestrowali się w innym klastrze i nie są tutaj widoczni.",
         "checksTitle": "Kontrole uruchamiane z tej lokalizacji",
         "checkName": "Nazwa",
         "noChecks": "Żadne kontrole nie zostały jeszcze przypisane do tej lokalizacji.",
