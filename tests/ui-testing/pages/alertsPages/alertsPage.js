@@ -2726,8 +2726,14 @@ export class AlertsPage {
         // folder the OTable can still be loading; clicking select-all over a not-yet-populated
         // table selects nothing, so the selection-gated Export button never appears (the 30s
         // toPass timeout in CI). OTable renders rows as [data-test^="o2-table-row-"].
-        await this.page.locator('[data-test^="o2-table-row-"]').first()
-            .waitFor({ state: 'visible', timeout: 15000 });
+        // The folder-list refetch after navigation lags under CI load, so reload + retry once
+        // (mirrors verifyAlertCreated) rather than failing on a single slow fetch.
+        const firstRow = this.page.locator('[data-test^="o2-table-row-"]').first();
+        if (!(await firstRow.isVisible({ timeout: 15000 }).catch(() => false))) {
+            await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+            await firstRow.waitFor({ state: 'visible', timeout: 15000 });
+        }
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox for export');
 
