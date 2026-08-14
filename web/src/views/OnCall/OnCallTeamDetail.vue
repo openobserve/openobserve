@@ -233,11 +233,12 @@
              of each on the screen. -->
         <OContent y class="flex flex-col gap-5">
           <template v-if="!editingSchedule">
-            <!-- The two facts that belong to the schedule rather than the
-                 team; who is on call stays in the strip above the tabs. -->
-            <OnCallScheduleContext
+            <!-- Only when the window ahead has a hole in it. Handover and who
+                 is on call are already in the strip above the tabs. -->
+            <OnCallGapBanner
               :segments="segments"
               :timezone="team?.timezone ?? 'UTC'"
+              @fill-gap="onFillGap"
             />
 
             <!-- The rail answers "which rotation is carrying this, and what do
@@ -385,7 +386,7 @@ import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import OnCallRotationsTable from "@/components/oncall/OnCallRotationsTable.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
 import OnCallRotationRail from "@/components/oncall/OnCallRotationRail.vue";
-import OnCallScheduleContext from "@/components/oncall/OnCallScheduleContext.vue";
+import OnCallGapBanner from "@/components/oncall/OnCallGapBanner.vue";
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
 import OnCallContactReadiness from "@/components/oncall/OnCallContactReadiness.vue";
