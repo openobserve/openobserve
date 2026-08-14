@@ -217,7 +217,7 @@
                      must not light up on hover. -->
                 <button
                   type="button"
-                  class="group bg-card-bg rounded-default border-text-secondary/16 enabled:hover:border-accent/45 enabled:hover:bg-card-bg-tint-subtle shadow-accent/12 flex w-full cursor-pointer items-center gap-3.5 border px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:shadow-xs disabled:cursor-not-allowed disabled:opacity-55"
+                  class="group bg-card-bg rounded-default border-text-secondary/16 enabled:hover:border-accent/45 enabled:hover:bg-card-bg-tint-subtle enabled:hover:shadow-accent/12 flex w-full cursor-pointer items-center gap-3.5 border px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:shadow-xs disabled:cursor-not-allowed disabled:opacity-55"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"

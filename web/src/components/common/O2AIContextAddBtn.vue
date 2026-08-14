@@ -6,7 +6,7 @@
     size="icon-toolbar"
     @click.stop="sendToAiChat"
     data-test="o2-ai-context-add-btn"
-    class="group shadow-ai-accent/35 shadow-ai-accent/20 shadow-ai-accent/35! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease] hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:shadow-md dark:hover:shadow-md"
+    class="group hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease] hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:shadow-md dark:hover:shadow-md"
     :class="props.class"
     :style="props.style"
   >

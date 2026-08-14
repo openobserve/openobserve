@@ -5887,7 +5887,9 @@ export default defineComponent({
 }
 .send-button:active:not(.disabled):not([disabled]):not(:disabled) {
   transform: translateY(0) !important;
-  box-shadow: var(--shadow-glow) !important;
+  /* Pressed keeps the accent, dimmer than hover — NOT --shadow-glow, which is a
+     neutral black ring and turns the press state grey. */
+  box-shadow: var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
 }
 
 /* ============================================================

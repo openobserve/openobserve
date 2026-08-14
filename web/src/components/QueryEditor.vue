@@ -55,7 +55,7 @@
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
-          class="text-text-inverse! disabled:bg-surface-subtle! bg-gradient-ai! shadow-ai-accent/40! h-7! min-h-7! w-7! min-w-7! transition-all! duration-200! enabled:hover:-translate-y-px enabled:hover:shadow-md enabled:active:translate-y-0 disabled:opacity-40!"
+          class="text-text-inverse! disabled:bg-surface-subtle! bg-gradient-ai! enabled:hover:shadow-ai-accent/40! h-7! min-h-7! w-7! min-w-7! transition-all! duration-200! enabled:hover:-translate-y-px enabled:hover:shadow-md enabled:active:translate-y-0 disabled:opacity-40!"
         >
           <OTooltip
             v-if="props.disableAi && props.disableAiReason"
@@ -120,7 +120,7 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="nlpMode = true"
-        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! shadow-ai-accent/35! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
+        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img
