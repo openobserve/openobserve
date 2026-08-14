@@ -643,7 +643,10 @@ function onStatSelect(key: string | null) {
   healthFilter.value = key === "total" ? null : key;
 }
 
-async function load(orgId: string | null, folderId: string) {
+// Both optional: refresh calls `load()` bare and falls back to the current org
+// and active folder — the folder-change path is the only caller that passes a
+// folder the refs have not caught up with yet.
+async function load(orgId?: string | null, folderId?: string) {
   if (!org.value) return;
   loading.value = true;
   error.value = null;
