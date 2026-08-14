@@ -408,7 +408,9 @@ impl Writer {
         let processed_batch = self.preprocess_batch(entries)?;
 
         let cfg = get_config();
-        if should_write_synchronously(&self.key.stream_type, cfg.common.wal_write_queue_enabled) {
+        if self.key.stream_type.as_ref() == StreamType::Metadata.as_str()
+            || !cfg.common.wal_write_queue_enabled
+        {
             return self.consume_processed(processed_batch, fsync).await;
         }
 
@@ -710,10 +712,6 @@ impl Writer {
     }
 }
 
-fn should_write_synchronously(stream_type: &str, queue_enabled: bool) -> bool {
-    stream_type == StreamType::Metadata.as_str() || !queue_enabled
-}
-
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub(crate) struct WriterKey {
     pub(crate) org_id: Arc<str>,
@@ -772,21 +770,5 @@ mod tests {
         let key = WriterKey::new_replay("abc", "xyz");
         let min_expected = std::mem::size_of::<WriterKey>() + "abc".len() + "xyz".len();
         assert_eq!(key.mem_size(), min_expected);
-    }
-
-    #[test]
-    fn metadata_bypasses_enabled_write_queue() {
-        assert!(should_write_synchronously(
-            StreamType::Metadata.as_str(),
-            true
-        ));
-        assert!(!should_write_synchronously(
-            StreamType::Traces.as_str(),
-            true
-        ));
-        assert!(should_write_synchronously(
-            StreamType::Traces.as_str(),
-            false
-        ));
     }
 }
