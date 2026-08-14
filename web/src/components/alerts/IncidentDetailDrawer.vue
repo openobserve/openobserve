@@ -888,6 +888,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                           </div>
 
+                          <!-- Composite members have no stream/query — show the type. -->
+                          <div
+                            v-if="alerts[selectedAlertIndex]?.alert_type === 'composite'"
+                            class="flex flex-col gap-0.5"
+                          >
+                            <span
+                              :class="'text-text-secondary'"
+                              class="text-3xs tracking-wide uppercase"
+                            >
+                              {{ t("alerts.alertType") }}
+                            </span>
+                            <OTag type="alertType" :value="'composite'" class="w-fit" />
+                          </div>
+
                           <!-- Stream Type & Name -->
                           <div class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
@@ -2336,7 +2350,10 @@ export default defineComponent({
 
         incidentDetails.value = response.data;
         triggers.value = response.data.triggers || [];
-        alerts.value = response.data.alerts || [];
+        // Composites have no `alerts` row, so the live-definition resolver
+        // returns them under `composite_alerts`; merge so the name-based
+        // trigger→details lookup finds them too (§9.6).
+        alerts.value = [...(response.data.alerts || []), ...(response.data.composite_alerts || [])];
 
         // Initialize editable status and severity from incident data
         editableStatus.value = response.data.status;
