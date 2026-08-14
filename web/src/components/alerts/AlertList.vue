@@ -1873,6 +1873,12 @@ export default defineComponent({
         await getAlertsFn(store, activeFolderId.value, "", true, true);
       }
       filterAlertsByTab();
+      // Re-apply the in-folder search too. Without it a refresh handed back the
+      // whole folder while the search box still showed the term — the same
+      // shape every other reload path here already guards against.
+      if (filterQuery.value) {
+        filterAlertsByQuery(filterQuery.value);
+      }
     };
 
     // onMounted(async () => {
