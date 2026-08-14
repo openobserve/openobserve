@@ -30,6 +30,7 @@
     icon="track-changes"
     :back="{ to: backTarget, label: t('slos.title') }"
     scroll
+    pad-y
     title-data-test="slos-addslo-title"
   >
     <template #actions>
@@ -328,11 +329,13 @@
                 v-model="form.config.comparator"
                 :label="t('slos.field.comparator')"
                 :options="comparatorOptions"
+                data-test="slos-addslo-comparator"
               />
               <OInput
                 v-model.number="form.config.threshold"
                 :label="t('slos.field.threshold')"
                 type="number"
+                data-test="slos-addslo-threshold"
               />
             </div>
             <!-- Hidden, not just ignored, in PromQL: a scope reaches a SQL

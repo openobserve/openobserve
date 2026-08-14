@@ -12734,6 +12734,8 @@
   },
   "slos": {
     "title": "SLOs",
+    "notFound": "SLO introuvable",
+    "notFoundDescription": "Ce SLO n'existe plus, ou vous n'y avez pas accès. Il a peut-être été supprimé.",
     "subtitle": "Objectifs de niveau de service : cibles, budgets d'erreur, alertes de vitesse de combustion.",
     "new": "Nouveau SLO",
     "newTitle": "Nouveau SLO",
@@ -12833,7 +12835,9 @@
       "sli": "SLI : ce que « bon » signifie",
       "objective": "Objectif",
       "grouping": "Regroupement",
-      "summary": "Résumé"
+      "summary": "Résumé",
+      "definition": "Définition",
+      "definitionEmpty": "Ce SLO n'a aucune définition enregistrée."
     },
     "field": {
       "name": "Nom du SLO",

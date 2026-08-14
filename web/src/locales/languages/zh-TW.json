@@ -12729,6 +12729,8 @@
   },
   "slos": {
     "title": "SLOs",
+    "notFound": "找不到 SLO",
+    "notFoundDescription": "此 SLO 已不存在，或您沒有存取權限。它可能已被刪除。",
     "subtitle": "服務水準目標：目標、錯誤預算、燃燒速率警示",
     "new": "新增 SLO",
     "newTitle": "新增 SLO",
@@ -12828,7 +12830,9 @@
       "sli": "SLI：「良好」的定義",
       "objective": "目標",
       "grouping": "分組",
-      "summary": "摘要"
+      "summary": "摘要",
+      "definition": "定義",
+      "definitionEmpty": "此 SLO 沒有儲存的定義。"
     },
     "field": {
       "name": "SLO 名稱",

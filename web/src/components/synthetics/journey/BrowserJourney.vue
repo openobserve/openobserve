@@ -826,7 +826,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         data-test="synthetics-journey-filter-input"
       />
       <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
-      <div class="flex w-100 items-center justify-end gap-2">
+      <div class="flex w-110 items-center justify-end gap-2">
         <OButton
           v-if="!isRecording && !isReplayLocked"
           variant="outline"
@@ -925,11 +925,12 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OButton
           v-if="variablesPanelOpen !== undefined"
           variant="outline"
-          size="icon-xs-sq"
+          size="sm"
           class="shrink-0"
           data-test="synthetics-journey-toggle-variables-btn"
           @click="emit('toggle-variables-panel')"
         >
+          {{ t("synthetics.variablesPanel.title") }}
           <OIcon
             :name="
               variablesPanelOpen ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
