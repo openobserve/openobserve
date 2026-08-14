@@ -415,47 +415,12 @@ pub(crate) async fn check_stream_permission(
     user_id: &str,
 ) -> std::result::Result<(), Response> {
     #[cfg(feature = "enterprise")]
-    {
-        use o2_openfga::meta::mapping::OFGA_MODELS;
-
-        use crate::service::{auth::AuthExtractor, users::get_user};
-
-        if let Err(e) = search_service::check_search_allowed(org_id, Some(stream_name)) {
-            return Err(MetaHttpResponse::too_many_requests(e.to_string()));
-        }
-
-        if !db::user::is_root_user(user_id) {
-            let user: config::meta::user::User = get_user(Some(org_id), user_id).await.unwrap();
-            let stream_type = StreamType::Traces.as_str();
-            if !openobserve_core::authz::check_permissions(
-                user_id,
-                AuthExtractor {
-                    auth: String::new(),
-                    method: "GET".to_string(),
-                    o2_type: format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(stream_type)
-                            .map_or(stream_type, |model| model.key),
-                        openobserve_core::auth::into_ofga_supported_format(stream_name)
-                    ),
-                    org_id: org_id.to_string(),
-                    bypass_check: false,
-                    parent_id: String::new(),
-                    use_all_org: false,
-                    use_self_context: false,
-                    use_self_parent: true,
-                },
-                user.role,
-                user.is_external,
-            )
-            .await
-            {
-                return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
-            }
-        }
+    if let Err(e) = search_service::check_search_allowed(org_id, Some(stream_name)) {
+        return Err(MetaHttpResponse::too_many_requests(e.to_string()));
     }
-    let _ = (org_id, stream_name, user_id);
+    if let Some(response) = super::check_stream_permissions(org_id, stream_name, user_id).await {
+        return Err(response);
+    }
     Ok(())
 }
 
