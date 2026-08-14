@@ -60,11 +60,11 @@
     <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
       <OText variant="meta">{{ t("oncall.ctxSecondary") }}</OText>
       <template v-if="secondary">
-        <OUserCell :value="secondary.user_email" />
-        <OText variant="meta">{{ raw(secondary.rotation) }}</OText>
+        <OUserCell :value="secondary.who" />
+        <OText variant="meta">{{ secondary.provenance }}</OText>
       </template>
-      <!-- A team with one pool has no secondary, and saying so beats an empty
-           box that reads as a loading state. -->
+      <!-- Only a one-person rotation genuinely has nobody behind it. Saying so
+           beats an empty box that reads as a loading state. -->
       <p v-else class="text-text-secondary text-sm" data-test="oncall-schedule-context-no-secondary">
         {{ t("oncall.ctxNoSecondary") }}
       </p>
@@ -101,6 +101,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallSlot, ResolvedSegment, TeamReachability } from "@/ts/interfaces/oncall";
 import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
+import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { ABSENT } from "@/composables/useSloFormat";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -130,9 +131,28 @@ const primary = computed<OnCallSlot | null>(
   () => props.slots.find((s) => sameSlot(s.slot, DEFAULT_SLOT) && !!s.user_email) ?? null,
 );
 
-const secondary = computed<OnCallSlot | null>(
-  () => props.slots.find((s) => !sameSlot(s.slot, DEFAULT_SLOT) && !!s.user_email) ?? null,
-);
+/**
+ * A team has ONE member list by default and the secondary is **derived** from
+ * it — there is no second list to fill in and nothing to keep in sync. A slot
+ * is the opt-in upgrade for a genuinely different pool.
+ *
+ * So there are two different things that can occupy this cell, and they must
+ * not be labelled alike: an explicitly staffed slot, and a person the rotation
+ * computed. The derived one carries its offset, because otherwise the first
+ * question anybody asks is why that person.
+ */
+const secondary = computed<{ who: string; provenance: I18nText } | null>(() => {
+  const staffed = props.slots.find((s) => !sameSlot(s.slot, DEFAULT_SLOT) && !!s.user_email);
+  if (staffed) {
+    return { who: staffed.user_email, provenance: raw(staffed.rotation) };
+  }
+  const derived = primary.value?.next_user_email;
+  if (!derived) return null;
+  return {
+    who: derived,
+    provenance: t("oncall.ctxSecondaryDerived", { offset: primary.value?.next_offset ?? 1 }),
+  };
+});
 
 /// Deliverable on at least one channel. A member the report does not mention is
 /// treated as reachable rather than broken — an absent row is a missing answer,

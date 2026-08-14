@@ -166,6 +166,19 @@ export interface Rotation {
   slot?: string;
   /** Participants in handover order. */
   members: string[];
+  /**
+   * How far down the cycle the derived secondary sits.
+   *
+   * **Absent means derived** — `max(1, len/2)` — not `1`. Writing the old
+   * behaviour into every rotation would have frozen it into the data. A
+   * three-person roster stays lockstep, which is correct: the only other offset
+   * would make the secondary *last* week's primary.
+   *
+   * `0` is refused with a 400 — it would make the secondary the person already
+   * on call. Larger than the roster is clamped silently, so a shrinking team
+   * never takes its own rotation out of service.
+   */
+  secondary_offset?: number;
   /** Shift length in microseconds. */
   shift_micros: number;
   /** Instant `members[0]`'s first shift begins, in microseconds. */
@@ -215,6 +228,11 @@ export interface OnCallSlot {
   /** Who it hands over to — **within this slot**, not the next slot. Absent
    *  for a one-person rotation. */
   next_user_email?: string | null;
+  /**
+   * How far down the cycle `next_user_email` sits, so the screen can say "+5"
+   * rather than leaving the reader to wonder why that person.
+   */
+  next_offset?: number | null;
 }
 
 export interface LadderStep {

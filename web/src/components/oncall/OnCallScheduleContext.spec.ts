@@ -56,9 +56,33 @@ describe("OnCallScheduleContext", () => {
     expect(text).not.toContain("Cannot be paged");
   });
 
-  it("says a one-pool team has no secondary rather than rendering an empty box", () => {
-    const wrapper = render({ slots: [slots[0]], segments });
+  // A team on the default has ONE member list and the secondary is derived
+  // from it — so the cell is filled, and it must say where that person came
+  // from or the first question anybody asks is why them.
+  it("names the derived secondary and its offset when no slot is staffed", () => {
+    const derived = { ...slots[0], next_offset: 5 };
+    const text = render({ slots: [derived], segments }).text();
+    expect(text).toContain("bo@o2.ai");
+    expect(text).toContain("+5");
+  });
+
+  it("falls back to +1 when the server has not sent an offset", () => {
+    expect(render({ slots: [slots[0]], segments }).text()).toContain("+1");
+  });
+
+  // Only a one-person rotation genuinely has nobody behind it.
+  it("says nobody backs a one-person rotation", () => {
+    const alone = { ...slots[0], next_user_email: null };
+    const wrapper = render({ slots: [alone], segments });
     expect(wrapper.find('[data-test="oncall-schedule-context-no-secondary"]').exists()).toBe(true);
+  });
+
+  // A staffed slot is an explicit pool, not a computed person: it must not
+  // carry the "derived" annotation.
+  it("labels a staffed slot by its rotation, never as derived", () => {
+    const text = render({ slots, segments }).text();
+    expect(text).toContain("cy@o2.ai");
+    expect(text).not.toContain("Derived from the rotation");
   });
 
   it("totals the gaps ahead and names the first window", () => {
