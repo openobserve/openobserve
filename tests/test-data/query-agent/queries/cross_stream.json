@@ -851,14 +851,6 @@
         ],
         "results": [
           [
-            "scan-hub",
-            "EU-WEST",
-            "EU-WEST",
-            "1",
-            "45.0",
-            "45.0"
-          ],
-          [
             "zone-controller",
             "US-WEST",
             "AP-EAST",
@@ -897,6 +889,14 @@
             "1",
             "230.0",
             "230.0"
+          ],
+          [
+            "scan-hub",
+            "EU-WEST",
+            "EU-WEST",
+            "1",
+            "45.0",
+            "45.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1254,17 +1254,17 @@
           ],
           [
             "manual",
-            "ZONE-2",
-            "1"
-          ],
-          [
-            "manual",
             "ZONE-1",
             "1"
           ],
           [
             "manual",
             "ZONE-3",
+            "1"
+          ],
+          [
+            "manual",
+            "ZONE-2",
             "1"
           ]
         ],
@@ -1393,14 +1393,14 @@
         ],
         "results": [
           [
-            "sorter-engine",
-            "AP-CENTRAL",
+            "zone-controller",
+            "US-WEST",
             "2",
             "2"
           ],
           [
-            "charge-checker",
-            "EU-CENTRAL",
+            "sorter-engine",
+            "AP-CENTRAL",
             "2",
             "2"
           ],
@@ -1411,8 +1411,8 @@
             "2"
           ],
           [
-            "zone-controller",
-            "US-WEST",
+            "charge-checker",
+            "EU-CENTRAL",
             "2",
             "2"
           ],
@@ -1521,12 +1521,12 @@
         ],
         "results": [
           [
-            "lane-monitor",
+            "batch-sync",
             "US-CENTRAL",
             "4"
           ],
           [
-            "batch-sync",
+            "lane-monitor",
             "US-CENTRAL",
             "4"
           ],
@@ -1539,6 +1539,16 @@
             "lane-monitor",
             "AP-EAST",
             "4"
+          ],
+          [
+            "batch-sync",
+            "EU-CENTRAL",
+            "2"
+          ],
+          [
+            "pallet-mapper",
+            "US-CENTRAL",
+            "2"
           ],
           [
             "temp-regulator",
@@ -1546,23 +1556,8 @@
             "2"
           ],
           [
-            "batch-sync",
-            "EU-CENTRAL",
-            "2"
-          ],
-          [
             "lane-monitor",
             "EU-CENTRAL",
-            "2"
-          ],
-          [
-            "track-router",
-            "AP-EAST",
-            "2"
-          ],
-          [
-            "pallet-mapper",
-            "US-CENTRAL",
             "2"
           ],
           [
@@ -1573,6 +1568,11 @@
           [
             "lane-monitor",
             "AP-SOUTH",
+            "2"
+          ],
+          [
+            "track-router",
+            "AP-EAST",
             "2"
           ],
           [
@@ -1622,14 +1622,14 @@
             "ZONE-2",
             "PL-004",
             "190.0",
-            "45.3",
+            "88.1",
             "1"
           ],
           [
             "ZONE-2",
             "PL-004",
             "190.0",
-            "88.1",
+            "45.3",
             "1"
           ],
           [
@@ -1650,14 +1650,14 @@
             "ZONE-3",
             "PL-001",
             "555.0",
-            "67.9",
+            "72.8",
             "3"
           ],
           [
             "ZONE-3",
             "PL-001",
             "555.0",
-            "72.8",
+            "67.9",
             "3"
           ],
           [
@@ -1709,12 +1709,6 @@
         ],
         "results": [
           [
-            "scan-hub",
-            "45.0",
-            "45.0",
-            "0.0"
-          ],
-          [
             "conveyor-driver",
             "15.0",
             "15.0",
@@ -1724,6 +1718,12 @@
             "zone-controller",
             "12.0",
             "12.0",
+            "0.0"
+          ],
+          [
+            "scan-hub",
+            "45.0",
+            "45.0",
             "0.0"
           ],
           [
@@ -1967,14 +1967,14 @@
             "89.0"
           ],
           [
-            "batch-sync",
-            "1",
-            "1450.0"
-          ],
-          [
             "charge-checker",
             "1",
             "78.0"
+          ],
+          [
+            "batch-sync",
+            "1",
+            "1450.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -2028,10 +2028,10 @@
         ],
         "results": [
           [
-            "warehouse-central",
-            "warehouse-west",
+            "warehouse-north",
+            "warehouse-north",
             "None",
-            "false",
+            "true",
             "1"
           ],
           [
@@ -2077,10 +2077,10 @@
             "1"
           ],
           [
-            "warehouse-north",
-            "warehouse-north",
+            "warehouse-central",
+            "warehouse-west",
             "None",
-            "true",
+            "false",
             "1"
           ],
           [
@@ -2500,12 +2500,12 @@
         ],
         "results": [
           [
-            "US-CENTRAL",
+            "AP-EAST",
             "2",
-            "1"
+            "0"
           ],
           [
-            "AP-EAST",
+            "EU-CENTRAL",
             "2",
             "0"
           ],
@@ -2515,9 +2515,9 @@
             "2"
           ],
           [
-            "EU-CENTRAL",
+            "US-CENTRAL",
             "2",
-            "0"
+            "1"
           ],
           [
             "AP-SOUTH",
@@ -2735,18 +2735,10 @@
             "2"
           ],
           [
-            "SORT-Q5",
-            "LANE-C",
-            "SORT-Q5",
-            "LANE-C",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-M3",
-            "LANE-B",
-            "SORT-M3",
-            "LANE-B",
+            "SORT-A7",
+            "LANE-A",
+            "SORT-A7",
+            "LANE-A",
             "1",
             "1"
           ],
@@ -2759,10 +2751,18 @@
             "1"
           ],
           [
-            "SORT-A7",
-            "LANE-A",
-            "SORT-A7",
-            "LANE-A",
+            "SORT-Q5",
+            "LANE-C",
+            "SORT-Q5",
+            "LANE-C",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-M3",
+            "LANE-B",
+            "SORT-M3",
+            "LANE-B",
             "1",
             "1"
           ]
@@ -2992,18 +2992,18 @@
         ],
         "results": [
           [
-            "low",
-            "allow",
-            "2",
-            "12.0",
-            "956.0"
-          ],
-          [
             "high",
             "allow",
             "2",
             "1900.0",
             "956.0"
+          ],
+          [
+            "critical",
+            "allow",
+            "2",
+            "61.5",
+            "45.0"
           ],
           [
             "critical",
@@ -3013,10 +3013,17 @@
             "15.0"
           ],
           [
-            "critical",
+            "low",
             "allow",
             "2",
-            "61.5",
+            "12.0",
+            "956.0"
+          ],
+          [
+            "medium",
+            "allow",
+            "1",
+            "15.0",
             "45.0"
           ],
           [
@@ -3032,13 +3039,6 @@
             "1",
             "1900.0",
             "230.0"
-          ],
-          [
-            "medium",
-            "allow",
-            "1",
-            "15.0",
-            "45.0"
           ],
           [
             "medium",
@@ -3346,23 +3346,8 @@
         ],
         "results": [
           [
-            "PL-007",
-            "['PL-003']",
-            "1"
-          ],
-          [
-            "PL-001",
-            "['PL-005']",
-            "1"
-          ],
-          [
-            "PL-008",
-            "['PL-004']",
-            "1"
-          ],
-          [
-            "PL-003",
-            "['PL-007']",
+            "PL-002",
+            "['PL-006']",
             "1"
           ],
           [
@@ -3371,8 +3356,23 @@
             "1"
           ],
           [
-            "PL-002",
-            "['PL-006']",
+            "PL-007",
+            "['PL-003']",
+            "1"
+          ],
+          [
+            "PL-008",
+            "['PL-004']",
+            "1"
+          ],
+          [
+            "PL-001",
+            "['PL-005']",
+            "1"
+          ],
+          [
+            "PL-003",
+            "['PL-007']",
             "1"
           ]
         ],
@@ -3418,12 +3418,39 @@
           ],
           [
             "Computer",
+            "Tablet",
+            "searchPage",
+            "itemPage",
+            "1",
+            "3200000.0",
+            "2500000.0"
+          ],
+          [
+            "Computer",
             "Mobile",
             "searchPage",
             "itemPage",
             "1",
             "1200000.0",
             "1800000.0"
+          ],
+          [
+            "Mobile",
+            "Mobile",
+            "itemPage",
+            "cartPage",
+            "1",
+            "1800000.0",
+            "900000.0"
+          ],
+          [
+            "Tablet",
+            "Tablet",
+            "itemPage",
+            "itemPage",
+            "1",
+            "2500000.0",
+            "2500000.0"
           ],
           [
             "Tablet",
@@ -3433,24 +3460,6 @@
             "1",
             "2500000.0",
             "3200000.0"
-          ],
-          [
-            "Computer",
-            "Tablet",
-            "searchPage",
-            "itemPage",
-            "1",
-            "3200000.0",
-            "2500000.0"
-          ],
-          [
-            "Tablet",
-            "Tablet",
-            "itemPage",
-            "itemPage",
-            "1",
-            "2500000.0",
-            "2500000.0"
           ],
           [
             "Mobile",
@@ -3478,15 +3487,6 @@
             "1",
             "1100000.0",
             "2500000.0"
-          ],
-          [
-            "Mobile",
-            "Mobile",
-            "itemPage",
-            "cartPage",
-            "1",
-            "1800000.0",
-            "900000.0"
           ]
         ],
         "results_mode": "rowsort"

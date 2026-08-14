@@ -297,19 +297,19 @@
         ],
         "results": [
           [
-            "2026-08-14T05:39:00",
+            "2026-08-14T05:59:00",
             "5",
             "5",
             "100.0"
           ],
           [
-            "2026-08-14T05:40:00",
+            "2026-08-14T06:00:00",
             "5",
             "5",
             "100.0"
           ],
           [
-            "2026-08-14T05:41:00",
+            "2026-08-14T06:01:00",
             "4",
             "4",
             "100.0"
@@ -3829,22 +3829,22 @@
         ],
         "results": [
           [
-            "2026-08-14T15:15:00",
+            "2026-08-14T15:35:00",
             "2",
             "0"
           ],
           [
-            "2026-08-14T15:16:00",
+            "2026-08-14T15:36:00",
             "2",
             "0"
           ],
           [
-            "2026-08-14T15:17:00",
+            "2026-08-14T15:37:00",
             "2",
             "0"
           ],
           [
-            "2026-08-14T15:18:00",
+            "2026-08-14T15:38:00",
             "1",
             "0"
           ]
@@ -4142,11 +4142,11 @@
         ],
         "results": [
           [
-            "conveyor-driver",
+            "charge-checker",
             "2"
           ],
           [
-            "charge-checker",
+            "conveyor-driver",
             "2"
           ],
           [
@@ -4182,12 +4182,6 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "0",
-            "1",
-            "2"
-          ],
-          [
             "ZONE-4",
             "0",
             "1",
@@ -4195,6 +4189,12 @@
           ],
           [
             "ZONE-1",
+            "0",
+            "1",
+            "2"
+          ],
+          [
+            "ZONE-3",
             "0",
             "1",
             "2"
@@ -4315,6 +4315,12 @@
             "1"
           ],
           [
+            "ZONE-1",
+            "0",
+            "1",
+            "1"
+          ],
+          [
             "ZONE-2",
             "0",
             "2",
@@ -4324,12 +4330,6 @@
             "ZONE-4",
             "0",
             "2",
-            "1"
-          ],
-          [
-            "ZONE-1",
-            "0",
-            "1",
             "1"
           ]
         ],
@@ -4502,11 +4502,6 @@
         ],
         "results": [
           [
-            "batch-sync",
-            "2",
-            "0"
-          ],
-          [
             "scan-hub",
             "2",
             "0"
@@ -4514,6 +4509,11 @@
           [
             "pallet-mapper",
             "1",
+            "0"
+          ],
+          [
+            "batch-sync",
+            "2",
             "0"
           ],
           [
@@ -4740,12 +4740,12 @@
             "2"
           ],
           [
-            "AP-CENTRAL",
+            "EU-NORTH",
             "internal",
             "1"
           ],
           [
-            "EU-NORTH",
+            "AP-CENTRAL",
             "internal",
             "1"
           ],
@@ -4776,6 +4776,13 @@
         ],
         "results": [
           [
+            "track-router",
+            "2",
+            "0",
+            "2",
+            "1"
+          ],
+          [
             "pallet-mapper",
             "2",
             "0",
@@ -4783,11 +4790,11 @@
             "1"
           ],
           [
-            "track-router",
-            "2",
+            "batch-sync",
+            "1",
             "0",
-            "2",
-            "1"
+            "1",
+            "3"
           ],
           [
             "lane-monitor",
@@ -4798,13 +4805,6 @@
           ],
           [
             "scan-hub",
-            "1",
-            "0",
-            "1",
-            "3"
-          ],
-          [
-            "batch-sync",
             "1",
             "0",
             "1",
@@ -4874,13 +4874,13 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "CC-DELTA",
+            "ZONE-2",
+            "CC-ALPHA",
             "2"
           ],
           [
-            "ZONE-2",
-            "CC-ALPHA",
+            "ZONE-1",
+            "CC-DELTA",
             "2"
           ],
           [
@@ -4999,11 +4999,6 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "2",
-            "465.0"
-          ],
-          [
             "ZONE-1",
             "2",
             "465.0"
@@ -5012,6 +5007,11 @@
             "ZONE-4",
             "2",
             "437.5"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "465.0"
           ],
           [
             "ZONE-2",
@@ -5149,14 +5149,14 @@
             "0"
           ],
           [
-            "scan-hub",
-            "EU-WEST",
+            "batch-sync",
+            "AP-SOUTH",
             "1",
             "0"
           ],
           [
-            "batch-sync",
-            "AP-SOUTH",
+            "scan-hub",
+            "EU-WEST",
             "1",
             "0"
           ],
@@ -5196,7 +5196,7 @@
             "2"
           ],
           [
-            "warehouse-west",
+            "warehouse-south",
             "1"
           ],
           [
@@ -5204,7 +5204,7 @@
             "1"
           ],
           [
-            "warehouse-south",
+            "warehouse-west",
             "1"
           ]
         ],
@@ -5312,12 +5312,12 @@
         ],
         "results": [
           [
-            "ZONE-3",
+            "ZONE-1",
             "840.0",
             "2"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "840.0",
             "2"
           ],
@@ -8226,40 +8226,6 @@
       }
     },
     {
-      "id": "Q1069",
-      "sql": "SELECT s.http_method, COUNT(*) AS cnt FROM (SELECT http_method FROM \"{stream}\" WHERE match_all('warehouse')) s WHERE s.http_method IN (SELECT DISTINCT http_method FROM \"{stream}\" WHERE match_all('event')) GROUP BY s.http_method ORDER BY cnt DESC, s.http_method ASC LIMIT 10",
-      "category": "full_text_search",
-      "expected": {
-        "columns": [
-          "http_method",
-          "cnt"
-        ],
-        "results": [
-          [
-            "POST",
-            "151"
-          ],
-          [
-            "GET",
-            "149"
-          ],
-          [
-            "DELETE",
-            "100"
-          ],
-          [
-            "PUT",
-            "100"
-          ]
-        ],
-        "results_mode": "rowsort"
-      },
-      "time_offset": {
-        "start_offset": 0,
-        "end_offset": 6000000000
-      }
-    },
-    {
       "id": "Q1070",
       "sql": "SELECT histogram(_timestamp, '5 minute') AS bucket, COUNT(*) AS hits FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY bucket ORDER BY bucket ASC LIMIT 20",
       "category": "full_text_search",
@@ -8270,24 +8236,8 @@
         ],
         "results": [
           [
-            "2026-08-14T04:20:00",
-            "24"
-          ],
-          [
-            "2026-08-14T04:25:00",
-            "25"
-          ],
-          [
-            "2026-08-14T04:30:00",
-            "25"
-          ],
-          [
-            "2026-08-14T04:35:00",
-            "25"
-          ],
-          [
             "2026-08-14T04:40:00",
-            "25"
+            "24"
           ],
           [
             "2026-08-14T04:45:00",
@@ -8348,6 +8298,22 @@
           [
             "2026-08-14T05:55:00",
             "25"
+          ],
+          [
+            "2026-08-14T06:00:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:05:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:10:00",
+            "25"
+          ],
+          [
+            "2026-08-14T06:15:00",
+            "25"
           ]
         ],
         "results_mode": "rowsort"
@@ -8369,63 +8335,23 @@
         ],
         "results": [
           [
-            "2026-08-14T04:20:00",
-            "ZONE-4",
-            "13"
-          ],
-          [
-            "2026-08-14T04:20:00",
-            "ZONE-2",
-            "12"
-          ],
-          [
-            "2026-08-14T04:20:00",
-            "ZONE-1",
-            "12"
-          ],
-          [
-            "2026-08-14T04:20:00",
-            "ZONE-3",
-            "12"
-          ],
-          [
-            "2026-08-14T04:30:00",
-            "ZONE-1",
-            "13"
-          ],
-          [
-            "2026-08-14T04:30:00",
-            "ZONE-2",
-            "13"
-          ],
-          [
-            "2026-08-14T04:30:00",
-            "ZONE-4",
-            "12"
-          ],
-          [
-            "2026-08-14T04:30:00",
-            "ZONE-3",
-            "12"
-          ],
-          [
-            "2026-08-14T04:40:00",
-            "ZONE-3",
-            "13"
-          ],
-          [
             "2026-08-14T04:40:00",
             "ZONE-4",
             "13"
           ],
           [
             "2026-08-14T04:40:00",
-            "ZONE-1",
+            "ZONE-2",
             "12"
           ],
           [
             "2026-08-14T04:40:00",
-            "ZONE-2",
+            "ZONE-3",
+            "12"
+          ],
+          [
+            "2026-08-14T04:40:00",
+            "ZONE-1",
             "12"
           ],
           [
@@ -8470,18 +8396,13 @@
           ],
           [
             "2026-08-14T05:10:00",
-            "ZONE-2",
-            "13"
-          ],
-          [
-            "2026-08-14T05:10:00",
             "ZONE-1",
             "13"
           ],
           [
             "2026-08-14T05:10:00",
-            "ZONE-3",
-            "12"
+            "ZONE-2",
+            "13"
           ],
           [
             "2026-08-14T05:10:00",
@@ -8489,6 +8410,11 @@
             "12"
           ],
           [
+            "2026-08-14T05:10:00",
+            "ZONE-3",
+            "12"
+          ],
+          [
             "2026-08-14T05:20:00",
             "ZONE-4",
             "13"
@@ -8500,12 +8426,12 @@
           ],
           [
             "2026-08-14T05:20:00",
-            "ZONE-2",
+            "ZONE-1",
             "12"
           ],
           [
             "2026-08-14T05:20:00",
-            "ZONE-1",
+            "ZONE-2",
             "12"
           ],
           [
@@ -8515,6 +8441,46 @@
           ],
           [
             "2026-08-14T05:30:00",
+            "ZONE-1",
+            "13"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "ZONE-4",
+            "12"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "ZONE-3",
+            "12"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-3",
+            "13"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-4",
+            "13"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-1",
+            "12"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-2",
+            "12"
+          ],
+          [
+            "2026-08-14T05:50:00",
+            "ZONE-2",
+            "13"
+          ],
+          [
+            "2026-08-14T05:50:00",
             "ZONE-1",
             "13"
           ]
@@ -8537,12 +8503,8 @@
         ],
         "results": [
           [
-            "2026-08-14T04:15:00",
-            "772.265306122449"
-          ],
-          [
             "2026-08-14T04:30:00",
-            "821.88"
+            "984.25"
           ],
           [
             "2026-08-14T04:45:00",
@@ -8566,7 +8528,11 @@
           ],
           [
             "2026-08-14T06:00:00",
-            "1450.0"
+            "821.88"
+          ],
+          [
+            "2026-08-14T06:15:00",
+            "602.6538461538462"
           ]
         ],
         "results_mode": "rowsort"
@@ -8578,29 +8544,34 @@
     },
     {
       "id": "Q1055",
-      "sql": "WITH fts_a AS (SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND facility_zone IS NOT NULL), all_b AS (SELECT facility_zone FROM \"{stream2}\" WHERE facility_zone IS NOT NULL) SELECT a.facility_zone, COUNT(*) AS pair_cnt FROM fts_a a JOIN all_b b ON a.facility_zone = b.facility_zone GROUP BY a.facility_zone ORDER BY pair_cnt DESC, a.facility_zone ASC LIMIT 10",
+      "sql": "WITH fts_a AS (SELECT facility_zone, COUNT(*) AS a_cnt FROM \"{stream}\" WHERE match_all('warehouse') AND facility_zone IS NOT NULL GROUP BY facility_zone), all_b AS (SELECT facility_zone, COUNT(*) AS b_cnt FROM \"{stream2}\" WHERE facility_zone IS NOT NULL GROUP BY facility_zone) SELECT a.facility_zone, a.a_cnt, b.b_cnt FROM fts_a a JOIN all_b b ON a.facility_zone = b.facility_zone ORDER BY a.a_cnt DESC, a.facility_zone ASC LIMIT 10",
       "category": "full_text_search",
       "expected": {
         "columns": [
           "facility_zone",
-          "pair_cnt"
+          "a_cnt",
+          "b_cnt"
         ],
         "results": [
           [
             "ZONE-4",
-            "15750"
+            "126",
+            "125"
           ],
           [
             "ZONE-1",
-            "15625"
-          ],
-          [
-            "ZONE-3",
-            "15624"
+            "125",
+            "125"
           ],
           [
             "ZONE-2",
-            "15500"
+            "125",
+            "124"
+          ],
+          [
+            "ZONE-3",
+            "124",
+            "126"
           ]
         ],
         "results_mode": "rowsort"
@@ -8612,53 +8583,98 @@
     },
     {
       "id": "Q1058",
-      "sql": "WITH fts_left AS (SELECT region_code FROM \"{stream}\" WHERE match_all('warehouse') AND region_code IS NOT NULL), fts_right AS (SELECT region_code FROM \"{stream2}\" WHERE match_all('event') AND region_code IS NOT NULL) SELECT l.region_code, COUNT(*) AS pair_cnt FROM fts_left l JOIN fts_right r ON l.region_code = r.region_code GROUP BY l.region_code ORDER BY pair_cnt DESC, l.region_code ASC LIMIT 10",
+      "sql": "WITH fts_left AS (SELECT region_code, COUNT(*) AS l_cnt FROM \"{stream}\" WHERE match_all('warehouse') AND region_code IS NOT NULL GROUP BY region_code), fts_right AS (SELECT region_code, COUNT(*) AS r_cnt FROM \"{stream2}\" WHERE match_all('event') AND region_code IS NOT NULL GROUP BY region_code) SELECT l.region_code, l.l_cnt, r.r_cnt FROM fts_left l JOIN fts_right r ON l.region_code = r.region_code ORDER BY l.l_cnt DESC, l.region_code ASC LIMIT 10",
       "category": "full_text_search",
       "expected": {
         "columns": [
           "region_code",
-          "pair_cnt"
+          "l_cnt",
+          "r_cnt"
         ],
         "results": [
           [
             "AP-SOUTH",
-            "2550"
+            "51",
+            "50"
           ],
           [
             "AP-CENTRAL",
-            "2500"
+            "50",
+            "50"
           ],
           [
             "EU-CENTRAL",
-            "2500"
+            "50",
+            "50"
           ],
           [
             "EU-NORTH",
-            "2500"
+            "50",
+            "50"
           ],
           [
             "EU-WEST",
-            "2500"
-          ],
-          [
-            "US-CENTRAL",
-            "2500"
-          ],
-          [
-            "US-EAST",
-            "2500"
-          ],
-          [
-            "US-WEST",
-            "2500"
-          ],
-          [
-            "AP-EAST",
-            "2499"
+            "50",
+            "50"
           ],
           [
             "SA-EAST",
-            "2450"
+            "50",
+            "49"
+          ],
+          [
+            "US-CENTRAL",
+            "50",
+            "50"
+          ],
+          [
+            "US-EAST",
+            "50",
+            "50"
+          ],
+          [
+            "US-WEST",
+            "50",
+            "50"
+          ],
+          [
+            "AP-EAST",
+            "49",
+            "51"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1069",
+      "sql": "SELECT http_method, COUNT(*) AS cnt FROM \"{stream}\" WHERE (match_all('warehouse') OR match_all('event')) AND http_method IN ('GET','POST','PUT','DELETE') GROUP BY http_method ORDER BY cnt DESC, http_method ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "http_method",
+          "cnt"
+        ],
+        "results": [
+          [
+            "POST",
+            "151"
+          ],
+          [
+            "GET",
+            "149"
+          ],
+          [
+            "DELETE",
+            "100"
+          ],
+          [
+            "PUT",
+            "100"
           ]
         ],
         "results_mode": "rowsort"

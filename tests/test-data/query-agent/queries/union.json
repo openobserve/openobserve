@@ -432,14 +432,14 @@
         ],
         "results": [
           [
-            "PL-004",
-            "ZONE-2",
+            "PL-006",
+            "ZONE-4",
             "88.1",
             "day_shift"
           ],
           [
-            "PL-006",
-            "ZONE-4",
+            "PL-004",
+            "ZONE-2",
             "88.1",
             "day_shift"
           ],
@@ -447,12 +447,6 @@
             "PL-002",
             "ZONE-4",
             "55.2",
-            "day_shift"
-          ],
-          [
-            "PL-007",
-            "ZONE-1",
-            "33.0",
             "day_shift"
           ],
           [
@@ -464,18 +458,24 @@
           [
             "PL-007",
             "ZONE-1",
-            "94.6",
-            "night_shift"
+            "33.0",
+            "day_shift"
           ],
           [
-            "PL-003",
+            "PL-007",
             "ZONE-1",
-            "72.8",
+            "94.6",
             "night_shift"
           ],
           [
             "PL-005",
             "ZONE-3",
+            "72.8",
+            "night_shift"
+          ],
+          [
+            "PL-003",
+            "ZONE-1",
             "72.8",
             "night_shift"
           ],
@@ -811,14 +811,14 @@
         "results": [
           [
             "AP-CENTRAL",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "900.0",
             "94.6"
           ],
           [
             "AP-CENTRAL",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "900.0",
             "94.6"
@@ -839,14 +839,14 @@
           ],
           [
             "US-WEST",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "320.0",
             "67.9"
           ],
           [
             "US-WEST",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "320.0",
             "67.9"
@@ -1017,17 +1017,17 @@
         "results": [
           [
             "errors",
-            "E001",
-            "1"
-          ],
-          [
-            "errors",
             "E009",
             "1"
           ],
           [
             "errors",
             "E003",
+            "1"
+          ],
+          [
+            "errors",
+            "E001",
             "1"
           ],
           [
@@ -1173,12 +1173,12 @@
           ],
           [
             "component_err",
-            "track-router",
+            "pallet-mapper",
             "1"
           ],
           [
             "component_err",
-            "pallet-mapper",
+            "track-router",
             "1"
           ]
         ],
@@ -1271,7 +1271,7 @@
           ],
           [
             "error_bucket",
-            "E001",
+            "E003",
             "1"
           ],
           [
@@ -1281,7 +1281,7 @@
           ],
           [
             "error_bucket",
-            "E003",
+            "E001",
             "1"
           ],
           [
@@ -1763,12 +1763,12 @@
           [
             "track-router",
             "230.0",
-            "stream1"
+            "stream2"
           ],
           [
             "track-router",
             "230.0",
-            "stream2"
+            "stream1"
           ],
           [
             "scan-hub",
@@ -1783,12 +1783,12 @@
           [
             "conveyor-driver",
             "15.0",
-            "stream2"
+            "stream1"
           ],
           [
             "conveyor-driver",
             "15.0",
-            "stream1"
+            "stream2"
           ],
           [
             "zone-controller",
@@ -2246,11 +2246,11 @@
         ],
         "results": [
           [
-            "warehouse-west",
+            "warehouse-south",
             "3"
           ],
           [
-            "warehouse-south",
+            "warehouse-west",
             "3"
           ],
           [
@@ -2326,11 +2326,11 @@
             "480.0"
           ],
           [
-            "PL-001",
+            "PL-007",
             "320.0"
           ],
           [
-            "PL-007",
+            "PL-001",
             "320.0"
           ],
           [
@@ -2362,15 +2362,15 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "4",
-            "640.0",
-            "840.0"
-          ],
-          [
             "ZONE-1",
             "3",
             "745.0",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "4",
+            "640.0",
             "840.0"
           ],
           [
@@ -2404,11 +2404,11 @@
         ],
         "results": [
           [
-            "charge-checker",
+            "temp-regulator",
             "3"
           ],
           [
-            "conveyor-driver",
+            "charge-checker",
             "3"
           ],
           [
@@ -2416,15 +2416,15 @@
             "3"
           ],
           [
-            "temp-regulator",
+            "conveyor-driver",
             "3"
           ],
           [
-            "zone-controller",
+            "lane-monitor",
             "1"
           ],
           [
-            "lane-monitor",
+            "zone-controller",
             "1"
           ]
         ],

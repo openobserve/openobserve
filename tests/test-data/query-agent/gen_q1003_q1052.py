@@ -546,14 +546,16 @@ QUERIES.append(q("Q1054",
 
 QUERIES.append(q("Q1055",
     "WITH fts_a AS ("
-    "SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND facility_zone IS NOT NULL"
+    "SELECT facility_zone, COUNT(*) AS a_cnt FROM \"{stream}\" "
+    "WHERE match_all('warehouse') AND facility_zone IS NOT NULL "
+    "GROUP BY facility_zone"
     "), all_b AS ("
-    "SELECT facility_zone FROM \"{stream2}\" WHERE facility_zone IS NOT NULL"
-    ") SELECT a.facility_zone, COUNT(*) AS pair_cnt FROM fts_a a "
+    "SELECT facility_zone, COUNT(*) AS b_cnt FROM \"{stream2}\" "
+    "WHERE facility_zone IS NOT NULL GROUP BY facility_zone"
+    ") SELECT a.facility_zone, a.a_cnt, b.b_cnt FROM fts_a a "
     "JOIN all_b b ON a.facility_zone = b.facility_zone "
-    "GROUP BY a.facility_zone "
-    "ORDER BY pair_cnt DESC, a.facility_zone ASC LIMIT 10",
-    ["facility_zone", "pair_cnt"]))
+    "ORDER BY a.a_cnt DESC, a.facility_zone ASC LIMIT 10",
+    ["facility_zone", "a_cnt", "b_cnt"]))
 
 QUERIES.append(q("Q1056",
     "SELECT outer_t.http_method, outer_t.n FROM ("
@@ -576,14 +578,17 @@ QUERIES.append(q("Q1057",
 
 QUERIES.append(q("Q1058",
     "WITH fts_left AS ("
-    "SELECT region_code FROM \"{stream}\" WHERE match_all('warehouse') AND region_code IS NOT NULL"
+    "SELECT region_code, COUNT(*) AS l_cnt FROM \"{stream}\" "
+    "WHERE match_all('warehouse') AND region_code IS NOT NULL "
+    "GROUP BY region_code"
     "), fts_right AS ("
-    "SELECT region_code FROM \"{stream2}\" WHERE match_all('event') AND region_code IS NOT NULL"
-    ") SELECT l.region_code, COUNT(*) AS pair_cnt FROM fts_left l "
+    "SELECT region_code, COUNT(*) AS r_cnt FROM \"{stream2}\" "
+    "WHERE match_all('event') AND region_code IS NOT NULL "
+    "GROUP BY region_code"
+    ") SELECT l.region_code, l.l_cnt, r.r_cnt FROM fts_left l "
     "JOIN fts_right r ON l.region_code = r.region_code "
-    "GROUP BY l.region_code "
-    "ORDER BY pair_cnt DESC, l.region_code ASC LIMIT 10",
-    ["region_code", "pair_cnt"]))
+    "ORDER BY l.l_cnt DESC, l.region_code ASC LIMIT 10",
+    ["region_code", "l_cnt", "r_cnt"]))
 
 
 # ── Family G: match_all + window functions (Q1059-Q1063) ──────────────────
@@ -682,11 +687,10 @@ QUERIES.append(q("Q1068",
     ["facility_zone", "or_cnt"]))
 
 QUERIES.append(q("Q1069",
-    "SELECT s.http_method, COUNT(*) AS cnt FROM ("
-    "SELECT http_method FROM \"{stream}\" WHERE match_all('warehouse')"
-    ") s WHERE s.http_method IN ("
-    "SELECT DISTINCT http_method FROM \"{stream}\" WHERE match_all('event')"
-    ") GROUP BY s.http_method ORDER BY cnt DESC, s.http_method ASC LIMIT 10",
+    "SELECT http_method, COUNT(*) AS cnt FROM \"{stream}\" "
+    "WHERE (match_all('warehouse') OR match_all('event')) "
+    "AND http_method IN ('GET','POST','PUT','DELETE') "
+    "GROUP BY http_method ORDER BY cnt DESC, http_method ASC LIMIT 10",
     ["http_method", "cnt"]))
 
 
