@@ -31,7 +31,7 @@ use config::{
     meta::{
         search::{Query, Request, RequestEncoding},
         slo::{
-            SliConfig, Slo,
+            QueryLanguage, SliConfig, Slo,
             alert_uptime::{EvalInterval, UptimeGrid, uptime_slices},
             slice::SliceRow,
             stream::{SLO_SLICES_STREAM, SloSliceRow},
@@ -102,6 +102,20 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
         log::warn!("here, skipped the pass");
         return Ok(PassOutcome::NothingToDo);
     };
+
+    // for promql query, we add the slice interval sec to start to get the actual query start time
+    // see the prom_query fn for more details. But if after that calculation the start > = end
+    // we will get error in downstream processing and the slo will freeze. Thus instead we check
+    // here and skip early
+    if let SliConfig::TimeSlice { query_language, .. } = slo.definition.sli_config
+        && matches!(query_language, QueryLanguage::PromQl)
+    {
+        if range.start + slo.definition.slice_interval_secs >= range.end {
+            log::warn!("here, skipped the pass for promql");
+            return Ok(PassOutcome::NothingToDo);
+        }
+    }
+
     log::warn!(
         "here-test, now secs : {now_secs} range_start : {} range_end : {} slice interval sec {} ingest delay sec {} slo_id : {}",
         range.start,
