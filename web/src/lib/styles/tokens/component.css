@@ -2022,6 +2022,10 @@
   --color-promo-webinar-sep: var(--color-promo-webinar-sep);
   --color-tool-thread-accent: var(--color-tool-thread-accent);
   --color-tool-thread-accent-text: var(--color-tool-thread-accent-text);
+  /* Flame-graph tooltip: the ECharts formatter builds an HTML string, so these
+     are reached as text-* utilities rather than an inline style. */
+  --color-flame-tooltip-label: var(--color-flame-tooltip-label);
+  --color-flame-tooltip-error: var(--color-flame-tooltip-error);
   --color-section-accent-secondary: var(--color-section-accent-secondary);
   --color-bg-gray: var(--color-bg-gray);
   --color-cancel-query-bg: var(--color-cancel-query-bg);
