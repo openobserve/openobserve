@@ -156,6 +156,7 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick, watch } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import useResizer from "@/composables/useResizer";
 import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
@@ -216,6 +217,16 @@ const emit = defineEmits<{
 
 // Composables
 const { t } = useI18nTyped();
+const store = useStore();
+
+/**
+ * The stream's configured timestamp column, as the waterfall and the sidebar
+ * mini-timeline already pass. Reading events without it would silently fall
+ * back to `_timestamp` and let this surface drift from the other two.
+ */
+const eventTimestampField = computed<string | undefined>(
+  () => store.state.zoConfig?.timestamp_column,
+);
 
 // State
 const cursorVisible = ref(false);
@@ -259,7 +270,7 @@ interface FlameEventMarker {
  * it would describe a duration the block does not actually represent.
  */
 const buildSpanEventMarkers = (span: any, blockWidthPx: number): FlameEventMarker[] => {
-  const events = normalizeSpanEvents(span?.events);
+  const events = normalizeSpanEvents(span?.events, eventTimestampField.value);
   if (!events.length) return [];
 
   const markers = toSpanEventMarkers(events, {
@@ -289,18 +300,32 @@ const buildSpanEventMarkers = (span: any, blockWidthPx: number): FlameEventMarke
 };
 
 /**
+ * Reads a registered design token's current value.
+ *
+ * `renderItem` returns raw ECharts shapes drawn to a canvas, which cannot take
+ * Tailwind utility classes. Resolving the token off the document root is the
+ * sanctioned escape hatch: the value still comes from the token, so it follows
+ * a theme flip instead of freezing whatever the light theme happened to be.
+ */
+const tokenColor = (token: string): string =>
+  getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+
+/**
  * Severity colours read from the design tokens.
  *
- * `renderItem` returns raw ECharts shapes, which cannot take Tailwind classes,
- * so the token values are resolved at draw time rather than hardcoded. The token
- * names come from the shared vocabulary so this surface cannot drift from the
- * waterfall and the sidebar mini-timeline.
+ * The token names come from the shared vocabulary so this surface cannot drift
+ * from the waterfall and the sidebar mini-timeline.
  */
 const severityColor = (severity: SpanEventSeverity): string =>
-  getComputedStyle(document.documentElement)
-    .getPropertyValue(SEVERITY_MARKER_TOKEN[severity])
-    .trim();
+  tokenColor(SEVERITY_MARKER_TOKEN[severity]);
 
+/**
+ * Halo separating a marker from the block colour behind it. The DOM surfaces
+ * use `ring-surface-base` for the same job, so this reads the same token.
+ */
+const MARKER_HALO_TOKEN = "--color-surface-base";
+
+// Exposed for tests only — neither is part of this component's public surface.
 defineExpose({ buildSpanEventMarkers, severityColor });
 
 const GRID_LEFT = 10;
@@ -460,6 +485,7 @@ const chartOptions = computed(() => {
       formatter: (params: any) => {
         const span = params.data.spanData as EnrichedSpan;
         const percentage = ((span.durationMs / props.traceDuration) * 100).toFixed(2);
+        const eventCount = normalizeSpanEvents(span.events, eventTimestampField.value).length;
 
         return `
           <div style="padding: 0.25rem 0;">
@@ -479,11 +505,11 @@ const chartOptions = computed(() => {
               </div>
               ${span.hasError ? `<div class="text-flame-tooltip-error mt-1">${t("traces.flameGraphView.hasErrors")}</div>` : ""}
               ${
-                normalizeSpanEvents(span.events).length
+                eventCount
                   ? `<div class="mt-1">${escapeHtml(
-                      t("traces.spanEventCount", {
-                        count: normalizeSpanEvents(span.events).length,
-                      }),
+                      eventCount === 1
+                        ? t("traces.spanEventCount", { count: eventCount })
+                        : t("traces.spanEventCountPlural", { count: eventCount }),
                     )}</div>`
                   : ""
               }
@@ -546,7 +572,7 @@ const chartOptions = computed(() => {
             },
             style: {
               fill: severityColor(marker.severity),
-              stroke: "#ffffff",
+              stroke: tokenColor(MARKER_HALO_TOKEN),
               lineWidth: 1,
             },
             silent: true,

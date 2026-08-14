@@ -18,8 +18,18 @@ import { mount, flushPromises, config } from "@vue/test-utils";
 import i18n from "@/locales";
 import FlameGraphView from "@/components/traces/FlameGraphView.vue";
 import { SEVERITY_MARKER_TOKEN } from "@/composables/traces/useSpanEvents";
+import { createStore } from "vuex";
 
-config.global.plugins = [...(config.global.plugins ?? []), i18n];
+// The component reads the stream's configured timestamp column off the store so
+// its event markers agree with the waterfall's.
+const mockStore = createStore({
+  state: {
+    theme: "light",
+    zoConfig: { timestamp_column: "@timestamp" },
+  },
+});
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n, mockStore];
 
 // Stub ChartRenderer globally so defineAsyncComponent resolves synchronously
 const ChartRendererStub = {
@@ -1426,6 +1436,37 @@ describe("FlameGraphView span event markers", () => {
     };
 
     expect(mountView().vm.buildSpanEventMarkers(withError, 10)[0].severity).toBe("error");
+  });
+
+  // Regression: this surface read the events payload with no timestamp column,
+  // so it saw only `_timestamp`. The waterfall and the sidebar both pass the
+  // configured column, and an event carrying only that column was silently
+  // dropped here while showing up on the other two.
+  it("reads events through the configured timestamp column", () => {
+    const configuredColumnOnly = {
+      ...spanWithEvents,
+      events: [{ name: "a", "@timestamp": spanStartNs + 40_000_000 }],
+    };
+
+    expect(mountView().vm.buildSpanEventMarkers(configuredColumnOnly, 400)).toHaveLength(1);
+  });
+
+  // Regression: the halo was a hardcoded #ffffff, so on the dark theme every
+  // marker kept a white outline while the DOM surfaces' `ring-surface-base`
+  // went dark. A canvas shape cannot take a utility class, so it resolves the
+  // same token instead. jsdom returns "" for custom properties, so this asserts
+  // the lookup rather than the resolved colour.
+  it("strokes the marker halo with the surface token, not a hex literal", () => {
+    const spy = vi.spyOn(CSSStyleDeclaration.prototype, "getPropertyValue");
+
+    try {
+      const marker = renderBlock(mountView(), 100).children[1];
+
+      expect(spy).toHaveBeenCalledWith("--color-surface-base");
+      expect(marker.style.stroke).not.toMatch(/^#/);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
