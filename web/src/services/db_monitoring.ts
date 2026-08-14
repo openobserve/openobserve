@@ -194,6 +194,16 @@ export interface DatabasesResponse {
   /** The baseline read failed while the current window succeeded (stated, not
    * implied by emptiness); the Δ features go quiet rather than lying. */
   baseline_read_failed?: boolean;
+  /**
+   * Present when `includeBreakdown` asked for it: the per-instance schema →
+   * service split, keyed by `db_instance`. Each entry holds the same
+   * `query_stats` rows `GET /queries?instance=<it>&stmt_class=all` returns for
+   * this window — folded server-side from rows this response already read, so
+   * an expanded row costs no request of its own.
+   */
+  breakdown?: Record<string, QueryStatsRow[]>;
+  /** The split could not be built (stated, not implied by an empty section). */
+  breakdown_read_failed?: boolean;
 }
 
 export interface QueriesResponse {
@@ -213,6 +223,23 @@ export interface QueriesResponse {
   baseline_other?: QueryStatsRow[];
   /** See DatabasesResponse.baseline_read_failed. */
   baseline_read_failed?: boolean;
+  /**
+   * Present when `includeServerFallback` asked for it AND the client answer was
+   * an exact zero: the database-reported list, as `/server_queries` returns it.
+   *
+   * `null` when the fallback did not run, was denied, or failed — the two flags
+   * below tell those apart. Absent entirely when the caller did not ask.
+   */
+  server_fallback?: ServerQueriesResponse | null;
+  /**
+   * The fallback reads a LOGS stream while this endpoint is Traces-auth, so a
+   * reader can be entitled to one and not the other. A denial is stated here
+   * rather than failing the whole request — the client-vantage rows the reader
+   * IS entitled to still come back.
+   */
+  server_fallback_forbidden?: boolean;
+  /** The fallback ran and broke — a retry, as against a permission to request. */
+  server_fallback_read_failed?: boolean;
 }
 
 /** One exact errors-by-code bucket for a fingerprint over the range. */
@@ -245,6 +272,18 @@ export interface QueryHistoryResponse {
    * the figures are floors, never exact window totals.
    */
   breakdown?: QueryBreakdownRow[];
+  /**
+   * Present when `includeEndpoints` asked for it: the FR-5 calling-endpoints
+   * aggregation, run server-side against the trace stream THIS response
+   * resolved (`trace_stream_name`) — which is why the page no longer has to
+   * wait for that name before asking a second endpoint for it.
+   *
+   * `null` means there was no stream to aggregate (ambiguous or absent), which
+   * is the reader's choice to make and must NOT be rendered as "no callers".
+   * `endpoints_read_failed` separates that from a read that ran and broke.
+   */
+  endpoints?: EndpointRow[] | null;
+  endpoints_read_failed?: boolean;
   freshness: Freshness;
 }
 
@@ -625,6 +664,15 @@ export interface SamplesResponse {
   streams_scanned: string[];
   /** Streams whose read failed — the answer is partial when > 0. */
   streams_failed: number;
+  /**
+   * Present when `includeServerFallback` asked for it AND the client answer was
+   * an exact zero with no failed stream read (a partial answer is UNKNOWN, not
+   * zero, so the fallback stays out of it). See QueriesResponse.server_fallback
+   * for the flags.
+   */
+  server_fallback?: ServerSamplesResponse | null;
+  server_fallback_forbidden?: boolean;
+  server_fallback_read_failed?: boolean;
 }
 
 export interface SamplesParams {
@@ -637,6 +685,23 @@ export interface SamplesParams {
   env?: string;
   service?: string;
   limit?: number;
+  /**
+   * Rank the slowest executions of ONE statement — the query-detail page's
+   * question.
+   *
+   * Without it that page had no endpoint to ask, so it built raw SQL in the
+   * browser against a stream name taken from the URL, carrying its own
+   * single-quote escaping and stream-name validator to do it safely. The
+   * predicate is built server-side now, alongside every other DBM predicate.
+   */
+  fingerprint?: string;
+  /**
+   * Run the database-reported fallback list in the same request when the
+   * client-vantage answer is an exact zero, returning it as `server_fallback`.
+   * It replaces a second, SEQUENTIAL `getServerSamples` call the page issued
+   * once this one came back empty.
+   */
+  includeServerFallback?: boolean;
 }
 
 export interface DatabasesParams {
@@ -652,6 +717,13 @@ export interface DatabasesParams {
    */
   baselineStartTime?: number;
   baselineEndTime?: number;
+  /**
+   * Fold the per-instance schema → service split into the same response, as
+   * `breakdown`. It replaces one `getQueries({ instance })` per expanded row —
+   * the rows come from the `query_stats` pool this endpoint already reads, so
+   * the section adds no search.
+   */
+  includeBreakdown?: boolean;
 }
 
 export interface QueriesParams {
@@ -673,6 +745,24 @@ export interface QueriesParams {
   limit?: number;
   /** Free-text over the normalized query text; forces `top_n_subset`. */
   search?: string;
+  /**
+   * Run the database-reported fallback list in the same request when the
+   * client-vantage answer is an exact zero, returning it as `server_fallback`.
+   * It replaces a second, SEQUENTIAL `getServerQueries` call the page issued
+   * once this one came back empty — two round trips on exactly the deployment
+   * that can least afford them.
+   */
+  includeServerFallback?: boolean;
+  /**
+   * Narrows the SERVER FALLBACK to one statement; the client-vantage rows are
+   * unaffected (this page filters those itself).
+   *
+   * The query-detail page asks about ONE fingerprint. With no traced traffic
+   * its client read is empty and the fallback is the only vantage that can
+   * answer — and it must answer about this statement rather than returning the
+   * org's most-frequent fifty, among which this one may not even rank.
+   */
+  fingerprint?: string;
 }
 
 export interface QueryHistoryParams {
@@ -685,6 +775,14 @@ export interface QueryHistoryParams {
   namespace?: string;
   env?: string;
   service?: string;
+  /**
+   * Fold the FR-5 calling-endpoints aggregation into the same response, as
+   * `endpoints`. It replaces a co-fired `getQueryEndpoints` call that could not
+   * even start until this request had told it which trace stream to read.
+   */
+  includeEndpoints?: boolean;
+  /** Cap for that section — the standalone endpoint's `limit`. */
+  endpointsLimit?: number;
 }
 
 export interface QueryEndpointsParams {
@@ -729,6 +827,42 @@ export interface QueryServerMetricsParams {
   stream?: string;
   startTime?: number;
   endTime?: number;
+}
+
+/**
+ * The query-detail page's server-vantage pair, in ONE request.
+ *
+ * `/query/plans` and `/query/server_metrics` were always co-fired from this
+ * page: same default stream, same schema read, same records, same window. The
+ * merged endpoint runs both and returns each as its own nullable section, so
+ * the join key can be absent (no `engine`, or no `database` on an engine whose
+ * records carry one) without costing a request that could only 400.
+ */
+export interface QueryInsightsParams {
+  fingerprint: string;
+  /** Optional — the handler defaults to the shared `dbm_server` logs stream. */
+  stream?: string;
+  startTime?: number;
+  endTime?: number;
+  /**
+   * The server-metrics join key. Omit either and `server_metrics` comes back
+   * `null` with its read-failed flag FALSE — "we did not look", which the page
+   * renders differently from "we looked and could not read".
+   */
+  engine?: string;
+  database?: string;
+}
+
+export interface QueryInsightsResponse {
+  /** The `/query/plans` envelope verbatim, or `null` when the read failed. */
+  plans: QueryPlansResponse | null;
+  plans_read_failed: boolean;
+  /**
+   * The `/query/server_metrics` envelope verbatim; `null` when the read failed
+   * OR when no join key was sent. The flag tells the two apart.
+   */
+  server_metrics: Record<string, unknown> | null;
+  server_metrics_read_failed: boolean;
 }
 
 export interface DeadlocksParams {
@@ -927,6 +1061,9 @@ const dbMonitoringService = {
     put(params, "service", options.service);
     put(params, "baseline_start_time", options.baselineStartTime);
     put(params, "baseline_end_time", options.baselineEndTime);
+    // Sent only when asked for: a `false` on the wire and an absent param mean
+    // the same thing to the server, and the shorter URL is the honest one.
+    if (options.includeBreakdown) params.include_breakdown = "true";
     return http().get<DatabasesResponse>(`/api/${orgId}/traces/db_monitoring/databases`, {
       params,
     });
@@ -951,6 +1088,8 @@ const dbMonitoringService = {
     put(params, "search", options.search);
     put(params, "baseline_start_time", options.baselineStartTime);
     put(params, "baseline_end_time", options.baselineEndTime);
+    put(params, "fingerprint", options.fingerprint);
+    if (options.includeServerFallback) params.include_server_fallback = "true";
     return http().get<QueriesResponse>(`/api/${orgId}/traces/db_monitoring/queries`, { params });
   },
 
@@ -969,6 +1108,8 @@ const dbMonitoringService = {
     put(params, "env", options.env);
     put(params, "service", options.service);
     put(params, "limit", options.limit);
+    put(params, "fingerprint", options.fingerprint);
+    if (options.includeServerFallback) params.include_server_fallback = "true";
     return http().get<SamplesResponse>(`/api/${orgId}/traces/db_monitoring/samples`, { params });
   },
 
@@ -983,6 +1124,10 @@ const dbMonitoringService = {
     put(params, "namespace", options.namespace);
     put(params, "env", options.env);
     put(params, "service", options.service);
+    // Same convention as `include_indexes`/`include_breakdown`: sent only when
+    // asked for, since a `false` and an absent param mean the same thing.
+    if (options.includeEndpoints) params.include_endpoints = "true";
+    put(params, "endpoints_limit", options.endpointsLimit);
     return http().get<QueryHistoryResponse>(`/api/${orgId}/traces/db_monitoring/query/history`, {
       params,
     });
@@ -1004,10 +1149,36 @@ const dbMonitoringService = {
   },
 
   /**
+   * The query-detail page's server-vantage pair in one round trip: the plans
+   * list and the database's own counters, each as its own nullable section.
+   *
+   * Supersedes `getQueryPlans` + `getQueryServerMetrics`, which this page
+   * always called together. The sections ARE those endpoints' envelopes — the
+   * backend produces them with the same code — so nothing downstream of the
+   * call needs to know which shape it came from.
+   */
+  getQueryInsights: (orgId: string, options: QueryInsightsParams) => {
+    const params: QueryParams = { fingerprint: options.fingerprint };
+    put(params, "stream", options.stream);
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    // Omitted rather than blanked: an absent join key is what tells the server
+    // not to run the counters read at all.
+    put(params, "engine", options.engine);
+    put(params, "database", options.database);
+    return http().get<QueryInsightsResponse>(`/api/${orgId}/traces/db_monitoring/query/insights`, {
+      params,
+    });
+  },
+
+  /**
    * Distinct captured plans for one query.
    *
    * The response is a GENERIC, NULL-BOUND estimate — see `utils/dbm/plans.ts`
    * for what that means and why nothing here may be paired with latency.
+   *
+   * SUPERSEDED by `getQueryInsights`, which returns this envelope as its
+   * `plans` section. Kept for callers that want plans alone.
    */
   getQueryPlans: (orgId: string, options: QueryPlansParams) => {
     const params: QueryParams = { fingerprint: options.fingerprint };
@@ -1026,6 +1197,11 @@ const dbMonitoringService = {
    * A sibling of `/query/plans` rather than a field on `/queries`: `/queries`
    * reads the rollup and live trace tails under Traces auth, and this is a
    * Logs-auth server-vantage source.
+   *
+   * SUPERSEDED by `getQueryInsights`, which returns this envelope as its
+   * `server_metrics` section — plans share this endpoint's stream, auth model
+   * and schema read, so folding the pair costs nothing. Kept for callers that
+   * want the counters alone.
    */
   getQueryServerMetrics: (orgId: string, options: QueryServerMetricsParams) => {
     const params: QueryParams = {

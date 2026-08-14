@@ -39,9 +39,10 @@
  */
 
 import { onActivated } from "vue";
+import type { Ref } from "vue";
 import type { RouteLocationNormalizedLoaded } from "vue-router";
 
-import { rangeFromQuery, type DbmRange } from "@/composables/dbm/useDbmScope";
+import { rangeFromQuery, type DbmDateChange, type DbmRange } from "@/composables/dbm/useDbmScope";
 
 /**
  * The identity of a scope, for comparison only.
@@ -72,5 +73,42 @@ export function useDbmScopeSync({ route, current, adopt, reload }: DbmScopeSyncO
     if (scopeIdentity(fromUrl) === scopeIdentity(current())) return;
     adopt(fromUrl);
     reload();
+  });
+}
+
+/** The two members of a `useDbmScope` return this sync actually needs. */
+export interface DbmScopeSyncScope {
+  range: Ref<DbmRange>;
+  setRange: (value: DbmDateChange) => void;
+}
+
+export interface DbmScopeSyncScopeOptions {
+  /** The page's live route. */
+  route: RouteLocationNormalizedLoaded;
+  /** The page's scope, as `useDbmScope` returned it. */
+  scope: DbmScopeSyncScope;
+  /** Refetch under the adopted range. */
+  reload: () => void;
+}
+
+/**
+ * The same sync, taking the scope object itself.
+ *
+ * Every caller was re-spreading a `DbmRange` into `setRange`'s `DbmDateChange`
+ * shape by hand — fourteen identical lines per page whose only content was
+ * that adapter. The adapter lives here now; the base signature above stays for
+ * callers that hold something other than a `useDbmScope` return.
+ */
+export function useDbmScopeSyncScope({ route, scope, reload }: DbmScopeSyncScopeOptions): void {
+  useDbmScopeSync({
+    route,
+    current: () => scope.range.value,
+    adopt: (next) =>
+      scope.setRange({
+        startTime: next.startTime,
+        endTime: next.endTime,
+        relativeTimePeriod: next.relativeTimePeriod,
+      }),
+    reload,
   });
 }

@@ -83,15 +83,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import DbmCheckList, { type DbmCheckRow, type DbmCheckStatus } from "./DbmCheckList.vue";
+import DbmCheckList, { type DbmCheckRow } from "./DbmCheckList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { raw, type I18nText } from "@/types/i18n";
 
-// Aliases of the shared checklist types, kept exported so callers keep typing
+// Alias of the shared checklist row type, kept exported so callers keep typing
 // their checks against THIS component's contract rather than its internals.
-export type DbmLockCheckStatus = DbmCheckStatus;
 export type DbmLockCheck = DbmCheckRow;
 
 export interface DbmLockEmptyAction {

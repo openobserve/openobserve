@@ -54,6 +54,10 @@ describe("DbmSectionTabs", () => {
     it.each([
       ["dbmDatabases", "overview"],
       ["dbmQueries", "queries"],
+      ["dbmSamples", "samples"],
+      ["dbmActivity", "activity"],
+      ["dbmDeadlocks", "deadlocks"],
+      ["dbmBlocking", "blocked"],
     ])("lights %s as %s", (routeName, tabKey) => {
       expect(mountAt(routeName).findComponent({ name: "OTabs" }).props("modelValue")).toBe(tabKey);
     });
@@ -134,6 +138,19 @@ describe("DbmSectionTabs", () => {
       });
     });
 
+    it.each([
+      ["samples", "dbmSamples"],
+      ["activity", "dbmActivity"],
+      ["deadlocks", "dbmDeadlocks"],
+    ])("navigates to the %s route, carrying the scope", async (tabKey, routeName) => {
+      const wrapper = mountAt("dbmQueries", { org_identifier: "default", range: "360" });
+      await selectTab(wrapper, tabKey);
+      expect(push).toHaveBeenCalledWith({
+        name: routeName,
+        query: { org_identifier: "default", range: "360" },
+      });
+    });
+
     /**
      * ...but a single query's identity is meaningless on a list, so it is
      * dropped rather than carried into a table's URL.
@@ -162,28 +179,10 @@ describe("DbmSectionTabs", () => {
       expect(wrapper.text()).not.toContain("soon");
     });
 
-    it("navigates to the deadlocks route, carrying the scope", async () => {
-      const wrapper = mountAt("dbmQueries", { org_identifier: "default", range: "360" });
-      await selectTab(wrapper, "deadlocks");
-      expect(push).toHaveBeenCalledWith({
-        name: "dbmDeadlocks",
-        query: { org_identifier: "default", range: "360" },
-      });
-    });
-
     it("navigates to the blocking route", async () => {
       const wrapper = mountAt("dbmQueries");
       await selectTab(wrapper, "blocked");
       expect(push).toHaveBeenCalledWith({ name: "dbmBlocking", query: {} });
-    });
-
-    it("lights the tab that matches the current lock route", () => {
-      expect(mountAt("dbmDeadlocks").findComponent({ name: "OTabs" }).props("modelValue")).toBe(
-        "deadlocks",
-      );
-      expect(mountAt("dbmBlocking").findComponent({ name: "OTabs" }).props("modelValue")).toBe(
-        "blocked",
-      );
     });
   });
 
@@ -215,36 +214,6 @@ describe("DbmSectionTabs", () => {
         "dbm-section-tab-blocked",
         "dbm-section-tab-tableHealth",
       ]);
-    });
-
-    it("navigates to the samples route, carrying the scope", async () => {
-      const wrapper = mountAt("dbmQueries", { org_identifier: "default", range: "360" });
-      await selectTab(wrapper, "samples");
-      expect(push).toHaveBeenCalledWith({
-        name: "dbmSamples",
-        query: { org_identifier: "default", range: "360" },
-      });
-    });
-
-    it("lights the Slowest calls tab on its own route", () => {
-      expect(mountAt("dbmSamples").findComponent({ name: "OTabs" }).props("modelValue")).toBe(
-        "samples",
-      );
-    });
-
-    it("navigates to the activity route, carrying the scope", async () => {
-      const wrapper = mountAt("dbmQueries", { org_identifier: "default", range: "360" });
-      await selectTab(wrapper, "activity");
-      expect(push).toHaveBeenCalledWith({
-        name: "dbmActivity",
-        query: { org_identifier: "default", range: "360" },
-      });
-    });
-
-    it("lights the Activity tab on its own route", () => {
-      expect(mountAt("dbmActivity").findComponent({ name: "OTabs" }).props("modelValue")).toBe(
-        "activity",
-      );
     });
 
     // Activity's badge is the window population, not capped `hits.length` — the

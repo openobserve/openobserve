@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <template v-for="chip in chips" :key="chip.id">
     <span
       class="text-3xs inline-flex h-3.75 items-center gap-0.5 rounded-full px-1.5 font-semibold whitespace-nowrap"
-      :class="TONES[chip.tone]"
+      :class="DBM_SOFT_TONES[chip.tone]"
       :data-test="`dbm-row-chip-${chip.id}`"
     >
       {{ chip.label }}
@@ -52,12 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
+import { DBM_SOFT_TONES, type DbmRowChipTone } from "@/utils/dbm/tones";
 
 /** A fact about one row, ready to render. */
 export interface DbmRowChip {
   id: string;
   label: I18nText;
-  tone: "error" | "warning" | "info" | "new";
+  tone: DbmRowChipTone;
   /** The rule that produced it, shown on hover. */
   rule?: I18nText;
 }
@@ -69,11 +70,4 @@ withDefaults(
   }>(),
   { chips: () => [] },
 );
-
-const TONES: Record<DbmRowChip["tone"], string> = {
-  error: "bg-badge-error-soft-bg text-badge-error-soft-text",
-  warning: "bg-badge-warning-soft-bg text-badge-warning-soft-text",
-  info: "bg-badge-blue-soft-bg text-badge-blue-soft-text",
-  new: "bg-badge-primary-soft-bg text-badge-primary-soft-text",
-};
 </script>

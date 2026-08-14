@@ -82,7 +82,15 @@
  * dead code that still looked correct.
  */
 
-import { readonly, ref, type DeepReadonly, type Ref } from "vue";
+import {
+  readonly,
+  ref,
+  shallowReadonly,
+  shallowRef,
+  type DeepReadonly,
+  type Ref,
+  type ShallowRef,
+} from "vue";
 
 import dbMonitoringService, {
   type ActivitySession,
@@ -378,7 +386,7 @@ export interface DbmTabCountsLoadOptions {
 
 export interface DbmTabCountsSource {
   /** The snapshot every tab strip renders. Always fully shaped. */
-  counts: DeepReadonly<Ref<DbmTabCounts>>;
+  counts: Readonly<ShallowRef<DbmTabCounts>>;
   /** Whether a fan-out is in flight. */
   loading: DeepReadonly<Ref<boolean>>;
   /**
@@ -402,7 +410,7 @@ export interface DbmTabCountsSource {
  * fan-out single.
  */
 export function useDbmTabCounts(): DbmTabCountsSource {
-  const counts = ref<DbmTabCounts>(emptyDbmTabCounts());
+  const counts = shallowRef<DbmTabCounts>(emptyDbmTabCounts());
   const loading = ref(false);
 
   /**
@@ -477,7 +485,7 @@ export function useDbmTabCounts(): DbmTabCountsSource {
     }
   };
 
-  return { counts: readonly(counts), loading: readonly(loading), load };
+  return { counts: shallowReadonly(counts), loading: readonly(loading), load };
 }
 
 /** The seven count fields, as distinct from the snapshot's array payloads. */

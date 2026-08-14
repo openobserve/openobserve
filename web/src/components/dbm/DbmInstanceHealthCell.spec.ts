@@ -101,13 +101,12 @@ describe("DbmInstanceHealthCell", () => {
   // engine has none, because one stream read failed, sends them to fix
   // nothing.
   it("does not blame the engine for a missing limit when Postgres publishes one", () => {
-    const wrapper = mount(DbmInstanceHealthCell, {
-      props: {
-        metrics: metrics({ saturation: { state: "no-limit", used: 20, limit: null, ratio: null } }),
+    const wrapper = mountWith(
+      metrics({
         engine: "postgresql",
-      },
-      global: { plugins: [i18n] },
-    });
+        saturation: { state: "no-limit", used: 20, limit: null, ratio: null },
+      }),
+    );
     const hint = wrapper.findComponent({ name: "OTooltip" }).props("content") as string;
     expect(hint).not.toContain("does not publish");
     // ...and still says SOMETHING, because a bare count with no explanation is
@@ -115,31 +114,20 @@ describe("DbmInstanceHealthCell", () => {
     expect(hint).toContain("no percentage");
   });
 
-  it("does say the engine publishes no limit when that is true of MySQL", () => {
-    const wrapper = mount(DbmInstanceHealthCell, {
-      props: {
-        metrics: metrics({ saturation: { state: "no-limit", used: 20, limit: null, ratio: null } }),
-        engine: "mysql",
-      },
-      global: { plugins: [i18n] },
-    });
-    const hint = wrapper.findComponent({ name: "OTooltip" }).props("content") as string;
-    expect(hint).toContain("does not publish");
-  });
-
-  // The no-limit state is FIXABLE now: the MySQL setup card ships a
+  // The no-limit state is honest AND fixable, and the hint carries both: the
+  // engine genuinely publishes no limit, and the setup card ships a
   // sqlquery/mysql_limits recipe that collects max_connections. A hint that
   // only shrugs "the engine has none" leaves the user parked in a state the
-  // product can close, so it must point at the recipe.
-  it("points a MySQL no-limit row at the setup card's limits recipe", () => {
-    const wrapper = mount(DbmInstanceHealthCell, {
-      props: {
-        metrics: metrics({ saturation: { state: "no-limit", used: 20, limit: null, ratio: null } }),
+  // product can close, so it must also point at the recipe.
+  it("says MySQL publishes no limit, and points at the limits recipe that fixes it", () => {
+    const wrapper = mountWith(
+      metrics({
         engine: "mysql",
-      },
-      global: { plugins: [i18n] },
-    });
+        saturation: { state: "no-limit", used: 20, limit: null, ratio: null },
+      }),
+    );
     const hint = wrapper.findComponent({ name: "OTooltip" }).props("content") as string;
+    expect(hint).toContain("does not publish");
     expect(hint).toMatch(/recipe|mysql_limits/i);
     expect(hint).toContain("max_connections");
   });
@@ -149,17 +137,14 @@ describe("DbmInstanceHealthCell", () => {
   // decides only which HINT a limitless row gets, never whether an arrived
   // limit renders.
   it("renders a measured ratio for a MySQL row whose limit arrived", () => {
-    const wrapper = mount(DbmInstanceHealthCell, {
-      props: {
-        metrics: metrics({
-          saturation: { state: "measured", used: 40, limit: 151, ratio: 40 / 151 },
-          cacheHitRatio: null,
-          replicationLag: null,
-        }),
+    const wrapper = mountWith(
+      metrics({
         engine: "mysql",
-      },
-      global: { plugins: [i18n] },
-    });
+        saturation: { state: "measured", used: 40, limit: 151, ratio: 40 / 151 },
+        cacheHitRatio: null,
+        replicationLag: null,
+      }),
+    );
     expect(wrapper.text()).toContain("26%");
     expect(wrapper.text()).toContain("40");
     expect(wrapper.text()).toContain("151");

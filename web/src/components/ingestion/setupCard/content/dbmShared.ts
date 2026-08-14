@@ -756,6 +756,10 @@ const PG_INDEX_STATS_RECEIVER = `  sqlquery/pg_index_stats:
  * tests/dbm-server-vantage/captures/mysql-table-stats.jsonl; the column
  * contract is pinned by the spec tests either way.
  */
+// MUST stay a static template literal with a static 'o2_recipe' tag literal:
+// the Rust contract test `shipped_recipe_tags_and_backend_dispatch_agree`
+// (tests_server_vantage.rs) extracts o2_recipe tags from this source text and
+// deliberately skips dynamic/interpolated tags. Do not factor into a function.
 const MYSQL_TABLE_STATS_RECEIVER = `  sqlquery/mysql_table_stats:
     driver: mysql
     datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
@@ -858,6 +862,10 @@ const MYSQL_INDEX_STATS_RECEIVER = `  sqlquery/mysql_index_stats:
  * Verified against the MariaDB 11.8 rig 2026-08-13 —
  * tests/dbm-server-vantage/captures/mariadb-table-stats.jsonl.
  */
+// MUST stay a static template literal with a static 'o2_recipe' tag literal:
+// the Rust contract test `shipped_recipe_tags_and_backend_dispatch_agree`
+// (tests_server_vantage.rs) extracts o2_recipe tags from this source text and
+// deliberately skips dynamic/interpolated tags. Do not factor into a function.
 const MARIADB_TABLE_STATS_RECEIVER = `  sqlquery/mariadb_table_stats:
     driver: mysql
     datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
