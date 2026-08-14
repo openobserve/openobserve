@@ -531,6 +531,337 @@ describe("useSyntheticsRecorder", () => {
       expect(r.replayPhase.value).not.toBe("restoring");
     });
 
+    // The reason decides the whole surface downstream — a toast for a cancel, a
+    // recovery banner for a real failure — so it is classified once, here.
+    it("should say a restore ended because the window was closed", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      emitStreamEvent({
+        method: "prefixFailed",
+        stepId: "b",
+        error: "crxRecorder.runActions: Target page, context or browser has been closed",
+        structuredError: { message: "…", name: "TargetClosedError" },
+      });
+
+      expect(r.prefixFailure.value?.reason).toBe("window-closed");
+    });
+
+    it("should say a restore ended because a step failed", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      emitStreamEvent({
+        method: "prefixFailed",
+        stepId: "b",
+        error: "locator.click: Timeout 30000ms exceeded",
+        structuredError: { message: "…", name: "TimeoutError" },
+      });
+
+      expect(r.prefixFailure.value?.reason).toBe("step-failed");
+      // The error card's vocabulary keys on this, so dropping it forced the
+      // banner to render the raw Playwright string instead.
+      expect(r.prefixFailure.value?.structuredError?.name).toBe("TimeoutError");
+    });
+
+    /**
+     * The extension reports one failure twice — a `prefixFailed` push and a
+     * `{success:false}` on the command it is answering. Both used to render, so a
+     * closed window produced a warning banner AND a raw red banner, one cause
+     * stacked on itself.
+     *
+     * The push always lands first: the extension sends it before returning, and both
+     * travel the same relay in order. That ordering is what this suppression relies
+     * on, so it is the ordering the test drives.
+     */
+    it("should not raise a second, rawer report of the failure it already described", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+
+      emitStreamEvent({
+        method: "prefixFailed",
+        stepId: "b",
+        error: "Target page, context or browser has been closed",
+      });
+      respondToLastCommand({
+        success: false,
+        error: "Target page, context or browser has been closed",
+      });
+      await promise;
+
+      expect(r.error.value).toBe("");
+    });
+
+    /**
+     * The session the extension deliberately left open has to stay reachable.
+     *
+     * On a prefix failure the extension keeps the browser sitting where the failing
+     * step stopped — that is what makes the recovery a mode flip rather than a second
+     * restore. Tearing the stream handler down here would leave that session running
+     * with nothing in O2 listening, so the steps the author then records arrive
+     * nowhere.
+     */
+    it("should keep listening to the session a failed prefix left open", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      emitStreamEvent({ method: "prefixFailed", stepId: "b", error: "boom" });
+      respondToLastCommand({ success: false, error: "boom" });
+      await promise;
+
+      emitStreamEvent({
+        method: "recordingStarted",
+        tabId: 1,
+        url: "https://app.test/",
+        mode: "insert",
+        baselineStepCount: 0,
+      });
+      emitStreamEvent({
+        method: "setActions",
+        actions: [],
+        sources: [],
+        browserSteps: [{ id: "n1", action: "click", selector: "#new" }],
+      });
+
+      expect(r.liveSteps.value).toHaveLength(1);
+    });
+
+    // A start that never got as far as replaying a step has no prefixFailed to
+    // speak for it, so the raw report is all there is and must survive.
+    it("should still report a start that failed before the prefix ran", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      respondToLastCommand({ success: false, error: "Recording needs incognito access." });
+      await promise;
+
+      expect(r.error.value).toBe("Recording needs incognito access.");
+    });
+
+    /**
+     * The restore banner counts `stepResults`, and the prefix streams its results over
+     * the same messages a replay uses. Those were being dropped: the stream gate
+     * admits only `running` and `stopping`, and a restore is neither — so the banner
+     * read "step 0 of N" for the whole restore while the recorder window visibly
+     * worked through it.
+     */
+    it("should count the steps a restore has replayed", async () => {
+      const r = useSyntheticsRecorder();
+      // Left in flight deliberately: the extension answers only once the prefix has
+      // finished, so this is the state every one of these results arrives in.
+      void r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      expect(r.replayPhase.value).toBe("restoring");
+
+      emitStreamEvent({ method: "stepReplayResult", stepId: "a", passed: true, duration_ms: 10 });
+      emitStreamEvent({ method: "stepReplayResult", stepId: "b", passed: true, duration_ms: 12 });
+
+      expect(r.stepResults.size).toBe(2);
+    });
+
+    /**
+     * The gate this widens exists to keep late events out of a run nobody is watching
+     * (#13592). Widening it to `restoring` must not reopen that: once the restore has
+     * handed over to recording, its results are history.
+     */
+    it("should still ignore a result that arrives once the restore is over", async () => {
+      const r = useSyntheticsRecorder();
+      void r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      emitStreamEvent({
+        method: "recordingStarted",
+        tabId: 1,
+        url: "https://app.test/",
+        mode: "insert",
+        baselineStepCount: 0,
+      });
+      expect(r.replayPhase.value).not.toBe("restoring");
+
+      emitStreamEvent({ method: "stepReplayResult", stepId: "late", passed: true, duration_ms: 9 });
+
+      expect(r.stepResults.has("late")).toBe(false);
+    });
+
+    // ── Cancelling a restore ────────────────────────────────────────────────
+    //
+    // Until there was a Cancel, closing the recorder window was the only way out of
+    // a restore — and that arrives as an exception, which is how walking away came
+    // to be reported as a failing step.
+
+    /**
+     * The command is STILL OUTSTANDING when the author cancels — which is the only
+     * state a cancel can happen in, since the extension answers `startRecordingFrom`
+     * only once the whole prefix has finished.
+     *
+     * Ending the session force-resolves that promise (`bridgeDisconnect` answers every
+     * pending command with null), so its continuation runs AFTER the cancel has
+     * cleaned up and wrote "Failed to start recording." over the top — a failure
+     * banner for the button the author had just pressed to make things stop.
+     */
+    it("should not report a failure for the restore it just cancelled", async () => {
+      const r = useSyntheticsRecorder();
+      const pending = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+
+      r.cancelRestore();
+      await pending;
+
+      expect(r.error.value).toBe("");
+      expect(r.replayPhase.value).toBe("idle");
+    });
+
+    /**
+     * Why the guard counts sessions rather than raising a "cancelled" flag.
+     *
+     * The abandoned restore's answer arrives whenever it arrives — possibly after the
+     * author has started another one. A flag would still be up, and the new session's
+     * genuine refusal would be swallowed by the previous session's cancel.
+     */
+    it("should not let a cancelled restore silence the next one's failure", async () => {
+      const r = useSyntheticsRecorder();
+      const abandoned = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      r.cancelRestore();
+      await abandoned;
+
+      const second = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      respondToLastCommand({ success: false, error: "Recording needs incognito access." });
+      await second;
+
+      expect(r.error.value).toBe("Recording needs incognito access.");
+    });
+
+    it("should ask the extension to stop the prefix it is replaying", async () => {
+      const r = useSyntheticsRecorder();
+      const pending = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+
+      r.cancelRestore();
+      await pending;
+
+      expect(getLastCommand()?.action).toBe("stopReplay");
+      expect(r.replayPhase.value).toBe("idle");
+      expect(r.isRecording.value).toBe(false);
+    });
+
+    /**
+     * Stopping the player makes the in-flight action throw, so the extension reports
+     * the cancel back as a `prefixFailed` — the same message a real failure uses. O2
+     * asked for it, so it must not turn round and report it as a problem: the cancel
+     * ends the session, and the stream handler ends with it.
+     */
+    it("should stay quiet about the failure its own cancel provokes", async () => {
+      const r = useSyntheticsRecorder();
+      const pending = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+
+      r.cancelRestore();
+      emitStreamEvent({ method: "prefixFailed", stepId: "b", error: "Stopped" });
+      await pending;
+
+      expect(r.prefixFailure.value).toBeNull();
+      expect(r.error.value).toBe("");
+    });
+
+    // The suppression is scoped to the cancelled session: the next restore has to be
+    // able to report its own failures.
+    it("should report a failure in the restore that follows a cancelled one", async () => {
+      const r = useSyntheticsRecorder();
+      const first = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      r.cancelRestore();
+      await first;
+
+      const second = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await second;
+      emitStreamEvent({ method: "prefixFailed", stepId: "b", error: "Timeout 30000ms exceeded" });
+
+      expect(r.prefixFailure.value?.stepId).toBe("b");
+    });
+
+    // ── Recovering from a failed prefix ─────────────────────────────────────
+    //
+    // The browser is already sitting where the failing step stopped, which is a
+    // legitimate restored state — just an earlier one than was asked for. So the
+    // recovery is a mode flip on the session that is still open, not another
+    // restore: no teardown, no second replay, no wasted minute (design §7.6).
+
+    async function failedRestore(r: ReturnType<typeof useSyntheticsRecorder>) {
+      const promise = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      emitStreamEvent({
+        method: "prefixFailed",
+        stepId: "b",
+        error: "locator.click: Timeout 30000ms exceeded",
+        structuredError: { message: "…", name: "TimeoutError" },
+      });
+      respondToLastCommand({ success: false, error: "Timeout" });
+      await promise;
+    }
+
+    it("should record on the session the failed prefix left open", async () => {
+      const r = useSyntheticsRecorder();
+      await failedRestore(r);
+
+      const promise = r.recordFromHere();
+      expect(getLastCommand()?.action).toBe("recordFromHere");
+
+      respondToLastCommand({ success: true });
+      await promise;
+      // The extension still has the last word on when capture starts — it has to
+      // reset the collection and flip the mode first.
+      emitStreamEvent({
+        method: "recordingStarted",
+        tabId: 7,
+        url: "https://app.test/",
+        mode: "insert",
+        baselineStepCount: 0,
+      });
+
+      expect(r.isRecording.value).toBe(true);
+      expect(r.prefixFailure.value).toBeNull();
+    });
+
+    // The banner is the only thing still describing that failure; a recovery that
+    // starts while it is on screen leaves the author recording under a warning.
+    it("should retire the failure the moment the recovery starts", async () => {
+      const r = useSyntheticsRecorder();
+      await failedRestore(r);
+
+      const promise = r.recordFromHere();
+      expect(r.prefixFailure.value).toBeNull();
+
+      respondToLastCommand({ success: true });
+      await promise;
+    });
+
+    /**
+     * An extension too old for the command answers `unsupported-command` rather than
+     * hanging (P1). The failure has to come back so the author is told, instead of a
+     * banner quietly closing over a recording that never started.
+     */
+    it("should report a refusal to record on the open session", async () => {
+      const r = useSyntheticsRecorder();
+      await failedRestore(r);
+
+      const promise = r.recordFromHere();
+      respondToLastCommand({ success: false, error: "unsupported-command" });
+      await promise;
+
+      expect(r.error.value).toBe("unsupported-command");
+      expect(r.isRecording.value).toBe(false);
+    });
+
     // Starting a fresh session must clear the previous failure, or the recovery
     // banner outlives the problem it describes.
     it("should clear a previous restore failure when a new session starts", async () => {

@@ -29,6 +29,16 @@ import type { I18nText } from "@/types/i18n";
 export type ReplayPhase =
   "idle" | "running" | "restoring" | "stopping" | "passed" | "failed" | "stopped";
 
+/**
+ * Why a restore-then-record session stopped short of the point it was aiming for.
+ *
+ * Only `step-failed` is a fault in the journey. The other two are the author
+ * ending a restore they no longer wanted — by closing the recorder window, which
+ * is the exit that window offers, or by pressing Cancel — and reporting either of
+ * those as a failing step blames the journey for a deliberate act.
+ */
+export type RestoreFailureReason = "window-closed" | "cancelled" | "step-failed";
+
 /** Machine-readable error from the extension's replay pipeline. */
 export interface StructuredError {
   message: I18nText;
@@ -308,6 +318,14 @@ export type RecorderCommand =
       headers?: { key: string; value: string }[];
       cookies?: { name: string; value: string; domain: string }[];
     }
+  | {
+      /**
+       * Start capturing on the session a failed prefix left open, from wherever the
+       * failing step stopped. A mode flip on a live context, so it carries nothing —
+       * the state it records against is already in the browser.
+       */
+      action: "recordFromHere";
+    }
   | { action: "stopReplay" };
 
 export interface RecorderCommandEnvelope {
@@ -412,6 +430,13 @@ export type RecorderPushPayload =
       stepId: string;
       error?: string;
       structuredError?: StructuredError;
+      /**
+       * Why the restore ended, when the extension is new enough to know.
+       *
+       * Absent from extensions that predate it, which is why O2 still classifies
+       * from the error itself — see `classifyRestoreFailure`.
+       */
+      reason?: RestoreFailureReason;
     }
   | { method: "recordingStopped"; totalSteps: number }
   | {

@@ -421,7 +421,12 @@ function handleUpdateExpanded(ids: string[]) {
 
     <!-- ── cell-actions: Row action buttons (editor mode) ──────── -->
     <template v-if="mode === 'editor'" #cell-actions="{ row }">
-      <div class="flex shrink-0 items-center gap-0.5" :class="{ invisible: isLocked }">
+      <!-- Locked leaves these on screen and unavailable, rather than hiding them.
+           Hidden, a running replay or restore looked like the row had lost actions it
+           still has, and the author had nothing to point at to explain why. Each
+           button carries its own `isLocked` disable, so unavailability is stated per
+           control rather than by making the whole cluster vanish. -->
+      <div class="flex shrink-0 items-center gap-0.5">
         <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
 
         <!-- Disabled on the first row: inserting before it would leave the journey

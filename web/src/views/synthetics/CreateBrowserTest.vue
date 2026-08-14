@@ -193,6 +193,17 @@ const checkingExtension = ref(false);
  */
 const canRecordFrom = computed(() => extensionReady.value && recorder.hasCapability("recordFrom"));
 
+/**
+ * Whether it can also record on the session a FAILED restore left open.
+ *
+ * A separate capability from `recordFrom`, and read separately, because the two
+ * shipped in different extension builds — an installed base that updates on the Web
+ * Store's schedule always contains both.
+ */
+const canRecordFromFailure = computed(
+  () => extensionReady.value && recorder.hasCapability("recordFromFailure"),
+);
+
 async function probeExtension() {
   checkingExtension.value = true;
   try {
@@ -1088,6 +1099,7 @@ function onClearResults() {
                     :start-url="check.url"
                     :extension-ready="extensionReady"
                     :can-record-from="canRecordFrom"
+                    :can-record-from-failure="canRecordFromFailure"
                     :auto-record="autoRecord"
                     :replay-phase="replayPhase"
                     :step-results="stepResults"

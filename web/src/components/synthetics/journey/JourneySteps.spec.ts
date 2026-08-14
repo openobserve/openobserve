@@ -237,6 +237,65 @@ describe("JourneySteps", () => {
     });
   });
 
+  // ── Locked (a replay or a restore is running) ──────────────────────
+  //
+  // Locked is not readonly. Readonly means the journey cannot be edited at all and
+  // the actions do not exist; locked means they exist and are unavailable *right
+  // now*. Hiding them said the wrong thing — the row appeared to lose capabilities
+  // it still has, and the cluster's width vanished with it.
+
+  describe("locked", () => {
+    function mountLocked(locked: boolean) {
+      return mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor", locked },
+        global: { stubs: STUBS },
+      }) as VueWrapper;
+    }
+
+    const ROW_ACTIONS = [
+      "synthetics-journey-step-record-before-btn",
+      "synthetics-journey-step-insert-btn",
+      "synthetics-journey-step-duplicate-btn",
+      "synthetics-journey-step-delete-btn",
+    ];
+
+    it("should keep the row actions on screen while locked", async () => {
+      wrapper = mountLocked(true);
+      await flushPromises();
+
+      for (const action of ROW_ACTIONS) {
+        expect(wrapper.find(`[data-test="${action}"]`).exists(), `${action} left the row`).toBe(
+          true,
+        );
+      }
+      // The cluster itself must not be hidden either — an invisible button is
+      // unreachable while still claiming its place, which is the worst of both.
+      expect(wrapper.find(".invisible").exists(), "the action cluster is still hidden").toBe(false);
+    });
+
+    it("should disable every row action while locked", async () => {
+      wrapper = mountLocked(true);
+      await flushPromises();
+
+      for (const action of ROW_ACTIONS) {
+        expect(
+          wrapper.find(`[data-test="${action}"]`).attributes("disabled"),
+          `${action} is still clickable`,
+        ).toBeDefined();
+      }
+    });
+
+    it("should leave the row actions alone when nothing is running", async () => {
+      wrapper = mountLocked(false);
+      await flushPromises();
+
+      // record-before stays disabled on the FIRST row by its own guardrail, so the
+      // second row is the one that proves the lock is not what disabled them.
+      const rows = wrapper.findAll('[data-test="synthetics-journey-step-insert-btn"]');
+      expect(rows[0].attributes("disabled")).toBeUndefined();
+    });
+  });
+
   // ── Step selection (row click) ─────────────────────────────────────
 
   describe("step selection", () => {

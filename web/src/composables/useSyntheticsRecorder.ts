@@ -25,10 +25,13 @@ import type {
   RecorderStopResponse,
   ReplayResponse,
   ReplayPhase,
+  RestoreFailureReason,
   StepReplayResult,
+  StructuredError,
   WireStep,
 } from "@/types/synthetics";
 import { substituteVariables } from "@/utils/synthetics/mapRecordedStep";
+import { classifyRestoreFailure } from "@/utils/synthetics/replayFailure";
 import { DEFAULT_TEST_ID_ATTR, MIN_EXTENSION_VERSION } from "@/constants/synthetics";
 
 /**
@@ -99,8 +102,20 @@ const useSyntheticsRecorder = () => {
    * block. The extension reports the count at the moment it enables recording.
    */
   const baselineStepCount = ref<number | null>(null);
-  /** Which step stopped the restore, or null when nothing has failed this session. */
-  const prefixFailure = ref<{ stepId: string; error?: string } | null>(null);
+  /**
+   * How the restore ended short, or null when nothing has ended it this session.
+   *
+   * `reason` is what the surface downstream keys on: a cancel is narrated with a
+   * toast and nothing else, while a step that genuinely failed earns a banner with
+   * a way out. `structuredError` is kept for the same reason the step error card
+   * keeps it — it carries the error class the human wording is derived from.
+   */
+  const prefixFailure = ref<{
+    stepId: string;
+    error?: string;
+    structuredError?: StructuredError;
+    reason: RestoreFailureReason;
+  } | null>(null);
 
   // Synchronous callback invoked when recording stops externally (user closes the extension
   // window without clicking "Stop"). BrowserJourney sets this to commit the steps immediately,
@@ -129,6 +144,17 @@ const useSyntheticsRecorder = () => {
   // Stop followed quickly by Re-run lets the OLD replay's response land on the NEW run and
   // knock `running` back to `stopped`. Latent until stopping became fast enough to hit.
   let replayGeneration = 0;
+
+  // The same rule for a restore, and it needs its own counter because a restore and a
+  // replay can be abandoned independently.
+  //
+  // `startRecordingFrom` is answered only when the whole prefix has finished, so at the
+  // moment anyone cancels one, its command is ALWAYS still outstanding. Ending the
+  // session force-resolves it — `bridgeDisconnect` answers every pending command with
+  // null — and the continuation then ran on a session that no longer existed, writing
+  // "Failed to start recording." over the cleanup the cancel had just done. The author
+  // pressed a button to stop things and was shown a failure.
+  let restoreGeneration = 0;
 
   let nonceCounter = 0;
   function nextNonce(): string {
@@ -312,7 +338,16 @@ const useSyntheticsRecorder = () => {
         // The restore could not reach the requested point. The extension leaves the
         // session open and the browser sitting where the failing step stopped, so the
         // recovery is a mode flip rather than another replay — see design §7.6.
-        prefixFailure.value = { stepId: payload.stepId, error: payload.error };
+        prefixFailure.value = {
+          stepId: payload.stepId,
+          error: payload.error,
+          structuredError: payload.structuredError,
+          reason: classifyRestoreFailure(payload),
+        };
+        // This message describes the failure in full; the `{success:false}` answer to
+        // the command is the same event with less in it. Clearing here — and refusing
+        // to set it below — is what stops one cause rendering as two banners.
+        error.value = "";
         replayPhase.value = "failed";
         activeStepId.value = null;
         isRecording.value = false;
@@ -332,7 +367,18 @@ const useSyntheticsRecorder = () => {
         // A result already in flight when Stop was pressed is real evidence — the step
         // did run — so it still counts toward "completed X of N" while `stopping`. Once
         // the replay is over, late arrivals belong to a run nobody is looking at.
-        if (replayPhase.value !== "running" && replayPhase.value !== "stopping") break;
+        //
+        // `restoring` belongs here for that same reason, and was missing: this gate
+        // predates the phase, so it admitted only the two that existed when it was
+        // written. A restore streams its prefix over these very messages, and dropping
+        // them left the banner reading "step 0 of N" for the whole restore while the
+        // recorder window visibly worked through it.
+        if (
+          replayPhase.value !== "running" &&
+          replayPhase.value !== "stopping" &&
+          replayPhase.value !== "restoring"
+        )
+          break;
         stepResults.set(payload.stepId, {
           stepId: payload.stepId,
           stepName: payload.stepName ?? "",
@@ -454,6 +500,7 @@ const useSyntheticsRecorder = () => {
     currentUrl.value = opts.targetUrl ?? "";
     mode.value = "recording";
     replayPhase.value = "restoring";
+    const generation = ++restoreGeneration;
 
     window.postMessage({ ch: "oo-bridge-probe" }, "*");
     await new Promise((r) => setTimeout(r, 500));
@@ -498,11 +545,84 @@ const useSyntheticsRecorder = () => {
       REPLAY_TIMEOUT_MS,
     );
 
+    // Superseded — this answer belongs to a restore that has already been abandoned or
+    // replaced, and everything it would touch describes a session that is gone. The
+    // one state it must NOT touch is `error`: a cancel clears that on its way out, and
+    // the null this promise was force-resolved with reads as a failure.
+    if (generation !== restoreGeneration) return;
+
+    if (!res?.success) {
+      // A `prefixFailed` has already said what happened, with the step and the error
+      // class this answer does not carry. Repeating it here is what put a raw red
+      // banner under the warning banner describing the same event.
+      if (!prefixFailure.value) error.value = res?.error || "Failed to start recording.";
+      replayPhase.value = "idle";
+      // A prefix failure is the one refusal the extension does NOT tear down after: it
+      // keeps the browser sitting where the failing step stopped, which is what makes
+      // the recovery a mode flip rather than a second restore (design §7.6). Dropping
+      // the stream handler here would leave that session running with nothing in O2
+      // listening to it, so the recovery would record into a void.
+      if (!prefixFailure.value) bridgeDisconnect();
+    }
+  }
+
+  /**
+   * Record on the session a failed prefix left open, starting where it stopped.
+   *
+   * The extension does not tear down after a prefix failure: the browser sits at the
+   * state the failing step reached, which is a legitimate restored state — simply an
+   * earlier one than was asked for, and exactly where an author fixing that step
+   * wants to be. So this is a mode flip on the live session rather than a second
+   * restore: no window teardown, no replay, no wasted minute (design §7.6).
+   *
+   * The extension still decides when capture begins — it has to empty the collection
+   * of the restore's artifacts first — so `isRecording` is left for the
+   * `recordingStarted` push to set, as it is for every other way recording starts.
+   */
+  async function recordFromHere(): Promise<void> {
+    error.value = "";
+    liveSteps.value = [];
+    baselineStepCount.value = null;
+    // The failure is over the moment its recovery starts; leaving it set would keep a
+    // warning on screen above a live recording.
+    prefixFailure.value = null;
+    replayPhase.value = "idle";
+    mode.value = "recording";
+
+    bridgeConnect();
+    const res = await sendCommand<RecorderStartResponse>({ action: "recordFromHere" });
     if (!res?.success) {
       error.value = res?.error || "Failed to start recording.";
-      replayPhase.value = "idle";
       bridgeDisconnect();
     }
+  }
+
+  /**
+   * Abandon a restore that is still replaying.
+   *
+   * The recorder window used to be the only exit from a restore, and closing it
+   * surfaces as an exception the extension can only report as a failing step. This
+   * is the exit that says what it means.
+   *
+   * Stopping the player makes the in-flight action throw, so the extension answers
+   * this cancel with a `prefixFailed` describing an abort O2 asked for. Reporting
+   * that back to the author would be the same misattribution in reverse — which is
+   * what the teardown below prevents: the stream handler goes with the session, so
+   * the failure it provoked has nowhere to land.
+   */
+  function cancelRestore(): void {
+    // Orphan the start command before tearing anything down. Its promise outlives the
+    // session, and the teardown below is what resolves it.
+    restoreGeneration++;
+    sendCommand({ action: "stopReplay" }); // fire-and-forget: nothing waits on the abort
+    prefixFailure.value = null;
+    error.value = "";
+    replayPhase.value = "idle";
+    activeStepId.value = null;
+    isRecording.value = false;
+    liveSteps.value = [];
+    baselineStepCount.value = null;
+    bridgeDisconnect();
   }
 
   /**
@@ -697,6 +817,8 @@ const useSyntheticsRecorder = () => {
     detectExtension,
     startRecording,
     startRecordingFrom,
+    recordFromHere,
+    cancelRestore,
     recordedSteps,
     baselineStepCount,
     prefixFailure,

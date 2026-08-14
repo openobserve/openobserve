@@ -64,6 +64,15 @@ const props = defineProps<{
    * would be refused.
    */
   canRecordFrom?: boolean;
+  /**
+   * Whether the installed extension can record on the session a failed restore left
+   * open (`recordFromFailure`).
+   *
+   * Separate from `canRecordFrom` because the two shipped in different extension
+   * builds, and O2 always runs against a mix of them: without this, the recovery
+   * button would be offered to an extension that answers it with a refusal.
+   */
+  canRecordFromFailure?: boolean;
   autoRecord?: boolean; // if true, start recording immediately on mount
   /** Owned by the parent (CreateBrowserTest). */
   replayPhase?: ReplayPhase;
@@ -179,8 +188,16 @@ const deleteConfirmMessage = computed(() => {
 });
 
 // ── Drag-and-drop ──────────────────────────────────────────────────────────
+// `isRestoring` as well as the parent's replay: a reorder mid-restore edits the very
+// list the restore is anchored in, so the prefix being replayed and the index the
+// capture splices at stop describing the same journey.
 const dragReady = computed(
-  () => !isRecording.value && !isReplayActive.value && !props.readonly && !filterQuery.value.trim(),
+  () =>
+    !isRecording.value &&
+    !isReplayActive.value &&
+    !isRestoring.value &&
+    !props.readonly &&
+    !filterQuery.value.trim(),
 );
 // Column stays visible during replay (handles invisible) to prevent layout shift
 const showDragColumn = computed(
@@ -319,8 +336,13 @@ watch(
   },
 );
 
+// Selection is the OTHER way to delete: ticking rows hands the parent a bulk Delete
+// in its sticky footer. Recording and a running replay were excluded from the start;
+// a restore has to be too, or the journey can be edited underneath the very run that
+// is anchored in it — and the row's own Delete being disabled makes that path look
+// deliberate rather than missed.
 const multiSelectEnabled = computed(
-  () => !isRecording.value && !props.readonly && !isReplayLocked.value,
+  () => !isRecording.value && !props.readonly && !isReplayLocked.value && !isRestoring.value,
 );
 
 // ── Recording state ────────────────────────────────────────────────────────
@@ -342,6 +364,69 @@ const prefixFailure = recorder.prefixFailure;
 const capturedSteps = recorder.liveSteps;
 const currentUrl = recorder.currentUrl;
 const recordingError = recorder.error;
+
+// ── How a restore ended ────────────────────────────────────────────────────
+//
+// Two endings share one message from the extension, and nothing else about them
+// is alike. The recorder window is the exit a restore offers, so closing it is a
+// cancel — it simply reaches O2 as `runActions` rejecting, which the extension
+// can only report through the channel a failing step uses.
+
+/** The one restore ending with something to explain and somewhere to go. */
+const restoreStepFailure = computed(() =>
+  prefixFailure.value?.reason === "step-failed" ? prefixFailure.value : null,
+);
+
+// The same vocabulary the step error card speaks (issue 003), against the same
+// `structuredError.name`. A restore IS a replay of the journey, so an author who
+// has read "Timeout" on a failed step should read the same word here.
+const restoreFailureIcon = computed(() => {
+  switch (restoreStepFailure.value?.structuredError?.name) {
+    case "TimeoutError":
+      return "timer-off";
+    case "TargetClosedError":
+      return "visibility-off";
+    default:
+      return "error_outline";
+  }
+});
+
+const restoreFailureLabel = computed(() => {
+  switch (restoreStepFailure.value?.structuredError?.name) {
+    case "TimeoutError":
+      return t("synthetics.stepErrors.timeout");
+    case "TargetClosedError":
+      return t("synthetics.stepErrors.tabClosed");
+    default:
+      return t("synthetics.stepErrors.default");
+  }
+});
+
+/** Is a restore still running? Distinct from the parent's replay — see `restorePhase`. */
+const isRestoring = computed(() => restorePhase.value === "restoring");
+
+/**
+ * Put the editor back after a restore the author walked away from, and say so.
+ *
+ * A toast rather than a banner, for the reason the added-steps toast is one (see
+ * `announceRecordedSteps`): the author spent that session in the extension's own
+ * window, and there is nothing here to act on — a banner would sit on the table
+ * demanding attention for a decision already taken. The marker goes with it,
+ * because left up it promises a destination for a session that no longer exists
+ * and the toolbar's Record would silently inherit it.
+ *
+ * Only the closed window is narrated. A cancel from the button below announces
+ * itself by being pressed.
+ */
+watch(
+  () => prefixFailure.value?.reason,
+  (reason) => {
+    if (reason !== "window-closed" && reason !== "cancelled") return;
+    anchorStepId.value = null;
+    if (reason === "window-closed")
+      toast({ variant: "info", message: t("synthetics.journey.restoreCancelledWindowClosed") });
+  },
+);
 
 // Emit selection state changes for the parent's sticky footer
 watch([selectedCount, isRecording], ([count, recording]) => {
@@ -547,6 +632,47 @@ function startRecording() {
     });
 }
 
+/**
+ * Record from where the failing step stopped, on the session still open there.
+ *
+ * Re-anchors on that step, so what the author records lands immediately before the
+ * step that could not run — which is where a missing precondition belongs. No
+ * restore runs: the browser has not moved since it stopped, which is the whole
+ * point of the extension leaving the session up (design §7.6).
+ */
+function onRecordFromFailure() {
+  const failed = restoreStepFailure.value;
+  if (!failed) return;
+  anchorStepId.value = failed.stepId;
+  recorder.recordFromHere().catch((err) => {
+    recorder.error.value = err instanceof Error ? err.message : String(err);
+  });
+}
+
+/**
+ * Abandon a restore that is still replaying.
+ *
+ * The exit the recorder window used to be. Same ending as the failure dismissal —
+ * the anchor goes with the session — which is why both go through the composable's
+ * one cancel rather than each unwinding the state their own way.
+ */
+function onCancelRestore() {
+  anchorStepId.value = null;
+  recorder.cancelRestore();
+}
+
+/**
+ * Give up on the restore and go back to editing.
+ *
+ * Drops the anchor as well as the banner: the session it pointed into is over, and
+ * a marker left behind would send the toolbar's Record into the middle of the
+ * journey with nothing on screen to explain why.
+ */
+function onDismissRestoreFailure() {
+  anchorStepId.value = null;
+  recorder.cancelRestore();
+}
+
 /** Where recorded steps land: the anchor's index, or the end when unanchored. */
 function currentInsertAt(): number {
   if (!anchorStepId.value) return props.modelValue.length;
@@ -639,6 +765,11 @@ const extensionSetup = ref<{ open: boolean; action: "record" | "replay" }>({
 });
 
 function onRecordButtonClick() {
+  // This button has always meant "record at the end". The anchor is read by both
+  // record affordances, so one left over from an anchored session that ended without
+  // committing — a failed restore, a closed window — would silently turn this into a
+  // mid-journey insert with nothing on screen saying so.
+  anchorStepId.value = null;
   if (props.extensionReady) {
     startRecording();
   } else {
@@ -699,6 +830,13 @@ function stopActiveRecording(): boolean {
 
 /** Sync stop for replay — called by parent's route guard. */
 function stopActiveReplay(): boolean {
+  // A restore is a replay this component started, so it is one of the things the
+  // guard is asking about. Left running it holds an incognito window open with
+  // nothing listening to it, since the page that was listening is gone.
+  if (isRestoring.value) {
+    onCancelRestore();
+    return true;
+  }
   // `stopping` included: the extension has been asked to stop but has not confirmed, so
   // the replay is still live and leaving without the sync stop can orphan it.
   if (!isReplayLocked.value) return false;
@@ -938,7 +1076,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
   <div ref="journeyRootRef" class="flex min-h-0 w-full flex-col py-4">
     <!-- Toolbar — pl-4 mirrors the expand column (w-4) so the select-all checkbox
          aligns with the row checkboxes in the OTable below. -->
-    <div class="mb-3 ml-5.5 flex items-center gap-4 px-3">
+    <div class="mb-3 ml-6.5 flex items-center gap-4 px-3">
       <!-- Select-all — visibility:hidden during replay to preserve layout -->
       <OCheckbox
         :model-value="allSelected || undefined"
@@ -966,7 +1104,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       <OInput
         v-model="filterQuery"
         :placeholder="t('synthetics.journey.filterSteps')"
-        class="min-w-32! flex-1"
+        class="flex-1"
         data-test="synthetics-journey-filter-input"
       />
       <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
@@ -975,7 +1113,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           v-if="!isRecording && !isReplayLocked"
           variant="outline"
           size="sm"
-          :disabled="readonly || isRecording"
+          :disabled="readonly || isRecording || isRestoring"
           data-test="synthetics-journey-add-step-btn"
           @click="addStep"
           icon-left="add"
@@ -989,7 +1127,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
             v-if="replayPhase === 'idle'"
             variant="outline"
             size="sm"
-            :disabled="readonly || modelValue.length === 0"
+            :disabled="readonly || modelValue.length === 0 || isRestoring"
             data-test="synthetics-journey-replay-btn"
             @click="onReplayButtonClick"
             icon-left="replay"
@@ -1019,10 +1157,14 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           >
             {{ t("synthetics.journey.stopping") }}
           </OButton>
+          <!-- Re-run, reached when a previous replay has finished. Carries the same
+               restore guard as the idle branch: it is the same button in the same
+               slot, and a restore holds the only session a replay could use. -->
           <OButton
             v-else-if="isReplayTerminal"
             variant="outline"
             size="sm"
+            :disabled="isRestoring"
             data-test="synthetics-journey-replay-btn"
             @click="onReplayButtonClick"
             icon-left="replay"
@@ -1056,7 +1198,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           v-else
           variant="primary"
           size="sm"
-          :disabled="readonly || isRecording || isReplayLocked"
+          :disabled="readonly || isRecording || isReplayLocked || isRestoring"
           data-test="synthetics-journey-record-btn"
           @click="onRecordButtonClick"
           icon-left="smart-display"
@@ -1106,21 +1248,72 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       <span class="text-text-body text-sm">
         {{ t("synthetics.journey.restoringState", { done: restoredCount, total: restoreTotal }) }}
       </span>
+      <span class="flex-1" />
+      <!-- Without this, closing the recorder window was the only way to end a
+           restore — and that arrives as an exception the extension can only report
+           as a failing step. The exit has to be here, where the author is. -->
+      <OButton
+        variant="ghost"
+        size="xs"
+        data-test="synthetics-journey-restore-cancel-btn"
+        @click="onCancelRestore"
+      >
+        {{ t("synthetics.journey.cancel") }}
+      </OButton>
     </div>
 
     <!-- The restore could not reach the anchor. The session is still alive and the
          browser is sitting where this step stopped, so the recovery re-anchors there
          rather than replaying the whole prefix again (design §7.6). -->
     <div
-      v-if="prefixFailure"
+      v-if="restoreStepFailure"
       class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mx-2! mb-3 flex flex-col gap-2 border p-3"
       role="alert"
       data-test="synthetics-journey-prefix-failed"
     >
-      <span class="text-text-body text-sm font-semibold">
-        {{ t("synthetics.journey.restoreFailed", { step: failedStepNumber }) }}
-      </span>
-      <span class="text-text-secondary text-xs">{{ prefixFailure.error }}</span>
+      <div class="flex items-center gap-2">
+        <OIcon
+          :name="restoreFailureIcon"
+          size="sm"
+          class="text-badge-warning-ol-text"
+          aria-hidden="true"
+        />
+        <span class="text-text-heading text-sm font-semibold">
+          {{ t("synthetics.journey.restoreFailed", { step: failedStepNumber }) }}
+        </span>
+      </div>
+      <!-- The error class in words, then the extension's own message. Naming the
+           class alone hides what happened; the raw string alone is the Playwright
+           internals the author was reading before this. -->
+      <p class="text-text-secondary m-0 text-xs">
+        {{ restoreFailureLabel }} — {{ t("synthetics.journey.restoreFailedHint") }}
+      </p>
+      <pre
+        class="text-text-body bg-surface-subtle rounded-default m-0 overflow-x-auto px-2 py-1.5 font-mono text-xs whitespace-pre-wrap"
+        data-test="synthetics-journey-prefix-failed-detail"
+        >{{ restoreStepFailure.error }}</pre>
+      <div class="flex items-center gap-2">
+        <!-- Recording before step 1 would leave the journey starting with something
+             that is not a navigate, which validateJourneySteps rejects — the same
+             guardrail the row button carries. -->
+        <OButton
+          v-if="canRecordFromFailure && failedStepNumber > 1"
+          variant="primary"
+          size="sm"
+          data-test="synthetics-journey-prefix-failed-record-btn"
+          @click="onRecordFromFailure"
+        >
+          {{ t("synthetics.journey.recordBeforeFailedStep", { step: failedStepNumber }) }}
+        </OButton>
+        <OButton
+          variant="ghost"
+          size="sm"
+          data-test="synthetics-journey-prefix-failed-cancel-btn"
+          @click="onDismissRestoreFailure"
+        >
+          {{ t("synthetics.journey.cancel") }}
+        </OButton>
+      </div>
     </div>
 
     <!-- Incognito blocked warning card (replay pre-flight or recording start) -->
@@ -1471,7 +1664,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       name-key="name"
       detail-key="selector"
       :dot-state-fn="dotStateForRow"
-      :locked="isReplayLocked"
+      :locked="isReplayLocked || isRestoring"
       :readonly="readonly"
       :enable-reorder="showDragColumn"
       :disable-row-reorder="() => !dragReady"
