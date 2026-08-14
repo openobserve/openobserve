@@ -790,6 +790,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/session", get(traces::session::get_latest_sessions))
         .route("/{org_id}/{stream_name}/traces/session/details", get(traces::session::get_session_details))
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/time_range", get(traces::time_index::get_trace_time_range))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
         // LLM Model Pricing
