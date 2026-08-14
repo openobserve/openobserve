@@ -883,11 +883,14 @@ const tabCounts = computed(() =>
         // total. While loading — and while the fallback read is still out —
         // `undefined` lets the shared snapshot's own zero-trace fallback
         // stand instead of stamping a transient 0 over it.
+        //
+        // Each branch carries the vantage of the list it counted, so the tab
+        // strip's qualifier follows the number instead of being fixed per page.
         loading.value || (!rows.value.length && !serverRows.value.length)
           ? undefined
           : rows.value.length
-            ? rows.value.length
-            : countClaim(serverRows.value.length, serverTruncated.value),
+            ? countClaim(rows.value.length, false, "client")
+            : countClaim(serverRows.value.length, serverTruncated.value, "server"),
       ),
       "databaseCount",
       // 0 here means "no client traffic", not "no databases" — the shared

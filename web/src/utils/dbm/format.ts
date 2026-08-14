@@ -165,7 +165,27 @@ export interface DbmCountClaim {
   count: number;
   /** `false` = the read hit its cap, so `count` is a floor and not a total. */
   complete: boolean;
+  /**
+   * Which vantage counted it, for the two OVERLAP measures only — call count
+   * and database time are the exactly-two figures both feeds produce, and D2
+   * makes the qualifier mandatory wherever one renders.
+   *
+   * `undefined` is the honest default for every count that is NOT an overlap
+   * measure (deadlock events, blocked sessions, relations): those exist in one
+   * vantage only, so there is nothing to disambiguate and a qualifier would
+   * imply a choice that was never made.
+   */
+  vantage?: DbmCountVantage;
 }
+
+/**
+ * Which feed produced a count.
+ *
+ * `client` is the trace rollup — instrumented, finished calls only, with no
+ * head-sampling compensation, so it is a SUBSET and never the population.
+ * `server` is the database's own counters, which see every client.
+ */
+export type DbmCountVantage = "server" | "client";
 
 /**
  * What a count is allowed to claim about itself.
@@ -175,10 +195,29 @@ export interface DbmCountClaim {
  * to say "at least" rather than "every" — the difference between a completeness
  * claim and an undercount presented as a total.
  */
-export const countClaim = (count: number, truncated?: boolean): DbmCountClaim => ({
+export const countClaim = (
+  count: number,
+  truncated?: boolean,
+  vantage?: DbmCountVantage,
+): DbmCountClaim => ({
   count,
   complete: !truncated,
+  ...(vantage ? { vantage } : {}),
 });
+
+/**
+ * The vantage a badge count carries, or `null` when it carries none.
+ *
+ * Bare numbers answer `null` deliberately: a plain `number` is what the
+ * non-overlap badges have always passed, and inventing a vantage for one would
+ * qualify a figure that has nothing to be qualified against.
+ */
+export const countVantage = (
+  value: DbmCountClaim | number | null | undefined,
+): DbmCountVantage | null => {
+  if (value === null || value === undefined || typeof value === "number") return null;
+  return value.vantage ?? null;
+};
 
 /**
  * The numeric floor of a count that may be a claim — for arithmetic and

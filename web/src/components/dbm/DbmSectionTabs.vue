@@ -50,16 +50,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span>{{ section.label }}</span>
       <!-- The count is what the tab is about, so the reader can see the shape
-           of the other views without opening them. -->
+           of the other views without opening them.
+
+           An OVERLAP count (calls) carries its vantage as a suffix on the
+           badge itself — `141,984 client` — because D2 makes the qualifier
+           mandatory wherever an overlap value renders, and this badge is the
+           one place the same number appears on all eight pages. The suffix is
+           absent for the counts that exist in one vantage only: qualifying a
+           deadlock count would imply a choice between feeds that was never
+           available. -->
       <span
         v-if="section.count != null"
-        class="text-2xs rounded-full px-1.5 py-1 leading-none font-bold"
+        class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-1 leading-none font-bold"
         :class="
           section.key === activeTab
             ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
             : 'bg-surface-subtle text-text-secondary'
         "
-        >{{ section.count }}</span
+        :data-test="`dbm-section-tab-badge-${section.key}`"
+        ><span>{{ section.count }}</span
+        ><span
+          v-if="section.vantageLabel"
+          class="text-3xs font-normal opacity-80"
+          :data-test="`dbm-section-tab-vantage-${section.key}`"
+          >{{ section.vantageLabel }}</span
+        ></span
       >
       <OTooltip v-if="section.hint" side="bottom" :content="section.hint" />
     </OTab>
@@ -74,7 +89,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { badgeCount, type DbmCountClaim } from "@/utils/dbm/format";
+import { badgeCount, countVantage, type DbmCountClaim } from "@/utils/dbm/format";
 
 /**
  * A badge count is either a plain number (no cap to report) or a
@@ -165,9 +180,56 @@ interface Section {
    * reach the template as a bare total.
    */
   count?: string | null;
+  /**
+   * The vantage suffix printed beside an OVERLAP count, or `undefined` for a
+   * count with only one possible source. Resolved from the count itself, so a
+   * badge cannot be qualified with a vantage that did not produce it.
+   */
+  vantageLabel?: I18nText;
   /** What the count means, when that is not obvious from the label. */
   hint?: I18nText;
 }
+
+/**
+ * The qualifier and the sentence for an overlap badge, chosen by the vantage
+ * that actually produced the number.
+ *
+ * The hint is resolved with the count rather than stated once in the locale
+ * file because the SAME badge is fed by three different reads — the trace
+ * rollup, the database's own slowest-statement list, and a page's own
+ * override — and a hint fixed at one of them is false in the other two. The
+ * old copy ("Every finished call in this window") was the trace sentence
+ * printed over all three: false for a server-fed badge, and false even for the
+ * trace one, which counts every finished INSTRUMENTED call.
+ */
+const overlapBadge = (
+  count: DbmCountClaim | number | null | undefined,
+): { vantageLabel?: I18nText; hint: I18nText } => {
+  const vantage = countVantage(count);
+  if (vantage === "server") {
+    return {
+      vantageLabel: t("dbm.list.overlap.serverCounted"),
+      hint: t("dbm.page.tabs.samplesHintServer"),
+    };
+  }
+  if (vantage === "client") {
+    return {
+      vantageLabel: t("dbm.list.overlap.clientObserved"),
+      hint: t("dbm.page.tabs.samplesHintClient"),
+    };
+  }
+  // No vantage travelled with the count, so nothing about its source can be
+  // claimed. The hint says what the tab is FOR and asserts no population.
+  return { hint: t("dbm.page.tabs.samplesHintUnknown") };
+};
+
+/** The Top-queries badge's source marker, on the same terms as the overlap one. */
+const queriesVantageLabel = computed<I18nText | undefined>(() => {
+  const vantage = countVantage(props.queryCount);
+  if (vantage === "server") return t("dbm.list.overlap.serverCounted");
+  if (vantage === "client") return t("dbm.list.overlap.clientObserved");
+  return undefined;
+});
 
 /**
  * Everything the user has set — filters, search, time range — rides along, so
@@ -196,6 +258,11 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.queries"),
     to: { name: "dbmQueries", query: carriedQuery.value },
     count: badgeCount(props.queryCount),
+    // Not an overlap MEASURE (a distinct-statement count is not calls or
+    // database time), but its provenance swaps between the trace rollup and
+    // the database-reported list exactly as the samples badge's does — so the
+    // reader is told which list was counted, on the same terms.
+    vantageLabel: queriesVantageLabel.value,
   },
   {
     // Beside Top queries, deliberately: the aggregate and the per-execution
@@ -204,7 +271,9 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.samples"),
     to: { name: "dbmSamples", query: carriedQuery.value },
     count: badgeCount(props.sampleCallsCount),
-    hint: t("dbm.page.tabs.samplesHint"),
+    // A CALL COUNT — one of the exactly two overlap measures — so it carries
+    // its vantage rather than the generic population claim it used to make.
+    ...overlapBadge(props.sampleCallsCount),
   },
   {
     // Before the two lock tabs: "what is happening now" is the question a

@@ -202,9 +202,15 @@ describe("DbmSectionTabs", () => {
       // Slowest calls sits beside Top queries: the two are the aggregate and
       // the per-execution view of the same client-observed data.
       const wrapper = mountAt("dbmQueries");
+      // The TABS only. The badge and its vantage suffix are descendants with
+      // their own `dbm-section-tab-badge-*` / `-vantage-*` hooks, so the
+      // selector names the tab prefix exactly rather than matching everything
+      // beneath it.
       const labels = wrapper
         .findAll("[data-test^='dbm-section-tab-']")
-        .map((tab) => tab.attributes("data-test"));
+        .map((tab) => tab.attributes("data-test"))
+        .filter((name) => !name?.startsWith("dbm-section-tab-badge-"))
+        .filter((name) => !name?.startsWith("dbm-section-tab-vantage-"));
       expect(labels).toEqual([
         "dbm-section-tab-overview",
         "dbm-section-tab-queries",
@@ -235,6 +241,115 @@ describe("DbmSectionTabs", () => {
       });
       expect(wrapper.text()).toContain("12483");
     });
+  });
+
+  /**
+   * F4/F5. The Slowest-calls badge is a CALL COUNT — one of the exactly two
+   * overlap measures — and it is shared chrome, so it renders on all eight DBM
+   * pages including the four documented as server-only. Three different reads
+   * can feed it: the trace rollup, the database-reported list the server
+   * fallback returns, and the page's own override. Under D2 a rendered overlap
+   * value must carry its qualifier in every one of those states, and the old
+   * fixed tooltip ("Every finished call in this window") was a population claim
+   * that was false for all three.
+   */
+  describe("the overlap badge carries its vantage in every provenance state", () => {
+    const mountWith = (sampleCallsCount: unknown) =>
+      mount(DbmSectionTabs, {
+        props: { databaseCount: 2, queryCount: 34, sampleCallsCount } as never,
+        global: { plugins: [i18n] },
+      });
+
+    const vantageOf = (wrapper: ReturnType<typeof mountWith>) =>
+      wrapper.find("[data-test='dbm-section-tab-vantage-samples']");
+
+    /**
+     * The samples tab's OWN tooltip, found through its tab rather than by
+     * taking the first `OTooltip` in the tree — six tabs carry hints, and
+     * position is not the contract under test.
+     */
+    const samplesHint = (wrapper: ReturnType<typeof mountWith>): string =>
+      wrapper
+        .find("[data-test='dbm-section-tab-samples']")
+        .findComponent({ name: "OTooltip" })
+        .props("content") as string;
+
+    /** STATE 1 — the trace rollup (`/badges → databases[].calls`). */
+    it("says client-observed when the trace rollup counted it", () => {
+      const wrapper = mountWith({ count: 141984, complete: true, vantage: "client" });
+      expect(wrapper.text()).toContain("141984");
+      expect(vantageOf(wrapper).text()).toBe("client-observed");
+    });
+
+    /** STATE 2 — the database-reported list (`server_samples`), capped. */
+    it("says server-counted when the databases reported it", () => {
+      const wrapper = mountWith({ count: 100, complete: false, vantage: "server" });
+      // The cap survives the qualifier: still a floor, now an attributed one.
+      expect(wrapper.text()).toContain("100+");
+      expect(vantageOf(wrapper).text()).toBe("server count");
+    });
+
+    /**
+     * STATE 3 — a bare number, which is what a caller passes when it knows no
+     * vantage. Nothing is claimed rather than a vantage being guessed.
+     */
+    it("claims no vantage for a count that carries none", () => {
+      expect(vantageOf(mountWith(12483)).exists()).toBe(false);
+    });
+
+    /**
+     * The tooltip is the other half of D2: a fixed sentence cannot be true in
+     * three states, so it is resolved WITH the count. The trace state must not
+     * claim the population — it counts instrumented callers only.
+     */
+    it("scopes the trace sentence to instrumented callers, never the population", () => {
+      const hint = samplesHint(mountWith({ count: 141984, complete: true, vantage: "client" }));
+      expect(hint).toContain("instrumented");
+      expect(hint).not.toContain("Every finished call in this window");
+    });
+
+    it("says the database counted it in the server state", () => {
+      const hint = samplesHint(mountWith({ count: 100, complete: false, vantage: "server" }));
+      expect(hint).toContain("inside the database");
+      expect(hint).not.toContain("instrumented");
+    });
+
+    /** The Top-queries badge swaps provenance the same way, and says so. */
+    it("qualifies the Top-queries badge by the list that was counted", () => {
+      const wrapper = mount(DbmSectionTabs, {
+        props: {
+          databaseCount: 2,
+          queryCount: { count: 50, complete: false, vantage: "server" },
+        } as never,
+        global: { plugins: [i18n] },
+      });
+      expect(wrapper.find("[data-test='dbm-section-tab-vantage-queries']").text()).toBe(
+        "server count",
+      );
+    });
+
+    /**
+     * The counts that exist in ONE vantage get no qualifier: a deadlock is only
+     * ever reported by the database, so marking it would imply a choice between
+     * feeds that was never available.
+     */
+    it.each(["deadlocks", "blocked", "activity", "tableHealth", "overview"])(
+      "leaves the %s badge unqualified — it is not an overlap measure",
+      (key) => {
+        const wrapper = mount(DbmSectionTabs, {
+          props: {
+            databaseCount: 2,
+            queryCount: 34,
+            deadlockCount: 43,
+            blockedCount: 6,
+            activityCount: 12,
+            tableHealthCount: 9,
+          },
+          global: { plugins: [i18n] },
+        });
+        expect(wrapper.find(`[data-test='dbm-section-tab-vantage-${key}']`).exists()).toBe(false);
+      },
+    );
   });
 
   describe("counts", () => {

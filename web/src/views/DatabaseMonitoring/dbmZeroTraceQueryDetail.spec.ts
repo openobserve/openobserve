@@ -267,3 +267,42 @@ describe("absent measurements never render as zero", () => {
     }
   });
 });
+
+/**
+ * F5, the empty states the SERVER-VANTAGE pages show a zero-trace org.
+ *
+ * `databaseCount` on those pages is the TRACE fleet count. Measured live on
+ * org `dbm_notraces` (collector recipes wired, no APM): `/badges` returns
+ * `databases.hits = []`, so the count is 0 while the server fallback returns 50
+ * database-reported statements and the deadlock log is being read normally.
+ *
+ * Interpolated, that 0 produced "0 databases · most recent line read 3m ago" —
+ * a HEALTHY state denying the very reading it exists to confirm. The clause is
+ * dropped instead, so the sentence is true in both deployments.
+ */
+describe("the server-vantage empty states never print a trace-vantage zero", () => {
+  const deadlocks = readFileSync(join(here, "DeadlocksPage.vue"), "utf8");
+
+  it("gates the deadlocks healthy copy on a non-zero fleet count", () => {
+    const checks =
+      deadlocks.split("const healthyChecks = computed<DbmLockCheck[]>(")[1]?.split("\n});")[0] ??
+      "";
+    expect(checks, "the healthyChecks declaration must be found").not.toBe("");
+    // Both branches — the aged one and the unknown-age one — are gated.
+    expect(checks).toContain("detailNoFleet");
+    expect(checks).toContain("detailUnknownNoFleet");
+    // And the un-gated `?? 0` that produced "0 databases" is gone.
+    expect(checks).not.toContain('t("dbm.databases.databaseCount", databaseCount.value ?? 0)');
+  });
+
+  /**
+   * The shared checklist the three lock/activity pages render. The check still
+   * PASSES on a server-only org — its databases genuinely are reporting — so
+   * what is pinned is the sentence, not the status.
+   */
+  it("drops the database clause from the shared not-collecting checklist", () => {
+    const shared = readFileSync(join(here, "../../utils/dbm/notCollecting.ts"), "utf8");
+    expect(shared).toContain("okDetailNoFleet");
+    expect(shared).not.toContain('t("dbm.databases.databaseCount", signals.databaseCount ?? 0)');
+  });
+});

@@ -69,6 +69,62 @@ describe("buildDbmNotCollectingChecks", () => {
     expect(queries.status).toBe("fail");
   });
 
+  /**
+   * F5, the zero-trace case — measured live against org `dbm_notraces`, which
+   * has collector recipes wired and no APM anywhere.
+   *
+   * `/badges` there returns `databases.hits = []` (trace fleet count 0) while
+   * the server fallback returns 50 database-reported statements, so the signals
+   * arriving here are `queryCount: 50, databaseCount: 0`. The check PASSES on
+   * the query count — correctly, that org's databases are reporting — but the
+   * detail used to interpolate the trace-vantage zero and read
+   * "50 kinds of query from 0 databases", a sentence that contradicts its own
+   * ✓ and blames a healthy server-only deployment for the absence of tracing.
+   *
+   * So the database clause is dropped rather than printed as a zero. The check
+   * still passes, and what it says is true in both deployments.
+   */
+  it("drops the database clause when the trace vantage counted no fleet", () => {
+    const [queries] = buildDbmNotCollectingChecks(
+      "activity",
+      signals({ queryCount: 50, databaseCount: 0 }),
+      t,
+      [],
+    );
+    expect(queries.status).toBe("ok");
+    // `okDetail` is a PREFIX of `okDetailNoFleet`, so the key is matched at its
+    // boundary — a `toContain` on the shorter name would pass on either.
+    expect(String(queries.detail)).toMatch(
+      /dbm\.activity\.notCollecting\.checks\.queries\.okDetailNoFleet\|/,
+    );
+    expect(queries.detail).toContain("dbm.queries.queryCount|50");
+    // The zero must not reach the sentence in any form.
+    expect(queries.detail).not.toContain("dbm.databases.databaseCount");
+  });
+
+  /** An unknown fleet count is not a fleet of zero, and reads the same way. */
+  it("drops the database clause when the fleet count never landed", () => {
+    const [queries] = buildDbmNotCollectingChecks(
+      "deadlocks",
+      signals({ queryCount: 7, databaseCount: null }),
+      t,
+      [],
+    );
+    expect(String(queries.detail)).toMatch(
+      /dbm\.deadlocks\.notCollecting\.checks\.queries\.okDetailNoFleet\|/,
+    );
+    expect(queries.detail).not.toContain("dbm.databases.databaseCount");
+  });
+
+  /** With a real fleet count the fuller sentence still renders, unchanged. */
+  it("keeps the database clause when the trace vantage saw a fleet", () => {
+    const [queries] = buildDbmNotCollectingChecks("blocked", signals({ databaseCount: 4 }), t, []);
+    expect(String(queries.detail)).toMatch(
+      /dbm\.blocked\.notCollecting\.checks\.queries\.okDetail\|/,
+    );
+    expect(queries.detail).toContain("dbm.databases.databaseCount|4");
+  });
+
   it("fails the flag check when the feature is off", () => {
     const checks = buildDbmNotCollectingChecks("activity", signals({ dbmEnabled: false }), t, []);
     expect(checks[1].status).toBe("fail");

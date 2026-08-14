@@ -378,6 +378,10 @@ const {
 // database-reported list rendered beneath the badge, the shared `0` would
 // deny working data — so the badge counts the reported list as a capped claim
 // (`100+`), the same false-zero rule the fleet badge follows.
+//
+// The override counts the DATABASE-REPORTED list, so it carries the `server`
+// vantage — the third of the three reads that can feed this one badge, and the
+// reason the qualifier is resolved from the count rather than fixed per page.
 const tabCounts = computed(() =>
   tabCountProps(
     withOwnCount(
@@ -385,7 +389,7 @@ const tabCounts = computed(() =>
       "sampleCallsCount",
       allRows.value.length || !serverRows.value.length
         ? undefined
-        : countClaim(serverRows.value.length, serverTruncated.value),
+        : countClaim(serverRows.value.length, serverTruncated.value, "server"),
     ),
   ),
 );

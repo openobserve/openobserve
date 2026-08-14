@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -89,13 +89,24 @@ const tooltip = computed<I18nText>(() =>
       : t("dbm.blocked.terminate.hintNoInstance"),
 );
 
+/**
+ * The pending reset, so a second copy restarts the two seconds rather than
+ * letting the first timer cut the second one short — and so unmount can cancel
+ * it. A row action lives in a table that re-renders on every refresh, so the
+ * callback would otherwise fire into a torn-down component.
+ */
+let resetTimer: number | undefined;
+
 const copy = async () => {
   if (!statement.value) return;
   const ok = await copyToClipboard(statement.value, t);
   if (!ok) return;
   copied.value = true;
-  window.setTimeout(() => {
+  window.clearTimeout(resetTimer);
+  resetTimer = window.setTimeout(() => {
     copied.value = false;
   }, 2000);
 };
+
+onBeforeUnmount(() => window.clearTimeout(resetTimer));
 </script>

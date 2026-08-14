@@ -268,13 +268,23 @@ export const fetchDbmTabCounts = async (
     // calls, so the sum is the window's finished-call population. A row without
     // `calls` (a row from an idle instance) contributes 0 rather than poisoning
     // the sum into `NaN`.
+    // A claim rather than a bare number so the CLIENT vantage travels with it:
+    // this is a call count — an overlap measure — and D2 requires the badge
+    // that renders it to say which feed counted. `complete: true` because the
+    // rollup's per-instance totals are exact, not a capped read.
     sampleCallsCount: databases
-      ? (databases.hits ?? []).reduce(
-          (sum: number, row: { calls?: number }) => sum + (row.calls ?? 0),
-          0,
+      ? countClaim(
+          (databases.hits ?? []).reduce(
+            (sum: number, row: { calls?: number }) => sum + (row.calls ?? 0),
+            0,
+          ),
+          false,
+          "client",
         )
       : null,
-    queryCount: queries ? (queries.total ?? queries.hits?.length ?? 0) : null,
+    queryCount: queries
+      ? countClaim(queries.total ?? queries.hits?.length ?? 0, false, "client")
+      : null,
     // From `by_state`, the population. Note this is the ARRAY — passing the
     // whole member here silently yields `null` forever, because a response
     // object has no `.length` for `activitySampleTotal` to reduce over.
@@ -311,8 +321,12 @@ export const fetchDbmTabCounts = async (
     // The same claims the fallback pages put on their own badges: the list
     // length with the cap disclosed — a full page renders `50+`, never the
     // cap as a total. An empty server answer leaves the honest client zero.
-    if (sq?.hits?.length) counts.queryCount = countClaim(sq.hits.length, sq.truncated);
-    if (ss?.hits?.length) counts.sampleCallsCount = countClaim(ss.hits.length, ss.truncated);
+    // Same two badges, now fed by the DATABASE'S own lists — so the vantage
+    // stamped here is `server`, and the strip's qualifier flips with it. This
+    // is the swap F4 named: one badge, three reads. It is no longer silent.
+    if (sq?.hits?.length) counts.queryCount = countClaim(sq.hits.length, sq.truncated, "server");
+    if (ss?.hits?.length)
+      counts.sampleCallsCount = countClaim(ss.hits.length, ss.truncated, "server");
     // Overview: identity only, no request at all — distinct instances the
     // server vantage NAMES, from rows already in hand (the same sources the
     // fleet page's own union reads). This can undercount an instance known
