@@ -903,7 +903,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Stream Type & Name -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
@@ -937,7 +937,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Threshold & Period -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
@@ -971,7 +971,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Frequency & Silence -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
@@ -1010,6 +1010,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- Alert Conditions Section -->
                         <div
+                          v-if="!isSelectedComposite"
                           :class="[
                             'rounded-default border-card-glass-border rounded-default flex flex-col border',
                           ]"
@@ -1475,6 +1476,12 @@ export default defineComponent({
 
     // Alert Triggers tab - selected alert for detail view
     const selectedAlertIndex = ref(-1);
+
+    // A composite member has no stream/query/threshold/frequency, so those
+    // sections and the query panel are hidden for it (§9.6).
+    const isSelectedComposite = computed(
+      () => alerts.value[selectedAlertIndex.value]?.alert_type === "composite",
+    );
 
     // Computed property to process alerts with formatted conditions upfront
     // Editable status and severity for Overview tab
@@ -3373,6 +3380,7 @@ export default defineComponent({
       triggers,
       alerts,
       selectedAlertIndex,
+      isSelectedComposite,
       rcaLoading,
       rcaError,
       rcaCancelling,

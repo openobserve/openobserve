@@ -714,7 +714,7 @@ fn ensure_mutation_allowed() -> Result<(), CompositeServiceError> {
 /// before enabling it; this fails closed rather than serving a corrupt graph.
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "composite alerts are unsupported in super-cluster mode: {definition_count} definitions and {job_count} jobs remain"
+    "composite alerts are unsupported in super-cluster mode ({code}): {definition_count} definitions and {job_count} jobs remain"
 )]
 pub struct StartupPreflightError {
     pub code: &'static str,
