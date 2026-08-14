@@ -33,10 +33,10 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIter
 
 use super::{
     exec::PromqlContext,
-    label_usage::labels_dropped_at_root,
-    selector_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
+    load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
+    promql::label_usage::labels_dropped_at_root,
 };
-use crate::{aggregations, binaries, functions, micros, rewrite::remove_filter_all};
+use crate::{aggregations, binaries, functions, micros, promql::rewrite::remove_filter_all};
 
 pub struct Engine {
     trace_id: String,
