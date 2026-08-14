@@ -2249,6 +2249,13 @@ const loadHistory = async (token: number = requestSeq.current()) => {
  * is the one case that needs it refetched WITHOUT re-reading the series: the
  * series is scoped by system/instance/namespace and does not change, while the
  * callers are read from the picked stream and do.
+ *
+ * It sends the SAME (system, namespace) scope `loadHistory` sends its own
+ * endpoints read, because both fill the same table and a fingerprint is not a
+ * join key — it hashes statement text only, so unscoped this returns every
+ * engine's callers fused (live: fp `69219a9c7fc5039d` names the MySQL-only
+ * `dbm-sv-workload` under a Postgres row). Refetching after a stream pick must
+ * not be the path that silently widens the scope the cold load was read under.
  */
 const loadEndpoints = async (token: number = requestSeq.current()) => {
   endpointsError.value = null;
@@ -2268,6 +2275,8 @@ const loadEndpoints = async (token: number = requestSeq.current()) => {
       stream: traceStream.value,
       startTime: current.value.startTime,
       endTime: current.value.endTime,
+      system: systemFilter.value,
+      namespace: namespaceFilter.value,
     });
     if (requestSeq.isStale(token)) return;
     applyEndpointHits(response.data.hits ?? []);

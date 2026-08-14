@@ -791,6 +791,21 @@ export interface QueryEndpointsParams {
   stream: string;
   startTime?: number;
   endTime?: number;
+  /**
+   * The REST of the join key, same composite as `utils/dbm/overlapJoin.ts`.
+   *
+   * A fingerprint hashes statement TEXT ONLY, so one statement running on two
+   * engines is ONE fingerprint, and aggregating its callers without the engine
+   * returns both engines' services fused into a list that describes neither.
+   * Measured live on org `default`, fp `69219a9c7fc5039d`: unscoped names
+   * `dbm-sv-workload` — a MySQL-only caller — among 343,055 fused calls, while
+   * `system=postgresql` returns 125,195 calls and does NOT name it.
+   *
+   * Optional because the endpoint's contract is: no engine given, no engine
+   * assumed. A caller enriching a server-vantage row MUST send it.
+   */
+  system?: string;
+  namespace?: string;
   limit?: number;
 }
 
@@ -1141,6 +1156,10 @@ const dbMonitoringService = {
     };
     put(params, "start_time", options.startTime);
     put(params, "end_time", options.endTime);
+    // The rest of the join key. Omitted rather than blanked: an empty predicate
+    // matches every engine, which is the fusion itself.
+    put(params, "system", options.system);
+    put(params, "namespace", options.namespace);
     put(params, "limit", options.limit);
     return http().get<QueryEndpointsResponse>(
       `/api/${orgId}/traces/db_monitoring/query/endpoints`,
