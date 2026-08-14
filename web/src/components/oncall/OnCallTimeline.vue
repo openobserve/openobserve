@@ -103,19 +103,34 @@ const { t } = useI18nTyped();
 // they are specifically the question.
 const showAll = ref(false);
 
-const HUMAN_KINDS: ResponseEventKind[] = ["note", "ack", "handoff"];
+/// What the default view answers: what happened to this page, and what people
+/// did about it.
+///
+/// `ai_verdict` and `severity_promoted` sit here rather than behind the toggle
+/// because a machine's recommendation that changed who got woken is a human
+/// event — "why was I paged" has to be answerable without knowing there is a
+/// toggle. `delivery` is absent by server contract, not by omission: it is
+/// ledger-only and never reaches this list.
+const DEFAULT_KINDS: ResponseEventKind[] = [
+  "note",
+  "ack",
+  "handoff",
+  "page",
+  "rca",
+  "ai_verdict",
+  "severity_promoted",
+];
 
 const visibleEvents = computed(() =>
-  showAll.value
-    ? props.events
-    : props.events.filter(
-        (e) => HUMAN_KINDS.includes(e.kind) || e.kind === "page" || e.kind === "rca",
-      ),
+  showAll.value ? props.events : props.events.filter((e) => DEFAULT_KINDS.includes(e.kind)),
 );
 
 function dotClass(kind: ResponseEventKind): string {
   switch (kind) {
+    // A promotion rides with the pages because it is the reason more people
+    // were woken, not a separate class of thing.
     case "page":
+    case "severity_promoted":
       return "bg-icon-chip-error-text";
     case "ack":
       return "bg-icon-chip-info-text";
@@ -123,6 +138,7 @@ function dotClass(kind: ResponseEventKind): string {
     case "state":
       return "bg-icon-chip-success-text";
     case "rca":
+    case "ai_verdict":
       return "bg-icon-chip-warning-text";
     default:
       return "bg-border-strong";
@@ -132,13 +148,17 @@ function dotClass(kind: ResponseEventKind): string {
 function kindVariant(kind: ResponseEventKind): BadgeVariant {
   switch (kind) {
     case "page":
+    case "severity_promoted":
       return "error-soft";
     case "ack":
       return "blue-soft";
     case "recovery":
     case "state":
       return "success-soft";
+    // The agent's verdict reads as analysis, the same family as an RCA — the
+    // label says which of the two wrote it.
     case "rca":
+    case "ai_verdict":
       return "amber-soft";
     case "handoff":
       return "orange-soft";

@@ -72,7 +72,31 @@ export type ResponseEventKind =
   | "recovery"
   | "state"
   /** The ladder ran out of rungs and nobody had acknowledged (storage id 9). */
-  | "exhausted";
+  | "exhausted"
+  /**
+   * One page, to one person, on one channel (storage id 10).
+   *
+   * The machine-readable half of the ledger. Deliberately kept off the human
+   * timeline — a responder wants one legible "paged ana, bo" line, not a row
+   * per address — but it is what `GET /responses/{id}/deliveries` returns, so
+   * the kind has to exist here even though `OnCallTimeline` filters it out.
+   */
+  | "delivery"
+  /**
+   * The L0 agent's structured verdict for this firing (storage id 11).
+   *
+   * Its own kind rather than another `rca` because it is the durable,
+   * auditable copy of a machine's *recommendation* — "why was I not paged"
+   * has to be answerable from it.
+   */
+  | "ai_verdict"
+  /**
+   * A verdict raised this firing's severity (storage id 12).
+   *
+   * Carries the severity asked for beside the one applied: a clamped promotion
+   * is two different facts, and a responder woken by one is owed both.
+   */
+  | "severity_promoted";
 
 /**
  * Why this team was paged. The owner fixes the thing; an impacted team contains

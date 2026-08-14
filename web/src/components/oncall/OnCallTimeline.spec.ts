@@ -90,6 +90,53 @@ describe("OnCallTimeline", () => {
     expect(wrapper.text()).toContain("resolved");
   });
 
+  // The agent's verdict is the answer to "why was I paged" — and, when it
+  // raised the severity, to "why was I paged at all". Both have to be in the
+  // view a responder opens, not behind a toggle they have to know exists.
+  it("shows the agent's verdict and a severity promotion by default", () => {
+    const wrapper = render([
+      event("sys", 0, "opened"),
+      event("ai_verdict", 1_000_000, "probable cause: the 14:02 deploy"),
+      event("severity_promoted", 2_000_000, "P3 raised to P2"),
+    ]);
+    expect(wrapper.findAll('[data-test="oncall-timeline-event"]')).toHaveLength(2);
+    const text = wrapper.text();
+    expect(text).toContain("probable cause: the 14:02 deploy");
+    expect(text).toContain("P3 raised to P2");
+    // The labels themselves, so this test fails if the keys go missing rather
+    // than only if the filter drops the rows.
+    expect(text).toContain("AI verdict");
+    expect(text).toContain("Severity raised");
+  });
+
+  // The label is built as a dynamic i18n key, so a kind the locale file does
+  // not name renders its own key on screen — `oncall.eventKind_ai_verdict`
+  // rather than "AI verdict". `ALL_KINDS` is a Record over the union, so
+  // adding a variant fails type-check here until it is named.
+  it("names every event kind the engine can write", () => {
+    const ALL_KINDS: Record<OnCallResponseEvent["kind"], true> = {
+      sys: true,
+      page: true,
+      ack: true,
+      note: true,
+      rca: true,
+      handoff: true,
+      recovery: true,
+      state: true,
+      exhausted: true,
+      delivery: true,
+      ai_verdict: true,
+      severity_promoted: true,
+    };
+    for (const kind of Object.keys(ALL_KINDS) as OnCallResponseEvent["kind"][]) {
+      const wrapper = render([event(kind, 0, `body for ${kind}`)]);
+      wrapper.find('[data-test="oncall-timeline-filter-all"]').trigger("click");
+      expect(wrapper.text(), `${kind} has no eventKind_ translation`).not.toContain(
+        "oncall.eventKind_",
+      );
+    }
+  });
+
   // A trace is read as offsets from the firing, not as wall-clock stamps.
   it("renders each event as an offset from the record opening", () => {
     const wrapper = render([
