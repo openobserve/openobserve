@@ -137,7 +137,7 @@
     <div v-if="!notFound" class="min-h-0 flex-1">
       <OTabPanels v-model="tab" grow scroll="y" class="h-full min-h-0">
         <OTabPanel name="alerts">
-          <OContent>
+          <OContent y>
             <SloAlertsPanel
               ref="alertsPanel"
               v-if="slo"
@@ -150,7 +150,7 @@
         </OTabPanel>
 
         <OTabPanel name="trend">
-          <OContent>
+          <OContent y>
             <!-- The ribbon before the burndown: for an alert SLI the first
                  question is whether the source was running at all, and the
                  grey bands are the only place that answer is visible. -->
@@ -180,84 +180,65 @@
              than opening a second, nested one. Every tab then scrolls the same
              way, which is the point of putting the scroller on the panels. -->
         <OTabPanel v-if="isGrouped" name="groups">
-          <OTable
-            :data="groups"
-            :columns="groupColumns"
-            row-key="group_key"
-            :loading="groupsLoading"
-            :frame="false"
-            :page-size="25"
-            :show-global-filter="false"
-            table-id="slo-groups"
-            data-test="slos-slodetail-groups-table"
-          >
-            <template #cell-group_key="{ row }">
-              <span class="text-compact font-mono">{{ row.group_key }}</span>
-            </template>
-            <template #cell-sli="{ row }">
-              <span v-if="!row.no_data" class="tabular-nums">{{ formatSli(row.sli) }}</span>
-              <span v-else class="text-text-secondary">{{ ABSENT }}</span>
-            </template>
-            <template #cell-budget="{ row }">
-              <span
-                v-if="!row.no_data"
-                class="tabular-nums"
-                :class="(row.error_budget_remaining ?? 0) <= 0 ? 'text-negative font-semibold' : ''"
-              >
-                {{ formatBudget(row.error_budget_remaining) }}
-              </span>
-              <span v-else class="text-text-secondary">{{ ABSENT }}</span>
-            </template>
-            <template #cell-burn="{ row }">
-              <span v-if="!row.no_data" class="tabular-nums">{{ formatBurn(row.burn_rate) }}</span>
-              <span v-else class="text-text-secondary">{{ ABSENT }}</span>
-            </template>
-            <template #cell-coverage="{ row }">
-              <span class="tabular-nums" :class="row.no_data ? 'text-warning font-semibold' : ''">
-                {{ formatCoverage(row.coverage) }}
-              </span>
-            </template>
-            <template #empty>
-              <OEmptyState
-                icon="layers"
-                :title="t('slos.groups.emptyTitle')"
-                :description="t('slos.groups.emptyDescription')"
-              />
-            </template>
-          </OTable>
+          <!-- `bleed-x` keeps the table flush to the window edge (above); `y`
+               supplies only the vertical inset, so the gap under the tab strip
+               is the same on every tab. -->
+          <OContent bleed-x y>
+            <OTable
+              :data="groups"
+              :columns="groupColumns"
+              row-key="group_key"
+              :loading="groupsLoading"
+              :frame="false"
+              :page-size="25"
+              :show-global-filter="false"
+              table-id="slo-groups"
+              data-test="slos-slodetail-groups-table"
+            >
+              <template #cell-group_key="{ row }">
+                <span class="text-compact font-mono">{{ row.group_key }}</span>
+              </template>
+              <template #cell-sli="{ row }">
+                <span v-if="!row.no_data" class="tabular-nums">{{ formatSli(row.sli) }}</span>
+                <span v-else class="text-text-secondary">{{ ABSENT }}</span>
+              </template>
+              <template #cell-budget="{ row }">
+                <span
+                  v-if="!row.no_data"
+                  class="tabular-nums"
+                  :class="
+                    (row.error_budget_remaining ?? 0) <= 0 ? 'text-negative font-semibold' : ''
+                  "
+                >
+                  {{ formatBudget(row.error_budget_remaining) }}
+                </span>
+                <span v-else class="text-text-secondary">{{ ABSENT }}</span>
+              </template>
+              <template #cell-burn="{ row }">
+                <span v-if="!row.no_data" class="tabular-nums">{{
+                  formatBurn(row.burn_rate)
+                }}</span>
+                <span v-else class="text-text-secondary">{{ ABSENT }}</span>
+              </template>
+              <template #cell-coverage="{ row }">
+                <span class="tabular-nums" :class="row.no_data ? 'text-warning font-semibold' : ''">
+                  {{ formatCoverage(row.coverage) }}
+                </span>
+              </template>
+              <template #empty>
+                <OEmptyState
+                  icon="layers"
+                  :title="t('slos.groups.emptyTitle')"
+                  :description="t('slos.groups.emptyDescription')"
+                />
+              </template>
+            </OTable>
+          </OContent>
         </OTabPanel>
 
         <OTabPanel name="config">
-          <OContent v-if="slo">
-            <dl class="text-compact grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2">
-              <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
-              <dd>{{ sliTypeLabel(slo.sli_type) }}</dd>
-
-              <dt class="text-text-secondary">{{ t("slos.field.target") }}</dt>
-              <dd>
-                {{ formatTarget(slo.target) }}
-                <span class="text-text-secondary">
-                  {{ t("slos.overRolling", { window: formatWindow(slo.window_secs) }) }}
-                </span>
-              </dd>
-
-              <dt class="text-text-secondary">{{ t("slos.field.sliceInterval") }}</dt>
-              <dd>{{ formatSlice(slo.slice_interval_secs) }}</dd>
-
-              <dt class="text-text-secondary">{{ t("slos.field.groupBy") }}</dt>
-              <dd>
-                <span v-if="isGrouped" class="font-mono">{{ slo.group_by?.join(", ") }}</span>
-                <span v-else class="text-text-secondary">{{ t("slos.noGrouping") }}</span>
-              </dd>
-
-              <dt class="text-text-secondary">{{ t("slos.field.reservation") }}</dt>
-              <dd>{{ t("slos.reservationValue", { groups: slo.groups_reserved }) }}</dd>
-
-              <dt class="text-text-secondary">{{ t("slos.field.owner") }}</dt>
-              <dd>{{ slo.owner || ABSENT }}</dd>
-            </dl>
-
-            <OCode class="mt-4" language="json" :code="configJson" />
+          <OContent y>
+            <SloConfigSummary v-if="slo" :slo="slo" />
           </OContent>
         </OTabPanel>
       </OTabPanels>
@@ -284,7 +265,6 @@ import { toZonedTime } from "date-fns-tz";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCode from "@/lib/core/Code/OCode.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -298,6 +278,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import SloAlertPreview from "@/components/slos/SloAlertPreview.vue";
 import SloAlertsPanel from "@/components/slos/SloAlertsPanel.vue";
 import SloBurndownChart from "@/components/slos/SloBurndownChart.vue";
+import SloConfigSummary from "@/components/slos/SloConfigSummary.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { Slo, SloStatus } from "@/ts/interfaces/slo";
@@ -485,10 +466,6 @@ const healthVariant = computed(() => {
   }
 });
 
-const configJson = computed(() =>
-  slo.value ? JSON.stringify(slo.value.config ?? {}, null, 2) : "{}",
-);
-
 const stats = computed<StatItem[]>(() => {
   const s = status.value;
   const frozen = !s || s.no_data;
@@ -572,7 +549,7 @@ const groupColumns = computed<OTableColumnDef<SloStatus>[]>(() => [
 
 async function load() {
   if (!org.value || !sloId.value) return;
-  try{
+  try {
     const res = await sloService.get(org.value, sloId.value);
     const body = res.data ?? {};
     status.value = body.status ?? null;
@@ -589,7 +566,7 @@ async function load() {
     if (rest.group_by?.length) {
       await loadGroups();
     }
-  }catch(e){
+  } catch (e) {
     slo.value = null;
     notFound.value = true;
   }
