@@ -1231,6 +1231,43 @@ mod tests {
         assert_eq!(s.unstaffed_slots(ANCHOR), vec!["secondary".to_string()]);
     }
 
+    /// The inverse, and the one that matters: a staffed **secondary** over an
+    /// unstaffed **primary** is a coverage gap, because the first rung of every
+    /// shipped ladder pages the default slot. Somebody is visibly on call and a
+    /// page raised now still wakes nobody.
+    ///
+    /// This is pinned because a "Covered" badge computed as "is anybody on call
+    /// in any slot" reads true here, disagreeing with `/coverage-gaps` and
+    /// `/config-risks`, which both ask this narrower question.
+    #[test]
+    fn test_a_staffed_secondary_over_an_unstaffed_primary_is_still_a_gap() {
+        let s = Schedule {
+            rotations: vec![
+                Rotation {
+                    // Not in force yet, so the default slot staffs nobody now.
+                    starts_at: Some(ANCHOR + MICROS_PER_WEEK),
+                    ..weekly("Juniors", &["ana@o2.ai"])
+                },
+                weekly("Seniors", &["eve@o2.ai"]).in_slot("secondary"),
+            ],
+            ..schedule(vec![])
+        };
+        assert!(
+            !s.is_staffed(ANCHOR),
+            "a page raised now pages the default slot, which nobody staffs"
+        );
+        assert!(
+            !s.on_call_at(ANCHOR).is_empty(),
+            "and yet somebody is on call — this is exactly the disagreement"
+        );
+        assert!(
+            s.unstaffed_slots(ANCHOR).is_empty(),
+            "the default slot is never reported here — an unstaffed default is the \
+             coverage gap itself, which is `is_staffed`'s answer, not a slot nuance"
+        );
+        assert_eq!(s.first_coverage_gap(ANCHOR, MICROS_PER_WEEK, MICROS_PER_WEEK / 7), Some(ANCHOR));
+    }
+
     /// The schedule carries absences for the same reason it carries covers: a
     /// resolution path that forgets them pages somebody on a beach.
     #[test]

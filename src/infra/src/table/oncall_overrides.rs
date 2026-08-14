@@ -190,19 +190,32 @@ pub async fn list_for_resolution(
     at: i64,
 ) -> Result<Vec<ScheduleOverride>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(oncall_overrides::Entity::find()
+    // Ordered **descending** so that the truncation keeps the covers that win.
+    //
+    // Overlapping covers are legal, and `covering_override_in_slot` resolves
+    // them by newest `created_at` — so the rows the limit must not drop are the
+    // newest ones. Ordering ascending here would have kept the 500 *oldest* and
+    // discarded exactly the cover that was going to win, paging the person the
+    // most recent cover excused. It only bites past `MAX_ROWS` covers in the
+    // lookback window, which is why it survived: the query reads correct, and
+    // its own comment claimed the right intent.
+    let mut rows: Vec<ScheduleOverride> = oncall_overrides::Entity::find()
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
         .filter(oncall_overrides::Column::TeamId.eq(team_id))
         .filter(oncall_overrides::Column::EndAt.gt(at - RESOLUTION_LOOKBACK_MICROS))
-        // Newest last, so a truncated read keeps the covers that win.
-        .order_by_asc(oncall_overrides::Column::CreatedAt)
-        .order_by_asc(oncall_overrides::Column::Id)
+        .order_by_desc(oncall_overrides::Column::CreatedAt)
+        .order_by_desc(oncall_overrides::Column::Id)
         .limit(MAX_ROWS)
         .all(client)
         .await?
         .into_iter()
         .map(to_override)
-        .collect())
+        .collect();
+    // Handed back oldest-first regardless, so callers see the same order they
+    // always did. Resolution picks by `created_at` and does not care, but a
+    // list whose order flips with its length is a trap for whoever reads it next.
+    rows.reverse();
+    Ok(rows)
 }
 
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
@@ -320,9 +333,9 @@ mod tests {
         assert!(!o.overlaps(0, 100), "ends where the cover starts");
     }
 
-    /// `list_for_resolution` orders oldest first so that a truncated read
-    /// keeps the covers that would win — and the winner is picked in memory,
-    /// so the ordering must not be what decides it.
+    /// The winner is picked in memory, so the row order must not be what
+    /// decides it — which is what lets `list_for_resolution` hand rows back
+    /// oldest-first while querying newest-first.
     #[test]
     fn test_the_winner_does_not_depend_on_the_row_order() {
         let rows = vec![
@@ -332,5 +345,29 @@ mod tests {
         let reversed: Vec<_> = rows.iter().rev().cloned().collect();
         assert_eq!(covering_override(&rows, 500).unwrap().id, "ov_b");
         assert_eq!(covering_override(&reversed, 500).unwrap().id, "ov_b");
+    }
+
+    /// Which end `list_for_resolution` must truncate from, pinned as an
+    /// assertion rather than left in a comment — because it was wrong in a
+    /// comment for a while and read as correct.
+    ///
+    /// The winner is the **newest** `created_at`. So a read limited to
+    /// `MAX_ROWS` has to keep the newest rows; keeping the oldest would discard
+    /// precisely the cover about to win and page the person the most recent
+    /// cover excused.
+    #[test]
+    fn test_truncation_must_keep_the_newest_covers() {
+        let all: Vec<_> = (0..5)
+            .map(|i| to_override(model(&format!("ov_{i}"), 0, 1000, i as i64 * 10)))
+            .collect();
+        let winner = covering_override(&all, 500).unwrap().id.clone();
+        assert_eq!(winner, "ov_4", "the newest cover wins");
+
+        // Truncating from the newest end loses the winner; from the oldest end
+        // does not. `list_for_resolution` therefore orders descending.
+        let kept_oldest = &all[..2];
+        let kept_newest = &all[all.len() - 2..];
+        assert_ne!(covering_override(kept_oldest, 500).unwrap().id, winner);
+        assert_eq!(covering_override(kept_newest, 500).unwrap().id, winner);
     }
 }
