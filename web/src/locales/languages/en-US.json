@@ -3880,6 +3880,8 @@
     "folder": "Folder",
     "folders": "Folders",
     "searchFolder": "Search Folder",
+    "folderIcon": "Icon",
+    "folderIconAria": "Choose a folder icon",
     "deleteFolder": "Delete Folder",
     "deleteFolderMessage": "Are you sure you want to delete this Folder?",
     "searchMsg": "Search for Dashboards across Folders",
@@ -12143,6 +12145,23 @@
     },
     "combobox": {
       "noOptionsFound": "No options found"
+    },
+    "emojiPicker": {
+      "chooseIcon": "Choose an icon",
+      "searchPlaceholder": "Search icons...",
+      "removeIcon": "Remove icon",
+      "noResults": "No icons match your search",
+      "groups": {
+        "results": "Results",
+        "status": "Status",
+        "services": "Services",
+        "creatures": "Creatures",
+        "infra": "Infrastructure",
+        "data": "Data",
+        "teams": "Teams",
+        "objects": "Objects",
+        "world": "World"
+      }
     },
     "input": {
       "clear": "Clear"

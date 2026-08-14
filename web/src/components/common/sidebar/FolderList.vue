@@ -66,6 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-folder-tab-name-${tab.name}`"
           >
             <div class="flex min-w-0 flex-1 items-center gap-1.5">
+              <OGlyph
+                v-if="iconFor(tab)"
+                :token="iconFor(tab)"
+                size="sm"
+                :data-test="`dashboard-folder-icon-${tab.name}`"
+              />
               <span
                 class="folder-name min-w-0 truncate text-left"
                 :title="tab.name"
@@ -152,15 +158,18 @@ import { useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { deleteFolderByIdByType, getFoldersListByType } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OGlyph from "@/lib/forms/EmojiPicker/OGlyph.vue";
 import AddFolder from "./AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import { useFolderIcons } from "@/composables/useFolderIcons";
 import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "FolderList",
   components: {
     OIcon,
+    OGlyph,
     ConfirmDialog,
     AddFolder,
     OTabs,
@@ -195,6 +204,7 @@ export default defineComponent({
     const confirmDeleteFolderDialog = ref(false);
     const searchQuery = ref("");
     const { track } = useReo();
+    const { iconFor, removeIcon } = useFolderIcons(() => props.type);
 
     const router = useRouter();
 
@@ -243,6 +253,7 @@ export default defineComponent({
         try {
           //delete folder
           await deleteFolderByIdByType(store, selectedFolderDelete.value, props.type);
+          removeIcon(selectedFolderDelete.value);
 
           //check activeFolderId to be deleted
           if (activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
@@ -323,6 +334,7 @@ export default defineComponent({
       filteredTabs,
       searchQuery,
       onTabClick,
+      iconFor,
       FAVORITES_FOLDER_ID,
     };
   },

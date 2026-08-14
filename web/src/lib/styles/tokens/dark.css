@@ -11,6 +11,12 @@
        calendar-picker icon stays dark gray and vanishes on dark inputs. */
   color-scheme: dark;
 
+  /* OGlyph plate — brand logos keep their own colours, and several marks
+     (GitHub, Kafka, Helm, InfluxDB) are near-black, so on a dark surface they
+     need a light chip behind them. Slightly off-white so it reads as a tile
+     rather than a glare. */
+  --color-glyph-plate: rgba(255, 255, 255, 0.92);
+
   /* DARK MODE FOUNDATION — tune these ~16 values to taste. Everything
        below (surfaces, borders, text, per-component overrides) references
        ONLY these vars, so the whole dark theme is tuned from here.
