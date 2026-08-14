@@ -161,8 +161,7 @@ export default class DashboardVariablesScoped {
       await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     } catch { /* acceptable if timeout */ }
 
-    // Opening the dropdown mid-load is a silent no-op — loadVariableOptions() early-returns
-    // while isLoading is true, so no request is sent and none is retried.
+    // Opening the dropdown mid-load is a silent no-op — see waitForVariableIdle.
     await this.waitForVariableIdle(variableName);
 
     await varTrigger.click();
@@ -201,11 +200,8 @@ export default class DashboardVariablesScoped {
       selectedValue = selectedValue?.trim() || null;
     }
 
-    // Nothing may still be loading when the new value is committed, or any dependent
-    // variable's reload is silently dropped: canVariableLoad() bails on
-    // `if (variable.isLoading) return false` and the child is never queued. Callers that
-    // assert on downstream effects (a dependent variable reloading, a panel turning its
-    // refresh button to warning because its variable changed) see nothing happen at all.
+    // Nothing may be mid-load when the value commits, or the dependent's reload is
+    // silently dropped and callers asserting on it see nothing — see waitForValuesQuiet.
     await this.waitForValuesQuiet({ timeout: Math.max(10000, timeout) });
 
     // Click the specified option
@@ -321,11 +317,8 @@ export default class DashboardVariablesScoped {
   /**
    * Wait for add panel button (empty dashboard state)
    *
-   * Defaults to 30s to match setupTestDashboard(): createDashboard() returns once
-   * /dashboards/view is reachable and the header has mounted, but this button lives in
-   * RenderDashboardCharts (v-if="!panels.length") and only renders after the dashboard
-   * GET and variables init complete — which under parallel load against a deployed org
-   * lands well after the header.
+   * 30s to match setupTestDashboard(): renders only after the dashboard GET and
+   * variables init, well after the header createDashboard() waits on.
    *
    * @param {Object} options - Wait options
    * @param {number} options.timeout - Timeout in ms (default: 30000)
@@ -1656,17 +1649,9 @@ export default class DashboardVariablesScoped {
   /**
    * Block until the variable's in-flight load has finished.
    *
-   * loadVariableOptions() in VariablesValueSelector.vue early-returns while
-   * variableItem.isLoading is true, so opening the dropdown mid-load is dropped
-   * silently — no request is sent and none is retried. isLoading is rendered as an
-   * OSpinner (role="status") inside the selector, which is the only reliable signal
-   * for it: [data-test*="loading-indicator"] matches nothing in these components,
-   * and the displayed text is unusable too because the selector renders
-   * "(No Data Found)" while the load is still in flight.
-   *
-   * A single "spinner gone" check is NOT enough — a cascade can start a second load
-   * a few hundred ms after the first spinner clears, and a click landing in that gap
-   * is dropped just the same — so require the idle state to HOLD for a quiet period.
+   * loadVariableOptions() early-returns while isLoading is true, so a click landing
+   * mid-load is silently dropped. Tracked via the OSpinner (role="status"); idle must
+   * HOLD, as a cascade can start a second load just after the first clears.
    *
    * @param {string} variableName - Variable name
    * @param {Object} options - Wait options
@@ -1692,17 +1677,11 @@ export default class DashboardVariablesScoped {
   }
 
   /**
-   * Arm a wait for a `_values_stream` response, optionally restricted to the variable
-   * field(s) it was fetched for.
+   * Arm a wait for a `_values_stream` response, optionally filtered by field.
    *
-   * The values endpoint is a POST to `/api/{org}/_values_stream` with NO query string —
-   * the stream name and requested fields live in the JSON body — so matching a specific
-   * variable's request means reading request.postData(), not the URL.
-   *
-   * Call this BEFORE the action that triggers the request and await the returned promise
-   * afterwards (the arm-then-act pattern used across the suite). Resolves to the response,
-   * or to null if none arrived within the timeout, so callers can branch on "did it fire"
-   * instead of dealing with a rejection.
+   * The endpoint is a POST with no query string, so field matching reads
+   * request.postData(). Arm before the triggering action, await after; resolves to
+   * null instead of rejecting so callers can branch on "did it fire".
    *
    * @param {string[]|null} fields - Only match calls fetching one of these fields (null = any)
    * @param {Object} options - Options
@@ -1728,19 +1707,10 @@ export default class DashboardVariablesScoped {
   /**
    * Resolve once no `_values_stream` request has been in flight for `quietMs`.
    *
-   * The precondition for a dependency cascade is that NO variable is mid-load when the
-   * new value is committed: canVariableLoad() bails on `if (variable.isLoading) return
-   * false`, so the child is never queued — no request is sent and none is retried.
-   *
-   * Neither of the narrower signals is sufficient on its own here. The parent's spinner
-   * is unusable while its own dropdown is open (OSelect renders it only when closed, via
-   * `:loading="variableItem.isLoading && !isOpen"`), and waiting for a single values
-   * response is ambiguous when sibling variables are loading concurrently — it can
-   * resolve on someone else's response while the parent is still in flight. Counting
-   * in-flight values requests covers every variable at once.
-   *
-   * Decrements on `response` (headers received) rather than `requestfinished`, because
-   * these are SSE streams whose bodies stay open well after the app has what it needs.
+   * A cascade only queues when nothing is mid-load (canVariableLoad bails on isLoading).
+   * Counting in-flight requests covers every variable, unlike the parent's spinner
+   * (hidden while its dropdown is open) or a single response wait (can match a sibling).
+   * Decrements on `response`, not `requestfinished` — these are SSE streams.
    *
    * @param {Object} options - Options
    * @param {number} options.quietMs - Required quiet period in ms (default: 1000)
@@ -1829,10 +1799,8 @@ export default class DashboardVariablesScoped {
     // silent no-op — see waitForVariableIdle.
     await this.waitForVariableIdle(variableName);
 
-    // Backward compatibility: callers that do NOT pass dependentFields keep the original
-    // semantics, where the monitor is armed BEFORE the dropdown is opened and so also
-    // counts the parent's own values request toward expectedAPICalls. Deferring the start
-    // for them would silently redefine what their expected counts mean.
+    // Without dependentFields, keep the original semantics: monitor armed pre-open, so
+    // the parent's own request still counts toward expectedAPICalls.
     let apiMonitor = dependentFields
       ? null
       : monitorVariableAPICalls(this.page, {
@@ -1847,23 +1815,14 @@ export default class DashboardVariablesScoped {
     const dropdownMenu = this.page.locator(`[data-test="${selectorDataTest}-popover"]`).first();
     const optionLocator = this.page.locator(`[data-test="${selectorDataTest}-option"]`);
 
-    // Load the PARENT's own options first, on their own budget, syncing on the values
-    // API rather than guessing from the DOM.
+    // Load the PARENT's own options first, on their own budget. Previously this awaited
+    // waitForValuesStreamComplete() on the SAME timeout as the dependency monitor; that
+    // reads the SSE body via CDP, never settles on deployed envs, and burned the whole
+    // budget before any option was clicked. waitForValuesResponse resolves on headers.
     //
-    // This step used to `await waitForValuesStreamComplete(page, timeout)` while the
-    // dependency monitor was ALREADY running on that same `timeout`. That helper reads
-    // the _values_stream SSE body through CDP, which on deployed environments never
-    // completes, so it reliably burned the entire budget: by the time an option was
-    // clicked the monitor had already expired, and every dependency test reported
-    // "1 calls, 1/N matched" (just the parent's own open request) whether or not the
-    // cascade actually worked. waitForValuesResponse resolves on the response HEAD
-    // instead of the streamed body, so it settles reliably, and the monitor now starts
-    // afterwards so its timeout measures only the cascade.
-    //
-    // At least two options must exist or the selection cannot change and no cascade can
-    // fire at all. Values ingested moments earlier in beforeEach can take a beat to
-    // become queryable, so close and reopen (forcing a fresh values query) until they
-    // show up rather than accepting a single blank option.
+    // Needs >= 2 options or the value cannot change and nothing cascades; freshly
+    // ingested values can lag, so reopen (forcing a new query) rather than accept one
+    // blank option.
     const deadline = Date.now() + optionsTimeout;
     let optionCount = 0;
     while (Date.now() < deadline) {
@@ -1892,11 +1851,9 @@ export default class DashboardVariablesScoped {
       );
     }
 
-    // Pick an option that actually CHANGES the value — re-selecting the value already
-    // in effect does not cascade. Clamp the requested index into range, then walk
-    // forward (wrapping) to the first option whose value differs from the current one.
-    // data-test-value is only rendered by OSelect's virtualized rows, so fall back to
-    // the option's text when the attribute is absent.
+    // Pick an option that actually CHANGES the value — re-selecting the current one does
+    // not cascade. Clamp the index, then walk forward to the first differing value.
+    // data-test-value exists only on virtualized rows, so fall back to text.
     const currentValue = await varDropdown.getAttribute('data-test-selected-value').catch(() => null);
     const optionValueAt = async (i) => {
       const option = optionLocator.nth(i);
@@ -1924,10 +1881,8 @@ export default class DashboardVariablesScoped {
     // than on this variable alone.
     await this.waitForValuesQuiet({ timeout: Math.max(10000, Math.floor(optionsTimeout / 2)) });
 
-    // Arm the dependent-variable wait BEFORE the click that should trigger it, so we
-    // sync on the actual values API rather than polling the DOM afterwards. The monitor
-    // alongside it counts how many dependents fired (a chain needs more than one); this
-    // waiter is what makes "the first dependent reloaded" a deterministic signal.
+    // Arm before the click so we sync on the values API, not the DOM. The monitor counts
+    // how many dependents fired; this waiter makes the first one a deterministic signal.
     const dependentResponse = dependentFields
       ? this.waitForValuesResponse(dependentFields, { timeout })
       : Promise.resolve(null);
@@ -2432,11 +2387,8 @@ export default class DashboardVariablesScoped {
   async verifyVariableHasOptions(variableName, options = {}) {
     const { timeout = 10000 } = options;
 
-    // Open variable dropdown via the OSelect trigger.
-    // Gate on the variable being idle first: loadVariableOptions() early-returns while
-    // isLoading is true, so a click landing mid-load shows the popover but never fetches,
-    // and the option wait below then burns its full timeout on a list that was never
-    // going to populate.
+    // Open variable dropdown via the OSelect trigger. Gate on idle first: a click
+    // landing mid-load opens the popover but never fetches (see waitForVariableIdle).
     const selector = this.page.locator(`[data-test="variable-selector-${variableName}-inner-trigger"]`);
     await this.waitForVariableIdle(variableName);
     await selector.click();
@@ -2528,11 +2480,8 @@ export default class DashboardVariablesScoped {
    * @param {string} variableName - Variable name
    */
   async editVariable(variableName) {
-    // The row is rendered by the settings drawer's variables list, which only populates
-    // after the drawer opens AND the dashboard fetch resolves. Under parallel load
-    // against a deployed org that lands past 10s, so use the same budget the other
-    // post-navigation waits here already use (setupTestDashboard: 30s) rather than a
-    // tighter one that fails on a list which was going to arrive.
+    // The row renders only after the drawer opens AND the dashboard fetch resolves,
+    // which under parallel load lands past 10s — use the same 30s as setupTestDashboard.
     const editBtn = this.page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`);
     await editBtn.waitFor({ state: "visible", timeout: 30000 });
     await editBtn.click();

@@ -46,12 +46,9 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       fetchResponse = await post();
 
-      // On cloud the ingestion passcode is per-org and can be rotated out from under a
-      // running session (another shard sharing the org, or plain expiry). When that
-      // happens this call 401s, no data lands, and the failure surfaces much later and
-      // far away — as "No dropdown options appeared for stream", or a variable that
-      // loaded 0 options — with nothing pointing at auth. refreshCloudConfig re-fetches
-      // the passcode using the page's live cookie session, so retry behind it.
+      // The per-org cloud passcode can be rotated mid-session (another shard, or expiry).
+      // The 401 leaves no data ingested and surfaces far away as "No dropdown options
+      // appeared for stream", so refresh it from the page's live session and retry.
       if ((fetchResponse.status === 401 || fetchResponse.status === 403) && page) {
         testLogger.warn(
           `Ingestion returned ${fetchResponse.status} — refreshing cloud passcode and retrying`
@@ -59,11 +56,8 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
         if (await refreshCloudConfig(page)) continue;
       }
 
-      // Transient upstream failures: the ingest node behind the proxy intermittently
-      // drops a request under load ("502 Proxy request failed: error sending request
-      // for url ..."). Nothing is wrong with the payload or the credentials, and a
-      // beforeEach that dies here fails the whole test far from the real cause, so back
-      // off briefly and try again.
+      // Transient upstream failure (e.g. "502 Proxy request failed") — payload and
+      // credentials are fine, so back off briefly and retry rather than fail beforeEach.
       if (fetchResponse.status >= 500 && attempt < MAX_ATTEMPTS) {
         testLogger.warn(
           `Ingestion returned ${fetchResponse.status} — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`

@@ -88,9 +88,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(varB).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change A and monitor B's reload using the new helper function.
-    // dependentFields restricts the tally to _values_stream calls for B's own field,
-    // so the parent's dropdown-open request is not miscounted as a dependency reload.
+    // dependentFields scopes the tally to B's own field, so A's dropdown-open request
+    // is not miscounted as a dependency reload.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1, // Select second option so the value actually changes
       expectedAPICalls: 1, // B is the only dependent variable
@@ -188,9 +187,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(varC).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change A and monitor B and C's reload using the new helper function.
-    // The cascade is sequential (C only starts once B finishes), so the budget has to
-    // cover two round trips against the deployed backend.
+    // Cascade is sequential (C starts only once B finishes), so budget two round trips.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 2, // B and C
@@ -288,8 +285,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(vars[3]).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change A and monitor cascade using the new helper function.
-    // Three sequential round trips (B -> C -> D) against the deployed backend.
+    // Three sequential round trips (B -> C -> D).
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(vars[0], {
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 3, // B, C and D
@@ -395,9 +391,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(vars[5]).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change first variable and monitor the cascade.
-    // Driven through the shared helper so the monitor starts only once the parent's
-    // own options are on screen — the budget below covers the cascade alone.
+    // Via the shared helper so the monitor starts once the parent's options are up,
+    // leaving the budget below for the cascade alone.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(vars[0], {
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 5, // the 5 variables below the root of the chain
@@ -516,17 +511,10 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await var0Dropdown.waitFor({ state: "visible", timeout: 60000 });
     await var0Dropdown.scrollIntoViewIfNeeded();
 
-    // Change first and monitor the full cascade using the new helper function.
-    //
-    // Only 6 of the 8 dependents are required. Each level filters on the level above
-    // (WHERE <parentField> = '<parentValue>'), so deep in the chain the predicates get
-    // narrow enough to return nothing — and a variable that resolves to no value has
-    // its children marked loaded-with-null WITHOUT firing a request (see
-    // resetDescendants/onVariablePartiallyLoaded in useVariablesManager.ts). The tail of
-    // a chain this long is therefore legitimately allowed to stop early; what this
-    // stress test pins down is that a long chain cascades rather than stalling at the
-    // first hop. expectedAPICalls matches the threshold so the monitor resolves as soon
-    // as it is met instead of always burning the full budget.
+    // Only 6 of 8 required: each level filters on the one above, so deep predicates can
+    // return nothing, and a variable with no value marks its children loaded-with-null
+    // without firing (onVariablePartiallyLoaded). The point is that a long chain
+    // cascades rather than stalling at the first hop.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(vars[0], {
       optionIndex: 1,                   // Select second option to ensure value changes
       expectedAPICalls: 6,              // 6 of the 8 dependent variables
@@ -633,14 +621,12 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(varC).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change A, monitor if C loads using the new helper function.
-    // C is the only dependent variable, and _timestamp is the field it queries.
+    // C is the only dependent, and _timestamp is the field it queries.
     const result1 = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 1, // C is the only dependent variable
       dependentFields: ["_timestamp"],
-      // C sits behind two parents, so its reload is queued only once BOTH are settled.
-      // Under parallel CI load that serialisation pushes the cascade past 30s.
+      // C sits behind two parents, so it queues only once BOTH settle — past 30s on CI.
       timeout: 45000
     });
 
@@ -653,8 +639,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 1, // C is the only dependent variable
       dependentFields: ["_timestamp"],
-      // C sits behind two parents, so its reload is queued only once BOTH are settled.
-      // Under parallel CI load that serialisation pushes the cascade past 30s.
+      // C sits behind two parents, so it queues only once BOTH settle — past 30s on CI.
       timeout: 45000
     });
 
@@ -844,9 +829,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
-    // Monitor API calls when reopening dashboard. Restricting the tally to the three
-    // fields these variables query keeps unrelated dashboard traffic out of the count,
-    // so it really is "all three independent variables loaded".
+    // Scope the tally to these three fields so unrelated dashboard traffic is excluded.
     const apiMonitor = monitorVariableAPICalls(page, {
       expectedCount: 3,
       timeout: 45000,

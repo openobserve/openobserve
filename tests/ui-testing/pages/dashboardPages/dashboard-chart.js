@@ -258,13 +258,10 @@ export default class ChartTypeSelector {
     // hidden and the wait burns its full timeout on an element that can no longer
     // become visible — the "15 x locator resolved to hidden" failure signature.
     // Re-hover on every attempt so a re-render costs one retry, not the whole call.
-    //
-    // The click belongs INSIDE the guarded block for the same reason. A re-render that
-    // lands between the visibility check and the click drops :hover just as easily,
-    // leaving the button hidden again — Playwright then retries "element is not visible"
-    // until the action timeout expires and the whole call fails. Keeping hover → check →
-    // click together means such a re-render costs one attempt instead of the call. On
-    // success we break immediately, so the field is never added twice.
+    // The click stays INSIDE the loop for the same reason: a re-render between the check
+    // and the click drops :hover again, so the click burns its full timeout. Keeping
+    // hover -> check -> click together costs one retry instead of the call; break on
+    // success means the field is never added twice.
     const maxAttempts = 3;
     let lastError;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {

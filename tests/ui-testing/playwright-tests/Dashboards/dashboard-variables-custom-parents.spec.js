@@ -79,9 +79,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Start monitoring for API calls BEFORE reopening dashboard
     const apiMonitorPromise = monitorVariableAPICalls(page, {
       expectedCount: 1, // Child variable should make 1 API call on initial load
-      // 45s: this window opens BEFORE reopenDashboardFromList(), so the navigation
-      // itself eats part of it. Under parallel CI load a 15s budget can expire while
-      // the dashboard is still loading, reporting 0 calls for a variable that did load.
+      // 45s: this window opens BEFORE the reopen, so navigation eats part of it.
       timeout: 45000
     });
 
@@ -169,9 +167,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Start monitoring for API calls BEFORE reopening dashboard
     const apiMonitorPromise = monitorVariableAPICalls(page, {
       expectedCount: 1, // Child variable should make 1 API call on initial load
-      // 45s: this window opens BEFORE reopenDashboardFromList(), so the navigation
-      // itself eats part of it. Under parallel CI load a 15s budget can expire while
-      // the dashboard is still loading, reporting 0 calls for a variable that did load.
+      // 45s: this window opens BEFORE the reopen, so navigation eats part of it.
       timeout: 45000
     });
 
@@ -255,9 +251,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Start monitoring for API calls BEFORE reopening dashboard
     const apiMonitorPromise = monitorVariableAPICalls(page, {
       expectedCount: 1, // Child variable should make 1 API call on initial load
-      // 45s: this window opens BEFORE reopenDashboardFromList(), so the navigation
-      // itself eats part of it. Under parallel CI load a 15s budget can expire while
-      // the dashboard is still loading, reporting 0 calls for a variable that did load.
+      // 45s: this window opens BEFORE the reopen, so navigation eats part of it.
       timeout: 45000
     });
 
@@ -352,9 +346,7 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Start monitoring for API calls BEFORE reopening dashboard
     const initialApiMonitorPromise = monitorVariableAPICalls(page, {
       expectedCount: 1, // Child variable should make 1 API call on initial load
-      // 45s: this window opens BEFORE reopenDashboardFromList(), so the navigation
-      // itself eats part of it. Under parallel CI load a 15s budget can expire while
-      // the dashboard is still loading, reporting 0 calls for a variable that did load.
+      // 45s: this window opens BEFORE the reopen, so navigation eats part of it.
       timeout: 45000
     });
 
@@ -368,10 +360,8 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
 
     testLogger.debug("Monitoring API calls when opening parent dropdown without changing value");
 
-    // Let the initial load fully settle before arming a "zero calls" monitor. Otherwise a
-    // values request still in flight from the dashboard opening above lands inside the
-    // 3s window and is counted against the dropdown-open, failing an assertion that has
-    // nothing to do with what it is measuring.
+    // Let the initial load settle first, or a request still in flight from the reopen
+    // lands in the 3s window and is counted against the dropdown-open.
     await scopedVars.waitForValuesQuiet({ timeout: 15000 });
 
     // Now test that opening dropdown WITHOUT changing value doesn't trigger additional API calls

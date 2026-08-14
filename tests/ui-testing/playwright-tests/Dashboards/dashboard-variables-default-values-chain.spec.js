@@ -79,13 +79,9 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain("ALL");
 
-    // Change A and verify B still has "All".
-    //
-    // B has an "all" default, so it deliberately does NOT re-query when A changes —
-    // asserting on an API-call count here would only ever be satisfied by A's own
-    // dropdown-open request, which proves nothing about B. What has to hold is that A
-    // genuinely changed (otherwise "B kept its default" is vacuous) and that B still
-    // reads ALL afterwards.
+    // B has an "all" default so it does NOT re-query; an API count here would only be
+    // satisfied by A's own request. Assert A genuinely changed, else "B kept its
+    // default" is vacuous.
     const varAValueBefore = await scopedVars.getVariableInnerValueLocator(varA).textContent();
 
     await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
@@ -164,9 +160,8 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain(customValue1);
 
-    // Change A and verify B still has custom values.
-    // B has a custom default and so does not re-query on a parent change; assert that A
-    // actually changed rather than on an API count that only A's own request satisfies.
+    // B has a custom default so it does not re-query; assert A actually changed rather
+    // than on a count only A's own request satisfies.
     const varAValueBefore = await scopedVars.getVariableInnerValueLocator(varA).textContent();
 
     await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
@@ -268,11 +263,8 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     expect(varCValue).toBeTruthy();
     expect(varCValue.length).toBeGreaterThan(0);
 
-    // Change A and verify C still loads properly.
-    // B holds its "all" default without re-querying, so C (field `_timestamp`) is the
-    // only variable expected to reload. dependentFields restricts the tally to C's own
-    // request, so this measures the grandchild reloading rather than being satisfied by
-    // A's dropdown-open request.
+    // B holds "all" without re-querying, so C (_timestamp) is the only expected reload;
+    // dependentFields scopes the tally to C's own request.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1,
       expectedAPICalls: 1, // C reloads; B keeps "all" without an API call
@@ -398,10 +390,8 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     const varDValue = await scopedVars.getVariableInnerValueLocator(varD).textContent();
     expect(varDValue).toBeTruthy();
 
-    // Change A and verify the entire chain.
-    // B keeps "all" and C keeps its custom values, both without re-querying, so D
-    // (field `_timestamp`) is the only variable expected to reload. Scoping the tally to
-    // D's field makes this assert the tail of the chain actually reloaded.
+    // B keeps "all" and C its custom values without re-querying, so D (_timestamp) is
+    // the only expected reload — scoping the tally asserts the chain's tail fired.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1,
       expectedAPICalls: 1, // D reloads; B and C hold their defaults without an API call
@@ -484,9 +474,8 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain(customValue);
 
-    // Change A and verify B still has custom value.
-    // B has a custom default and so does not re-query on a parent change; assert that A
-    // actually changed rather than on an API count that only A's own request satisfies.
+    // B has a custom default so it does not re-query; assert A actually changed rather
+    // than on a count only A's own request satisfies.
     const varAValueBefore = await scopedVars.getVariableInnerValueLocator(varA).textContent();
 
     await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
