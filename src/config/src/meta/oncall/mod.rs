@@ -58,9 +58,9 @@ pub use preset::{
     RESTRICTED_PRIORITY, RegionGroup, build as build_preset, catalogue as preset_catalogue,
 };
 pub use response::{
-    FIRST_LADDER_RUN, ResolutionCause, ResponderRole, Response, ResponseError, ResponseEvent,
-    ResponseEventKind, ResponseState, UpstreamRecovery, dependents_all_clear, next_ladder_run,
-    upstream_recovery,
+    DEFAULT_FLAP_DAMPENING_SECS, FIRST_LADDER_RUN, PageDecision, ResolutionCause, ResponderRole,
+    Response, ResponseError, ResponseEvent, ResponseEventKind, ResponseState, UpstreamRecovery,
+    dependents_all_clear, flap_note, next_ladder_run, page_decision, upstream_recovery,
 };
 pub use rotation::{
     AwayShift, CoverageSegment, DEFAULT_SLOT, GridError, MAX_AWAY_SHIFTS, MAX_GRID_MICROS,
