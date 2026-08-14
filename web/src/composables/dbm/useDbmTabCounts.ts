@@ -100,7 +100,7 @@ import dbMonitoringService, {
 } from "@/services/db_monitoring";
 import type { DbmRange } from "@/composables/dbm/useDbmScope";
 import { activitySampleTotal } from "@/utils/dbm/activity";
-import { countClaim, type DbmCountClaim } from "@/utils/dbm/format";
+import { countClaim, overlapClaim, type DbmCountClaim } from "@/utils/dbm/format";
 
 /**
  * Everything the tab strips need, from one request.
@@ -272,8 +272,11 @@ export const fetchDbmTabCounts = async (
     // this is a call count — an overlap measure — and D2 requires the badge
     // that renders it to say which feed counted. `complete: true` because the
     // rollup's per-instance totals are exact, not a capped read.
+    //
+    // A vantage that measured NOTHING claims nothing: `overlapClaim` withholds
+    // the zero rather than stamping it `0 client-observed`. See D6/L2.
     sampleCallsCount: databases
-      ? countClaim(
+      ? overlapClaim(
           (databases.hits ?? []).reduce(
             (sum: number, row: { calls?: number }) => sum + (row.calls ?? 0),
             0,
@@ -283,7 +286,7 @@ export const fetchDbmTabCounts = async (
         )
       : null,
     queryCount: queries
-      ? countClaim(queries.total ?? queries.hits?.length ?? 0, false, "client")
+      ? overlapClaim(queries.total ?? queries.hits?.length ?? 0, false, "client")
       : null,
     // From `by_state`, the population. Note this is the ARRAY — passing the
     // whole member here silently yields `null` forever, because a response
