@@ -724,6 +724,29 @@ const useSyntheticsRecorder = () => {
     bridgeConnect();
     bridgeDisconnectHandler = () => {
       isRecording.value = false;
+
+      // The bridge is the ONLY channel a replay's outcome travels on — the answer to
+      // the command sent below. Once it is gone that answer can never arrive, and
+      // nothing else moves the run out of `running`: the banner goes on counting and
+      // the step the player was on keeps the spinner it was given, because the result
+      // that would clear it is undeliverable. Closing the recorder window is how this
+      // is reached in practice.
+      //
+      // #13592 cleared that spinner for every ending it knew about, but each of its
+      // guards is conditioned on the phase having already left `running`, and here
+      // nothing takes it there. The 15-minute watchdog is the only other backstop, and
+      // it resolves to `idle` — dropping the results as well as the spinner.
+      //
+      // `stopped` rather than `failed`: no step failed. The run ended before it
+      // finished, which is exactly what that banner says, and it offers Re-run.
+      if (replayPhase.value !== "running" && replayPhase.value !== "stopping") return;
+      // Orphan the in-flight answer. The worker buffers what it cannot deliver and
+      // re-sends on the next connect, so it can still arrive — after the author has
+      // dismissed this banner, or started another run.
+      replayGeneration++;
+      activeStepId.value = null;
+      isReplaying.value = false;
+      replayPhase.value = "stopped";
     };
 
     // Unwrap Vue reactive proxies before structured clone. Vue Proxy traps

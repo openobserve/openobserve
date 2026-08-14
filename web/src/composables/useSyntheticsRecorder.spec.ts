@@ -1300,6 +1300,109 @@ describe("useSyntheticsRecorder", () => {
       expect(r.replayPhase.value).toBe("idle");
     });
 
+    // ── The bridge dies mid-replay ──────────────────────────────────────────
+    //
+    // Closing the recorder window can take the extension's ability to report with
+    // it. The outcome of a replay travels on exactly ONE channel — the answer to the
+    // `replay` command — so when that channel goes, nothing moves the run out of
+    // `running`: the banner keeps counting and the step it was on keeps its spinner.
+    //
+    // #13592 made every KNOWN ending clear that spinner. It could not cover this one,
+    // because all of its guards are conditioned on the phase having already left
+    // `running`, and here nothing takes it there.
+
+    /** The content script telling the page its port to the worker has dropped. */
+    function emitBridgeDisconnect() {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          source: window,
+          data: { ch: "oo-bridge", dir: "to-page", msg: { type: "bridge-disconnected" } },
+        }),
+      );
+    }
+
+    it("should end a replay whose bridge died rather than leave it running", async () => {
+      const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+      emitStreamEvent({ method: "stepReplayStarted", stepId: "s1" });
+
+      emitBridgeDisconnect();
+
+      expect(r.replayPhase.value, "the journey is still claiming to replay").toBe("stopped");
+      expect(r.isReplaying.value).toBe(false);
+    });
+
+    it("should clear the step a dead bridge left in progress", async () => {
+      // The reported symptom: a step spinning forever, because the result that would
+      // have cleared it can no longer be delivered.
+      const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+      emitStreamEvent({ method: "stepReplayStarted", stepId: "s1" });
+      expect(r.activeStepId.value).toBe("s1");
+
+      emitBridgeDisconnect();
+
+      expect(r.activeStepId.value).toBeNull();
+    });
+
+    // What the run did manage to prove is still real, and the stopped banner counts it.
+    it("should keep the results the replay had already reported", async () => {
+      const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+      emitStreamEvent({ method: "stepReplayResult", stepId: "s1", passed: true, duration_ms: 12 });
+
+      emitBridgeDisconnect();
+
+      expect(r.stepResults.size).toBe(1);
+    });
+
+    /**
+     * The worker buffers what it could not deliver and re-sends on the next connect,
+     * so the abandoned run's answer can arrive minutes later — after the author has
+     * dismissed the banner, or started another run.
+     */
+    it("should ignore the answer of a replay the bridge already ended", async () => {
+      const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+      const abandonedNonce = getLastCommandNonce()!;
+      // A reported step, so the late answer has something to be classified as: with
+      // results present it reads as `failed`, which is what would land on the author.
+      emitStreamEvent({ method: "stepReplayResult", stepId: "s1", passed: true, duration_ms: 12 });
+
+      emitBridgeDisconnect();
+      r.replayPhase.value = "idle"; // author dismisses the banner
+
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          source: window,
+          data: {
+            ch: "oo-bridge",
+            dir: "to-page",
+            nonce: abandonedNonce,
+            msg: { success: true, passed: false, error: "Target page… has been closed" },
+          },
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(r.replayPhase.value).toBe("idle");
+    });
+
+    // A disconnect once the run is over describes nothing — it must not overwrite the
+    // result the author is reading.
+    it("should leave a finished replay's result alone", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.replay(steps);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true, passed: true });
+      await promise;
+      expect(r.replayPhase.value).toBe("passed");
+
+      emitBridgeDisconnect();
+
+      expect(r.replayPhase.value).toBe("passed");
+    });
+
     it("should be a no-op when no replay is running", async () => {
       const r = useSyntheticsRecorder();
       await r.stopReplay();
