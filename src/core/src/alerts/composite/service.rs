@@ -425,8 +425,12 @@ async fn resolve_children(
 fn validate_candidate_graph(
     graph: &HashMap<String, Vec<String>>,
 ) -> Result<(), CompositeServiceError> {
+    // Memoize depth per node so validation is O(V + E), not a DFS re-run from
+    // every node. Cycle detection still happens via `visiting`, which never
+    // memoizes an incomplete traversal.
+    let mut memo: HashMap<String, usize> = HashMap::new();
     for id in graph.keys() {
-        match depth(id, graph, &mut HashSet::new()) {
+        match depth(id, graph, &mut HashSet::new(), &mut memo) {
             Err(()) => return Err(CompositeServiceError::Cycle),
             Ok(value) if value > 2 => return Err(CompositeServiceError::TooDeep),
             Ok(_) => {}
@@ -439,7 +443,11 @@ fn depth(
     id: &str,
     graph: &HashMap<String, Vec<String>>,
     visiting: &mut HashSet<String>,
+    memo: &mut HashMap<String, usize>,
 ) -> Result<usize, ()> {
+    if let Some(cached) = memo.get(id) {
+        return Ok(*cached);
+    }
     let Some(children) = graph.get(id) else {
         return Ok(0);
     };
@@ -448,10 +456,12 @@ fn depth(
     }
     let mut maximum = 0;
     for child in children {
-        maximum = maximum.max(depth(child, graph, visiting)?);
+        maximum = maximum.max(depth(child, graph, visiting, memo)?);
     }
     visiting.remove(id);
-    Ok(maximum + 1)
+    let value = maximum + 1;
+    memo.insert(id.to_string(), value);
+    Ok(value)
 }
 
 async fn schedule_definition(definition: &composite_entity::Model) {

@@ -22,6 +22,7 @@
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
+    sync::{Arc, LazyLock, Mutex},
 };
 
 use chrono::{FixedOffset, Offset as _, Utc};
@@ -339,6 +340,29 @@ pub fn canonical_expression(expr: &CompositeExpr) -> String {
     }
 }
 
+/// Parsed cron schedules are immutable and reused across every child freshness
+/// computation on every evaluation tick, so cache them by source string.
+static CRON_SCHEDULE_CACHE: LazyLock<Mutex<HashMap<String, Arc<Schedule>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn cached_schedule(cron: &str) -> Result<Arc<Schedule>, CompositeError> {
+    if let Some(schedule) = CRON_SCHEDULE_CACHE
+        .lock()
+        .ok()
+        .and_then(|cache| cache.get(cron).cloned())
+    {
+        return Ok(schedule);
+    }
+    let schedule = Arc::new(
+        Schedule::from_str(cron)
+            .map_err(|error| CompositeError::Parse(format!("invalid cron: {error}")))?,
+    );
+    if let Ok(mut cache) = CRON_SCHEDULE_CACHE.lock() {
+        cache.entry(cron.to_string()).or_insert_with(|| schedule.clone());
+    }
+    Ok(schedule)
+}
+
 /// Derive the absolute freshness deadline for an ordinary scheduled alert.
 /// Cron schedules are advanced occurrence by occurrence because neighboring
 /// gaps need not be equal (weekends, month lengths, and DST transitions).
@@ -368,8 +392,7 @@ pub fn alert_stale_deadline_micros(
             .ok_or_else(|| CompositeError::Parse("freshness deadline overflow".to_string()));
     }
 
-    let schedule = Schedule::from_str(&condition.cron)
-        .map_err(|error| CompositeError::Parse(format!("invalid cron: {error}")))?;
+    let schedule = cached_schedule(&condition.cron)?;
     let configured_timezone = condition
         .timezone
         .as_deref()

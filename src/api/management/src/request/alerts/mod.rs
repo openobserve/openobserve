@@ -915,6 +915,21 @@ pub async fn get_composite_timeline(
         .map(|state| (state.alert_id.clone(), state))
         .collect::<HashMap<_, _>>();
 
+    // Resolve child identities and fetch their transitions in one round trip
+    // each, instead of one `resolve_by_id` + `list_transitions_between` per child.
+    let resolutions = infra::table::alert_composites::resolve_many(db, &org_id, &child_ids)
+        .await
+        .unwrap_or_default();
+    let mut transitions_by_alert = infra::table::alert_states::list_transitions_between_many(
+        &child_ids,
+        Some(rollup),
+        from,
+        to,
+        COMPOSITE_TIMELINE_LIMIT,
+    )
+    .await
+    .unwrap_or_default();
+
     let mut children = Vec::with_capacity(composite.children.len());
     for (slot, child) in composite.children.into_iter().enumerate() {
         let id = child.child_alert_id;
@@ -936,10 +951,12 @@ pub async fn get_composite_timeline(
         let name = if !authorized {
             None
         } else {
-            match infra::table::alert_composites::resolve_by_id(db, &org_id, &id).await {
-                Ok(infra::table::alert_composites::Resolution::Alert(alert)) => Some(alert.name),
-                Ok(infra::table::alert_composites::Resolution::Composite(composite)) => {
-                    Some(composite.name)
+            match resolutions.get(&id) {
+                Some(infra::table::alert_composites::Resolution::Alert(alert)) => {
+                    Some(alert.name.clone())
+                }
+                Some(infra::table::alert_composites::Resolution::Composite(composite)) => {
+                    Some(composite.name.clone())
                 }
                 _ => None,
             }
@@ -950,15 +967,7 @@ pub async fn get_composite_timeline(
             None
         };
         let transitions = if name.is_some() {
-            infra::table::alert_states::list_transitions_between(
-                &id,
-                Some(rollup),
-                from,
-                to,
-                COMPOSITE_TIMELINE_LIMIT,
-            )
-            .await
-            .unwrap_or_default()
+            transitions_by_alert.remove(&id).unwrap_or_default()
         } else {
             Vec::new()
         };
@@ -2306,7 +2315,14 @@ pub async fn list_alerts(
         _ => false,
     };
     if merges_extra {
-        params.page_size_and_idx = None;
+        // Bound the regular-alert fetch to the prefix that could fall inside the
+        // requested page rather than fetching every row. Composites/anomalies
+        // only push regular alerts down the merged order, so the regular rows in
+        // any page are a subset of the first `(page_idx + 1) * page_size` regular
+        // rows. Unpaginated requests (no page_size) still fetch everything.
+        params.page_size_and_idx = page_size_and_idx.map(|(page_size, page_idx)| {
+            (page_idx.saturating_add(1).saturating_mul(page_size), 0)
+        });
     }
 
     // Fetch regular (scheduled / realtime) alerts unless the filter is anomaly-only.

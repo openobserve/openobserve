@@ -742,6 +742,57 @@ pub async fn list_transitions_between(
         .collect())
 }
 
+/// Batched counterpart to [`list_transitions_between`]: transitions for many
+/// alerts inside one window, grouped by alert id, oldest first per alert. Each
+/// lane is truncated to `per_alert_limit` in memory — the window itself bounds
+/// the fetch, so no per-alert SQL limit (and no N per-child queries) is needed.
+pub async fn list_transitions_between_many(
+    alert_ids: &[String],
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    per_alert_limit: u64,
+) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    let mut grouped: std::collections::HashMap<String, Vec<StateTransition>> =
+        std::collections::HashMap::new();
+    if alert_ids.is_empty() {
+        return Ok(grouped);
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut query = alert_state_transitions::Entity::find()
+        .filter(alert_state_transitions::Column::AlertId.is_in(alert_ids.iter().cloned()))
+        .filter(alert_state_transitions::Column::At.gte(from))
+        .filter(alert_state_transitions::Column::At.lte(to));
+    if let Some(key) = group_key {
+        query = query.filter(alert_state_transitions::Column::GroupKey.eq(key));
+    }
+    let rows = query
+        .order_by_asc(alert_state_transitions::Column::At)
+        .all(client)
+        .await?;
+    for m in rows {
+        let Some(to_outcome) = RunOutcome::from_i32(m.to_outcome) else {
+            continue;
+        };
+        let transition = StateTransition {
+            alert_id: m.alert_id,
+            group_key: m.group_key,
+            from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
+            to_outcome,
+            from_level: m.from_level.and_then(AlertLevel::from_i32),
+            to_level: m.to_level.and_then(AlertLevel::from_i32),
+            at: m.at,
+            value: m.value,
+            group_labels: m.group_labels,
+        };
+        let lane = grouped.entry(transition.alert_id.clone()).or_default();
+        if lane.len() < per_alert_limit as usize {
+            lane.push(transition);
+        }
+    }
+    Ok(grouped)
+}
+
 /// Remove all state for an alert. Called when the alert itself is deleted —
 /// unlike `scheduled_jobs`, these rows are owned by the alert's lifecycle.
 pub async fn delete_by_alert(alert_id: &str) -> Result<(), errors::Error> {
