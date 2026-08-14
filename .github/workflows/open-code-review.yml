@@ -113,7 +113,7 @@ jobs:
           # DeepSeek OpenAI-compatible API (https://api-docs.deepseek.com).
           llm_url: https://api.deepseek.com
           llm_auth_token: ${{ secrets.DEEPSEEK_API_KEY }}
-          llm_model: deepseek-v4-pro
+          llm_model: deepseek-v4-flash
           llm_use_anthropic: 'false'
           # Reproducibility: pin the OCR CLI to the same release as the action
           # so review behavior doesn't drift with a new CLI release.
