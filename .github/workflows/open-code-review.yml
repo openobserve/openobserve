@@ -10,12 +10,12 @@
 # removed.
 #
 # Triggers:
-#   - pull_request_target (opened/synchronize/reopened/ready_for_review): safe
-#     because the action only reads the diff and never executes PR code, and it
-#     makes DEEPSEEK_API_KEY available even for PRs from forks.
+#   - pull_request (opened/synchronize/reopened/ready_for_review): auto-review of
+#     same-repo PRs. Fork PRs run without DEEPSEEK_API_KEY (GitHub withholds
+#     secrets from forks on pull_request), so the review step is skipped for them.
 #   - issue_comment ("/open-code-review" or "@open-code-review"): on-demand
-#     re-review, gated to collaborators only to protect LLM quota.
-#   - workflow_dispatch (pr_number): manual review of a specific PR.
+#     re-review, gated to collaborators only to protect LLM quota. Runs in the
+#     base-branch context, so a collaborator can explicitly re-review a fork PR.
 
 name: OpenCodeReview
 
@@ -28,8 +28,7 @@ concurrency:
   group: >-
     ${{
       (
-        github.event_name == 'pull_request_target'
-        || github.event_name == 'workflow_dispatch'
+        github.event_name == 'pull_request'
         || (
           github.event_name == 'issue_comment'
           && github.event.issue.pull_request
@@ -45,22 +44,16 @@ concurrency:
           )
         )
       )
-      && format('ocr-{0}', github.event.pull_request.number || github.event.issue.number || github.event.inputs.pr_number)
+      && format('ocr-{0}', github.event.pull_request.number || github.event.issue.number)
       || format('noop-{0}', github.run_id)
     }}
   cancel-in-progress: true
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   issue_comment:
     types: [created]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number to review"
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -80,8 +73,7 @@ jobs:
     # issue_comment triggers are gated on author_association so only
     # MEMBER/OWNER/COLLABORATOR users can spend LLM quota via re-review.
     if: |
-      github.event_name == 'pull_request_target'
-      || github.event_name == 'workflow_dispatch'
+      github.event_name == 'pull_request'
       || (
         github.event_name == 'issue_comment'
         && github.event.issue.pull_request
@@ -97,44 +89,25 @@ jobs:
         )
       )
     steps:
-      # For workflow_dispatch the action cannot derive a PR number from the
-      # event, so its internal "Fetch PR head (fork-safe)" step is a no-op and
-      # the head commit is never fetched — merge-base would collapse to an empty
-      # diff. Pre-fetch base + head here (dispatch only). pull_request_target and
-      # issue_comment are handled entirely by the action.
-      - name: Checkout base
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Fetch PR head
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          git fetch origin "pull/${{ github.event.inputs.pr_number }}/head"
-
       - name: Resolve PR refs
         id: pr-context
-        if: github.event_name != 'pull_request_target'
+        if: github.event_name == 'issue_comment'
         uses: actions/github-script@v9
         with:
           script: |
-            // pull_request_target carries a top-level `pull_request` payload, so
-            // the action resolves refs from the event. For issue_comment and
-            // workflow_dispatch there is none — resolve base ref and head SHA
-            // from the PR number instead.
-            const prNumber = context.eventName === 'workflow_dispatch'
-              ? context.payload.inputs.pr_number
-              : context.issue.number;
+            // For issue_comment events there is no top-level `pull_request`
+            // payload, so resolve the base ref and head SHA so the action can
+            // review the right diff.
             const { data: pullRequest } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: Number(prNumber)
+              pull_number: context.issue.number
             });
             core.setOutput('base_ref', pullRequest.base.ref);
             core.setOutput('head_sha', pullRequest.head.sha);
 
       - name: Run OpenCodeReview
+        if: ${{ github.event_name == 'issue_comment' || github.event.pull_request.head.repo.fork == false }}
         uses: alibaba/open-code-review@v1.9.2
         with:
           # DeepSeek OpenAI-compatible API (https://api-docs.deepseek.com).
@@ -145,7 +118,7 @@ jobs:
           # Reproducibility: pin the OCR CLI to the same release as the action
           # so review behavior doesn't drift with a new CLI release.
           ocr_version: '1.9.2'
-          # For issue_comment and workflow_dispatch, pass the resolved refs;
-          # for pull_request_target the action resolves them from the event.
+          # For issue_comment triggers, pass the resolved refs; for
+          # pull_request the action resolves them from the event.
           base_ref: ${{ steps.pr-context.outputs.base_ref }}
           head_sha: ${{ steps.pr-context.outputs.head_sha }}
