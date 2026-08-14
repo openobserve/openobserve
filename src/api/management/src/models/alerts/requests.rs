@@ -287,7 +287,7 @@ fn composite_trigger_unsupported_field(trigger: &super::TriggerCondition) -> Opt
         Some("trigger_condition.notify_on_warning")
     } else if trigger.frequency_minutes != 0 {
         Some("trigger_condition.frequency")
-    } else if trigger.frequency_type != super::FrequencyType::default() {
+    } else if trigger.frequency_type.is_some() {
         Some("trigger_condition.frequency_type")
     } else if !trigger.cron.is_empty() {
         Some("trigger_condition.cron")

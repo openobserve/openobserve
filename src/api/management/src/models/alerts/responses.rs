@@ -37,9 +37,10 @@ pub struct ListAlertsResponseBody {
 
 /// An item in the list returned by the `ListAlerts` endpoint.
 ///
-/// For `scheduled` and `realtime` alert types, `condition` and
-/// `trigger_condition` are always present. For `anomaly_detection` items they
-/// are absent; use `last_trained_at` and `status` instead.
+/// `condition` is always present: a concrete query for `scheduled`/`realtime`,
+/// `null` for `composite` and `anomaly_detection` (which have no query). Use
+/// `last_trained_at` and `status` for anomaly state. `trigger_condition` is
+/// present for `scheduled`/`realtime` and omitted otherwise.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ListAlertsResponseBodyItem {
     #[schema(value_type = String)]
@@ -51,7 +52,6 @@ pub struct ListAlertsResponseBodyItem {
     pub description: Option<String>,
     /// Discriminator: "scheduled" | "realtime" | "anomaly_detection"
     pub alert_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub condition: Option<QueryCondition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trigger_condition: Option<TriggerCondition>,
@@ -441,7 +441,7 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
     let trigger_condition = Some(TriggerCondition {
         period_minutes,
         frequency_minutes,
-        frequency_type: FrequencyType::Minutes,
+        frequency_type: Some(FrequencyType::Minutes),
         ..Default::default()
     });
 
@@ -591,7 +591,7 @@ mod tests {
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();
-        assert!(!obj.contains_key("condition"));
+        assert!(obj.get("condition").is_some_and(serde_json::Value::is_null));
         assert!(!obj.contains_key("trigger_condition"));
         assert!(!obj.contains_key("last_trained_at"));
         assert!(!obj.contains_key("status"));
