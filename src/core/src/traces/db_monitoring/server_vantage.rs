@@ -45,6 +45,24 @@
 //! The collector recipes remain the customer-facing artifact for *collection*; this module owns
 //! *canonicalization*. Recipes stay declarative and version-pinned, and no customer edits VRL
 //! when a receiver renames a column.
+//!
+//! ## Module invariants
+//!
+//! Two invariants hold at every canonicalizer and every `to_record` writer in this module. They
+//! are stated once here; the code below references them as "Invariant 1/2 (module docs)".
+//!
+//! 1. **Canonical `o2_dbm_*` names are OUTPUTS, never inputs.** Every canonicalizer reads only
+//!    receiver/recipe vendor field names. Accepting a canonical name as an input alias would let a
+//!    caller POSTing a log record (the logs paths flatten caller keys straight onto the record)
+//!    hand us a fabricated event — a deadlock, a session, an executed plan — and have it stored as
+//!    engine-derived truth. [`apply_to_record`] additionally strips every caller-supplied
+//!    [`ALL_DBM_FIELDS`] member before canonicalization (D1 condition 1).
+//! 2. **Every stored value is a SCALAR (X5 / D-B).** The logs schema inferrer
+//!    (`config::utils::schema`) accepts only basic types and hard-errors with "Cannot infer schema
+//!    from non-basic type value" on an array or object — and that error rejects the WHOLE ingest
+//!    batch, not just the offending record. Anything tree- or list-shaped (participants, plans,
+//!    blocker pids) is therefore stored as a JSON **string**, with a tolerant reader
+//!    ([`participants_of`], [`plan_of`], [`blocking_pids_of`]) on the way back.
 
 use std::collections::BTreeMap;
 
@@ -396,10 +414,9 @@ impl ActivitySample {
 
     /// The flattened canonical record written onto the log row.
     ///
-    /// EVERY value is a SCALAR. The logs schema inferrer accepts only basic
-    /// types and hard-errors on an array or object — and that error rejects the
-    /// WHOLE ingest batch, not just this record. `blocking_pids` is the live
-    /// risk: it is a list, and the obvious encoding is a JSON array.
+    /// Every value is a SCALAR (Invariant 2, module docs). `blocking_pids` is
+    /// the live risk here: it is a list, and the obvious encoding is a JSON
+    /// array.
     pub fn to_record(&self) -> BTreeMap<String, Value> {
         let mut out = BTreeMap::new();
         out.insert(O2_DBM_KIND.into(), json!(KIND_ACTIVITY));
@@ -463,11 +480,11 @@ impl ActivitySample {
     }
 }
 
-/// Encode blocker pids for storage: a comma-joined SCALAR string.
+/// Encode blocker pids for storage: a comma-joined SCALAR string (Invariant 2,
+/// module docs — the `O2_DBM_PARTICIPANTS` precedent).
 ///
-/// Mirrors the `O2_DBM_PARTICIPANTS` precedent — a nested value would fail the
-/// whole ingest batch. Comma-joined rather than the PG literal so the stored
-/// form is engine-neutral and needs no brace-stripping on read.
+/// Comma-joined rather than the PG literal so the stored form is
+/// engine-neutral and needs no brace-stripping on read.
 pub fn store_blocking_pids(pids: &[i32]) -> Value {
     json!(
         pids.iter()
@@ -520,11 +537,10 @@ fn parse_blocking_pids(raw: &str) -> Vec<i32> {
 
 /// Canonicalize one `db.server.query_sample` row into an [`ActivitySample`].
 ///
-/// Follows the invariants `canonicalize_blocking` establishes: reads only
-/// receiver-vendor field names (canonical `o2_dbm_*` names are OUTPUTS, never
-/// inputs, so a caller cannot POST a fabricated session), returns `None` without
-/// a session identity, reuses the shared detectors, runs statement text through
-/// the same normalizer the span path uses, and prefers normalized text over raw.
+/// Follows the module invariants (Invariant 1: vendor names in, canonical names
+/// out only): returns `None` without a session identity, reuses the shared
+/// detectors, runs statement text through the same normalizer the span path
+/// uses, and prefers normalized text over raw.
 pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySample> {
     let engine = detect_engine(rec);
 
@@ -955,10 +971,8 @@ pub fn fingerprint_statement(text: &str, engine: Option<&str>) -> (Option<String
 /// record (`dl_*` fields populated) and treats a participant-less record as a banner to skip.
 pub fn canonicalize_pg_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEvent> {
     let engine = detect_engine(rec).or_else(|| Some("postgresql".to_string()));
-    // NOTE: the canonical `o2_dbm_*` names are deliberately NOT read as input aliases here (or
-    // anywhere in this module). They are OUTPUTS. Accepting one as input would let a client that
-    // POSTs a log record hand us a fabricated victim/pid and have it stored as engine-derived
-    // truth — the logs path flattens caller keys directly. Derivation reads receiver fields only.
+    // Invariant 1 (module docs): canonical `o2_dbm_*` names are outputs, never
+    // input aliases — derivation reads receiver fields only.
     let victim_pid = first_i64(rec, &["deadlock_victim_pid", "pg_pid"]);
 
     // The two edges of the wait cycle, as the filelog operators captured them.
@@ -1252,8 +1266,8 @@ pub fn merge_mysql_deadlocks(
 /// Canonicalize a `pg_blocking_chain` / `mysql_lock_waits` recipe row into a [`BlockingSample`].
 pub fn canonicalize_blocking(rec: &Map<String, Value>) -> Option<BlockingSample> {
     let engine = detect_engine(rec);
-    // Receiver fields only — see the note in `canonicalize_pg_deadlock`: canonical `o2_dbm_*`
-    // names are outputs, never inputs, so a caller cannot inject a blocking relationship.
+    // Invariant 1 (module docs): receiver fields only — a caller cannot inject
+    // a blocking relationship.
     let blocked_pid = first_i64(rec, &["blocked_pid", "waiting_thread"]);
     let blocking_pid = first_i64(rec, &["blocking_pid", "blocking_thread"]);
     // An edge needs both ends; a half-populated row is not a blocking relationship.
@@ -1319,14 +1333,11 @@ impl DeadlockEvent {
         if let Some(v) = self.victim_side {
             out.insert(O2_DBM_VICTIM_SIDE.into(), json!(v));
         }
-        // Stored as a JSON *string*, not a JSON array.
-        //
-        // The logs schema inferrer (`config::utils::schema`) accepts ONLY scalar values and
-        // hard-errors with "Cannot infer schema from non-basic type value" on an array or object
-        // — and that error rejects the WHOLE ingest batch, not just this record. Since
-        // canonicalization runs after flattening (it must: it reads the flattened receiver
-        // fields), a nested array here silently killed every batch containing a deadlock.
-        // Readers parse it back via `participants_of`.
+        // Stored as a JSON *string*, not a JSON array (Invariant 2, module
+        // docs). Since canonicalization runs after flattening (it must: it
+        // reads the flattened receiver fields), a nested array here silently
+        // killed every batch containing a deadlock — the incident the
+        // invariant records. Readers parse it back via `participants_of`.
         out.insert(
             O2_DBM_PARTICIPANTS.into(),
             json!(
@@ -1459,9 +1470,9 @@ fn insert_opt(out: &mut BTreeMap<String, Value>, key: &str, val: Option<String>)
 
 /// Read `o2_dbm_participants` off a stored row, tolerating BOTH storage forms.
 ///
-/// The canonical write path stores the array as a JSON **string** (the logs schema inferrer
-/// rejects nested values — see [`DeadlockEvent::to_record`]). A row produced by a VRL pipeline,
-/// or by an older build, may still carry a real JSON array, so both parse.
+/// The canonical write path stores the array as a JSON **string** (Invariant 2,
+/// module docs). A row produced by a VRL pipeline, or by an older build, may
+/// still carry a real JSON array, so both parse.
 pub fn participants_of(row: &Value) -> Vec<Participant> {
     let parsed;
     let arr = match row.get(O2_DBM_PARTICIPANTS) {
@@ -1482,9 +1493,8 @@ pub fn participants_of(row: &Value) -> Vec<Participant> {
 /// `refactor_map` so a user-defined schema listing the canonical columns keeps them
 /// (D1 condition 2).
 ///
-/// It first drops any client-supplied `o2_dbm_*` key: the logs paths flatten caller keys
-/// straight onto the record, so without this a caller could POST a fabricated deadlock and
-/// have it stored as engine-derived truth (D1 condition 1).
+/// It first drops any client-supplied `o2_dbm_*` key — the strip half of Invariant 1
+/// (module docs).
 ///
 /// No-ops when db_monitoring is disabled, so callers need no `cfg` check of their own.
 ///
@@ -1623,37 +1633,70 @@ fn warn_unrecognized_recipe(tag: &str) {
     }
 }
 
+/// The reserved namespace prefix. Every [`ALL_DBM_FIELDS`] member is either
+/// under it or is exactly [`O2_EVENT_NAME`] —
+/// `the_strip_prescan_covers_every_reserved_field` pins that coverage, so a
+/// future field outside both would fail the test rather than silently dodge
+/// the pre-scan below.
+const RESERVED_DBM_PREFIX: &str = "o2_dbm_";
+
+/// Fast pre-scan: could the reservation strip touch this record at all?
+///
+/// Prefix-based rather than per-member membership so one pass over the
+/// record's OWN keys decides. A key that matches the prefix without being an
+/// `ALL_DBM_FIELDS` member merely routes the record through the strip, which
+/// still removes exact members only — behavior is identical, just via the
+/// slow path.
+pub(crate) fn has_reserved_dbm_key(rec: &Map<String, Value>) -> bool {
+    rec.keys()
+        .any(|k| k.starts_with(RESERVED_DBM_PREFIX) || k == O2_EVENT_NAME)
+}
+
 pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     if !config::get_config().db_monitoring.enabled {
         return;
     }
-    // The event name has to survive the strip, because for some engines it is the ONLY
-    // discriminator there is.
-    //
-    // `O2_EVENT_NAME` is an `ALL_DBM_FIELDS` member, so the loop below removes it along
-    // with every other caller-settable key — correctly, since a forged value and a
-    // receiver-derived one are byte-identical in a flattened map. But `canonicalize_record`
-    // then has nothing to dispatch on and falls back to `sniff_event_name`, which matches
-    // Postgres attribute shapes ONLY. MySQL records carry no `postgresql.*` attribute at
-    // all, so every MySQL receiver event was dropped: measured 0 of 170 `top_query` and
-    // 0 of 11 `query_sample` canonicalized in one window, against 373/373 and 242/242 for
-    // Postgres on the same binary. Postgres survived purely by accident of the sniff.
-    //
-    // Carrying the value across the strip restores dispatch WITHOUT weakening the strip:
-    // the name is re-read from the record we were handed, and the ingest paths still
-    // overwrite it afterwards with the value taken from the OTLP envelope, which is what
-    // makes the stored field trusted. This only decides which arm runs.
-    let event_name = local_val
-        .get(O2_EVENT_NAME)
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .map(str::to_owned);
-    for f in ALL_DBM_FIELDS {
-        local_val.remove(f);
-    }
-    if let Some(name) = &event_name {
-        local_val.insert(O2_EVENT_NAME.to_string(), Value::String(name.clone()));
-    }
+    // The strip is gated on a fast pre-scan: this function runs on EVERY log
+    // record every customer ships, and essentially all of them carry no
+    // reserved key at all — for those, one O(record keys) scan replaces 83
+    // `remove` calls. A record that DOES carry a reserved-looking key takes
+    // the identical strip path it always did (the strip still removes exact
+    // `ALL_DBM_FIELDS` members only), so behavior is unchanged either way.
+    // The event-name save/restore is skipped with it: `O2_EVENT_NAME` is
+    // itself covered by the pre-scan, so a record the scan clears cannot
+    // carry one.
+    let event_name = if has_reserved_dbm_key(local_val) {
+        // The event name has to survive the strip, because for some engines it is the ONLY
+        // discriminator there is.
+        //
+        // `O2_EVENT_NAME` is an `ALL_DBM_FIELDS` member, so the loop below removes it along
+        // with every other caller-settable key — correctly, since a forged value and a
+        // receiver-derived one are byte-identical in a flattened map. But `canonicalize_record`
+        // then has nothing to dispatch on and falls back to `sniff_event_name`, which matches
+        // Postgres attribute shapes ONLY. MySQL records carry no `postgresql.*` attribute at
+        // all, so every MySQL receiver event was dropped: measured 0 of 170 `top_query` and
+        // 0 of 11 `query_sample` canonicalized in one window, against 373/373 and 242/242 for
+        // Postgres on the same binary. Postgres survived purely by accident of the sniff.
+        //
+        // Carrying the value across the strip restores dispatch WITHOUT weakening the strip:
+        // the name is re-read from the record we were handed, and the ingest paths still
+        // overwrite it afterwards with the value taken from the OTLP envelope, which is what
+        // makes the stored field trusted. This only decides which arm runs.
+        let event_name = local_val
+            .get(O2_EVENT_NAME)
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned);
+        for f in ALL_DBM_FIELDS {
+            local_val.remove(f);
+        }
+        if let Some(name) = &event_name {
+            local_val.insert(O2_EVENT_NAME.to_string(), Value::String(name.clone()));
+        }
+        event_name
+    } else {
+        None
+    };
     let canon = canonicalize_record(local_val);
     // Put the map back the way the strip left it: the caller owns this field, and a
     // record we could not canonicalize must not keep a key the strip was meant to remove.
@@ -1680,6 +1723,8 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
 ///
 /// This is the single ingest-side entry point (the logs analogue of [`super::enrich`]).
 pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, Value>> {
+    // One config load per record — the gated arms below all read from it.
+    let cfg = config::get_config();
     // Deadlocks — Postgres DETAIL entries and MySQL per-transaction entries.
     let is_pg_deadlock = rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("deadlock");
     let is_my_deadlock = rec.get("o2_my_event").and_then(|v| v.as_str()) == Some("deadlock");
@@ -1699,7 +1744,7 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     // own knob (D-G), scoped to THIS arm only — deadlocks and blocking
     // shipped enabled and must not switch off behind a knob about a sixth
     // record type.
-    if config::get_config().db_monitoring.explain_enabled
+    if cfg.db_monitoring.explain_enabled
         && rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("explain")
     {
         return canonicalize_pg_auto_explain(rec).map(|e| e.to_record());
@@ -1717,7 +1762,7 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     // `# Query_time:` headers), needing multi-line stitching nothing here
     // does yet. An arm without a producer would be dead code that reads as
     // coverage — add the MySQL arm together with a slow-log tailer recipe.
-    if config::get_config().db_monitoring.statement_enabled
+    if cfg.db_monitoring.statement_enabled
         && rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("statement_duration")
     {
         return canonicalize_pg_statement_duration(rec).map(|e| e.to_record());
@@ -1786,17 +1831,13 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     // (~200 rows/sec for a 200-session instance), but deadlocks and blocking
     // already shipped enabled and must not switch off behind a knob about a
     // third record type.
-    if config::get_config().db_monitoring.activity_enabled
-        && resolve_event_name(rec) == Some(EVENT_QUERY_SAMPLE)
-    {
+    if cfg.db_monitoring.activity_enabled && resolve_event_name(rec) == Some(EVENT_QUERY_SAMPLE) {
         return canonicalize_query_sample(rec).map(|s| s.to_record());
     }
     // Top queries + plans (W3) — gated on its own knob, for the same reason
     // activity is: plan documents are large (the captured Postgres plans reach
     // 2.4 KB each) and a user upgrading must not silently acquire the cost.
-    if config::get_config().db_monitoring.top_query_enabled
-        && resolve_event_name(rec) == Some(EVENT_TOP_QUERY)
-    {
+    if cfg.db_monitoring.top_query_enabled && resolve_event_name(rec) == Some(EVENT_TOP_QUERY) {
         return canonicalize_top_query(rec).map(|s| s.to_record());
     }
     None
@@ -1830,14 +1871,9 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
 //   * Latency is NEVER attributed to a plan. Per-plan latency would come from `pg_stat_statements`
 //     real executions while this plan was never executed, so correlating them fabricates causality.
 
-/// The EXPLAIN document, stored as a JSON **string** (D-B / X5).
-///
-/// A plan is a tree, and a nested JSON value in a canonicalized record makes the
-/// logs schema inferrer hard-error with "Cannot infer schema from non-basic type
-/// value" — which rejects the ENTIRE ingest batch, not just this record. That
-/// bug already bit the deadlock path once, which is why `O2_DBM_PARTICIPANTS` is
-/// a string; the plan follows the same precedent, with [`plan_of`] as its
-/// tolerant reader.
+/// The EXPLAIN document, stored as a JSON **string** (Invariant 2, module docs
+/// — a plan is a tree, and the deadlock path already paid for storing one
+/// nested). [`plan_of`] is its tolerant reader.
 pub const O2_DBM_PLAN: &str = "o2_dbm_plan";
 /// Structural hash of [`O2_DBM_PLAN`] — see [`plan_hash`].
 pub const O2_DBM_PLAN_HASH: &str = "o2_dbm_plan_hash";
@@ -1987,8 +2023,7 @@ pub struct TopQuerySample {
 impl TopQuerySample {
     /// The flattened canonical record written onto the log row.
     ///
-    /// EVERY value is a SCALAR — see [`O2_DBM_PLAN`] for why a nested one would
-    /// reject the whole ingest batch.
+    /// Every value is a SCALAR (Invariant 2, module docs).
     pub fn to_record(&self) -> BTreeMap<String, Value> {
         let mut out = BTreeMap::new();
         out.insert(O2_DBM_KIND.into(), json!(KIND_TOP_QUERY));
@@ -2049,11 +2084,10 @@ impl TopQuerySample {
 
 /// Canonicalize one `db.server.top_query` row into a [`TopQuerySample`].
 ///
-/// Follows the same invariants as the other canonicalizers: reads only
-/// receiver-vendor field names (the canonical `o2_dbm_*` names are OUTPUTS, so a
-/// caller cannot POST a fabricated plan), returns `None` without a statement
-/// identity, reuses the shared detectors, and runs the statement text through
-/// the same normalizer the span path uses.
+/// Follows the module invariants (Invariant 1: a caller cannot POST a
+/// fabricated plan): returns `None` without a statement identity, reuses the
+/// shared detectors, and runs the statement text through the same normalizer
+/// the span path uses.
 pub fn canonicalize_top_query(rec: &Map<String, Value>) -> Option<TopQuerySample> {
     let engine = detect_engine(rec);
 
@@ -2339,8 +2373,8 @@ pub struct AutoExplainEvent {
 }
 
 impl AutoExplainEvent {
-    /// The flattened canonical record. EVERY value is a SCALAR — see
-    /// [`O2_DBM_PLAN`] for why a nested one would reject the whole batch.
+    /// The flattened canonical record. Every value is a SCALAR (Invariant 2,
+    /// module docs).
     pub fn to_record(&self) -> BTreeMap<String, Value> {
         let mut out = BTreeMap::new();
         out.insert(O2_DBM_KIND.into(), json!(KIND_EXPLAIN));
@@ -2380,18 +2414,18 @@ impl AutoExplainEvent {
 /// Canonicalize one `o2_pg_event = explain` filelog record into an
 /// [`AutoExplainEvent`].
 ///
-/// Follows the five invariants every canonicalizer holds: reads ONLY
-/// collector-produced field names (`ae_plan_json`, `ae_duration_ms`,
-/// `pg_query_id`, `pg_db`, …) — the canonical `o2_dbm_*` names are OUTPUTS,
-/// never input aliases, so a caller POSTing to `/_json` cannot hand us a
-/// fabricated executed plan; returns `None` without a plan document (an
-/// auto_explain record with no plan is nothing); reuses the shared detectors;
-/// runs the statement text through the SAME normalizer the span path uses; and
-/// stores the plan as a STRING (D-B).
+/// Follows the module invariants (Invariant 1: only collector-produced field
+/// names — `ae_plan_json`, `ae_duration_ms`, `pg_query_id`, `pg_db`, … — are
+/// read, so a `/_json` caller cannot hand us a fabricated executed plan;
+/// Invariant 2: the plan is stored as a STRING): returns `None` without a plan
+/// document (an auto_explain record with no plan is nothing), reuses the
+/// shared detectors, and runs the statement text through the SAME normalizer
+/// the span path uses.
 pub fn canonicalize_pg_auto_explain(rec: &Map<String, Value>) -> Option<AutoExplainEvent> {
     // The recipe ships the whole auto_explain document as ONE string attr
-    // (`ae_plan_json`) — never a nested value (X5). Query text, plan tree and
-    // actuals are all read from it here, on the trusted side of the strip.
+    // (`ae_plan_json`) — never a nested value (Invariant 2). Query text, plan
+    // tree and actuals are all read from it here, on the trusted side of the
+    // strip.
     let doc_str = first_str(rec, &["ae_plan_json"])?;
     let doc: Value = serde_json::from_str(doc_str.trim()).ok()?;
     let plan = rewrap_auto_explain_plan(&doc)?;
@@ -2566,7 +2600,9 @@ pub fn parse_statement_duration_message(msg: &str) -> Option<(f64, &str)> {
     let duration_ms: f64 = num.trim().parse().ok()?;
     let rest = rest.trim_start();
     let (kind, text) = rest.split_once(':')?;
-    if kind != "statement" && !kind.starts_with("execute ") && kind != "execute" {
+    // Same phase filter as the pre-parsed `stmt_kind` route in
+    // `canonicalize_pg_statement_duration` — the two must not drift.
+    if kind != "statement" && !kind.starts_with("execute") {
         return None;
     }
     Some((duration_ms, text.trim_start()))
@@ -2575,11 +2611,10 @@ pub fn parse_statement_duration_message(msg: &str) -> Option<(f64, &str)> {
 /// Canonicalize one `o2_pg_event = statement_duration` filelog record into a
 /// [`StatementDurationEvent`].
 ///
-/// Follows the module's invariants: reads ONLY collector-produced field names
-/// (`stmt_duration_ms`, `stmt_text`, `pg_user`, `pg_db`, …) — the canonical
-/// `o2_dbm_*` names are OUTPUTS, so a `/_json` caller cannot POST a fabricated
-/// execution; returns `None` without a measured duration (a duration record
-/// with no duration is nothing); and reuses the shared detectors.
+/// Follows the module invariants (Invariant 1: only collector-produced field
+/// names — `stmt_duration_ms`, `stmt_text`, `pg_user`, `pg_db`, … — are read):
+/// returns `None` without a measured duration (a duration record with no
+/// duration is nothing), and reuses the shared detectors.
 ///
 /// **The privacy rule is STRICTER here than in the sibling canonicalizers, on
 /// purpose.** The logged text is the raw statement WITH ITS LITERALS — that is
@@ -2803,8 +2838,8 @@ pub struct TableStatsSample {
 }
 
 impl TableStatsSample {
-    /// The flattened canonical record. Every value is a SCALAR — a nested one
-    /// makes the logs schema inferrer reject the whole ingest batch.
+    /// The flattened canonical record. Every value is a SCALAR (Invariant 2,
+    /// module docs).
     pub fn to_record(&self) -> BTreeMap<String, Value> {
         let mut out = BTreeMap::new();
         out.insert(O2_DBM_KIND.into(), json!(KIND_TABLE_STATS));
@@ -2967,8 +3002,8 @@ impl IndexStatsSample {
 /// `mysql_index_stats` or `mariadb_index_stats` — all three emit the same
 /// aliased columns) into an [`IndexStatsSample`].
 ///
-/// Reads only the recipe's own column names, so a caller cannot POST a
-/// fabricated index row using the canonical `o2_dbm_*` names.
+/// Reads only the recipe's own column names (Invariant 1, module docs), so a
+/// caller cannot POST a fabricated index row.
 pub fn canonicalize_index_stats(rec: &Map<String, Value>) -> Option<IndexStatsSample> {
     // The index's own name is the identity. Absent, there is no index to show
     // and a fabricated name would invent a row in the health list. NOT read
@@ -3013,10 +3048,9 @@ pub fn canonicalize_index_stats(rec: &Map<String, Value>) -> Option<IndexStatsSa
 /// `mysql_table_stats` or `mariadb_table_stats` — all three emit the same
 /// aliased columns) into a [`TableStatsSample`].
 ///
-/// Follows the invariants every other canonicalizer here establishes: reads only
-/// the recipe's own column names (the canonical `o2_dbm_*` names are OUTPUTS, so
-/// a caller cannot POST a fabricated table row), returns `None` without a
-/// relation identity, and reuses the shared detectors where they apply.
+/// Follows the module invariants (Invariant 1: the recipe's own column names
+/// only): returns `None` without a relation identity, and reuses the shared
+/// detectors where they apply.
 pub fn canonicalize_table_stats(rec: &Map<String, Value>) -> Option<TableStatsSample> {
     // The table name is the recipe's `body_column`, so it arrives as `body` and
     // there is NO `table_name` attribute. `canonicalize_mssql_deadlock` reads

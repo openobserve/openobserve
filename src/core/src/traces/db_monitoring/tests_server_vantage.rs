@@ -38,6 +38,38 @@ fn obj(v: Value) -> Map<String, Value> {
     v.as_object().unwrap().clone()
 }
 
+// ─── Env-knob scaffolding (shared by every gated-ingest test) ────────────────
+
+/// ONE shared mutex serves every knob: env vars are process-global, so two
+/// knobs flipped concurrently by parallel tests would still race each other's
+/// `refresh_config` — serializing them all is the only safe ordering.
+static KNOB_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Set env knobs for the duration of `f`, restoring the prior values (and
+/// refreshing config) afterwards.
+fn with_knobs<T>(knobs: &[(&str, &str)], f: impl FnOnce() -> T) -> T {
+    let _guard = KNOB_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let prev: Vec<Option<String>> = knobs.iter().map(|(k, _)| std::env::var(k).ok()).collect();
+    for (k, v) in knobs {
+        unsafe { std::env::set_var(k, v) };
+    }
+    config::refresh_config().expect("config refresh");
+    let out = f();
+    for ((k, _), prev) in knobs.iter().zip(prev) {
+        match prev {
+            Some(v) => unsafe { std::env::set_var(k, v) },
+            None => unsafe { std::env::remove_var(k) },
+        }
+    }
+    config::refresh_config().expect("config refresh");
+    out
+}
+
+/// Force one boolean ingest knob ON for the duration of `f`.
+fn with_knob<T>(env_var: &str, f: impl FnOnce() -> T) -> T {
+    with_knobs(&[(env_var, "true")], f)
+}
+
 // ─── Fixtures: the verbatim proof records ────────────────────────────────────
 
 /// Proof §2.1 — the captured Postgres deadlock DETAIL record.
@@ -1631,34 +1663,7 @@ fn event_name_of_is_none_for_a_non_string_value() {
     );
 }
 
-/// The const must name the flattened key exactly. Every other test would still
-/// pass if the const and the producer loop agreed on a WRONG name, so the wire
-/// contract is pinned literally, once.
-#[test]
-fn o2_event_name_const_is_the_wire_key() {
-    assert_eq!(
-        server_vantage::O2_EVENT_NAME,
-        "o2_event_name",
-        "the flattened key is part of the ingest wire contract"
-    );
-}
-
 // ─── D-I · reservation against spoofing ──────────────────────────────────────
-
-/// D-I: `o2_event_name` must be in `ALL_DBM_FIELDS` so `apply_to_record`'s strip
-/// loop removes caller-supplied values.
-///
-/// Spec X7: Revision 1 claimed the canonicalizer would remove it instead, but
-/// `canonicalize_record` takes `&Map` (immutable, `server_vantage.rs:981`) and
-/// cannot remove anything. Reservation is the only mechanism that works.
-#[test]
-fn o2_event_name_is_a_reserved_field() {
-    assert!(
-        server_vantage::ALL_DBM_FIELDS.contains(&server_vantage::O2_EVENT_NAME),
-        "o2_event_name must be reserved, or a caller can POST one to /_json and \
-         forge an engine-derived record (spec D-I)"
-    );
-}
 
 /// `apply_to_record` CANNOT distinguish a trusted value from a spoofed one, and
 /// must therefore strip unconditionally.
@@ -1715,56 +1720,6 @@ fn caller_supplied_event_name_is_stripped_whatever_its_value() {
     }
 }
 
-/// Reservation must not damage the pre-existing strip list. `ALL_DBM_FIELDS` does
-/// triple duty — write-side strip, read-side projection allowlist
-/// (`api.rs:1806-1810`), and schema gate (spec §5.1) — so a bump that dropped an
-/// entry would silently break DBM reads.
-#[test]
-fn reserving_event_name_keeps_every_pre_existing_reserved_field() {
-    for pre_existing in [
-        "o2_dbm_kind",
-        "o2_dbm_engine",
-        "o2_dbm_database",
-        "o2_dbm_instance",
-        "o2_dbm_timestamp",
-        "o2_dbm_raw",
-        "o2_dbm_victim_pid",
-        "o2_dbm_participants",
-        "o2_dbm_participant_count",
-        "o2_dbm_victim_side",
-        "o2_dbm_blocked_pid",
-        "o2_dbm_blocked_app",
-        "o2_dbm_blocked_query",
-        "o2_dbm_blocked_fingerprint",
-        "o2_dbm_blocking_pid",
-        "o2_dbm_blocking_app",
-        "o2_dbm_blocking_query",
-        "o2_dbm_blocking_fingerprint",
-        "o2_dbm_wait_event_type",
-        "o2_dbm_wait_event",
-        "o2_dbm_wait_seconds",
-        "o2_dbm_query_shape",
-    ] {
-        assert!(
-            server_vantage::ALL_DBM_FIELDS.contains(&pre_existing),
-            "{pre_existing} must stay reserved — ALL_DBM_FIELDS is also the read-side \
-             projection allowlist, so dropping an entry breaks reads"
-        );
-    }
-    assert_eq!(
-        server_vantage::ALL_DBM_FIELDS.len(),
-        83,
-        "23 pre-existing (22 + o2_event_name from W1) + 19 activity columns (W2) \
-         + 14 top-query columns (W3) + 3 executed-plan columns (W-E3: plan_source, \
-         plan_duration_ms, plan_rows_actual) + 18 table-health columns (W10) + 5 index-health \
-         columns (W11: index_name, index_bytes, idx_tup_read, idx_tup_fetch, \
-         index_is_unique — relation, schema and idx_scan_count are SHARED with W10) \
-         + 1 statement-duration column (W-S1: stmt_duration_ms — pid/user/app/query/fingerprint \
-         are SHARED with W2); bump this deliberately — the length is the compile-time forcing \
-         function"
-    );
-}
-
 // ─── No-regression: the hot path shared by ALL logs ──────────────────────────
 
 /// A record with NO event name must come out byte-identical.
@@ -1787,6 +1742,40 @@ fn record_without_event_name_is_unchanged() {
         rec, before,
         "an ordinary log record must be byte-identical after canonicalization — \
          W1 must not add a column to every log line in the product"
+    );
+}
+
+/// **The strip pre-scan must COVER every reserved field.**
+///
+/// `apply_to_record` gates the 83-key reservation strip on
+/// `has_reserved_dbm_key`, one O(record keys) scan — because it runs on every
+/// log record every customer ships and ~100% of them carry no DBM key at all.
+/// That makes the pre-scan's prefix set load-bearing: a reserved field the
+/// scan did not cover would dodge the strip entirely and become forgeable. So
+/// every `ALL_DBM_FIELDS` member must trip the predicate on its own, and a
+/// plain record must not (the byte-identical pass-through itself is pinned by
+/// `record_without_event_name_is_unchanged`; that a covered record still gets
+/// stripped exactly as before is pinned by the strip tests, e.g.
+/// `caller_supplied_table_columns_are_stripped`).
+#[test]
+fn the_strip_prescan_covers_every_reserved_field() {
+    for f in server_vantage::ALL_DBM_FIELDS {
+        let rec = obj(json!({ f: "forged" }));
+        assert!(
+            server_vantage::has_reserved_dbm_key(&rec),
+            "`{f}` is reserved but the strip pre-scan does not see it — a caller \
+             could forge it and skip the strip"
+        );
+    }
+    let plain = obj(json!({
+        "_timestamp": 1_786_165_745_930_000i64,
+        "level": "info",
+        "message": "an ordinary application log line",
+        "service_name": "checkout",
+    }));
+    assert!(
+        !server_vantage::has_reserved_dbm_key(&plain),
+        "a plain record must take the fast path — that skip is the entire point"
     );
 }
 
@@ -2031,51 +2020,20 @@ fn resolution_is_none_when_neither_source_identifies_an_event() {
 }
 
 // ─── Producer-loop wiring (the insertion point itself) ───────────────────────
+//
+// SOURCE-SCRAPING guards over `logs/otlp.rs`: `handle_request` is async and
+// writes through infra, so the wiring is asserted on the source (the
+// `every_logs_ingest_path_applies_canonicalization` precedent). The three
+// tests share the offset/landmark helpers below; every distinct property each
+// asserts guarded a real shipped bug.
 
-/// The producer loop must RE-INSERT the trusted event name after the strip.
-///
-/// Spec D-I: "The OTLP producer loop re-inserts the trusted value **after** the
-/// strip." This is the other half of
-/// `apply_to_record_strips_the_event_name_it_cannot_authenticate` — the strip is
-/// unconditional because provenance is invisible inside `apply_to_record`, so the
-/// only place the trusted value can be restored is where `log_record` is still in
-/// scope. Without this the field is plumbed to nowhere and W1 delivers nothing.
-///
-/// Why this is safe from spoofing on the OTLP path: the producer loop writes the
-/// value AFTER `log_record.attributes` are copied onto `rec` (verified: attributes
-/// are copied at ~byte 7812, trace_id/span_id are written at ~8033 for exactly this
-/// reason), so an attacker-supplied attribute named `o2_event_name` is overwritten
-/// by the receiver's own value rather than trusted.
-#[test]
-fn otlp_reinserts_the_trusted_event_name_after_canonicalization() {
-    let src = include_str!("../../logs/otlp.rs");
-    let apply_at = src
-        .find("server_vantage::apply_to_record")
-        .expect("otlp.rs must call apply_to_record");
-
-    // A write of the reserved key must exist AFTER the first apply_to_record call,
-    // or the strip leaves nothing behind.
-    let after = &src[apply_at..];
-    assert!(
-        after.contains("O2_EVENT_NAME"),
-        "the producer loop must re-insert the trusted event name AFTER \
-         apply_to_record strips it (spec D-I); otherwise the reservation deletes \
-         the very value W1 exists to deliver"
-    );
-
-    // And that re-insertion must still be guarded on non-empty, so an ordinary log
-    // line does not acquire the column.
-    let reinsert_rel = after.find("O2_EVENT_NAME").expect("checked above");
-    let head = &after[..reinsert_rel];
-    assert!(
-        head.contains("event_name.is_empty()") || head.contains("event_name_value"),
-        "the re-insertion must be guarded on a non-empty event name so records \
-         without one stay byte-identical"
-    );
-}
-
-/// EVERY `apply_to_record` call site in `otlp.rs` must restore the event name across
-/// the strip. All three can.
+/// EVERY `apply_to_record` call site in `otlp.rs` must restore the trusted
+/// event name across the strip — spec D-I: "The OTLP producer loop re-inserts
+/// the trusted value **after** the strip". The strip is unconditional because
+/// provenance is invisible inside `apply_to_record` (see
+/// `apply_to_record_strips_the_event_name_it_cannot_authenticate`), so the only
+/// place the value can be restored is where it is still recoverable. Without
+/// the restore the field is plumbed to nowhere and W1 delivers nothing.
 ///
 /// Regression guard for two real misses found in review. The first version of W1
 /// restored only at the non-pipeline site; the second added the evaluation-only
@@ -2103,6 +2061,21 @@ fn every_apply_site_restores_the_event_name() {
          which of them can carry an event name across the strip"
     );
 
+    // At the FIRST site the re-insertion must be guarded on non-empty, so an
+    // ordinary log line does not acquire the column (the brace-balance check in
+    // `every_event_name_write_is_guarded_on_non_empty` pins the same property
+    // structurally for every write).
+    let after = &src[sites[0]..];
+    let reinsert_rel = after
+        .find("O2_EVENT_NAME")
+        .expect("the first apply site must be followed by a restore");
+    let head = &after[..reinsert_rel];
+    assert!(
+        head.contains("event_name.is_empty()") || head.contains("event_name_value"),
+        "the re-insertion must be guarded on a non-empty event name so records \
+         without one stay byte-identical"
+    );
+
     for (nth, site) in sites.iter().copied().enumerate() {
         // The restore must come before this record is handed onward — bounded by the
         // next `refactor_map` call, which is the first thing that consumes `local_val`
@@ -2126,54 +2099,6 @@ fn every_apply_site_restores_the_event_name() {
              it immediately after; every site can recover the value (the pipeline sites \
              via `pipeline_inputs[idx]`), so the event name is lost for no reason"
         );
-    }
-}
-
-/// The event name must be written AFTER the `_original` snapshot.
-///
-/// `_original` is a verbatim copy of what the customer sent, replayed on recovery.
-/// Writing a synthesized field into it makes the copy non-verbatim. Nothing forces
-/// the write to precede the snapshot — the anti-spoof property only requires it to
-/// follow the attribute copy — so this ordering is free.
-#[test]
-fn the_event_name_is_written_after_the_original_snapshot() {
-    let src = include_str!("../../logs/otlp.rs");
-    let insert_at = event_name_insertion_offset(src);
-    let snapshot_at = src
-        .find("let original_data = if rec.is_object()")
-        .expect("the producer loop must still snapshot original_data");
-    assert!(
-        insert_at > snapshot_at,
-        "the event name must be written AFTER the _original snapshot, so _original \
-         stays a verbatim copy of the customer's payload"
-    );
-}
-
-/// Writing the column must be gated on `db_monitoring.enabled`, matching
-/// `apply_to_record`'s own early return.
-///
-/// Without the gate an operator who set `ZO_DB_MONITORING_ENABLED=false` still gets a
-/// DBM column written onto every receiver record, for a feature they turned off.
-#[test]
-fn writing_the_event_name_is_gated_on_db_monitoring_enabled() {
-    let src = include_str!("../../logs/otlp.rs");
-    for w in event_name_write_offsets(src) {
-        // The enclosing guard for a producer-loop write must also test the config.
-        // (The replay site restores a value already on the record and is reached
-        // only when the producer wrote it, so it inherits the gate.)
-        let head = &src[..w];
-        let guard = head
-            .rfind("if !log_record.event_name.is_empty()")
-            .map(|g| &src[g..w]);
-        if let Some(guard) = guard
-            && guard.len() < 300
-        {
-            assert!(
-                guard.contains("db_monitoring.enabled"),
-                "a producer-loop write of o2_event_name must be gated on \
-                 db_monitoring.enabled, matching apply_to_record's early return"
-            );
-        }
     }
 }
 
@@ -2219,11 +2144,11 @@ fn event_name_insertion_offset(src: &str) -> usize {
     )
 }
 
-/// The OTLP producer loop must surface `event_name` onto the record.
+/// The OTLP producer loop must surface `event_name` onto the record — in the
+/// right SLOT: inside the producer loop, after the attribute copy and the
+/// `_original` snapshot, before the pipeline push and flattening.
 ///
-/// `handle_request` is async and writes through infra, so like the pre-existing
-/// `every_logs_ingest_path_applies_canonicalization` guard above, the wiring is
-/// asserted on the source. The behavior it guards is measured: with the field
+/// The behavior the surfacing half guards is measured: with the field
 /// unplumbed, a LogRecord carrying `EventName = "db.server.top_query"` reaches
 /// `apply_to_record` as `{_timestamp, body, dropped_attributes_count,
 /// postgresql_calls, severity}` — no event name anywhere.
@@ -2232,6 +2157,16 @@ fn event_name_insertion_offset(src: &str) -> usize {
 /// `log_record` is in scope, NOT at the three `apply_to_record` call sites — site
 /// `:382` iterates pipeline results where `log_record` does not exist. One
 /// insertion there covers both the pipeline and non-pipeline branches.
+///
+/// The ordering half is ANTI-SPOOF, not "so the canonicalizer can see it" (the
+/// reservation strip removes the field before any canonicalizer arm could read
+/// it): written after `log_record.attributes` are copied onto `rec`, a receiver
+/// attribute literally named `o2_event_name` is overwritten by the trusted
+/// value rather than winning — the same slot and the same reason `trace_id`
+/// and `span_id` are written where they are. And it must follow the
+/// `_original` snapshot: `_original` is a verbatim copy of what the customer
+/// sent, replayed on recovery, and writing a synthesized field into it makes
+/// the copy non-verbatim.
 #[test]
 fn otlp_producer_loop_surfaces_the_event_name() {
     let src = include_str!("../../logs/otlp.rs");
@@ -2290,23 +2225,9 @@ fn otlp_producer_loop_surfaces_the_event_name() {
         "the event name must be written onto `rec` inside the producer loop, where \
          log_record is in scope"
     );
-}
 
-/// The FIRST write must precede attribute-independent tampering, and must come
-/// before flattening — i.e. it lives in the producer loop, not after.
-///
-/// NOT "before apply_to_record so the canonicalizer can see it": that rationale is
-/// false, because the reservation strip removes the field before any canonicalizer
-/// arm could read it. The real reason the early write exists is ANTI-SPOOF — it is
-/// written after `log_record.attributes` are copied onto `rec`, so a receiver
-/// attribute literally named `o2_event_name` is overwritten by the trusted value
-/// rather than winning. That is the same slot and the same reason `trace_id` and
-/// `span_id` are written where they are.
-#[test]
-fn the_first_event_name_write_overwrites_any_caller_attribute() {
-    let src = include_str!("../../logs/otlp.rs");
-    let insert_at = event_name_insertion_offset(src);
-
+    // The anti-spoof slot: AFTER the attribute copy, so a receiver attribute
+    // literally named o2_event_name cannot beat the trusted value.
     let attrs_copied = src
         .find("log_record.attributes.iter().for_each")
         .expect("the producer loop must still copy log_record attributes onto rec");
@@ -2315,6 +2236,17 @@ fn the_first_event_name_write_overwrites_any_caller_attribute() {
         "the event name must be written AFTER log_record.attributes are copied, so a \
          receiver attribute named o2_event_name cannot beat the trusted value \
          (same protection trace_id/span_id get)"
+    );
+
+    // After the `_original` snapshot, so _original stays a verbatim copy of the
+    // customer's payload.
+    let snapshot_at = src
+        .find("let original_data = if rec.is_object()")
+        .expect("the producer loop must still snapshot original_data");
+    assert!(
+        insert_at > snapshot_at,
+        "the event name must be written AFTER the _original snapshot, so _original \
+         stays a verbatim copy of the customer's payload"
     );
 
     // And before flattening, so it is a first-class key on the flattened record
@@ -2328,13 +2260,38 @@ fn the_first_event_name_write_overwrites_any_caller_attribute() {
     );
 }
 
-/// Both writes must be GUARDED on a non-empty event name.
-///
-/// Checked by BRACE BALANCE, not byte distance. A fixed-size window is bypassable:
-/// an unguarded insert placed just after an unrelated CLOSED
-/// `if !log_record.event_name.is_empty() { ... }` block sits a few bytes from a
-/// matching `rfind` and passes, while adding an empty column to every log line in
-/// the product — the exact whole-product regression W1 must avoid.
+/// The innermost block header still unclosed at byte `at` — walking backwards
+/// tracking brace depth. This is what makes the guard checks below BRACE
+/// BALANCE, not byte distance: a fixed-size window is bypassable by an
+/// unguarded insert placed just after an unrelated CLOSED
+/// `if !log_record.event_name.is_empty() { ... }` block, which sits a few bytes
+/// from a matching `rfind` and passes.
+fn enclosing_block_header(src: &str, at: usize) -> &str {
+    let head = &src[..at];
+    let mut depth = 0i32;
+    for (i, ch) in head.char_indices().rev() {
+        match ch {
+            '}' => depth += 1,
+            '{' => {
+                if depth == 0 {
+                    // An unclosed `{` — this block encloses the offset.
+                    let line_start = head[..i].rfind('\n').map(|n| n + 1).unwrap_or(0);
+                    return &head[line_start..i];
+                }
+                depth -= 1;
+            }
+            _ => {}
+        }
+    }
+    panic!("a write must sit inside some block");
+}
+
+/// Every write must be GUARDED — on a non-empty event name (or an ordinary log
+/// line acquires an empty column, the exact whole-product regression W1 must
+/// avoid), and, for the producer-loop writes, on `db_monitoring.enabled`
+/// (matching `apply_to_record`'s early return: without it an operator who set
+/// `ZO_DB_MONITORING_ENABLED=false` still gets a DBM column written onto every
+/// receiver record, for a feature they turned off).
 #[test]
 fn every_event_name_write_is_guarded_on_non_empty() {
     let src = include_str!("../../logs/otlp.rs");
@@ -2348,27 +2305,7 @@ fn every_event_name_write_is_guarded_on_non_empty() {
     );
 
     for w in write_offsets {
-        // Walk backwards from the write, tracking brace depth, to find the
-        // innermost `if` block that still encloses it.
-        let head = &src[..w];
-        let mut depth = 0i32;
-        let mut enclosing = None;
-        for (i, ch) in head.char_indices().rev() {
-            match ch {
-                '}' => depth += 1,
-                '{' => {
-                    if depth == 0 {
-                        // An unclosed `{` — this block encloses the write.
-                        let line_start = head[..i].rfind('\n').map(|n| n + 1).unwrap_or(0);
-                        enclosing = Some(&head[line_start..i]);
-                        break;
-                    }
-                    depth -= 1;
-                }
-                _ => {}
-            }
-        }
-        let enclosing = enclosing.expect("a write must sit inside some block");
+        let enclosing = enclosing_block_header(src, w);
         // Two guard shapes are acceptable, and both mean "only when there is one":
         //   * `if !log_record.event_name.is_empty()` — the producer-loop writes, which read the
         //     value straight off the proto.
@@ -2385,6 +2322,23 @@ fn every_event_name_write_is_guarded_on_non_empty() {
              innermost enclosing block header was: {}",
             enclosing.trim()
         );
+
+        // The enclosing guard for a producer-loop write must ALSO test the
+        // config. (The replay site restores a value already on the record and
+        // is reached only when the producer wrote it, so it inherits the gate.)
+        let head = &src[..w];
+        let guard = head
+            .rfind("if !log_record.event_name.is_empty()")
+            .map(|g| &src[g..w]);
+        if let Some(guard) = guard
+            && guard.len() < 300
+        {
+            assert!(
+                guard.contains("db_monitoring.enabled"),
+                "a producer-loop write of o2_event_name must be gated on \
+                 db_monitoring.enabled, matching apply_to_record's early return"
+            );
+        }
     }
 }
 
@@ -3063,40 +3017,6 @@ fn a_nameless_shapeless_record_is_still_not_activity() {
 
 // ─── W2.2 · reserved fields and the X5 batch-safety guard ────────────────────
 
-/// Every new activity column must join `ALL_DBM_FIELDS`: the array is the
-/// write-side strip list (anti-spoof), the read-side projection allowlist, and
-/// the schema gate. A column missing from it is BOTH spoofable and unreadable.
-#[test]
-fn every_activity_column_is_reserved() {
-    for col in [
-        server_vantage::O2_DBM_SESSION_PID,
-        server_vantage::O2_DBM_SESSION_USER,
-        server_vantage::O2_DBM_SESSION_APP,
-        server_vantage::O2_DBM_SESSION_STATE,
-        server_vantage::O2_DBM_QUERY_START,
-        server_vantage::O2_DBM_XACT_START,
-        server_vantage::O2_DBM_WAIT_START,
-        server_vantage::O2_DBM_DURATION_MS,
-        server_vantage::O2_DBM_EXEC_TIME_MS,
-        server_vantage::O2_DBM_SERVER_QUERY_ID,
-        server_vantage::O2_DBM_ACTIVITY_QUERY,
-        server_vantage::O2_DBM_FINGERPRINT,
-        server_vantage::O2_DBM_BLOCKING_PIDS,
-        server_vantage::O2_DBM_LOCK_MODE,
-        server_vantage::O2_DBM_LOCK_TYPE,
-        server_vantage::O2_DBM_LOCK_RELATION,
-        server_vantage::O2_DBM_CLIENT_ADDR,
-        server_vantage::O2_DBM_CLIENT_HOST,
-        server_vantage::O2_DBM_CLIENT_PORT,
-    ] {
-        assert!(
-            server_vantage::ALL_DBM_FIELDS.contains(&col),
-            "{col} must be reserved: ALL_DBM_FIELDS is the strip list, the read \
-             projection allowlist AND the schema gate"
-        );
-    }
-}
-
 /// W2 reuses the EXISTING wait columns rather than defining parallel ones (D-D),
 /// so one wait-event view reads across activity and blocking alike.
 #[test]
@@ -3226,15 +3146,6 @@ fn client_supplied_activity_columns_are_stripped() {
             "with activity ingest off, no session column is written at all"
         );
     }
-}
-
-/// `KIND_ACTIVITY` must be its own kind — reusing an existing one would make the
-/// read API's `o2_dbm_kind` filter return the wrong rows.
-#[test]
-fn activity_kind_is_distinct() {
-    assert_eq!(server_vantage::KIND_ACTIVITY, "activity");
-    assert_ne!(server_vantage::KIND_ACTIVITY, server_vantage::KIND_BLOCKING);
-    assert_ne!(server_vantage::KIND_ACTIVITY, server_vantage::KIND_DEADLOCK);
 }
 
 // ─── Findings from the cold test review (all reproduced before acting) ───────
@@ -3454,15 +3365,20 @@ fn a_live_session_carries_a_duration_value_beside_its_state() {
     );
 }
 
-/// **The write side and the reservation list must name the SAME columns.**
+/// **The write side and the reservation list must name the SAME columns — for
+/// EVERY writer.**
 ///
 /// `ALL_DBM_FIELDS` is the strip list, the read-side projection allowlist and the
 /// schema gate. A column `to_record()` writes but the array does not name is
 /// spoofable (never stripped from caller input) AND unreadable (never projected)
 /// — and no membership test catches it, because membership tests only walk the
-/// array. This walks the OTHER direction.
+/// array. This walks the OTHER direction, over every canonicalizer's output.
+/// Together with the no-duplicates + length pin in
+/// `the_reserved_field_list_has_no_duplicates`, it subsumes the per-kind
+/// explicit membership lists this file used to carry.
 #[test]
-fn every_column_the_activity_writer_emits_is_reserved() {
+fn every_column_any_writer_emits_is_reserved() {
+    let mut records: Vec<(&str, BTreeMap<String, Value>)> = Vec::new();
     for fixture in [
         pg_query_sample_unblocked(),
         pg_query_sample_blocked(),
@@ -3470,16 +3386,111 @@ fn every_column_the_activity_writer_emits_is_reserved() {
         pg_query_sample_on_cpu(),
         mysql_query_sample(),
     ] {
-        let rec = server_vantage::canonicalize_query_sample(&fixture)
-            .expect("fixture must canonicalize")
-            .to_record();
+        records.push((
+            "activity",
+            server_vantage::canonicalize_query_sample(&fixture)
+                .expect("activity fixture must canonicalize")
+                .to_record(),
+        ));
+    }
+    for fixture in [pg_top_query(), mysql_top_query()] {
+        records.push((
+            "top_query",
+            server_vantage::canonicalize_top_query(&fixture)
+                .expect("top_query fixture must canonicalize")
+                .to_record(),
+        ));
+    }
+    records.push((
+        "deadlock",
+        canonicalize_pg_deadlock(&pg_deadlock_record())
+            .expect("deadlock fixture must canonicalize")
+            .to_record(),
+    ));
+    records.push((
+        "blocking",
+        canonicalize_blocking(&pg_blocking_record())
+            .expect("blocking fixture must canonicalize")
+            .to_record(),
+    ));
+    for fixture in [
+        pg_table_stats_record(),
+        pg_table_stats_bloated_record(),
+        mysql_table_stats_record(),
+        mariadb_table_stats_record(),
+    ] {
+        records.push((
+            "table_stats",
+            server_vantage::canonicalize_table_stats(&fixture)
+                .expect("table-stats fixture must canonicalize")
+                .to_record(),
+        ));
+    }
+    for fixture in [
+        pg_index_stats_unused_record(),
+        pg_index_stats_used_record(),
+        mysql_index_stats_record(),
+        mariadb_index_stats_record(),
+    ] {
+        records.push((
+            "index_stats",
+            server_vantage::canonicalize_index_stats(&fixture)
+                .expect("index-stats fixture must canonicalize")
+                .to_record(),
+        ));
+    }
+    records.push((
+        "explain",
+        server_vantage::canonicalize_pg_auto_explain(&pg_auto_explain_flattened())
+            .expect("explain fixture must canonicalize")
+            .to_record(),
+    ));
+    records.push((
+        "statement",
+        server_vantage::canonicalize_pg_statement_duration(&pg_statement_duration_flattened())
+            .expect("statement-duration fixture must canonicalize")
+            .to_record(),
+    ));
+
+    for (kind, rec) in &records {
         for key in rec.keys() {
             assert!(
                 server_vantage::ALL_DBM_FIELDS.contains(&key.as_str()),
-                "the writer emits `{key}` but ALL_DBM_FIELDS does not reserve it — \
+                "the {kind} writer emits `{key}` but ALL_DBM_FIELDS does not reserve it — \
                  that column is both spoofable and unreadable"
             );
         }
+    }
+
+    // Iterating whatever the writers emit is satisfied by writers that emit
+    // nothing, so the columns W3.1 promises are named explicitly: each must be
+    // WRITTEN by the Postgres top_query record (reservation follows from the
+    // ⊆ walk above).
+    let (_, top) = records
+        .iter()
+        .find(|(kind, _)| *kind == "top_query")
+        .expect("a top_query record was just pushed");
+    for col in [
+        server_vantage::O2_DBM_PLAN,
+        server_vantage::O2_DBM_PLAN_HASH,
+        server_vantage::O2_DBM_PLAN_HASH_VERSION,
+        server_vantage::O2_DBM_CALLS,
+        server_vantage::O2_DBM_ROWS,
+        server_vantage::O2_DBM_EXEC_TIME_S,
+        server_vantage::O2_DBM_SHARED_BLKS_HIT,
+        server_vantage::O2_DBM_SHARED_BLKS_READ,
+        server_vantage::O2_DBM_SHARED_BLKS_DIRTIED,
+        server_vantage::O2_DBM_SHARED_BLKS_WRITTEN,
+        server_vantage::O2_DBM_TEMP_BLKS_READ,
+        server_vantage::O2_DBM_TEMP_BLKS_WRITTEN,
+        server_vantage::O2_DBM_SERVER_QUERY_ID,
+        server_vantage::O2_DBM_FINGERPRINT,
+        server_vantage::O2_DBM_METRICS_ARE_DELTA,
+    ] {
+        assert!(
+            top.contains_key(col),
+            "the Postgres top_query record must write `{col}`"
+        );
     }
 }
 
@@ -3876,20 +3887,8 @@ fn mysql_top_query() -> Map<String, Value> {
 /// The knob defaults OFF (D-G), so the dispatch arm is unreachable without it —
 /// which is itself pinned by `top_query_dispatch_is_gated_off_by_default`.
 fn with_top_query_enabled<T>(f: impl FnOnce() -> T) -> T {
-    let _guard = TOP_QUERY_KNOB.lock().unwrap_or_else(|e| e.into_inner());
-    let prev = std::env::var("ZO_DB_MONITORING_TOP_QUERY_ENABLED").ok();
-    unsafe { std::env::set_var("ZO_DB_MONITORING_TOP_QUERY_ENABLED", "true") };
-    config::refresh_config().expect("config refresh");
-    let out = f();
-    match prev {
-        Some(v) => unsafe { std::env::set_var("ZO_DB_MONITORING_TOP_QUERY_ENABLED", v) },
-        None => unsafe { std::env::remove_var("ZO_DB_MONITORING_TOP_QUERY_ENABLED") },
-    }
-    config::refresh_config().expect("config refresh");
-    out
+    with_knob("ZO_DB_MONITORING_TOP_QUERY_ENABLED", f)
 }
-
-static TOP_QUERY_KNOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 // ── W3.1 · Canonicalization ─────────────────────────────────────────────────
 
@@ -4894,7 +4893,7 @@ fn top_query_reaches_its_arm_by_shape_sniff() {
 /// that exists and defaults false while the arm ignores it is the bug.
 #[test]
 fn top_query_dispatch_is_gated_off_by_default() {
-    let _guard = TOP_QUERY_KNOB.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = KNOB_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     unsafe { std::env::remove_var("ZO_DB_MONITORING_TOP_QUERY_ENABLED") };
     config::refresh_config().expect("config refresh");
     assert!(
@@ -4965,30 +4964,26 @@ fn each_record_kind_reaches_its_own_arm() {
 /// upgraded actually runs.
 #[test]
 fn the_parent_knob_disables_top_query_ingest_entirely() {
-    with_top_query_enabled(|| {
-        let prev = std::env::var("ZO_DB_MONITORING_ENABLED").ok();
-        unsafe { std::env::set_var("ZO_DB_MONITORING_ENABLED", "false") };
-        config::refresh_config().expect("config refresh");
-
-        let mut rec = pg_top_query();
-        rec.insert(
-            server_vantage::O2_EVENT_NAME.into(),
-            json!(server_vantage::EVENT_TOP_QUERY),
-        );
-        server_vantage::apply_to_record(&mut rec);
-        assert!(
-            !rec.contains_key(server_vantage::O2_DBM_KIND),
-            "with DB monitoring off wholesale, top_query ingest must write nothing — the child \
-             knob cannot re-enable a disabled feature"
-        );
-        assert!(!rec.contains_key(server_vantage::O2_DBM_PLAN));
-
-        match prev {
-            Some(v) => unsafe { std::env::set_var("ZO_DB_MONITORING_ENABLED", v) },
-            None => unsafe { std::env::remove_var("ZO_DB_MONITORING_ENABLED") },
-        }
-        config::refresh_config().expect("config refresh");
-    });
+    with_knobs(
+        &[
+            ("ZO_DB_MONITORING_TOP_QUERY_ENABLED", "true"),
+            ("ZO_DB_MONITORING_ENABLED", "false"),
+        ],
+        || {
+            let mut rec = pg_top_query();
+            rec.insert(
+                server_vantage::O2_EVENT_NAME.into(),
+                json!(server_vantage::EVENT_TOP_QUERY),
+            );
+            server_vantage::apply_to_record(&mut rec);
+            assert!(
+                !rec.contains_key(server_vantage::O2_DBM_KIND),
+                "with DB monitoring off wholesale, top_query ingest must write nothing — the \
+                 child knob cannot re-enable a disabled feature"
+            );
+            assert!(!rec.contains_key(server_vantage::O2_DBM_PLAN));
+        },
+    );
 }
 
 /// The MySQL fixture with its OTLP event name attached — MySQL carries no
@@ -5000,54 +4995,6 @@ fn mysql_top_query_with_event_name() -> Map<String, Value> {
         json!(server_vantage::EVENT_TOP_QUERY),
     );
     rec
-}
-
-/// **Every new column joins `ALL_DBM_FIELDS` (D-I / §5.1).**
-///
-/// The array does triple duty: write-side strip list, read-side projection
-/// allowlist, and schema gate. A column missing from it is BOTH forgeable by a
-/// caller and invisible to every read — and neither failure announces itself.
-#[test]
-fn every_top_query_column_is_reserved_and_projected() {
-    let s = server_vantage::canonicalize_top_query(&pg_top_query()).expect("plan rec");
-    let rec = s.to_record();
-    for key in rec.keys() {
-        assert!(
-            server_vantage::ALL_DBM_FIELDS.contains(&key.as_str()),
-            "`{key}` is written at ingest but is not in ALL_DBM_FIELDS — a caller can forge it \
-             and no read projects it"
-        );
-    }
-
-    // Iterating whatever the writer emits is satisfied by a writer that emits
-    // nothing, so the columns W3.1 promises are named explicitly. Each must be
-    // both WRITTEN by this record and RESERVED in the array.
-    for col in [
-        server_vantage::O2_DBM_PLAN,
-        server_vantage::O2_DBM_PLAN_HASH,
-        server_vantage::O2_DBM_PLAN_HASH_VERSION,
-        server_vantage::O2_DBM_CALLS,
-        server_vantage::O2_DBM_ROWS,
-        server_vantage::O2_DBM_EXEC_TIME_S,
-        server_vantage::O2_DBM_SHARED_BLKS_HIT,
-        server_vantage::O2_DBM_SHARED_BLKS_READ,
-        server_vantage::O2_DBM_SHARED_BLKS_DIRTIED,
-        server_vantage::O2_DBM_SHARED_BLKS_WRITTEN,
-        server_vantage::O2_DBM_TEMP_BLKS_READ,
-        server_vantage::O2_DBM_TEMP_BLKS_WRITTEN,
-        server_vantage::O2_DBM_SERVER_QUERY_ID,
-        server_vantage::O2_DBM_FINGERPRINT,
-        server_vantage::O2_DBM_METRICS_ARE_DELTA,
-    ] {
-        assert!(
-            rec.contains_key(col),
-            "the Postgres top_query record must write `{col}`"
-        );
-        assert!(
-            server_vantage::ALL_DBM_FIELDS.contains(&col),
-            "`{col}` must be reserved in ALL_DBM_FIELDS"
-        );
-    }
 }
 
 /// A caller cannot POST a fabricated plan.
@@ -5386,14 +5333,14 @@ fn the_top_query_selection_bias_is_documented() {
     );
 }
 
-/// **No duplicate entries in `ALL_DBM_FIELDS`.**
+/// **No duplicate entries in `ALL_DBM_FIELDS`, and the length is pinned.**
 ///
-/// The LENGTH is already pinned by
-/// `reserving_event_name_keeps_every_pre_existing_reserved_field`, and
-/// duplicating that assertion here would only mean two tests to update for one
-/// deliberate change. What that test cannot see is a DUPLICATE: a repeated entry
-/// satisfies the expected total while a real column is silently missing, which
-/// drops it from both the strip list and the read projection.
+/// The two assertions work together: the length pin is the compile-time forcing
+/// function for a deliberate bump, and the duplicate check catches what the
+/// length cannot see — a repeated entry satisfies the expected total while a
+/// real column is silently missing, dropping it from both the strip list and
+/// the read projection. (Which columns the array must contain is covered from
+/// the other direction by `every_column_any_writer_emits_is_reserved`.)
 #[test]
 fn the_reserved_field_list_has_no_duplicates() {
     let mut seen = std::collections::HashSet::new();
@@ -5404,6 +5351,25 @@ fn the_reserved_field_list_has_no_duplicates() {
              behind a correct-looking length"
         );
     }
+    // D-I: `o2_event_name` is reserved even though no writer emits it, so the
+    // ⊆ walk cannot cover it — a caller must not be able to POST one to /_json
+    // and forge an engine-derived discriminator.
+    assert!(
+        seen.contains(&server_vantage::O2_EVENT_NAME),
+        "o2_event_name must be reserved (spec D-I)"
+    );
+    assert_eq!(
+        server_vantage::ALL_DBM_FIELDS.len(),
+        83,
+        "23 pre-existing (22 + o2_event_name from W1) + 19 activity columns (W2) \
+         + 14 top-query columns (W3) + 3 executed-plan columns (W-E3: plan_source, \
+         plan_duration_ms, plan_rows_actual) + 18 table-health columns (W10) + 5 index-health \
+         columns (W11: index_name, index_bytes, idx_tup_read, idx_tup_fetch, \
+         index_is_unique — relation, schema and idx_scan_count are SHARED with W10) \
+         + 1 statement-duration column (W-S1: stmt_duration_ms — pid/user/app/query/fingerprint \
+         are SHARED with W2); bump this deliberately — the length is the compile-time forcing \
+         function"
+    );
 }
 
 /// **The strip must remove a forged column the receiver does NOT write.**
@@ -5626,36 +5592,20 @@ fn apply_to_record_still_canonicalizes_postgres_receiver_events() {
 fn apply_to_record_canonicalizes_mysql_query_sample() {
     // The real knob, not `dispatch_activity`: that helper BYPASSES the gate rather
     // than enabling it, so it cannot exercise the ingest entry point this pins.
-    let _guard = ACTIVITY_KNOB.lock().unwrap_or_else(|e| e.into_inner());
-    let prev = std::env::var("ZO_DB_MONITORING_ACTIVITY_ENABLED").ok();
-    unsafe { std::env::set_var("ZO_DB_MONITORING_ACTIVITY_ENABLED", "true") };
-    config::refresh_config().expect("config refresh");
-
-    let mut rec = mysql_query_sample();
-    rec.insert(
-        server_vantage::O2_EVENT_NAME.into(),
-        json!(server_vantage::EVENT_QUERY_SAMPLE),
-    );
-    server_vantage::apply_to_record(&mut rec);
-    let kind = rec
-        .get(server_vantage::O2_DBM_KIND)
-        .and_then(Value::as_str)
-        .map(str::to_owned);
-
-    match prev {
-        Some(v) => unsafe { std::env::set_var("ZO_DB_MONITORING_ACTIVITY_ENABLED", v) },
-        None => unsafe { std::env::remove_var("ZO_DB_MONITORING_ACTIVITY_ENABLED") },
-    }
-    config::refresh_config().expect("config refresh");
-
-    assert_eq!(
-        kind.as_deref(),
-        Some(server_vantage::KIND_ACTIVITY),
-        "a MySQL query_sample must canonicalize through the real ingest entry point"
-    );
+    with_knob("ZO_DB_MONITORING_ACTIVITY_ENABLED", || {
+        let mut rec = mysql_query_sample();
+        rec.insert(
+            server_vantage::O2_EVENT_NAME.into(),
+            json!(server_vantage::EVENT_QUERY_SAMPLE),
+        );
+        server_vantage::apply_to_record(&mut rec);
+        assert_eq!(
+            rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+            Some(server_vantage::KIND_ACTIVITY),
+            "a MySQL query_sample must canonicalize through the real ingest entry point"
+        );
+    });
 }
-
-static ACTIVITY_KNOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// **The strip must not become a back door.**
 ///
@@ -5692,6 +5642,24 @@ fn the_carried_event_name_is_not_stored_on_the_record() {
 // it). The recipe declares `table_name` as the recipe's `body_column`, so the
 // table name arrives as `body` and NOT as a `table_name` attribute — the exact
 // producer/parser mismatch that shipped two DBM bugs green through 205 tests.
+
+/// Table-driven canonicalization check: run `rec` through `apply_to_record`
+/// (the production entry point — the B19 discipline: tests that call
+/// `canonicalize_record` directly skip the strip and repeat the hole that
+/// shipped two DBM bugs green) and assert each `(column, expected)` pair.
+/// `None` pins a DELIBERATE absence — an absent column and a fabricated zero
+/// are different claims.
+#[track_caller]
+fn assert_canonicalizes(
+    name: &str,
+    mut rec: Map<String, Value>,
+    expected: &[(&str, Option<Value>)],
+) {
+    server_vantage::apply_to_record(&mut rec);
+    for (col, want) in expected {
+        assert_eq!(rec.get(*col), want.as_ref(), "{name}: `{col}`: {rec:?}");
+    }
+}
 
 /// One real `pg_table_stats` record, post-ingest flattening.
 fn pg_table_stats_record() -> Map<String, Value> {
@@ -5765,50 +5733,39 @@ fn table_stats_canonicalizes_through_the_ingest_entry_point() {
 /// that puts the smallest table first and looks like a working answer.
 #[test]
 fn table_stats_parses_the_text_columns_into_numbers() {
-    let mut rec = pg_table_stats_record();
-    server_vantage::apply_to_record(&mut rec);
-
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_TOTAL_BYTES),
-        Some(&json!(13_639_680i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_HEAP_BYTES),
-        Some(&json!(10_510_336i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_LIVE_TUPLES),
-        Some(&json!(137_268i64))
-    );
-    assert_eq!(rec.get(server_vantage::O2_DBM_DEAD_TUPLES), Some(&json!(0)));
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_DEAD_TUP_PCT),
-        Some(&json!(0.0)),
-        "a percentage is fractional and must not be truncated to an integer"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_MOD_SINCE_ANALYZE),
-        Some(&json!(5547i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_FROZEN_XID_AGE),
-        Some(&json!(335_437i64))
-    );
-    // W11 wants this one specifically: idx_scan = 0 on a live table is the
-    // unused-index signal. Zero must SURVIVE, not be dropped as falsy.
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
-        Some(&json!(0)),
-        "a measured zero is a finding, not an absence — dropping it hides the \
-         never-scanned table W11 exists to surface"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_SEQ_SCAN_COUNT),
-        Some(&json!(0))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_AUTOVACUUM_COUNT),
-        Some(&json!(8))
+    assert_canonicalizes(
+        "pg_table_stats (audit_log)",
+        pg_table_stats_record(),
+        &[
+            (
+                server_vantage::O2_DBM_TOTAL_BYTES,
+                Some(json!(13_639_680i64)),
+            ),
+            (
+                server_vantage::O2_DBM_HEAP_BYTES,
+                Some(json!(10_510_336i64)),
+            ),
+            (server_vantage::O2_DBM_LIVE_TUPLES, Some(json!(137_268i64))),
+            (server_vantage::O2_DBM_DEAD_TUPLES, Some(json!(0))),
+            // A percentage is fractional and must not be truncated to an
+            // integer.
+            (server_vantage::O2_DBM_DEAD_TUP_PCT, Some(json!(0.0))),
+            (
+                server_vantage::O2_DBM_MOD_SINCE_ANALYZE,
+                Some(json!(5547i64)),
+            ),
+            (
+                server_vantage::O2_DBM_FROZEN_XID_AGE,
+                Some(json!(335_437i64)),
+            ),
+            // W11 wants this one specifically: idx_scan = 0 on a live table is
+            // the unused-index signal. A measured zero is a finding, not an
+            // absence — dropped as falsy, it hides the never-scanned table W11
+            // exists to surface.
+            (server_vantage::O2_DBM_IDX_SCAN_COUNT, Some(json!(0))),
+            (server_vantage::O2_DBM_SEQ_SCAN_COUNT, Some(json!(0))),
+            (server_vantage::O2_DBM_AUTOVACUUM_COUNT, Some(json!(8))),
+        ],
     );
 }
 
@@ -5961,38 +5918,6 @@ fn caller_supplied_table_columns_are_stripped() {
     }
 }
 
-/// The new kind must be reserved in `ALL_DBM_FIELDS`, or the strip above cannot
-/// remove it and the read projection cannot name it.
-#[test]
-fn table_stats_columns_are_all_reserved() {
-    for col in [
-        server_vantage::O2_DBM_RELATION,
-        server_vantage::O2_DBM_SCHEMA,
-        server_vantage::O2_DBM_TOTAL_BYTES,
-        server_vantage::O2_DBM_HEAP_BYTES,
-        server_vantage::O2_DBM_LIVE_TUPLES,
-        server_vantage::O2_DBM_DEAD_TUPLES,
-        server_vantage::O2_DBM_DEAD_TUP_PCT,
-        server_vantage::O2_DBM_MOD_SINCE_ANALYZE,
-        server_vantage::O2_DBM_SEQ_SCAN_COUNT,
-        server_vantage::O2_DBM_SEQ_TUP_READ,
-        server_vantage::O2_DBM_IDX_SCAN_COUNT,
-        server_vantage::O2_DBM_AUTOVACUUM_COUNT,
-        server_vantage::O2_DBM_FROZEN_XID_AGE,
-        server_vantage::O2_DBM_LAST_VACUUM,
-        server_vantage::O2_DBM_LAST_AUTOVACUUM,
-        server_vantage::O2_DBM_LAST_ANALYZE,
-        server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE,
-        server_vantage::O2_DBM_TUPLES_ARE_ESTIMATED,
-    ] {
-        assert!(
-            server_vantage::ALL_DBM_FIELDS.contains(&col),
-            "`{col}` must be reserved, or a caller can forge it and the read \
-             projection cannot name it"
-        );
-    }
-}
-
 /// **The other kinds must not regress.** A new dispatch arm keyed on `o2_recipe`
 /// sits beside four existing ones, and the cheapest way to break them is to
 /// return early on a tag that overlaps.
@@ -6047,81 +5972,54 @@ fn pg_table_stats_bloated_record() -> Map<String, Value> {
 
 #[test]
 fn table_stats_reads_each_relation_from_its_own_record() {
-    let mut rec = pg_table_stats_bloated_record();
-    server_vantage::apply_to_record(&mut rec);
-
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_RELATION),
-        Some(&json!("sessions"))
-    );
-    assert_eq!(rec.get(server_vantage::O2_DBM_SCHEMA), Some(&json!("app")));
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INSTANCE),
-        Some(&json!("pg-replica-2"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_TOTAL_BYTES),
-        Some(&json!(1_245_184i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_HEAP_BYTES),
-        Some(&json!(884_736i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_LIVE_TUPLES),
-        Some(&json!(412i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_DEAD_TUPLES),
-        Some(&json!(9130i64))
-    );
-    // The bloat figure must survive as a FRACTION. An integer parse of "95.68"
-    // fails outright and the column vanishes; a truncating one reports 95.
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_DEAD_TUP_PCT),
-        Some(&json!(95.68)),
-        "the percentage is fractional and must be parsed as one"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_SEQ_SCAN_COUNT),
-        Some(&json!(88_214i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_SEQ_TUP_READ),
-        Some(&json!(3_120_044i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
-        Some(&json!(17i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_MOD_SINCE_ANALYZE),
-        Some(&json!(12i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_FROZEN_XID_AGE),
-        Some(&json!(51i64))
-    );
-    // Never autovacuumed; manually vacuumed. The exact inverse of the primary
-    // fixture, which is what makes the pair discriminating.
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_AUTOVACUUM_COUNT),
-        Some(&json!(0)),
-        "zero autovacuums is the finding, not an absence"
-    );
-    assert_eq!(rec.get(server_vantage::O2_DBM_LAST_AUTOVACUUM), None);
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_LAST_VACUUM),
-        Some(&json!("2026-08-10 04:00:01.113402+00"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_LAST_ANALYZE),
-        Some(&json!("2026-08-10 04:00:02.881190+00"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_TIMESTAMP),
-        Some(&json!(1_786_600_000_000_000i64)),
-        "the snapshot time comes from the record, not a constant"
+    assert_canonicalizes(
+        "pg_table_stats (bloated sessions)",
+        pg_table_stats_bloated_record(),
+        &[
+            (server_vantage::O2_DBM_RELATION, Some(json!("sessions"))),
+            (server_vantage::O2_DBM_SCHEMA, Some(json!("app"))),
+            (server_vantage::O2_DBM_INSTANCE, Some(json!("pg-replica-2"))),
+            (
+                server_vantage::O2_DBM_TOTAL_BYTES,
+                Some(json!(1_245_184i64)),
+            ),
+            (server_vantage::O2_DBM_HEAP_BYTES, Some(json!(884_736i64))),
+            (server_vantage::O2_DBM_LIVE_TUPLES, Some(json!(412i64))),
+            (server_vantage::O2_DBM_DEAD_TUPLES, Some(json!(9130i64))),
+            // The bloat figure must survive as a FRACTION. An integer parse of
+            // "95.68" fails outright and the column vanishes; a truncating one
+            // reports 95.
+            (server_vantage::O2_DBM_DEAD_TUP_PCT, Some(json!(95.68))),
+            (
+                server_vantage::O2_DBM_SEQ_SCAN_COUNT,
+                Some(json!(88_214i64)),
+            ),
+            (
+                server_vantage::O2_DBM_SEQ_TUP_READ,
+                Some(json!(3_120_044i64)),
+            ),
+            (server_vantage::O2_DBM_IDX_SCAN_COUNT, Some(json!(17i64))),
+            (server_vantage::O2_DBM_MOD_SINCE_ANALYZE, Some(json!(12i64))),
+            (server_vantage::O2_DBM_FROZEN_XID_AGE, Some(json!(51i64))),
+            // Never autovacuumed (zero autovacuums is the finding, not an
+            // absence); manually vacuumed. The exact inverse of the primary
+            // fixture, which is what makes the pair discriminating.
+            (server_vantage::O2_DBM_AUTOVACUUM_COUNT, Some(json!(0))),
+            (server_vantage::O2_DBM_LAST_AUTOVACUUM, None),
+            (
+                server_vantage::O2_DBM_LAST_VACUUM,
+                Some(json!("2026-08-10 04:00:01.113402+00")),
+            ),
+            (
+                server_vantage::O2_DBM_LAST_ANALYZE,
+                Some(json!("2026-08-10 04:00:02.881190+00")),
+            ),
+            // The snapshot time comes from the record, not a constant.
+            (
+                server_vantage::O2_DBM_TIMESTAMP,
+                Some(json!(1_786_600_000_000_000i64)),
+            ),
+        ],
     );
 }
 
@@ -6166,59 +6064,48 @@ fn pg_table_stats_live_record() -> Map<String, Value> {
 
 #[test]
 fn live_captured_table_stats_record_canonicalizes() {
-    let mut rec = pg_table_stats_live_record();
-    server_vantage::apply_to_record(&mut rec);
-
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_KIND),
-        Some(&json!(server_vantage::KIND_TABLE_STATS)),
-        "the record the collector is emitting RIGHT NOW must canonicalize: {rec:?}"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_RELATION),
-        Some(&json!("demo_inventory"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_SCHEMA),
-        Some(&json!("public"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_TOTAL_BYTES),
-        Some(&json!(98_304i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
-        Some(&json!(130_769i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_DEAD_TUP_PCT),
-        Some(&json!(3.66)),
-        "the live bloat figure is fractional"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_DEAD_TUPLES),
-        Some(&json!(19i64))
-    );
-    // The rig emits no server_address on this recipe, so the instance is
-    // genuinely unknown and must stay that way rather than be invented.
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INSTANCE),
-        None,
-        "no instance was reported; attributing this table to a guessed server \
-         is worse than attributing it to none"
-    );
-    // Never vacuumed, never analyzed — the recipe sent no such column at all
-    // here, which reads the same as the empty string: absent.
-    assert_eq!(rec.get(server_vantage::O2_DBM_LAST_VACUUM), None);
-    assert_eq!(rec.get(server_vantage::O2_DBM_LAST_AUTOVACUUM), None);
-    // And the disclosures ride on the row regardless of which columns arrived.
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE),
-        Some(&json!(true))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_TUPLES_ARE_ESTIMATED),
-        Some(&json!(true))
+    assert_canonicalizes(
+        // "The record the collector is emitting RIGHT NOW must canonicalize."
+        "pg_table_stats (live rig, demo_inventory)",
+        pg_table_stats_live_record(),
+        &[
+            (
+                server_vantage::O2_DBM_KIND,
+                Some(json!(server_vantage::KIND_TABLE_STATS)),
+            ),
+            (
+                server_vantage::O2_DBM_RELATION,
+                Some(json!("demo_inventory")),
+            ),
+            (server_vantage::O2_DBM_SCHEMA, Some(json!("public"))),
+            (server_vantage::O2_DBM_TOTAL_BYTES, Some(json!(98_304i64))),
+            (
+                server_vantage::O2_DBM_IDX_SCAN_COUNT,
+                Some(json!(130_769i64)),
+            ),
+            // The live bloat figure is fractional.
+            (server_vantage::O2_DBM_DEAD_TUP_PCT, Some(json!(3.66))),
+            (server_vantage::O2_DBM_DEAD_TUPLES, Some(json!(19i64))),
+            // The rig emits no server_address on this recipe, so the instance
+            // is genuinely unknown and must stay that way rather than be
+            // invented — attributing this table to a guessed server is worse
+            // than attributing it to none.
+            (server_vantage::O2_DBM_INSTANCE, None),
+            // Never vacuumed, never analyzed — the recipe sent no such column
+            // at all here, which reads the same as the empty string: absent.
+            (server_vantage::O2_DBM_LAST_VACUUM, None),
+            (server_vantage::O2_DBM_LAST_AUTOVACUUM, None),
+            // And the disclosures ride on the row regardless of which columns
+            // arrived.
+            (
+                server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE,
+                Some(json!(true)),
+            ),
+            (
+                server_vantage::O2_DBM_TUPLES_ARE_ESTIMATED,
+                Some(json!(true)),
+            ),
+        ],
     );
 }
 
@@ -6635,51 +6522,36 @@ fn mariadb_index_stats_record() -> Map<String, Value> {
 /// discipline every fixture in this file follows.
 #[test]
 fn mysql_table_stats_canonicalizes_as_mysql() {
-    let mut rec = mysql_table_stats_record();
-    server_vantage::apply_to_record(&mut rec);
-
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_KIND),
-        Some(&json!(server_vantage::KIND_TABLE_STATS)),
-        "a mysql_table_stats record must canonicalize through the real ingest path: {rec:?}"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_RELATION),
-        Some(&json!("orders")),
-        "the table name arrives in `body`, exactly as the PG recipe's does"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_SCHEMA),
-        Some(&json!("dbmlab"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_ENGINE),
-        Some(&json!("mysql")),
-        "the tag names the engine — stamped postgresql, every MySQL table \
-         would file under the wrong engine on the fleet view"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INSTANCE),
-        Some(&json!("mysql")),
-        "the shipped recipe stamps the bare {{host}} — nothing to port-strip, \
-         and the value must survive unmangled"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_TOTAL_BYTES),
-        Some(&json!(12_107_776i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_HEAP_BYTES),
-        Some(&json!(8_929_280i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_LIVE_TUPLES),
-        Some(&json!(39_546i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_LAST_ANALYZE),
-        Some(&json!("2026-08-13 02:24:46")),
-        "innodb_table_stats.last_update rides the last_analyze alias"
+    assert_canonicalizes(
+        "mysql_table_stats (orders)",
+        mysql_table_stats_record(),
+        &[
+            (
+                server_vantage::O2_DBM_KIND,
+                Some(json!(server_vantage::KIND_TABLE_STATS)),
+            ),
+            // The table name arrives in `body`, exactly as the PG recipe's
+            // does.
+            (server_vantage::O2_DBM_RELATION, Some(json!("orders"))),
+            (server_vantage::O2_DBM_SCHEMA, Some(json!("dbmlab"))),
+            // The tag names the engine — stamped postgresql, every MySQL table
+            // would file under the wrong engine on the fleet view.
+            (server_vantage::O2_DBM_ENGINE, Some(json!("mysql"))),
+            // The shipped recipe stamps the bare {host} — nothing to
+            // port-strip, and the value must survive unmangled.
+            (server_vantage::O2_DBM_INSTANCE, Some(json!("mysql"))),
+            (
+                server_vantage::O2_DBM_TOTAL_BYTES,
+                Some(json!(12_107_776i64)),
+            ),
+            (server_vantage::O2_DBM_HEAP_BYTES, Some(json!(8_929_280i64))),
+            (server_vantage::O2_DBM_LIVE_TUPLES, Some(json!(39_546i64))),
+            // innodb_table_stats.last_update rides the last_analyze alias.
+            (
+                server_vantage::O2_DBM_LAST_ANALYZE,
+                Some(json!("2026-08-13 02:24:46")),
+            ),
+        ],
     );
 }
 
@@ -6688,124 +6560,99 @@ fn mysql_table_stats_canonicalizes_as_mysql() {
 /// age 0" about measurements that never happened.
 #[test]
 fn mysql_table_stats_leaves_postgres_only_columns_absent() {
-    let mut rec = mysql_table_stats_record();
-    server_vantage::apply_to_record(&mut rec);
-
-    for pg_only in [
-        server_vantage::O2_DBM_DEAD_TUPLES,
-        server_vantage::O2_DBM_DEAD_TUP_PCT,
-        server_vantage::O2_DBM_MOD_SINCE_ANALYZE,
-        server_vantage::O2_DBM_SEQ_SCAN_COUNT,
-        server_vantage::O2_DBM_SEQ_TUP_READ,
-        server_vantage::O2_DBM_IDX_SCAN_COUNT,
-        server_vantage::O2_DBM_AUTOVACUUM_COUNT,
-        server_vantage::O2_DBM_FROZEN_XID_AGE,
-        server_vantage::O2_DBM_LAST_VACUUM,
-        server_vantage::O2_DBM_LAST_AUTOVACUUM,
-    ] {
-        assert_eq!(
-            rec.get(pg_only),
-            None,
-            "`{pg_only}` has no MySQL source and must stay absent, not zero"
-        );
-    }
-    // The honesty disclosures still ride on every row: MySQL's TABLE_ROWS /
-    // innodb_table_stats.n_rows are estimates too, and its counters (where an
-    // engine has any) are lifetime totals.
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE),
-        Some(&json!(true))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_TUPLES_ARE_ESTIMATED),
-        Some(&json!(true))
+    assert_canonicalizes(
+        "mysql_table_stats (pg-only columns have no MySQL source and must stay absent, not zero)",
+        mysql_table_stats_record(),
+        &[
+            (server_vantage::O2_DBM_DEAD_TUPLES, None),
+            (server_vantage::O2_DBM_DEAD_TUP_PCT, None),
+            (server_vantage::O2_DBM_MOD_SINCE_ANALYZE, None),
+            (server_vantage::O2_DBM_SEQ_SCAN_COUNT, None),
+            (server_vantage::O2_DBM_SEQ_TUP_READ, None),
+            (server_vantage::O2_DBM_IDX_SCAN_COUNT, None),
+            (server_vantage::O2_DBM_AUTOVACUUM_COUNT, None),
+            (server_vantage::O2_DBM_FROZEN_XID_AGE, None),
+            (server_vantage::O2_DBM_LAST_VACUUM, None),
+            (server_vantage::O2_DBM_LAST_AUTOVACUUM, None),
+            // The honesty disclosures still ride on every row: MySQL's
+            // TABLE_ROWS / innodb_table_stats.n_rows are estimates too, and
+            // its counters (where an engine has any) are lifetime totals.
+            (
+                server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE,
+                Some(json!(true)),
+            ),
+            (
+                server_vantage::O2_DBM_TUPLES_ARE_ESTIMATED,
+                Some(json!(true)),
+            ),
+        ],
     );
 }
 
 #[test]
 fn mariadb_table_stats_canonicalizes_as_mariadb() {
-    let mut rec = mariadb_table_stats_record();
-    server_vantage::apply_to_record(&mut rec);
-
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_KIND),
-        Some(&json!(server_vantage::KIND_TABLE_STATS))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_ENGINE),
-        Some(&json!("mariadb")),
-        "the mariadb_ tag must not file under mysql — the ?system= filter and \
-         the fleet view both key on the engine"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_RELATION),
-        Some(&json!("session_scratch"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_SCHEMA),
-        Some(&json!("dbmlab"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INSTANCE),
-        Some(&json!("mariadb"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_LAST_ANALYZE),
-        None,
-        "a STATS_PERSISTENT=0 table has no innodb_table_stats row — `\"\"` is \
-         'never', exactly as the PG recipe's empty timestamp reads"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_LIVE_TUPLES),
-        Some(&json!(3i64)),
-        "with no persistent stats, n_live_tup is the TABLE_ROWS fallback — \
-         measured live on the rig"
+    assert_canonicalizes(
+        "mariadb_table_stats (session_scratch)",
+        mariadb_table_stats_record(),
+        &[
+            (
+                server_vantage::O2_DBM_KIND,
+                Some(json!(server_vantage::KIND_TABLE_STATS)),
+            ),
+            // The mariadb_ tag must not file under mysql — the ?system= filter
+            // and the fleet view both key on the engine.
+            (server_vantage::O2_DBM_ENGINE, Some(json!("mariadb"))),
+            (
+                server_vantage::O2_DBM_RELATION,
+                Some(json!("session_scratch")),
+            ),
+            (server_vantage::O2_DBM_SCHEMA, Some(json!("dbmlab"))),
+            (server_vantage::O2_DBM_INSTANCE, Some(json!("mariadb"))),
+            // A STATS_PERSISTENT=0 table has no innodb_table_stats row — `""`
+            // is 'never', exactly as the PG recipe's empty timestamp reads.
+            (server_vantage::O2_DBM_LAST_ANALYZE, None),
+            // With no persistent stats, n_live_tup is the TABLE_ROWS fallback
+            // — measured live on the rig.
+            (server_vantage::O2_DBM_LIVE_TUPLES, Some(json!(3i64))),
+        ],
     );
 }
 
 #[test]
 fn mysql_index_stats_canonicalizes_as_mysql() {
-    let mut rec = mysql_index_stats_record();
-    server_vantage::apply_to_record(&mut rec);
-
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_KIND),
-        Some(&json!(server_vantage::KIND_INDEX_STATS)),
-        "a mysql_index_stats record must canonicalize through the real ingest path: {rec:?}"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_ENGINE),
-        Some(&json!("mysql"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INDEX_NAME),
-        Some(&json!("idx_orders_acct_sku")),
-        "the identity comes from `index_name`, never from the DDL in `body`"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_RELATION),
-        Some(&json!("orders"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
-        Some(&json!(800)),
-        "performance_schema COUNT_READ rides the idx_scan alias — 800 measured \
-         reads through the index on the rig"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INDEX_BYTES),
-        Some(&json!(1_589_248i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INDEX_IS_UNIQUE),
-        Some(&json!(false)),
-        "the recipe renders MIN(NON_UNIQUE)=0 as 'true'/'false' strings, and \
-         the string parse must land as a boolean"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE),
-        Some(&json!(true)),
-        "table_io_waits counters are lifetime totals, same disclosure as PG"
+    assert_canonicalizes(
+        "mysql_index_stats (idx_orders_acct_sku)",
+        mysql_index_stats_record(),
+        &[
+            (
+                server_vantage::O2_DBM_KIND,
+                Some(json!(server_vantage::KIND_INDEX_STATS)),
+            ),
+            (server_vantage::O2_DBM_ENGINE, Some(json!("mysql"))),
+            // The identity comes from `index_name`, never from the DDL in
+            // `body`.
+            (
+                server_vantage::O2_DBM_INDEX_NAME,
+                Some(json!("idx_orders_acct_sku")),
+            ),
+            (server_vantage::O2_DBM_RELATION, Some(json!("orders"))),
+            // performance_schema COUNT_READ rides the idx_scan alias — 800
+            // measured reads through the index on the rig.
+            (server_vantage::O2_DBM_IDX_SCAN_COUNT, Some(json!(800))),
+            (
+                server_vantage::O2_DBM_INDEX_BYTES,
+                Some(json!(1_589_248i64)),
+            ),
+            // The recipe renders MIN(NON_UNIQUE)=0 as 'true'/'false' strings,
+            // and the string parse must land as a boolean.
+            (server_vantage::O2_DBM_INDEX_IS_UNIQUE, Some(json!(false))),
+            // table_io_waits counters are lifetime totals, same disclosure as
+            // PG.
+            (
+                server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE,
+                Some(json!(true)),
+            ),
+        ],
     );
 }
 
@@ -6814,23 +6661,20 @@ fn mysql_index_stats_canonicalizes_as_mysql() {
 /// which is a measurement, not an absence.
 #[test]
 fn mysql_index_stats_keeps_a_measured_zero_idx_scan() {
-    let mut rec = mysql_index_stats_unused_record();
-    server_vantage::apply_to_record(&mut rec);
-
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_KIND),
-        Some(&json!(server_vantage::KIND_INDEX_STATS))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
-        Some(&json!(0)),
-        "a measured zero from performance_schema is the never-scanned FINDING \
-         and must survive"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INDEX_IS_UNIQUE),
-        Some(&json!(true)),
-        "a PRIMARY KEY reaches the wire flagged as a constraint"
+    assert_canonicalizes(
+        "mysql_index_stats (unused PRIMARY)",
+        mysql_index_stats_unused_record(),
+        &[
+            (
+                server_vantage::O2_DBM_KIND,
+                Some(json!(server_vantage::KIND_INDEX_STATS)),
+            ),
+            // A measured zero from performance_schema is the never-scanned
+            // FINDING and must survive.
+            (server_vantage::O2_DBM_IDX_SCAN_COUNT, Some(json!(0))),
+            // A PRIMARY KEY reaches the wire flagged as a constraint.
+            (server_vantage::O2_DBM_INDEX_IS_UNIQUE, Some(json!(true))),
+        ],
     );
 }
 
@@ -6851,20 +6695,21 @@ fn mysql_index_stats_functional_index_keeps_its_identity_and_definition() {
          empty body here means the recipe regressed to the NULL index_def bug"
     );
 
-    let mut rec = raw;
-    server_vantage::apply_to_record(&mut rec);
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_KIND),
-        Some(&json!(server_vantage::KIND_INDEX_STATS))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INDEX_NAME),
-        Some(&json!("idx_orders_lower_ref")),
-        "the identity is the index name, not the expression DDL in body"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
-        Some(&json!(41))
+    assert_canonicalizes(
+        "mysql_index_stats (functional idx_orders_lower_ref)",
+        raw,
+        &[
+            (
+                server_vantage::O2_DBM_KIND,
+                Some(json!(server_vantage::KIND_INDEX_STATS)),
+            ),
+            // The identity is the index name, not the expression DDL in body.
+            (
+                server_vantage::O2_DBM_INDEX_NAME,
+                Some(json!("idx_orders_lower_ref")),
+            ),
+            (server_vantage::O2_DBM_IDX_SCAN_COUNT, Some(json!(41))),
+        ],
     );
 }
 
@@ -6874,34 +6719,25 @@ fn mysql_index_stats_functional_index_keeps_its_identity_and_definition() {
 /// every index on every MariaDB server.
 #[test]
 fn mariadb_index_stats_leaves_absent_idx_scan_absent() {
-    let mut rec = mariadb_index_stats_record();
-    server_vantage::apply_to_record(&mut rec);
-
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_KIND),
-        Some(&json!(server_vantage::KIND_INDEX_STATS)),
-        "the row must still canonicalize — size and definition are worth \
-         collecting without the usage counter: {rec:?}"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_ENGINE),
-        Some(&json!("mariadb"))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
-        None,
-        "no idx_scan was measured; absent is honestly unknown, zero is the \
-         never-scanned finding fabricated"
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INDEX_BYTES),
-        Some(&json!(16_384i64))
-    );
-    assert_eq!(
-        rec.get(server_vantage::O2_DBM_INDEX_IS_UNIQUE),
-        Some(&json!(true)),
-        "a PRIMARY KEY must reach the wire flagged as a constraint, or the \
-         unused-index rule recommends reviewing it"
+    assert_canonicalizes(
+        "mariadb_index_stats (accounts PRIMARY)",
+        mariadb_index_stats_record(),
+        &[
+            // The row must still canonicalize — size and definition are worth
+            // collecting without the usage counter.
+            (
+                server_vantage::O2_DBM_KIND,
+                Some(json!(server_vantage::KIND_INDEX_STATS)),
+            ),
+            (server_vantage::O2_DBM_ENGINE, Some(json!("mariadb"))),
+            // No idx_scan was measured; absent is honestly unknown, zero is
+            // the never-scanned finding fabricated.
+            (server_vantage::O2_DBM_IDX_SCAN_COUNT, None),
+            (server_vantage::O2_DBM_INDEX_BYTES, Some(json!(16_384i64))),
+            // A PRIMARY KEY must reach the wire flagged as a constraint, or
+            // the unused-index rule recommends reviewing it.
+            (server_vantage::O2_DBM_INDEX_IS_UNIQUE, Some(json!(true))),
+        ],
     );
 }
 
@@ -7018,46 +6854,6 @@ fn w8_reports_every_unrecognized_tag_by_its_own_name() {
             server_vantage::take_unrecognized_recipe(&rec),
             Some(expected.to_string()),
             "the report must name the tag that was not recognized"
-        );
-    }
-}
-
-/// Every SHIPPED recipe must stay silent. A signal that fires on the recipes we
-/// do handle is noise, and would fire on every row of the reference rig.
-#[test]
-fn w8_never_reports_a_recognized_recipe() {
-    // The four blocking recipes share the aliased-column shape by construction,
-    // so the tag is the only thing that varies — which is precisely the input
-    // this classifier reads.
-    let tagged_blocking = |tag: &str| {
-        let mut r = pg_blocking_record();
-        r.insert("o2_recipe".into(), json!(tag));
-        r
-    };
-    for (name, mut rec) in [
-        ("pg_blocking_chain", pg_blocking_record()),
-        ("mysql_lock_waits", tagged_blocking("mysql_lock_waits")),
-        ("mariadb_lock_waits", tagged_blocking("mariadb_lock_waits")),
-        (
-            "mssql_blocking_chain",
-            tagged_blocking("mssql_blocking_chain"),
-        ),
-        (
-            "mssql_deadlock",
-            mssql_deadlock_row("93", "1", "UPDATE accounts SET balance = 1 WHERE id = 31"),
-        ),
-        ("pg_table_stats", pg_table_stats_record()),
-        ("pg_index_stats", pg_index_stats_unused_record()),
-        ("mysql_table_stats", mysql_table_stats_record()),
-        ("mysql_index_stats", mysql_index_stats_record()),
-        ("mariadb_table_stats", mariadb_table_stats_record()),
-        ("mariadb_index_stats", mariadb_index_stats_record()),
-    ] {
-        server_vantage::apply_to_record(&mut rec);
-        assert_eq!(
-            server_vantage::take_unrecognized_recipe(&rec),
-            None,
-            "shipped recipe {name} is recognized and must not be reported"
         );
     }
 }
@@ -7205,9 +7001,13 @@ fn w8_reports_a_tag_no_implementation_could_have_enumerated() {
 }
 
 /// The complement: recognition must be driven by `RECOGNIZED_RECIPES`, so every
-/// member is silent — including ones added after this test was written.
+/// member is silent — including ones added after this test was written — and
+/// every shipped recipe's REALISTIC row is silent too. A signal that fires on
+/// the recipes we do handle is noise, and would fire on every row of the
+/// reference rig.
 #[test]
 fn w8_every_member_of_the_recognized_array_is_silent() {
+    // Array-driven, so a recipe added later is covered automatically.
     for tag in server_vantage::RECOGNIZED_RECIPES {
         let mut rec = custom_recipe_record();
         rec.insert("o2_recipe".to_string(), json!(tag));
@@ -7217,6 +7017,42 @@ fn w8_every_member_of_the_recognized_array_is_silent() {
             server_vantage::take_unrecognized_recipe(&rec),
             None,
             "{tag} is a shipped recipe and must never be reported as unrecognized"
+        );
+    }
+
+    // And over each shipped recipe's realistic fixture. The four blocking
+    // recipes share the aliased-column shape by construction, so the tag is
+    // the only thing that varies — which is precisely the input this
+    // classifier reads.
+    let tagged_blocking = |tag: &str| {
+        let mut r = pg_blocking_record();
+        r.insert("o2_recipe".into(), json!(tag));
+        r
+    };
+    for (name, mut rec) in [
+        ("pg_blocking_chain", pg_blocking_record()),
+        ("mysql_lock_waits", tagged_blocking("mysql_lock_waits")),
+        ("mariadb_lock_waits", tagged_blocking("mariadb_lock_waits")),
+        (
+            "mssql_blocking_chain",
+            tagged_blocking("mssql_blocking_chain"),
+        ),
+        (
+            "mssql_deadlock",
+            mssql_deadlock_row("93", "1", "UPDATE accounts SET balance = 1 WHERE id = 31"),
+        ),
+        ("pg_table_stats", pg_table_stats_record()),
+        ("pg_index_stats", pg_index_stats_unused_record()),
+        ("mysql_table_stats", mysql_table_stats_record()),
+        ("mysql_index_stats", mysql_index_stats_record()),
+        ("mariadb_table_stats", mariadb_table_stats_record()),
+        ("mariadb_index_stats", mariadb_index_stats_record()),
+    ] {
+        server_vantage::apply_to_record(&mut rec);
+        assert_eq!(
+            server_vantage::take_unrecognized_recipe(&rec),
+            None,
+            "shipped recipe {name} is recognized and must not be reported"
         );
     }
 }
@@ -7563,23 +7399,10 @@ fn t1_prepared_statement_text_fingerprints_as_the_prepare_row() {
 
 // ── W-E3 · canonicalization, through `apply_to_record` ──────────────────────
 
-/// Force the explain ingest knob on for the duration of a test (the
-/// `with_top_query_enabled` pattern; own mutex, own env var).
+/// Force the explain ingest knob on for the duration of a test.
 fn with_explain_enabled<T>(f: impl FnOnce() -> T) -> T {
-    let _guard = EXPLAIN_KNOB.lock().unwrap_or_else(|e| e.into_inner());
-    let prev = std::env::var("ZO_DB_MONITORING_EXPLAIN_ENABLED").ok();
-    unsafe { std::env::set_var("ZO_DB_MONITORING_EXPLAIN_ENABLED", "true") };
-    config::refresh_config().expect("config refresh");
-    let out = f();
-    match prev {
-        Some(v) => unsafe { std::env::set_var("ZO_DB_MONITORING_EXPLAIN_ENABLED", v) },
-        None => unsafe { std::env::remove_var("ZO_DB_MONITORING_EXPLAIN_ENABLED") },
-    }
-    config::refresh_config().expect("config refresh");
-    out
+    with_knob("ZO_DB_MONITORING_EXPLAIN_ENABLED", f)
 }
-
-static EXPLAIN_KNOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// A flattened auto_explain filelog record, exactly as the T2 recipe produces
 /// it: the prefix fields from `pg_prefix`, the tag from `mark_explain`, and the

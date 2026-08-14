@@ -304,16 +304,23 @@ fn fold_word(w: &str) -> Cow<'_, str> {
     if !w.bytes().any(|b| b.is_ascii_digit()) {
         return Cow::Borrowed(w);
     }
-    let folded = w
-        .split('_')
-        .map(|seg| if fold_segment(seg) { "?" } else { seg })
-        .collect::<Vec<_>>()
-        .join("_");
-    if folded == w {
-        Cow::Borrowed(w)
-    } else {
-        Cow::Owned(folded)
+    // Cheap scan first: any identifier containing a digit lands here, so the folded form is
+    // built only when a segment actually folds — and directly into a String, no Vec+join.
+    if !w.split('_').any(fold_segment) {
+        return Cow::Borrowed(w);
     }
+    let mut folded = String::with_capacity(w.len());
+    for (i, seg) in w.split('_').enumerate() {
+        if i > 0 {
+            folded.push('_');
+        }
+        if fold_segment(seg) {
+            folded.push('?');
+        } else {
+            folded.push_str(seg);
+        }
+    }
+    Cow::Owned(folded)
 }
 
 fn fold_segment(seg: &str) -> bool {
@@ -336,7 +343,8 @@ fn lex_sql<'a>(
     let m = SqlMode::for_dialect(d);
     let b = text.as_bytes();
     let n = b.len();
-    let mut toks: Vec<Tok<'a>> = Vec::new();
+    // Rough token density of real SQL (~6 bytes/token) — avoids repeated regrowth.
+    let mut toks: Vec<Tok<'a>> = Vec::with_capacity(text.len() / 6);
     let mut i = 0usize;
     let mut ws = false;
     macro_rules! push {
@@ -682,8 +690,10 @@ fn hash_needs_space(prev: Option<TokKind>, next: TokKind) -> bool {
 }
 
 fn render_stmt(toks: &[Tok<'_>]) -> RenderedStmt {
-    let mut norm = String::new();
-    let mut folded = String::new();
+    // Pre-size to token text plus a separator each — the output is never larger.
+    let cap: usize = toks.iter().map(|t| t.text.len() + 1).sum();
+    let mut norm = String::with_capacity(cap);
+    let mut folded = String::with_capacity(cap);
     let mut first_word: Option<String> = None;
     // Kind of the last token appended to the HASH stream (the display stream keeps
     // using each token's own `ws` flag).
@@ -734,7 +744,16 @@ fn render_stmt(toks: &[Tok<'_>]) -> RenderedStmt {
         }
         norm.push_str(&t.text);
         if t.kind == TokKind::Word {
-            folded.push_str(&t.text.to_lowercase());
+            if t.text.is_ascii() {
+                // ASCII fast path: lowercase in place, no per-token String. Non-ASCII
+                // words (rare) keep the exact `str::to_lowercase` behavior — including
+                // its context-dependent mappings — so the hash stream is unchanged.
+                for &b in t.text.as_bytes() {
+                    folded.push(b.to_ascii_lowercase() as char);
+                }
+            } else {
+                folded.push_str(&t.text.to_lowercase());
+            }
         } else {
             folded.push_str(&t.text);
         }
@@ -807,17 +826,6 @@ fn normalize_sql(
         }
     }
 
-    let norm = blocks
-        .iter()
-        .map(|s| s.norm.as_str())
-        .collect::<Vec<_>>()
-        .join("; ");
-    let folded = blocks
-        .iter()
-        .map(|s| s.folded.as_str())
-        .collect::<Vec<_>>()
-        .join("; ");
-
     // Operation: first non-TCL statement's leading keyword; heterogeneous batches → BATCH;
     // all-TCL batches → the first statement's keyword.
     let mut non_tcl_ops: Vec<String> = Vec::new();
@@ -853,6 +861,27 @@ fn normalize_sql(
         } else {
             StmtClass::Query
         }
+    };
+
+    // Assembled last (operation/stmt_class above still read the blocks): the single-statement
+    // path — the overwhelmingly common case — moves the rendered strings out instead of paying
+    // two Vec+join copies of the full text.
+    let (norm, folded) = if blocks.len() == 1 {
+        let s = &mut blocks[0];
+        (std::mem::take(&mut s.norm), std::mem::take(&mut s.folded))
+    } else {
+        (
+            blocks
+                .iter()
+                .map(|s| s.norm.as_str())
+                .collect::<Vec<_>>()
+                .join("; "),
+            blocks
+                .iter()
+                .map(|s| s.folded.as_str())
+                .collect::<Vec<_>>()
+                .join("; "),
+        )
     };
 
     Ok(NormalizedStatement {
@@ -1102,11 +1131,16 @@ fn fold_command_doc(text: &str, operation: &mut Option<String>) -> Result<String
                 command_value_pending = false;
                 out.push_str("\"?\"");
             }
-            c if c.is_ascii_alphabetic() || c == b'_' || c == b'$' => {
+            c if c.is_ascii_alphabetic() || c == b'_' || c == b'$' || c >= 0x80 => {
                 // Bare word: an unquoted key is preserved; anything else is a word
                 // literal (JSON true/false/null, Python True/False/None, …) → `"?"`.
+                // Bytes >= 0x80 are UTF-8 continuation/lead bytes: including them keeps a
+                // non-ASCII word (e.g. a `café` key) one intact token instead of splitting
+                // it mid-character.
                 let start = i;
-                while i < n && (b[i].is_ascii_alphanumeric() || matches!(b[i], b'_' | b'$')) {
+                while i < n
+                    && (b[i].is_ascii_alphanumeric() || matches!(b[i], b'_' | b'$') || b[i] >= 0x80)
+                {
                     i += 1;
                 }
                 let span = &text[start..i];
@@ -1125,8 +1159,17 @@ fn fold_command_doc(text: &str, operation: &mut Option<String>) -> Result<String
                 }
             }
             other => {
-                out.push(other as char);
-                i += 1;
+                // Pass punctuation/whitespace through. `byte as char` is only correct for
+                // ASCII — a byte >= 0x80 read that way re-encodes as a Latin-1 codepoint
+                // (mojibake), so multi-byte UTF-8 is copied as a whole char.
+                if other.is_ascii() {
+                    out.push(other as char);
+                    i += 1;
+                } else {
+                    let ch = text[i..].chars().next().expect("i is on a char boundary");
+                    out.push(ch);
+                    i += ch.len_utf8();
+                }
             }
         }
     }
@@ -1223,8 +1266,16 @@ fn collapse_repeated_array_elements(s: &str) -> String {
                 i = j + 1;
             }
             other => {
-                out.push(other as char);
-                i += 1;
+                // Same UTF-8 rule as `fold_command_doc`: `byte as char` mangles non-ASCII
+                // (a bare `café` key survives folding and must survive collapsing too).
+                if other.is_ascii() {
+                    out.push(other as char);
+                    i += 1;
+                } else {
+                    let ch = s[i..].chars().next().expect("i is on a char boundary");
+                    out.push(ch);
+                    i += ch.len_utf8();
+                }
             }
         }
     }
