@@ -95,11 +95,6 @@ pub struct PlanRange {
 
 /// Build the pass's query plan.
 pub fn plan(sli: &SliConfig, group_by: &[String], range: PlanRange) -> SliQueryPlan {
-    log::warn!(
-        "here-test plan start {} end {}",
-        range.start_secs,
-        range.end_secs
-    );
     match sli {
         SliConfig::Count { source } => match source {
             CountSource::SingleQuery {
@@ -141,21 +136,7 @@ pub fn plan(sli: &SliConfig, group_by: &[String], range: PlanRange) -> SliQueryP
             // GROUP BY columns. Grouping comes from the labels the series
             // already carry, and summing four pods' p95 does not produce a
             // p95 of anything.
-            QueryLanguage::PromQl => {
-                log::warn!(
-                    "here-test time slice promql start {} end {}",
-                    range.start_secs,
-                    range.end_secs
-                );
-                let q = prom_query(query, range);
-                log::warn!(
-                    "here-test time slice promql query start {} end {} step {}",
-                    q.start_micros,
-                    q.end_micros,
-                    q.step_micros
-                );
-                SliQueryPlan::PromQlValue(q)
-            }
+            QueryLanguage::PromQl => SliQueryPlan::PromQlValue(prom_query(query, range)),
             QueryLanguage::Sql => SliQueryPlan::Single(SliQuery {
                 sql: time_slice_sql(stream, query, scope.as_deref(), group_by, range),
                 start_micros: range.start_secs * 1_000_000,
@@ -184,12 +165,6 @@ pub fn plan(sli: &SliConfig, group_by: &[String], range: PlanRange) -> SliQueryP
 /// drift, and a drift is a whole-slice time shift that is invisible in the
 /// values and wrong in every one of them.
 fn prom_query(expr: &str, range: PlanRange) -> PromQuery {
-    log::warn!(
-        "here-test prom query  start {} end {} start_micros {}",
-        range.start_secs,
-        range.end_secs,
-        range.start_secs + range.slice_interval_secs
-    );
     PromQuery {
         expr: expr.to_string(),
         start_micros: (range.start_secs + range.slice_interval_secs) * 1_000_000,

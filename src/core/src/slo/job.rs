@@ -127,15 +127,6 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
         _ => {}
     }
 
-    log::warn!(
-        "here-test, now secs : {now_secs} range_start : {} range_end : {} slice interval sec {} ingest delay sec {} slo_id : {}",
-        range.start,
-        range.end,
-        slo.definition.slice_interval_secs,
-        cfg.slo.ingest_delay_secs,
-        slo.id
-    );
-
     let group_by = slo.definition.group_by.clone().unwrap_or_default();
     let params = PassParams {
         slo_id: slo.id.clone(),
@@ -151,13 +142,7 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
         max_groups: cfg.slo.max_groups,
     };
 
-    let (rows, query_rejects) = match fetch_rows(slo, &group_by, &range, &params).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("here-test slo: {slo:?}");
-            return Err(anyhow::anyhow!(e));
-        }
-    };
+    let (rows, query_rejects) = fetch_rows(slo, &group_by, &range, &params).await?;
     let mut result = build_slices(&slo.definition.sli_config, rows, &params);
     // Rows the query layer itself refused never reach `build_slices`, so their
     // reasons are merged in here. Dropping them would report a window that is
@@ -216,12 +201,6 @@ async fn fetch_rows(
     range: &config::meta::slo::window::IngestRange,
     params: &PassParams,
 ) -> Result<(Vec<QueryRow>, Vec<(String, RejectReason)>), anyhow::Error> {
-    log::warn!(
-        "here-test fetch_rows {} start {} end {}",
-        slo.id,
-        range.start,
-        range.end
-    );
     let plan = plan(
         &slo.definition.sli_config,
         group_by,
@@ -283,12 +262,6 @@ async fn fetch_rows(
             ))
         }
         SliQueryPlan::PromQlValue(q) => {
-            log::warn!(
-                "here-test promql value {} start {} end {}",
-                slo.id,
-                q.start_micros,
-                q.end_micros
-            );
             let series = prom_search(&slo.org, &q).await?;
             Ok(promql_value_rows(
                 series,
@@ -555,11 +528,6 @@ async fn prom_search(
     org: &str,
     q: &super::query::PromQuery,
 ) -> Result<Vec<PromSeries>, anyhow::Error> {
-    log::warn!(
-        "here-test prom search start {} end {}",
-        q.start_micros,
-        q.end_micros
-    );
     let req = promql_service::MetricsQueryRequest {
         query: q.expr.clone(),
         start: q.start_micros,
@@ -586,11 +554,7 @@ async fn prom_search(
         // ERROR that fails the pass, so coverage falls — never an empty
         // window that reads as data.
         anyhow::bail!(
-            "here-test SLO PromQL query returned a non-matrix response : {resp:?} trace : {trace_id} , start : {} end : {} step : {} expr : {}",
-            q.start_micros,
-            q.end_micros,
-            q.step_micros,
-            q.expr
+            "SLO PromQL query returned a non-matrix response : {resp:?} trace : {trace_id}",
         );
     };
     Ok(matrix
