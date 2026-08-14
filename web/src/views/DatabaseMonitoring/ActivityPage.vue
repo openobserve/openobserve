@@ -39,33 +39,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   one, which is why they occupy two columns and never one.
 -->
 <template>
-  <OPageLayout
+  <DbmPageChrome
     :title="t('dbm.activity.title')"
     :subtitle="t(isLiveWindow ? 'dbm.activity.subtitle' : 'dbm.activity.subtitlePast')"
-    icon="database"
     title-data-test="dbm-activity-title"
-    tabs-below
-    bleed
+    date-time-data-test="dbm-activity-date-time"
+    :tab-counts="tabCounts"
+    :range="range"
+    @date-change="onDateChange"
   >
-    <template #header-tabs>
-      <!-- The sibling badges come from the shell's one shared fan-out; this
-           page's own is counted from the breakdown it already loaded. -->
-      <DbmSectionTabs v-bind="tabCounts" />
-    </template>
-
-    <template #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        data-test-name="dbm-activity-date-time"
-        class="h-8"
-        @on:date-change="onDateChange"
-      />
-    </template>
-
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
         :data="rows"
@@ -84,31 +66,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @row-click="onRowClick"
       >
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <div class="w-64 shrink-0">
-              <OSearchInput
-                v-model="search"
-                :placeholder="t('dbm.activity.searchPlaceholder')"
-                clearable
-                :debounce="400"
-                data-test="dbm-activity-search"
-              />
-            </div>
-          </div>
+          <DbmTableToolbar
+            v-model:search="search"
+            :placeholder="t('dbm.activity.searchPlaceholder')"
+            :debounce="400"
+            search-data-test="dbm-activity-search"
+          />
         </template>
 
         <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+          <DbmRefreshButton
             :loading="loading"
-            class="shrink-0"
             data-test="dbm-activity-refresh"
-            @click="onRefresh"
-          >
-            <OTooltip side="bottom" :content="t('dbm.common.reload')" />
-          </OButton>
+            @refresh="onRefresh"
+          />
         </template>
 
         <template #subheader>
@@ -117,12 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                page a single strip rather than two stacked ones. Always
                rendered — `:loading` draws the skeleton — so arriving data never
                shifts the rows below it. -->
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="dbm-activity-summary"
-          >
+          <DbmSubheaderBand data-test="dbm-activity-summary">
             <OStatStrip :items="summaryStats" :loading="loading" />
-          </div>
+          </DbmSubheaderBand>
 
           <!-- The wait-event breakdown, grouped by the ENGINE'S OWN vocabulary.
                A unified cross-engine taxonomy was considered and withdrawn:
@@ -186,25 +154,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- The statement, with the identity of the session under it. -->
         <template #cell-query="{ row }">
-          <div class="flex min-w-0 flex-col gap-px">
-            <span
-              class="text-text-code min-w-0 truncate font-mono text-xs"
-              :title="row.query ?? ''"
-            >
-              {{ raw(row.query ?? "—") }}
-            </span>
-            <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
-              <OTag type="dbSystem" :value="row.db_system" size="xs" />
-              <template v-if="row.db_instance">
-                <span class="opacity-45">·</span>
-                <span>{{ raw(row.db_instance) }}</span>
-              </template>
-              <template v-if="row.transactionAge">
-                <span class="opacity-45">·</span>
-                <span class="text-status-warning-text">{{ row.transactionAge }}</span>
-              </template>
-            </div>
-          </div>
+          <DbmQueryCell
+            :text="raw(row.query ?? '')"
+            :title-attr="row.query ?? ''"
+            :db-system="row.db_system"
+            :meta-items="[
+              { key: 'instance', label: raw(row.db_instance ?? '') },
+              {
+                key: 'txnAge',
+                label: row.transactionAge ?? raw(''),
+                class: 'text-status-warning-text',
+              },
+            ]"
+          />
         </template>
 
         <template #cell-session="{ row }">
@@ -336,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
-  </OPageLayout>
+  </DbmPageChrome>
 </template>
 
 <script setup lang="ts">
@@ -345,23 +307,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmActivityPage" });
 
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useStore } from "vuex";
 
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
-import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
-import DateTime from "@/components/DateTime.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
+import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
+import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
+import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
   type ActivitySession,
@@ -369,12 +329,10 @@ import dbMonitoringService, {
   type ActivityWaitBucket,
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
-import { setDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
-import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
+import { useDbmQueryDetailHop } from "@/composables/dbm/useDbmQueryDetailHop";
 import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
-import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
-import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
+import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { useDbmSearchEmpty } from "@/composables/dbm/useDbmSearchEmpty";
 import {
   activityCountClaim,
   activityDisclosureLines,
@@ -394,23 +352,31 @@ import {
   waitBucketLabelParts,
   waitTotals,
 } from "@/utils/dbm/activity";
-import { claimedCount, formatCount, formatPercent } from "@/utils/dbm/format";
+import { formatAge, formatCount, formatPercent } from "@/utils/dbm/format";
+import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
 
 const { t } = useI18nTyped();
-const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-const { range, current, refresh, setRange, queryParams } = useDbmScope(route.query);
-
-// Search, the picker and refresh can all be in flight at once; this keeps the
-// last request the reader made the one that paints.
-const requestSeq = useDbmRequestSeq();
-
-// The sibling-tab badges are the same numbers on every tab, so DbmShell fetches
-// them ONCE per window for every route and this page reads the snapshot.
-// See useDbmTabCounts.
-const tabCountsContext = useDbmTabCountsContext();
+// The shared list-page spine: scope from the URL, the request-sequence guard,
+// the shell's badge snapshot, refresh/date-change handlers and the load
+// envelope. See useDbmListPage.
+const {
+  scope: { range, current, queryParams },
+  requestSeq,
+  tabCountsContext,
+  loading,
+  error,
+  search,
+  org,
+  dbmEnabled,
+  queryCount,
+  databaseCount,
+  run,
+  onRefresh,
+  onDateChange,
+} = useDbmListPage({ load: () => load() });
 
 /**
  * Whether the page is describing NOW or a stretch of the past. A relative range
@@ -419,17 +385,14 @@ const tabCountsContext = useDbmTabCountsContext();
  */
 const isLiveWindow = computed(() => range.value.type === "relative");
 
-const sessions = ref<ActivitySession[]>([]);
-const waitBuckets = ref<ActivityWaitBucket[]>([]);
-const stateBuckets = ref<ActivityStateBucket[]>([]);
+const sessions = shallowRef<ActivitySession[]>([]);
+const waitBuckets = shallowRef<ActivityWaitBucket[]>([]);
+const stateBuckets = shallowRef<ActivityStateBucket[]>([]);
 const truncated = ref(false);
 const notCollecting = ref(false);
 const logLinesSeen = ref<number | null>(null);
 const sampledAt = ref<number | null>(null);
 const sampleInterval = ref<number | null>(null);
-const loading = ref(false);
-const error = ref<string | null>(null);
-const search = ref("");
 
 /**
  * The sibling badges, from the shell's shared fan-out, plus THIS tab's own
@@ -443,13 +406,6 @@ const search = ref("");
 const tabCounts = computed(() =>
   tabCountProps(withOwnCount(tabCountsContext.counts.value, "activityCount", sampleTotal.value)),
 );
-
-/** Read by `notCollectingChecks` to say what else in DBM is answering. */
-const queryCount = computed(() => claimedCount(tabCountsContext.counts.value.queryCount));
-const databaseCount = computed(() => tabCountsContext.counts.value.databaseCount);
-
-const org = computed(() => store.state.selectedOrganization?.identifier as string);
-const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
 
 /**
  * SESSION SAMPLES in the window, from the SQL aggregate. Not a distinct-session
@@ -487,6 +443,9 @@ const waitRemainderLabel = computed<I18nText | null>(() => {
       })
     : t("dbm.activity.wait.remainderNoShare", { count: remainder.buckets });
 });
+// The list→detail hop: the seed hand-off plus the push, in one place. See
+// useDbmQueryDetailHop.
+const { openDbmQueryDetail } = useDbmQueryDetailHop({ router, route, org, range, queryParams });
 
 const disclosure = computed(() => sampleDisclosure(sampleInterval.value));
 const disclosureLines = computed(() => activityDisclosureLines(disclosure.value, t));
@@ -542,9 +501,7 @@ const rows = computed(() => {
 const showsLocks = computed(() => hasLockData(sessions.value));
 
 /** The reader's own filter emptied the table — not the database being quiet. */
-const searchHidEverything = computed(
-  () => !!search.value.trim() && allRows.value.length > 0 && rows.value.length === 0,
-);
+const searchHidEverything = useDbmSearchEmpty(search, allRows, rows);
 
 type ActivityTableRow = (typeof allRows.value)[number];
 
@@ -706,11 +663,6 @@ const emptyCause = computed(() =>
   }),
 );
 
-const formatAge = (micros: number): I18nText => {
-  const seconds = Math.max(0, Math.round((Date.now() - micros / 1000) / 1000));
-  return raw(seconds < 60 ? `${seconds}s ago` : `${Math.round(seconds / 60)}m ago`);
-};
-
 const healthyChecks = computed<DbmLockCheck[]>(() => [
   {
     id: "sampling",
@@ -745,57 +697,27 @@ const healthyChecks = computed<DbmLockCheck[]>(() => [
   },
 ]);
 
-const notCollectingChecks = computed<DbmLockCheck[]>(() => {
-  const hasQueries = (queryCount.value ?? 0) > 0;
-  return [
+// The shared queries/enabled diagnostics in this page's namespace, plus its
+// own missing prerequisite: the session sampler.
+const notCollectingChecks = computed<DbmLockCheck[]>(() =>
+  buildDbmNotCollectingChecks(
+    "activity",
     {
-      id: "queries",
-      status: hasQueries ? "ok" : "fail",
-      title: hasQueries
-        ? t("dbm.activity.notCollecting.checks.queries.ok")
-        : t("dbm.activity.notCollecting.checks.queries.no"),
-      detail: hasQueries
-        ? t("dbm.activity.notCollecting.checks.queries.okDetail", {
-            queries: t("dbm.queries.queryCount", queryCount.value ?? 0),
-            databases: t("dbm.databases.databaseCount", databaseCount.value ?? 0),
-          })
-        : t("dbm.activity.notCollecting.checks.queries.noDetail"),
+      queryCount: queryCount.value,
+      databaseCount: databaseCount.value,
+      dbmEnabled: dbmEnabled.value,
     },
-    {
-      id: "enabled",
-      status: dbmEnabled.value ? "ok" : "fail",
-      title: dbmEnabled.value
-        ? t("dbm.activity.notCollecting.checks.enabled.ok")
-        : t("dbm.activity.notCollecting.checks.enabled.no"),
-      detail: dbmEnabled.value
-        ? t("dbm.activity.notCollecting.checks.enabled.okDetail")
-        : t("dbm.activity.notCollecting.checks.enabled.noDetail"),
-    },
-    {
-      id: "sampling",
-      status: "fail",
-      title: t("dbm.activity.notCollecting.checks.sampling.no"),
-      detail: t("dbm.activity.notCollecting.checks.sampling.noDetail"),
-    },
-  ];
-});
-
-// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
-// badge cache alongside the page's own load — the URL does not change on a
-// refresh, so the shell cannot see one on its own.
-const onRefresh = () => {
-  void load();
-  tabCountsContext.refresh({ force: true });
-};
-
-const onDateChange = (value: DbmDateChange) => {
-  setRange(value);
-  router.replace({ query: { ...route.query, ...queryParams.value } }).catch(() => {});
-  // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
-  // mount replay would otherwise double every request. See
-  // `DbmDateChange.userChangedValue`.
-  if (value?.userChangedValue !== false) load();
-};
+    t,
+    [
+      {
+        id: "sampling",
+        status: "fail",
+        title: t("dbm.activity.notCollecting.checks.sampling.no"),
+        detail: t("dbm.activity.notCollecting.checks.sampling.noDetail"),
+      },
+    ],
+  ),
+);
 
 /**
  * A row opens the query it is running (W4/B13).
@@ -819,103 +741,55 @@ const onRowClick = (row: ActivityTableRow) => {
   // the /queries lookup finds no client row to take the text from. Only the
   // fields this page truly knows go in — no stats, no stream — so the detail
   // page paints the statement and dimensions and stays silent on the rest.
-  if (row.query) {
-    setDbmQueryDetailSeed({
-      row: {
-        fingerprint: target.fingerprint,
-        query_norm: row.query,
-        db_system: row.db_system ?? "",
-        db_instance: row.db_instance ?? "",
-        db_namespace: row.db_namespace ?? undefined,
-      },
-      org: org.value,
-      range: { ...range.value },
-    });
-  }
-  router
-    .push({
-      name: "dbmQueryDetail",
-      query: {
-        ...route.query,
-        org_identifier: route.query.org_identifier ?? org.value,
-        ...queryParams.value,
-        ...target,
-        // The back affordance and the tab strip both honor the origin — an
-        // Activity reader must not be handed back to Top queries.
-        from: "activity",
-      },
-    })
-    .catch(() => {});
+  // The back affordance and the tab strip both honor the origin — an Activity
+  // reader must not be handed back to Top queries.
+  openDbmQueryDetail({
+    seed: row.query
+      ? {
+          fingerprint: target.fingerprint,
+          query_norm: row.query,
+          db_system: row.db_system ?? "",
+          db_instance: row.db_instance ?? "",
+          db_namespace: row.db_namespace ?? undefined,
+        }
+      : null,
+    target,
+    from: "activity",
+  });
 };
 
-const load = async () => {
-  if (!org.value) return;
-  const token = requestSeq.begin();
-  loading.value = true;
-  error.value = null;
-  refresh();
+const load = () =>
+  run(
+    async (token) => {
+      const { data } = await dbMonitoringService.getActivity(org.value, {
+        startTime: current.value.startTime,
+        endTime: current.value.endTime,
+      });
 
-  try {
-    const { data } = await dbMonitoringService.getActivity(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-    });
+      // A newer window or refresh already owns the page.
+      if (requestSeq.isStale(token)) return;
 
-    // A newer window or refresh already owns the page.
-    if (requestSeq.isStale(token)) return;
-
-    sessions.value = data.hits ?? [];
-    waitBuckets.value = data.by_wait_event ?? [];
-    stateBuckets.value = data.by_state ?? [];
-    truncated.value = Boolean(data.truncated);
-    notCollecting.value = Boolean(data.not_collecting);
-    logLinesSeen.value = data.log_lines_seen ?? null;
-    sampledAt.value = data.sampled_at ?? null;
-    sampleInterval.value = data.sample_interval_seconds ?? null;
-  } catch (err: unknown) {
-    if (requestSeq.isStale(token)) return;
-    // Whatever went wrong, the previous window's rows are no longer an answer
-    // to the question on screen. Leaving them would put stale sessions under an
-    // error banner — and would let `emptyCause` read the old window's
-    // breakdown as proof that this one was sampled.
-    sessions.value = [];
-    waitBuckets.value = [];
-    stateBuckets.value = [];
-    truncated.value = false;
-
-    // The endpoint is not on this build yet, or nothing has ever sampled a
-    // session: "not collecting", not a failure the reader can act on.
-    const status = (err as { response?: { status?: number } })?.response?.status;
-    if (status === 404 || status === 501) {
-      notCollecting.value = true;
-    } else {
-      error.value =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        String(err);
-    }
-  } finally {
-    if (!requestSeq.isStale(token)) loading.value = false;
-  }
-};
-
-// Only this page's OWN read. The badges are DbmShell's, fetched once for
-// every tab — a call here would put the fan-out back on every mount.
-onMounted(() => {
-  load();
-});
-
-// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
-// session on this tab. The URL is how the tabs agree on a window, so re-read it
-// on return and reload ONLY if it actually moved.
-useDbmScopeSync({
-  route,
-  current: () => range.value,
-  adopt: (next) =>
-    setRange({
-      startTime: next.startTime,
-      endTime: next.endTime,
-      relativeTimePeriod: next.relativeTimePeriod,
-    }),
-  reload: () => load(),
-});
+      sessions.value = data.hits ?? [];
+      waitBuckets.value = data.by_wait_event ?? [];
+      stateBuckets.value = data.by_state ?? [];
+      truncated.value = Boolean(data.truncated);
+      notCollecting.value = Boolean(data.not_collecting);
+      logLinesSeen.value = data.log_lines_seen ?? null;
+      sampledAt.value = data.sampled_at ?? null;
+      sampleInterval.value = data.sample_interval_seconds ?? null;
+    },
+    {
+      // Cleared on failure so `emptyCause` cannot read the old window's
+      // breakdown as proof that this one was sampled.
+      reset: () => {
+        sessions.value = [];
+        waitBuckets.value = [];
+        stateBuckets.value = [];
+        truncated.value = false;
+      },
+      onNotCollecting: () => {
+        notCollecting.value = true;
+      },
+    },
+  );
 </script>

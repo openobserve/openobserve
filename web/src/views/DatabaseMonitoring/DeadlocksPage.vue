@@ -40,34 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       list is the HEALTHY normal and is rendered as reassurance.
 -->
 <template>
-  <OPageLayout
+  <DbmPageChrome
     :title="t('dbm.deadlocks.title')"
     :subtitle="t('dbm.deadlocks.subtitle')"
-    icon="database"
     title-data-test="dbm-deadlocks-title"
-    tabs-below
-    bleed
+    date-time-data-test="dbm-deadlocks-date-time"
+    :tab-counts="tabCounts"
+    :range="range"
+    @date-change="onDateChange"
   >
-    <template #header-tabs>
-      <!-- The sibling badges come from the shell's one shared fan-out. This
-           page's own is its EVENT count: it answers "how much is happening",
-           which is what a tab label is for. -->
-      <DbmSectionTabs v-bind="tabCounts" />
-    </template>
-
-    <template #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        data-test-name="dbm-deadlocks-date-time"
-        class="h-8"
-        @on:date-change="onDateChange"
-      />
-    </template>
-
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
         :data="tableRows"
@@ -86,18 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-deadlocks-table"
       >
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <div class="w-64 shrink-0">
-              <OSearchInput
-                v-model="search"
-                :placeholder="t('dbm.deadlocks.searchPlaceholder')"
-                clearable
-                :debounce="400"
-                data-test="dbm-deadlocks-search"
-                @update:model-value="load"
-              />
-            </div>
-
+          <DbmTableToolbar
+            v-model:search="search"
+            :placeholder="t('dbm.deadlocks.searchPlaceholder')"
+            :debounce="400"
+            search-data-test="dbm-deadlocks-search"
+            @search="load"
+          >
             <!-- What a ROW means. Not a data-processing mode — the reader is
                  choosing between "name the bug" and "give me a timestamp". -->
             <OToggleGroup v-model="grouping" class="shrink-0" data-test="dbm-deadlocks-grouping">
@@ -110,32 +86,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.eventsHint')" />
               </OToggleGroupItem>
             </OToggleGroup>
-          </div>
+          </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+          <DbmRefreshButton
             :loading="loading"
-            class="shrink-0"
             data-test="dbm-deadlocks-refresh"
-            @click="onRefresh"
-          >
-            <OTooltip side="bottom" :content="t('dbm.common.reload')" />
-          </OButton>
+            @refresh="onRefresh"
+          />
         </template>
 
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="dbm-deadlocks-summary"
-          >
+          <DbmSubheaderBand data-test="dbm-deadlocks-summary">
             <OStatStrip :items="summaryStats" :loading="loading" />
-          </div>
+          </DbmSubheaderBand>
 
           <!-- ONE storm band, not two. The completion-bias caution has no
                condition of its own beyond `storm`, so it rides inside this
@@ -169,21 +136,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The database logs every deadlock it resolves, so this is not a
                sample — unless the read hit its cap, which is what `truncated`
                says and what turns the claim into a floor. -->
-          <div
+          <DbmLockCoverageLine
             v-if="rows.length"
-            class="border-border-subtle bg-surface-base text-text-secondary text-2xs px-page-edge flex shrink-0 items-center gap-2 border-b py-1"
+            :summary="coverageLine"
+            :dot-class="truncated ? 'bg-status-warning-text' : 'bg-status-success-text'"
+            :trailing-label="readUpToLabel"
             data-test="dbm-deadlocks-coverage"
-          >
-            <span
-              class="size-1.5 shrink-0 rounded-full"
-              :class="truncated ? 'bg-status-warning-text' : 'bg-status-success-text'"
-            ></span>
-            <span>{{ coverageLine }}</span>
-            <template v-if="readUpToLabel">
-              <span class="opacity-45">·</span>
-              <span>{{ readUpToLabel }}</span>
-            </template>
-          </div>
+          />
         </template>
 
         <!-- The finding IS the collision, so the two statements share one cell
@@ -261,13 +220,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ formatPercent(row.share, 0) }}
                 </span>
               </span>
-              <span class="bg-surface-subtle mt-0.5 h-1 w-14 overflow-hidden rounded-full">
-                <span
-                  class="block h-full rounded-full"
-                  :class="row.critical ? 'bg-status-error-text' : 'bg-status-warning-text'"
-                  :style="shareWidth(row.share)"
-                ></span>
-              </span>
+              <DbmShareBar
+                :share="row.share"
+                track-class="mt-0.5 h-1 w-14"
+                :fill-class="row.critical ? 'bg-status-error-text' : 'bg-status-warning-text'"
+              />
             </div>
           </div>
         </template>
@@ -299,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{
                     t("dbm.deadlocks.detail.nthOf", {
-                      index: eventIndex(row) + 1,
+                      index: row.selectedEventIndex + 1,
                       total: row.count,
                     })
                   }}
@@ -309,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-muted"
                   size="sm"
                   icon-left="chevron-left"
-                  :disabled="eventIndex(row) >= row.count - 1"
+                  :disabled="row.selectedEventIndex >= row.count - 1"
                   data-test="dbm-deadlocks-earlier"
                   @click="stepEvent(row, 1)"
                 >
@@ -319,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-muted"
                   size="sm"
                   icon-left="chevron-right"
-                  :disabled="eventIndex(row) <= 0"
+                  :disabled="row.selectedEventIndex <= 0"
                   data-test="dbm-deadlocks-later"
                   @click="stepEvent(row, -1)"
                 >
@@ -415,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
-  </OPageLayout>
+  </DbmPageChrome>
 </template>
 
 <script setup lang="ts">
@@ -424,21 +381,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmDeadlocksPage" });
 
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import DbmDeadlockCycle from "@/components/dbm/DbmDeadlockCycle.vue";
+import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
+import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
+import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
+import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
+import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
+import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmLockEmptyState, {
   type DbmLockCheck,
   type DbmLockEmptyAction,
 } from "@/components/dbm/DbmLockEmptyState.vue";
-import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
-import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
-import DateTime from "@/components/DateTime.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -446,23 +406,15 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
   type DeadlockEvent,
   type DeadlockParticipant,
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
-import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
 import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
-import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
-import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
-import {
-  contextRegistry,
-  createDbmContextProvider,
-  DBM_CONTEXT_KEY,
-} from "@/composables/contextProviders";
+import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { createDbmContextProvider } from "@/composables/contextProviders";
 import { copyToClipboard } from "@/utils/clipboard";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { buildDbmLockPrefill } from "@/utils/alerts/prefill/fromDbmLocks";
@@ -476,7 +428,16 @@ import {
   DEADLOCK_DOMINANT_SHARE,
   type DeadlockPair,
 } from "@/utils/dbm/deadlocks";
-import { claimedCount, countClaim, discriminatingPart, formatPercent } from "@/utils/dbm/format";
+import {
+  countClaim,
+  discriminatingPart,
+  formatAge,
+  formatClock,
+  formatPercent,
+  formatWhenWithAge,
+} from "@/utils/dbm/format";
+import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
+import { DBM_STATUS_TONES } from "@/utils/dbm/tones";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -489,25 +450,29 @@ const emit = defineEmits<{
   (e: "sendToAiChat", value: { query: string; autoSend: boolean }): void;
 }>();
 
-const { range, rangeMinutes, current, refresh, setRange, setPeriod, queryParams } = useDbmScope(
-  route.query,
-);
+// The shared list-page spine: scope from the URL, the request-sequence guard,
+// the shell's badge snapshot, refresh/date-change handlers, the load envelope
+// and the AI-context registry lifecycle. See useDbmListPage.
+const {
+  scope: { range, rangeMinutes, current, setPeriod, queryParams },
+  requestSeq,
+  tabCountsContext,
+  loading,
+  error,
+  search,
+  org,
+  dbmEnabled,
+  queryCount,
+  databaseCount,
+  run,
+  onRefresh,
+  onDateChange,
+} = useDbmListPage({ load: () => load(), context: () => dbmContext });
 
-// Search, the picker and refresh can all be in flight at once; this keeps the
-// last request the reader made the one that paints.
-const requestSeq = useDbmRequestSeq();
-
-// The sibling-tab badges are the same numbers on every tab, so DbmShell
-// fetches them ONCE per window for every route and this page reads the
-// snapshot. See useDbmTabCounts.
-const tabCountsContext = useDbmTabCountsContext();
-
-const events = ref<DeadlockEvent[]>([]);
+const events = shallowRef<DeadlockEvent[]>([]);
 const eventCount = ref(0);
 /** The server capped the read, so `eventCount` is a floor rather than a total. */
 const truncated = ref(false);
-const loading = ref(false);
-const error = ref<string | null>(null);
 /** The database's log never arrives — distinct from "no deadlocks happened". */
 const notCollecting = ref(false);
 const mysqlPrintAll = ref<boolean | null>(null);
@@ -530,16 +495,9 @@ const tabCounts = computed(() =>
   tabCountProps(withOwnCount(tabCountsContext.counts.value, "deadlockCount", eventCount.value)),
 );
 
-/** Read by the empty states to say what else in DBM is answering. */
-const queryCount = computed(() => claimedCount(tabCountsContext.counts.value.queryCount));
-const databaseCount = computed(() => tabCountsContext.counts.value.databaseCount);
-
-const search = ref("");
 const grouping = ref<string>("pairs");
 /** Which event of a pair the expansion is showing, by pair key. */
 const selectedEventByPair = ref<Record<string, string>>({});
-
-const org = computed(() => store.state.selectedOrganization?.identifier as string);
 
 interface DeadlockRow {
   rowKey: string;
@@ -557,6 +515,7 @@ interface DeadlockRow {
   oppositeRowOrder: boolean;
   chips: { id: string; label: I18nText; tone: string }[];
   selectedEvent: DeadlockEvent | null;
+  selectedEventIndex: number;
   lanes: { pid: string; points: { id: string; offset: number }[] }[];
   victimSummary: I18nText;
   events: DeadlockEvent[];
@@ -579,7 +538,7 @@ const chipFor = (pair: DeadlockPair) => {
     chips.push({
       id: "opposite",
       label: t("dbm.deadlocks.chips.oppositeOrder"),
-      tone: "bg-status-error-bg text-status-error-text",
+      tone: DBM_STATUS_TONES.error,
     });
   }
   const cadence = deadlockCadenceSeconds(pair);
@@ -587,14 +546,14 @@ const chipFor = (pair: DeadlockPair) => {
     chips.push({
       id: "cadence",
       label: t("dbm.deadlocks.chips.cadence", { seconds: cadence }),
-      tone: "bg-surface-subtle text-text-secondary",
+      tone: DBM_STATUS_TONES.neutral,
     });
   }
   if (!pair.queries[0]) {
     chips.push({
       id: "no-queries",
       label: t("dbm.deadlocks.chips.noQueries"),
-      tone: "bg-status-warning-bg text-status-warning-text",
+      tone: DBM_STATUS_TONES.warning,
     });
   }
   // A pair built from one-sided events shows one statement where the reader
@@ -603,7 +562,7 @@ const chipFor = (pair: DeadlockPair) => {
     chips.push({
       id: "partial",
       label: t("dbm.deadlocks.chips.partial"),
-      tone: "bg-status-warning-bg text-status-warning-text",
+      tone: DBM_STATUS_TONES.warning,
     });
   }
   return chips;
@@ -642,31 +601,38 @@ const selectedEventFor = (pair: DeadlockPair): DeadlockEvent | null => {
 };
 
 const pairRows = computed<DeadlockRow[]>(() =>
-  rows.value.map((pair) => ({
-    rowKey: pair.pairKey,
-    pairKey: pair.pairKey,
-    // The two statements are near-identical apart from the row they name, so
-    // the FULL text truncates before reaching the difference — which is the
-    // whole finding. `discriminatingPart` anchors each side on its WHERE
-    // clause, putting `id = 2 ⇄ id = 1` inside the visible width.
-    queries: pair.queries.filter(Boolean).map(discriminatingPart),
-    pairTitle: pair.queries.filter(Boolean).join(" ⇄ "),
-    db_system: pair.db_system,
-    db_instance: pair.db_instance,
-    applications: pair.applications,
-    objects: pair.objects,
-    lastSeen: pair.lastSeen,
-    count: pair.count,
-    share: pair.share,
-    // The dominant pair earns the red rail; a minority one does not.
-    critical: pair.share >= DEADLOCK_DOMINANT_SHARE,
-    oppositeRowOrder: hasOppositeRowOrder(pair),
-    chips: chipFor(pair),
-    selectedEvent: selectedEventFor(pair),
-    lanes: lanesFor(pair),
-    victimSummary: victimSummaryFor(pair),
-    events: pair.events,
-  })),
+  rows.value.map((pair) => {
+    const selectedEvent = selectedEventFor(pair);
+    return {
+      rowKey: pair.pairKey,
+      pairKey: pair.pairKey,
+      // The two statements are near-identical apart from the row they name, so
+      // the FULL text truncates before reaching the difference — which is the
+      // whole finding. `discriminatingPart` anchors each side on its WHERE
+      // clause, putting `id = 2 ⇄ id = 1` inside the visible width.
+      queries: pair.queries.filter(Boolean).map(discriminatingPart),
+      pairTitle: pair.queries.filter(Boolean).join(" ⇄ "),
+      db_system: pair.db_system,
+      db_instance: pair.db_instance,
+      applications: pair.applications,
+      objects: pair.objects,
+      lastSeen: pair.lastSeen,
+      count: pair.count,
+      share: pair.share,
+      // The dominant pair earns the red rail; a minority one does not.
+      critical: pair.share >= DEADLOCK_DOMINANT_SHARE,
+      oppositeRowOrder: hasOppositeRowOrder(pair),
+      chips: chipFor(pair),
+      selectedEvent,
+      selectedEventIndex: Math.max(
+        0,
+        pair.events.findIndex((e) => e.id === selectedEvent?.id),
+      ),
+      lanes: lanesFor(pair),
+      victimSummary: victimSummaryFor(pair),
+      events: pair.events,
+    };
+  }),
 );
 
 /** One row per deadlock, newest first — for when a timestamp is the question. */
@@ -693,6 +659,7 @@ const eventRows = computed<DeadlockRow[]>(() =>
         oppositeRowOrder: false,
         chips: [],
         selectedEvent: event,
+        selectedEventIndex: 0,
         lanes: [],
         victimSummary: raw(""),
         events: [event],
@@ -875,7 +842,7 @@ const healthyChecks = computed<DbmLockCheck[]>(() => {
           status: "note",
           title: t("dbm.deadlocks.healthy.checks.lastEver.title"),
           detail: t("dbm.deadlocks.healthy.checks.lastEver.detail", {
-            when: formatWhen(lastSeenBefore.value),
+            when: formatWhenWithAge(lastSeenBefore.value),
           }),
         }
       : {
@@ -894,88 +861,42 @@ const healthyActions = computed<DbmLockEmptyAction[]>(() => [
   { id: "widen", label: t("dbm.deadlocks.healthy.widen") },
 ]);
 
-/** Names the missing prerequisite: the database's own log. */
-const notCollectingChecks = computed<DbmLockCheck[]>(() => {
-  const hasQueries = (queryCount.value ?? 0) > 0;
-  return [
+// The shared queries/enabled diagnostics in this page's namespace, plus the
+// missing prerequisite this page names: the database's own log.
+const notCollectingChecks = computed<DbmLockCheck[]>(() =>
+  buildDbmNotCollectingChecks(
+    "deadlocks",
     {
-      id: "queries",
-      status: hasQueries ? "ok" : "fail",
-      title: hasQueries
-        ? t("dbm.deadlocks.notCollecting.checks.queries.ok")
-        : t("dbm.deadlocks.notCollecting.checks.queries.no"),
-      detail: hasQueries
-        ? t("dbm.deadlocks.notCollecting.checks.queries.okDetail", {
-            queries: t("dbm.queries.queryCount", queryCount.value ?? 0),
-            databases: t("dbm.databases.databaseCount", databaseCount.value ?? 0),
-          })
-        : t("dbm.deadlocks.notCollecting.checks.queries.noDetail"),
+      queryCount: queryCount.value,
+      databaseCount: databaseCount.value,
+      dbmEnabled: dbmEnabled.value,
     },
-    {
-      id: "enabled",
-      status: dbmEnabled.value ? "ok" : "fail",
-      title: dbmEnabled.value
-        ? t("dbm.deadlocks.notCollecting.checks.enabled.ok")
-        : t("dbm.deadlocks.notCollecting.checks.enabled.no"),
-      detail: dbmEnabled.value
-        ? t("dbm.deadlocks.notCollecting.checks.enabled.okDetail")
-        : t("dbm.deadlocks.notCollecting.checks.enabled.noDetail"),
-    },
-    {
-      id: "log",
-      status: "fail",
-      title: t("dbm.deadlocks.notCollecting.checks.log.no"),
-      detail: t("dbm.deadlocks.notCollecting.checks.log.noDetail"),
-    },
-    {
-      // The trap the capture proof found: a config matching only the first log
-      // line records the count and loses every participant query.
-      id: "settings",
-      status: "note",
-      title: t("dbm.deadlocks.notCollecting.checks.settings.title"),
-      detail: t("dbm.deadlocks.notCollecting.checks.settings.detail"),
-    },
-  ];
-});
-
-const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
+    t,
+    [
+      {
+        id: "log",
+        status: "fail",
+        title: t("dbm.deadlocks.notCollecting.checks.log.no"),
+        detail: t("dbm.deadlocks.notCollecting.checks.log.noDetail"),
+      },
+      {
+        // The trap the capture proof found: a config matching only the first
+        // log line records the count and loses every participant query.
+        id: "settings",
+        status: "note",
+        title: t("dbm.deadlocks.notCollecting.checks.settings.title"),
+        detail: t("dbm.deadlocks.notCollecting.checks.settings.detail"),
+      },
+    ],
+  ),
+);
 
 // ── formatting ──────────────────────────────────────────────────────────────
-
-const formatClock = (micros: number): string =>
-  new Date(micros / 1000).toLocaleTimeString(undefined, { hour12: false });
 
 const formatClockMs = (micros: number): string => {
   const ms = String(Math.floor((micros / 1000) % 1000)).padStart(3, "0");
   return `${formatClock(micros)}.${ms}`;
 };
-
-/** Relative age, so "20s ago" reads without arithmetic. */
-const formatAge = (micros: number): string => {
-  const seconds = Math.max(0, Math.round((Date.now() - micros / 1000) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-};
-
-/**
- * A timestamp from another day needs its DATE. A bare clock time on a
- * three-day-old event reads as "today at 20:43", which is the one thing the
- * healthy state's "last time this wasn't empty" line must not say.
- */
-const formatWhen = (micros: number): string => {
-  const at = new Date(micros / 1000);
-  const sameDay = at.toDateString() === new Date().toDateString();
-  return sameDay
-    ? `${formatClock(micros)} (${formatAge(micros)})`
-    : `${at.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${formatClock(micros)} (${formatAge(micros)})`;
-};
-
-/** A share bar's width is a percentage of its track, not a fixed length. */
-const shareWidth = (share: number) => ({ width: `${Math.round(share * 100)}%` });
 
 /** A dot's position along its lane, as a percentage of the pair's time span. */
 const leftPercent = (offset: number) => ({ left: `${Math.round(offset * 100)}%` });
@@ -987,19 +908,13 @@ const rowClass = (row: DeadlockRow) => (row.critical ? CRITICAL_RAIL : "");
 
 // ── behaviour ───────────────────────────────────────────────────────────────
 
-const eventIndex = (row: DeadlockRow) =>
-  Math.max(
-    0,
-    row.events.findIndex((e) => e.id === row.selectedEvent?.id),
-  );
-
 const selectEvent = (row: DeadlockRow, eventId: string) => {
   selectedEventByPair.value = { ...selectedEventByPair.value, [row.pairKey]: eventId };
 };
 
 /** `+1` walks back in time, because the list is newest-first. */
 const stepEvent = (row: DeadlockRow, direction: number) => {
-  const next = row.events[eventIndex(row) + direction];
+  const next = row.events[row.selectedEventIndex + direction];
   if (next) selectEvent(row, next.id);
 };
 
@@ -1114,23 +1029,6 @@ const copyStormSummary = () => {
   copyToClipboard([header, "", ...rows.flatMap((r) => [...summaryLines(r), ""])].join("\n"), t);
 };
 
-// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
-// badge cache alongside the page's own load — the URL does not change on a
-// refresh, so the shell cannot see one on its own.
-const onRefresh = () => {
-  void load();
-  tabCountsContext.refresh({ force: true });
-};
-
-const onDateChange = (value: DbmDateChange) => {
-  setRange(value);
-  router.replace({ query: { ...route.query, ...queryParams.value } }).catch(() => {});
-  // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
-  // mount replay would otherwise double every request. See
-  // `DbmDateChange.userChangedValue`.
-  if (value?.userChangedValue !== false) load();
-};
-
 const onEmptyAction = (id: string) => {
   if (id === "widen") {
     setPeriod("1d");
@@ -1139,58 +1037,42 @@ const onEmptyAction = (id: string) => {
   }
 };
 
-const load = async () => {
-  if (!org.value) return;
-  const token = requestSeq.begin();
-  loading.value = true;
-  error.value = null;
-  refresh();
+const load = () =>
+  run(
+    async (token) => {
+      const { data } = await dbMonitoringService.getDeadlocks(org.value, {
+        startTime: current.value.startTime,
+        endTime: current.value.endTime,
+        search: search.value || undefined,
+      });
 
-  try {
-    const { data } = await dbMonitoringService.getDeadlocks(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-      search: search.value || undefined,
-    });
+      // A newer search or window already owns the page.
+      if (requestSeq.isStale(token)) return;
 
-    // A newer search or window already owns the page.
-    if (requestSeq.isStale(token)) return;
-
-    // The wire rows carry participants as a JSON string, and MySQL splits one
-    // deadlock across several entries — both are resolved here.
-    events.value = parseDeadlockEvents(data.hits ?? []);
-    // Prefer the server's uncapped total: the badge must say how much is
-    // happening, not how much fitted in the row limit.
-    eventCount.value = data.total ?? events.value.length;
-    truncated.value = Boolean(data.truncated);
-    notCollecting.value = Boolean(data.not_collecting);
-    mysqlPrintAll.value = data.innodb_print_all_deadlocks ?? null;
-    logLinesSeen.value = data.log_lines_seen ?? null;
-    lastSeenBefore.value = data.last_seen_before ?? null;
-    readUpTo.value = data.freshness?.data_through ?? null;
-  } catch (err: unknown) {
-    if (requestSeq.isStale(token)) return;
-    // Whatever went wrong, the previous window's rows are no longer an answer
-    // to the question on screen — leaving them would put stale pairs and stale
-    // summary counts under an error banner.
-    events.value = [];
-    eventCount.value = 0;
-    truncated.value = false;
-    // The endpoint does not exist yet on this build, or the receiver has never
-    // written the stream: that is "not collecting", not an error the user can
-    // act on. Anything else is a real failure and says so.
-    const status = (err as { response?: { status?: number } })?.response?.status;
-    if (status === 404 || status === 501) {
-      notCollecting.value = true;
-    } else {
-      error.value =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        String(err);
-    }
-  } finally {
-    if (!requestSeq.isStale(token)) loading.value = false;
-  }
-};
+      // The wire rows carry participants as a JSON string, and MySQL splits one
+      // deadlock across several entries — both are resolved here.
+      events.value = parseDeadlockEvents(data.hits ?? []);
+      // Prefer the server's uncapped total: the badge must say how much is
+      // happening, not how much fitted in the row limit.
+      eventCount.value = data.total ?? events.value.length;
+      truncated.value = Boolean(data.truncated);
+      notCollecting.value = Boolean(data.not_collecting);
+      mysqlPrintAll.value = data.innodb_print_all_deadlocks ?? null;
+      logLinesSeen.value = data.log_lines_seen ?? null;
+      lastSeenBefore.value = data.last_seen_before ?? null;
+      readUpTo.value = data.freshness?.data_through ?? null;
+    },
+    {
+      reset: () => {
+        events.value = [];
+        eventCount.value = 0;
+        truncated.value = false;
+      },
+      onNotCollecting: () => {
+        notCollecting.value = true;
+      },
+    },
+  );
 
 // ─── AI ──────────────────────────────────────────────────────────────────────
 
@@ -1226,6 +1108,7 @@ const cadenceFor = (row: DeadlockRow): number | null => {
   return pair ? deadlockCadenceSeconds(pair) : null;
 };
 
+// Registered/unregistered by useDbmListPage around this page's lifecycle.
 const dbmContext = createDbmContextProvider(() => {
   const focused = tableRows.value.find(
     (row) => row.selectedEvent?.id === selectedEventByPair.value[row.pairKey],
@@ -1246,32 +1129,4 @@ const dbmContext = createDbmContextProvider(() => {
     },
   };
 }, store);
-
-onMounted(() => {
-  contextRegistry.register(DBM_CONTEXT_KEY, dbmContext);
-  contextRegistry.setActive(DBM_CONTEXT_KEY);
-  // Only this page's OWN read. The badges are DbmShell's, fetched once for
-  // every tab — a call here would put the fan-out back on every mount.
-  load();
-});
-
-// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
-// session on this tab. The URL is how the tabs agree on a window, so re-read it
-// on return and reload ONLY if it actually moved.
-useDbmScopeSync({
-  route,
-  current: () => range.value,
-  adopt: (next) =>
-    setRange({
-      startTime: next.startTime,
-      endTime: next.endTime,
-      relativeTimePeriod: next.relativeTimePeriod,
-    }),
-  reload: () => load(),
-});
-
-onBeforeUnmount(() => {
-  contextRegistry.unregister(DBM_CONTEXT_KEY);
-  contextRegistry.setActive("");
-});
 </script>

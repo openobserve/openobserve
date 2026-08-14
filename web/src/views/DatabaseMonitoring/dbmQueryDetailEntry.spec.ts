@@ -46,10 +46,16 @@ const list = read("QueriesPage.vue");
 const shell = read("DbmShell.vue");
 
 describe("the queries list hands the clicked row to the detail page", () => {
+  /**
+   * The seed hand-off and the push live in `useDbmQueryDetailHop` now — four
+   * lists make this hop and all four had it copied out. What the LIST must show
+   * is that its clicked row is what gets seeded.
+   */
   it("sets the seed on the row-click navigation", () => {
     const handler = list.split("const openQueryDetail")[1]?.split("\n};")[0] ?? "";
     expect(handler, "openQueryDetail must exist").not.toBe("");
-    expect(handler).toContain("setDbmQueryDetailSeed(");
+    expect(handler).toContain("openDbmQueryDetail({");
+    expect(handler).toContain("seed: row,");
   });
 
   /**
@@ -58,7 +64,8 @@ describe("the queries list hands the clicked row to the detail page", () => {
    * validating a stale row against a window nobody fetched it for.
    */
   it("hands off a copied range, never the live scope object", () => {
-    expect(list).toContain("range: { ...range.value }");
+    const hop = readFileSync(join(here, "../../composables/dbm/useDbmQueryDetailHop.ts"), "utf8");
+    expect(hop).toContain("range: { ...context.range.value }");
   });
 });
 
@@ -206,12 +213,19 @@ describe("the database-reported fallback list on Top queries", () => {
   /**
    * The server list answers ONLY the page whose client vantage is empty. A
    * populated client table must clear it — server counts under a live client
-   * ranking would read as traced traffic that never existed — and the fetch
-   * fires only on the empty branch, so a page with rows never pays for it.
+   * ranking would read as traced traffic that never existed.
+   *
+   * The rows now ride the page's own response (`include_server_fallback`)
+   * rather than a second request fired on the empty branch, so "a page with
+   * rows never pays for it" is enforced SERVER-side: the fallback body only
+   * runs when the client answer is an exact zero. What the page still owns is
+   * the rendering rule, and that is what this pins.
    */
-  it("fetches the server list only when the client read came back empty", () => {
+  it("shows the server list only when the client read came back empty", () => {
     expect(list).toMatch(/if \(hits\.length\) \{\s*\n\s*serverRows\.value = \[\];/);
-    expect(list).toMatch(/await loadServerQueries\(token\);/);
+    expect(list).toMatch(/serverRows\.value = \(fallback\?\.hits \?\? \[\]\)/);
+    // Asked for on the page's own read, so there is no second round trip.
+    expect(list).toContain("includeServerFallback: true");
   });
 
   /**
@@ -221,7 +235,7 @@ describe("the database-reported fallback list on Top queries", () => {
    */
   it("navigates server rows to the detail page without inventing a stream", () => {
     const handler = list.split("const openServerQueryDetail")[1]?.split("\n};")[0] ?? "";
-    expect(handler).toContain('name: "dbmQueryDetail"');
+    expect(handler).toContain("openDbmQueryDetail({");
     expect(handler).toContain('from: "queries"');
     expect(handler).not.toContain("stream:");
   });
@@ -236,7 +250,7 @@ describe("the database-reported fallback list on Top queries", () => {
     ["SamplesPage.vue server rows", "openServerSampleDetail", read("SamplesPage.vue")],
   ])("%s seed the statement into the detail page", (_name, handlerName, source) => {
     const handler = source.split(`const ${handlerName}`)[1]?.split("\n};")[0] ?? "";
-    expect(handler).toContain("setDbmQueryDetailSeed(");
+    expect(handler).toContain("seed: row.query");
     expect(handler).toContain("query_norm: row.query");
   });
 
@@ -245,9 +259,14 @@ describe("the database-reported fallback list on Top queries", () => {
    * alone: a seed painting the header is not client data, and on a
    * server-vantage-only entry the line's "nothing to measure" would sit
    * directly under a section full of measurements.
+   *
+   * Rule A adds an outer gate — the line describes the coverage of a TRACE
+   * read, so it goes with the rest of the trace vantage — but the fetched-row
+   * distinction inside it is unchanged and still load-bearing for the
+   * partially-instrumented case.
    */
   it("gates the coverage line on the fetched client row, not the seed", () => {
-    expect(detail).toMatch(/v-if="clientRowFound \|\| !serverAnswering"/);
+    expect(detail).toMatch(/v-if="traceVantage && \(clientRowFound \|\| !serverAnswering\)"/);
     expect(detail).toMatch(/clientRowFound\.value = fetched !== null;/);
   });
 
@@ -272,12 +291,16 @@ describe("the database-reported fallback list on Slowest calls", () => {
    * Same contract as the Top-queries fallback: the server list answers ONLY
    * the page whose client vantage is empty. A populated client table must
    * clear it — in-engine durations under a live client list would read as
-   * traced calls that never existed — and the fetch fires only on the empty
-   * branch, so a page with rows never pays for it.
+   * traced calls that never existed.
+   *
+   * And, as there, the rows ride the page's own response rather than a second
+   * request: the server runs the conditional, so a page with rows never pays
+   * for the fallback body at all.
    */
-  it("fetches the server list only when the client read came back empty", () => {
+  it("shows the server list only when the client read came back empty", () => {
     expect(samples).toMatch(/if \(hits\.length\) \{\s*\n\s*serverRows\.value = \[\];/);
-    expect(samples).toMatch(/await loadServerSamples\(token\);/);
+    expect(samples).toMatch(/serverRows\.value = \(fallback\?\.hits \?\? \[\]\)/);
+    expect(samples).toContain("includeServerFallback: true");
   });
 
   /**
@@ -289,7 +312,7 @@ describe("the database-reported fallback list on Slowest calls", () => {
   it("navigates server rows to the detail page without inventing a stream", () => {
     const handler = samples.split("const openServerSampleDetail")[1]?.split("\n};")[0] ?? "";
     expect(handler, "openServerSampleDetail must exist").not.toBe("");
-    expect(handler).toContain('name: "dbmQueryDetail"');
+    expect(handler).toContain("openDbmQueryDetail({");
     expect(handler).toContain('from: "samples"');
     expect(handler).not.toContain("stream:");
   });

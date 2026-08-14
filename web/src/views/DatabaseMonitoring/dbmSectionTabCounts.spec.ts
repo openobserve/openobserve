@@ -466,21 +466,43 @@ describe("no page re-fetches the badges the shell already owns", () => {
     ).toEqual([]);
   });
 
-  /** And every page must actually render the strip it is handed counts for. */
+  /**
+   * And every page must actually render the strip it is handed counts for. The
+   * strip's markup moved into `DbmPageChrome` — one header for all seven tabs —
+   * so what a PAGE must show is that it hands its counts to that header. The
+   * chrome's own spec pins that the strip is what receives them.
+   */
   it.each(Object.keys(OWN_READ))("%s renders the shared tab strip", (page) => {
-    expect(read(page)).toMatch(/<DbmSectionTabs\s+v-bind="tabCounts"\s*\/>/);
+    const source = read(page);
+    expect(source).toContain('import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue"');
+    expect(source).toMatch(/:tab-counts="tabCounts"/);
   });
 
   /**
    * The refresh button must still reach the badges. The shell watches the URL,
    * which does NOT change on a refresh, so a page that only reloaded its own
    * table would leave the badges stating the pre-refresh numbers.
+   *
+   * The force lives ONCE now — in `useDbmListPage.onRefresh` — so what each
+   * page must show is that its refresh button is wired to THAT handler, and
+   * the composable must show the force itself.
+   *
+   * The button itself is now the shared `DbmRefreshButton`, which emits
+   * `refresh`; a page that still hand-rolls the OButton binds `@click`. Either
+   * spelling satisfies the requirement — that the handler is reached.
    */
-  it.each(Object.keys(OWN_READ))("%s forces the shared counts on refresh", (page) => {
+  it.each(Object.keys(OWN_READ))("%s wires its refresh button to the shared handler", (page) => {
+    const source = read(page);
+    expect(source).toContain('from "@/composables/dbm/useDbmListPage"');
     expect(
-      read(page),
-      `${page} never forces the shared badges, so its refresh button leaves them stale`,
-    ).toMatch(/tabCountsContext\.refresh\(\{ force: true \}\)/);
+      source,
+      `${page} never binds onRefresh, so its refresh button leaves the badges stale`,
+    ).toMatch(/@(?:click|refresh)="onRefresh"/);
+  });
+
+  it("the shared refresh handler forces the badge cache", () => {
+    const composable = readFileSync(join(here, "../../composables/dbm/useDbmListPage.ts"), "utf8");
+    expect(composable).toMatch(/tabCountsContext\.refresh\(\{ force: true \}\)/);
   });
 
   /**
@@ -489,19 +511,27 @@ describe("no page re-fetches the badges the shell already owns", () => {
    * `load()` narrows the table while the URL — and everything reading it —
    * still describes the unfiltered question; a reload or a shared link then
    * reopens a different table than the one on screen.
+   *
+   * The handler lives ONCE per page now — `createDbmFilterEntry` owns the
+   * `onChange` — so the pins are: the page's one apply callback syncs the URL
+   * BEFORE reloading, every entry goes through the factory, and no entry
+   * carries a hand-written `onChange` that could skip the URL half.
    */
   it.each(["QueriesPage.vue", "SamplesPage.vue", "DatabasesPage.vue"])(
     "%s publishes every dimension-filter change to the URL",
     (page) => {
       const source = read(page);
+      expect(source, `${page}: the apply callback must sync the URL before reloading`).toMatch(
+        /createDbmFilterEntry\(\(\) => \{\s*\n\s*syncUrl\(\);\s*\n\s*load\(\);\s*\n\s*\}\)/,
+      );
       const filters = source.split("const dimensionFilters")[1]?.split("\n]);")[0] ?? "";
       expect(filters, "dimensionFilters must exist").not.toBe("");
-      const handlers = filters.match(/onChange: \(/g) ?? [];
-      expect(handlers.length, "the filter set must carry handlers").toBeGreaterThan(0);
-      const synced = filters.match(/syncUrl\(\);\s*\n\s*load\(\);/g) ?? [];
-      expect(synced.length, `${page}: every onChange must sync the URL before reloading`).toBe(
-        handlers.length,
-      );
+      const entries = filters.match(/filterEntry\(\{/g) ?? [];
+      expect(entries.length, "the filter set must carry entries").toBeGreaterThan(0);
+      expect(
+        filters,
+        `${page}: a hand-written onChange can skip the URL half — go through the factory`,
+      ).not.toMatch(/onChange:/);
     },
   );
 });

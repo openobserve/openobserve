@@ -36,33 +36,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   reasoning. The destructive action is copyable SQL, never an execution.
 -->
 <template>
-  <OPageLayout
+  <DbmPageChrome
     :title="t('dbm.blocked.title')"
     :subtitle="t(isLiveWindow ? 'dbm.blocked.subtitle' : 'dbm.blocked.subtitlePast')"
-    icon="database"
     title-data-test="dbm-blocked-title"
-    tabs-below
-    bleed
+    date-time-data-test="dbm-blocked-date-time"
+    :tab-counts="tabCounts"
+    :range="range"
+    @date-change="onDateChange"
   >
-    <template #header-tabs>
-      <!-- The sibling badges come from the shell's one shared fan-out; this
-           page's own count is its own. -->
-      <DbmSectionTabs v-bind="tabCounts" />
-    </template>
-
-    <template #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        data-test-name="dbm-blocked-date-time"
-        class="h-8"
-        @on:date-change="onDateChange"
-      />
-    </template>
-
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
         :data="tableRows"
@@ -79,18 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-blocked-table"
       >
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <div class="w-64 shrink-0">
-              <OSearchInput
-                v-model="search"
-                :placeholder="t('dbm.blocked.searchPlaceholder')"
-                clearable
-                :debounce="400"
-                data-test="dbm-blocked-search"
-                @update:model-value="load"
-              />
-            </div>
-
+          <DbmTableToolbar
+            v-model:search="search"
+            :placeholder="t('dbm.blocked.searchPlaceholder')"
+            :debounce="400"
+            search-data-test="dbm-blocked-search"
+            @search="load"
+          >
             <!-- Which question the table answers. Defaults to "who's stuck". -->
             <OToggleGroup
               v-model="perspective"
@@ -106,45 +83,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
               </OToggleGroupItem>
             </OToggleGroup>
-          </div>
+          </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+          <DbmRefreshButton
             :loading="loading"
-            class="shrink-0"
             data-test="dbm-blocked-refresh"
-            @click="onRefresh"
-          >
-            <OTooltip side="bottom" :content="t('dbm.common.reload')" />
-          </OButton>
+            @refresh="onRefresh"
+          />
         </template>
 
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="dbm-blocked-summary"
-          >
+          <DbmSubheaderBand data-test="dbm-blocked-summary">
             <OStatStrip :items="summaryStats" :loading="loading" />
-          </div>
+          </DbmSubheaderBand>
 
-          <div
+          <DbmLockCoverageLine
             v-if="samples.length"
-            class="border-border-subtle bg-surface-base text-text-secondary text-2xs px-page-edge flex shrink-0 items-center gap-2 border-b py-1"
+            :summary="coverageLine"
+            dot-class="bg-status-warning-text"
+            :trailing-label="checkedLabel"
             data-test="dbm-blocked-coverage"
-          >
-            <span class="bg-status-warning-text size-1.5 shrink-0 rounded-full"></span>
-            <span>{{ coverageLine }}</span>
-            <template v-if="checkedLabel">
-              <span class="opacity-45">·</span>
-              <span>{{ checkedLabel }}</span>
-            </template>
-          </div>
+          />
 
           <!-- The one blocking cause whose fix is in code: a session sitting in
                an open transaction without running anything. -->
@@ -321,13 +284,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              a column of numbers is not. -->
         <template #cell-waiting="{ row }">
           <div v-if="row.waitSeconds != null" class="flex items-center justify-end gap-1.5">
-            <span class="bg-surface-subtle h-1.5 w-13 shrink-0 overflow-hidden rounded-full">
-              <span
-                class="block h-full rounded-full"
-                :class="waitTone(row.waitShare)"
-                :style="shareWidth(row.waitShare)"
-              ></span>
-            </span>
+            <DbmShareBar
+              :share="row.waitShare"
+              track-class="h-1.5 w-13 shrink-0"
+              :fill-class="waitTone(row.waitShare)"
+            />
             <span class="text-text-heading text-compact font-mono font-semibold tabular-nums">
               {{ formatSeconds(row.waitSeconds) }}
             </span>
@@ -430,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
-  </OPageLayout>
+  </DbmPageChrome>
 </template>
 
 <script setup lang="ts">
@@ -439,43 +400,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmBlockedQueriesPage" });
 
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { computed, ref, shallowRef } from "vue";
 import { useStore } from "vuex";
 
+import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
+import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
-import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
+import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
+import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
-import DateTime from "@/components/DateTime.vue";
+import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
   type BlockingChain,
   type BlockingSample,
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
-import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
 import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
-import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
-import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
-import {
-  contextRegistry,
-  createDbmContextProvider,
-  DBM_CONTEXT_KEY,
-} from "@/composables/contextProviders";
+import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { createDbmContextProvider } from "@/composables/contextProviders";
 import { copyToClipboard } from "@/utils/clipboard";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { buildDbmLockPrefill } from "@/utils/alerts/prefill/fromDbmLocks";
@@ -494,12 +449,12 @@ import {
   waitEventKey,
   WAIT_TONE_RULES,
 } from "@/utils/dbm/blocking";
-import { claimedCount, countClaim } from "@/utils/dbm/format";
+import { countClaim, formatAge, formatClock } from "@/utils/dbm/format";
+import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
+import { DBM_STATUS_TONES } from "@/utils/dbm/tones";
 
 const { t } = useI18nTyped();
 const store = useStore();
-const route = useRoute();
-const router = useRouter();
 
 // This page is a route root, so MainLayout's `@sendToAiChat` binding is on it
 // directly — no re-emit chain needed.
@@ -507,16 +462,24 @@ const emit = defineEmits<{
   (e: "sendToAiChat", value: { query: string; autoSend: boolean }): void;
 }>();
 
-const { range, current, refresh, setRange, queryParams } = useDbmScope(route.query);
-
-// Search, the picker and refresh can all be in flight at once; this keeps the
-// last request the reader made the one that paints.
-const requestSeq = useDbmRequestSeq();
-
-// The sibling-tab badges are the same numbers on every tab, so DbmShell
-// fetches them ONCE per window for every route and this page reads the
-// snapshot. See useDbmTabCounts.
-const tabCountsContext = useDbmTabCountsContext();
+// The shared list-page spine: scope from the URL, the request-sequence guard,
+// the shell's badge snapshot, refresh/date-change handlers, the load envelope
+// and the AI-context registry lifecycle. See useDbmListPage.
+const {
+  scope: { range, current },
+  requestSeq,
+  tabCountsContext,
+  loading,
+  error,
+  search,
+  org,
+  dbmEnabled,
+  queryCount,
+  databaseCount,
+  run,
+  onRefresh,
+  onDateChange,
+} = useDbmListPage({ load: () => load(), context: () => dbmContext });
 
 /**
  * Whether this page is describing NOW or a stretch of the past.
@@ -532,13 +495,11 @@ const tabCountsContext = useDbmTabCountsContext();
  */
 const isLiveWindow = computed(() => range.value.type === "relative");
 
-const samples = ref<BlockingSample[]>([]);
-const serverChains = ref<BlockingChain[] | null>(null);
+const samples = shallowRef<BlockingSample[]>([]);
+const serverChains = shallowRef<BlockingChain[] | null>(null);
 const waitingCount = ref(0);
 /** The server capped the read, so the waits below are a subset of what is stuck. */
 const truncated = ref(false);
-const loading = ref(false);
-const error = ref<string | null>(null);
 const notCollecting = ref(false);
 const sampledAt = ref<number | null>(null);
 const sampleInterval = ref<number | null>(null);
@@ -555,16 +516,8 @@ const tabCounts = computed(() =>
   tabCountProps(withOwnCount(tabCountsContext.counts.value, "blockedCount", waitingCount.value)),
 );
 
-/** Read by the empty states to say what else in DBM is answering. */
-const queryCount = computed(() => claimedCount(tabCountsContext.counts.value.queryCount));
-const databaseCount = computed(() => tabCountsContext.counts.value.databaseCount);
-
-const search = ref("");
 /** "My query is hanging" is how the incident arrives, so this is the default. */
 const perspective = ref<string>(DEFAULT_BLOCKING_PERSPECTIVE);
-
-const org = computed(() => store.state.selectedOrganization?.identifier as string);
-const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
 
 interface BlockedRow {
   rowKey: string;
@@ -653,9 +606,9 @@ const waitingRows = computed<BlockedRow[]>(() => {
 });
 
 const PILL_TONES: Record<BlockedRow["kind"], string> = {
-  root: "bg-status-error-bg text-status-error-text",
-  "waiting-blocking": "bg-status-warning-bg text-status-warning-text",
-  waiting: "bg-surface-subtle text-text-secondary",
+  root: DBM_STATUS_TONES.error,
+  "waiting-blocking": DBM_STATUS_TONES.warning,
+  waiting: DBM_STATUS_TONES.neutral,
 };
 
 /** Root first, waiters indented beneath — the chain as rows, never a drawer. */
@@ -946,63 +899,39 @@ const healthyChecks = computed<DbmLockCheck[]>(() => [
   },
 ]);
 
-const notCollectingChecks = computed<DbmLockCheck[]>(() => {
-  const hasQueries = (queryCount.value ?? 0) > 0;
-  return [
+// The shared queries/enabled diagnostics in this page's namespace, plus its
+// own missing prerequisite (the lock sampler) and the settings note.
+const notCollectingChecks = computed<DbmLockCheck[]>(() =>
+  buildDbmNotCollectingChecks(
+    "blocked",
     {
-      id: "queries",
-      status: hasQueries ? "ok" : "fail",
-      title: hasQueries
-        ? t("dbm.blocked.notCollecting.checks.queries.ok")
-        : t("dbm.blocked.notCollecting.checks.queries.no"),
-      detail: hasQueries
-        ? t("dbm.blocked.notCollecting.checks.queries.okDetail", {
-            queries: t("dbm.queries.queryCount", queryCount.value ?? 0),
-            databases: t("dbm.databases.databaseCount", databaseCount.value ?? 0),
-          })
-        : t("dbm.blocked.notCollecting.checks.queries.noDetail"),
+      queryCount: queryCount.value,
+      databaseCount: databaseCount.value,
+      dbmEnabled: dbmEnabled.value,
     },
-    {
-      id: "enabled",
-      status: dbmEnabled.value ? "ok" : "fail",
-      title: dbmEnabled.value
-        ? t("dbm.blocked.notCollecting.checks.enabled.ok")
-        : t("dbm.blocked.notCollecting.checks.enabled.no"),
-      detail: dbmEnabled.value
-        ? t("dbm.blocked.notCollecting.checks.enabled.okDetail")
-        : t("dbm.blocked.notCollecting.checks.enabled.noDetail"),
-    },
-    {
-      id: "sampling",
-      status: "fail",
-      title: t("dbm.blocked.notCollecting.checks.sampling.no"),
-      detail: t("dbm.blocked.notCollecting.checks.sampling.noDetail"),
-    },
-    {
-      id: "settings",
-      status: "note",
-      title: t("dbm.blocked.notCollecting.checks.settings.title"),
-      detail: t("dbm.blocked.notCollecting.checks.settings.detail"),
-    },
-  ];
-});
+    t,
+    [
+      {
+        id: "sampling",
+        status: "fail",
+        title: t("dbm.blocked.notCollecting.checks.sampling.no"),
+        detail: t("dbm.blocked.notCollecting.checks.sampling.noDetail"),
+      },
+      {
+        id: "settings",
+        status: "note",
+        title: t("dbm.blocked.notCollecting.checks.settings.title"),
+        detail: t("dbm.blocked.notCollecting.checks.settings.detail"),
+      },
+    ],
+  ),
+);
 
 // ── formatting ──────────────────────────────────────────────────────────────
-
-const formatClock = (micros: number): string =>
-  new Date(micros / 1000).toLocaleTimeString(undefined, { hour12: false });
-
-const formatAge = (micros: number): string => {
-  const seconds = Math.max(0, Math.round((Date.now() - micros / 1000) / 1000));
-  return seconds < 60 ? `${seconds}s ago` : `${Math.round(seconds / 60)}m ago`;
-};
 
 /** Sub-minute waits read in seconds with one decimal — 4.8s, not 5s. */
 const formatSeconds = (seconds: number): string =>
   seconds >= 60 ? `${Math.round(seconds / 60)}m` : `${seconds.toFixed(1)}s`;
-
-/** A wait bar's width is a percentage of its track, not a fixed length. */
-const shareWidth = (share: number) => ({ width: `${Math.round(share * 100)}%` });
 
 const waitTone = (share: number) =>
   share >= WAIT_TONE_RULES.critical
@@ -1049,70 +978,38 @@ const onRowAction = (id: string, row: BlockedRow) => {
   }
 };
 
-// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
-// badge cache alongside the page's own load — the URL does not change on a
-// refresh, so the shell cannot see one on its own.
-const onRefresh = () => {
-  void load();
-  tabCountsContext.refresh({ force: true });
-};
+const load = () =>
+  run(
+    async (token) => {
+      const { data } = await dbMonitoringService.getBlocking(org.value, {
+        startTime: current.value.startTime,
+        endTime: current.value.endTime,
+        search: search.value || undefined,
+      });
 
-const onDateChange = (value: DbmDateChange) => {
-  setRange(value);
-  router.replace({ query: { ...route.query, ...queryParams.value } }).catch(() => {});
-  // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
-  // mount replay would otherwise double every request. See
-  // `DbmDateChange.userChangedValue`.
-  if (value?.userChangedValue !== false) load();
-};
+      // A newer search or window already owns the page.
+      if (requestSeq.isStale(token)) return;
 
-const load = async () => {
-  if (!org.value) return;
-  const token = requestSeq.begin();
-  loading.value = true;
-  error.value = null;
-  refresh();
-
-  try {
-    const { data } = await dbMonitoringService.getBlocking(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-      search: search.value || undefined,
-    });
-
-    // A newer search or window already owns the page.
-    if (requestSeq.isStale(token)) return;
-
-    samples.value = parseBlockingSamples(data.hits ?? []);
-    serverChains.value = data.chains ?? null;
-    waitingCount.value = data.total ?? samples.value.length;
-    truncated.value = Boolean(data.truncated);
-    notCollecting.value = Boolean(data.not_collecting);
-    sampledAt.value = data.sampled_at ?? null;
-    sampleInterval.value = data.sample_interval_seconds ?? null;
-  } catch (err: unknown) {
-    if (requestSeq.isStale(token)) return;
-    // Whatever went wrong, the previous window's rows are no longer an answer
-    // to the question on screen — leaving them would put stale waits and stale
-    // summary counts under an error banner.
-    samples.value = [];
-    serverChains.value = null;
-    waitingCount.value = 0;
-    truncated.value = false;
-    // The endpoint is not on this build yet, or nothing has ever sampled the
-    // lock tables: "not collecting", not a failure the user can act on.
-    const status = (err as { response?: { status?: number } })?.response?.status;
-    if (status === 404 || status === 501) {
-      notCollecting.value = true;
-    } else {
-      error.value =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        String(err);
-    }
-  } finally {
-    if (!requestSeq.isStale(token)) loading.value = false;
-  }
-};
+      samples.value = parseBlockingSamples(data.hits ?? []);
+      serverChains.value = data.chains ?? null;
+      waitingCount.value = data.total ?? samples.value.length;
+      truncated.value = Boolean(data.truncated);
+      notCollecting.value = Boolean(data.not_collecting);
+      sampledAt.value = data.sampled_at ?? null;
+      sampleInterval.value = data.sample_interval_seconds ?? null;
+    },
+    {
+      reset: () => {
+        samples.value = [];
+        serverChains.value = null;
+        waitingCount.value = 0;
+        truncated.value = false;
+      },
+      onNotCollecting: () => {
+        notCollecting.value = true;
+      },
+    },
+  );
 
 // ─── AI ──────────────────────────────────────────────────────────────────────
 
@@ -1148,6 +1045,7 @@ const askAiForFix = (row: BlockedRow) => {
   });
 };
 
+// Registered/unregistered by useDbmListPage around this page's lifecycle.
 const dbmContext = createDbmContextProvider(() => {
   const root = tableRows.value.find((row) => row.kind === "root");
   return {
@@ -1162,32 +1060,4 @@ const dbmContext = createDbmContextProvider(() => {
     focus: { blockingRootPid: root?.pid, blockingRootQuery: root?.query },
   };
 }, store);
-
-onMounted(() => {
-  contextRegistry.register(DBM_CONTEXT_KEY, dbmContext);
-  contextRegistry.setActive(DBM_CONTEXT_KEY);
-  // Only this page's OWN read. The badges are DbmShell's, fetched once for
-  // every tab — a call here would put the fan-out back on every mount.
-  load();
-});
-
-// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
-// session on this tab. The URL is how the tabs agree on a window, so re-read it
-// on return and reload ONLY if it actually moved.
-useDbmScopeSync({
-  route,
-  current: () => range.value,
-  adopt: (next) =>
-    setRange({
-      startTime: next.startTime,
-      endTime: next.endTime,
-      relativeTimePeriod: next.relativeTimePeriod,
-    }),
-  reload: () => load(),
-});
-
-onBeforeUnmount(() => {
-  contextRegistry.unregister(DBM_CONTEXT_KEY);
-  contextRegistry.setActive("");
-});
 </script>

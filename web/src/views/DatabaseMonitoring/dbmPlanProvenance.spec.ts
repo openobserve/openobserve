@@ -41,12 +41,16 @@ import { describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 const source = () => readFileSync(join(here, "QueryDetailPage.vue"), "utf8");
 
-/** The `<section data-test="dbm-detail-plans">` block, template only. */
+/**
+ * The `<DbmSection data-test="dbm-detail-plans">` block, template only. The
+ * card shell is the shared `DbmSection` component now — the section markup
+ * itself was identical across six cards — so the block closes on that tag.
+ */
 const plansSection = (): string => {
   const text = source();
   const open = text.indexOf('data-test="dbm-detail-plans"');
   expect(open, "QueryDetailPage must render the plans section").toBeGreaterThan(-1);
-  const close = text.indexOf("</section>", open);
+  const close = text.indexOf("</DbmSection>", open);
   expect(close, "the plans section must be closed").toBeGreaterThan(open);
   return text.slice(open, close);
 };
