@@ -759,11 +759,37 @@ export default defineComponent({
       };
     };
 
-    const getEventSummary = (span: any) =>
-      summarizeSpanEvents(
-        props.spanMap[span.spanId]?.events,
-        store.state.zoConfig?.timestamp_column,
-      );
+    interface SpanEventSummary {
+      total: number;
+      errors: number;
+    }
+
+    /** Shared result for a span the trace carries no event payload for. */
+    const NO_SPAN_EVENTS: SpanEventSummary = Object.freeze({ total: 0, errors: 0 });
+
+    /**
+     * Every span's event tally, computed once per `spanMap`.
+     *
+     * The badge reads this five or six times per row — `v-if`, `:class`,
+     * `:title`, the text, and the label helper — and the row list is virtualized,
+     * so it re-renders on every scroll tick. Summarizing on demand meant
+     * re-running `JSON.parse` over the raw events payload 150+ times per frame
+     * for a screenful of rows. Keying the whole map off `spanMap` collapses that
+     * to one parse per span per trace.
+     */
+    const eventSummaryMap = computed<Record<string, SpanEventSummary>>(() => {
+      const timestampField = store.state.zoConfig?.timestamp_column;
+      const summaries: Record<string, SpanEventSummary> = {};
+
+      for (const [spanId, spanData] of Object.entries(props.spanMap ?? {})) {
+        summaries[spanId] = summarizeSpanEvents((spanData as any)?.events, timestampField);
+      }
+
+      return summaries;
+    });
+
+    const getEventSummary = (span: any): SpanEventSummary =>
+      eventSummaryMap.value[span.spanId] ?? NO_SPAN_EVENTS;
 
     /**
      * The badge is the honest fallback: markers can only show events that
