@@ -179,6 +179,15 @@ pub(crate) async fn create_scheduled_jobs_for_test(
                         .primary_key()
                         .auto_increment(),
                 )
+                // The scheduler owns `claim_epoch` (see infra::scheduler's
+                // idempotent bootstrap); the test helper mirrors that so the
+                // composite migration never has to add it.
+                .col(
+                    ColumnDef::new(Alias::new("claim_epoch"))
+                        .big_integer()
+                        .not_null()
+                        .default(0),
+                )
                 .to_owned(),
         )
         .await
@@ -208,9 +217,6 @@ pub(crate) fn composite_alert_migration_sql_for_test(
             .build(&migration::composites_statement())
             .to_string(),
         backend.build(&migration::children_statement()).to_string(),
-        backend
-            .build(&migration::claim_epoch_statement())
-            .to_string(),
         backend
             .build(&migration::reverse_index_statement())
             .to_string(),

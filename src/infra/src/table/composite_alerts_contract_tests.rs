@@ -255,7 +255,6 @@ fn migration_statements_build_for_supported_meta_stores() {
         for contract in [
             "alert_composites",
             "alert_composite_children",
-            "claim_epoch",
             "evaluation_generation",
             "child_kind",
             "display_order",
