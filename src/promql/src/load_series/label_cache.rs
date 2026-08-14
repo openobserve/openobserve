@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Process-wide cache used while loading PromQL series labels.
+
 use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{
@@ -22,6 +24,9 @@ use config::{
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 use parking_lot::Mutex;
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+
+use super::{PartitionedMetrics, load_labels::LoadedLabelsObserver, with_hash_label};
 
 // Shards scale with the query thread count (~4x, rounded to a power of two)
 // so lock contention stays low on large queriers; clamped to a sane range.
@@ -47,7 +52,7 @@ const ADMIT_MAX_PERCENT: usize = 50;
 /// Process-wide cache of series labels keyed by (context fingerprint, series
 /// hash), bounded by memory size. Labels are immutable per series hash, so
 /// entries never need invalidation, only LRU eviction.
-pub(crate) struct LabelCache {
+struct LabelCache {
     shards: Vec<Mutex<Shard>>,
     shard_mask: u64,
     max_bytes: usize,
@@ -61,7 +66,7 @@ struct Shard {
     bytes: usize,
 }
 
-pub(crate) static LABEL_CACHE: Lazy<LabelCache> = Lazy::new(|| {
+static LABEL_CACHE: Lazy<LabelCache> = Lazy::new(|| {
     let cfg = config::get_config();
     let max_bytes = if cfg.limit.metrics_label_cache_max_size > 0 {
         cfg.limit.metrics_label_cache_max_size * 1024 * 1024
@@ -76,7 +81,7 @@ pub(crate) static LABEL_CACHE: Lazy<LabelCache> = Lazy::new(|| {
 
 /// The series a query still has to recover from a label scan after the cache
 /// was consulted, and the cache decisions that follow from them.
-pub(crate) struct CacheMisses {
+pub(super) struct CacheMisses {
     ctx_fp: u64,
     series_count: usize,
     /// per-partition hashes that missed the cache
@@ -85,7 +90,7 @@ pub(crate) struct CacheMisses {
 }
 
 impl CacheMisses {
-    pub fn new(ctx_fp: u64, series_count: usize, per_partition: Vec<Vec<u64>>) -> Self {
+    fn new(ctx_fp: u64, series_count: usize, per_partition: Vec<Vec<u64>>) -> Self {
         Self {
             ctx_fp,
             series_count,
@@ -94,15 +99,15 @@ impl CacheMisses {
         }
     }
 
-    pub fn count(&self) -> usize {
+    pub(super) fn count(&self) -> usize {
         self.count
     }
 
-    pub fn hits(&self) -> usize {
+    pub(super) fn hits(&self) -> usize {
         self.series_count - self.count
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub(super) fn is_empty(&self) -> bool {
         self.count == 0
     }
 
@@ -110,14 +115,17 @@ impl CacheMisses {
         self.count == self.series_count
     }
 
-    pub fn hashes(&self) -> impl Iterator<Item = u64> + '_ {
+    pub(super) fn hashes(&self) -> impl Iterator<Item = u64> + '_ {
         self.per_partition.iter().flatten().copied()
     }
 
-    /// The fingerprint to store scanned labels under, or `None` when writes
-    /// are bypassed: a query can insert at most its misses, and one query's
-    /// working set must not evict the whole shared cache.
-    pub fn write_fingerprint(&self, trace_id: &str, label_col_count: usize) -> Option<u64> {
+    /// Returns an observer that writes extracted source labels to this cache,
+    /// or `None` when this query's working set is too large to admit.
+    pub(super) fn write_observer(
+        &self,
+        trace_id: &str,
+        label_col_count: usize,
+    ) -> Option<Arc<dyn LoadedLabelsObserver>> {
         // stored labels exclude the hash column
         let admitted = LABEL_CACHE.admit(label_col_count.saturating_sub(1), self.count);
         if !admitted {
@@ -126,12 +134,16 @@ impl CacheMisses {
                 self.count,
             );
         }
-        admitted.then_some(self.ctx_fp)
+        admitted.then(|| {
+            Arc::new(CacheWriter {
+                ctx_fp: self.ctx_fp,
+            }) as Arc<dyn LoadedLabelsObserver>
+        })
     }
 
     /// Per-partition membership sets for the scan, or `None` (attach every
     /// scanned series) when every series missed.
-    pub fn into_missing_sets(self) -> Option<Vec<HashSet<u64>>> {
+    pub(super) fn into_selected_hashes(self) -> Option<Vec<HashSet<u64>>> {
         (!self.all_missing()).then(|| {
             self.per_partition
                 .into_iter()
@@ -142,7 +154,7 @@ impl CacheMisses {
 }
 
 /// Fingerprint of the query context a cached label set belongs to.
-pub(crate) fn context_fingerprint(org_id: &str, stream_name: &str, label_cols: &[String]) -> u64 {
+fn context_fingerprint(org_id: &str, stream_name: &str, label_cols: &[String]) -> u64 {
     let mut key = String::with_capacity(64);
     key.push_str(org_id);
     key.push('\u{0}');
@@ -152,6 +164,60 @@ pub(crate) fn context_fingerprint(org_id: &str, stream_name: &str, label_cols: &
         key.push_str(col);
     }
     gxhash::new().sum64(&key)
+}
+
+struct CacheWriter {
+    ctx_fp: u64,
+}
+
+impl LoadedLabelsObserver for CacheWriter {
+    fn observe(&self, hash: u64, labels: &Labels) {
+        LABEL_CACHE.put(self.ctx_fp, hash, Arc::new(labels.clone()));
+    }
+}
+
+/// Attach cached labels partition-parallel and describe the series that still
+/// need to be loaded. Reads are never admission-gated because they cannot grow
+/// the cache and remain useful even when this query is too large to write back.
+pub(super) fn attach_cached_labels(
+    org_id: &str,
+    table_name: &str,
+    label_col_names: &[String],
+    include_hash_label: bool,
+    metrics: &mut PartitionedMetrics,
+) -> CacheMisses {
+    let ctx_fp = context_fingerprint(org_id, table_name, label_col_names);
+    let per_partition: Vec<Vec<u64>> = metrics
+        .par_iter_mut()
+        .map(|partition| {
+            partition
+                .iter_mut()
+                .filter_map(|(hash, range_val)| match LABEL_CACHE.get(ctx_fp, *hash) {
+                    Some(labels) => {
+                        // Materialize outside the shard lock; this clones only
+                        // the Arc pointers held by the cached label set.
+                        range_val.labels =
+                            with_hash_label(labels.to_vec(), *hash, include_hash_label);
+                        None
+                    }
+                    None => Some(*hash),
+                })
+                .collect()
+        })
+        .collect();
+
+    let misses = CacheMisses::new(
+        ctx_fp,
+        metrics.iter().map(|partition| partition.len()).sum(),
+        per_partition,
+    );
+    config::metrics::QUERY_METRICS_LABEL_CACHE_HIT_COUNT
+        .with_label_values(&[org_id])
+        .inc_by(misses.hits() as u64);
+    config::metrics::QUERY_METRICS_LABEL_CACHE_MISS_COUNT
+        .with_label_values(&[org_id])
+        .inc_by(misses.count() as u64);
+    misses
 }
 
 fn entry_size(labels: &Labels) -> usize {
@@ -184,7 +250,7 @@ impl LabelCache {
     /// Returns false when the estimated working set exceeds a single query's
     /// share of the budget, so the caller should bypass cache writes instead
     /// of thrashing it. Reads are never gated: a lookup cannot grow the cache.
-    pub fn admit(&self, label_count: usize, series_count: usize) -> bool {
+    fn admit(&self, label_count: usize, series_count: usize) -> bool {
         let est_entry =
             ENTRY_OVERHEAD + std::mem::size_of::<Labels>() + label_count * EST_LABEL_BYTES;
         series_count.saturating_mul(est_entry) <= self.max_bytes * ADMIT_MAX_PERCENT / 100
@@ -195,7 +261,7 @@ impl LabelCache {
     }
 
     /// A hit clones only the `Arc`, keeping the critical section short.
-    pub fn get(&self, ctx_fp: u64, series_hash: u64) -> Option<Arc<Labels>> {
+    fn get(&self, ctx_fp: u64, series_hash: u64) -> Option<Arc<Labels>> {
         self.shard(series_hash)
             .lock()
             .lru
@@ -206,7 +272,7 @@ impl LabelCache {
     /// A shard at its budget evicts on every insert, so eviction reads the
     /// accounted size back from the entry instead of walking the label set to
     /// re-derive it.
-    pub fn put(&self, ctx_fp: u64, series_hash: u64, labels: Arc<Labels>) {
+    fn put(&self, ctx_fp: u64, series_hash: u64, labels: Arc<Labels>) {
         let size = entry_size(&labels);
         if size > self.shard_max_bytes {
             return;
@@ -229,7 +295,11 @@ impl LabelCache {
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::Label;
+    use config::meta::promql::{
+        HASH_LABEL,
+        value::{Label, RangeValue},
+    };
+    use hashbrown::HashMap;
 
     use super::*;
 
@@ -322,5 +392,55 @@ mod tests {
         let fp3 = context_fingerprint("org", "stream", &[col_a]);
         assert_ne!(fp1, fp2);
         assert_eq!(fp1, fp3);
+    }
+
+    #[test]
+    fn test_attach_cached_labels_returns_partitioned_selection() {
+        let table = "attach_cached_labels_returns_partitioned_selection";
+        let ctx_fp = context_fingerprint("org", table, &[]);
+        let cached = Arc::new(vec![Arc::new(Label {
+            name: "instance".to_string(),
+            value: "cached".to_string(),
+        })]);
+        LABEL_CACHE.put(ctx_fp, 11, Arc::clone(&cached));
+        let mut metrics = vec![
+            HashMap::from([(11, RangeValue::default())]),
+            HashMap::from([(22, RangeValue::default())]),
+        ];
+
+        let misses = attach_cached_labels("org", table, &[], true, &mut metrics);
+
+        assert_eq!(misses.hashes().collect::<Vec<_>>(), vec![22]);
+        assert_eq!(misses.count(), 1);
+        assert_eq!(misses.hits(), 1);
+        assert!(!misses.is_empty());
+        let labels = &metrics[0][&11].labels;
+        assert_eq!(labels.len(), 2);
+        assert_eq!(labels[0].name, HASH_LABEL);
+        assert_eq!(labels[0].value, "11");
+        assert!(Arc::ptr_eq(&labels[1], &cached[0]));
+        assert!(metrics[1][&22].labels.is_empty());
+        assert_eq!(
+            misses.into_selected_hashes(),
+            Some(vec![HashSet::new(), HashSet::from([22])])
+        );
+    }
+
+    #[test]
+    fn test_write_observer_caches_only_source_labels() {
+        let ctx_fp = context_fingerprint("org", "write_observer_caches_source_labels", &[]);
+        let misses = CacheMisses::new(ctx_fp, 1, vec![vec![11]]);
+        let observer = misses.write_observer("test", 2).unwrap();
+        let labels = vec![Arc::new(Label {
+            name: "instance".to_string(),
+            value: "api".to_string(),
+        })];
+
+        observer.observe(11, &labels);
+
+        let cached = LABEL_CACHE.get(ctx_fp, 11).unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].name, "instance");
+        assert_eq!(cached[0].value, "api");
     }
 }

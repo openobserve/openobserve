@@ -13,13 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Loads PromQL series samples, exemplars, and labels from DataFusion.
+
+mod label_cache;
+mod labels;
+mod load_labels;
+
 use std::sync::Arc;
 
 use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
         EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL,
-        value::{Exemplar, QueryContext, RangeValue, Sample},
+        value::{Exemplar, Label, Labels, QueryContext, RangeValue, Sample},
     },
     utils::{
         hash::{Sum64, gxhash},
@@ -42,10 +48,8 @@ use futures::TryStreamExt;
 use hashbrown::{HashMap, HashSet};
 use promql_parser::parser::VectorSelector;
 
-use super::{
-    series_labels::load_series_labels,
-    utils::{apply_label_selector, apply_matchers},
-};
+use self::labels::load_series_labels;
+use super::utils::{apply_label_selector, apply_matchers};
 
 pub(super) type PartitionedMetrics = Vec<HashMap<u64, RangeValue>>;
 
@@ -61,6 +65,22 @@ pub(super) enum LoadedMetrics {
 }
 
 type TokioResult = tokio::task::JoinHandle<Result<(HashMap<u64, RangeValue>, HashSet<i64>)>>;
+
+/// Materialize the labels exposed to the query. The process-wide cache stores
+/// only source labels, so raw-data queries add their synthetic hash label at
+/// this boundary for both cache hits and freshly loaded labels.
+fn with_hash_label(labels: Labels, hash: u64, include_hash_label: bool) -> Labels {
+    if !include_hash_label {
+        return labels;
+    }
+    let mut with_hash = Vec::with_capacity(labels.len() + 1);
+    with_hash.push(Arc::new(Label {
+        name: HASH_LABEL.to_string(),
+        value: hash.to_string(),
+    }));
+    with_hash.extend(labels);
+    with_hash
+}
 
 // Constants for optimization thresholds
 const OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER: i64 = 5;
@@ -125,7 +145,7 @@ pub(super) async fn selector_load_data_from_datafusion(
         }
     };
 
-    df_group = apply_matchers(df_group, &schema, &selector.matchers)?;
+    df_group = apply_matchers(df_group, &selector.matchers)?;
 
     match apply_label_selector(df_group, &schema, &label_selector) {
         Some(dataframe) => df_group = dataframe,
