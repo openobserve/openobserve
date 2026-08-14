@@ -42,33 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   deliberately not gated on `ai_enabled`/`isEnterprise`: DBM is all-OSS.
 -->
 <template>
-  <OPageLayout
+  <DbmPageChrome
     :title="t('dbm.tableHealth.title')"
     :subtitle="t('dbm.tableHealth.subtitle')"
-    icon="database"
     title-data-test="dbm-table-health-title"
-    tabs-below
-    bleed
+    date-time-data-test="dbm-table-health-date-time"
+    :tab-counts="tabCounts"
+    :range="range"
+    @date-change="onDateChange"
   >
-    <template #header-tabs>
-      <!-- The sibling badges come from the shell's one shared fan-out; this
-           page's own is counted from the relations it already loaded. -->
-      <DbmSectionTabs v-bind="tabCounts" />
-    </template>
-
-    <template #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        data-test-name="dbm-table-health-date-time"
-        class="h-8"
-        @on:date-change="onDateChange"
-      />
-    </template>
-
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- W11 · Recommendations. Deterministic checks, each showing the
            arithmetic that fired it. The rule line is one hover away rather
@@ -109,9 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span
               class="rounded-default grid size-4.5 shrink-0 place-items-center"
-              :class="RECOMMENDATION_TONES[entry.rec.tone].chip"
+              :class="DBM_SOFT_TONES[entry.rec.tone]"
             >
-              <OIcon :name="RECOMMENDATION_TONES[entry.rec.tone].icon" size="xs" />
+              <OIcon :name="DBM_TONE_ICONS[entry.rec.tone]" size="xs" />
             </span>
             <span class="text-text-heading text-xs font-semibold whitespace-nowrap">
               {{ t(`dbm.recommendations.${entry.rec.id}.title`) }}
@@ -136,40 +118,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The two empty states are NOT interchangeable. On an engine whose
              index catalogs are never read, "nothing found" would be an
              all-clear about a check that did not run. -->
-        <div
+        <DbmDisclosureLine
           v-else-if="recommendationsEmpty === 'engine-partial'"
-          class="text-text-secondary text-2xs flex items-start gap-1.5"
           data-test="dbm-recommendations-engine-partial"
         >
-          <OIcon name="info" class="mt-px shrink-0" size="xs" />
-          <span>
-            <strong class="font-semibold">{{ t("dbm.recommendations.enginePartialTitle") }}</strong>
-            — {{ t("dbm.recommendations.enginePartialDescription") }}
-          </span>
-        </div>
-        <div
-          v-else
-          class="text-text-secondary text-2xs flex items-start gap-1.5"
-          data-test="dbm-recommendations-all-clear"
-        >
-          <OIcon name="check" class="mt-px shrink-0" size="xs" />
-          <span>
-            <strong class="font-semibold">{{ t("dbm.recommendations.allClearTitle") }}</strong>
-            — {{ t("dbm.recommendations.allClearDescription") }}
-          </span>
-        </div>
+          <strong class="font-semibold">{{ t("dbm.recommendations.enginePartialTitle") }}</strong>
+          — {{ t("dbm.recommendations.enginePartialDescription") }}
+        </DbmDisclosureLine>
+        <DbmDisclosureLine v-else icon="check" data-test="dbm-recommendations-all-clear">
+          <strong class="font-semibold">{{ t("dbm.recommendations.allClearTitle") }}</strong>
+          — {{ t("dbm.recommendations.allClearDescription") }}
+        </DbmDisclosureLine>
 
         <!-- Gated on the API's own flag: a build whose response omits it has
              not told us the counters are cumulative, and asserting it anyway
              would invent a disclosure. -->
-        <div
+        <DbmDisclosureLine
           v-if="indexCountersAreCumulative"
-          class="text-text-secondary text-2xs flex items-start gap-1.5"
           data-test="dbm-recommendations-cumulative"
         >
-          <OIcon name="info" class="mt-px shrink-0" size="xs" />
-          <span>{{ t("dbm.recommendations.countersCumulative") }}</span>
-        </div>
+          {{ t("dbm.recommendations.countersCumulative") }}
+        </DbmDisclosureLine>
       </section>
 
       <OTable
@@ -191,30 +160,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the honest measurements, and the bar only makes their relative size
              scannable. Which columns qualify, and why the lifetime counters do
              not, is argued at `TableHealthBarScale`. -->
-        <template #cell-total_bytes="{ row }">
+        <!-- The three byte columns are one cell three times: same formatter,
+             same tone, each scaled to its OWN column's worst row (a shared
+             reference would make the heap bar a copy of the total bar). Only
+             the field and the data-test differ, so they are a loop. -->
+        <template
+          v-for="column in SIZE_BAR_COLUMNS"
+          :key="column.key"
+          #[`cell-${column.key}`]="{ row }"
+        >
           <ODataBarCell
-            :value="row.total_bytes"
-            :max="sizeColumnMax.total_bytes"
-            :display="tableSizeLabel(row.total_bytes)"
-            :data-test="`dbm-table-health-total-bytes-${row.rowKey}`"
-          />
-        </template>
-
-        <template #cell-heap_bytes="{ row }">
-          <ODataBarCell
-            :value="row.heap_bytes"
-            :max="sizeColumnMax.heap_bytes"
-            :display="tableSizeLabel(row.heap_bytes)"
-            :data-test="`dbm-table-health-heap-bytes-${row.rowKey}`"
-          />
-        </template>
-
-        <template #cell-overheadBytes="{ row }">
-          <ODataBarCell
-            :value="row.overheadBytes"
-            :max="sizeColumnMax.overheadBytes"
-            :display="tableSizeLabel(row.overheadBytes)"
-            :data-test="`dbm-table-health-overhead-bytes-${row.rowKey}`"
+            :value="row[column.key]"
+            :max="sizeColumnMax[column.key]"
+            :display="tableSizeLabel(row[column.key])"
+            :data-test="`dbm-table-health-${column.dataTest}-${row.rowKey}`"
           />
         </template>
 
@@ -257,16 +216,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+          <!-- The search box here is a bare full-width input rather than the
+               fixed-width one inside a flex row the other tables use, so this
+               button is not competing for space and never carried `shrink-0`. -->
+          <DbmRefreshButton
             :loading="loading"
+            :shrink="false"
             data-test="dbm-table-health-refresh"
-            @click="onRefresh"
-          >
-            <OTooltip side="bottom" :content="t('dbm.common.reload')" />
-          </OButton>
+            @refresh="onRefresh"
+          />
         </template>
 
         <!-- The disclosures live here, always visible, never behind a hover.
@@ -278,14 +236,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-border-default bg-surface-subtle px-page-edge flex flex-col gap-1 border-b py-2"
             data-test="dbm-table-health-disclosures"
           >
-            <div
-              v-for="line in disclosures"
-              :key="line"
-              class="text-text-secondary text-2xs flex items-start gap-1.5"
-            >
-              <OIcon name="info" class="mt-px shrink-0" size="xs" />
-              <span>{{ line }}</span>
-            </div>
+            <DbmDisclosureLine v-for="line in disclosures" :key="line">
+              {{ line }}
+            </DbmDisclosureLine>
           </div>
         </template>
 
@@ -333,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
-  </OPageLayout>
+  </DbmPageChrome>
 </template>
 
 <script setup lang="ts">
@@ -342,17 +295,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmTableHealthPage" });
 
-import { computed, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
-import { useStore } from "vuex";
+import { computed, ref, shallowRef } from "vue";
 
+import DbmDisclosureLine from "@/components/dbm/DbmDisclosureLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
-import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
-import DateTime from "@/components/DateTime.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 // The shared in-cell magnitude bar from the core Table library — the same one
 // QueryDetailPage already uses. Preferred over the traces plugin's
@@ -364,11 +314,9 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
-import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
 import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
-import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
-import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
+import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { useDbmSearchEmpty } from "@/composables/dbm/useDbmSearchEmpty";
 import {
   scanCountDisclosure,
   tableHealthColumns,
@@ -386,37 +334,35 @@ import {
   recommendationRuleParams,
   recommendationsEmptyCause,
   type DbmRecommendation,
-  type DbmRecommendationTone,
   type IndexHealthRow,
 } from "@/utils/dbm/recommendations";
 import { formatCount } from "@/utils/dbm/format";
 import { formatDurationMs } from "@/utils/dbm/activity";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { DBM_SOFT_TONES, DBM_TONE_ICONS } from "@/utils/dbm/tones";
 
 const { t } = useI18nTyped();
-const store = useStore();
-const route = useRoute();
 
-const { range, current, refresh, setRange } = useDbmScope(route.query);
+// The shared list-page spine: scope from the URL, the request-sequence guard,
+// the shell's badge snapshot, refresh/date-change handlers and the load
+// envelope. `syncUrl: null` — this page deliberately never writes the URL,
+// though it still adopts it on keep-alive return. See useDbmListPage.
+const {
+  scope: { range, current },
+  requestSeq,
+  tabCountsContext,
+  loading,
+  error,
+  search,
+  org,
+  run,
+  onRefresh,
+  onDateChange,
+} = useDbmListPage({ load: () => load(), syncUrl: null });
 
-// The picker and refresh can be in flight at once; this keeps the last request
-// the reader made the one that paints.
-const requestSeq = useDbmRequestSeq();
-
-// The sibling-tab badges are the same numbers on every tab, so DbmShell fetches
-// them ONCE per window for every route and this page reads the snapshot.
-// See useDbmTabCounts.
-const tabCountsContext = useDbmTabCountsContext();
-
-const org = computed(() => store.state?.selectedOrganization?.identifier ?? "");
-
-const hits = ref<TableHealthRow[]>([]);
+const hits = shallowRef<TableHealthRow[]>([]);
 const coverage = ref<TableHealthCoverage>("unknown");
 const countersAreCumulative = ref(false);
 const tuplesAreEstimated = ref(false);
-const loading = ref(false);
-const error = ref<string | null>(null);
-const search = ref("");
 
 /**
  * The sibling badges from the shell's shared fan-out, plus THIS tab's own
@@ -445,7 +391,7 @@ const rows = computed(() => {
 /** This tab's own badge: relations reported, not the row-limited render. */
 const tableHealthCount = computed(() => (hits.value.length ? hits.value.length : null));
 
-const searchHidEverything = computed(() => allRows.value.length > 0 && rows.value.length === 0);
+const searchHidEverything = useDbmSearchEmpty(search, allRows, rows);
 
 const emptyCause = computed<TableHealthEmptyCause | null>(() =>
   tableHealthEmptyCause({ engine_coverage: coverage.value, hits: hits.value }),
@@ -503,9 +449,23 @@ const columns = computed<OTableColumnDef[]>(() => tableHealthColumns(t));
  * scaled against 100 in the template; see `TableHealthBarScale` for why the
  * lifetime counters get no bar at all.
  */
+/** The byte columns that carry a magnitude bar. */
+type SizeBarColumn = "total_bytes" | "heap_bytes" | "overheadBytes";
+
+/**
+ * The byte columns that render as a magnitude bar. The `data-test` is spelled
+ * out rather than derived: `overheadBytes` would kebab to `overhead-bytes` and
+ * `total_bytes` would not, so a derivation here would be two rules pretending
+ * to be one.
+ */
+const SIZE_BAR_COLUMNS: { key: SizeBarColumn; dataTest: string }[] = [
+  { key: "total_bytes", dataTest: "total-bytes" },
+  { key: "heap_bytes", dataTest: "heap-bytes" },
+  { key: "overheadBytes", dataTest: "overhead-bytes" },
+];
+
 const sizeColumnMax = computed(() => {
-  const max = (key: "total_bytes" | "heap_bytes" | "overheadBytes") =>
-    rows.value.reduce((acc, r) => Math.max(acc, r[key] ?? 0), 0);
+  const max = (key: SizeBarColumn) => rows.value.reduce((acc, r) => Math.max(acc, r[key] ?? 0), 0);
   return {
     total_bytes: max("total_bytes"),
     heap_bytes: max("heap_bytes"),
@@ -516,7 +476,7 @@ const sizeColumnMax = computed(() => {
 // ─── W11 · Recommendations ───────────────────────────────────────────────────
 
 /** The three inputs the rules predicate on, beyond the table feed itself. */
-const indexHits = ref<IndexHealthRow[]>([]);
+const indexHits = shallowRef<IndexHealthRow[]>([]);
 const indexCountersAreCumulative = ref(false);
 /**
  * The two rule inputs that are PROJECTIONS of the shared fan-out's own
@@ -532,12 +492,6 @@ const indexCountersAreCumulative = ref(false);
  */
 const sessions = computed(() => tabCountsContext.counts.value.sessions);
 const blockingSamples = computed(() => tabCountsContext.counts.value.blockingSamples);
-
-const RECOMMENDATION_TONES: Record<DbmRecommendationTone, { chip: string; icon: IconName }> = {
-  error: { chip: "bg-badge-error-soft-bg text-badge-error-soft-text", icon: "error" },
-  warning: { chip: "bg-badge-warning-soft-bg text-badge-warning-soft-text", icon: "trending-up" },
-  info: { chip: "bg-badge-blue-soft-bg text-badge-blue-soft-text", icon: "insights" },
-};
 
 /**
  * The rules, run over whatever arrived. Every predicate lives in
@@ -625,97 +579,49 @@ const recommendationRule = (rec: DbmRecommendation) => {
   return t(key as Parameters<typeof t>[0], params);
 };
 
-const load = async () => {
-  if (!org.value) return;
-  const token = requestSeq.begin();
-  loading.value = true;
-  error.value = null;
-  refresh();
+const load = () =>
+  run(
+    async (token) => {
+      // ONE request for both sections — the index search runs concurrently
+      // with the table search server-side. A separate endpoint would cost a
+      // full extra round trip for the same stream.
+      const { data } = await dbMonitoringService.getTableHealth(org.value, {
+        startTime: current.value.startTime,
+        endTime: current.value.endTime,
+        includeIndexes: true,
+      });
 
-  try {
-    // ONE request for both sections — the index search runs concurrently
-    // with the table search server-side. A separate endpoint would cost a
-    // full extra round trip for the same stream.
-    const { data } = await dbMonitoringService.getTableHealth(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-      includeIndexes: true,
-    });
+      if (requestSeq.isStale(token)) return;
 
-    if (requestSeq.isStale(token)) return;
+      hits.value = data.hits ?? [];
+      coverage.value = data.engine_coverage ?? "unknown";
+      countersAreCumulative.value = Boolean(data.counters_are_cumulative);
+      tuplesAreEstimated.value = Boolean(data.tuples_are_estimated);
 
-    hits.value = data.hits ?? [];
-    coverage.value = data.engine_coverage ?? "unknown";
-    countersAreCumulative.value = Boolean(data.counters_are_cumulative);
-    tuplesAreEstimated.value = Boolean(data.tuples_are_estimated);
-
-    // Index health feeds the unused-index rule, and still degrades
-    // independently: `index_read_failed` is the server saying the index search
-    // failed while the tables succeeded, so the rules that need no index data
-    // keep rendering and no disclosure is claimed for rows never received.
-    indexHits.value = data.index_read_failed ? [] : (data.index_hits ?? []);
-    indexCountersAreCumulative.value =
-      !data.index_read_failed && Boolean(data.index_counters_are_cumulative);
-  } catch (err: unknown) {
-    if (requestSeq.isStale(token)) return;
-    hits.value = [];
-    // The flags are claims the API makes; a failed request made none, so they
-    // must not persist from a previous window and label stale-free rows.
-    countersAreCumulative.value = false;
-    tuplesAreEstimated.value = false;
-    indexHits.value = [];
-    indexCountersAreCumulative.value = false;
-
-    // The endpoint is not on this build yet, or nothing has ever reported a
-    // table: "not collecting", not a failure the reader can act on.
-    const status = (err as { response?: { status?: number } })?.response?.status;
-    if (status === 404 || status === 501) {
-      coverage.value = "unknown";
-    } else {
-      error.value =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        String(err);
-    }
-  } finally {
-    if (!requestSeq.isStale(token)) loading.value = false;
-  }
-};
-
-// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
-// badge cache alongside the page's own load — the URL does not change on a
-// refresh, so the shell cannot see one on its own.
-const onRefresh = () => {
-  void load();
-  tabCountsContext.refresh({ force: true });
-};
-
-const onDateChange = (change: DbmDateChange) => {
-  setRange(change);
-  // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
-  // mount replay would otherwise double every request. See
-  // `DbmDateChange.userChangedValue`.
-  if (change?.userChangedValue === false) return;
-  load();
-};
-
-onMounted(() => {
-  // Only this page's OWN read. The badges are DbmShell's, fetched once for
-  // every tab — a call here would put the fan-out back on every mount.
-  load();
-});
-
-// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
-// session on this tab. The URL is how the tabs agree on a window, so re-read it
-// on return and reload ONLY if it actually moved.
-useDbmScopeSync({
-  route,
-  current: () => range.value,
-  adopt: (next) =>
-    setRange({
-      startTime: next.startTime,
-      endTime: next.endTime,
-      relativeTimePeriod: next.relativeTimePeriod,
-    }),
-  reload: () => load(),
-});
+      // Index health feeds the unused-index rule, and still degrades
+      // independently: `index_read_failed` is the server saying the index search
+      // failed while the tables succeeded, so the rules that need no index data
+      // keep rendering and no disclosure is claimed for rows never received.
+      indexHits.value = data.index_read_failed ? [] : (data.index_hits ?? []);
+      indexCountersAreCumulative.value =
+        !data.index_read_failed && Boolean(data.index_counters_are_cumulative);
+    },
+    {
+      reset: () => {
+        hits.value = [];
+        // The flags are claims the API makes; a failed request made none, so
+        // they must not persist from a previous window and label stale-free
+        // rows.
+        countersAreCumulative.value = false;
+        tuplesAreEstimated.value = false;
+        indexHits.value = [];
+        indexCountersAreCumulative.value = false;
+      },
+      // This page has no `notCollecting` ref — an unknown coverage IS its
+      // "nothing has ever reported a table" state.
+      onNotCollecting: () => {
+        coverage.value = "unknown";
+      },
+    },
+  );
 </script>

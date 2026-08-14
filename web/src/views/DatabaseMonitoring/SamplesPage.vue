@@ -41,31 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   "everything is slow" — which demand different responses — look different.
 -->
 <template>
-  <OPageLayout
+  <DbmPageChrome
     :title="t('dbm.samples.title')"
     :subtitle="t(serverListShown ? 'dbm.samples.subtitleServer' : 'dbm.samples.subtitle')"
-    icon="database"
     title-data-test="dbm-samples-title"
-    tabs-below
-    bleed
+    date-time-data-test="dbm-samples-date-time"
+    :tab-counts="tabCounts"
+    :range="range"
+    @date-change="onDateChange"
   >
-    <template #header-tabs>
-      <DbmSectionTabs v-bind="tabCounts" />
-    </template>
-
-    <template #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        data-test-name="dbm-samples-date-time"
-        class="h-8"
-        @on:date-change="onDateChange"
-      />
-    </template>
-
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- In fallback mode the client table UNMOUNTS: its tall empty-state
            checklist would otherwise consume the viewport and squeeze the
@@ -88,36 +72,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @row-click="onRowClick"
       >
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <div class="w-64 shrink-0">
-              <OSearchInput
-                v-model="search"
-                :placeholder="t('dbm.samples.searchPlaceholder')"
-                clearable
-                :debounce="400"
-                data-test="dbm-samples-search"
-              />
-            </div>
+          <DbmTableToolbar
+            v-model:search="search"
+            :placeholder="t('dbm.samples.searchPlaceholder')"
+            :debounce="400"
+            search-data-test="dbm-samples-search"
+          >
             <DbmScopeFilters
               class="min-w-0 flex-1"
               :filters="dimensionFilters"
               @clear="clearScope"
             />
-          </div>
+          </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+          <DbmRefreshButton
             :loading="loading"
-            class="shrink-0"
             data-test="dbm-samples-refresh"
-            @click="onRefresh"
-          >
-            <OTooltip side="bottom" :content="t('dbm.common.reload')" />
-          </OButton>
+            @refresh="onRefresh"
+          />
         </template>
 
         <template #subheader>
@@ -129,30 +103,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="px-page-edge border-table-row-divider h-50 w-full border-b py-1.5"
             data-test="dbm-samples-scatter"
           >
-            <ChartRenderer :data="{ options: samplesOption }" @click="onScatterClick" />
+            <ChartRenderer :data="scatterData" @click="onScatterClick" />
           </div>
         </template>
 
         <!-- The statement, with where it ran under it. -->
         <template #cell-query="{ row }">
-          <div class="flex min-w-0 flex-col gap-px">
-            <span
-              class="text-text-code min-w-0 truncate font-mono text-xs"
-              :title="row.queryText"
-              >{{ raw(row.queryText || "—") }}</span
-            >
-            <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
-              <OTag v-if="row.dbSystem" type="dbSystem" :value="row.dbSystem" size="xs" />
-              <template v-if="row.dbInstance">
-                <span class="opacity-45">·</span>
-                <span>{{ raw(row.dbInstance) }}</span>
-              </template>
-              <template v-if="row.dbNamespace">
-                <span class="opacity-45">·</span>
-                <span>{{ raw(row.dbNamespace) }}</span>
-              </template>
-            </div>
-          </div>
+          <DbmQueryCell
+            :text="raw(row.queryText)"
+            :title-attr="row.queryText"
+            :db-system="row.dbSystem"
+            :meta-items="[
+              { key: 'instance', label: raw(row.dbInstance ?? '') },
+              { key: 'namespace', label: raw(row.dbNamespace ?? '') },
+            ]"
+          />
         </template>
 
         <template #cell-timestamp="{ row }">
@@ -282,50 +247,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                unmounted), so it carries the toolbar — same search and refresh
                bindings. -->
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-              <div class="w-64 shrink-0">
-                <OSearchInput
-                  v-model="search"
-                  :placeholder="t('dbm.samples.searchPlaceholder')"
-                  clearable
-                  :debounce="400"
-                  data-test="dbm-server-samples-search"
-                />
-              </div>
-            </div>
+            <DbmTableToolbar
+              v-model:search="search"
+              :placeholder="t('dbm.samples.searchPlaceholder')"
+              :debounce="400"
+              search-data-test="dbm-server-samples-search"
+            />
           </template>
           <template #toolbar-trailing>
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+            <DbmRefreshButton
               :loading="loading"
-              class="shrink-0"
               data-test="dbm-server-samples-refresh"
-              @click="onRefresh"
-            >
-              <OTooltip side="bottom" :content="t('dbm.common.reload')" />
-            </OButton>
+              @refresh="onRefresh"
+            />
           </template>
           <template #cell-query="{ row }">
-            <div class="flex min-w-0 flex-col gap-px">
-              <span
-                class="text-text-code min-w-0 truncate font-mono text-xs"
-                :title="row.query ?? undefined"
-                >{{ raw(row.query || "—") }}</span
-              >
-              <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
-                <OTag v-if="row.db_system" type="dbSystem" :value="row.db_system" size="xs" />
-                <template v-if="row.db_instance">
-                  <span class="opacity-45">·</span>
-                  <span>{{ raw(row.db_instance) }}</span>
-                </template>
-                <template v-if="row.db_namespace">
-                  <span class="opacity-45">·</span>
-                  <span>{{ raw(row.db_namespace) }}</span>
-                </template>
-              </div>
-            </div>
+            <DbmQueryCell
+              :text="raw(row.query ?? '')"
+              :title-attr="row.query ?? undefined"
+              :db-system="row.db_system"
+              :meta-items="[
+                { key: 'instance', label: raw(row.db_instance ?? '') },
+                { key: 'namespace', label: raw(row.db_namespace ?? '') },
+              ]"
+            />
           </template>
           <template #cell-when="{ row }">
             <span class="tabular-nums">{{ formatWhen(row.timestamp) }}</span>
@@ -350,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </section>
     </div>
-  </OPageLayout>
+  </DbmPageChrome>
 </template>
 
 <script setup lang="ts">
@@ -359,37 +304,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmSamplesPage" });
 
-import { computed, defineAsyncComponent, onMounted, ref } from "vue";
+import { computed, defineAsyncComponent, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
+import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
+import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
-import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
-import DateTime from "@/components/DateTime.vue";
+import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, { type ServerSampleRow } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
 import useStreams from "@/composables/useStreams";
-import { setDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
-import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
+import { useDbmQueryDetailHop } from "@/composables/dbm/useDbmQueryDetailHop";
 import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
-import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
-import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
-import { chartColor } from "@/utils/chartTheme";
+import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { useDbmChartTheme } from "@/composables/dbm/useDbmChartTheme";
+import { useDbmSearchEmpty } from "@/composables/dbm/useDbmSearchEmpty";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
+import { createDbmFilterEntry, optionsFrom } from "@/utils/dbm/filters";
 import { countClaim, formatNs } from "@/utils/dbm/format";
-import { buildSamplesOption, type DbmChartTheme } from "@/utils/dbm/historyChart";
+import { buildSamplesOption } from "@/utils/dbm/historyChart";
 import {
   buildSampleRows,
   sampleQueryDetailTarget,
@@ -410,23 +354,30 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-// The window arrives from the URL, so a tab switch, a back button and a shared
-// link all land on the SAME scope rather than resetting to the default.
-const { range, current, rangeMinutes, refresh, setRange, queryParams } = useDbmScope(route.query);
+// The shared list-page spine: scope from the URL, the request-sequence guard,
+// the shell's badge snapshot, refresh/date-change handlers and the load
+// envelope. This page's own `syncUrl` rides the date change so the five
+// filters survive in the URL. See useDbmListPage.
+const {
+  scope: { range, current, rangeMinutes, queryParams },
+  requestSeq,
+  tabCountsContext,
+  loading,
+  error,
+  search,
+  org,
+  dbmEnabled,
+  run,
+  onRefresh,
+  onDateChange,
+} = useDbmListPage({ load: () => load(), syncUrl: () => syncUrl() });
 
-// Search, filters, the picker and refresh can all be in flight at once; this
-// keeps the last request the reader made the one that paints.
-const requestSeq = useDbmRequestSeq();
-
-// The sibling-tab badges are the same numbers on every tab, so DbmShell
-// fetches them ONCE per window for every route and this page reads the
-// snapshot. The page's own client rows never override the badge — they are a
-// capped top-list, not the population (see `sampleCallsCount` in
-// useDbmTabCounts.ts). The ONE override is fallback mode: with zero client
-// rows and a database-reported list rendered beneath the badge, the shared
-// `0` would deny working data — so the badge counts the reported list as a
-// capped claim (`100+`), the same false-zero rule the fleet badge follows.
-const tabCountsContext = useDbmTabCountsContext();
+// The page's own client rows never override the badge — they are a capped
+// top-list, not the population (see `sampleCallsCount` in useDbmTabCounts.ts).
+// The ONE override is fallback mode: with zero client rows and a
+// database-reported list rendered beneath the badge, the shared `0` would
+// deny working data — so the badge counts the reported list as a capped claim
+// (`100+`), the same false-zero rule the fleet badge follows.
 const tabCounts = computed(() =>
   tabCountProps(
     withOwnCount(
@@ -439,16 +390,10 @@ const tabCounts = computed(() =>
   ),
 );
 
-const org = computed(() => store.state.selectedOrganization?.identifier as string);
-const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
-
-const allRows = ref<DbmSampleRow[]>([]);
+const allRows = shallowRef<DbmSampleRow[]>([]);
 const truncated = ref(false);
 const streamsFailed = ref(0);
-const loading = ref(false);
-const error = ref<string | null>(null);
 const permissionOk = ref(true);
-const search = ref("");
 
 /**
  * The database-reported fallback list (`/server_samples`). Populated ONLY
@@ -461,7 +406,7 @@ const search = ref("");
  * appears is governed by the database's own logging threshold, and the copy
  * says so.
  */
-const serverRows = ref<ServerSampleRow[]>([]);
+const serverRows = shallowRef<ServerSampleRow[]>([]);
 
 /**
  * Fallback mode: the database-reported list is what the reader sees, so the
@@ -497,11 +442,12 @@ const rows = computed(() => {
       .some((field) => field.toLowerCase().includes(needle)),
   );
 });
+// The list→detail hop: the seed hand-off plus the push, in one place. See
+// useDbmQueryDetailHop.
+const { openDbmQueryDetail } = useDbmQueryDetailHop({ router, route, org, range, queryParams });
 
 /** The reader's own filter emptied the table — not the window being quiet. */
-const searchHidEverything = computed(
-  () => !!search.value.trim() && allRows.value.length > 0 && rows.value.length === 0,
-);
+const searchHidEverything = useDbmSearchEmpty(search, allRows, rows);
 
 const isFiltered = computed(
   () =>
@@ -557,26 +503,11 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
 
 // ─── The database-reported fallback list ─────────────────────────────────────
 
-const loadServerSamples = async (token: number) => {
-  try {
-    const { data } = await dbMonitoringService.getServerSamples(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-      system: systemFilter.value ?? undefined,
-      instance: instanceFilter.value ?? undefined,
-      namespace: namespaceFilter.value ?? undefined,
-    });
-    if (requestSeq.isStale(token)) return;
-    serverRows.value = data.hits ?? [];
-    serverTruncated.value = Boolean(data.truncated);
-  } catch {
-    // Supplementary: its absence is not a claim, and the empty state above it
-    // already tells the reader whether call data is arriving at all.
-    if (requestSeq.isStale(token)) return;
-    serverRows.value = [];
-    serverTruncated.value = false;
-  }
-};
+// `loadServerSamples` lived here — a second, sequential request to
+// `/server_samples` issued once this page's own read came back empty. The
+// server runs that conditional itself now (`include_server_fallback`), so the
+// rows arrive with the response that decides they are needed, and a failed or
+// denied fallback is a flag on that response rather than a swallowed catch.
 
 /**
  * Two executions can legitimately share a timestamp and a statement, so the
@@ -644,34 +575,24 @@ const openServerSampleDetail = (row: ServerSampleTableRow) => {
   // The statement travels as a seed, exactly as the Activity hop does: with
   // no client row anywhere, the detail header would otherwise paint the bare
   // hash. Only fields this row truly knows — no stats, no stream.
-  if (row.query) {
-    setDbmQueryDetailSeed({
-      row: {
-        fingerprint: row.fingerprint,
-        query_norm: row.query,
-        db_system: row.db_system,
-        db_instance: row.db_instance ?? "",
-        db_namespace: row.db_namespace ?? undefined,
-      },
-      org: org.value,
-      range: { ...range.value },
-    });
-  }
-  router
-    .push({
-      name: "dbmQueryDetail",
-      query: {
-        ...route.query,
-        org_identifier: route.query.org_identifier ?? org.value,
-        ...queryParams.value,
-        fingerprint: row.fingerprint,
-        system: row.db_system,
-        ...(row.db_instance ? { instance: row.db_instance } : {}),
-        ...(row.db_namespace ? { namespace: row.db_namespace } : {}),
-        from: "samples",
-      },
-    })
-    .catch(() => {});
+  openDbmQueryDetail({
+    seed: row.query
+      ? {
+          fingerprint: row.fingerprint,
+          query_norm: row.query,
+          db_system: row.db_system,
+          db_instance: row.db_instance ?? "",
+          db_namespace: row.db_namespace ?? undefined,
+        }
+      : null,
+    target: {
+      fingerprint: row.fingerprint,
+      system: row.db_system,
+      ...(row.db_instance ? { instance: row.db_instance } : {}),
+      ...(row.db_namespace ? { namespace: row.db_namespace } : {}),
+    },
+    from: "samples",
+  });
 };
 
 /**
@@ -694,15 +615,7 @@ const formatWhen = (micros: number): string =>
  * ECharts renders to a canvas with no CSS cascade, so a class cannot reach it.
  * Depends on the theme state so the colours re-resolve on a light/dark flip.
  */
-const chartTheme = computed<DbmChartTheme>(() => {
-  void store.state.theme;
-  return {
-    calls: chartColor("--color-chart-series-1"),
-    errors: chartColor("--color-severity-error-color"),
-    axisLabel: chartColor("--color-text-secondary"),
-    splitLine: chartColor("--color-border-default"),
-  };
-});
+const chartTheme = useDbmChartTheme();
 
 /** The rows the scatter can place — a sample without a duration has no y. */
 const scatterSamples = computed(() =>
@@ -722,6 +635,8 @@ const samplesOption = computed(() =>
   }),
 );
 
+const scatterData = computed(() => ({ options: samplesOption.value }));
+
 /** ECharts hands back the datum; map it to the sample that produced it. */
 const onScatterClick = (params: unknown) => {
   const value = (params as { value?: [number, number] })?.value;
@@ -734,73 +649,49 @@ const onScatterClick = (params: unknown) => {
 
 // ─── Filters ─────────────────────────────────────────────────────────────────
 
-const optionsFrom = (values: (string | undefined)[]) =>
-  [...new Set(values.filter((v): v is string => !!v))].map((value) => ({
-    value,
-    label: raw(value),
-  }));
+// Every filter change publishes the scope to the URL BEFORE reloading — the
+// factory owns the handler, so no entry can forget the URL half.
+const filterEntry = createDbmFilterEntry(() => {
+  syncUrl();
+  load();
+});
 
 const dimensionFilters = computed<DbmScopeFilter[]>(() => [
-  {
+  filterEntry({
     key: "instance",
     dimension: t("dbm.filters.dimension.instance"),
-    value: instanceFilter.value,
     placeholder: t("dbm.filters.allInstances"),
     options: optionsFrom(allRows.value.map((r) => r.dbInstance)),
-    onChange: (value) => {
-      instanceFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
-  {
+    model: instanceFilter,
+  }),
+  filterEntry({
     key: "env",
     dimension: t("dbm.filters.dimension.env"),
-    value: envFilter.value,
     placeholder: t("dbm.filters.allEnvs"),
     options: optionsFrom(allRows.value.map((r) => r.env)),
-    onChange: (value) => {
-      envFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
-  {
+    model: envFilter,
+  }),
+  filterEntry({
     key: "system",
     dimension: t("dbm.filters.dimension.system"),
-    value: systemFilter.value,
     placeholder: t("dbm.filters.allEngines"),
     options: optionsFrom(allRows.value.map((r) => r.dbSystem)),
-    onChange: (value) => {
-      systemFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
-  {
+    model: systemFilter,
+  }),
+  filterEntry({
     key: "service",
     dimension: t("dbm.filters.dimension.service"),
-    value: serviceFilter.value,
     placeholder: t("dbm.filters.allServices"),
     options: optionsFrom(allRows.value.map((r) => r.serviceName)),
-    onChange: (value) => {
-      serviceFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
-  {
+    model: serviceFilter,
+  }),
+  filterEntry({
     key: "namespace",
     dimension: t("dbm.filters.dimension.namespace"),
-    value: namespaceFilter.value,
     placeholder: t("dbm.filters.allNamespaces"),
     options: optionsFrom(allRows.value.map((r) => r.dbNamespace)),
-    onChange: (value) => {
-      namespaceFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
+    model: namespaceFilter,
+  }),
 ]);
 
 const clearScope = () => {
@@ -916,105 +807,72 @@ const onEmptyAction = (cause: DbmEmptyCauseId) => {
 
 // ─── Loading ─────────────────────────────────────────────────────────────────
 
-// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
-// badge cache alongside the page's own load — the URL does not change on a
-// refresh, so the shell cannot see one on its own.
-const onRefresh = () => {
-  void load();
-  tabCountsContext.refresh({ force: true });
-};
+const load = () =>
+  run(
+    async (token) => {
+      const { data } = await dbMonitoringService.getSamples(org.value, {
+        startTime: current.value.startTime,
+        endTime: current.value.endTime,
+        system: systemFilter.value ?? undefined,
+        instance: instanceFilter.value ?? undefined,
+        namespace: namespaceFilter.value ?? undefined,
+        env: envFilter.value ?? undefined,
+        service: serviceFilter.value ?? undefined,
+        // The database-reported fallback rides THIS response when the client
+        // answer is an exact zero — it used to be a second, sequential request
+        // fired once this one came back empty, which is two round trips on the
+        // deployment where it always fires.
+        includeServerFallback: true,
+      });
 
-const onDateChange = (value: DbmDateChange) => {
-  setRange(value);
-  syncUrl();
-  // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
-  // mount replay would otherwise double every request. See
-  // `DbmDateChange.userChangedValue`.
-  if (value?.userChangedValue !== false) load();
-};
+      // A newer window or refresh already owns the page.
+      if (requestSeq.isStale(token)) return;
 
-const load = async () => {
-  if (!org.value) return;
-  const token = requestSeq.begin();
-  loading.value = true;
-  error.value = null;
-  permissionOk.value = true;
-  refresh();
-
-  try {
-    const { data } = await dbMonitoringService.getSamples(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-      system: systemFilter.value ?? undefined,
-      instance: instanceFilter.value ?? undefined,
-      namespace: namespaceFilter.value ?? undefined,
-      env: envFilter.value ?? undefined,
-      service: serviceFilter.value ?? undefined,
-    });
-
-    // A newer window or refresh already owns the page.
-    if (requestSeq.isStale(token)) return;
-
-    const hits = data.hits ?? [];
-    allRows.value = buildSampleRows(hits);
-    truncated.value = Boolean(data.truncated);
-    streamsFailed.value = data.streams_failed ?? 0;
-    // The server list answers ONLY the empty page: populated client rows
-    // clear it (in-engine durations under a live client list would read as
-    // traced calls that never existed), and the fetch fires only on the
-    // empty branch so a page with rows never pays for it. Awaited, so the
-    // skeleton covers the read: the empty client answer arrives in
-    // milliseconds on an org with no trace streams, and clearing `loading`
-    // then would pop the empty state with no visible loading at all, only
-    // for the fallback table to appear beneath it half a second later.
-    if (hits.length) {
-      serverRows.value = [];
-      serverTruncated.value = false;
-    } else {
-      await loadServerSamples(token);
-    }
-    // Only probed when there is an empty state about to explain itself.
-    if (!allRows.value.length) void probeTracePresence();
-  } catch (err: unknown) {
-    if (requestSeq.isStale(token)) return;
-    // The previous window's rows are no longer an answer to the question on
-    // screen — leaving them would put stale samples under an error banner.
-    allRows.value = [];
-    truncated.value = false;
-    streamsFailed.value = 0;
-    serverRows.value = [];
-    serverTruncated.value = false;
-    const status = (err as { response?: { status?: number } })?.response?.status;
-    if (status === 403) {
-      permissionOk.value = false;
-    } else {
-      error.value =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        String(err);
-    }
-  } finally {
-    if (!requestSeq.isStale(token)) loading.value = false;
-  }
-};
-
-// Only this page's OWN read. The badges are DbmShell's, fetched once for
-// every tab — a call here would put the fan-out back on every mount.
-onMounted(() => {
-  load();
-});
-
-// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
-// session on this tab. The URL is how the tabs agree on a window, so re-read it
-// on return and reload ONLY if it actually moved.
-useDbmScopeSync({
-  route,
-  current: () => range.value,
-  adopt: (next) =>
-    setRange({
-      startTime: next.startTime,
-      endTime: next.endTime,
-      relativeTimePeriod: next.relativeTimePeriod,
-    }),
-  reload: () => load(),
-});
+      const hits = data.hits ?? [];
+      allRows.value = buildSampleRows(hits);
+      truncated.value = Boolean(data.truncated);
+      streamsFailed.value = data.streams_failed ?? 0;
+      // The server list answers ONLY the empty page: populated client rows
+      // clear it, since in-engine durations under a live client list would
+      // read as traced calls that never existed.
+      //
+      // It arrives WITH this response now, so the skeleton covers it for free
+      // — there is no second read for the spinner to race. That timing used to
+      // be delicate: the empty client answer lands in milliseconds on an org
+      // with no trace streams, so clearing `loading` before the fallback
+      // returned popped the empty state with no visible loading at all.
+      //
+      // The server also refuses to fall back on a PARTIAL answer: an empty
+      // list with a failed stream read is unknown, not zero, and the page's
+      // own `streams_failed` disclosure is what the reader should see there.
+      if (hits.length) {
+        serverRows.value = [];
+        serverTruncated.value = false;
+      } else {
+        const fallback = data.server_fallback;
+        serverRows.value = (fallback?.hits ?? []) as ServerSampleRow[];
+        serverTruncated.value = Boolean(fallback?.truncated);
+      }
+      // Only probed when there is an empty state about to explain itself.
+      if (!allRows.value.length) void probeTracePresence();
+    },
+    {
+      // A fresh load withdraws the previous permission diagnosis until the
+      // response says otherwise.
+      before: () => {
+        permissionOk.value = true;
+      },
+      reset: () => {
+        allRows.value = [];
+        truncated.value = false;
+        streamsFailed.value = 0;
+        serverRows.value = [];
+        serverTruncated.value = false;
+      },
+      // 403 is a diagnosis the empty state names, not an error banner.
+      onForbidden: () => {
+        permissionOk.value = false;
+      },
+    },
+  );
 </script>

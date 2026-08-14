@@ -65,17 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dbm.detail.copySummary") }}
         <OTooltip side="bottom" :content="t('dbm.detail.copySummaryHint')" />
       </OButton>
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
-        :loading="loading"
-        class="shrink-0"
-        data-test="dbm-detail-refresh"
-        @click="load"
-      >
-        <OTooltip side="bottom" :content="t('dbm.common.reload')" />
-      </OButton>
+      <DbmRefreshButton :loading="loading" data-test="dbm-detail-refresh" @refresh="load" />
     </template>
 
     <div class="flex flex-col gap-4 pt-3">
@@ -110,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <DbmQueryText
           :query="queryText"
-          :db-system="row?.db_system ?? ''"
+          :db-system="queryDbSystem"
           data-test="dbm-detail-query-text"
         />
         <span v-if="row?.truncated" class="text-text-muted text-2xs">
@@ -119,45 +109,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
 
       <!-- The headline numbers, before the charts: minute 0 of an incident is
-           "how bad and how much of the database is it", and that is six
-           figures, not a graph.
+           "how bad and how much of the database is it", and that is figures,
+           not a graph.
 
-           Labelled with its VANTAGE because a second, server-side block sits
-           below it (W6). These figures come from instrumented callers only —
-           anything talking to the database without tracing is invisible here
-           and IS counted in the block below. -->
-      <div class="text-text-muted text-xs" data-test="dbm-detail-stats-provenance">
+           The grid is now MIXED-vantage by design (Rule B): database time and
+           calls are the DATABASE's own figures under their generic labels, each
+           carrying an engine qualifier, while the percentiles and the error
+           count remain trace-derived — and drop out entirely when there is no
+           trace vantage, leaving the two the database answered.
+
+           Hence the disclaimer below is conditional. "Instrumented callers
+           only" describes the trace-derived tiles; over a grid of two
+           server-sourced figures it would misattribute them to a vantage that
+           measured nothing here, so it renders only alongside the tiles it
+           actually qualifies. -->
+
+      <!-- STEP 4 — information hierarchy. With no trace vantage the database's
+           own section is the only populated one, so it must LEAD rather than
+           sit under hidden client tiles. The order is expressed as flex
+           `order-*` on the two blocks rather than by duplicating either of them
+           in a second branch: one copy of each section, one source of truth for
+           its states, and the trace-led order restored the moment traces
+           return. -->
+      <div
+        v-if="traceVantage"
+        class="text-text-muted text-xs"
+        data-test="dbm-detail-stats-provenance"
+      >
         {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
       </div>
-      <div
-        class="border-border-default rounded-surface grid grid-cols-2 overflow-hidden border md:grid-cols-3 xl:grid-cols-6"
+      <DbmMetricTiles
+        :items="visibleHeadlineStats"
+        with-sub-labels
+        :class="traceVantage ? '' : 'order-2'"
+        tile-data-test="dbm-detail-stat"
         data-test="dbm-detail-stats"
-      >
-        <div
-          v-for="stat in headlineStats"
-          :key="stat.id"
-          class="border-border-subtle border-r border-b px-3 py-2 last:border-r-0"
-          :data-test="`dbm-detail-stat-${stat.id}`"
-        >
-          <!-- The percentile the plain-English label stands for, alongside it in
-               the quiet weight — the tile says what it means and what it is. -->
-          <div class="flex items-baseline gap-1">
-            <span class="text-text-label text-3xs font-semibold tracking-wide uppercase">
-              {{ stat.label }}
-            </span>
-            <span v-if="stat.sub" class="text-text-muted text-3xs" data-test="dbm-detail-stat-sub">
-              {{ stat.sub }}
-            </span>
-          </div>
-          <div
-            class="text-text-heading font-mono text-lg leading-tight font-semibold tabular-nums"
-            :class="stat.tone"
-          >
-            {{ stat.value }}
-          </div>
-          <div class="text-text-secondary text-3xs">{{ stat.detail }}</div>
-        </div>
-      </div>
+      />
 
       <!-- Plan drift, promoted. "It got slow because the plan changed" is the
            most actionable finding on this page, and the section that computes it
@@ -204,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="serverMetricsRead === 'done' && serverMetrics.state === 'off'"
         class="flex flex-wrap items-center gap-2"
+        :class="traceVantage ? '' : 'order-1'"
         data-test="dbm-detail-server-metrics"
       >
         <span class="text-text-muted text-xs" data-test="dbm-detail-server-metrics-off">
@@ -221,15 +209,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <section
+      <DbmSection
         v-else
-        class="card-container border-border-default rounded-surface flex flex-col border"
+        :title="t('dbm.detail.serverMetrics.title')"
+        :class="traceVantage ? '' : 'order-1'"
         data-test="dbm-detail-server-metrics"
       >
-        <div class="flex flex-wrap items-baseline gap-2 p-3 pb-1">
-          <h3 class="text-text-heading text-sm font-medium">
-            {{ t("dbm.detail.serverMetrics.title") }}
-          </h3>
+        <template #hint>
           <span class="text-text-muted text-xs" data-test="dbm-detail-server-metrics-provenance">
             {{ t("dbm.detail.serverMetrics.subtitle") }}
           </span>
@@ -251,23 +237,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("dbm.detail.serverMetrics.instanceWide") }}
           </span>
-        </div>
+        </template>
 
         <!-- The read FAILED. Distinct from `off` on purpose: a failed request
              says nothing about whether capture is running, and the off copy
              sends the reader to reconfigure a collector that may be fine. -->
-        <div
+        <DbmStateNote
           v-if="serverMetricsRead === 'failed'"
-          class="flex flex-col gap-1 px-3 pb-3"
+          :title="t('dbm.detail.serverMetrics.readFailed')"
+          :hint="t('dbm.detail.serverMetrics.readFailedHint')"
           data-test="dbm-detail-server-metrics-failed"
-        >
-          <span class="text-text-secondary text-sm">
-            {{ t("dbm.detail.serverMetrics.readFailed") }}
-          </span>
-          <span class="text-text-muted text-xs">
-            {{ t("dbm.detail.serverMetrics.readFailedHint") }}
-          </span>
-        </div>
+        />
 
         <!-- In flight: the header only, never a claim — which sentence applies
              is exactly what the read has not answered yet. -->
@@ -275,63 +255,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Two instances share this database name, so the join cannot tell
                which one ran the query. Deliberately NOT an error, and the
                numbers are withheld rather than guessed. -->
-          <div
+          <DbmStateNote
             v-if="serverMetrics.state === 'ambiguous'"
-            class="flex flex-col gap-1 px-3 pb-3"
+            :title="t('dbm.detail.serverMetrics.ambiguous')"
+            :hint="
+              t('dbm.detail.serverMetrics.ambiguousHint', {
+                instances: serverMetrics.candidateInstances.join(', '),
+              })
+            "
             data-test="dbm-detail-server-metrics-ambiguous"
-          >
-            <span class="text-text-secondary text-sm">
-              {{ t("dbm.detail.serverMetrics.ambiguous") }}
-            </span>
-            <span class="text-text-muted text-xs">
-              {{
-                t("dbm.detail.serverMetrics.ambiguousHint", {
-                  instances: serverMetrics.candidateInstances.join(", "),
-                })
-              }}
-            </span>
-          </div>
+          />
 
           <!-- Capture ran and found no counterpart. ORDINARY, not a failure:
                fingerprint convergence is partial by measurement, and the server
                legitimately sees statements no instrumented client issued. Muted
                copy, never error styling. -->
-          <div
+          <DbmStateNote
             v-else-if="serverMetrics.state === 'unmatched'"
-            class="flex flex-col gap-1 px-3 pb-3"
+            :title="t('dbm.detail.serverMetrics.noMatch')"
+            :hint="t('dbm.detail.serverMetrics.noMatchHint')"
             data-test="dbm-detail-server-metrics-unmatched"
-          >
-            <span class="text-text-secondary text-sm">
-              {{ t("dbm.detail.serverMetrics.noMatch") }}
-            </span>
-            <span class="text-text-muted text-xs">
-              {{ t("dbm.detail.serverMetrics.noMatchHint") }}
-            </span>
-          </div>
+          />
 
-          <div
+          <DbmMetricTiles
             v-else
-            class="border-border-default grid grid-cols-2 overflow-hidden border-t md:grid-cols-3 xl:grid-cols-6"
+            :items="serverTileItems"
+            variant="attached"
+            tile-data-test="dbm-detail-server-metric"
             data-test="dbm-detail-server-metrics-tiles"
-          >
-            <div
-              v-for="tile in serverTiles"
-              :key="tile.id"
-              class="border-border-subtle border-r border-b px-3 py-2 last:border-r-0"
-              :data-test="`dbm-detail-server-metric-${tile.id}`"
-            >
-              <div class="text-text-label text-3xs font-semibold tracking-wide uppercase">
-                {{ t(`dbm.detail.serverMetrics.${tile.labelKey}`) }}
-              </div>
-              <div
-                class="text-text-heading font-mono text-lg leading-tight font-semibold tabular-nums"
-              >
-                {{ tile.value }}
-              </div>
-            </div>
-          </div>
+          />
         </template>
-      </section>
+      </DbmSection>
 
       <!-- Coverage, as the same quiet line the list pages carry. Hidden on a
            server-vantage-only entry: with NO client row and the database's
@@ -340,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the instrumented-callers-only disclaimer, and there is no client
            coverage to be stale about. -->
       <DbmCoverageLine
-        v-if="clientRowFound || !serverAnswering"
+        v-if="traceVantage && (clientRowFound || !serverAnswering)"
         :freshness="freshness"
         :hits="row ? [row] : []"
         :top-n-subset="topNSubset"
@@ -371,54 +325,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OBanner>
 
-      <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <section
-          class="card-container border-border-default rounded-surface flex flex-col border p-3"
+      <!-- Both charts are drawn from the rollup series, which only traces fill.
+           Hidden entirely rather than shown as two empty axes labelled "No
+           history for this query" — there is no history because nothing traced
+           it, and an empty chart reads as a gap in data we should have. -->
+      <div v-if="traceVantage" class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <DbmHistoryPanel
+          :title="t('dbm.detail.latencyTitle')"
+          :empty-label="t('dbm.detail.noSeries')"
+          :loading="loading"
+          :has-series="hasSeries"
+          :panel-schema="latencyPanelSchema"
+          :selected-time-obj="selectedTimeObj"
+          :injected-promql-data="latencyInjectedData"
+          panel-data-test="dbm-detail-latency-panel"
           data-test="dbm-detail-latency-chart"
-        >
-          <h3 class="text-text-heading mb-1 text-sm font-medium">
-            {{ t("dbm.detail.latencyTitle") }}
-          </h3>
-          <OSkeleton v-if="loading" variant="button" class="h-55 w-full" />
-          <div v-else-if="!hasSeries" class="text-text-muted flex h-55 items-center justify-center">
-            {{ t("dbm.detail.noSeries") }}
-          </div>
-          <div v-else class="h-55 w-full">
-            <PanelSchemaRenderer
-              :panel-schema="latencyPanelSchema"
-              :selected-time-obj="selectedTimeObj"
-              :variables-data="{}"
-              :injected-promql-data="latencyInjectedData"
-              :allow-annotations-add="false"
-              :allow-annotations-a-p-i="false"
-              data-test="dbm-detail-latency-panel"
-            />
-          </div>
-        </section>
+        />
 
-        <section
-          class="card-container border-border-default rounded-surface flex flex-col border p-3"
+        <DbmHistoryPanel
+          :title="t('dbm.detail.volumeTitle')"
+          :empty-label="t('dbm.detail.noSeries')"
+          :loading="loading"
+          :has-series="hasSeries"
+          :panel-schema="volumePanelSchema"
+          :selected-time-obj="selectedTimeObj"
+          :injected-promql-data="volumeInjectedData"
+          panel-data-test="dbm-detail-volume-panel"
           data-test="dbm-detail-volume-chart"
-        >
-          <h3 class="text-text-heading mb-1 text-sm font-medium">
-            {{ t("dbm.detail.volumeTitle") }}
-          </h3>
-          <OSkeleton v-if="loading" variant="button" class="h-55 w-full" />
-          <div v-else-if="!hasSeries" class="text-text-muted flex h-55 items-center justify-center">
-            {{ t("dbm.detail.noSeries") }}
-          </div>
-          <div v-else class="h-55 w-full">
-            <PanelSchemaRenderer
-              :panel-schema="volumePanelSchema"
-              :selected-time-obj="selectedTimeObj"
-              :variables-data="{}"
-              :injected-promql-data="volumeInjectedData"
-              :allow-annotations-add="false"
-              :allow-annotations-a-p-i="false"
-              data-test="dbm-detail-volume-panel"
-            />
-          </div>
-        </section>
+        />
       </div>
 
       <!-- Where it runs (FR-5). The same rows the two charts merge per window,
@@ -435,19 +369,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            render — their share must stay visible — but refuse the click: the
            stored rows spell "absent" two ways, and a filter on one spelling
            would silently miss the other. -->
-      <section
-        v-if="whereRows.length || whereScopeActive"
-        class="card-container border-border-default rounded-surface flex flex-col border"
+      <DbmSection
+        v-if="traceVantage && (whereRows.length || whereScopeActive)"
+        :title="t('dbm.detail.whereItRuns.title')"
+        header-align="center"
         data-test="dbm-detail-where-it-runs"
       >
-        <div class="flex flex-wrap items-center gap-2 p-3 pb-1">
-          <h3 class="text-text-heading text-sm font-medium">
-            {{ t("dbm.detail.whereItRuns.title") }}
-          </h3>
+        <template #hint>
           <span class="text-text-secondary text-xs">
             {{ t("dbm.detail.whereItRuns.hint") }}
             <OTooltip side="top" :content="t('dbm.detail.whereItRuns.trackedHint')" />
           </span>
+        </template>
+        <template #actions>
           <div class="flex-1"></div>
           <OButton
             v-if="whereScopeActive"
@@ -459,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("dbm.detail.whereItRuns.showAll") }}
           </OButton>
-        </div>
+        </template>
 
         <!-- A focus that empties out still renders the section: the reader
              needs the way back, not a page that quietly hid the exit. -->
@@ -556,7 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
         </OTable>
-      </section>
+      </DbmSection>
 
       <!-- Errors by code (FR-5). Rendered only when there ARE coded failures:
            a standing empty "no errors" card would spend prime space saying
@@ -564,15 +498,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            range; when the scope is narrower than that tally exists at, the
            section falls back to counting the sample rows below — and SAYS so,
            because a capped sample undercounts precisely when errors spike. -->
-      <section
+      <DbmSection
         v-if="errorClasses.length"
-        class="card-container border-border-default rounded-surface flex flex-col border"
+        :title="t('dbm.detail.errorsByCode.title')"
         data-test="dbm-detail-error-codes"
       >
-        <div class="flex flex-wrap items-baseline gap-2 p-3 pb-1">
-          <h3 class="text-text-heading text-sm font-medium">
-            {{ t("dbm.detail.errorsByCode.title") }}
-          </h3>
+        <template #hint>
           <span class="text-text-secondary text-xs" data-test="dbm-detail-error-codes-provenance">
             {{
               errorClassesExact
@@ -580,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : t("dbm.detail.errorsByCode.sampleHint")
             }}
           </span>
-        </div>
+        </template>
         <div class="flex flex-col gap-1.5 p-3 pt-1">
           <div
             v-for="entry in errorClasses"
@@ -595,26 +526,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : entry.status_code
               }}
             </span>
-            <span class="bg-surface-subtle h-1.5 w-40 shrink-0 overflow-hidden rounded-full">
-              <span
-                class="bg-status-error-text block h-full rounded-full"
-                :style="{ width: errorCodeBarWidth(entry) }"
-              ></span>
-            </span>
+            <DbmShareBar
+              :share="errorCodeBarShare(entry)"
+              track-class="h-1.5 w-40 shrink-0"
+              fill-class="bg-status-error-text"
+            />
             <span class="text-text-body font-mono text-xs tabular-nums">
               {{ formatCount(entry.errors) }}
             </span>
           </div>
         </div>
-      </section>
+      </DbmSection>
 
       <!-- The two panels below read RAW traces, so they need to know which
            trace stream this fingerprint lives on — and the queries endpoint does
            not carry it. With several streams in the org there is no way to tell,
            and picking one silently would put another stream's callers under this
            query's headline numbers. So it says so, and asks. -->
+      <!-- The picker exists to disambiguate WHICH trace stream to read. With no
+           trace vantage for this fingerprint there is nothing to pick between —
+           every stream would answer empty — so asking would be busywork. -->
       <OBanner
-        v-if="streamAmbiguous"
+        v-if="traceVantage && streamAmbiguous"
         variant="warning"
         class="shrink-0"
         data-test="dbm-detail-stream-ambiguous"
@@ -635,16 +568,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Calling endpoints: who is responsible for this query's load. The
            per-caller bars answer the share question ("which caller do I go
            talk to") faster than a number does. -->
-      <section
-        class="card-container border-border-default rounded-surface flex flex-col border"
+      <!-- Callers are read from raw traces and exist nowhere else. Hidden, not
+           shown as an empty table saying we couldn't tell which part of the
+           application ran this: that sentence is a finding about broken
+           instrumentation, and here nothing was instrumented to begin with. -->
+      <DbmSection
+        v-if="traceVantage"
+        :title="t('dbm.detail.endpointsTitle')"
+        header-align="between"
         data-test="dbm-detail-endpoints"
       >
-        <div class="flex items-center justify-between gap-2 p-3 pb-1">
-          <h3 class="text-text-heading text-sm font-medium">
-            {{ t("dbm.detail.endpointsTitle") }}
-          </h3>
+        <template #hint>
           <span class="text-text-secondary text-xs">{{ t("dbm.detail.endpointsHint") }}</span>
-        </div>
+        </template>
         <OTable
           :data="endpoints"
           :columns="endpointColumns"
@@ -699,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </OTable>
-      </section>
+      </DbmSection>
 
       <!-- Query plans. Provenance is PER ROW now (W-E3): generic NULL-bound
            estimates keep the gap tag — the statement EXPLAINed with every bind
@@ -710,17 +646,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
            Above the samples, deliberately: plans are the diagnosis, samples the
            rawest evidence, so the diagnosis reads first. -->
-      <section
+      <!-- Plans are a SERVER-vantage section (captured by the collector, not
+           derived from traces), so they stay whatever the trace vantage says —
+           and follow the counters directly when the counters are leading. -->
+      <DbmSection
         ref="plansSection"
-        class="card-container border-border-default rounded-surface flex flex-col border"
+        :title="t('dbm.detail.plans.title')"
+        header-align="center"
+        :class="traceVantage ? '' : 'order-3'"
         data-test="dbm-detail-plans"
       >
-        <div class="flex flex-wrap items-center gap-2 p-3 pb-1">
-          <h3 class="text-text-heading text-sm font-medium">
-            {{ t("dbm.detail.plans.title") }}
-          </h3>
-        </div>
-
         <div v-if="plansError" class="text-text-muted p-6 text-center text-sm">
           {{ plansError }}
         </div>
@@ -730,35 +665,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              statement is normal — the database cannot explain a COMMIT,
              ROLLBACK or SHOW — so it must not be blamed on config. -->
         <template v-else-if="planEmpty === 'captureOff'">
-          <div class="flex flex-col gap-1 p-6 text-center">
-            <span class="text-text-secondary text-sm">{{ t("dbm.detail.plans.noPlans") }}</span>
-            <span class="text-text-muted text-xs">{{ t("dbm.detail.plans.noPlansHint") }}</span>
-          </div>
+          <DbmStateNote
+            :title="t('dbm.detail.plans.noPlans')"
+            :hint="t('dbm.detail.plans.noPlansHint')"
+            placement="centered"
+          />
         </template>
 
         <template v-else-if="planEmpty === 'noPlanForQuery'">
-          <div class="flex flex-col gap-1 p-6 text-center">
-            <span class="text-text-secondary text-sm">{{
-              t("dbm.detail.plans.noPlanForQuery")
-            }}</span>
-            <span class="text-text-muted text-xs">{{
-              t("dbm.detail.plans.noPlanForQueryHint")
-            }}</span>
-          </div>
+          <DbmStateNote
+            :title="t('dbm.detail.plans.noPlanForQuery')"
+            :hint="t('dbm.detail.plans.noPlanForQueryHint')"
+            placement="centered"
+          />
         </template>
 
         <!-- Good news, not a gap: executed-plan capture is on and running, and
              no execution of this query was slow enough to be captured. Must
              never read as a config error. -->
         <template v-else-if="planEmpty === 'noExecutionCaptured'">
-          <div class="flex flex-col gap-1 p-6 text-center" data-test="dbm-detail-plans-not-slow">
-            <span class="text-text-secondary text-sm">{{
-              t("dbm.detail.plans.noExecutionCaptured")
-            }}</span>
-            <span class="text-text-muted text-xs">{{
-              t("dbm.detail.plans.noExecutionCapturedHint")
-            }}</span>
-          </div>
+          <DbmStateNote
+            :title="t('dbm.detail.plans.noExecutionCaptured')"
+            :hint="t('dbm.detail.plans.noExecutionCapturedHint')"
+            placement="centered"
+            data-test="dbm-detail-plans-not-slow"
+          />
         </template>
 
         <template v-else>
@@ -882,24 +813,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </article>
           </div>
         </template>
-      </section>
+      </DbmSection>
 
       <!-- Slow samples. The scatter spreads across BOTH
            time and duration so the distribution's shape is visible, not only
            its tail. Every point pivots to its trace. -->
-      <section
-        class="card-container border-border-default rounded-surface flex flex-col border"
+      <!-- Every sample here is a raw SPAN, and each row's only action is a pivot
+           to its trace. With no trace vantage there is neither a row nor a
+           trace to pivot to. -->
+      <DbmSection
+        v-if="traceVantage"
+        :title="t('dbm.detail.samplesTitle')"
+        header-align="between"
         data-test="dbm-detail-samples"
       >
-        <div class="flex items-center justify-between gap-2 p-3 pb-1">
-          <h3 class="text-text-heading text-sm font-medium">
-            {{ t("dbm.detail.samplesTitle") }}
-          </h3>
+        <template #hint>
           <span class="text-text-secondary text-xs">{{ t("dbm.detail.samplesHint") }}</span>
-        </div>
+        </template>
 
         <div v-if="samples.length" class="h-50 w-full px-3">
-          <ChartRenderer :data="{ options: samplesOption }" @click="onSampleClick" />
+          <ChartRenderer :data="scatterData" @click="onSampleClick" />
         </div>
 
         <OTable
@@ -946,7 +879,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </OTable>
-      </section>
+      </DbmSection>
     </div>
   </OPageLayout>
 </template>
@@ -957,7 +890,13 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
+import DbmHistoryPanel from "@/components/dbm/DbmHistoryPanel.vue";
 import DbmQueryText from "@/components/dbm/DbmQueryText.vue";
+import DbmMetricTiles, { type DbmMetricTile } from "@/components/dbm/DbmMetricTiles.vue";
+import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
+import DbmSection from "@/components/dbm/DbmSection.vue";
+import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
+import DbmStateNote from "@/components/dbm/DbmStateNote.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -970,27 +909,30 @@ import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
   type EndpointRow,
   type ErrorCodeCount,
   type Freshness,
   type QueryStatsRow,
+  type ServerQueryRow,
 } from "@/services/db_monitoring";
-import searchService from "@/services/search";
+// No `searchService` import: this page no longer runs a raw search of its own.
+// Its one hand-built query — the per-fingerprint slow samples — is served by
+// `/samples?fingerprint=`, which builds the predicate server-side.
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { takeDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
+import { useDbmChartTheme } from "@/composables/dbm/useDbmChartTheme";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
+import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
 import useStreams from "@/composables/useStreams";
 import {
   contextRegistry,
   createDbmContextProvider,
   DBM_CONTEXT_KEY,
 } from "@/composables/contextProviders";
-import { chartColor } from "@/utils/chartTheme";
 import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
 import { DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import {
@@ -1002,6 +944,7 @@ import {
   type PlanRow,
 } from "@/utils/dbm/plans";
 import {
+  dbmHttpError,
   formatCount,
   formatNs,
   formatPercent,
@@ -1022,7 +965,7 @@ import {
   type WhereItRunsRow,
   type WhereItRunsScope,
 } from "@/utils/dbm/whereItRuns";
-import { buildSamplesOption, type DbmChartTheme } from "@/utils/dbm/historyChart";
+import { buildSamplesOption } from "@/utils/dbm/historyChart";
 import {
   buildHistoryRows,
   buildInjectedHistoryData,
@@ -1031,13 +974,11 @@ import {
 } from "@/utils/dbm/historyPanelSchema";
 import { buildIncidentSummary } from "@/utils/dbm/incidentSummary";
 import { deltaFor, isCriticalErrorRate } from "@/utils/dbm/insights";
+import { resolveCalls, resolveDatabaseTime } from "@/utils/dbm/overlapMetrics";
 import { escapeSingleQuotes } from "@/utils/zincutils";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
-);
-const PanelSchemaRenderer = defineAsyncComponent(
-  () => import("@/components/dashboards/PanelSchemaRenderer.vue"),
 );
 
 /** `HISTORY_BACKFILL_MAX_WINDOWS` in api.rs — printed in the capped disclosure. */
@@ -1114,6 +1055,23 @@ const namespaceFilter = computed(() => (route.query.namespace as string) ?? unde
 const row = ref<QueryStatsRow | null>(null);
 /** Whether the CLIENT fetch found this query — a painted seed does not count. */
 const clientRowFound = ref(false);
+/**
+ * The database's OWN row for this statement, when the client vantage had none.
+ *
+ * On a fleet with the collector wired and no traced application traffic the
+ * list pages already fall back to the server-vantage list — so a reader clicks
+ * a row showing a call count and an in-database time. This page's row lookup
+ * reads only the trace vantage, so without this it answered "no row" and lost
+ * every figure the reader had just been looking at: on a reload, where no seed
+ * survives, down to the bare fingerprint.
+ *
+ * Held SEPARATE from `row` rather than folded into it. `row` is a
+ * client-vantage `QueryStatsRow` — percentiles, error counts, trace ids — and
+ * this feed has none of those. Merging would put a server call count under a
+ * heading that promises traced traffic, and leave the percentile tiles reading
+ * from a shape that cannot fill them.
+ */
+const serverRow = ref<ServerQueryRow | null>(null);
 const previousRow = ref<QueryStatsRow | null>(null);
 /**
  * The clicked row the queries list handed off, when this page was opened from
@@ -1150,6 +1108,18 @@ const serverMetrics = ref<DbmServerMetrics>(readServerMetrics(null));
  */
 const serverMetricsRead = ref<"loading" | "failed" | "done">("loading");
 const serverTiles = computed(() => serverMetricsTiles(serverMetrics.value));
+/**
+ * The server counters as tiles. The util names each figure by KEY — it does no
+ * translation, so no copy is duplicated between it and the messages file — and
+ * the label is resolved here, at the one place that has `t`.
+ */
+const serverTileItems = computed<DbmMetricTile[]>(() =>
+  serverTiles.value.map((tile) => ({
+    id: tile.id,
+    label: t(`dbm.detail.serverMetrics.${tile.labelKey}`),
+    value: raw(tile.value),
+  })),
+);
 const freshness = ref<Freshness | null>(null);
 const topNSubset = ref(false);
 const scopeTotalNs = ref(0);
@@ -1182,18 +1152,51 @@ const plans = ref<PlanRow[]>([]);
 const serverAnswering = computed(
   () => serverMetrics.value.state === "matched" || plans.value.length > 0,
 );
+
+/**
+ * RULE A's one predicate for this page: does the TRACE vantage hold anything
+ * for THIS fingerprint in THIS window?
+ *
+ * Everything that can only come from traces — percentiles, the two history
+ * charts, "Where it runs", the caller list, the sample scatter, errors by code —
+ * hides on `false` rather than rendering "—" or an empty table with a message.
+ * An empty table saying "we couldn't tell which part of your application ran
+ * this" is a FINDING about instrumentation; on a fleet with no traced traffic
+ * it is simply not the question, and six of them stacked above the section that
+ * does have the answer buried it.
+ *
+ * The signals are the response's own: the resolved client row and the rollup
+ * series. Both empty, both answered, is the observation. `loading` keeps the
+ * vantage present so sections do not flash out on every window change, and a
+ * failed read is never treated as absence — see `useDbmTraceVantage`.
+ */
+const traceVantage = computed(() =>
+  hasDbmTraceVantage({
+    rows: clientRowFound.value ? [row.value] : [],
+    series: history.value?.points ?? [],
+    loading: loading.value,
+  }),
+);
 const planDrift = ref<PlanDriftLevel>("none");
 /** Why the section is empty, when it is — see `planEmptyReason`. */
 const planEmpty = ref<ReturnType<typeof planEmptyReason>>("captureOff");
 const plansError = ref<string | null>(null);
-/** Anchor for the promoted drift callout's "View plans" jump. */
-const plansSection = ref<HTMLElement | null>(null);
+/**
+ * Anchor for the promoted drift callout's "View plans" jump. A component ref
+ * now that the section is a `DbmSection`, so the element is reached through
+ * `$el` — its root IS the `<section>`, single-rooted, so there is no fragment
+ * to disambiguate.
+ */
+const plansSection = ref<InstanceType<typeof DbmSection> | null>(null);
 /**
  * The top callout promotes the drift FINDING; the plan evidence stays in its
  * section below, so the action is a jump rather than a second rendering.
  */
 const scrollToPlans = () => {
-  plansSection.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+  (plansSection.value?.$el as HTMLElement | undefined)?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
 };
 const samples = ref<SampleRow[]>([]);
 const samplesError = ref<string | null>(null);
@@ -1250,12 +1253,30 @@ const backTarget = computed(() => {
   };
 });
 
-const queryText = computed(() => oneLine(row.value?.query_norm) || fingerprint.value);
+/**
+ * The statement itself. The server-vantage row is the SAME statement text —
+ * the receiver's normalization of what the database reported — so it stands in
+ * when no client row exists, rather than letting the header paint a hash the
+ * reader cannot read. The bare fingerprint stays the last resort.
+ */
+const queryText = computed(
+  () => oneLine(row.value?.query_norm) || oneLine(serverRow.value?.query) || fingerprint.value,
+);
+/** The engine, for the SQL highlighter — from either vantage's row. */
+const queryDbSystem = computed(() => row.value?.db_system ?? serverRow.value?.db_system ?? "");
 
 const identityChips = computed(() => {
   const chips: { key: string; label: I18nText }[] = [];
   const current = row.value;
-  if (!current) return chips;
+  // Dimensions the server row knows just as well; on a fleet with no traced
+  // traffic they are the only ones there are.
+  if (!current) {
+    const server = serverRow.value;
+    if (!server) return chips;
+    if (server.db_instance) chips.push({ key: "instance", label: raw(server.db_instance) });
+    if (server.db_namespace) chips.push({ key: "namespace", label: raw(server.db_namespace) });
+    return chips;
+  }
   if (current.db_instance) chips.push({ key: "instance", label: raw(current.db_instance) });
   if (current.db_namespace) chips.push({ key: "namespace", label: raw(current.db_namespace) });
   if (current.env) chips.push({ key: "env", label: raw(current.env) });
@@ -1310,7 +1331,8 @@ const formatClock = (micros: number): string =>
  * the app's units, axes, legend, tooltip, timezone and theming. The series are
  * computed here from the classified history rather than by a query, so they
  * reach the renderer through its pre-fetched-results injection path. See
- * `utils/dbm/historyPanelSchema.ts` for why that path is the right one.
+ * `utils/dbm/historyPanelSchema.ts` for why that path is the right one, and
+ * `DbmHistoryPanel` for the loading/empty/panel ladder the two cards share.
  */
 const latencyPanelSchema = computed(() =>
   buildLatencyPanelSchema({
@@ -1389,17 +1411,7 @@ const volumeInjectedData = computed(() => {
  * token stylesheet is live), so no colour is spelled out here. Depends on the
  * theme state so the colours re-resolve on a light/dark flip.
  */
-const chartTheme = computed<Pick<DbmChartTheme, "calls" | "errors" | "axisLabel" | "splitLine">>(
-  () => {
-    void store.state.theme;
-    return {
-      calls: chartColor("--color-chart-series-1"),
-      errors: chartColor("--color-severity-error-color"),
-      axisLabel: chartColor("--color-text-secondary"),
-      splitLine: chartColor("--color-border-default"),
-    };
-  },
-);
+const chartTheme = useDbmChartTheme();
 
 const samplesOption = computed(() =>
   buildSamplesOption(samples.value, chartTheme.value, formatNs, formatClock, {
@@ -1407,6 +1419,8 @@ const samplesOption = computed(() =>
     error: t("dbm.detail.sampleError"),
   }),
 );
+
+const scatterData = computed(() => ({ options: samplesOption.value }));
 
 // ─── Headline stats ──────────────────────────────────────────────────────────
 
@@ -1416,11 +1430,64 @@ const samplesOption = computed(() =>
  * no failures or no visibility. A big number with no qualifier is the thing
  * that gets quoted in an incident channel and then walked back.
  */
+/**
+ * Whose counters the overlap tiles are quoting, for the engine qualifier. The
+ * server row and the matched counters are the same feed; either names the
+ * engine, and the URL scope is the last resort on a deep link.
+ */
+const engineLabel = computed(
+  () => serverRow.value?.db_system || row.value?.db_system || systemFilter.value || "",
+);
+
+/**
+ * RULE B, resolved once: the DB server's figures win for the two measures both
+ * vantages carry, with the traced value as the fallback when the join found no
+ * counterpart (which is the ordinary case — see `serverMetrics.ts`).
+ */
+const databaseTime = computed(() =>
+  resolveDatabaseTime({
+    serverExecTimeS: serverRow.value?.exec_time_s,
+    execTimeKind: serverRow.value?.exec_time_kind ?? serverMetrics.value.execTimeKind,
+    engine: engineLabel.value,
+    clientTotalTimeNs: row.value?.total_time_ns,
+  }),
+);
+
+const callCount = computed(() =>
+  resolveCalls({
+    // The matched counters and the fallback row are the same server feed; take
+    // whichever this entry resolved, never both.
+    serverCalls: serverRow.value?.calls ?? serverMetrics.value.calls,
+    engine: engineLabel.value,
+    clientCalls: row.value?.calls,
+  }),
+);
+
+/**
+ * RULE A applied to the headline grid. The percentile and error tiles are
+ * TRACE-ONLY — the server feed has no percentiles and no error counts — so with
+ * no trace vantage they are removed rather than rendered as four "—"s under
+ * labels promising measurements. What is left is the two overlap tiles, which
+ * the database itself is answering.
+ */
+const visibleHeadlineStats = computed(() =>
+  traceVantage.value
+    ? headlineStats.value
+    : headlineStats.value.filter((tile) => tile.id === "load" || tile.id === "calls"),
+);
+
 const headlineStats = computed(() => {
   const current = row.value;
   const share = scopeTotalNs.value > 0 ? (current?.total_time_ns ?? 0) / scopeTotalNs.value : 0;
-  const calls = current?.calls ?? 0;
-  const errors = current?.errors ?? 0;
+  // ABSENT stays absent. With no client row these tiles have no measurement to
+  // report, and `0` would be a claim that the query ran zero times and failed
+  // zero times — precisely the false all-clear a reader would act on. The
+  // formatters render `undefined` as "—"; only the error-RATE comparisons
+  // below need a number, and they get an explicit 0 that is never displayed.
+  const calls = current?.calls;
+  const errors = current?.errors;
+  const callsForRate = calls ?? 0;
+  const errorsForRate = errors ?? 0;
   const callsChange = deltaFor(current?.calls, previousRow.value?.calls);
   const latencyChange = deltaFor(current?.p95_ns, previousRow.value?.p95_ns);
 
@@ -1439,25 +1506,67 @@ const headlineStats = computed(() => {
   // the share and the deltas are this page's own scope arithmetic and have not
   // been computed yet — their caption lines stay blank until the fetch lands,
   // because "0% of database" and "new" are claims, not placeholders.
+  //
+  // The SAME rule governs an absent value, and for a stronger reason: on a
+  // fleet with no traced traffic every figure here is absent, and a caption
+  // under a "—" describes a measurement that does not exist. "0% of this
+  // database", "new to this list", "close, not exact" — each was read as a
+  // finding about a query the trace vantage never saw. A caption may only
+  // qualify a number that is actually on screen.
+  const captionFor = (value: number | null | undefined, caption: () => I18nText): I18nText =>
+    value === undefined || value === null ? raw("") : caption();
+
+  // RULE B — the two OVERLAP figures. Both vantages can supply a database time
+  // and a call count; the DATABASE SERVER wins, under the generic label, and
+  // the trace number is dropped rather than shown as a secondary line (two
+  // numbers for one question is what sent readers looking for a tiebreak).
+  //
+  // The qualifier is NOT decoration. `exec_time_s` is execution time on
+  // Postgres and WAIT time on MySQL/MariaDB, so the generic "Database time"
+  // heading is only honest while the sub-label says which one this is.
+  const engineName = raw(engineLabel.value);
+  const overlapDetail = (qualifierKey: string | null): I18nText =>
+    qualifierKey === null
+      ? raw("")
+      : t(`dbm.detail.overlap.${qualifierKey}` as "dbm.detail.overlap.serverExecution", {
+          engine: engineName,
+        });
+
   return [
     {
       id: "load",
       label: t("dbm.detail.stats.load"),
       sub: undefined,
-      value: raw(formatNs(current?.total_time_ns)),
-      detail: rowStatsReady.value
-        ? t("dbm.detail.stats.loadShare", { percent: formatPercent(share, 0) })
-        : raw(""),
+      value: raw(formatNs(databaseTime.value.value ?? undefined)),
+      // The share is CLIENT-scope arithmetic (this row's time over the traced
+      // scope total), so it may only caption a client-sourced value. Under a
+      // server figure it would divide the engine's total by a traced subtotal.
+      detail:
+        databaseTime.value.source === "client"
+          ? captionFor(current?.total_time_ns, () =>
+              rowStatsReady.value
+                ? t("dbm.detail.stats.loadShare", { percent: formatPercent(share, 0) })
+                : raw(""),
+            )
+          : overlapDetail(databaseTime.value.qualifierKey),
       tone: "",
     },
     {
       id: "calls",
       label: t("dbm.detail.stats.calls"),
       sub: undefined,
-      value: raw(formatCount(calls)),
-      detail: rowStatsReady.value
-        ? t("dbm.detail.stats.callsDelta", { change: changeWords(callsChange) })
-        : raw(""),
+      value: raw(formatCount(callCount.value.value ?? undefined)),
+      // Same rule as the share: the delta compares THIS window's traced count
+      // with the previous window's traced count, so it cannot qualify a server
+      // figure drawn from a different population.
+      detail:
+        callCount.value.source === "client"
+          ? captionFor(calls, () =>
+              rowStatsReady.value
+                ? t("dbm.detail.stats.callsDelta", { change: changeWords(callsChange) })
+                : raw(""),
+            )
+          : overlapDetail(callCount.value.qualifierKey),
       tone: "",
     },
     {
@@ -1468,7 +1577,7 @@ const headlineStats = computed(() => {
       // Per-query percentiles are combined across windows rather than
       // recomputed, so they are close but not exact — and the stat says so
       // instead of leaving the reader to assume precision it does not have.
-      detail: t("dbm.detail.stats.approx"),
+      detail: captionFor(current?.p50_ns, () => t("dbm.detail.stats.approx")),
       tone: "",
     },
     {
@@ -1476,7 +1585,9 @@ const headlineStats = computed(() => {
       label: t("dbm.detail.stats.p95"),
       sub: raw("p95"),
       value: raw(formatNs(current?.p95_ns)),
-      detail: rowStatsReady.value ? changeWords(latencyChange) : raw(""),
+      detail: captionFor(current?.p95_ns, () =>
+        rowStatsReady.value ? changeWords(latencyChange) : raw(""),
+      ),
       tone: "",
     },
     {
@@ -1485,23 +1596,33 @@ const headlineStats = computed(() => {
       sub: raw("max"),
       value: raw(formatNs(current?.max_ns)),
       // A maximum is a real observed call, never a fused estimate.
-      detail: t("dbm.detail.stats.exact"),
+      detail: captionFor(current?.max_ns, () => t("dbm.detail.stats.exact")),
       tone: "",
     },
     {
       id: "errors",
       label: t("dbm.detail.stats.errors"),
       sub: undefined,
+      // No row, no error count: "none" would be an all-clear nobody measured.
       value:
-        errors <= 0
-          ? t("dbm.queries.errorsNone")
-          : calls > 0 && errors >= calls
-            ? t("dbm.queries.errorsAll")
-            : raw(formatCount(errors)),
-      detail: errors <= 0 ? t("dbm.detail.stats.noErrors") : t("dbm.detail.stats.exact"),
+        errors === undefined
+          ? raw(formatCount(undefined))
+          : errors <= 0
+            ? t("dbm.queries.errorsNone")
+            : callsForRate > 0 && errors >= callsForRate
+              ? t("dbm.queries.errorsAll")
+              : raw(formatCount(errors)),
+      detail:
+        errors === undefined
+          ? raw("")
+          : errors <= 0
+            ? t("dbm.detail.stats.noErrors")
+            : t("dbm.detail.stats.exact"),
       // Red only past a real failure RATE — reddening on any error at all
       // would make one failure in a million read as loudly as a total outage.
-      tone: isCriticalErrorRate(errors, calls) ? "text-status-error-text" : "text-text-label",
+      tone: isCriticalErrorRate(errorsForRate, callsForRate)
+        ? "text-status-error-text"
+        : "text-text-label",
     },
   ];
 });
@@ -1709,19 +1830,12 @@ const loadTraceStreams = async () => {
   }
 };
 
-/**
- * A stream name safe to interpolate as a table name.
- *
- * The allowlist is the authority — a name the org actually has cannot be an
- * injection. The shape check is the fallback for when the stream list could not
- * be fetched: OpenObserve stream names are identifiers, so anything carrying a
- * quote, a space or a semicolon is not one and is refused.
- */
-const isSafeStreamName = (name: string): boolean => {
-  if (!name) return false;
-  if (traceStreams.value.includes(name)) return true;
-  return /^[A-Za-z0-9_-]+$/.test(name);
-};
+// `isSafeStreamName` lived here — an allowlist plus an identifier-shape
+// fallback, guarding a stream name this page interpolated into a table position
+// in hand-built SQL. There is no interpolation left to guard: the samples read
+// goes through `/samples?fingerprint=`, which resolves and authorizes the
+// stream server-side through `involved_streams`. A validator with nothing to
+// validate is a claim of safety nobody is checking, so it is gone with the SQL.
 
 const streamOptions = computed<SelectOption[]>(() =>
   traceStreams.value.map((name) => ({ label: raw(name), value: name })),
@@ -1730,20 +1844,21 @@ const streamOptions = computed<SelectOption[]>(() =>
 /**
  * Picking a stream re-reads the panels that depend on it; history follows too.
  *
- * All three share ONE token, so picking A then B voids A's three responses
- * together — without it, A's callers and samples land under B-labelled headline
- * stats, which is the mis-attribution the stream-resolution design exists to
- * prevent.
+ * They share ONE token, so picking A then B voids A's responses together —
+ * without it, A's callers and samples land under B-labelled headline stats,
+ * which is the mis-attribution the stream-resolution design exists to prevent.
+ *
+ * The server-vantage pair is deliberately NOT refetched. Plans and the
+ * database's own counters are `dbm_server` records keyed on the fingerprint;
+ * neither reads the picked TRACE stream, so a refetch would re-request
+ * identical data. (The old `loadPlans` call here did exactly that.) `loadRow`
+ * stays out for its own reason: it is scoped by system/instance/namespace, not
+ * by the trace stream.
  */
 const onStreamPick = (value: SelectModelValue) => {
   pickedStream.value = typeof value === "string" ? value : "";
   const token = requestSeq.begin();
-  void Promise.all([
-    loadHistory(token),
-    loadEndpoints(token),
-    loadSamples(token),
-    loadPlans(token),
-  ]);
+  void Promise.all([loadHistory(token), loadEndpoints(token), loadSamples(token)]);
 };
 
 const load = async () => {
@@ -1761,8 +1876,9 @@ const load = async () => {
   // The stream list exists to RESOLVE an unknown stream (and to feed the
   // picker when the org has several). When the stream traveled in the URL or
   // on the seeded row it is already resolved, so the fetch would answer a
-  // question nobody is asking — skipped. `isSafeStreamName`'s identifier-shape
-  // fallback still guards the interpolation the allowlist normally covers.
+  // question nobody is asking — skipped. It no longer carries a security
+  // duty: the reads that take a stream now hand it to endpoints that
+  // authorize it, rather than interpolating it into SQL here.
   const streamKnown = Boolean(streamParam.value || seed?.trace_stream_name);
   const streamsSettled = streamKnown ? Promise.resolve() : loadTraceStreams();
 
@@ -1775,15 +1891,14 @@ const load = async () => {
       row.value = seed;
       await Promise.all([
         loadRow(token, seed),
-        loadServerMetrics(token),
-        streamsSettled.then(() =>
-          Promise.all([
-            loadHistory(token),
-            loadEndpoints(token),
-            loadSamples(token),
-            loadPlans(token),
-          ]),
-        ),
+        // The server-vantage pair rides ONE request now, and it still runs in
+        // this batch rather than behind the stream list: neither section needs
+        // a trace stream, and the counters' join key is on the seed already.
+        loadQueryInsights(token),
+        // The calling endpoints ride `loadHistory`'s response — same
+        // fingerprint, same window, and the stream they need is the one that
+        // request resolves.
+        streamsSettled.then(() => Promise.all([loadHistory(token), loadSamples(token)])),
       ]);
     } else {
       // Cold entry (deep link, reload, window change): history needs the
@@ -1794,14 +1909,16 @@ const load = async () => {
       await Promise.all([loadRow(token), streamsSettled]);
       if (requestSeq.isStale(token)) return;
       await Promise.all([
+        // The series AND the calling endpoints — one request. Endpoints needs
+        // the trace stream this one resolves, so asking separately meant
+        // waiting for an answer this response already carried.
         loadHistory(token),
-        loadEndpoints(token),
         loadSamples(token),
-        loadPlans(token),
-        // Runs in this batch rather than the one above: the join key comes
-        // from the row's engine and database, so it needs `loadRow` to have
-        // landed.
-        loadServerMetrics(token),
+        // ONE request for the two server-vantage sections (plans + the
+        // database's own counters). Runs in this batch rather than the one
+        // above: the counters' join key comes from the row's engine and
+        // database, so it needs `loadRow` to have landed.
+        loadQueryInsights(token),
       ]);
     }
   } finally {
@@ -1830,6 +1947,13 @@ const loadRow = async (token: number = requestSeq.current(), seed: QueryStatsRow
     endTime: current.value.endTime,
     baselineStartTime: previous.value.startTime,
     baselineEndTime: previous.value.endTime,
+    // The same one-request fallback the list pages use, narrowed to THIS
+    // statement — it arms only on an exact client zero, so a traced fleet
+    // pays nothing for it. Without the fingerprint the fallback would answer
+    // with the org's most-frequent statements, among which this one need not
+    // rank at all.
+    fingerprint: fingerprint.value,
+    includeServerFallback: true,
   });
 
   // A newer window or stream pick already owns the page.
@@ -1847,6 +1971,12 @@ const loadRow = async (token: number = requestSeq.current(), seed: QueryStatsRow
   // client row anywhere. The coverage gate keys on what the FETCH found.
   clientRowFound.value = fetched !== null;
   row.value = fetched ?? seed ?? null;
+  // The database's own row for this statement, when the client vantage had
+  // none. Filtered to the exact fingerprint for the same reason the client
+  // rows are: the section must describe THIS statement or nothing.
+  serverRow.value =
+    response.data.server_fallback?.hits?.find((hit) => hit.fingerprint === fingerprint.value) ??
+    null;
   // A server-side baseline failure degrades the deltas to "no baseline" rather
   // than comparing against an empty set it would misread as change.
   const baselineHits = response.data.baseline_read_failed
@@ -1866,7 +1996,58 @@ const loadRow = async (token: number = requestSeq.current(), seed: QueryStatsRow
   rowStatsReady.value = true;
 };
 
+/**
+ * Turn the endpoints aggregation's rows into the table's rows. Shared by the
+ * `include_endpoints` section below and by the stand-alone refetch a stream
+ * pick triggers, so the two paths cannot render the same data differently.
+ */
+const applyEndpointHits = (hits: EndpointRow[]) => {
+  const totalCalls = hits.reduce((acc, hit) => acc + (hit.calls ?? 0), 0);
+  endpoints.value = hits.map((hit, index) => ({
+    ...hit,
+    rowKey: `${hit.service_name ?? "null"}-${hit.endpoint ?? "null"}-${index}`,
+    // A null caller is a real result: the DB span's trace root fell outside
+    // the window or is missing, so the call is genuinely unattributed.
+    serviceLabel: hit.service_name ? raw(hit.service_name) : t("dbm.detail.unattributed"),
+    share: totalCalls > 0 ? (hit.calls ?? 0) / totalCalls : 0,
+  }));
+};
+
+/**
+ * The "we cannot answer because we do not know the stream" state.
+ *
+ * This now renders ONLY in the partially-instrumented case: the fingerprint HAS
+ * a trace vantage (so the section is on screen at all under Rule A) but the
+ * stream carrying it could not be resolved — several trace streams in the org,
+ * or none named on the row. Both are a reader-fixable ambiguity, and the copy
+ * says which.
+ *
+ * The zero-trace branch is gone with the copy it returned. It explained that no
+ * traces reached this query, inside a section that no longer renders when no
+ * traces reached this query — the section is hidden outright instead, which is
+ * the same fact stated by absence rather than by a paragraph in an empty table.
+ */
+const noStreamMessage = () =>
+  streamAmbiguous.value ? t("dbm.detail.ambiguousStream") : t("dbm.detail.noStream");
+
+/**
+ * The series — and, on the cold path, the calling endpoints with it.
+ *
+ * The two were separate requests fired together on every entry, with the same
+ * fingerprint and window. Worse, `/query/endpoints` REQUIRES a trace stream,
+ * and the stream this page uses is the one `/query/history` resolves and
+ * returns (`trace_stream_name`) — so the second request was waiting on a fact
+ * the first had already computed. `include_endpoints=true` runs the
+ * aggregation server-side against that same resolved stream, concurrently with
+ * the backfill it was already doing.
+ *
+ * The three endpoint outcomes stay three: rows, `null` (no stream to
+ * aggregate — the prompt to pick one, NOT "no callers"), and the read-failed
+ * flag. Collapsing the first two is the mis-read this section's shape exists
+ * to prevent.
+ */
 const loadHistory = async (token: number = requestSeq.current()) => {
+  endpointsError.value = null;
   try {
     const response = await dbMonitoringService.getQueryHistory(org.value, {
       fingerprint: fingerprint.value,
@@ -1876,6 +2057,7 @@ const loadHistory = async (token: number = requestSeq.current()) => {
       system: systemFilter.value,
       instance: instanceFilter.value,
       namespace: namespaceFilter.value,
+      includeEndpoints: true,
     });
 
     if (requestSeq.isStale(token)) return;
@@ -1896,14 +2078,36 @@ const loadHistory = async (token: number = requestSeq.current()) => {
     });
     exactErrorClasses.value = response.data.error_classes ?? [];
     breakdownRows.value = response.data.breakdown ?? [];
+
+    if (response.data.endpoints) {
+      applyEndpointHits(response.data.endpoints);
+    } else {
+      endpoints.value = [];
+      // A failed read is the server's error; a null section with no failure is
+      // "there was no stream to aggregate", which is the reader's choice to
+      // make and must not read as "no callers".
+      endpointsError.value = response.data.endpoints_read_failed
+        ? t("dbm.common.loadFailed")
+        : noStreamMessage();
+    }
   } catch {
     if (requestSeq.isStale(token)) return;
     history.value = null;
     exactErrorClasses.value = [];
     breakdownRows.value = [];
+    endpoints.value = [];
+    endpointsError.value = t("dbm.common.loadFailed");
   }
 };
 
+/**
+ * The endpoints table alone — the stream-pick path.
+ *
+ * On a cold load the section rides `loadHistory`'s response. Picking a stream
+ * is the one case that needs it refetched WITHOUT re-reading the series: the
+ * series is scoped by system/instance/namespace and does not change, while the
+ * callers are read from the picked stream and do.
+ */
 const loadEndpoints = async (token: number = requestSeq.current()) => {
   endpointsError.value = null;
   if (!traceStream.value) {
@@ -1911,9 +2115,7 @@ const loadEndpoints = async (token: number = requestSeq.current()) => {
     // showing an empty table that looks like "no callers" — or, worse, rows
     // read from whichever stream happened to be named `default`.
     if (requestSeq.isStale(token)) return;
-    endpointsError.value = streamAmbiguous.value
-      ? t("dbm.detail.ambiguousStream")
-      : t("dbm.detail.noStream");
+    endpointsError.value = noStreamMessage();
     endpoints.value = [];
     return;
   }
@@ -1926,18 +2128,7 @@ const loadEndpoints = async (token: number = requestSeq.current()) => {
       endTime: current.value.endTime,
     });
     if (requestSeq.isStale(token)) return;
-
-    const hits = response.data.hits ?? [];
-    const totalCalls = hits.reduce((acc, hit) => acc + (hit.calls ?? 0), 0);
-
-    endpoints.value = hits.map((hit, index) => ({
-      ...hit,
-      rowKey: `${hit.service_name ?? "null"}-${hit.endpoint ?? "null"}-${index}`,
-      // A null caller is a real result: the DB span's trace root fell outside
-      // the window or is missing, so the call is genuinely unattributed.
-      serviceLabel: hit.service_name ? raw(hit.service_name) : t("dbm.detail.unattributed"),
-      share: totalCalls > 0 ? (hit.calls ?? 0) / totalCalls : 0,
-    }));
+    applyEndpointHits(response.data.hits ?? []);
   } catch (err: unknown) {
     if (requestSeq.isStale(token)) return;
     endpointsError.value = errorMessage(err);
@@ -1946,82 +2137,81 @@ const loadEndpoints = async (token: number = requestSeq.current()) => {
 };
 
 /**
- * Distinct captured plans for this query.
+ * The two SERVER-VANTAGE reads this page has always fired together: the
+ * distinct captured plans, and the database's own counters for the statement.
  *
- * Unlike the endpoints read above, this needs no trace stream: plans are
- * server-vantage records and the handler defaults to the shared logs stream.
+ * They were two endpoints and two round trips, and they had nothing to gain
+ * from being apart: same default logs stream, same schema read, same records,
+ * same window. `/query/insights` runs both and returns each as its own nullable
+ * section, so a failure in either is a section flag rather than a page failure
+ * — exactly the per-read independence the two calls had.
+ *
+ * Neither needs a trace stream: these are server-vantage records and the
+ * handler defaults to the shared logs stream.
+ *
+ * W6 join key (the `server_metrics` half): (engine, database, fingerprint).
+ * The instance is deliberately NOT sent, because behind a connection pooler the
+ * client records the pooler's address while the server records the real host,
+ * and an instance-keyed join drops every match. Without a usable key the server
+ * skips the read and returns a null section — the same decision this page used
+ * to make by not sending the second request.
+ *
+ * The key prefers the loaded client row but falls back to the URL scope: a
+ * server-vantage entry (Activity, Deadlocks) has no client row to read from —
+ * on a fleet with no APM there is none at all — yet the origin page already
+ * knew the engine and database and passed them. Without the fallback this read
+ * never fires there and the section claims capture is off while the counters
+ * exist.
  */
-const loadPlans = async (token: number = requestSeq.current()) => {
+const loadQueryInsights = async (token: number = requestSeq.current()) => {
   plansError.value = null;
-  try {
-    const { data } = await dbMonitoringService.getQueryPlans(org.value, {
-      fingerprint: fingerprint.value,
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-    });
-    if (requestSeq.isStale(token)) return;
-    plans.value = planRows(data);
-    planDrift.value = planDriftLevel(data);
-    planEmpty.value = planEmptyReason(data);
-  } catch (err: unknown) {
-    if (requestSeq.isStale(token)) return;
-    plansError.value = errorMessage(err);
-    plans.value = [];
-    planDrift.value = "none";
-    // The error branch renders instead of the empty state, so this only has to
-    // be a state that claims nothing new about capture.
-    planEmpty.value = "captureOff";
-  }
-};
-
-/**
- * W6 — the database's own counters for this statement.
- *
- * The join key is (engine, database, fingerprint): the instance is deliberately
- * NOT sent, because behind a connection pooler the client records the pooler's
- * address while the server records the real host, and an instance-keyed join
- * drops every match. Without both an engine and a database there is no key at
- * all, so the read is skipped rather than sent — MySQL top queries carry no
- * database, and a request without one would match every database.
- *
- * A failed read never takes the rest of the page down with it — this is
- * supplementary detail beside a page whose point is the query — but it is
- * surfaced as `failed`, never as `off`: a failed request says nothing about
- * whether capture is running, and the off copy prescribes a collector fix.
- */
-const loadServerMetrics = async (token: number = requestSeq.current()) => {
   serverMetricsRead.value = "loading";
-  // The join key prefers the loaded client row but falls back to the URL
-  // scope: a server-vantage entry (Activity, Deadlocks) has no client row to
-  // read from — on a fleet with no APM there is none at all — yet the origin
-  // page already knew the engine and database and passed them. Without the
-  // fallback this read never fires there and the section claims capture is
-  // off while /query/server_metrics holds data.
+
   const engine = row.value?.db_system ?? systemFilter.value;
   const database = row.value?.db_namespace ?? namespaceFilter.value;
   // mysql/mariadb server records carry no database, so for them the endpoint
   // matches instance-wide and a missing client namespace is no obstacle.
   const databaseless = engine === "mysql" || engine === "mariadb";
-  if (!engine || (!database && !databaseless)) {
-    // No join key, no request: nothing server-side can ever surface for this
-    // row, so the quiet off line — with its route to setup — is the floor.
-    serverMetrics.value = readServerMetrics(null);
-    serverMetricsRead.value = "done";
-    return;
-  }
+
   try {
-    const { data } = await dbMonitoringService.getQueryServerMetrics(org.value, {
+    const { data } = await dbMonitoringService.getQueryInsights(org.value, {
       fingerprint: fingerprint.value,
-      engine,
-      database: databaseless ? undefined : database,
       startTime: current.value.startTime,
       endTime: current.value.endTime,
+      engine: engine || undefined,
+      database: databaseless ? undefined : database || undefined,
     });
     if (requestSeq.isStale(token)) return;
-    serverMetrics.value = readServerMetrics(data);
-    serverMetricsRead.value = "done";
-  } catch {
+
+    // ── plans ──────────────────────────────────────────────────────────────
+    if (data.plans) {
+      plans.value = planRows(data.plans);
+      planDrift.value = planDriftLevel(data.plans);
+      planEmpty.value = planEmptyReason(data.plans);
+    } else {
+      plansError.value = t("dbm.common.loadFailed");
+      plans.value = [];
+      planDrift.value = "none";
+      // The error branch renders instead of the empty state, so this only has
+      // to be a state that claims nothing new about capture.
+      planEmpty.value = "captureOff";
+    }
+
+    // ── server counters ────────────────────────────────────────────────────
+    //
+    // A null section with the flag FALSE is "no join key" — the quiet off
+    // line, with its route to setup, which is the floor for a row nothing
+    // server-side could ever match. A null WITH the flag is a failed read, and
+    // that is `failed`, never `off`: a failed request says nothing about
+    // whether capture is running, and the off copy prescribes a collector fix.
+    serverMetrics.value = readServerMetrics(data.server_metrics);
+    serverMetricsRead.value = data.server_metrics_read_failed ? "failed" : "done";
+  } catch (err: unknown) {
     if (requestSeq.isStale(token)) return;
+    plansError.value = errorMessage(err);
+    plans.value = [];
+    planDrift.value = "none";
+    planEmpty.value = "captureOff";
     serverMetrics.value = readServerMetrics(null);
     serverMetricsRead.value = "failed";
   }
@@ -2057,52 +2247,37 @@ const loadSamples = async (token: number = requestSeq.current()) => {
     return;
   }
 
-  // The stream is a TABLE name, so it cannot be escaped as a literal the way
-  // the fingerprint below is — and it arrives from `route.query`, which anyone
-  // can write. It is checked against the org's real trace streams first, and
-  // falls back to a strict identifier shape for the case where the list could
-  // not be fetched. Anything else is refused rather than interpolated.
-  const stream = traceStream.value;
-  if (!isSafeStreamName(stream)) {
-    if (requestSeq.isStale(token)) return;
-    samplesError.value = t("dbm.detail.invalidStream");
-    samples.value = [];
-    return;
-  }
-
-  const sql =
-    `SELECT _timestamp, trace_id, duration, span_status, o2_db_status_code ` +
-    `FROM "${stream}" ` +
-    `WHERE o2_db_fingerprint = '${escapeSingleQuotes(fingerprint.value)}' ` +
-    `ORDER BY duration DESC`;
-
   try {
-    const response = await searchService.search({
-      org_identifier: org.value,
-      query: {
-        query: {
-          sql,
-          start_time: current.value.startTime,
-          end_time: current.value.endTime,
-          from: 0,
-          size: SAMPLE_LIMIT,
-        },
-      },
-      page_type: "traces",
+    // Through the DBM endpoint, which now takes a `fingerprint` scope.
+    //
+    // This page used to build the SQL itself — `SELECT … FROM "<stream>" WHERE
+    // o2_db_fingerprint = '…'` — against a stream name taken straight from
+    // `route.query`, and carried an `isSafeStreamName` validator and an
+    // `escapeSingleQuotes` helper to make that safe. Both are gone: the
+    // predicate is built server-side through the same escaping every other DBM
+    // predicate uses, and the stream is resolved through the endpoint's own
+    // `involved_streams` RBAC gate rather than interpolated from a URL.
+    const response = await dbMonitoringService.getSamples(org.value, {
+      fingerprint: fingerprint.value,
+      stream: traceStream.value,
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+      limit: SAMPLE_LIMIT,
     });
 
     if (requestSeq.isStale(token)) return;
 
-    samples.value = (response.data?.hits ?? []).map(
-      (hit: Record<string, unknown>, index: number) => ({
-        rowKey: `${String(hit.trace_id ?? index)}-${index}`,
-        timestamp: Number(hit._timestamp ?? 0),
-        durationNs: Number(hit.duration ?? 0) * 1000,
-        traceId: String(hit.trace_id ?? ""),
-        isError: String(hit.span_status ?? "") === "ERROR",
-        statusCode: String(hit.o2_db_status_code ?? ""),
-      }),
-    );
+    // `duration_ns` is already NANOseconds — the endpoint computes
+    // `end_time - start_time` rather than reading the span's µs `duration`
+    // column, which is why the ×1000 the hand-rolled query needed is gone.
+    samples.value = (response.data.hits ?? []).map((hit, index) => ({
+      rowKey: `${hit.trace_id ?? index}-${index}`,
+      timestamp: hit._timestamp ?? 0,
+      durationNs: hit.duration_ns ?? 0,
+      traceId: hit.trace_id ?? "",
+      isError: hit.span_status === "ERROR",
+      statusCode: hit.status_code ?? "",
+    }));
   } catch (err: unknown) {
     if (requestSeq.isStale(token)) return;
     samplesError.value = errorMessage(err);
@@ -2110,9 +2285,10 @@ const loadSamples = async (token: number = requestSeq.current()) => {
   }
 };
 
+// Through the shared reader; this page's fallback is its own "couldn't load"
+// copy rather than the raw error text.
 const errorMessage = (err: unknown): string =>
-  (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-  t("dbm.common.loadFailed");
+  dbmHttpError(err).serverMessage ?? t("dbm.common.loadFailed");
 
 // ─── Pivots ──────────────────────────────────────────────────────────────────
 
@@ -2212,10 +2388,18 @@ const errorClasses = computed<ErrorCodeCount[]>(() => {
 /** Bar width for one code, against the largest bucket — same drawing as the
  *  coverage line's bar: the number beside it is the claim, the bar is the
  *  same claim drawn. */
-const errorCodeBarWidth = (entry: ErrorCodeCount): string => {
+/**
+ * A code's errors as a share of the worst code's, `0`–`1`.
+ *
+ * Floored at 2% so a code with a handful of failures still draws something a
+ * reader can see beside one with thousands — `DbmShareBar` rounds the share to
+ * whole percent, and an unfloored 0.4% would round to a zero-width fill and
+ * read as "no errors under this code", which is the opposite of the truth.
+ */
+const errorCodeBarShare = (entry: ErrorCodeCount): number => {
   const max = errorClasses.value[0]?.errors ?? 0;
-  if (max <= 0) return "0%";
-  return `${Math.max(2, Math.round((entry.errors / max) * 100))}%`;
+  if (max <= 0) return 0;
+  return Math.max(0.02, entry.errors / max);
 };
 
 /** A link with the window frozen, so the numbers still mean something later. */

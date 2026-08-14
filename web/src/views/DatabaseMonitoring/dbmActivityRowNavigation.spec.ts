@@ -69,10 +69,15 @@ describe("an Activity row hands off to its query detail", () => {
     expect(source).toMatch(/if \(!target\) return;/);
   });
 
-  /** It goes to the query detail route, and carries the helper's target. */
+  /**
+   * It goes to the query detail route, and carries the helper's target. The
+   * push itself now lives in `useDbmQueryDetailHop` — four lists make the same
+   * hop — so what this page must show is that it hands the target to it.
+   */
   it("pushes the query detail route with the resolved target", () => {
-    expect(source).toMatch(/name: "dbmQueryDetail"/);
-    expect(source).toMatch(/\.\.\.target/);
+    expect(source).toContain('from "@/composables/dbm/useDbmQueryDetailHop"');
+    expect(source).toMatch(/openDbmQueryDetail\(\{/);
+    expect(source).toMatch(/^\s*target,$/m);
   });
 
   /**
@@ -92,8 +97,10 @@ describe("an Activity row hands off to its query detail", () => {
    * seeding an empty statement over the fingerprint fallback.
    */
   it("seeds the detail page with the statement it already holds", () => {
-    expect(source).toMatch(/setDbmQueryDetailSeed\(/);
+    expect(source).toMatch(/seed: row\.query$/m);
     expect(source).toMatch(/query_norm: row\.query/);
-    expect(source).toMatch(/if \(row\.query\) \{/);
+    // The text-less session seeds NOTHING rather than an empty statement over
+    // the fingerprint fallback — the ternary's else branch is that refusal.
+    expect(source).toMatch(/^\s*: null,$/m);
   });
 });

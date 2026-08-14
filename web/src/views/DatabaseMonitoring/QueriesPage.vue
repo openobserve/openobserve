@@ -48,34 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sort and didn't would be a lie the UI tells by omission.
 -->
 <template>
-  <OPageLayout
+  <DbmPageChrome
     :title="t('dbm.queries.title')"
     :subtitle="t(serverListShown ? 'dbm.queries.subtitleServer' : 'dbm.queries.subtitle')"
-    icon="database"
     title-data-test="dbm-queries-title"
-    tabs-below
-    bleed
+    date-time-data-test="dbm-queries-date-time"
+    :tab-counts="tabCounts"
+    :range="range"
+    @date-change="onDateChange"
   >
-    <template #header-tabs>
-      <!-- The sibling badges come from the shell's one shared fan-out; this
-           page substitutes the two counts it measures better itself — see
-           `tabCounts`. -->
-      <DbmSectionTabs v-bind="tabCounts" />
-    </template>
-
-    <template #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        data-test-name="dbm-queries-date-time"
-        class="h-8"
-        @on:date-change="onDateChange"
-      />
-    </template>
-
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Blocked queries emit no span until they finish, so a lock storm makes
            QPS FALL — and a falling line reads as recovery at the worst possible
@@ -126,18 +107,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- `min-w-0` + `flex-1` so the chip run absorbs the slack and the
                trailing controls keep their intrinsic width; without it the
                chips push the time range off the row. -->
-          <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <div class="w-64 shrink-0">
-              <OSearchInput
-                v-model="search"
-                :placeholder="t('dbm.queries.searchPlaceholder')"
-                clearable
-                :debounce="400"
-                data-test="dbm-queries-search"
-                @update:model-value="load"
-              />
-            </div>
-
+          <DbmTableToolbar
+            v-model:search="search"
+            :placeholder="t('dbm.queries.searchPlaceholder')"
+            :debounce="400"
+            search-data-test="dbm-queries-search"
+            @search="load"
+          >
             <OToggleGroup
               :model-value="stmtClass"
               class="shrink-0"
@@ -187,21 +163,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @clear="clearScope"
               @clear-insight="activeInsightId = null"
             />
-          </div>
+          </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+          <DbmRefreshButton
             :loading="loading"
-            class="shrink-0"
             data-test="dbm-queries-refresh"
-            @click="onRefresh"
-          >
-            <OTooltip side="bottom" :content="t('dbm.common.reload')" />
-          </OButton>
+            @refresh="onRefresh"
+          />
         </template>
 
         <!-- Coverage, then the cross-row framing. Both inside the table frame
@@ -209,12 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="dbm-queries-summary"
-          >
-            <OStatStrip :items="summaryStats" :loading="loading" />
-          </div>
+          <DbmSubheaderBand data-test="dbm-queries-summary">
+            <OStatStrip :items="visibleSummaryStats" :loading="loading" />
+          </DbmSubheaderBand>
           <DbmCoverageLine
             :freshness="freshness"
             :hits="rows"
@@ -299,22 +266,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <!-- Calls, with how that moved. Two facts about the same quantity, so
-             they stack rather than occupying two columns. -->
+        <!-- Calls — an OVERLAP measure: the database counts every client,
+             traced or not, so its figure wins and the traced count is dropped
+             rather than shown alongside. The qualifier travels with the value
+             because this column mixes vantages row by row (a statement the
+             databases never reported keeps its client count, labelled).
+
+             The Δ stays only under a CLIENT value: it compares this window's
+             traced count with the previous window's traced count, so under a
+             server figure it would qualify a number drawn from a different
+             population. -->
         <template #cell-calls="{ row }">
           <div class="flex flex-col items-end leading-tight">
             <!-- The fold's own numbers are muted: it is a control, and a bold
                  call count on it competes with the queries either side for the
                  same "how big is this?" read. The share it carries is stated in
                  words on the row itself. -->
-            <span
-              class="font-mono text-xs tabular-nums"
-              :class="row.isFold ? 'text-text-muted' : 'text-text-body'"
-            >
-              {{ formatCount(row.calls) }}
-            </span>
+            <DbmOverlapValue
+              :value="row.overlapCalls.value === null ? null : formatCount(row.overlapCalls.value)"
+              :source="row.overlapCalls.source"
+              :qualifier-key="row.overlapCalls.qualifierKey"
+              :engine="row.db_system"
+              data-test="dbm-queries-calls"
+            />
             <DbmDeltaCell
-              v-if="!row.isOther && !row.isFold"
+              v-if="!row.isOther && !row.isFold && row.overlapCalls.source === 'client'"
               :delta="row.callsDelta"
               variant="words"
               data-test="dbm-queries-calls-delta"
@@ -399,10 +375,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Time, share and trend in ONE cell: three facts about the same
              quantity, so the comparison is pre-made rather than reassembled
              per row by the reader. -->
+        <!-- Database time — the other OVERLAP measure, resolved server-first.
+             The cell keeps the share and trend for a client-observed value and
+             drops them for a server one: the share divides by a TRACED scope
+             total, which is not the denominator of an engine's own figure. -->
         <template #cell-total_time_ns="{ row }">
           <DbmLoadCell
-            :total-time-ns="row.total_time_ns"
+            :total-time-ns="row.overlapTime.value ?? undefined"
             :share="row.share"
+            :source="row.overlapTime.source"
+            :qualifier-key="row.overlapTime.qualifierKey"
+            :engine="row.db_system"
             :flagged="row.flagged"
             :critical="row.critical"
             data-test="dbm-queries-load"
@@ -472,65 +455,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                bindings, minus the client-only controls (statement-class and
                baseline toggles describe data this list does not have). -->
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-              <div class="w-64 shrink-0">
-                <OSearchInput
-                  v-model="search"
-                  :placeholder="t('dbm.queries.searchPlaceholder')"
-                  clearable
-                  :debounce="400"
-                  data-test="dbm-server-queries-search"
-                />
-              </div>
-            </div>
+            <DbmTableToolbar
+              v-model:search="search"
+              :placeholder="t('dbm.queries.searchPlaceholder')"
+              :debounce="400"
+              search-data-test="dbm-server-queries-search"
+            />
           </template>
           <template #toolbar-trailing>
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+            <DbmRefreshButton
               :loading="loading"
-              class="shrink-0"
               data-test="dbm-server-queries-refresh"
-              @click="onRefresh"
-            >
-              <OTooltip side="bottom" :content="t('dbm.common.reload')" />
-            </OButton>
+              @refresh="onRefresh"
+            />
+          </template>
+          <!-- The totals follow the TABLE. When the client vantage is empty
+               this band used to unmount with the client table, taking the
+               window's totals with it; before that it summed a trace vantage
+               that returned nothing, printing four figures about rows the
+               reader could not see. It now summarises exactly these rows, and
+               the failure tile — which only traces can answer — is absent
+               rather than claiming an all-clear. -->
+          <template #subheader>
+            <DbmSubheaderBand data-test="dbm-server-queries-summary">
+              <OStatStrip :items="visibleSummaryStats" :loading="loading" />
+            </DbmSubheaderBand>
           </template>
           <template #cell-query="{ row }">
-            <div class="flex min-w-0 flex-col gap-px">
-              <span
-                class="text-text-code min-w-0 truncate font-mono text-xs"
-                :title="row.query ?? undefined"
-                >{{ raw(row.query || "—") }}</span
-              >
-              <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
-                <OTag type="dbSystem" :value="row.db_system" size="xs" />
-                <template v-if="row.db_instance">
-                  <span class="opacity-45">·</span>
-                  <span>{{ raw(row.db_instance) }}</span>
-                </template>
-                <template v-if="row.db_namespace">
-                  <span class="opacity-45">·</span>
-                  <span>{{ raw(row.db_namespace) }}</span>
-                </template>
-              </div>
-            </div>
+            <DbmQueryCell
+              :text="raw(row.query ?? '')"
+              :title-attr="row.query ?? undefined"
+              :db-system="row.db_system"
+              :meta-items="[
+                { key: 'instance', label: raw(row.db_instance ?? '') },
+                { key: 'namespace', label: raw(row.db_namespace ?? '') },
+              ]"
+            />
           </template>
           <template #cell-calls="{ row }">
-            <span class="tabular-nums">{{ formatCount(row.calls) }}</span>
+            <DbmOverlapValue
+              :value="formatCount(row.calls)"
+              source="server"
+              qualifier-key="serverCounted"
+              :engine="row.db_system"
+              data-test="dbm-server-queries-calls"
+            />
           </template>
+          <!-- Same rule as the client table's time column, and it bites harder
+               here: EVERY row is a server figure, so on a MySQL fleet every
+               row is wait time under a heading that says "Total time". The
+               qualifier is per row because this list mixes engines too. -->
           <template #cell-totalTime="{ row }">
-            <span v-if="row.exec_time_s !== null" class="tabular-nums">{{
-              formatNs(row.exec_time_s * 1e9)
-            }}</span>
-            <span v-else class="text-text-muted">{{ raw("—") }}</span>
+            <DbmOverlapValue
+              :value="row.exec_time_s === null ? null : formatNs(row.exec_time_s * 1e9)"
+              source="server"
+              :qualifier-key="serverTimeQualifier(row)"
+              :engine="row.db_system"
+              data-test="dbm-server-queries-total-time"
+            />
           </template>
           <template #cell-meanTime="{ row }">
-            <span v-if="row.mean_exec_time_s !== null" class="tabular-nums">{{
-              formatNs(row.mean_exec_time_s * 1e9)
-            }}</span>
-            <span v-else class="text-text-muted">{{ raw("—") }}</span>
+            <DbmOverlapValue
+              :value="row.mean_exec_time_s === null ? null : formatNs(row.mean_exec_time_s * 1e9)"
+              source="server"
+              :qualifier-key="serverTimeQualifier(row)"
+              :engine="row.db_system"
+              data-test="dbm-server-queries-mean-time"
+            />
           </template>
           <template #bottom>
             <div v-if="serverTruncated" class="text-text-label px-page-edge py-1.5 text-xs">
@@ -540,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </section>
     </div>
-  </OPageLayout>
+  </DbmPageChrome>
 </template>
 
 <script setup lang="ts">
@@ -549,34 +540,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmQueriesPage" });
 
-import { computed, nextTick, onMounted, onBeforeUnmount, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmDeltaCell from "@/components/dbm/DbmDeltaCell.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
-import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
-import { copyToClipboard } from "@/utils/clipboard";
 import DbmInsightStrip from "@/components/dbm/DbmInsightStrip.vue";
 import DbmLoadCell from "@/components/dbm/DbmLoadCell.vue";
+import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
+import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
+import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
-import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
-import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
-import DateTime from "@/components/DateTime.vue";
+import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
+import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
+import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
+import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
+import { copyToClipboard } from "@/utils/clipboard";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
@@ -587,19 +579,13 @@ import dbMonitoringService, {
 } from "@/services/db_monitoring";
 import config from "@/aws-exports";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { setDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
-import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
+import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
+import { useDbmQueryDetailHop } from "@/composables/dbm/useDbmQueryDetailHop";
 import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
 import useStreams from "@/composables/useStreams";
-import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
 import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
-import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
-import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
-import {
-  contextRegistry,
-  createDbmContextProvider,
-  DBM_CONTEXT_KEY,
-} from "@/composables/contextProviders";
+import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { createDbmContextProvider } from "@/composables/contextProviders";
 import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
@@ -614,6 +600,17 @@ import {
   oneLine,
   showsPerRequest,
 } from "@/utils/dbm/format";
+import { createDbmFilterEntry, optionsFrom } from "@/utils/dbm/filters";
+import {
+  indexServerRows,
+  serverCounterpart,
+  type DbmServerCounters,
+} from "@/utils/dbm/overlapJoin";
+import {
+  resolveCalls,
+  resolveDatabaseTime,
+  type DbmOverlapMetric,
+} from "@/utils/dbm/overlapMetrics";
 import {
   callsDropPercent,
   detectCompletionBias,
@@ -647,26 +644,37 @@ const aiEnabled = computed(
   () => config.isEnterprise == "true" && Boolean(store.state.zoConfig?.ai_enabled),
 );
 
-// The window arrives from the URL, so a tab switch, a back button and a shared
-// link all land on the SAME scope rather than resetting to the default.
-const { range, current, baseline, baselineWindow, setBaseline, refresh, setRange, queryParams } =
-  useDbmScope(route.query);
+// The shared list-page spine: scope from the URL, the request-sequence guard,
+// the shell's badge snapshot, refresh/date-change handlers and the load
+// envelope. This page's own `syncUrl` rides the date change so the five
+// filters, search, statement class and sort survive in the URL; its filters
+// are restored from the URL before the first load. See useDbmListPage.
+const {
+  scope: { range, current, baseline, baselineWindow, setBaseline, queryParams },
+  requestSeq,
+  tabCountsContext,
+  loading,
+  error,
+  search,
+  org,
+  dbmEnabled,
+  run,
+  onRefresh,
+  onDateChange,
+} = useDbmListPage({
+  load: () => load(),
+  syncUrl: () => syncUrl(),
+  context: () => dbmContext,
+  beforeMount: () => restoreFromUrl(),
+});
+// The list→detail hop: the seed hand-off plus the push, in one place. See
+// useDbmQueryDetailHop.
+const { openDbmQueryDetail } = useDbmQueryDetailHop({ router, route, org, range, queryParams });
 
-// Search, five filters, sort, the picker and refresh can all be in flight at
-// once; this is what keeps the last one the reader asked for the one that wins.
-const requestSeq = useDbmRequestSeq();
-
-// The sibling-tab badges are the same numbers on every tab, so DbmShell
-// fetches them ONCE per window for every route and this page reads the
-// snapshot. See useDbmTabCounts.
-const tabCountsContext = useDbmTabCountsContext();
-
-const rows = ref<QueryRow[]>([]);
-const other = ref<QueryStatsRow[]>([]);
+const rows = shallowRef<QueryRow[]>([]);
+const other = shallowRef<QueryStatsRow[]>([]);
 const freshness = ref<Freshness | null>(null);
 const topNSubset = ref(false);
-const loading = ref(false);
-const error = ref<string | null>(null);
 const permissionOk = ref(true);
 const neverAggregated = ref(false);
 /**
@@ -680,29 +688,66 @@ const neverAggregated = ref(false);
  * feed's own selection criterion (`ranked_by`); retitling it "most expensive"
  * would claim a ranking the feed cannot support.
  */
-const serverRows = ref<ServerQueryRow[]>([]);
+const serverRows = shallowRef<ServerQueryRow[]>([]);
 const serverTruncated = ref(false);
 
-const loadServerQueries = async (token: number) => {
-  try {
-    const { data } = await dbMonitoringService.getServerQueries(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-      system: systemFilter.value ?? undefined,
-      instance: instanceFilter.value ?? undefined,
-      namespace: namespaceFilter.value ?? undefined,
-    });
-    if (requestSeq.isStale(token)) return;
-    serverRows.value = data.hits ?? [];
-    serverTruncated.value = Boolean(data.truncated);
-  } catch {
-    // Supplementary: its absence is not a claim, and the empty state above it
-    // already tells the reader whether query data is arriving at all.
-    if (requestSeq.isStale(token)) return;
-    serverRows.value = [];
-    serverTruncated.value = false;
-  }
-};
+/**
+ * The database's own counters for the statements ALREADY on screen — the join
+ * source for the two overlap columns (calls, database time).
+ *
+ * Distinct from `serverRows` above, which is the FALLBACK list that replaces
+ * the client table when it is empty. This one rides alongside a POPULATED
+ * client table: the rows are the reader's client-ranked rows, and these
+ * counters re-source two of their columns.
+ *
+ * Why both exist rather than one: the fallback list is a different ranking
+ * answering a different question ("what does the database run most often"),
+ * and it is only fetched when the client vantage is empty. This read is
+ * needed precisely when the client vantage is NOT empty, which is the case
+ * the fallback deliberately skips.
+ *
+ * A failed read is not an observation: it leaves the map empty, every row
+ * falls back to its client figure, and each one says `client-observed` rather
+ * than the page silently presenting traced numbers as the database's.
+ */
+const serverCounters = shallowRef<Map<string, DbmServerCounters>>(new Map());
+
+/**
+ * The counter read's cap. Above the client list's own page size so every row
+ * on screen can find its counterpart — see `loadServerCounters`. 200 is the
+ * endpoint's documented maximum.
+ */
+const SERVER_COUNTER_LIMIT = 200;
+
+/**
+ * A figure that is client-observed by construction — the synthetic rows (the
+ * fold, the remainder buckets), whose values are sums over traced rows and
+ * have no server counterpart to resolve against.
+ *
+ * Not `resolveCalls({ clientCalls })`: going through the resolver would read
+ * as "the server had none for this row", when in truth there is no row for the
+ * server to have a counter FOR. Same output, honest provenance.
+ */
+/**
+ * Which measurement a server row's time IS, from the engine's own answer.
+ * Read off `exec_time_kind` rather than the engine name, so an engine that
+ * starts reporting execution time gets the right word without a UI change.
+ */
+const serverTimeQualifier = (row: ServerQueryRow): string =>
+  row.exec_time_kind === "wait" ? "serverWait" : "serverExecution";
+
+const clientOnlyMetric = (value: number | null | undefined): DbmOverlapMetric =>
+  typeof value === "number" && Number.isFinite(value)
+    ? { value, source: "client", qualifierKey: "clientObserved" }
+    : { value: null, source: null, qualifierKey: null };
+
+// `loadServerQueries` lived here — a second, sequential request to
+// `/server_queries` issued once this page's own read came back empty. The
+// server runs that conditional itself now (`include_server_fallback`), so the
+// rows arrive with the response that decides they are needed. Its failure
+// handling moved too: a failed or denied fallback is a flag on that response,
+// and the page keeps its own empty state rather than treating absence as a
+// claim that the databases reported nothing.
 
 /**
  * Whether the page is in fallback mode — the database-reported list is what
@@ -771,34 +816,24 @@ const openServerQueryDetail = (row: ServerQueryRow) => {
   // The statement travels as a seed, exactly as the Activity hop does: with
   // no client row anywhere, the detail header would otherwise paint the bare
   // hash. Only fields this row truly knows — no stats, no stream.
-  if (row.query) {
-    setDbmQueryDetailSeed({
-      row: {
-        fingerprint: row.fingerprint,
-        query_norm: row.query,
-        db_system: row.db_system,
-        db_instance: row.db_instance ?? "",
-        db_namespace: row.db_namespace ?? undefined,
-      },
-      org: org.value,
-      range: { ...range.value },
-    });
-  }
-  router
-    .push({
-      name: "dbmQueryDetail",
-      query: {
-        ...route.query,
-        org_identifier: route.query.org_identifier ?? org.value,
-        ...queryParams.value,
-        fingerprint: row.fingerprint,
-        system: row.db_system,
-        ...(row.db_instance ? { instance: row.db_instance } : {}),
-        ...(row.db_namespace ? { namespace: row.db_namespace } : {}),
-        from: "queries",
-      },
-    })
-    .catch(() => {});
+  openDbmQueryDetail({
+    seed: row.query
+      ? {
+          fingerprint: row.fingerprint,
+          query_norm: row.query,
+          db_system: row.db_system,
+          db_instance: row.db_instance ?? "",
+          db_namespace: row.db_namespace ?? undefined,
+        }
+      : null,
+    target: {
+      fingerprint: row.fingerprint,
+      system: row.db_system,
+      ...(row.db_instance ? { instance: row.db_instance } : {}),
+      ...(row.db_namespace ? { namespace: row.db_namespace } : {}),
+    },
+    from: "queries",
+  });
 };
 
 const { getStreams } = useStreams(t);
@@ -862,7 +897,6 @@ const tabCounts = computed(() =>
   ),
 );
 
-const search = ref("");
 /**
  * Only the two things this page asks of the table. `InstanceType<typeof OTable>`
  * does not type-check — OTable is a generic component, so its instance type has
@@ -883,9 +917,6 @@ const insights = ref<DbmInsight[]>([]);
 const insightsHidden = ref(false);
 const activeInsightId = ref<DbmInsightId | null>(null);
 
-const org = computed(() => store.state.selectedOrganization?.identifier as string);
-const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
-
 interface QueryRow extends QueryStatsRow {
   rowKey: string;
   queryText: string;
@@ -900,6 +931,14 @@ interface QueryRow extends QueryStatsRow {
   /** ...in how slow its slow tail is. */
   latencyDelta: DbmDelta;
   callsPerTrace: number | null;
+  /**
+   * The two OVERLAP measures, already resolved to a vantage and carrying the
+   * qualifier that makes them readable. Resolved at row-build time so a
+   * synthetic row (the fold, a remainder bucket) cannot inherit a server
+   * qualifier for a figure that is a sum of client numbers.
+   */
+  overlapCalls: DbmOverlapMetric;
+  overlapTime: DbmOverlapMetric;
   looping: boolean;
   /** An insight named this row, so its trend line takes a tone. */
   flagged: boolean;
@@ -922,44 +961,155 @@ const totalCalls = computed(() =>
 );
 
 /**
+ * The window's totals for the two OVERLAP tiles, summed over the SAME vantage
+ * the table beneath them is showing.
+ *
+ * Two rules, and the second is the one that used to be broken:
+ *
+ *  • Never mix. A total that adds server counts for the statements the
+ *    databases reported to traced counts for the rest is a number from no
+ *    single population — bigger than either vantage measured, and quotable as
+ *    neither. So the tile sums the server figures only when EVERY row on
+ *    screen resolved to the server, and otherwise stays with the traced total
+ *    it can add honestly.
+ *  • Follow the table. In FALLBACK mode the table below is the database's own
+ *    list, and these tiles kept summing a trace vantage that returned nothing
+ *    — four figures describing rows that are not on screen. They now sum the
+ *    fallback rows.
+ */
+const overlapTotals = computed(() => {
+  // Fallback mode: the table IS the server list, so the tiles are its totals.
+  if (serverListShown.value) {
+    const list = filteredServerRows.value;
+    const execTimeS = list.reduce((acc, row) => acc + (row.exec_time_s ?? 0), 0);
+    return {
+      calls: {
+        value: list.reduce((acc, row) => acc + (row.calls ?? 0), 0),
+        source: "server" as const,
+        qualifierKey: "serverCounted",
+      },
+      // A mixed-engine fallback list folds execution time and wait time into
+      // one sum, so the tile refuses to name either — `serverReported` is the
+      // honest generic. Single-engine lists (the common case) name the kind.
+      time: {
+        value: execTimeS * 1e9,
+        source: "server" as const,
+        qualifierKey: fallbackTimeQualifier.value,
+      },
+    };
+  }
+
+  const list = rows.value;
+  const everyRowServed =
+    list.length > 0 && list.every((row) => row.overlapCalls.source === "server");
+  const everyTimeServed =
+    list.length > 0 && list.every((row) => row.overlapTime.source === "server");
+
+  return {
+    calls: everyRowServed
+      ? {
+          value: list.reduce((acc, row) => acc + (row.overlapCalls.value ?? 0), 0),
+          source: "server" as const,
+          qualifierKey: "serverCounted",
+        }
+      : { value: totalCalls.value, source: "client" as const, qualifierKey: "clientObserved" },
+    time: everyTimeServed
+      ? {
+          value: list.reduce((acc, row) => acc + (row.overlapTime.value ?? 0), 0),
+          source: "server" as const,
+          qualifierKey: uniformTimeQualifier(list.map((row) => row.overlapTime.qualifierKey)),
+        }
+      : { value: scopeTotalTime.value, source: "client" as const, qualifierKey: "clientObserved" },
+  };
+});
+
+/**
+ * One qualifier for a SUM, or the generic when the rows disagree.
+ *
+ * Adding Postgres execution time to MySQL wait time gives a figure that is
+ * neither, so naming it "exec time" or "wait time" would be false for half
+ * the rows it contains. The generic says only what is certainly true: the
+ * databases reported it.
+ */
+const uniformTimeQualifier = (keys: (string | null)[]): string => {
+  const distinct = new Set(keys.filter((key): key is string => key !== null));
+  return distinct.size === 1 ? [...distinct][0] : "serverReported";
+};
+
+const fallbackTimeQualifier = computed(() =>
+  uniformTimeQualifier(
+    filteredServerRows.value.map((row) =>
+      row.exec_time_kind === "wait" ? "serverWait" : "serverExecution",
+    ),
+  ),
+);
+
+/**
  * The window's totals, over the rows below. Read-only: none of these four is a
  * facet the table can filter to, so making them clickable would promise a
  * behaviour the page does not have.
+ *
+ * The two overlap tiles carry the same qualifier discipline as the columns: a
+ * database time with no word for WHICH time it is reads as execution time on a
+ * MySQL fleet, whether it sits in a cell or a tile.
  */
-const summaryStats = computed<StatItem[]>(() => [
-  {
-    key: "queries",
-    label: t("dbm.queries.summary.queries"),
-    value: rows.value.length,
-    icon: "database",
-    tone: "primary",
-    dataTest: "dbm-queries-summary-queries",
-  },
-  {
-    key: "calls",
-    label: t("dbm.queries.summary.calls"),
-    value: formatCount(totalCalls.value),
-    icon: "bar-chart",
-    tone: "info",
-    dataTest: "dbm-queries-summary-calls",
-  },
-  {
-    key: "time",
-    label: t("dbm.queries.summary.time"),
-    value: formatNs(scopeTotalTime.value),
-    icon: "timer",
-    tone: "teal",
-    dataTest: "dbm-queries-summary-time",
-  },
-  {
-    key: "failed",
-    label: t("dbm.queries.summary.failed"),
-    value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
-    icon: "error-outline",
-    tone: errorCount.value ? "error" : "neutral",
-    dataTest: "dbm-queries-summary-failed",
-  },
-]);
+const summaryStats = computed<StatItem[]>(() => {
+  const totals = overlapTotals.value;
+  const qualifier = (key: string | null): I18nText =>
+    key === null ? raw("") : t(`dbm.list.overlap.${key}` as "dbm.list.overlap.serverWait");
+
+  return [
+    {
+      key: "queries",
+      // In fallback mode the count describes the rows actually on screen.
+      label: t("dbm.queries.summary.queries"),
+      value: serverListShown.value ? filteredServerRows.value.length : rows.value.length,
+      icon: "database",
+      tone: "primary",
+      dataTest: "dbm-queries-summary-queries",
+    },
+    {
+      key: "calls",
+      label: t("dbm.queries.summary.calls"),
+      value: formatCount(totals.calls.value),
+      sub: qualifier(totals.calls.qualifierKey),
+      icon: "bar-chart",
+      tone: "info",
+      dataTest: "dbm-queries-summary-calls",
+    },
+    {
+      key: "time",
+      label: t("dbm.queries.summary.time"),
+      value: formatNs(totals.time.value),
+      sub: qualifier(totals.time.qualifierKey),
+      icon: "timer",
+      tone: "teal",
+      dataTest: "dbm-queries-summary-time",
+    },
+    // TRACE-ONLY: the server feed carries no error counts. In fallback mode
+    // the tile is REMOVED rather than shown as "—" under a label promising a
+    // measurement — see `visibleSummaryStats`.
+    {
+      key: "failed",
+      label: t("dbm.queries.summary.failed"),
+      value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
+      icon: "error-outline",
+      tone: errorCount.value ? "error" : "neutral",
+      dataTest: "dbm-queries-summary-failed",
+    },
+  ];
+});
+
+/**
+ * RULE A on the tile strip: the failure count can only come from traces, so on
+ * a fleet whose trace vantage is empty it is dropped rather than rendered as a
+ * dash — or worse, as the "none" that reads as an all-clear nobody measured.
+ */
+const visibleSummaryStats = computed(() =>
+  hasDbmTraceVantage({ rows: rows.value, loading: loading.value })
+    ? summaryStats.value
+    : summaryStats.value.filter((stat) => stat.key !== "failed"),
+);
 
 const isFiltered = computed(
   () =>
@@ -982,11 +1132,12 @@ const narrowingFilterLabel = computed<string | null>(
   () => serviceFilter.value ?? envFilter.value ?? null,
 );
 
-const optionsFrom = (values: (string | undefined)[]) =>
-  [...new Set(values.filter((v): v is string => !!v))].map((value) => ({
-    value,
-    label: raw(value),
-  }));
+// Every filter change publishes the scope to the URL BEFORE reloading — the
+// factory owns the handler, so no entry can forget the URL half.
+const filterEntry = createDbmFilterEntry(() => {
+  syncUrl();
+  load();
+});
 
 /**
  * Filter dropdowns, built from the values present in the current response, and
@@ -994,66 +1145,41 @@ const optionsFrom = (values: (string | undefined)[]) =>
  * as `database: orders-db` rather than a bare value with no subject.
  */
 const dimensionFilters = computed<DbmScopeFilter[]>(() => [
-  {
+  filterEntry({
     key: "instance",
     dimension: t("dbm.filters.dimension.instance"),
-    value: instanceFilter.value,
     placeholder: t("dbm.filters.allInstances"),
     options: optionsFrom(rows.value.map((r) => r.db_instance)),
-    onChange: (value) => {
-      instanceFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
-  {
+    model: instanceFilter,
+  }),
+  filterEntry({
     key: "env",
     dimension: t("dbm.filters.dimension.env"),
-    value: envFilter.value,
     placeholder: t("dbm.filters.allEnvs"),
     options: optionsFrom(rows.value.flatMap((r) => r.envs ?? [r.env])),
-    onChange: (value) => {
-      envFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
-  {
+    model: envFilter,
+  }),
+  filterEntry({
     key: "system",
     dimension: t("dbm.filters.dimension.system"),
-    value: systemFilter.value,
     placeholder: t("dbm.filters.allEngines"),
     options: optionsFrom(rows.value.map((r) => r.db_system)),
-    onChange: (value) => {
-      systemFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
-  {
+    model: systemFilter,
+  }),
+  filterEntry({
     key: "service",
     dimension: t("dbm.filters.dimension.service"),
-    value: serviceFilter.value,
     placeholder: t("dbm.filters.allServices"),
     options: optionsFrom(rows.value.flatMap((r) => r.services ?? [r.service_name])),
-    onChange: (value) => {
-      serviceFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
-  {
+    model: serviceFilter,
+  }),
+  filterEntry({
     key: "namespace",
     dimension: t("dbm.filters.dimension.namespace"),
-    value: namespaceFilter.value,
     placeholder: t("dbm.filters.allNamespaces"),
     options: optionsFrom(rows.value.flatMap((r) => r.namespaces ?? [r.db_namespace])),
-    onChange: (value) => {
-      namespaceFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
+    model: namespaceFilter,
+  }),
 ]);
 
 /**
@@ -1098,128 +1224,24 @@ const errorCount = computed(() =>
  * so the flag only ever reached the badge cache — and the badges are the
  * shell's now. `onRefresh` forces them directly.
  */
-const load = async () => {
-  if (!org.value) return;
-  const token = requestSeq.begin();
-  loading.value = true;
-  error.value = null;
-  refresh();
-
-  try {
-    // Both windows in ONE request — the server fetches the baseline
-    // concurrently under the SAME filters and sort so the two sets are
-    // comparable row-for-row; anything else makes the delta a comparison
-    // between two different questions. WHICH window it is depends on the
-    // reader's baseline choice, and every insight names the one it used.
-    const { data } = await dbMonitoringService.getQueries(org.value, {
-      ...requestParams(),
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-      sort: sortBy.value,
-      baselineStartTime: baselineWindow.value.startTime,
-      baselineEndTime: baselineWindow.value.endTime,
-    });
-
-    // A newer load already owns the page; painting these rows would put the
-    // previous window's data under the current window's toolbar.
-    if (requestSeq.isStale(token)) return;
-
-    const hits = data.hits ?? [];
-    // A server-side baseline failure degrades the Δ features to "no baseline"
-    // rather than comparing against an empty set it would misread as change.
-    const previousHits = data.baseline_read_failed ? [] : (data.baseline_hits ?? []);
-    other.value = data.other ?? [];
-    freshness.value = data.freshness;
-    topNSubset.value = data.top_n_subset;
-    neverAggregated.value = data.freshness?.data_through === 0;
-    databaseCount.value = new Set(hits.map((r) => r.db_instance)).size;
-
-    // Shares are measured against the WHOLE scope (shown + remainder), not just
-    // what is on screen — otherwise every row's share inflates as the ranking
-    // cut bites, and the number silently changes meaning with the filter.
-    const scopeTotal = sumTotalTime(hits) + sumTotalTime(other.value);
-    const previousScopeTotal = sumTotalTime(previousHits) + sumTotalTime(data.baseline_other ?? []);
-
-    insights.value = detectInsights({
-      rows: hits,
-      previousRows: previousHits,
-      scopeTotalTimeNs: scopeTotal,
-      previousScopeTotalTimeNs: previousScopeTotal,
-    });
-
-    // The remainder rows carry real traffic, so both windows include them —
-    // measuring the collapse over the ranked rows alone would read a shift in
-    // the ranking cut as a drop in volume.
-    const currentCalls = [...hits, ...other.value];
-    const previousCalls = [...previousHits, ...(data.baseline_other ?? [])];
-    completionBias.value = detectCompletionBias(currentCalls, previousCalls)
-      ? { dropPercent: callsDropPercent(currentCalls, previousCalls) }
-      : null;
-
-    const flagged = new Set(insights.value.flatMap((insight) => insight.fingerprints));
-    const previousIndex = indexByKey(previousHits);
-
-    // The database-reported fallback list exists only for the page whose
-    // client vantage is honestly empty; a populated table clears it so stale
-    // server rows can never sit under a live client ranking. Awaited, so the
-    // skeleton covers the read: the empty client answer arrives in
-    // milliseconds on an org with no trace streams, and clearing `loading`
-    // then would pop the empty state with no visible loading at all, only for
-    // the fallback table to appear beneath it half a second later. A load
-    // that produced rows never fires it, so it still costs those nothing.
-    if (hits.length) {
-      serverRows.value = [];
-      serverTruncated.value = false;
-    } else {
-      await loadServerQueries(token);
-    }
-
-    rows.value = hits.map((row) => {
-      const traces = row.traces ?? 0;
-      const calls = row.calls ?? 0;
-      const text = oneLine(row.query_norm) || row.fingerprint;
-      const perTrace = traces > 0 ? calls / traces : null;
-      const previousRow = previousIndex.get(rowKey(row));
-      return {
-        ...row,
-        rowKey: rowKey(row),
-        queryText: text,
-        queryPreview: discriminatingPart(text) || text,
-        serviceLabel: row.service_name ?? row.services?.[0] ?? "",
-        share: scopeTotal > 0 ? (row.total_time_ns ?? 0) / scopeTotal : 0,
-        delta: totalTimeDelta(row, previousRow),
-        callsDelta: computeCallsDelta(row, previousRow),
-        latencyDelta: latencyDelta(row, previousRow),
-        callsPerTrace: perTrace,
-        // Same rule the N+1 insight uses, so the row tint and the chip that
-        // explains it can never disagree.
-        looping: (perTrace ?? 0) >= DBM_INSIGHT_RULES.nPlusOne.minCallsPerTrace,
-        flagged: flagged.has(row.fingerprint),
-        critical: calls > 0 && (row.errors ?? 0) >= calls,
-        isOther: false,
-      };
-    });
-  } catch (err: unknown) {
-    // A superseded request's failure is not this page's failure — surfacing it
-    // would blank a table the newer load is about to fill.
-    if (requestSeq.isStale(token)) return;
-    const status = (err as { response?: { status?: number } })?.response?.status;
-    permissionOk.value = status !== 403;
-    if (permissionOk.value) {
-      error.value =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        t("dbm.common.loadFailed");
-    }
-    rows.value = [];
-    other.value = [];
-    // A failed load says nothing about completion bias; leaving the banner up
-    // would attach the last window's claim to a table that is now empty.
-    completionBias.value = null;
-  } finally {
-    // Only the load that still owns the page may clear the spinner; an older
-    // one doing it would report "done" while the current fetch is in flight.
-    if (!requestSeq.isStale(token)) {
-      loading.value = false;
+const load = () =>
+  run(loadQueries, {
+    reset: () => {
+      rows.value = [];
+      other.value = [];
+      // A failed load says nothing about completion bias; leaving the banner
+      // up would attach the last window's claim to a table that is now empty.
+      completionBias.value = null;
+    },
+    // 403 is a diagnosis the empty state names, not an error banner.
+    onForbidden: () => {
+      permissionOk.value = false;
+    },
+    onError: (serverMessage) => {
+      permissionOk.value = true;
+      error.value = serverMessage ?? t("dbm.common.loadFailed");
+    },
+    settled: async () => {
       // The trace-presence probe answers a question only the empty state asks,
       // so it runs exactly when the empty state is about to render — a load
       // that produced rows never pays for it. Unawaited: the checklist gains
@@ -1231,12 +1253,181 @@ const load = async () => {
       // off — so every load lands on row 1 and the strip's subject is on screen.
       await nextTick();
       tableRef.value?.scrollToTop?.();
-    }
+    },
+  });
+// The sibling badges are NOT fetched by `load`. DbmShell watches the window in
+// the URL — which `syncUrl` publishes — and refetches them itself, once for
+// every tab. The one thing it cannot infer is a REFRESH, since the URL does
+// not change: `onRefresh` forces those explicitly.
+
+/**
+ * Read the database's own statement counters for this window, to re-source the
+ * two overlap columns on the rows already fetched.
+ *
+ * Deliberately NOT awaited into the failure path of the page: this read is an
+ * IMPROVEMENT to two columns, not the page's data. A logs-stream permission
+ * the reader lacks, or a stream that never carried counters, must leave the
+ * table exactly as it was — client figures, each labelled `client-observed` —
+ * rather than failing a load that otherwise succeeded. So the catch clears the
+ * map and says nothing.
+ */
+const loadServerCounters = async (token: number, wanted: boolean) => {
+  if (!wanted) {
+    serverCounters.value = new Map();
+    return;
   }
-  // The sibling badges are NOT fetched here. DbmShell watches the window in
-  // the URL — which `syncUrl` publishes — and refetches them itself, once for
-  // every tab. The one thing it cannot infer is a REFRESH, since the URL does
-  // not change: `onRefresh` forces those explicitly.
+  try {
+    const { data } = await dbMonitoringService.getServerQueries(org.value, {
+      ...requestParams(),
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+      // The join is per-row, so the cap must cover the rows on screen rather
+      // than the browse page's default 50 — a statement ranked below the cap
+      // would silently fall back to its client figure while its neighbours
+      // quote the server, putting two vantages in one column with no reason
+      // the reader could see.
+      limit: SERVER_COUNTER_LIMIT,
+    });
+    if (requestSeq.isStale(token)) return;
+    serverCounters.value = indexServerRows(data?.hits ?? []);
+  } catch {
+    // See above: absence of counters is not a page error.
+    if (!requestSeq.isStale(token)) serverCounters.value = new Map();
+  }
+};
+
+const loadQueries = async (token: number) => {
+  // Both windows in ONE request — the server fetches the baseline
+  // concurrently under the SAME filters and sort so the two sets are
+  // comparable row-for-row; anything else makes the delta a comparison
+  // between two different questions. WHICH window it is depends on the
+  // reader's baseline choice, and every insight names the one it used.
+  const { data } = await dbMonitoringService.getQueries(org.value, {
+    ...requestParams(),
+    startTime: current.value.startTime,
+    endTime: current.value.endTime,
+    sort: sortBy.value,
+    baselineStartTime: baselineWindow.value.startTime,
+    baselineEndTime: baselineWindow.value.endTime,
+    // The database-reported fallback rides THIS response when the client
+    // answer is an exact zero. It used to be a second, SEQUENTIAL request
+    // issued after this one landed — on the deployment where it always fires
+    // (collector wired, no traced traffic), that was two round trips before
+    // anything could be drawn. The server runs the same conditional `/badges`
+    // has always run, so the tab and its badge still fall back together.
+    includeServerFallback: true,
+  });
+
+  // A newer load already owns the page; painting these rows would put the
+  // previous window's data under the current window's toolbar.
+  if (requestSeq.isStale(token)) return;
+
+  const hits = data.hits ?? [];
+  // A server-side baseline failure degrades the Δ features to "no baseline"
+  // rather than comparing against an empty set it would misread as change.
+  const previousHits = data.baseline_read_failed ? [] : (data.baseline_hits ?? []);
+  other.value = data.other ?? [];
+  freshness.value = data.freshness;
+  topNSubset.value = data.top_n_subset;
+  neverAggregated.value = data.freshness?.data_through === 0;
+  databaseCount.value = new Set(hits.map((r) => r.db_instance)).size;
+
+  // Shares are measured against the WHOLE scope (shown + remainder), not just
+  // what is on screen — otherwise every row's share inflates as the ranking
+  // cut bites, and the number silently changes meaning with the filter.
+  const scopeTotal = sumTotalTime(hits) + sumTotalTime(other.value);
+  const previousScopeTotal = sumTotalTime(previousHits) + sumTotalTime(data.baseline_other ?? []);
+
+  insights.value = detectInsights({
+    rows: hits,
+    previousRows: previousHits,
+    scopeTotalTimeNs: scopeTotal,
+    previousScopeTotalTimeNs: previousScopeTotal,
+  });
+
+  // The remainder rows carry real traffic, so both windows include them —
+  // measuring the collapse over the ranked rows alone would read a shift in
+  // the ranking cut as a drop in volume.
+  const currentCalls = [...hits, ...other.value];
+  const previousCalls = [...previousHits, ...(data.baseline_other ?? [])];
+  completionBias.value = detectCompletionBias(currentCalls, previousCalls)
+    ? { dropPercent: callsDropPercent(currentCalls, previousCalls) }
+    : null;
+
+  const flagged = new Set(insights.value.flatMap((insight) => insight.fingerprints));
+  const previousIndex = indexByKey(previousHits);
+
+  // The database-reported fallback list exists only for the page whose client
+  // vantage is honestly empty; a populated table clears it so stale server rows
+  // can never sit under a live client ranking.
+  //
+  // It arrives WITH this response now (`include_server_fallback`), so the
+  // skeleton covers it for free — there is no second read for the spinner to
+  // race. That timing used to be delicate: the empty client answer lands in
+  // milliseconds on an org with no trace streams, so clearing `loading` before
+  // the fallback returned popped the empty state with no visible loading at
+  // all, only for the fallback table to appear beneath it half a second later.
+  //
+  // A `null` section is not an empty one. The fallback reads a LOGS stream
+  // while this page's own read is Traces-auth, so a reader can be entitled to
+  // one and not the other — `server_fallback_forbidden` says so, and the page
+  // keeps its own empty state rather than claiming the databases reported
+  // nothing.
+  if (hits.length) {
+    serverRows.value = [];
+    serverTruncated.value = false;
+  } else {
+    const fallback = data.server_fallback;
+    serverRows.value = (fallback?.hits ?? []) as ServerQueryRow[];
+    serverTruncated.value = Boolean(fallback?.truncated);
+  }
+
+  // The counters for the rows we are ABOUT to paint. Only when there are rows:
+  // with an empty client list the fallback section above already IS the server
+  // vantage, and a second server read would answer a question nobody asked.
+  await loadServerCounters(token, hits.length > 0);
+
+  rows.value = hits.map((row) => {
+    const traces = row.traces ?? 0;
+    const calls = row.calls ?? 0;
+    const text = oneLine(row.query_norm) || row.fingerprint;
+    const perTrace = traces > 0 ? calls / traces : null;
+    const previousRow = previousIndex.get(rowKey(row));
+    // RULE B per row: the database's own counters win for the two measures
+    // both vantages carry. Resolved HERE rather than in the cell so the
+    // fold/remainder rows below — which are sums over client figures — cannot
+    // accidentally inherit a server qualifier they did not earn.
+    const counterpart = serverCounterpart(serverCounters.value, row);
+    return {
+      ...row,
+      overlapCalls: resolveCalls({
+        serverCalls: counterpart?.calls,
+        engine: counterpart?.db_system ?? row.db_system,
+        clientCalls: row.calls,
+      }),
+      overlapTime: resolveDatabaseTime({
+        serverExecTimeS: counterpart?.exec_time_s,
+        execTimeKind: counterpart?.exec_time_kind ?? undefined,
+        engine: counterpart?.db_system ?? row.db_system,
+        clientTotalTimeNs: row.total_time_ns,
+      }),
+      rowKey: rowKey(row),
+      queryText: text,
+      queryPreview: discriminatingPart(text) || text,
+      serviceLabel: row.service_name ?? row.services?.[0] ?? "",
+      share: scopeTotal > 0 ? (row.total_time_ns ?? 0) / scopeTotal : 0,
+      delta: totalTimeDelta(row, previousRow),
+      callsDelta: computeCallsDelta(row, previousRow),
+      latencyDelta: latencyDelta(row, previousRow),
+      callsPerTrace: perTrace,
+      // Same rule the N+1 insight uses, so the row tint and the chip that
+      // explains it can never disagree.
+      looping: (perTrace ?? 0) >= DBM_INSIGHT_RULES.nPlusOne.minCallsPerTrace,
+      flagged: flagged.has(row.fingerprint),
+      critical: calls > 0 && (row.errors ?? 0) >= calls,
+      isOther: false,
+    };
+  });
 };
 
 /**
@@ -1433,6 +1624,12 @@ const foldedRows = computed<QueryRow[]>(() => {
     errors: tail.reduce((acc, row) => acc + (row.errors ?? 0), 0),
     total_time_ns: tail.reduce((acc, row) => acc + (row.total_time_ns ?? 0), 0),
     share: tailShare,
+    // A SUM over the folded rows' client figures, so it is client-observed by
+    // construction. Never a mix: summing the members' RESOLVED values would
+    // add server counts to client counts, which is the one arithmetic the
+    // vantage rules forbid outright.
+    overlapCalls: clientOnlyMetric(tail.reduce((acc, row) => acc + (row.calls ?? 0), 0)),
+    overlapTime: clientOnlyMetric(tail.reduce((acc, row) => acc + (row.total_time_ns ?? 0), 0)),
     delta: { state: "new" },
     callsDelta: { state: "new" },
     latencyDelta: { state: "new" },
@@ -1494,6 +1691,11 @@ const tableRows = computed<QueryRow[]>(() => {
     otherRowExplained: index === 0,
     serviceLabel: "",
     share: scopeTotal > 0 ? (row.total_time_ns ?? 0) / scopeTotal : 0,
+    // The remainder is the trace vantage's own leftover bucket — the server
+    // feed has no counterpart for "everything else", so there is nothing to
+    // resolve against and the figures stay explicitly client-observed.
+    overlapCalls: clientOnlyMetric(row.calls),
+    overlapTime: clientOnlyMetric(row.total_time_ns),
     delta: { state: "new" },
     callsDelta: { state: "new" },
     latencyDelta: { state: "new" },
@@ -1659,13 +1861,27 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     sortable: false,
     meta: { isName: true },
   },
+  // An OVERLAP column: the value shown is the DATABASE's count where it has
+  // one. The sub-label states that provenance once, in the header; the
+  // per-row marker states it again on the rows where it differs, because the
+  // column legitimately mixes vantages (a statement the databases never
+  // reported keeps its traced count).
+  //
+  // `sortable` stays TRUE and still sorts by the TRACED count, which is what
+  // the backend ranks on — the ordering is a property of the ranked read, not
+  // of the figures this column displays. The hint says so rather than leaving
+  // the reader to infer that a server-first column re-ranks by server counts.
   {
     id: "calls",
     header: t("dbm.queries.columns.calls"),
     accessorKey: "calls",
-    size: 96,
+    size: 112,
     sortable: true,
-    meta: { align: "right", headerTooltip: t("dbm.queries.columnHints.calls") },
+    meta: {
+      align: "right",
+      headerSubLabel: t("dbm.queries.columnSubLabels.calls"),
+      headerTooltip: t("dbm.queries.columnHints.calls"),
+    },
   },
   {
     id: "p95_ns",
@@ -1702,7 +1918,11 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
     accessorKey: "total_time_ns",
     size: 190,
     sortable: true,
-    meta: { align: "right", headerTooltip: t("dbm.queries.columnHints.load") },
+    meta: {
+      align: "right",
+      headerSubLabel: t("dbm.queries.columnSubLabels.load"),
+      headerTooltip: t("dbm.queries.columnHints.load"),
+    },
   },
   {
     id: "actions",
@@ -1791,40 +2011,17 @@ const openQueryDetail = (row: QueryRow, tab?: string) => {
   // one-shot seed for the detail page's instant first paint. The RANGE goes
   // with it (copied, because this kept-alive page's scope lives on and can
   // move): the detail page ignores a seed fetched under any other window.
-  setDbmQueryDetailSeed({ row, org: org.value, range: { ...range.value } });
-  router
-    .push({
-      name: "dbmQueryDetail",
-      query: {
-        ...route.query,
-        org_identifier: route.query.org_identifier ?? org.value,
-        ...queryParams.value,
-        fingerprint: row.fingerprint,
-        stream: row.trace_stream_name,
-        system: row.db_system,
-        instance: row.db_instance,
-        namespace: row.db_namespace,
-        ...(tab ? { tab } : {}),
-      },
-    })
-    .catch(() => {});
-};
-
-// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
-// badge cache alongside the page's own load — the URL does not change on a
-// refresh, so the shell cannot see one on its own.
-const onRefresh = () => {
-  void load();
-  tabCountsContext.refresh({ force: true });
-};
-
-const onDateChange = (value: DbmDateChange) => {
-  setRange(value);
-  syncUrl();
-  // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
-  // mount replay would otherwise double every request. See
-  // `DbmDateChange.userChangedValue`.
-  if (value?.userChangedValue !== false) load();
+  openDbmQueryDetail({
+    seed: row,
+    target: {
+      fingerprint: row.fingerprint,
+      stream: row.trace_stream_name,
+      system: row.db_system,
+      instance: row.db_instance,
+      namespace: row.db_namespace,
+      ...(tab ? { tab } : {}),
+    },
+  });
 };
 
 /**
@@ -1944,6 +2141,7 @@ const askAiForFix = (row: QueryRow) => {
   });
 };
 
+// Registered/unregistered by useDbmListPage around this page's lifecycle.
 const dbmContext = createDbmContextProvider(
   () => ({
     currentPage: "queries" as const,
@@ -1987,30 +2185,7 @@ const restoreFromUrl = () => {
   if (sort && SORT_KEYS.includes(sort as QuerySortKey)) sortBy.value = sort as QuerySortKey;
 };
 
-onMounted(() => {
-  contextRegistry.register(DBM_CONTEXT_KEY, dbmContext);
-  contextRegistry.setActive(DBM_CONTEXT_KEY);
-  restoreFromUrl();
-  load();
-});
-
-// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
-// session on this tab. The URL is how the tabs agree on a window, so re-read it
-// on return and reload ONLY if it actually moved.
-useDbmScopeSync({
-  route,
-  current: () => range.value,
-  adopt: (next) =>
-    setRange({
-      startTime: next.startTime,
-      endTime: next.endTime,
-      relativeTimePeriod: next.relativeTimePeriod,
-    }),
-  reload: () => load(),
-});
 onBeforeUnmount(() => {
-  contextRegistry.unregister(DBM_CONTEXT_KEY);
-  contextRegistry.setActive("");
   if (revealTimer) clearTimeout(revealTimer);
 });
 </script>

@@ -33,21 +33,38 @@ const messages = JSON.parse(
 ) as { dbm: { detail: { serverMetrics: Record<string, string> } } };
 
 describe("W6 server metrics section wiring", () => {
+  /**
+   * Through the service layer, and through the MERGED endpoint: the counters
+   * and the plans list were always co-fired from this page — same logs stream,
+   * same schema read, same records, same window — so they ride one request.
+   * The section it returns is `/query/server_metrics`'s own envelope, which is
+   * why nothing below this line had to change shape.
+   */
   it("reads the endpoint through the service layer", () => {
-    expect(page).toContain("getQueryServerMetrics");
+    expect(page).toContain("getQueryInsights");
+    // And no longer pays for a second round trip to the endpoint the merged
+    // one supersedes.
+    expect(page).not.toContain("getQueryServerMetrics");
+    expect(page).not.toContain("getQueryPlans");
   });
 
   /**
    * The join key is (engine, database, fingerprint). All three must reach the
-   * request or the backend 400s — and `instance` must NOT, because omitting it
-   * is what lets the join survive a connection pooler.
+   * request or no counters can be matched — and `instance` must NOT, because
+   * omitting it is what lets the join survive a connection pooler.
    */
   it("sends every part of the join key", () => {
-    const call = page.slice(page.indexOf("getQueryServerMetrics("));
+    const start = page.indexOf("getQueryInsights(");
+    expect(start).toBeGreaterThan(-1);
+    const call = page.slice(start);
     const args = call.slice(0, call.indexOf("});"));
+    // Guard: prove the slice is the call's arguments and not an empty tail.
+    expect(args.length).toBeGreaterThan(60);
     expect(args).toContain("fingerprint");
     expect(args).toContain("engine");
     expect(args).toContain("database");
+    // The instance is the one dimension that must stay out of the key.
+    expect(args).not.toContain("instance");
   });
 
   it("renders the value tiles from the pure read layer, not inline arithmetic", () => {
@@ -88,19 +105,56 @@ describe("W6 server metrics section wiring", () => {
 
   /**
    * Failed ≠ off, in copy and in data. The read's lifecycle is tracked apart
-   * from its result: a thrown request lands in `failed` — never in the empty
+   * from its result: a failed read lands in `failed` — never in the empty
    * envelope's `off` — and the failed copy must not claim capture is off.
+   *
+   * The merge did not weaken this; it moved where the distinction is MADE. The
+   * server now tells us which of the two happened, because it can: a `null`
+   * section with `server_metrics_read_failed` false means "we did not look"
+   * (no join key), and with it true means "we looked and could not read". The
+   * page reads the flag rather than inferring failure from a thrown request,
+   * so a per-section failure inside a 200 is no longer invisible to it.
    */
   it("keeps a failed read distinct from capture-off", () => {
     const sm = messages.dbm.detail.serverMetrics;
     expect(sm.readFailed).toBeTruthy();
     expect(sm.readFailed).not.toEqual(sm.off);
     expect(sm.readFailedHint.toLowerCase()).not.toContain("collector");
-    // The catch path marks the READ failed rather than synthesising an off
-    // envelope the response never sent.
-    const catchBlock = page.slice(page.indexOf("const loadServerMetrics"));
-    expect(catchBlock).toContain('serverMetricsRead.value = "failed"');
+
+    const start = page.indexOf("const loadQueryInsights");
+    expect(start).toBeGreaterThan(-1);
+    const loader = page.slice(start, page.indexOf("\nconst ", start + 30));
+    // Guard: prove the slice is the real loader, not an empty tail.
+    expect(loader.length).toBeGreaterThan(400);
+    expect(loader).toContain("getQueryInsights(");
+
+    // The section's own flag drives the state — never a synthesised off
+    // envelope the response did not send.
+    expect(loader).toContain(
+      'serverMetricsRead.value = data.server_metrics_read_failed ? "failed" : "done"',
+    );
+    // A thrown request is still `failed` too: a request that never arrived
+    // says nothing about whether capture is running.
+    expect(loader).toContain('serverMetricsRead.value = "failed"');
     expect(page).toContain("dbm-detail-server-metrics-failed");
+  });
+
+  /**
+   * Per-section failure, not per-page: the plans list and the counters ride one
+   * request now, and a failure in either must not blank the other. The server
+   * returns each section nullable with its own flag for exactly this reason,
+   * and the page must branch on them separately rather than treating one 200 as
+   * all-or-nothing.
+   */
+  it("degrades the two merged sections independently", () => {
+    const start = page.indexOf("const loadQueryInsights");
+    const loader = page.slice(start, page.indexOf("\nconst ", start + 30));
+    expect(loader.length).toBeGreaterThan(400);
+    // Plans branch on their own section being present…
+    expect(loader).toContain("if (data.plans)");
+    // …and the counters on their own flag, in the same success path.
+    expect(loader).toContain("data.server_metrics_read_failed");
+    expect(loader).toContain("readServerMetrics(data.server_metrics)");
   });
 
   /**
@@ -152,7 +206,11 @@ describe("W6 server metrics section wiring", () => {
   it("claims no percentile and derives no cross-vantage figure", () => {
     const start = page.indexOf("dbm-detail-server-metrics");
     expect(start).toBeGreaterThan(-1);
-    const section = page.slice(start, page.indexOf("</section>", start)).toLowerCase();
+    // The card shell is the shared `DbmSection` component now — the section
+    // markup was identical across six cards — so the block closes on that tag.
+    const end = page.indexOf("</DbmSection>", start);
+    expect(end, "the server metrics section must be closed").toBeGreaterThan(start);
+    const section = page.slice(start, end).toLowerCase();
     for (const banned of ["p95", "p99", "percentile", "network", "overhead"]) {
       expect(section).not.toContain(banned);
     }

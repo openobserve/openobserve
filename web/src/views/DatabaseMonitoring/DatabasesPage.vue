@@ -51,33 +51,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   from the parent they belong to.
 -->
 <template>
-  <OPageLayout
+  <DbmPageChrome
     :title="t('dbm.databases.title')"
     :subtitle="t('dbm.databases.subtitle')"
-    icon="database"
     title-data-test="dbm-databases-title"
-    tabs-below
-    bleed
+    date-time-data-test="dbm-databases-date-time"
+    :tab-counts="tabCounts"
+    :range="range"
+    @date-change="onDateChange"
   >
-    <template #header-tabs>
-      <!-- The sibling badges come from the shell's one shared fan-out; this
-           page's own is counted from the rows it already loaded. -->
-      <DbmSectionTabs v-bind="tabCounts" />
-    </template>
-
-    <template #actions>
-      <DateTime
-        auto-apply
-        menu-align="end"
-        :default-type="range.type"
-        :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
-        :default-relative-time="range.relativeTimePeriod ?? undefined"
-        data-test-name="dbm-databases-date-time"
-        class="h-8"
-        @on:date-change="onDateChange"
-      />
-    </template>
-
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
         :data="treeRows"
@@ -106,46 +88,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              is a dimension inside the shared filter popover rather than a bare
              full-width select, so both tabs filter the same way. -->
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <div class="w-64 shrink-0">
-              <OSearchInput
-                v-model="search"
-                :placeholder="t('dbm.databases.searchPlaceholder')"
-                clearable
-                data-test="dbm-databases-search"
-              />
-            </div>
+          <DbmTableToolbar
+            v-model:search="search"
+            :placeholder="t('dbm.databases.searchPlaceholder')"
+            search-data-test="dbm-databases-search"
+          >
             <DbmScopeFilters
               class="min-w-0 flex-1"
               :filters="dimensionFilters"
               @clear="clearScope"
             />
-          </div>
+          </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+          <DbmRefreshButton
             :loading="loading"
-            class="shrink-0"
             data-test="dbm-databases-refresh"
-            @click="onRefresh"
-          >
-            <OTooltip side="bottom" :content="t('dbm.common.reload')" />
-          </OButton>
+            @refresh="onRefresh"
+          />
         </template>
 
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <div
-            class="px-page-edge border-table-row-divider border-b py-1.5"
-            data-test="dbm-databases-summary"
-          >
+          <DbmSubheaderBand data-test="dbm-databases-summary">
             <OStatStrip :items="summaryStats" :loading="loading" />
-          </div>
+          </DbmSubheaderBand>
           <DbmCoverageLine
             :freshness="freshness"
             :hits="rows"
@@ -403,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
-  </OPageLayout>
+  </DbmPageChrome>
 </template>
 
 <script setup lang="ts">
@@ -412,42 +381,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmDatabasesPage" });
 
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, ref, watch, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
-import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
+import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
+import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
-import DbmSectionTabs from "@/components/dbm/DbmSectionTabs.vue";
-import DateTime from "@/components/DateTime.vue";
+import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
+import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
+import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import dbMonitoringService, { type DbTotalsRow, type Freshness } from "@/services/db_monitoring";
+import dbMonitoringService, {
+  type DbTotalsRow,
+  type Freshness,
+  type QueryStatsRow,
+} from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
-import { useDbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
 import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
-import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
-import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
-import {
-  contextRegistry,
-  createDbmContextProvider,
-  DBM_CONTEXT_KEY,
-} from "@/composables/contextProviders";
+import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { createDbmContextProvider } from "@/composables/contextProviders";
 import { buildDatabaseBreakdown, type DbmBreakdown } from "@/utils/dbm/breakdown";
 import {
   isBreakdownRow,
@@ -463,7 +429,7 @@ import {
   formatPercent,
   formatRate,
 } from "@/utils/dbm/format";
-import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
+import { createDbmFilterEntry, optionsFrom } from "@/utils/dbm/filters";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import streamService from "@/services/stream";
@@ -480,26 +446,34 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-// Seeded from the URL so the window survives a tab switch and a shared link.
-const { range, current, previous, refresh, setRange, queryParams } = useDbmScope(route.query);
+// The shared list-page spine: scope from the URL, the request-sequence guard
+// (one token for the page, so the per-database breakdown fetches a load starts
+// are invalidated by the NEXT load along with the load itself), the shell's
+// badge snapshot, refresh/date-change handlers and the load envelope. This
+// page's `system` filter is written to the URL by `syncUrl`, which is how the
+// shell learns to refetch under it. See useDbmListPage.
+const {
+  scope: { range, current, previous, queryParams },
+  requestSeq,
+  tabCountsContext,
+  loading,
+  error,
+  search,
+  org,
+  dbmEnabled,
+  run,
+  onRefresh,
+  onDateChange,
+} = useDbmListPage({
+  load: () => load(),
+  syncUrl: () => syncUrl(),
+  context: () => dbmContext,
+});
 
-// One token for the page, so the per-database breakdown fetches a load starts
-// are invalidated by the NEXT load along with the load itself.
-const requestSeq = useDbmRequestSeq();
-
-// The sibling-tab badges are the same numbers on every tab, so DbmShell fetches
-// them ONCE per window for every route and this page reads the snapshot.
-// This page's `system` filter is written to the URL by `syncUrl`, which is how
-// the shell learns to refetch under it. See useDbmTabCounts.
-const tabCountsContext = useDbmTabCountsContext();
-
-const rows = ref<DatabaseRow[]>([]);
+const rows = shallowRef<DatabaseRow[]>([]);
 const freshness = ref<Freshness | null>(null);
 const topNSubset = ref(false);
-const loading = ref(false);
-const error = ref<string | null>(null);
 const permissionOk = ref(true);
-const search = ref("");
 // `env` is deliberately absent. The databases endpoint deserializes only
 // system/service/stream, so an env filter here could count itself as active and
 // still return staging merged with prod — a filter that lies is worse than no
@@ -530,8 +504,6 @@ const tabCounts = computed(() =>
   ),
 );
 
-const org = computed(() => store.state.selectedOrganization?.identifier as string);
-const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
 /**
  * W4/W4b. Off by default: the join costs a second read across up to eight
  * metric streams per page load, so nobody acquires it by upgrading.
@@ -548,18 +520,11 @@ const failedMetricStreams = ref<string[]>([]);
  * The query read's own rows, kept so the metrics read can rebuild the table
  * when it lands without refetching them.
  */
-const clientHits = ref<DbTotalsRow[]>([]);
+const clientHits = shallowRef<DbTotalsRow[]>([]);
 const drowningKeys = ref<Set<string>>(new Set());
 
 /** At most this many service chips per row before the cell collapses the rest. */
 const MAX_VISIBLE_SERVICES = 3;
-
-/**
- * Queries pulled to build one database's schema → service breakdown. The
- * breakdown is a shape, not a ranking, so the long tail past this adds pixels
- * rather than meaning — and this fires once per row expansion.
- */
-const BREAKDOWN_QUERY_LIMIT = 200;
 
 interface DatabaseRow extends Partial<DbTotalsRow> {
   db_system: string;
@@ -651,11 +616,12 @@ const summaryStats = computed<StatItem[]>(() => [
 
 const isFiltered = computed(() => !!search.value || !!systemFilter.value);
 
-const optionsFrom = (values: (string | undefined)[]) =>
-  [...new Set(values.filter((v): v is string => !!v))].map((value) => ({
-    value,
-    label: raw(value),
-  }));
+// Every filter change publishes the scope to the URL BEFORE reloading — the
+// factory owns the handler, so no entry can forget the URL half.
+const filterEntry = createDbmFilterEntry(() => {
+  syncUrl();
+  load();
+});
 
 /**
  * The same popover-and-chips control Top queries uses. Only the dimensions this
@@ -663,18 +629,13 @@ const optionsFrom = (values: (string | undefined)[]) =>
  * would be worse than its absence.
  */
 const dimensionFilters = computed<DbmScopeFilter[]>(() => [
-  {
+  filterEntry({
     key: "system",
     dimension: t("dbm.filters.dimension.system"),
-    value: systemFilter.value,
     placeholder: t("dbm.filters.allEngines"),
     options: optionsFrom(rows.value.map((r) => r.db_system)),
-    onChange: (value) => {
-      systemFilter.value = (value as string) || null;
-      syncUrl();
-      load();
-    },
-  },
+    model: systemFilter,
+  }),
 ]);
 
 /**
@@ -904,8 +865,8 @@ const shortfallLine = (row: TableRow): I18nText =>
  */
 const statusLine = (row: DbmBreakdownRow): I18nText => {
   if (row.status === "error") {
-    const parent = rows.value.find((candidate) => row.rowKey === `${candidate.rowKey}/status`);
-    return (parent && breakdownFor(parent).error) || t("dbm.common.loadFailed");
+    const parentKey = row.rowKey.slice(0, -"/status".length);
+    return breakdowns.value[parentKey]?.error || t("dbm.common.loadFailed");
   }
   return row.status === "empty"
     ? t("dbm.breakdown.nothingToAttribute")
@@ -913,79 +874,76 @@ const statusLine = (row: DbmBreakdownRow): I18nText => {
 };
 
 /**
- * Fetch one database's queries and roll them up.
+ * The per-instance splits the LAST load brought down, keyed by `db_instance` —
+ * exactly the shape `include_breakdown` returns.
  *
- * The `instance` param is all the scoping this needs — the endpoint already
- * accepts it, so the drill-down costs no backend change. The row's own exact
- * total rides along so the aggregation can report its shortfall rather than
- * presenting a sum that silently does not reconcile.
- *
- * It JOINS the load that owns the page rather than starting its own, so a
- * window change discards it along with the parent it describes — otherwise it
- * lands after `load()` cleared the cache and files old-window numbers under a
- * new-window database.
+ * This used to be one `GET /queries?instance=<row>&stmt_class=all` PER EXPANDED
+ * ROW, re-fired for every open row on every window change: opening six
+ * databases and moving the range cost six requests, all answering a question
+ * the overview's own read had already paid for. `include_breakdown=true` folds
+ * them into the response that draws the table, so expanding a row is now a
+ * lookup rather than a fetch. `null` means the section was not in the response
+ * at all (an older server, or the read failing) — which is what the row's error
+ * placeholder is for.
  */
-const loadBreakdown = async (row: DatabaseRow, token: number = requestSeq.current()) => {
-  if (!org.value) return;
-  breakdowns.value = {
-    ...breakdowns.value,
-    [row.rowKey]: { breakdown: buildDatabaseBreakdown([]), loading: true, error: null },
-  };
-  try {
-    const { data } = await dbMonitoringService.getQueries(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-      instance: row.db_instance,
-      system: systemFilter.value ?? undefined,
-      // Every statement class, not just `query`: the row's total counts them
-      // all, so filtering to one class here would manufacture a shortfall.
-      stmtClass: "all",
-      limit: BREAKDOWN_QUERY_LIMIT,
-    });
-    // The window or filter moved while this was in flight: `load()` has already
-    // cleared the cache, and writing here would re-file the OLD window's split
-    // under the new window's parent.
-    if (requestSeq.isStale(token)) return;
-    breakdowns.value = {
-      ...breakdowns.value,
-      [row.rowKey]: {
-        breakdown: buildDatabaseBreakdown(data.hits ?? [], row.total_time_ns),
-        loading: false,
-        error: null,
-      },
-    };
-  } catch (err: unknown) {
-    if (requestSeq.isStale(token)) return;
+const instanceBreakdowns = shallowRef<Record<string, QueryStatsRow[]> | null>(null);
+const breakdownFailed = ref(false);
+
+/**
+ * File one database's split from what the last load returned.
+ *
+ * The row's own exact total rides along so the aggregation can report its
+ * shortfall rather than presenting a sum that silently does not reconcile. The
+ * split is keyed by INSTANCE, and that is the grain it always had: the
+ * per-row request scoped on `instance` alone, so two namespace rows on one
+ * instance received the same response then and read the same entry now.
+ */
+const fileBreakdown = (row: DatabaseRow) => {
+  const section = instanceBreakdowns.value;
+  if (!section || breakdownFailed.value) {
     breakdowns.value = {
       ...breakdowns.value,
       [row.rowKey]: {
         breakdown: buildDatabaseBreakdown([]),
         loading: false,
-        error:
-          raw((err as { response?: { data?: { message?: string } } })?.response?.data?.message) ||
-          t("dbm.common.loadFailed"),
+        error: t("dbm.common.loadFailed"),
       },
     };
+    return;
   }
+  breakdowns.value = {
+    ...breakdowns.value,
+    [row.rowKey]: {
+      // An instance with no rows in the split is an EMPTY breakdown, not a
+      // failure: nothing was attributable, which the `empty` placeholder
+      // already says better than an error would.
+      breakdown: buildDatabaseBreakdown(section[row.db_instance] ?? [], row.total_time_ns),
+      loading: false,
+      error: null,
+    },
+  };
 };
 
 /**
- * Fetch every open DATABASE row that has no state yet — on open, and after a
+ * File every open DATABASE row that has no state yet — on open, and after a
  * reload. Open schema rows are in the same set and are skipped here: their
- * children came down with the parent's one request, so there is nothing left to
- * fetch.
+ * children came from their parent's entry, so there is nothing left to file.
+ *
+ * No longer async and no longer takes a request token: there is no request to
+ * be stale against. The split and the table it describes came down together,
+ * so the pair cannot disagree about which window it is.
  */
-const fillOpenBreakdowns = (token: number = requestSeq.current()) => {
+const fillOpenBreakdowns = () => {
   for (const id of expandedIds.value) {
     if (breakdowns.value[id]) continue;
     const row = rows.value.find((candidate) => candidate.rowKey === id);
-    if (row) loadBreakdown(row, token);
+    if (row) fileBreakdown(row);
   }
 };
 
 // A re-open reuses what we have; the range or filter changing is what
-// invalidates it, and `load()` clears the cache so this refetches. Wrapped so
-// the watcher's own arguments cannot land in the token parameter.
+// invalidates it, and `load()` clears the cache so this re-files. Wrapped so
+// the watcher's own arguments cannot land in a parameter.
 watch(expandedIds, () => fillOpenBreakdowns());
 
 /**
@@ -1193,88 +1151,94 @@ const METRIC_SAMPLE_LIMIT = 5000;
  * so the flag only ever reached the badge cache — and the badges are the
  * shell's now. `onRefresh` forces them directly.
  */
-const load = async () => {
-  if (!org.value) return;
-  // Claimed BEFORE the cache is cleared, so any breakdown still in flight is
-  // already stale by the time it tries to write back into it.
-  const token = requestSeq.begin();
-  loading.value = true;
-  error.value = null;
-  refresh();
-  // The open rows' numbers describe the OLD window; keeping them would leave
-  // two ranges on screen at once. The instance metrics are the same problem:
-  // the previous window's saturation rendered beside this window's latency is
-  // two ranges on one row.
-  breakdowns.value = {};
-  instanceMetrics.value = new Map();
-  failedMetricStreams.value = [];
+const load = () =>
+  run(
+    async (token) => {
+      // Both windows in ONE request — the server reads them concurrently and
+      // returns the baseline as `baseline_hits`. The previous window is what
+      // makes the "slowing down against its own normal" claim possible at all;
+      // if its read failed server-side the drowning detection goes quiet rather
+      // than comparing against an empty set it would misread as recovery.
+      const { data } = await dbMonitoringService.getDatabases(org.value, {
+        startTime: current.value.startTime,
+        endTime: current.value.endTime,
+        system: systemFilter.value ?? undefined,
+        baselineStartTime: previous.value.startTime,
+        baselineEndTime: previous.value.endTime,
+        // The per-instance split rides along, so expanding a row costs no
+        // request. It is folded from the `query_stats` rows this response
+        // already reads to name each row's calling services — the same rows
+        // the per-row `GET /queries` used to re-fetch, once per open row, on
+        // every window change.
+        includeBreakdown: true,
+      });
 
-  try {
-    // Both windows in ONE request — the server reads them concurrently and
-    // returns the baseline as `baseline_hits`. The previous window is what
-    // makes the "slowing down against its own normal" claim possible at all;
-    // if its read failed server-side the drowning detection goes quiet rather
-    // than comparing against an empty set it would misread as recovery.
-    const { data } = await dbMonitoringService.getDatabases(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-      system: systemFilter.value ?? undefined,
-      baselineStartTime: previous.value.startTime,
-      baselineEndTime: previous.value.endTime,
-    });
+      if (requestSeq.isStale(token)) return;
 
-    if (requestSeq.isStale(token)) return;
+      const hits = data.hits ?? [];
+      freshness.value = data.freshness;
+      topNSubset.value = data.top_n_subset;
+      neverAggregated.value = data.freshness?.data_through === 0;
 
-    const hits = data.hits ?? [];
-    freshness.value = data.freshness;
-    topNSubset.value = data.top_n_subset;
-    neverAggregated.value = data.freshness?.data_through === 0;
+      const drowning = data.baseline_read_failed
+        ? new Set<string>()
+        : new Set(
+            detectDrowningDatabases(hits, data.baseline_hits ?? []).map((d) => totalsKey(d.row)),
+          );
 
-    const drowning = data.baseline_read_failed
-      ? new Set<string>()
-      : new Set(
-          detectDrowningDatabases(hits, data.baseline_hits ?? []).map((d) => totalsKey(d.row)),
-        );
-
-    clientHits.value = hits;
-    drowningKeys.value = drowning;
-    applyInstanceMetrics();
-    // Rows that were open before the reload need their split recomputed for
-    // the new window; the watcher only fires when the open SET changes.
-    fillOpenBreakdowns(token);
-    // The metrics read goes LAST and unawaited. It is additive to a table that
-    // is already correct, so it must not be ahead of the breakdown fetches in
-    // the browser's connection queue.
-    void loadInstanceMetrics(token);
-    // The sibling badges are NOT fetched here. DbmShell watches the window
-    // and the `system` filter in the URL — both of which this page publishes
-    // via `syncUrl` — and refetches them itself, once for every tab. A call
-    // here would restore the per-page fan-out. The one thing the shell cannot
-    // infer is a REFRESH, since the URL does not change: that is why
-    // `onRefresh` forces explicitly.
-  } catch (err: unknown) {
-    // A superseded request's failure is not this page's failure.
-    if (requestSeq.isStale(token)) return;
-    const status = (err as { response?: { status?: number } })?.response?.status;
-    // 403 is a diagnosis, not a failure — the empty state names it precisely.
-    permissionOk.value = status !== 403;
-    if (permissionOk.value) {
-      error.value =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        t("dbm.common.loadFailed");
-    }
-    rows.value = [];
-  } finally {
-    if (!requestSeq.isStale(token)) {
-      loading.value = false;
-      // The trace-presence probe answers a question only the empty state asks,
-      // so it runs exactly when the empty state is about to render — a load
-      // that produced rows never pays for it. Unawaited: the checklist gains
-      // its trace row when the (session-cached) catalog answers.
-      if (!rows.value.length) void probeTracePresence();
-    }
-  }
-};
+      clientHits.value = hits;
+      drowningKeys.value = drowning;
+      instanceBreakdowns.value = data.breakdown ?? null;
+      breakdownFailed.value = !!data.breakdown_read_failed;
+      applyInstanceMetrics();
+      // Rows that were open before the reload need their split re-filed for
+      // the new window; the watcher only fires when the open SET changes.
+      fillOpenBreakdowns();
+      // The metrics read goes LAST and unawaited. It is additive to a table that
+      // is already correct, so it must not be ahead of the breakdown fetches in
+      // the browser's connection queue.
+      void loadInstanceMetrics(token);
+      // The sibling badges are NOT fetched here. DbmShell watches the window
+      // and the `system` filter in the URL — both of which this page publishes
+      // via `syncUrl` — and refetches them itself, once for every tab. A call
+      // here would restore the per-page fan-out. The one thing the shell cannot
+      // infer is a REFRESH, since the URL does not change: that is why
+      // `onRefresh` forces explicitly.
+    },
+    {
+      // The open rows' numbers describe the OLD window; keeping them would
+      // leave two ranges on screen at once. Both the cache and the section it
+      // is filed from are cleared, so an open row shows its loading
+      // placeholder until the new response re-files it. The instance metrics
+      // are the same problem: the previous window's saturation rendered beside
+      // this window's latency is two ranges on one row.
+      before: () => {
+        breakdowns.value = {};
+        instanceBreakdowns.value = null;
+        breakdownFailed.value = false;
+        instanceMetrics.value = new Map();
+        failedMetricStreams.value = [];
+      },
+      reset: () => {
+        rows.value = [];
+      },
+      // 403 is a diagnosis, not a failure — the empty state names it precisely.
+      onForbidden: () => {
+        permissionOk.value = false;
+      },
+      onError: (serverMessage) => {
+        permissionOk.value = true;
+        error.value = serverMessage ?? t("dbm.common.loadFailed");
+      },
+      settled: () => {
+        // The trace-presence probe answers a question only the empty state
+        // asks, so it runs exactly when the empty state is about to render — a
+        // load that produced rows never pays for it. Unawaited: the checklist
+        // gains its trace row when the (session-cached) catalog answers.
+        if (!rows.value.length) void probeTracePresence();
+      },
+    },
+  );
 
 /**
  * Only exceptions get a chip.
@@ -1520,24 +1484,6 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
 /** Every column in the mockup's set is on: at two rows there is room for all. */
 const defaultColumnVisibility = {};
 
-// Named handler, not `@click="load"`: a refresh must ALSO force the shell's
-// badge cache alongside the page's own load — the URL does not change on a
-// refresh, so the shell cannot see one on its own.
-const onRefresh = () => {
-  void load();
-  tabCountsContext.refresh({ force: true });
-};
-
-const onDateChange = (value: DbmDateChange) => {
-  setRange(value);
-  syncUrl();
-  // The window is adopted either way — it is the picker's resolved state. Only
-  // the FETCH is conditional: `onMounted` below already loads, so fetching on
-  // the picker's mount replay too would issue every request twice on first
-  // paint. See `DbmDateChange.userChangedValue`.
-  if (value?.userChangedValue !== false) load();
-};
-
 const clearScope = () => {
   systemFilter.value = null;
   syncUrl();
@@ -1640,8 +1586,9 @@ const onRowClick = (row: TableRow) => {
 };
 
 // This page carries no "suggest a fix" button — "make my database faster" has no
-// single artifact to reason about. It still registers the scope, so a question
-// typed into the chat panel from here lands on the right instance and window.
+// single artifact to reason about. It still registers the scope (via
+// useDbmListPage's lifecycle), so a question typed into the chat panel from
+// here lands on the right instance and window.
 const dbmContext = createDbmContextProvider(
   () => ({
     currentPage: "databases" as const,
@@ -1654,32 +1601,4 @@ const dbmContext = createDbmContextProvider(
   }),
   store,
 );
-
-onMounted(() => {
-  contextRegistry.register(DBM_CONTEXT_KEY, dbmContext);
-  contextRegistry.setActive(DBM_CONTEXT_KEY);
-  // Only this page's OWN read. The badges are DbmShell's, fetched once for
-  // every tab — a call here would put the fan-out back on every mount.
-  load();
-});
-
-// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
-// session on this tab. The URL is how the tabs agree on a window, so re-read it
-// on return and reload ONLY if it actually moved.
-useDbmScopeSync({
-  route,
-  current: () => range.value,
-  adopt: (next) =>
-    setRange({
-      startTime: next.startTime,
-      endTime: next.endTime,
-      relativeTimePeriod: next.relativeTimePeriod,
-    }),
-  reload: () => load(),
-});
-
-onBeforeUnmount(() => {
-  contextRegistry.unregister(DBM_CONTEXT_KEY);
-  contextRegistry.setActive("");
-});
 </script>
