@@ -437,6 +437,13 @@
   --color-badge-blue-soft-bg: var(--color-blue-50);
   --color-badge-blue-soft-text: var(--color-blue-700);
 
+  /* Trace span-event markers */
+  /* Achromatic: the waterfall bar is filled with an arbitrary per-service
+     colour, so a hue-based marker can vanish on a same-hue bar. A 50% alpha
+     black darkens whatever is beneath it, holding contrast against any fill.
+     Error and warning keep their badge hues — there the colour is semantic. */
+  --color-trace-event-info: color-mix(in srgb, var(--color-black) 50%, transparent);
+
   /* Bracket-pair colorization — Monaco rainbow brackets (vs light) */
   --color-bracket-1: #0431fa;
   --color-bracket-2: #319331;
@@ -1780,6 +1787,9 @@
   --color-badge-blue-ol-text: var(--color-badge-blue-ol-text);
   --color-badge-blue-soft-bg: var(--color-badge-blue-soft-bg);
   --color-badge-blue-soft-text: var(--color-badge-blue-soft-text);
+
+  /* Trace span-event markers */
+  --color-trace-event-info: var(--color-trace-event-info);
 
   /* Editor bracket-pair colorization */
   --color-bracket-1: var(--color-bracket-1);

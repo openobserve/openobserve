@@ -889,6 +889,19 @@ describe("TraceDetailsSidebar", async () => {
 
         expect(timelineMarkers()).toHaveLength(0);
       });
+
+      // The sidebar carries no marker styling of its own — it renders
+      // SEVERITY_MARKER_CLASS directly. This asserts that inheritance, so a
+      // future change to the waterfall cannot silently leave this surface behind.
+      it("draws mini-timeline markers with the shared severity vocabulary", async () => {
+        await setSpanEvents([
+          { name: "cache.miss", level: "INFO", _timestamp: eventNsAt(0.25) },
+          { name: "boom", level: "ERROR", _timestamp: eventNsAt(0.75) },
+        ]);
+
+        expect(timelineMarkers()[0].classes()).toContain("bg-trace-event-info");
+        expect(timelineMarkers()[1].classes()).toContain("bg-badge-error-solid-bg");
+      });
     });
   });
 

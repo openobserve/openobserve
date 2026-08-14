@@ -613,7 +613,7 @@ describe("SpanBlock", () => {
         { name: "exception", _timestamp: eventNsAt(0.75) },
       ]);
 
-      expect(markers()[0].classes()).toContain("bg-badge-blue-solid-bg");
+      expect(markers()[0].classes()).toContain("bg-trace-event-info");
       expect(markers()[1].classes()).toContain("bg-badge-error-solid-bg");
     });
 
@@ -636,7 +636,7 @@ describe("SpanBlock", () => {
     it("renders a level=INFO event with the info token", async () => {
       await setEvents([{ name: "cache hit", level: "INFO", _timestamp: eventNsAt(0.4) }]);
 
-      expect(markers()[0].classes()).toContain("bg-badge-blue-solid-bg");
+      expect(markers()[0].classes()).toContain("bg-trace-event-info");
       expect(markers()[0].attributes("data-event-severity")).toBe("info");
     });
 

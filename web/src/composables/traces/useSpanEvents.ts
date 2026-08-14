@@ -70,11 +70,30 @@ export type SpanEventSeverity = "error" | "warning" | "info";
  * Shared by every surface so the waterfall, the sidebar mini-timeline and the
  * flame graph read as one vocabulary. Colour is never the only channel carrying
  * severity — see the row event-count badge in TraceTree.
+ *
+ * Info is achromatic on purpose. The waterfall bar is filled with an arbitrary
+ * per-service colour, so a hue-based info tick can land invisibly on a same-hue
+ * bar; a 50%-alpha modifier holds contrast against any fill. Error and warning
+ * keep their hues, where the colour is semantic and the marker's ring carries
+ * it against a same-hue bar.
  */
 export const SEVERITY_MARKER_CLASS: Record<SpanEventSeverity, string> = {
   error: "bg-badge-error-solid-bg",
   warning: "bg-badge-warning-solid-bg",
-  info: "bg-badge-blue-solid-bg",
+  info: "bg-trace-event-info",
+};
+
+/**
+ * The same tiers as CSS custom-property names.
+ *
+ * The flame graph renders into a canvas and cannot take utility classes, so it
+ * resolves these at draw time. Keeping the two lists adjacent is what stops the
+ * surfaces drifting apart.
+ */
+export const SEVERITY_MARKER_TOKEN: Record<SpanEventSeverity, string> = {
+  error: "--color-badge-error-solid-bg",
+  warning: "--color-badge-warning-solid-bg",
+  info: "--color-trace-event-info",
 };
 
 /** Serialized field name of `Event._timestamp`; used when no column is configured. */

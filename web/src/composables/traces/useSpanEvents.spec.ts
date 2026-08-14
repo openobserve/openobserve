@@ -21,6 +21,8 @@ import {
   EVENT_NAME_MAX_CHARS,
   clusterSpanEventMarkers,
   summarizeSpanEvents,
+  SEVERITY_MARKER_CLASS,
+  SEVERITY_MARKER_TOKEN,
   type SpanEventSeverity,
 } from "@/composables/traces/useSpanEvents";
 
@@ -413,7 +415,10 @@ describe("clusterSpanEventMarkers", () => {
   // Regression: at the measured 882px waterfall width, 55.1% of `default`
   // events landed within a marker's width of a neighbour and were hidden.
   it("merges markers closer together than the minimum spacing", () => {
-    const clusters = clusterSpanEventMarkers([marker(0, 50), marker(1, 50.1), marker(2, 50.2)], 900);
+    const clusters = clusterSpanEventMarkers(
+      [marker(0, 50), marker(1, 50.1), marker(2, 50.2)],
+      900,
+    );
 
     expect(clusters).toHaveLength(1);
     expect(clusters[0].events).toHaveLength(3);
@@ -451,7 +456,10 @@ describe("clusterSpanEventMarkers", () => {
   });
 
   it("orders events within a cluster by time", () => {
-    const clusters = clusterSpanEventMarkers([marker(2, 50.2), marker(0, 50), marker(1, 50.1)], 900);
+    const clusters = clusterSpanEventMarkers(
+      [marker(2, 50.2), marker(0, 50), marker(1, 50.1)],
+      900,
+    );
 
     expect(clusters[0].events.map((e) => e.index)).toEqual([0, 1, 2]);
   });
@@ -505,5 +513,28 @@ describe("summarizeSpanEvents", () => {
   // own can be positioned — this is the whole point of the badge.
   it("counts events that no window could position", () => {
     expect(summarizeSpanEvents([{ name: "a", _timestamp: eventNsAt(0.1) }]).total).toBe(1);
+  });
+});
+
+describe("marker vocabulary", () => {
+  // The span bar is filled with an arbitrary per-service colour, so a hue-based
+  // info marker can land invisibly on a same-hue bar. An achromatic tick is a
+  // luminance modifier over whatever is beneath it, so contrast holds by
+  // construction. Error and warning keep their hues — there the colour is
+  // semantic, and the ring carries them.
+  it("gives the info tier an achromatic token and keeps hue for error and warning", () => {
+    expect(SEVERITY_MARKER_CLASS.info).toBe("bg-trace-event-info");
+    expect(SEVERITY_MARKER_CLASS.error).toBe("bg-badge-error-solid-bg");
+    expect(SEVERITY_MARKER_CLASS.warning).toBe("bg-badge-warning-solid-bg");
+  });
+
+  // The flame graph draws into a canvas and cannot take utility classes, so it
+  // resolves token values at draw time. Both surfaces must name the same tokens.
+  it("exposes the same tiers as custom-property names for canvas consumers", () => {
+    expect(SEVERITY_MARKER_TOKEN).toEqual({
+      error: "--color-badge-error-solid-bg",
+      warning: "--color-badge-warning-solid-bg",
+      info: "--color-trace-event-info",
+    });
   });
 });

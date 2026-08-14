@@ -330,6 +330,9 @@
   --color-badge-blue-soft-bg: color-mix(in srgb, var(--color-blue-400) 15%, transparent);
   --color-badge-blue-soft-text: var(--color-blue-400);
 
+  /* trace event markers: invert the luminance modifier for dark surfaces */
+  --color-trace-event-info: color-mix(in srgb, var(--color-white) 50%, transparent);
+
   /* Editor bracket-pair colorization — Monaco vs-dark defaults */
   --color-bracket-1: #ffd700;
   --color-bracket-2: #da70d6;
