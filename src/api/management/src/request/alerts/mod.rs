@@ -1377,7 +1377,7 @@ pub async fn list_alert_group_transitions(
     tag = "Alerts",
     operation_id = "GetAlert",
     summary = "Get alert details",
-    description = "Retrieves detailed information about a specific alert including its configuration, conditions, triggers, notification settings, and current status. Useful for viewing and understanding existing alert setups.",
+    description = "Retrieves detailed information about a specific alert including its configuration, conditions, triggers, notification settings, and current status. Useful for viewing and understanding existing alert setups. Composite alerts return a composite-shaped body (alert_type=\"composite\", composite_condition, children, evaluation) rather than GetAlertResponseBody.",
     security(
         ("Authorization"= [])
     ),
@@ -1834,7 +1834,7 @@ async fn build_and_run_anomaly_update(
     tag = "Alerts",
     operation_id = "DeleteAlert",
     summary = "Delete alert",
-    description = "Permanently removes an alert and all its configurations including conditions, triggers, and notification settings. This action cannot be undone and will stop all monitoring and notifications for the deleted alert.",
+    description = "Permanently removes an alert and all its configurations including conditions, triggers, and notification settings. This action cannot be undone and will stop all monitoring and notifications for the deleted alert. Also deletes composite alerts; returns 409 when the alert is referenced by one or more composite alerts.",
     security(
         ("Authorization"= [])
     ),
@@ -1845,6 +1845,7 @@ async fn build_and_run_anomaly_update(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 409, description = "Referenced by composite alerts", content_type = "application/json", body = Object),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(

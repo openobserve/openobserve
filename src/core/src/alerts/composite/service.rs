@@ -35,20 +35,36 @@ use crate::alerts::composite_graph_lock;
 #[cfg(feature = "enterprise")]
 use crate::auth::check_permissions;
 
+/// Create/update payload for a composite alert — the internal form the API layer
+/// builds from a `CreateAlertRequestBody` / `UpdateAlertRequestBody`.
+///
+/// Two fields carry encodings that only make sense once you know the API layer:
+/// - [`Self::stale_child_policy`] is the persisted integer id from
+///   `CompositeStaleChildPolicy::storage_id()` (0=use-last, 1=false, 2=true),
+///   not the wire string.
+/// - [`Self::silence_seconds`] is seconds; the API `trigger_condition.silence`
+///   is minutes and is multiplied by 60 before it reaches this struct.
 #[derive(Clone, Debug)]
 pub struct CompositeCreate {
+    /// Stable composite id. Assigned by the service on create; identifies the
+    /// record to update on update.
     pub id: Option<String>,
     pub org: String,
+    /// Folder slug the composite lives in (validated to exist).
     pub folder_id: String,
     pub name: String,
     pub description: Option<String>,
+    /// Boolean expression over child alert IDs.
     pub expression: String,
+    /// Whether a `warning` child counts as firing.
     pub warning_counts_as_firing: bool,
+    /// Stale-child policy as `CompositeStaleChildPolicy::storage_id()` (0/1/2).
     pub stale_child_policy: i16,
     pub destinations: Vec<String>,
     pub template: Option<String>,
     pub context_attributes: Option<serde_json::Value>,
     pub enabled: bool,
+    /// Silence window in **seconds** (API minutes × 60).
     pub silence_seconds: i64,
     pub creates_incident: bool,
     pub workflows: Vec<String>,
@@ -58,6 +74,8 @@ pub struct CompositeCreate {
     pub last_edited_by: Option<String>,
 }
 
+/// Errors the composite service surfaces to the API layer; each variant maps to
+/// a machine-readable `code` + HTTP status in `composite_error_response`.
 #[derive(Debug, thiserror::Error)]
 pub enum CompositeServiceError {
     #[error("client supplied composite IDs are not supported")]
