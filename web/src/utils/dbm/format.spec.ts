@@ -13,21 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   badgeCount,
   computeQps,
   errorRate,
   countClaim,
+  dbmHttpError,
+  formatAge,
   formatLagBytes,
   formatLagSeconds,
+  formatWhenWithAge,
   failedCellKind,
   formatNs,
   formatPercent,
   formatRate,
   formatSignedPercent,
   oneLine,
+  shareWidth,
   showsPerRequest,
 } from "./format";
 
@@ -316,5 +320,114 @@ describe("lag formatters and the sign", () => {
 
   it("does not print a negative second lag as a caught-up replica", () => {
     expect(formatLagSeconds(-30)).toBe("—");
+  });
+});
+
+describe("formatAge", () => {
+  const NOW = new Date("2026-08-13T12:00:00Z").getTime();
+  const agoMicros = (seconds: number) => (NOW - seconds * 1000) * 1000;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads in the unit the reader would reach for", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    expect(formatAge(agoMicros(20))).toBe("20s ago");
+    expect(formatAge(agoMicros(20 * 60))).toBe("20m ago");
+  });
+
+  /**
+   * The unification pin: two pages used to cap this at minutes, so a
+   * three-hour-old sample printed "180m ago" — arithmetic handed back to the
+   * reader. Every page now climbs to hours and days.
+   */
+  it("says 3h ago, never 180m ago", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    expect(formatAge(agoMicros(3 * 60 * 60))).toBe("3h ago");
+    expect(formatAge(agoMicros(3 * 24 * 60 * 60))).toBe("3d ago");
+  });
+
+  it("clamps a slightly-future timestamp to now rather than negative time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    expect(formatAge(agoMicros(-5))).toBe("0s ago");
+  });
+});
+
+describe("formatWhenWithAge", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("gives a same-day timestamp a clock and an age, no date", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-13T12:00:00").getTime());
+    const label = formatWhenWithAge(new Date("2026-08-13T09:00:00").getTime() * 1000);
+    expect(label).toMatch(/^\d{1,2}:\d{2}:\d{2} \(3h ago\)$/);
+  });
+
+  /**
+   * A bare clock time on a three-day-old event reads as "today at 20:43" —
+   * the one thing a "last time this wasn't empty" line must not say.
+   */
+  it("names the date once the timestamp is from another day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-13T12:00:00").getTime());
+    const label = formatWhenWithAge(new Date("2026-08-10T20:43:00").getTime() * 1000);
+    expect(label).toContain("Aug 10");
+    expect(label).toContain("(3d ago)");
+  });
+});
+
+describe("shareWidth", () => {
+  it("renders a share as a percentage of its track", () => {
+    expect(shareWidth(0.42)).toEqual({ width: "42%" });
+    expect(shareWidth(1)).toEqual({ width: "100%" });
+  });
+
+  it("rounds rather than printing sub-percent noise", () => {
+    expect(shareWidth(0.333)).toEqual({ width: "33%" });
+  });
+});
+
+describe("dbmHttpError", () => {
+  /** An axios rejection, shaped as the pages actually receive one. */
+  const axiosErr = (status?: number, message?: string) => ({
+    response: { status, data: message !== undefined ? { message } : {} },
+  });
+
+  it("reads the status and the server's own message", () => {
+    expect(dbmHttpError(axiosErr(404, "stream not found"))).toEqual({
+      status: 404,
+      serverMessage: "stream not found",
+      message: "stream not found",
+    });
+  });
+
+  /**
+   * `serverMessage` stays distinct from `message`: the pages disagree on the
+   * fallback (most print the error's own text, the aggregate pages substitute
+   * their own copy), and a helper that baked in either would silently change
+   * the other's banners.
+   */
+  it("falls back to the error's own text only for message", () => {
+    const result = dbmHttpError(new Error("network down"));
+    expect(result.status).toBeUndefined();
+    expect(result.serverMessage).toBeUndefined();
+    expect(result.message).toBe("Error: network down");
+  });
+
+  it("survives a rejection that is not an object at all", () => {
+    expect(dbmHttpError("boom")).toEqual({ message: "boom" });
+    expect(dbmHttpError(undefined)).toEqual({ message: "undefined" });
+  });
+
+  it("keeps a status that arrived without a body message", () => {
+    const result = dbmHttpError(axiosErr(501));
+    expect(result.status).toBe(501);
+    expect(result.serverMessage).toBeUndefined();
   });
 });

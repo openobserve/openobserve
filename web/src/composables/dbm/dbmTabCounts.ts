@@ -38,11 +38,10 @@
 import {
   inject,
   provide,
-  readonly,
-  ref,
-  type DeepReadonly,
+  shallowReadonly,
+  shallowRef,
   type InjectionKey,
-  type Ref,
+  type ShallowRef,
 } from "vue";
 
 import {
@@ -57,7 +56,7 @@ import {
  */
 export interface DbmTabCountsContext {
   /** The shared snapshot. Always fully shaped — see `DbmTabCounts`. */
-  counts: DeepReadonly<Ref<DbmTabCounts>>;
+  counts: Readonly<ShallowRef<DbmTabCounts>>;
   /**
    * Refetch the badges under the CURRENT scope.
    *
@@ -85,6 +84,6 @@ export const provideDbmTabCounts = (context: DbmTabCountsContext): void => {
  */
 export const useDbmTabCountsContext = (): DbmTabCountsContext =>
   inject(DBM_TAB_COUNTS, {
-    counts: readonly(ref(emptyDbmTabCounts())),
+    counts: shallowReadonly(shallowRef(emptyDbmTabCounts())),
     refresh: () => {},
   });

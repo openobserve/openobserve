@@ -131,6 +131,107 @@ describe("flattenPlanTree", () => {
   });
 });
 
+/**
+ * MySQL/MariaDB `EXPLAIN FORMAT=JSON` — a `query_block` OBJECT, structurally
+ * unrelated to Postgres's array of `{Plan}`.
+ *
+ * This was a SHIPPED bug caught on a live MySQL fleet: the plan was captured
+ * and stored perfectly, and the section rendered "The plan could not be read"
+ * over it, because the walker required an array and returned `[]` for
+ * anything else. The reader was denied the single most actionable fact on the
+ * page — `ALL` over 345k rows is a full table scan and a missing index — and
+ * the copy blamed a read that never failed.
+ */
+describe("flattenPlanTree on a MySQL query_block", () => {
+  /** The exact document the live instance returned for `demo_sessions`. */
+  const mysqlPlan = () => ({
+    query_block: {
+      select_id: 1,
+      cost_info: { query_cost: "34811.85" },
+      table: {
+        table_name: "demo_sessions",
+        access_type: "ALL",
+        rows_examined_per_scan: 345311,
+        rows_produced_per_join: 34531,
+        filtered: "10.00",
+        cost_info: {
+          read_cost: "31358.74",
+          eval_cost: "3453.11",
+          prefix_cost: "34811.85",
+          data_read_per_join: "9M",
+        },
+        used_columns: ["id", "token", "user_id"],
+        attached_condition: "( dbmlab . demo_sessions . token = ? )",
+      },
+    },
+  });
+
+  it("reads the plan instead of reporting it unreadable", () => {
+    expect(flattenPlanTree(mysqlPlan())).not.toEqual([]);
+  });
+
+  it("surfaces the full table scan and the table it scans", () => {
+    const [row] = flattenPlanTree(mysqlPlan());
+    // `access_type` IS the operation in MySQL's grammar — and `ALL` is the
+    // finding the reader came for.
+    expect(row.nodeType).toBe("ALL scan");
+    expect(row.relation).toBe("demo_sessions");
+    expect(row.planRows).toBe(345311);
+  });
+
+  it("parses MySQL's string-quoted cost as a number", () => {
+    // MySQL quotes cost ("34811.85"); Postgres sends a number. Both must reach
+    // the same numeric column or the cost renders blank on one engine.
+    expect(flattenPlanTree(mysqlPlan())[0].totalCost).toBe(34811.85);
+  });
+
+  it("never claims an executed row count MySQL's EXPLAIN did not measure", () => {
+    // This document is an ESTIMATE. A number here would be a measurement
+    // nobody made.
+    expect(flattenPlanTree(mysqlPlan())[0].actualRows).toBeNull();
+  });
+
+  it("shows the index actually chosen, never a candidate it rejected", () => {
+    const plan = {
+      query_block: {
+        table: {
+          table_name: "demo_sessions",
+          access_type: "ref",
+          key: "idx_token",
+          possible_keys: ["idx_token", "idx_user"],
+          rows_examined_per_scan: 1,
+        },
+      },
+    };
+    const [row] = flattenPlanTree(plan);
+    // `possible_keys` are candidates the optimizer did NOT choose; presenting
+    // one as the index used would send a reader tuning the wrong index.
+    expect(row.index).toBe("idx_token");
+  });
+
+  it("walks nested_loop joins as siblings under the block", () => {
+    const plan = {
+      query_block: {
+        nested_loop: [
+          { table: { table_name: "orders", access_type: "ALL" } },
+          { table: { table_name: "order_lines", access_type: "ref", key: "fk_order" } },
+        ],
+      },
+    };
+    const rows = flattenPlanTree(plan);
+    expect(rows.map((r) => r.relation)).toEqual(["orders", "order_lines"]);
+    // Joined tables are siblings, not one nested inside the other.
+    expect(rows[0].depth).toBe(rows[1].depth);
+  });
+
+  it("still returns nothing for an object that is not an EXPLAIN document", () => {
+    for (const bad of [{ not_a_plan: 1 }, { query_block: null }, { query_block: 42 }]) {
+      expect(() => flattenPlanTree(bad as never)).not.toThrow();
+      expect(flattenPlanTree(bad as never)).toEqual([]);
+    }
+  });
+});
+
 describe("planRows", () => {
   it("orders the most recently seen plan first", () => {
     const older = plan({ plan_hash: "old", last_seen: 1_000 });

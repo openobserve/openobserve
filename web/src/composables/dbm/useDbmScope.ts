@@ -156,7 +156,7 @@ export const rangeToQuery = (range: DbmRange) =>
  * DIFFERENT microsecond bounds on every landing, so nothing keyed on those
  * bounds could ever cache-hit, and reads issued moments apart would describe
  * different windows inside a single click (measured in
- * `useDbmScopeAnchor.spec.ts`).
+ * `useDbmScope.spec.ts`).
  *
  * Keyed per range because different ranges are different questions: one shared
  * pin would collapse `15m` and `1h` onto a single instant.

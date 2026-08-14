@@ -337,3 +337,83 @@ export const formatLagSeconds = (seconds: number | null | undefined): string => 
   if (minutes < 60) return `${minutes}m ${total % 60}s`;
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 };
+
+/**
+ * A microsecond timestamp as a wall clock, seconds included — for "sampled at"
+ * and "read up to" freshness lines, where the seconds are the point.
+ *
+ * NOT the formatter QueryDetailPage's chips use: those print minute-grain
+ * locale time (`hour: "2-digit", minute: "2-digit"`) because a first-seen chip
+ * carries no freshness claim. That variant stays local to the page — merging
+ * the two would change one surface or the other.
+ */
+export const formatClock = (micros: number): string =>
+  new Date(micros / 1000).toLocaleTimeString(undefined, { hour12: false });
+
+/**
+ * Relative age, so "20s ago" reads without arithmetic.
+ *
+ * Climbs all the way to hours and days: an age capped at minutes prints a
+ * three-hour-old sample as "180m ago", which the reader has to convert back —
+ * exactly the arithmetic this exists to remove.
+ */
+export const formatAge = (micros: number): string => {
+  const seconds = Math.max(0, Math.round((Date.now() - micros / 1000) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+};
+
+/**
+ * A timestamp from another day needs its DATE. A bare clock time on a
+ * three-day-old event reads as "today at 20:43", which is the one thing a
+ * "last time this wasn't empty" line must not say.
+ *
+ * Distinct from SamplesPage's `formatWhen`, which answers a different question
+ * (when a call ran, at the grain the window's span makes unambiguous) and
+ * stays local to that page — the two share a name's shape, not a meaning.
+ */
+export const formatWhenWithAge = (micros: number): string => {
+  const at = new Date(micros / 1000);
+  const sameDay = at.toDateString() === new Date().toDateString();
+  return sameDay
+    ? `${formatClock(micros)} (${formatAge(micros)})`
+    : `${at.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${formatClock(micros)} (${formatAge(micros)})`;
+};
+
+/** A share bar's width is a percentage of its track, not a fixed length. */
+export const shareWidth = (share: number) => ({ width: `${Math.round(share * 100)}%` });
+
+/** What an HTTP failure is allowed to claim about itself. */
+export interface DbmHttpError {
+  /** The response status, when the failure got as far as a response. */
+  status?: number;
+  /** The server's own message, verbatim — absent when it sent none. */
+  serverMessage?: string;
+  /** The server's message, or the error's own text. Never empty. */
+  message: string;
+}
+
+/**
+ * The one reading of an unknown `catch` value every DBM page shares.
+ *
+ * The axios error shape is reached through casts because `err` is honestly
+ * `unknown`; centralising the cast means one place can be wrong about it
+ * instead of nine. `serverMessage` is kept distinct from `message` because the
+ * pages disagree on the fallback — most print `String(err)`, the aggregate
+ * pages substitute their own "couldn't load" copy — and a helper that baked in
+ * either would silently change the other's banners.
+ */
+export const dbmHttpError = (err: unknown): DbmHttpError => {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  const serverMessage = (err as { response?: { data?: { message?: string } } })?.response?.data
+    ?.message;
+  return {
+    ...(status !== undefined ? { status } : {}),
+    ...(serverMessage ? { serverMessage } : {}),
+    message: serverMessage ?? String(err),
+  };
+};

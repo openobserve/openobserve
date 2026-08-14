@@ -170,17 +170,112 @@ function readString(node: Record<string, unknown>, key: string): string | null {
 }
 
 /**
+ * MySQL/MariaDB `EXPLAIN FORMAT=JSON` — a `query_block` OBJECT, not Postgres's
+ * array of `{Plan}`.
+ *
+ * The two engines share nothing structurally: MySQL nests under `table`,
+ * `nested_loop`, `ordering_operation` and friends, names the operation
+ * `access_type` (`ALL` = full scan) rather than `Node Type`, and quotes its
+ * costs as STRINGS. Parsed here rather than in the tree walker so neither
+ * engine's vocabulary leaks into the other's.
+ *
+ * Without this a MySQL fleet saw "the plan could not be read" over a plan that
+ * had been captured and stored perfectly — the reader is denied the single
+ * most actionable fact on the page (`ALL` over 345k rows is the missing index),
+ * and the section blames a read that never failed.
+ */
+function flattenMysqlPlan(queryBlock: unknown): PlanNodeRow[] {
+  const out: PlanNodeRow[] = [];
+  const seen = new WeakSet<object>();
+
+  // MySQL quotes cost as a string ("34811.85"); Postgres sends a number. Both
+  // reach the same numeric column, and anything else stays absent.
+  const numeric = (v: unknown): number | null => {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string") {
+      const parsed = Number(v);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
+  const walk = (node: unknown, depth: number): void => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      // `nested_loop` and the union/materialisation lists are arrays of
+      // sibling operations — same depth, in planner order.
+      for (const child of node) walk(child, depth);
+      return;
+    }
+    if (seen.has(node)) return;
+    seen.add(node);
+
+    const record = node as Record<string, unknown>;
+    // A `table` object IS the operation in MySQL's grammar. Everything else
+    // (`query_block`, `nested_loop`, `ordering_operation`, …) is structure to
+    // descend through, so it adds no row but still costs an indent step.
+    const table = record.table;
+    let nextDepth = depth;
+    if (table && typeof table === "object" && !Array.isArray(table)) {
+      const t = table as Record<string, unknown>;
+      const accessType = readString(t, "access_type");
+      out.push({
+        depth,
+        // `access_type` is the operation — `ALL` is a full table scan, `ref`
+        // an index lookup. Prefixed so it cannot be misread as a Postgres
+        // node type, which is a different vocabulary entirely.
+        nodeType: accessType ? `${accessType} scan` : "table",
+        relation: readString(t, "table_name"),
+        // MySQL names the chosen index `key`; `possible_keys` are candidates
+        // it did NOT choose and must never be shown as the one it used.
+        index: readString(t, "key"),
+        totalCost: numeric((t.cost_info as Record<string, unknown> | undefined)?.prefix_cost),
+        planRows: numeric(t.rows_examined_per_scan),
+        // MySQL's EXPLAIN is an estimate: no executed-row count exists, and a
+        // number here would claim a measurement nobody made. (`EXPLAIN
+        // ANALYZE` is a different document this branch never sees.)
+        actualRows: null,
+      });
+      nextDepth = depth + 1;
+      // Descend INTO the table for materialised subqueries hanging off it.
+      for (const [key, value] of Object.entries(t)) {
+        if (key !== "cost_info" && value && typeof value === "object") walk(value, nextDepth);
+      }
+    }
+
+    for (const [key, value] of Object.entries(record)) {
+      // `cost_info` and `table` are handled above; the rest is structure.
+      if (key === "cost_info" || key === "table") continue;
+      if (value && typeof value === "object") walk(value, nextDepth);
+    }
+  };
+
+  walk(queryBlock, 0);
+  return out;
+}
+
+/**
  * Flatten an EXPLAIN document into indented rows, depth-first.
  *
  * Depth-first with children emitted immediately after their parent is what
  * makes an indented list readable as a tree: a sibling and a child are one
  * indent step apart and in the order the planner nests them.
  *
+ * Handles BOTH engines' documents — Postgres's array of `{Plan}` and MySQL's
+ * `{query_block}` object — because one section renders whichever the fleet
+ * runs, and an unrecognised shape is indistinguishable to the reader from a
+ * failed read.
+ *
  * Returns `[]` for anything unparseable rather than throwing — a plan is
  * supplementary detail beside a query, and a bad one must never take down a
  * page that would otherwise work.
  */
 export function flattenPlanTree(plan: unknown): PlanNodeRow[] {
+  // MySQL/MariaDB: a single `query_block` object.
+  if (plan && typeof plan === "object" && !Array.isArray(plan)) {
+    const block = (plan as Record<string, unknown>).query_block;
+    return block ? flattenMysqlPlan(block) : [];
+  }
   if (!Array.isArray(plan)) return [];
   const out: PlanNodeRow[] = [];
   // A cycle cannot arrive over the wire (the API parses server JSON), but a

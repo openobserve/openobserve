@@ -179,7 +179,7 @@ const checks = computed<DbmCheckRow[]>(() => {
   // Absent, not failed, when nobody counted. A red ✕ here is a claim we
   // observed zero traces, and stating that on an org that is actively ingesting
   // sends the reader to instrument what is already instrumented.
-  if (props.traceCount !== null && props.traceCount !== undefined) {
+  if (props.traceCount !== null) {
     list.push(
       c("traces", props.traceCount > 0, "traces", {
         count: formatCount(props.traceCount),

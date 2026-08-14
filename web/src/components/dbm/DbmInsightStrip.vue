@@ -60,9 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span
         class="rounded-default grid size-4.5 shrink-0 place-items-center"
-        :class="TONES[insight.tone].chip"
+        :class="DBM_SOFT_TONES[insight.tone]"
       >
-        <OIcon :name="TONES[insight.tone].icon" size="xs" />
+        <OIcon :name="DBM_TONE_ICONS[insight.tone]" size="xs" />
       </span>
 
       <span class="flex items-baseline gap-1.5 leading-tight">
@@ -105,7 +105,6 @@ import { computed } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
@@ -116,6 +115,7 @@ import {
   type DbmInsightTone,
 } from "@/utils/dbm/insights";
 import { formatCount, formatNs, formatPercent, oneLine } from "@/utils/dbm/format";
+import { DBM_SOFT_TONES, DBM_TONE_ICONS } from "@/utils/dbm/tones";
 
 const props = withDefaults(
   defineProps<{
@@ -138,12 +138,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-
-const TONES: Record<DbmInsightTone, { chip: string; icon: IconName }> = {
-  error: { chip: "bg-badge-error-soft-bg text-badge-error-soft-text", icon: "error" },
-  warning: { chip: "bg-badge-warning-soft-bg text-badge-warning-soft-text", icon: "trending-up" },
-  info: { chip: "bg-badge-blue-soft-bg text-badge-blue-soft-text", icon: "insights" },
-};
 
 /**
  * Severity first, then impact. Share of database time is the number the page is

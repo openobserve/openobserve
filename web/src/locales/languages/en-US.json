@@ -14854,7 +14854,8 @@
       "failedChip": "{count} failed",
       "columnSubLabels": {
         "attention": "server",
-        "load": "client"
+        "load": "client",
+        "calls": "server where reported"
       },
       "attention": {
         "connections": "connections",
@@ -14918,14 +14919,14 @@
         "failed": "Failed"
       },
       "columnHints": {
-        "calls": "How many times your applications ran this query.",
+        "calls": "How many times this query ran. Your database's own count where it reports one — that covers every client, not just the parts of your system sending traces. Rows marked client-observed are counted from traces instead, because your database didn't report them.",
         "p50": "Half of all calls finished faster than this. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
         "p95": "The slow tail — 1 call in 20 took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
         "p99": "The worst 1% of calls took at least this long. Counts finished calls only — a query still running, or one that never came back, isn't measured here.",
         "max": "The single slowest call in this window — one real call, not an average.",
         "errors": "How many of these calls came back with an error.",
         "perTrace": "How many times this runs inside a single request. A high number usually means a loop.",
-        "load": "Total time your applications spent waiting on this query, and its share of the database."
+        "load": "Total time this query spent in the database. Your database's own figure where it reports one: execution time on Postgres, but WAIT time on MySQL and MariaDB — each row says which. Rows marked client-observed are measured from traces, so they include network round-trip."
       },
       "errorsNone": "none",
       "errorsAll": "all",
@@ -14938,7 +14939,11 @@
         "alert": "Alert me if this slows"
       },
       "otherRowTextFor": "All other queries on {database}",
-      "otherRowDetailShort": "— {calls} calls."
+      "otherRowDetailShort": "— {calls} calls.",
+      "columnSubLabels": {
+        "calls": "server where reported",
+        "load": "server where reported"
+      }
     },
     "insights": {
       "showRows": "Show this query | Show these {count} queries",
@@ -15095,7 +15100,7 @@
       "noSamples": "No individual executions loaded for this range.",
       "noSeries": "No history for this query in the range you picked.",
       "liveSeries": "The most recent points are still being counted and may change.",
-      "noStream": "We couldn't work out which traces to read, so history can't be loaded. Open this query from the Top queries tab.",
+      "noStream": "We couldn't work out which trace stream carries this query, so its callers and examples can't be loaded.",
       "ambiguousStream": "This organization has more than one trace stream, and we can't tell which one this query runs on. Pick a stream to load its callers and sample traces.",
       "pickStream": "Choose a trace stream",
       "invalidStream": "That trace stream name isn't one we recognize, so we didn't run the search.",
@@ -15164,6 +15169,12 @@
         "approx": "close, not exact",
         "exact": "exact"
       },
+      "overlap": {
+        "serverExecution": "Time {engine} spent executing it",
+        "serverWait": "Time {engine} spent waiting on it — wait time, not execution time",
+        "serverCounted": "Counted by {engine}, across every client",
+        "clientObserved": "Observed by instrumented callers — your database didn't report this one"
+      },
       "endpointsConcentrated": "One endpoint accounts for {percent} of this query's time. Fix {endpoint} and you've fixed this query.",
       "typicalMarker": "slow calls {value}",
       "plans": {
@@ -15211,6 +15222,15 @@
         "setUp": "Set up",
         "readFailed": "Server-side metrics could not be read",
         "readFailedHint": "The read failed, so this says nothing about whether your database is reporting statements. Everything above is still measured from your application."
+      }
+    },
+    "list": {
+      "overlap": {
+        "serverExecution": "exec time",
+        "serverWait": "wait time",
+        "serverCounted": "server count",
+        "clientObserved": "client-observed",
+        "serverReported": "reported by your databases"
       }
     },
     "page": {

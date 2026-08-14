@@ -140,7 +140,7 @@ const roleLabel = computed<I18nText>(() =>
 const pidLabel = computed<I18nText>(() => {
   const pid = props.participant.pid;
   if (pid == null) return raw("");
-  return props.dbSystem?.toLowerCase().includes("mysql")
+  return props.dbSystem.toLowerCase().includes("mysql")
     ? t("dbm.deadlocks.detail.thread", { pid })
     : t("dbm.deadlocks.detail.pid", { pid });
 });

@@ -54,11 +54,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
           {{ formatNs(totalTimeNs) }}
         </span>
-        <span class="text-text-label text-3xs font-mono tabular-nums">
+        <!-- The share is CLIENT-scope arithmetic — this row's traced time over
+             the traced scope total. Under a SERVER-sourced duration it would
+             divide the engine's own total by a traced subtotal, a ratio of two
+             different populations that routinely exceeds 100%. So it is
+             withheld, and the qualifier takes its place. -->
+        <span v-if="showsShare" class="text-text-label text-3xs font-mono tabular-nums">
           {{ formatPercent(share, 0) }}
         </span>
       </span>
-      <OProgressBar :value="share" :variant="barVariant" size="xs" class="w-18" />
+      <!-- What this duration IS, when it came from the database: execution
+           time on Postgres, WAIT time on MySQL/MariaDB. The column heading is
+           the generic "Database time" and this list mixes engines, so the
+           distinction can only be stated per row. -->
+      <span
+        v-if="qualifier"
+        class="text-text-label text-3xs"
+        :title="qualifierTitle"
+        data-test="dbm-overlap-qualifier"
+      >
+        {{ qualifier }}
+      </span>
+      <OProgressBar v-if="showsShare" :value="share" :variant="barVariant" size="xs" class="w-18" />
     </div>
   </div>
 </template>
@@ -84,12 +101,53 @@ const props = withDefaults(
     flagged?: boolean;
     /** Set when every call is failing — the strongest tone this cell carries. */
     critical?: boolean;
+    /**
+     * The `dbm.list.overlap.*` key naming WHICH measurement `totalTimeNs` is,
+     * when this duration came from the database's own counters. Absent on a
+     * purely client-observed cell that has no engine distinction to draw.
+     */
+    qualifierKey?: string | null;
+    /** Which vantage supplied `totalTimeNs` — the share is only valid on `client`. */
+    source?: "server" | "client" | null;
+    /** The engine that reported it, for the qualifier's full sentence on hover. */
+    engine?: string | null;
     dataTest?: string;
   }>(),
-  { share: 0, flagged: false, critical: false },
+  {
+    share: 0,
+    flagged: false,
+    critical: false,
+    qualifierKey: null,
+    source: null,
+    engine: null,
+  },
 );
 
 const { t } = useI18nTyped();
+
+/**
+ * The share may only caption a client-sourced duration — see the template.
+ * A cell that was never told its source is the legacy caller (a pure trace
+ * column), and keeps the share it has always shown.
+ */
+const showsShare = computed(() => props.source !== "server");
+
+const qualifier = computed(() =>
+  props.qualifierKey === null
+    ? null
+    : t(`dbm.list.overlap.${props.qualifierKey}` as "dbm.list.overlap.serverWait"),
+);
+
+/** The long form, matching the detail page's sentence for the same number. */
+const qualifierTitle = computed(() =>
+  props.qualifierKey === null
+    ? undefined
+    : String(
+        t(`dbm.detail.overlap.${props.qualifierKey}` as "dbm.detail.overlap.serverWait", {
+          engine: props.engine ?? "",
+        }),
+      ),
+);
 
 /** A single query owning this much of a database's time is worth noticing. */
 const DOMINANT_SHARE = 0.25;
