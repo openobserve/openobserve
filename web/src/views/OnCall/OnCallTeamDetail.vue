@@ -233,6 +233,15 @@
              of each on the screen. -->
         <OContent y class="flex flex-col gap-5">
           <template v-if="!editingSchedule">
+            <!-- The four facts somebody opens this tab to check, before any
+                 block on the chart below is worth reading. -->
+            <OnCallScheduleContext
+              :slots="onCallNow"
+              :segments="segments"
+              :reachability="reachability"
+              :timezone="team?.timezone ?? 'UTC'"
+            />
+
             <OnCallScheduleTimeline
               v-model:window="scheduleWindow"
               :rotations="schedule?.rotations ?? []"
@@ -362,6 +371,7 @@ import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import OnCallRotationsTable from "@/components/oncall/OnCallRotationsTable.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
+import OnCallScheduleContext from "@/components/oncall/OnCallScheduleContext.vue";
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
 import OnCallContactReadiness from "@/components/oncall/OnCallContactReadiness.vue";

@@ -32,7 +32,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OText variant="panel-title" data-test="oncall-timeline-range">{{ rangeLabel }}</OText>
       <OText variant="meta">{{ zoneLine }}</OText>
 
-      <span class="ms-auto flex items-center gap-1">
+      <!-- Two ways of narrowing what the chart is saying. "Gaps only" is the
+           one somebody reaches for when the answer is "where is the hole", and
+           it is a filter rather than a separate view so the axis does not move
+           underneath them. -->
+      <span class="ms-auto flex flex-wrap items-center gap-3">
+        <OSwitch
+          v-model="gapsOnly"
+          size="sm"
+          :label="t('oncall.timelineGapsOnly')"
+          data-test="oncall-timeline-gaps-only"
+        />
+        <OSwitch
+          v-model="showOverrides"
+          size="sm"
+          :label="t('oncall.timelineShowOverrides')"
+          data-test="oncall-timeline-show-overrides"
+        />
+      </span>
+
+      <span class="flex items-center gap-1">
         <OButton
           v-for="option in RANGES"
           :key="option.key"
@@ -110,6 +129,7 @@ import type {
   ScheduleTrack,
 } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
 import { SCHEDULE_BAND_TONE_COUNT } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
 import { DEFAULT_SLOT, MICROS_PER_DAY } from "@/ts/interfaces/oncall";
@@ -133,6 +153,12 @@ const emit = defineEmits<{ (e: "fill-gap", gap: ResolvedSegment): void }>();
 const window = defineModel<{ from: number; to: number }>("window", { required: true });
 
 const { t } = useI18nTyped();
+
+/// Two lenses on the same window rather than two views: the axis, the range and
+/// the now-marker stay put, so narrowing to gaps does not cost the reader their
+/// place on the chart.
+const gapsOnly = ref(false);
+const showOverrides = ref(true);
 const nowMicros = useOnCallClock();
 
 const RANGES = [
@@ -231,7 +257,15 @@ const tracks = computed<ScheduleTrack[]>(() => {
       ? undefined
       : t("oncall.timelineSlotNotResolved", { slot: raw(slot ?? DEFAULT_SLOT) }),
     bands: props.segments
-      .filter((segment) => segment.rotation === name && segment.to > from.value && segment.from < to.value)
+      .filter(
+        (segment) =>
+          segment.rotation === name &&
+          segment.to > from.value &&
+          segment.from < to.value &&
+          // "Gaps only" keeps the axis and the window and drops everything that
+          // is not the question being asked.
+          (!gapsOnly.value || !segment.user_email),
+      )
       .map<ScheduleBand>((segment) => {
         const start = Math.max(segment.from, from.value);
         const end = Math.min(segment.to, to.value);
@@ -242,7 +276,10 @@ const tracks = computed<ScheduleTrack[]>(() => {
           width: (end - start) / span.value,
           // A cover reads as "Sam is covering Tuesday", never as "the rotation
           // changed" — the layer it displaced is still the one it belongs to.
-          label: raw(segment.override_id ? `${who} ${COVER_MARK}` : who),
+          // With overrides hidden the cover still shows WHO is on — it is the
+          // resolved answer either way — it just stops being called out as a
+          // departure from the rotation.
+          label: raw(showOverrides.value && segment.override_id ? `${who} ${COVER_MARK}` : who),
           ariaLabel: t(segment.override_id ? "oncall.timelineCoverAria" : "oncall.timelineBandAria", {
             who: who ? raw(who) : t("oncall.calendarNobody"),
             rotation: raw(name),
