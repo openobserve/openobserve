@@ -252,6 +252,7 @@ jobs:
         # tests/ui-testing/ci-matrix/ci_matrix.json; shards that omit it get "false".
         env:
           ZO_QUICK_MODE_ENABLED: ${{ matrix.quick_mode_enabled || 'false' }}
+          ZO_ALERT_COMPOSITE_WRITES_ENABLED: 'true'
         run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
