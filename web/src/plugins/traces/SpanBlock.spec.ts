@@ -428,6 +428,21 @@ describe("SpanBlock", () => {
     });
   });
 
+  describe("getDurationStyle — bar-to-label gutter", () => {
+    // The 6px gutter used to be baked into the bar fill's width. It now lives
+    // here, so the bar can be truthful while the label keeps its breathing room.
+    it("offsets the label past the bar end by the gutter", async () => {
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 1000 });
+      await wrapper.vm.onResize();
+
+      // leftPosition = 0, spanWidth ≈ 91.72%, onePercent = 10
+      // bar ends at 917.2px; label sits 6px past it.
+      const style = wrapper.vm.getDurationStyle();
+      expect(style.left).toBe(`${91.72 * 10 + 6}px`);
+    });
+  });
+
   describe("durationStyle reactive ref", () => {
     it("should expose durationStyle and be an object", () => {
       expect(wrapper.vm.durationStyle).toBeDefined();
@@ -522,6 +537,17 @@ describe("SpanBlock", () => {
       const hasHex = style.includes(`background-color: ${mockSpan.style.color}`);
       const hasRgb = style.includes("background-color: rgb(26, 184, 190)");
       expect(hasHex || hasRgb).toBe(true);
+    });
+
+    // Regression: the fill carried `calc(100% - 6px)`, vestigial space
+    // reservation for a chevron removed in Oct 2024 (commit d7876dde46). It
+    // made every bar 6px shorter than its span and clamped any span <=6px wide
+    // to zero visible width.
+    it("fills the full width of the span's geometry box", () => {
+      const marker = wrapper.find('[data-test="span-marker"]');
+      const fill = marker.find("div");
+      expect(fill.classes()).toContain("w-full");
+      expect(fill.classes()).not.toContain("w-[calc(100%-0.375rem)]");
     });
   });
 
