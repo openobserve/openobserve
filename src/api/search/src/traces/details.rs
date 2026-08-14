@@ -51,6 +51,14 @@ fn parse_optional_time_range(
             let end_time = end
                 .parse::<i64>()
                 .map_err(|_| MetaHttpResponse::bad_request("Invalid end_time parameter"))?;
+            if start_time == 0 && end_time == 0 {
+                return Ok(None);
+            }
+            if start_time == 0 || end_time == 0 {
+                return Err(MetaHttpResponse::bad_request(
+                    "start_time and end_time must both be zero or non-zero",
+                ));
+            }
             if start_time > end_time {
                 return Err(MetaHttpResponse::bad_request(
                     "start_time must not be greater than end_time",
@@ -124,6 +132,7 @@ pub async fn get_trace_details(
     };
     let hint_ts = match params.get("hint_ts") {
         Some(value) => match value.parse::<i64>() {
+            Ok(0) => None,
             Ok(value) => Some(value),
             Err(_) => return MetaHttpResponse::bad_request("Invalid hint_ts parameter"),
         },
