@@ -12734,6 +12734,8 @@
   },
   "slos": {
     "title": "SLO",
+    "notFound": "Nie znaleziono SLO",
+    "notFoundDescription": "To SLO już nie istnieje lub nie masz do niego dostępu. Mogło zostać usunięte.",
     "subtitle": "Cele poziomu usług: cele, budżety błędów, alerty o tempie spalania",
     "new": "Nowy SLO",
     "newTitle": "Nowy SLO",
@@ -12833,7 +12835,9 @@
       "sli": "SLI: co oznacza \"dobrze\"",
       "objective": "Cel",
       "grouping": "Grupowanie",
-      "summary": "Podsumowanie"
+      "summary": "Podsumowanie",
+      "definition": "Definicja",
+      "definitionEmpty": "To SLO nie ma zapisanej definicji."
     },
     "field": {
       "name": "Nazwa SLO",
