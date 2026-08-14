@@ -240,4 +240,72 @@ describe("OnCallPolicyEditor", () => {
       wrapper.find('[data-test="oncall-policy-preview-nobody-1-0"]').exists(),
     ).toBe(true);
   });
+
+  // The connector edits the WAIT between neighbours; the model stores
+  // absolute offsets. Changing one wait shifts that rung and everything below
+  // it, preserving the later gaps — pulling a wait in must not stretch the
+  // rest of the ladder.
+  it("shifts the rungs below when a wait between rungs changes", async () => {
+    const threeRungs: OnCallPolicy = {
+      ...policy,
+      rungs: [
+        {
+          priority: 1,
+          steps: [
+            { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+            { after_micros: 5 * 60_000_000, targets: [{ kind: "next_on_call" }] },
+            { after_micros: 15 * 60_000_000, targets: [{ kind: "whole_team" }] },
+          ],
+          channels: ["email"],
+        },
+      ],
+    };
+    const wrapper = mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy: threeRungs },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+
+    // The 5m wait before rung 2 becomes 1m: rung 2 lands at +1m and rung 3
+    // keeps its 10m spacing, landing at +11m.
+    wrapper
+      .findComponent('[data-test="oncall-policy-step-delay-1-1"]')
+      .vm.$emit("update:modelValue", 1 * 60_000_000);
+    await flushPromises();
+
+    const text = wrapper.text();
+    expect(text).toContain("+1m");
+    expect(text).toContain("+11m");
+    expect(text).not.toContain("+15m");
+  });
+
+  // Removing a rung pulls the ones below up by its wait — the ladder gets
+  // shorter, not sparser.
+  it("closes the gap a removed rung leaves behind", async () => {
+    const threeRungs: OnCallPolicy = {
+      ...policy,
+      rungs: [
+        {
+          priority: 1,
+          steps: [
+            { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+            { after_micros: 5 * 60_000_000, targets: [{ kind: "next_on_call" }] },
+            { after_micros: 15 * 60_000_000, targets: [{ kind: "whole_team" }] },
+          ],
+          channels: ["email"],
+        },
+      ],
+    };
+    const wrapper = mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy: threeRungs },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-policy-remove-rung-1-1"]').trigger("click");
+
+    const text = wrapper.text();
+    expect(text).toContain("+10m");
+    expect(text).not.toContain("+15m");
+  });
 });

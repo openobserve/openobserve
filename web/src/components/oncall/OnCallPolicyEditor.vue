@@ -1,154 +1,174 @@
-<!-- Copyright 2026 OpenObserve Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
--->
-
 <template>
   <OCard data-test="oncall-policy-editor">
     <OCardSection>
       <p class="text-text-secondary mb-4 text-sm">{{ t("oncall.policyHint") }}</p>
 
       <div class="flex flex-col gap-4">
+        <!-- Same chips as the read view, so editing feels like the ladder
+             becoming editable rather than a different screen. One priority at
+             a time: five stacked ladders was a page nobody could scan. -->
+        <div class="flex flex-wrap items-center gap-2">
+          <OButton
+            v-for="rung in draft"
+            :key="rung.priority"
+            :variant="rung.priority === selected ? 'primary' : 'outline'"
+            size="xs"
+            :data-test="`oncall-policy-priority-${rung.priority}`"
+            @click="selected = rung.priority"
+          >
+            {{ priorityLabel(rung.priority) }}
+            {{
+              rung.steps.length
+                ? t("oncall.policyChipRungs", { count: rung.steps.length }, rung.steps.length)
+                : t("oncall.reachPagesNobody")
+            }}
+          </OButton>
+        </div>
+
         <div
-          v-for="rung in draft"
-          :key="rung.priority"
-          class="border-border-default flex flex-col gap-3 rounded-surface border p-4"
+          v-if="current"
+          :key="current.priority"
+          class="flex flex-col gap-3"
           data-test="oncall-policy-rung"
         >
-          <div class="flex flex-wrap items-center gap-2">
-            <OTag :variant="priorityTagVariant(rung.priority)" size="sm">
-              {{ priorityLabel(rung.priority) }}
-            </OTag>
-            <span v-if="!rung.steps.length" class="text-text-secondary text-sm">
-              {{ t("oncall.pagesNobody") }}
-            </span>
-          </div>
+          <!-- The ladder, as a ladder: a rail of rungs with the wait edited on
+               the connector BETWEEN them. "If nobody acknowledges in 5m" is
+               the sentence an operator thinks in; a delay field inside the
+               card made every rung an absolute offset they had to subtract. -->
+          <div
+            v-if="current.steps.length"
+            class="flex flex-col"
+            :data-test="`oncall-policy-preview-${current.priority}`"
+          >
+            <template v-for="(step, stepIndex) in current.steps" :key="stepIndex">
+              <!-- Connector: the wait that puts this rung where it is. -->
+              <div class="border-border-strong ms-3 flex items-center gap-2 border-s py-2 ps-4">
+                <span class="text-text-label text-xs">
+                  {{
+                    stepIndex === 0
+                      ? t("oncall.policyFirstPage")
+                      : t("oncall.policyIfNoAck")
+                  }}
+                </span>
+                <span class="w-44">
+                  <OSelect
+                    :model-value="gapBefore(current, stepIndex)"
+                    :options="stepIndex === 0 ? leadGapOptions : gapOptions"
+                    :data-test="`oncall-policy-step-delay-${current.priority}-${stepIndex}`"
+                    @update:model-value="(v: any) => setGap(current!, stepIndex, Number(v))"
+                  />
+                </span>
+              </div>
 
-          <!-- One line per rung, reading as a sentence: page THESE people,
-               THIS long after the record opened. Targets on one rung fire
-               together, which is why a rung holds a set rather than a single
-               slot. -->
-          <div v-if="rung.steps.length" class="flex flex-col gap-2">
-            <div
-              v-for="(step, stepIndex) in rung.steps"
-              :key="stepIndex"
-              class="border-border-subtle flex flex-wrap items-center gap-2 rounded-default border p-2"
-              :data-test="`oncall-policy-rung-${rung.priority}-${stepIndex}`"
-            >
-              <span class="text-text-label text-xs">{{ t("oncall.rungPages") }}</span>
-
-              <OTag
-                v-for="(target, ti) in step.targets"
-                :key="ti"
-                variant="default-soft"
-                size="sm"
-                :data-test="`oncall-policy-target-${rung.priority}-${stepIndex}-${ti}`"
+              <!-- The rung. -->
+              <div
+                class="border-border-default relative flex flex-col gap-2 rounded-surface border p-3"
+                :data-test="`oncall-policy-rung-${current.priority}-${stepIndex}`"
               >
-                {{ describeTarget(target, t) }}
-                <button
-                  type="button"
-                  class="ml-1"
-                  :aria-label="t('oncall.removeTarget')"
-                  :data-test="`oncall-policy-target-remove-${rung.priority}-${stepIndex}-${ti}`"
-                  @click="step.targets.splice(ti, 1)"
-                >
-                  {{ raw("×") }}
-                </button>
-              </OTag>
+                <div class="flex flex-wrap items-center gap-2">
+                  <OTag variant="default-soft" size="sm">
+                    {{
+                      step.after_micros
+                        ? raw(`+${formatMicrosDuration(step.after_micros)}`)
+                        : t("oncall.ladderNow")
+                    }}
+                  </OTag>
+                  <span class="text-text-label text-xs">{{ t("oncall.rungPages") }}</span>
 
-              <OSelect
-                :model-value="''"
-                :options="targetOptions"
-                :placeholder="t('oncall.addTarget')"
-                class="w-52"
-                :data-test="`oncall-policy-add-target-${rung.priority}-${stepIndex}`"
-                @update:model-value="(v: any) => addTarget(step, String(v))"
-              />
+                  <OTag
+                    v-for="(target, ti) in step.targets"
+                    :key="ti"
+                    variant="default-soft"
+                    size="sm"
+                    :data-test="`oncall-policy-target-${current.priority}-${stepIndex}-${ti}`"
+                  >
+                    {{ describeTarget(target, t) }}
+                    <button
+                      type="button"
+                      class="ml-1"
+                      :aria-label="t('oncall.removeTarget')"
+                      :data-test="`oncall-policy-target-remove-${current.priority}-${stepIndex}-${ti}`"
+                      @click="step.targets.splice(ti, 1)"
+                    >
+                      {{ raw("×") }}
+                    </button>
+                  </OTag>
 
-              <!-- A person target needs a name, so it asks rather than adding
-                   an empty chip the server would reject on save. -->
-              <OSelect
-                v-if="pendingUserStep === step"
-                :model-value="''"
-                :options="memberOptions"
-                :placeholder="t('oncall.targetPickPerson')"
-                class="w-52"
-                :data-test="`oncall-policy-pick-person-${rung.priority}-${stepIndex}`"
-                @update:model-value="(v: any) => addUser(String(v))"
-              />
+                  <span class="w-52">
+                    <OSelect
+                      :model-value="''"
+                      :options="targetOptions"
+                      :placeholder="t('oncall.addTarget')"
+                      :data-test="`oncall-policy-add-target-${current.priority}-${stepIndex}`"
+                      @update:model-value="(v: any) => addTarget(step, String(v))"
+                    />
+                  </span>
 
-              <span class="text-text-label text-xs">{{ t("oncall.rungAfter") }}</span>
-              <OSelect
-                v-model="step.after_micros"
-                :options="delayOptions"
-                class="w-40"
-                :data-test="`oncall-policy-step-delay-${rung.priority}-${stepIndex}`"
-              />
+                  <!-- A person target needs a name, so it asks rather than
+                       adding an empty chip the server would reject on save. -->
+                  <span v-if="pendingUserStep === step" class="w-52">
+                    <OSelect
+                      :model-value="''"
+                      :options="memberOptions"
+                      :placeholder="t('oncall.targetPickPerson')"
+                      :data-test="`oncall-policy-pick-person-${current.priority}-${stepIndex}`"
+                      @update:model-value="(v: any) => addUser(String(v))"
+                    />
+                  </span>
 
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                icon-left="close"
-                :aria-label="t('oncall.removeRung')"
-                :data-test="`oncall-policy-remove-rung-${rung.priority}-${stepIndex}`"
-                @click="rung.steps.splice(stepIndex, 1)"
-              />
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    icon-left="delete-outline"
+                    class="ms-auto"
+                    :aria-label="t('oncall.removeRung')"
+                    :data-test="`oncall-policy-remove-rung-${current.priority}-${stepIndex}`"
+                    @click="removeStep(current!, stepIndex)"
+                  />
+                </div>
+
+                <!-- Who this rung wakes, resolved against the rotation in
+                     force right now — the question the ladder is built out of
+                     target KINDS never answers. -->
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-text-label text-xs">{{ t("oncall.policyRightNow") }}</span>
+                  <template v-for="(line, i) in [resolveLadder(current, onCallNow)[stepIndex]]" :key="i">
+                    <OUserCell v-for="email in line?.people ?? []" :key="email" :value="email" />
+                    <span v-if="line?.wholeTeam" class="text-text-body text-sm">
+                      {{ t("oncall.target_whole_team") }}
+                    </span>
+                    <span
+                      v-if="line && !line.people.length && !line.wholeTeam"
+                      class="text-status-warning-text text-sm"
+                      :data-test="`oncall-policy-preview-nobody-${current.priority}-${stepIndex}`"
+                    >
+                      {{ t("oncall.ladderReachesNobody") }}
+                    </span>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- What the ladder does when it runs out is part of its shape. -->
+            <div class="border-border-strong ms-3 border-s py-2 ps-4">
+              <span class="text-text-secondary text-xs">{{ t("oncall.policyLadderEnds") }}</span>
             </div>
           </div>
+
+          <p v-else class="text-text-secondary text-sm" data-test="oncall-policy-silent">
+            {{ t("oncall.policyPrioritySilent", { priority: raw(priorityLabel(current.priority)) }) }}
+          </p>
 
           <div class="flex flex-wrap items-center gap-2">
             <OButton
               variant="outline"
               size="sm-action"
-              :data-test="`oncall-policy-add-step-${rung.priority}`"
-              @click="addStep(rung)"
+              icon-left="add"
+              :data-test="`oncall-policy-add-step-${current.priority}`"
+              @click="addStep(current)"
             >
               {{ t("oncall.addRung") }}
             </OButton>
-          </div>
-
-          <!-- The ladder is built out of target KINDS, which is not the question
-               anybody has about it. This answers that one — who this wakes, and
-               when — against the rotation in force right now. -->
-          <div
-            v-if="rung.steps.length"
-            class="border-border-subtle flex flex-col gap-1 rounded-default border p-3"
-            :data-test="`oncall-policy-preview-${rung.priority}`"
-          >
-            <span class="text-text-label text-xs">{{ t("oncall.ladderPreview") }}</span>
-            <div
-              v-for="(step, i) in resolveLadder(rung, onCallNow)"
-              :key="i"
-              class="flex flex-wrap items-center gap-2"
-            >
-              <OTag variant="default-soft" size="sm">
-                {{ step.afterMicros ? formatMicrosDuration(step.afterMicros) : t("oncall.ladderNow") }}
-              </OTag>
-              <OUserCell v-for="email in step.people" :key="email" :value="email" />
-              <span v-if="step.wholeTeam" class="text-text-body text-sm">
-                {{ t("oncall.target_whole_team") }}
-              </span>
-              <!-- A rung that resolves to nobody is configured and useless —
-                   a next-on-call step on a one-person rotation, or a gap. -->
-              <span
-                v-if="!step.people.length && !step.wholeTeam"
-                class="text-status-warning-text text-sm"
-                :data-test="`oncall-policy-preview-nobody-${rung.priority}-${i}`"
-              >
-                {{ t("oncall.ladderReachesNobody") }}
-              </span>
-            </div>
           </div>
 
           <!-- Channels apply to everyone paged at this priority; the primary
@@ -160,10 +180,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OCheckbox
                 v-for="channel in CHANNELS"
                 :key="channel"
-                :model-value="rung.channels.includes(channel)"
+                :model-value="current.channels.includes(channel)"
                 :label="t(`oncall.channel_${channel}`)"
-                :data-test="`oncall-policy-channel-${rung.priority}-${channel}`"
-                @update:model-value="(on: CheckboxModelValue) => toggleChannel(rung, channel, on === true)"
+                :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
+                @update:model-value="(on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)"
               />
             </div>
           </div>
@@ -256,6 +276,11 @@ const store = useStore();
 const CHANNELS = DELIVERABLE_CHANNELS;
 
 const draft = ref<PriorityRung[]>([]);
+
+/// One ladder on screen at a time, chosen by the same chips the read view
+/// uses. P1 first because it is the ladder that matters most.
+const selected = ref(1);
+const current = computed(() => draft.value.find((r) => r.priority === selected.value) ?? null);
 const pendingUserStep = ref<LadderStep | null>(null);
 const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
 /// The rotation in force, so the preview names people rather than target
@@ -303,20 +328,59 @@ function addUser(email: string) {
   }
 }
 
-const delayOptions = computed(() =>
-  [0, 5, 15, 30, 60].map((minutes) => ({
-    label:
-      minutes === 0
-        ? t("oncall.immediately")
-        : t("oncall.afterMinutes", { count: minutes }),
+/// The wait between two rungs — what the connector edits. The data model
+/// stores absolute offsets from the record opening; the operator thinks in
+/// "if nobody acks in five minutes". Editing the gap and recomputing the
+/// offsets keeps both true.
+function gapBefore(rung: PriorityRung, index: number): number {
+  const prev = index > 0 ? rung.steps[index - 1].after_micros : 0;
+  return rung.steps[index].after_micros - prev;
+}
+
+/// Shifts this rung and every rung after it, preserving the later gaps —
+/// pulling one wait in should not silently stretch the waits below it.
+function setGap(rung: PriorityRung, index: number, micros: number) {
+  const delta = micros - gapBefore(rung, index);
+  if (!delta) return;
+  for (let i = index; i < rung.steps.length; i++) {
+    rung.steps[i].after_micros += delta;
+  }
+}
+
+const GAP_MINUTES = [1, 5, 10, 15, 30, 60];
+
+/// Between rungs. Never zero: two rungs at the same instant are one rung with
+/// both target sets, and the server rejects them as such.
+const gapOptions = computed(() =>
+  GAP_MINUTES.map((minutes) => ({
+    label: t("oncall.afterMinutes", { count: minutes }),
     value: minutes * MICROS_PER_MINUTE,
   })),
 );
 
+/// Before the FIRST rung zero is legal and usual — P1 pages at once. A held
+/// first page (P2's five minutes) is the same control with a nonzero value.
+const leadGapOptions = computed(() => [
+  { label: t("oncall.immediately"), value: 0 },
+  ...gapOptions.value,
+]);
+
+/// Gap-preserving: removing a rung pulls the ones below it up by its wait,
+/// keeping their spacing — the ladder gets shorter, not sparser.
+function removeStep(rung: PriorityRung, index: number) {
+  const gap = index === 0 ? rung.steps[0].after_micros : gapBefore(rung, index);
+  rung.steps.splice(index, 1);
+  for (let i = index; i < rung.steps.length; i++) {
+    rung.steps[i].after_micros -= gap;
+  }
+}
+
 function reset() {
   draft.value = (props.policy?.rungs ?? []).map((rung) => ({
     priority: rung.priority,
-    steps: rung.steps.map((step) => ({ ...step })),
+    // Sorted, because the connectors edit the gaps between NEIGHBOURS — an
+    // out-of-order array would show a negative wait.
+    steps: rung.steps.map((step) => ({ ...step })).sort((a, b) => a.after_micros - b.after_micros),
     channels: [...rung.channels],
   }));
   pendingUserStep.value = null;

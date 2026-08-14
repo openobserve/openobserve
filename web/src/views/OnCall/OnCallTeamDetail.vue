@@ -322,7 +322,7 @@
                 data-test="oncall-policy-done-editing"
                 @click="editingPolicy = false"
               >
-                {{ t("oncall.scheduleDoneEditing") }}
+                {{ t("oncall.policyDoneEditing") }}
               </OButton>
             </span>
             <OnCallPolicyEditor :team-id="teamId" :policy="policy" @saved="onPolicySaved" />
