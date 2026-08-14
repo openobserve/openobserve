@@ -254,11 +254,26 @@ describe("InlineSelectFolderDropdown.vue", () => {
     it("maps store folders to {label, value} options", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.folderOptions).toEqual([
+      expect(
+        vm.folderOptions.map(({ label, value }: { label: string; value: string }) => ({
+          label,
+          value,
+        })),
+      ).toEqual([
         { label: "Default", value: "default" },
         { label: "My Alerts", value: "folder-1" },
         { label: "Production", value: "folder-2" },
       ]);
+    });
+
+    it("carries an icon component on every option, so rows keep one left inset", () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      // Folders with no chosen icon still get one — FolderIcon falls back to
+      // the folder glyph rather than leaving a gap.
+      for (const option of vm.folderOptions) {
+        expect(option.iconComponent).toBeTruthy();
+      }
     });
 
     it("returns [] when foldersByType has no entry for the given type", () => {
@@ -281,7 +296,12 @@ describe("InlineSelectFolderDropdown.vue", () => {
       setStoreFolders("alerts", [{ folderId: "x", name: "X" }]);
       await nextTick();
       const vm = wrapper.vm as any;
-      expect(vm.folderOptions).toEqual([{ label: "X", value: "x" }]);
+      expect(
+        vm.folderOptions.map(({ label, value }: { label: string; value: string }) => ({
+          label,
+          value,
+        })),
+      ).toEqual([{ label: "X", value: "x" }]);
     });
   });
 

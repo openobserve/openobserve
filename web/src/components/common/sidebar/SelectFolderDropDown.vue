@@ -70,6 +70,8 @@ import { computed } from "vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+import { folderIconOption } from "./folderIconOption";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
@@ -118,12 +120,17 @@ export default defineComponent({
     const store: any = useStore();
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
+    const { iconFor } = useFolderIcons(() => props.type);
 
     const folderOptions = computed(() =>
       (store.state.organizationData.foldersByType[props.type] ?? [])
         // `!== undefined` is every folder, so an unset prop filters nothing.
         .filter((item: any) => item.folderId !== props.excludeFolderId)
-        .map((item: any) => ({ label: item.name, value: item.folderId })),
+        .map((item: any) => ({
+          label: item.name,
+          value: item.folderId,
+          iconComponent: folderIconOption(iconFor(item)),
+        })),
     );
 
     const getInitialFolderId = () => {

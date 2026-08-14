@@ -106,6 +106,8 @@ import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+import { folderIconOption } from "./folderIconOption";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
@@ -146,12 +148,14 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store: any = useStore();
     const showDialog = ref(false);
+    const { iconFor } = useFolderIcons(() => props.type);
 
     const folderOptions = computed(
       () =>
         store.state.organizationData.foldersByType[props.type]?.map((f: any) => ({
           label: f.name,
           value: f.folderId,
+          iconComponent: folderIconOption(iconFor(f)),
         })) ?? [],
     );
 

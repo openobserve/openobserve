@@ -21,11 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="selectedFolder"
       :label="t('dashboard.selectFolderLabel')"
       :labelPosition="labelPosition"
-      :options="
-        store.state.organizationData.folders.map((item: any) => {
-          return { label: item.name, value: item.folderId };
-        })
-      "
+      :options="folderOptions"
       data-test="index-dropdown-stream_type"
       labelKey="label"
       class="flex-1"
@@ -70,6 +66,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useRoute } from "vue-router";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+import { folderIconOption } from "@/components/common/sidebar/folderIconOption";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
@@ -89,6 +87,15 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const store: any = useStore();
+    const { iconFor } = useFolderIcons("dashboards");
+
+    const folderOptions = computed(() =>
+      store.state.organizationData.folders.map((item: any) => ({
+        label: item.name,
+        value: item.folderId,
+        iconComponent: folderIconOption(iconFor(item)),
+      })),
+    );
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
     const addFolderRef: any = ref(null);
@@ -145,6 +152,7 @@ export default defineComponent({
     );
 
     return {
+      folderOptions,
       t,
       store,
       selectedFolder,
