@@ -39,7 +39,7 @@
 
 use config::meta::oncall::{
     EscalationPolicy, OwnershipRule, Response, ResponseEvent, Schedule, ScheduleOverride, Team,
-    TeamMember,
+    TeamMember, Unavailability,
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, TransactionTrait,
@@ -47,7 +47,7 @@ use sea_orm::{
 
 use super::entity::{
     oncall_overrides, oncall_ownership_rules, oncall_policies, oncall_response_events,
-    oncall_responses, oncall_schedules, oncall_team_members, oncall_teams,
+    oncall_responses, oncall_schedules, oncall_team_members, oncall_teams, oncall_unavailability,
 };
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
@@ -216,6 +216,65 @@ pub async fn put_override(record: &ScheduleOverride) -> Result<(), errors::Error
         }
     }
     super::oncall_schedules::invalidate_and_publish(&record.org_id, &record.team_id).await;
+    Ok(())
+}
+
+/// Applies one absence window under the id the source region gave it.
+///
+/// Absences replicate for the same reason covers do, and they were the last
+/// piece of on-call that did not: precedence is override → **unavailability** →
+/// the rotation, so a region that has never seen this row resolves a different
+/// person to the same minute. Lose the active cluster mid-holiday and the
+/// survivor pages somebody who is away, which is the one outcome the feature
+/// exists to prevent.
+///
+/// `created_at` is carried rather than restamped, matching the cover: nothing
+/// reads it as a tiebreak today, but the two are read by the same resolver and
+/// letting them drift is how a future overlap rule picks a different winner in
+/// each region.
+pub async fn put_unavailability(record: &Unavailability) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let model = oncall_unavailability::Model {
+        id: record.id.clone(),
+        org_id: record.org_id.clone(),
+        user_email: record.user_email.clone(),
+        start_at: record.start_at,
+        end_at: record.end_at,
+        reason: record.reason.clone(),
+        created_by: record.created_by.clone(),
+        created_at: record.created_at,
+    };
+    match oncall_unavailability::Entity::find_by_id(&record.id)
+        .one(client)
+        .await?
+    {
+        Some(_) => {
+            let mut active = model.into_active_model();
+            active.id = Set(record.id.clone());
+            active.update(client).await?;
+        }
+        None => {
+            model.into_active_model().insert(client).await?;
+        }
+    }
+    // An absence is stored per person but *read* as part of a schedule, so the
+    // cache that has to be dropped is every schedule's in the org. Missing this
+    // is what makes the feature worse than useless: the row lands, the stale
+    // schedule keeps resolving to the person who is away, and they are paged
+    // anyway.
+    super::oncall_schedules::invalidate_org_and_publish(&record.org_id).await;
+    Ok(())
+}
+
+/// Drops every absence one person holds. What offboarding replicates.
+pub async fn clear_unavailability_for_user(
+    org_id: &str,
+    user_email: &str,
+) -> Result<(), errors::Error> {
+    // Delegated: `delete_by_user` already prunes and invalidates, and there is
+    // no id to preserve in a delete. Listed here so the replication surface
+    // stays readable as one list.
+    super::oncall_unavailability::delete_by_user(org_id, user_email).await?;
     Ok(())
 }
 
@@ -489,6 +548,61 @@ mod tests {
             updated_at: 9,
         };
         assert_eq!(a.path(), b.path());
+    }
+
+    fn an_absence() -> Unavailability {
+        Unavailability {
+            id: "un_1".to_string(),
+            org_id: "org".to_string(),
+            user_email: "ana@o2.ai".to_string(),
+            start_at: 20_000,
+            end_at: 30_000,
+            reason: Some("annual leave".to_string()),
+            created_by: "ana@o2.ai".to_string(),
+            created_at: 5,
+        }
+    }
+
+    /// The round trip an absence has to survive: the row the replica writes
+    /// carries the source region's id and the source region's window, so the
+    /// two clusters answer "is Ana away at t?" the same way. A replica that
+    /// renumbered the row or restamped the window would hold the same holiday
+    /// under a different name and, at the edges, a different answer.
+    #[test]
+    fn test_an_absence_replicates_under_its_source_id_and_window() {
+        let source = an_absence();
+        let row = oncall_unavailability::Model {
+            id: source.id.clone(),
+            org_id: source.org_id.clone(),
+            user_email: source.user_email.clone(),
+            start_at: source.start_at,
+            end_at: source.end_at,
+            reason: source.reason.clone(),
+            created_by: source.created_by.clone(),
+            created_at: source.created_at,
+        };
+        let replicated = Unavailability {
+            id: row.id,
+            org_id: row.org_id,
+            user_email: row.user_email,
+            start_at: row.start_at,
+            end_at: row.end_at,
+            reason: row.reason,
+            created_by: row.created_by,
+            created_at: row.created_at,
+        };
+        assert_eq!(replicated, source, "nothing is dropped or restamped");
+        // And the surviving region resolves the away window identically.
+        for at in [source.start_at, 25_000, source.end_at - 1] {
+            assert!(replicated.covers(at));
+            assert_eq!(replicated.covers(at), source.covers(at));
+        }
+        assert!(!replicated.covers(source.end_at), "the end stays exclusive");
+        assert!(config::meta::oncall::is_unavailable(
+            std::slice::from_ref(&replicated),
+            "ana@o2.ai",
+            25_000
+        ));
     }
 
     /// The dedupe key has to separate two deliveries that differ only by

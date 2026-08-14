@@ -499,26 +499,17 @@ pub async fn handle_triggers(
     }
 }
 
-/// Whether a firing should open a new on-call record and page.
+/// The dampening window this deployment runs with, in micros.
 ///
-/// `open_state` is the state of the newest record for this source, if there is
-/// one that nobody has closed. There
-/// is no rate limiting anywhere else in the paging path, and an alert with
-/// `silence = 0` is re-evaluated as often as its frequency says — so without
-/// this, a thing that stayed broken opened a record and started a ladder on
-/// every cycle, and woke its owner every time.
-///
-/// The rule is deliberately "still open", not "seen recently": a record that
-/// somebody has resolved, for a signal that then fires again, is a genuinely
-/// new firing and gets its own record — which is what makes the previous
-/// firing's cause show up as history on the next one. A time window would
-/// blur those two cases together.
+/// Read here rather than inside the decision because the decision is pure and
+/// takes its window as an argument — this is the one place a clock-free rule
+/// meets a configured number.
 #[cfg(feature = "enterprise")]
-fn should_open_a_new_page(open_state: Option<config::meta::oncall::ResponseState>) -> bool {
-    // Terminal is checked rather than assumed: the query that produced this
-    // filters on state, and a page that depends on two places agreeing about
-    // which states are open is a page waiting to be missed.
-    open_state.is_none_or(|state| state.is_terminal())
+fn flap_dampening_micros() -> i64 {
+    o2_enterprise::enterprise::common::config::get_config()
+        .oncall
+        .flap_dampening_secs
+        .saturating_mul(1_000_000)
 }
 
 /// Run one escalation step for a response record.
@@ -1927,31 +1918,71 @@ async fn handle_alert_triggers(
             // number and start a fresh ladder — so a broken thing that stayed
             // broken paged its owner every minute. The record that is already
             // open IS this firing; the ladder attached to it is what escalates
-            // if nobody answers. A genuinely separate firing still gets its own
-            // record, because recovery closes this one first, which is what
-            // keeps the prior-causes history honest.
-            let already_open = infra::table::oncall_responses::latest_open_for_source(
+            // if nobody answers.
+            //
+            // The newest record for this source, open OR closed. Widened from
+            // the open-only read for G16: the flap this has to catch is the
+            // close-then-reopen cycle, and a query that returns only open
+            // records cannot see it. `page_decision` decides which of the two
+            // cases the row is.
+            let latest = infra::table::oncall_responses::history_for_source(
                 &alert.org_id,
                 config::meta::oncall::SubjectType::Alert,
                 &alert_id.to_string(),
+                1,
             )
             .await
             .unwrap_or_else(|e| {
                 // A read failure must not silence the page: an extra record is
                 // recoverable, a missed page is not.
                 log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] could not check for an open on-call record for {}/{}: {e}",
+                    "[SCHEDULER trace_id {scheduler_trace_id}] could not check for an existing on-call record for {}/{}: {e}",
                     alert.org_id,
                     alert.name
                 );
-                None
+                vec![]
             });
-            if !should_open_a_new_page(already_open.as_ref().map(|r| r.state)) {
+            let decision = config::meta::oncall::page_decision(
+                latest.first(),
+                now_micros(),
+                flap_dampening_micros(),
+            );
+            if let config::meta::oncall::PageDecision::AlreadyOpen = decision {
                 log::debug!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] {}/{} already has an open on-call record, so this evaluation does not page again",
                     alert.org_id,
                     alert.name
                 );
+            } else if let config::meta::oncall::PageDecision::Flap {
+                response_id,
+                recovered_for_micros,
+            } = &decision
+            {
+                // G16: the condition cleared and came straight back. That is
+                // one unstable firing, not two, so the responder is not woken
+                // again — but the record they WERE woken for has to say it
+                // happened, or the timeline claims a clean recovery that did
+                // not hold.
+                log::debug!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] {}/{} fired again {}us after recovering, dampened onto record {response_id}",
+                    alert.org_id,
+                    alert.name,
+                    recovered_for_micros
+                );
+                if let Err(e) = o2_enterprise::enterprise::oncall::escalation::note_flap(
+                    &alert.org_id,
+                    response_id,
+                    *recovered_for_micros,
+                    now_micros(),
+                )
+                .await
+                {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] could not record the flap on {response_id} for {}/{}: {e}",
+                        alert.org_id,
+                        alert.name
+                    );
+                }
             } else {
                 let semantic_groups =
                     crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
@@ -5099,6 +5130,36 @@ mod tests {
 
     // ── On-call: one page per firing ────────────────────────────────────────
 
+    /// The record this evaluation's paging decision is taken against.
+    #[cfg(feature = "enterprise")]
+    fn oncall_record(
+        state: config::meta::oncall::ResponseState,
+        closed_at: Option<i64>,
+    ) -> config::meta::oncall::Response {
+        use config::meta::oncall::{ResponderRole, SubjectRef, SubjectType};
+        config::meta::oncall::Response {
+            id: "resp_1".into(),
+            org_id: "default".into(),
+            subject: SubjectRef::new(SubjectType::Alert, "al_1", 1),
+            team_id: "team_1".into(),
+            title: None,
+            cause: None,
+            cause_note: None,
+            snoozed_until: None,
+            ladder_anchor: None,
+            ladder_run: None,
+            priority: 2,
+            responder_role: ResponderRole::Owner,
+            origin_response_id: None,
+            state,
+            opened_at: 0,
+            acked_by: None,
+            acked_at: None,
+            closed_at,
+            incident_id: None,
+        }
+    }
+
     /// An alert with `silence = 0` is re-evaluated every cycle, and every
     /// cycle used to open a record and start a ladder — so a thing that stayed
     /// broken woke its owner every minute. While the record is open, the
@@ -5106,7 +5167,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_still_open_firing_does_not_page_again_on_the_next_cycle() {
-        use config::meta::oncall::ResponseState;
+        use config::meta::oncall::{PageDecision, ResponseState, page_decision};
 
         for state in [
             ResponseState::Triggered,
@@ -5117,27 +5178,67 @@ mod tests {
                 !state.is_terminal(),
                 "precondition: {state:?} is an open state"
             );
-            assert!(
-                !should_open_a_new_page(Some(state)),
+            assert_eq!(
+                page_decision(Some(&oncall_record(state, None)), 1_000, 0),
+                PageDecision::AlreadyOpen,
                 "{state:?} is open, so the next evaluation must not page again"
             );
         }
     }
 
     /// The other half of the same rule: a firing that somebody resolved, for a
-    /// signal that then fires again, is genuinely new. It gets its own record,
-    /// which is what makes the previous firing's cause visible as history on
-    /// the next one.
+    /// signal that then fires again *later*, is genuinely new. It gets its own
+    /// record, which is what makes the previous firing's cause visible as
+    /// history on the next one — and dampening must not blur those two cases
+    /// together, which is why its window is minutes and not hours.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_resolved_firing_that_fires_again_gets_its_own_record() {
-        assert!(
-            should_open_a_new_page(None),
-            "nothing open means this is the first firing"
+        use config::meta::oncall::{
+            DEFAULT_FLAP_DAMPENING_SECS, PageDecision, ResponseState, page_decision,
+        };
+
+        let window = DEFAULT_FLAP_DAMPENING_SECS * 1_000_000;
+        assert_eq!(
+            page_decision(None, 1_000, window),
+            PageDecision::Page,
+            "nothing at all means this is the first firing"
         );
+        let closed = oncall_record(ResponseState::Resolved, Some(1_000));
+        assert_eq!(
+            page_decision(Some(&closed), 1_000 + window + 1, window),
+            PageDecision::Page,
+            "the previous firing closed and stayed closed, so this one is a new one"
+        );
+    }
+
+    /// G16, at the seam. The scheduler is the only caller of `page_decision`,
+    /// so the window it hands over is the one that decides whether a flapping
+    /// alert pages once or N times — a decision function fed a zero window is
+    /// a feature that silently does nothing.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_scheduler_hands_the_decision_a_real_dampening_window() {
+        use config::meta::oncall::{PageDecision, ResponseState, page_decision};
+
+        let window = flap_dampening_micros();
         assert!(
-            should_open_a_new_page(Some(config::meta::oncall::ResponseState::Resolved)),
-            "the previous firing is closed, so this one is a new one"
+            window > 0,
+            "the shipped default dampens; a zero window here is the feature turned off"
+        );
+        assert_eq!(
+            window,
+            config::meta::oncall::DEFAULT_FLAP_DAMPENING_SECS * 1_000_000,
+            "the env default and the documented default must not drift"
+        );
+        // One flap, decided with exactly the window the production path uses.
+        let closed = oncall_record(ResponseState::Resolved, Some(1_000));
+        assert!(
+            matches!(
+                page_decision(Some(&closed), 1_000 + window / 2, window),
+                PageDecision::Flap { .. }
+            ),
+            "a re-firing inside the deployment's own window is dampened, not paged"
         );
     }
 

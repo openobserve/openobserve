@@ -170,6 +170,16 @@ pub enum ResponseEventKind {
     /// clamped promotion is two different facts and a responder woken by one is
     /// owed both.
     SeverityPromoted,
+    /// The condition fired again so soon after recovering that the engine
+    /// treated it as the same unstable firing and did not page.
+    ///
+    /// Its own kind rather than a `Sys` sentence because "this was dampened"
+    /// is the one thing a smoothed record must not hide: the responder has to
+    /// be able to see, on the record they were woken for, that the condition
+    /// came back four more times and nobody was woken for those. A timeline
+    /// that only shows the page it did send is a timeline that lies about what
+    /// happened.
+    Flapped,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -269,6 +279,7 @@ impl ResponseEventKind {
             Self::Delivery => 10,
             Self::AiVerdict => 11,
             Self::SeverityPromoted => 12,
+            Self::Flapped => 13,
         }
     }
 
@@ -286,6 +297,7 @@ impl ResponseEventKind {
             10 => Some(Self::Delivery),
             11 => Some(Self::AiVerdict),
             12 => Some(Self::SeverityPromoted),
+            13 => Some(Self::Flapped),
             _ => None,
         }
     }
@@ -304,6 +316,7 @@ impl ResponseEventKind {
             Self::Delivery => "delivery",
             Self::AiVerdict => "ai_verdict",
             Self::SeverityPromoted => "severity_promoted",
+            Self::Flapped => "flapped",
         }
     }
 
@@ -625,6 +638,133 @@ impl Response {
     }
 }
 
+// ── Flap dampening (G16) ─────────────────────────────────────────────────────
+//
+// A healthy evaluation resolves the record, and the next firing opens a new
+// one. That is right for a condition that broke, was fixed, and broke again a
+// week later — it is what makes the previous firing's cause show up as history
+// on the next. It is wrong for a condition that is merely *unstable*: an alert
+// on a one-minute frequency that fires, clears, fires, clears produces a full
+// page cycle per flap, wakes one responder all night, and fills the history
+// with one-minute records that each look like a separate incident.
+//
+// Two market shapes address this. Opsgenie has a **close delay** — hold the
+// record open for a few minutes after recovery, so a re-fire lands on the
+// record that is still there. PagerDuty has an **auto-resolve timeout** plus
+// alert grouping. Both amount to the same sentence: *do not treat a brief
+// recovery as the end of the firing*.
+//
+// We implement that sentence from the **firing** side, not the recovery side,
+// and the choice is deliberate. A close delay puts the dampening in the path
+// that closes records, which means every bug in it is a record that does not
+// close — and a page that will not go away is worse than a page that repeats.
+// It also needs a timer to do the closing, so a lost timer is a stuck page
+// too. Suppressing on the *re-fire* instead has the failure modes the other
+// way round: recovery still closes the record the instant the condition
+// clears, exactly as it does today and by exactly the same code, so a real
+// recovery cannot become a stuck page no matter what this function returns.
+// The worst this can do is delay a page by one window, and it is bounded
+// below by that window rather than unbounded.
+//
+// The window is measured from the previous record's `closed_at` — from the
+// recovery, not from the last flap. Debouncing (each flap pushing the window
+// out) would dampen a flap storm to a single page ever, and a condition that
+// flaps for six hours *is* an outage somebody has to be told about more than
+// once. Measuring from the close means a storm pages at most once per window
+// instead of once per evaluation, and never goes permanently silent. Silence
+// is the failure mode this feature exists to prevent; noise is the one it is
+// being asked to reduce, and they are not worth the same.
+
+/// How long after a record closes a re-fire of the same source counts as the
+/// same unstable firing rather than a new one.
+///
+/// Five minutes: longer than any sane evaluation frequency, so an alert
+/// flapping on its own cadence is caught; shorter than the time it takes a
+/// responder to finish reading a page, so a condition that genuinely came back
+/// still reaches somebody while the first one is fresh.
+pub const DEFAULT_FLAP_DAMPENING_SECS: i64 = 300;
+
+/// What a firing should do about the record that already exists for its source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PageDecision {
+    /// Nothing open, nothing recently closed. Open a record and page.
+    Page,
+    /// A record for this source is still open — it **is** this firing, and the
+    /// ladder attached to it is what escalates if nobody answers. Paging again
+    /// would wake the same person for the thing they are already holding.
+    AlreadyOpen,
+    /// The previous record closed less than the dampening window ago. This
+    /// firing is the same unstable condition coming back, so it is recorded on
+    /// that record instead of opening a second one and waking anybody again.
+    Flap {
+        /// The record the flap belongs on. Carried in the value rather than
+        /// left for the caller to re-derive, so "dampen" cannot be spelled
+        /// without saying which record it is dampening onto.
+        response_id: String,
+        /// How long the recovery held before it came back, in micros. Goes on
+        /// the timeline verbatim: "fired again 40s after recovering" is a
+        /// different fact from "fired again 4m after recovering", and a
+        /// responder reading the record afterwards needs to tell them apart.
+        recovered_for_micros: i64,
+    },
+}
+
+/// Whether this firing pages, folds into an open record, or is dampened.
+///
+/// `latest` is the newest record for this source whatever its state — not the
+/// newest *open* one. That widening is the whole change: the close-then-reopen
+/// cycle is invisible to a query that only returns open records, which is why
+/// the previous rule ("still open") could not see a flap at all.
+///
+/// `dampening_micros` of zero or less turns dampening off and restores the
+/// previous behaviour exactly, which is what makes it safe to ship on by
+/// default: an operator who finds it eating pages has a switch, and the switch
+/// leads back to code that is still exercised.
+///
+/// `now` is passed in. A record whose `closed_at` is missing or in the future
+/// is treated as not-recently-closed — a clock that disagrees with itself must
+/// cost a duplicate page, never a suppressed one.
+pub fn page_decision(latest: Option<&Response>, now: i64, dampening_micros: i64) -> PageDecision {
+    let Some(record) = latest else {
+        return PageDecision::Page;
+    };
+    if !record.state.is_terminal() {
+        return PageDecision::AlreadyOpen;
+    }
+    if dampening_micros <= 0 {
+        return PageDecision::Page;
+    }
+    let Some(closed_at) = record.closed_at else {
+        // Terminal without a close instant is a row this code cannot reason
+        // about. It is not evidence of a recent recovery, so it does not
+        // suppress.
+        return PageDecision::Page;
+    };
+    let recovered_for = now - closed_at;
+    if (0..dampening_micros).contains(&recovered_for) {
+        PageDecision::Flap {
+            response_id: record.id.clone(),
+            recovered_for_micros: recovered_for,
+        }
+    } else {
+        PageDecision::Page
+    }
+}
+
+/// The timeline sentence for one dampened re-fire.
+///
+/// Pure and here rather than formatted at the call site, because this string is
+/// the entire responder-facing evidence that dampening happened — if it is
+/// wrong or absent the record is silently smoothed, which is the outcome G16
+/// says is worse than the flapping.
+pub fn flap_note(recovered_for_micros: i64) -> String {
+    let seconds = recovered_for_micros.max(0) / 1_000_000;
+    format!(
+        "the condition fired again {seconds}s after recovering — dampened as the same unstable \
+         firing, so nobody was paged a second time"
+    )
+}
+
 // ── Ordered recovery (00-simplified-flow §4) ─────────────────────────────────
 
 /// What the upstream signal recovering means for the records it opened.
@@ -889,7 +1029,7 @@ mod tests {
         ResponseState::Resolved,
     ];
 
-    const KINDS: [ResponseEventKind; 12] = [
+    const KINDS: [ResponseEventKind; 13] = [
         ResponseEventKind::Sys,
         ResponseEventKind::Page,
         ResponseEventKind::Ack,
@@ -902,6 +1042,7 @@ mod tests {
         ResponseEventKind::Delivery,
         ResponseEventKind::AiVerdict,
         ResponseEventKind::SeverityPromoted,
+        ResponseEventKind::Flapped,
     ];
 
     #[test]
@@ -983,7 +1124,7 @@ mod tests {
         assert_eq!(ResponseState::from_i32(0), None);
         assert_eq!(ResponseState::from_i32(5), None);
         assert_eq!(ResponseEventKind::from_i32(0), None);
-        assert_eq!(ResponseEventKind::from_i32(13), None);
+        assert_eq!(ResponseEventKind::from_i32(14), None);
     }
 
     /// A late event must never reopen a record a human already closed.
@@ -1614,5 +1755,156 @@ mod tests {
                 "{fixed}"
             );
         }
+    }
+
+    // ── Flap dampening (G16) ─────────────────────────────────────────────────
+
+    const WINDOW: i64 = DEFAULT_FLAP_DAMPENING_SECS * 1_000_000;
+
+    fn closed_at(at: i64) -> Response {
+        Response {
+            state: ResponseState::Resolved,
+            ..sample(None, Some(at))
+        }
+    }
+
+    /// The test that matters. An alert on a one-minute frequency that fires,
+    /// clears, fires, clears — the exact shape G16 describes — pages **once**,
+    /// not once per flap, and every suppressed re-fire is attributed to the
+    /// record the responder was actually woken for.
+    #[test]
+    fn test_a_flapping_alert_produces_one_page_cycle_not_n() {
+        let minute = 60 * 1_000_000;
+        // t=0 fires. Nothing has ever fired for this source.
+        assert_eq!(page_decision(None, 0, WINDOW), PageDecision::Page);
+        // t=60s recovers: the record closes, exactly as it does today.
+        let record = closed_at(minute);
+
+        let mut pages = 0;
+        let mut flaps = 0;
+        // Four more fire/clear cycles, one a minute, over the window.
+        for cycle in 2..=5 {
+            let firing_at = cycle * minute;
+            match page_decision(Some(&record), firing_at, WINDOW) {
+                PageDecision::Page => pages += 1,
+                PageDecision::Flap { response_id, .. } => {
+                    flaps += 1;
+                    assert_eq!(response_id, "resp_1", "the flap lands on the paged record");
+                }
+                PageDecision::AlreadyOpen => unreachable!("the record closed"),
+            }
+        }
+        assert_eq!(pages, 0, "one page cycle for the whole flap, not four more");
+        assert_eq!(flaps, 4, "and each flap is still on the record");
+    }
+
+    /// The other half, and the one that must not regress: a recovery that
+    /// holds is a recovery. Dampening lives entirely on the firing side, so
+    /// `closed_at` being set at all is proof the record closed at the instant
+    /// the condition cleared — there is no state in which a held recovery
+    /// leaves a page stuck open.
+    #[test]
+    fn test_a_recovery_that_holds_closes_promptly_and_the_next_firing_pages() {
+        let record = closed_at(1_000);
+        assert!(record.state.is_terminal(), "recovery closed it, unconditionally");
+        assert_eq!(record.closed_at, Some(1_000));
+        // A firing after the window is a new incident and gets its own record —
+        // which is what keeps the prior-causes history honest.
+        assert_eq!(
+            page_decision(Some(&record), 1_000 + WINDOW, WINDOW),
+            PageDecision::Page,
+            "exactly at the window the suppression is over"
+        );
+        assert_eq!(
+            page_decision(Some(&record), 1_000 + WINDOW + 1, WINDOW),
+            PageDecision::Page
+        );
+    }
+
+    /// A storm never goes permanently silent: the window runs from the close,
+    /// not from the last flap, so a condition that flaps for hours pages once
+    /// per window instead of once per evaluation.
+    #[test]
+    fn test_dampening_is_bounded_and_never_becomes_permanent_silence() {
+        let record = closed_at(0);
+        assert!(matches!(
+            page_decision(Some(&record), WINDOW - 1, WINDOW),
+            PageDecision::Flap { .. }
+        ));
+        // Six hours of flapping later, the same closed record no longer
+        // suppresses anything.
+        assert_eq!(
+            page_decision(Some(&record), 6 * 60 * 60 * 1_000_000, WINDOW),
+            PageDecision::Page
+        );
+    }
+
+    /// The pre-existing rule is unchanged: a still-open record IS this firing.
+    /// Dampening is only ever asked about after that has been answered.
+    #[test]
+    fn test_an_open_record_still_wins_over_dampening() {
+        for state in [
+            ResponseState::Triggered,
+            ResponseState::Triaged,
+            ResponseState::Acknowledged,
+        ] {
+            let open = Response {
+                state,
+                ..sample(None, None)
+            };
+            assert_eq!(
+                page_decision(Some(&open), 10_000_000, WINDOW),
+                PageDecision::AlreadyOpen,
+                "{state:?}"
+            );
+        }
+    }
+
+    /// Zero restores the previous behaviour exactly, which is the switch an
+    /// operator who finds dampening eating pages reaches for.
+    #[test]
+    fn test_a_window_of_zero_or_less_turns_dampening_off() {
+        let record = closed_at(1_000);
+        for off in [0, -1, i64::MIN] {
+            assert_eq!(page_decision(Some(&record), 1_001, off), PageDecision::Page);
+        }
+    }
+
+    /// A clock that disagrees with itself must cost a duplicate page, never a
+    /// suppressed one — so a close stamped in the future does not suppress, and
+    /// neither does a terminal row with no close instant at all.
+    #[test]
+    fn test_an_impossible_clock_pages_rather_than_suppresses() {
+        assert_eq!(
+            page_decision(Some(&closed_at(9_000)), 1_000, WINDOW),
+            PageDecision::Page,
+            "closed in the future"
+        );
+        let no_close = Response {
+            state: ResponseState::Resolved,
+            ..sample(None, None)
+        };
+        assert_eq!(
+            page_decision(Some(&no_close), 1_000, WINDOW),
+            PageDecision::Page
+        );
+    }
+
+    /// The flap is carried with how long the recovery held, because "back in
+    /// 40s" and "back in 4m" are different facts to whoever reads the record.
+    #[test]
+    fn test_the_flap_carries_how_long_the_recovery_held() {
+        let record = closed_at(1_000_000);
+        let PageDecision::Flap {
+            recovered_for_micros,
+            response_id,
+        } = page_decision(Some(&record), 41_000_000, WINDOW)
+        else {
+            panic!("inside the window this is a flap");
+        };
+        assert_eq!(response_id, "resp_1");
+        assert_eq!(recovered_for_micros, 40_000_000);
+        assert!(flap_note(recovered_for_micros).contains("40s"));
+        assert!(flap_note(recovered_for_micros).contains("dampened"));
     }
 }

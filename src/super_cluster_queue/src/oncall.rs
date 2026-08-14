@@ -148,6 +148,33 @@ pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
             );
             table::super_cluster_oncall::put_event(&response_id, &event).await?;
         }
+        OncallMessage::UnavailabilityPut { record } => {
+            log::debug!(
+                "[SUPER_CLUSTER:oncall] Put absence org={} user={} id={}",
+                record.org_id,
+                record.user_email,
+                record.id
+            );
+            table::super_cluster_oncall::put_unavailability(&record).await?;
+        }
+        OncallMessage::UnavailabilityDelete {
+            org_id,
+            unavailability_id,
+        } => {
+            log::debug!(
+                "[SUPER_CLUSTER:oncall] Delete absence org={org_id} id={unavailability_id}"
+            );
+            // Deleting an absence that is already gone is a no-op, which is
+            // what makes a redelivered delete harmless.
+            table::oncall_unavailability::delete(&org_id, &unavailability_id).await?;
+        }
+        OncallMessage::UnavailabilityClearedForUser { org_id, user_email } => {
+            log::debug!(
+                "[SUPER_CLUSTER:oncall] Clear every absence org={org_id} user={user_email}"
+            );
+            table::super_cluster_oncall::clear_unavailability_for_user(&org_id, &user_email)
+                .await?;
+        }
     }
     Ok(())
 }
