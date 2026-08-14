@@ -145,7 +145,10 @@ export interface TimeWindow {
  *
  * `name` is a rotation's stored name — data, not display text.
  */
-export type ScheduleEditorIntent = { mode: "new" } | { mode: "edit"; name: string };
+export type ScheduleEditorIntent =
+  | { mode: "new" }
+  | { mode: "edit"; name: string }
+  | { mode: "duplicate"; name: string };
 
 export interface Rotation {
   /** What this rotation is called — a label for a shift, not a rung of the

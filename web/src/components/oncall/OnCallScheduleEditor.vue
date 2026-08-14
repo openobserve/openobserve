@@ -415,6 +415,8 @@ watch(
     if (!intent) return;
     if (intent.mode === "new") {
       addRotation();
+    } else if (intent.mode === "duplicate") {
+      duplicateRotation(intent.name);
     } else {
       const found = draft.value.find((r) => r.name === intent.name);
       if (found) {
@@ -454,6 +456,27 @@ function addRotation() {
   // Straight into the editor: an empty row is not something anybody can act on.
   isNew.value = true;
   editRotation(rotation);
+}
+
+/// A copy is a starting point, not a save: the editor opens on a duplicate
+/// nobody has committed yet, so it is named and reviewed before it is real. The
+/// name must differ — the server keys a rotation by it — and so must the
+/// priority, or two identical layers are "equally in force" and the whole save
+/// is refused, taking the working one down with the copy.
+function duplicateRotation(name: string) {
+  const source = draft.value.find((r) => r.name === name);
+  if (!source) return;
+  const highest = draft.value.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
+  const copy: Rotation = {
+    ...source,
+    name: String(t("oncall.railCopyName", { name: raw(source.name) })),
+    members: [...source.members],
+    restrictions: source.restrictions ? [...source.restrictions] : [],
+    priority: highest + 1,
+  };
+  draft.value.push(copy);
+  isNew.value = true;
+  editRotation(copy);
 }
 
 async function save() {

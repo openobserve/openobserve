@@ -61,6 +61,7 @@
          page. The tabs below are where you go to CHANGE any of them. -->
     <div class="bg-border-default border-border-default border-y">
       <OnCallTeamPulse
+        :hide-holder="activeTab === 'schedule'"
         :slots="onCallNow"
         :schedule="schedule"
         :policy="policy"
@@ -242,14 +243,29 @@
               :timezone="team?.timezone ?? 'UTC'"
             />
 
-            <OnCallScheduleTimeline
-              v-model:window="scheduleWindow"
-              :rotations="schedule?.rotations ?? []"
-              :segments="segments"
-              :timezone="team?.timezone ?? 'UTC'"
-              :loading="segmentsLoading"
-              @fill-gap="onFillGap"
-            />
+            <!-- The rail answers "which rotation is carrying this, and what do
+                 I do about it"; the chart answers "when". Side by side because
+                 the second question is always asked of the first. -->
+            <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+              <OnCallRotationRail
+                :rotations="schedule?.rotations ?? []"
+                :segments="segments"
+                :timezone="team?.timezone ?? 'UTC'"
+                @edit="openScheduleEditor({ mode: 'edit', name: $event })"
+                @add="openScheduleEditor({ mode: 'new' })"
+                @override="coverOpen = true"
+                @duplicate="openScheduleEditor({ mode: 'duplicate', name: $event })"
+              />
+
+              <OnCallScheduleTimeline
+                v-model:window="scheduleWindow"
+                :rotations="schedule?.rotations ?? []"
+                :segments="segments"
+                :timezone="team?.timezone ?? 'UTC'"
+                :loading="segmentsLoading"
+                @fill-gap="onFillGap"
+              />
+            </div>
 
             <OnCallRotationsTable
               :rotations="schedule?.rotations ?? []"
@@ -371,6 +387,7 @@ import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import OnCallRotationsTable from "@/components/oncall/OnCallRotationsTable.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
+import OnCallRotationRail from "@/components/oncall/OnCallRotationRail.vue";
 import OnCallScheduleContext from "@/components/oncall/OnCallScheduleContext.vue";
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
@@ -454,6 +471,7 @@ function openScheduleEditor(intent: ScheduleEditorIntent) {
   scheduleIntent.value = intent;
   editingSchedule.value = true;
 }
+
 const coverOpen = ref(false);
 const coverSaving = ref(false);
 const coverGap = ref<{ from: number; to: number } | null>(null);

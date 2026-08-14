@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   instants — a slot has no start and no end.
 -->
 <template>
-  <div class="grid grid-cols-1 gap-px md:grid-cols-2 xl:grid-cols-4" data-test="oncall-team-pulse">
+  <div :class="gridClass" data-test="oncall-team-pulse">
     <!-- ── On call now ─────────────────────────────────────────── -->
-    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
+    <section v-if="!hideHolder" class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
       <span class="flex items-center gap-1.5">
         <OIcon name="notifications-active" size="xs" class="text-text-secondary" />
         <OText variant="section">{{ t("oncall.teamOnCallNow") }}</OText>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </section>
 
     <!-- ── Backing them up ─────────────────────────────────────── -->
-    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
+    <section v-if="!hideHolder" class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
       <span class="flex items-center gap-1.5">
         <OIcon name="group-work" size="xs" class="text-text-secondary" />
         <OText variant="section">{{ t("oncall.teamBackingUp") }}</OText>
@@ -219,6 +219,13 @@ const props = withDefaults(
     /** `GET .../reachability` — would a page to each person actually land. */
     reachability?: TeamReachability | null;
     timezone?: string;
+    /**
+     * Drop "on call now" and "backing them up".
+     *
+     * The schedule tab carries both in its own context strip, and a screen that
+     * says who holds the pager twice makes a reader check whether the two agree.
+     */
+    hideHolder?: boolean;
   }>(),
   {
     slots: () => [],
@@ -227,10 +234,19 @@ const props = withDefaults(
     overview: null,
     reachability: null,
     timezone: "UTC",
+    hideHolder: false,
   },
 );
 
 const { t } = useI18nTyped();
+
+/// Both strings are written out so Tailwind keeps them: a class assembled at
+/// runtime is not in the stylesheet.
+const gridClass = computed(() =>
+  props.hideHolder
+    ? "grid grid-cols-1 gap-px md:grid-cols-2"
+    : "grid grid-cols-1 gap-px md:grid-cols-2 xl:grid-cols-4",
+);
 const nowMicros = useOnCallClock();
 
 /// The primary slot, named rather than taken as "the first one with somebody in
