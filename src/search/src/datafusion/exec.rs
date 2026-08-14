@@ -19,6 +19,7 @@ use arrow_schema::Field;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
+        promql::{EXEMPLARS_LABEL, HASH_LABEL},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, StreamType},
     },
@@ -511,6 +512,7 @@ pub async fn register_metrics_table(
     table_name: &str,
     files: Vec<FileKey>,
 ) -> Result<SessionContext> {
+    let schema = metrics_query_schema(schema);
     let ctx = DataFusionContextBuilder::new()
         .trace_id(&session.id)
         .work_group(session.work_group.clone())
@@ -526,6 +528,38 @@ pub async fn register_metrics_table(
     ctx.register_table(table_name, union_table)?;
 
     Ok(ctx)
+}
+
+fn metrics_query_schema(schema: Arc<Schema>) -> Arc<Schema> {
+    metrics_query_schema_with_utf8_view(schema, get_config().common.utf8_view_enabled)
+}
+
+fn metrics_query_schema_with_utf8_view(
+    schema: Arc<Schema>,
+    utf8_view_enabled: bool,
+) -> Arc<Schema> {
+    if !utf8_view_enabled {
+        return schema;
+    }
+
+    let fields = schema
+        .fields()
+        .iter()
+        .map(|field| {
+            if matches!(field.data_type(), DataType::Utf8 | DataType::LargeUtf8)
+                && field.name() != HASH_LABEL
+                && field.name() != EXEMPLARS_LABEL
+            {
+                Arc::new(
+                    Field::new(field.name(), DataType::Utf8View, field.is_nullable())
+                        .with_metadata(field.metadata().clone()),
+                )
+            } else {
+                field.clone()
+            }
+        })
+        .collect::<Vec<_>>();
+    Arc::new(Schema::new(fields).with_metadata(schema.metadata().clone()))
 }
 
 /// Create a datafusion table from a list of files and a schema
@@ -788,6 +822,56 @@ mod tests {
             Field::new("field1", DataType::Utf8, true),
             Field::new("field2", DataType::Int64, true),
         ]))
+    }
+
+    #[test]
+    fn test_metrics_query_schema_uses_views_for_labels_only() {
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert("source".to_string(), "metrics".to_string());
+        let schema = Arc::new(
+            Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(HASH_LABEL, DataType::Utf8, false),
+                Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+                Field::new("path", DataType::Utf8, true),
+                Field::new("large_label", DataType::LargeUtf8, true),
+            ])
+            .with_metadata(metadata.clone()),
+        );
+
+        let converted = metrics_query_schema_with_utf8_view(schema, true);
+
+        assert_eq!(
+            converted.field_with_name(HASH_LABEL).unwrap().data_type(),
+            &DataType::Utf8
+        );
+        assert_eq!(
+            converted
+                .field_with_name(EXEMPLARS_LABEL)
+                .unwrap()
+                .data_type(),
+            &DataType::Utf8
+        );
+        assert_eq!(
+            converted.field_with_name("path").unwrap().data_type(),
+            &DataType::Utf8View
+        );
+        assert_eq!(
+            converted
+                .field_with_name("large_label")
+                .unwrap()
+                .data_type(),
+            &DataType::Utf8View
+        );
+        assert_eq!(converted.metadata(), &metadata);
+    }
+
+    #[test]
+    fn test_metrics_query_schema_can_disable_views() {
+        let schema = create_test_schema();
+        let unchanged = metrics_query_schema_with_utf8_view(Arc::clone(&schema), false);
+
+        assert!(Arc::ptr_eq(&schema, &unchanged));
     }
 
     #[tokio::test]

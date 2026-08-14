@@ -16,7 +16,7 @@
 use config::{meta::promql::value::Sample, utils::sort::sort_float};
 
 /// Calculate mean over a slice of f64s
-pub fn mean(data: &[f64]) -> Option<f64> {
+fn mean(data: &[f64]) -> Option<f64> {
     let sum = data.iter().sum::<f64>();
     let count = data.len();
 
