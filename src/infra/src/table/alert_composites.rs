@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use sea_orm::{
     ActiveModelTrait, ActiveValue,
     ActiveValue::Set,
-    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Statement,
-    TransactionTrait,
+    ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Statement, TransactionTrait,
     sea_query::{Expr, LockType},
 };
 
@@ -169,6 +169,12 @@ pub async fn list_by_org<C: ConnectionTrait>(
         .order_by_asc(alert_composites::Column::Name)
         .all(conn)
         .await
+}
+
+/// Total composite definitions across every org — the super-cluster startup
+/// preflight fails closed when this is non-zero.
+pub async fn count_all<C: ConnectionTrait>(conn: &C) -> Result<u64, sea_orm::DbErr> {
+    alert_composites::Entity::find().count(conn).await
 }
 
 pub async fn list_parents<C: ConnectionTrait>(

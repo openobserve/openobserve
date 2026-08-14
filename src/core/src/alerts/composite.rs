@@ -19,9 +19,10 @@ pub use runtime::{
     CompositeEvaluation, CompositeEvaluator, CompositeStateInput, EvaluatedChild, EvaluationFailure,
 };
 pub use service::{
-    CompositeCreate, CompositeServiceError, clone_composite, create_composite, delete_composite,
-    evaluate_definition, evaluate_expression, get_composite, move_composite, set_composite_enabled,
-    trigger_composite, update_composite, validate_composite_graph,
+    CompositeCreate, CompositeServiceError, StartupPreflightError, clone_composite,
+    create_composite, delete_composite, evaluate_definition, evaluate_expression, get_composite,
+    move_composite, set_composite_enabled, startup_preflight, trigger_composite, update_composite,
+    validate_composite_graph,
 };
 
 #[cfg(test)]

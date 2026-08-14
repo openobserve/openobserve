@@ -707,3 +707,47 @@ fn ensure_mutation_allowed() -> Result<(), CompositeServiceError> {
         Err(CompositeServiceError::WritesDisabled)
     }
 }
+
+/// Fatal on startup when super-cluster mode is enabled but composite
+/// definitions or `CompositeAlert` jobs remain (§18). Super-cluster replication
+/// cannot guarantee a cycle-sensitive graph, so operators must drain composites
+/// before enabling it; this fails closed rather than serving a corrupt graph.
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "composite alerts are unsupported in super-cluster mode: {definition_count} definitions and {job_count} jobs remain"
+)]
+pub struct StartupPreflightError {
+    pub code: &'static str,
+    pub definition_count: usize,
+    pub job_count: usize,
+}
+
+/// Startup gate for super-cluster mode. A no-op when super-cluster is off (or
+/// in OSS, where it cannot be enabled). Requires the ORM and scheduler clients
+/// to be initialised first.
+pub async fn startup_preflight() -> anyhow::Result<()> {
+    #[cfg(feature = "enterprise")]
+    let super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let super_cluster = false;
+
+    if !super_cluster {
+        return Ok(());
+    }
+
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let definition_count = alert_composites::count_all(db).await? as usize;
+    let job_count = scheduler::len_module(TriggerModule::CompositeAlert).await;
+    if definition_count == 0 && job_count == 0 {
+        Ok(())
+    } else {
+        Err(StartupPreflightError {
+            code: "composite_super_cluster_startup_blocked",
+            definition_count,
+            job_count,
+        }
+        .into())
+    }
+}
