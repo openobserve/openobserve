@@ -64,9 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @stream-change="onStreamChange"
     />
 
-    <!-- Streams exist: OTable owns the data surface (column chooser, server-side
-         pagination footer, column resize, empty/error body). The scope control
-         lives in the page-level bar above; the header owns refresh + date.
+    <!-- Streams exist: OTable owns the data surface (toolbar, server-side
+         pagination footer, column resize, empty/error body). Search is
+         server-side — the rows are one server page, so a client-side filter
+         would silently disagree with the footer count; the term instead rides
+         the endpoint's `filter` predicate alongside the agent scope. The scope
+         control lives in the page-level bar above; the header owns refresh +
+         date.
          NOTE: explicit v-if (not v-else) — the scope bar above carries its own
          v-if, so a v-else here would chain to the bar and hide the table
          whenever streams exist. -->
@@ -96,6 +100,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
     >
+      <!-- Search lives in #toolbar with an OSearchInput, the same shape every
+           other list page uses (SLOs, Alerts) — a bordered, clearable field
+           rather than OTable's bare built-in filter row. OTable auto-injects
+           the column-visibility toggle after this slot, so the toolbar reads
+           search → columns like the rest of the app. -->
+      <template #toolbar>
+        <!-- min-w-0 on the wrapper, not flex-1 on the input: a flex child will
+             not shrink below its content width without it, which is how a long
+             placeholder pushes the toolbar wider than the table. -->
+        <div class="min-w-0 flex-1">
+          <OSearchInput
+            v-model="searchQuery"
+            class="w-full"
+            :placeholder="t('traces.sessionsList.searchPlaceholder')"
+            clearable
+            :debounce="350"
+            data-test="sessions-list-search"
+          />
+        </div>
+      </template>
+
       <!-- Empty / error body — rendered inside the frame so the toolbar (and
            thus the stream selector) stays visible. -->
       <template #empty>
@@ -120,6 +145,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :description="t('traces.sessionsList.noAgentsDescription')"
           :action-label="t('traces.sessionsList.viewByStream')"
           @action="onFilterModeChange('stream')"
+        />
+        <!-- Search is server-side, so an empty body under an active term means
+             "nothing matched" — not "nothing ingested". Offer the way out
+             (clear the term) instead of the instrument-your-app hero. -->
+        <OEmptyState
+          v-else-if="searchQuery.trim()"
+          size="hero"
+          illustration="no-results"
+          data-test="sessions-empty-no-search-results"
+          :title="t('traces.sessionsList.noSearchResultsTitle')"
+          :description="t('traces.sessionsList.noSearchResultsDescription', { query: searchQuery })"
+          :action-label="t('traces.sessionsList.clearSearch')"
+          @action="clearSearch"
         />
         <div v-else class="flex items-center justify-center py-12" data-test="sessions-empty">
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
@@ -221,12 +259,14 @@ import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams"
 import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 import { useSessions, type SessionRow } from "./composables/useSessions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { AcceptableValue } from "reka-ui";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { buildAgentSessionFilter } from "./llmAgentFilter";
+import { buildSessionSearchFilter, combineSessionFilters } from "./sessionSearchFilter";
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 
@@ -261,6 +301,7 @@ const {
   loadedOrg,
   currentPage,
   rowsPerPage,
+  searchQuery,
   agents,
   agentsLoaded,
   fetchPage,
@@ -349,6 +390,26 @@ const {
 const agentFilterClause = computed(() =>
   buildAgentSessionFilter(effectiveAgent.value, effectiveStream.value),
 );
+
+// The single `filter` predicate sent to the sessions endpoint: agent scope AND
+// search term, either of which may be empty.
+const sessionFilterClause = computed(() =>
+  combineSessionFilters(agentFilterClause.value, buildSessionSearchFilter(searchQuery.value)),
+);
+
+// Each search costs a server round-trip, so the input coalesces keystrokes
+// (`:debounce` on OSearchInput) and only lands a settled term here. A new term
+// always resets to page 1 — the old offset means nothing against a different
+// result set. On remount `searchQuery` is restored alongside the rows it
+// produced, so nothing changes and this doesn't fire.
+watch(searchQuery, () => {
+  currentPage.value = 1;
+  loadSessions(undefined, undefined, true);
+});
+
+function clearSearch() {
+  searchQuery.value = "";
+}
 
 // `instrument` is the only action id the preset emits. Send the user to
 // the in-app AI integrations page (the closest "set this up" surface) so
@@ -597,7 +658,7 @@ async function loadSessions(startTime?: number, endTime?: number, force = false)
     end,
     currentPage.value - 1,
     rowsPerPage.value,
-    agentFilterClause.value,
+    sessionFilterClause.value,
   );
 }
 

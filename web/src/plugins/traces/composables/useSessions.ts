@@ -160,6 +160,11 @@ const loadedOrg = ref<string | null>(null);
 // unmount/remount cycle and stays in sync with the restored rows.
 const currentPage = ref(1);
 const rowsPerPage = ref(20);
+// Free-text search term. Module-scoped for the same reason as the pagination
+// state: the rows themselves survive a remount, so the search that produced
+// them has to survive with them — otherwise a back-navigation would show a
+// filtered list under an empty search box.
+const searchQuery = ref("");
 // Agent-filter list is loaded lazily by `loadSessions` (agent mode only), so it
 // lives here too — otherwise a back-navigation, which skips that load, would
 // reset `agentsLoaded` to false and strand the agent picker on its skeleton.
@@ -628,6 +633,7 @@ export function useSessions() {
     loadedOrg,
     currentPage,
     rowsPerPage,
+    searchQuery,
     agents,
     agentsLoaded,
     fetchPage,

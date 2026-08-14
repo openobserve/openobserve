@@ -18,6 +18,8 @@ const mockRouteQuery = {
   from: "1700000000000000",
   to: "1700001000000000",
   org_identifier: "default",
+  // Carried from the list row — the detail endpoint has no user field.
+  user_id: "alice@example.com",
 };
 
 vi.mock("./composables/useSessions", () => ({
@@ -249,6 +251,7 @@ beforeEach(() => {
   mockRouteQuery.stream = "test-stream";
   mockRouteQuery.from = "1700000000000000";
   mockRouteQuery.to = "1700001000000000";
+  mockRouteQuery.user_id = "alice@example.com";
 
   // Default: successful fetch with detail + one trace
   mockFetchSession.mockResolvedValue({
@@ -675,5 +678,37 @@ describe("SessionDetails — navigation", () => {
     const pushArg = mockRouterPush.mock.calls[0][0];
     expect(pushArg.name).toBe("traces");
     expect(pushArg.query.tab).toBe("sessions");
+  });
+});
+
+describe("SessionDetails — session user", () => {
+  it("shows the user from the route in the header actions", async () => {
+    const wrapper = await mountComponent();
+    const user = wrapper.find("[data-test='session-detail-user']");
+    expect(user.exists()).toBe(true);
+    expect(user.text()).toContain("alice@example.com");
+  });
+
+  it("places the user before the session id in the header", async () => {
+    const wrapper = await mountComponent();
+    const html = wrapper.html();
+    const userAt = html.indexOf("session-detail-user");
+    const idAt = html.indexOf("session-detail-title");
+    expect(userAt).toBeGreaterThan(-1);
+    expect(idAt).toBeGreaterThan(-1);
+    expect(userAt).toBeLessThan(idAt);
+  });
+
+  it("omits the chip when the session has no identified user", async () => {
+    mockRouteQuery.user_id = "";
+    const wrapper = await mountComponent();
+    expect(wrapper.find("[data-test='session-detail-user']").exists()).toBe(false);
+  });
+
+  it("omits the chip on a hand-typed URL that carries no user param", async () => {
+    // @ts-expect-error — deliberately dropping the param the list would supply
+    delete mockRouteQuery.user_id;
+    const wrapper = await mountComponent();
+    expect(wrapper.find("[data-test='session-detail-user']").exists()).toBe(false);
   });
 });

@@ -27,8 +27,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       bleed
     >
-      <!-- Session id pill (primary-tinted, copyable) — shows the full id -->
       <template #title-trail>
+        <!-- Who, then what: the user leads because it's the human answer to
+             "whose session am I looking at", and the id is the reference you
+             copy once you're already here. Purple-soft reads as a peer of the
+             id pill's info-blue without competing with it; truncated with the
+             full value on hover, since user ids are often long emails. -->
+        <OBadge
+          v-if="sessionUser"
+          variant="purple-soft"
+          shape="rounded"
+          icon="person"
+          class="min-w-0 shrink"
+          data-test="session-detail-user"
+        >
+          <span class="max-w-[16rem] truncate">{{ sessionUser }}</span>
+          <OTooltip side="bottom" align="start" :content="raw(sessionUser)" />
+        </OBadge>
+
+        <!-- Session id pill (info-tinted, copyable) — shows the full id -->
         <span
           v-if="detail"
           class="rounded-default text-status-info-text bg-status-info-bg inline-flex flex-shrink-0 items-center gap-1.5 px-2 py-1 font-semibold"
@@ -923,6 +940,7 @@ import { messagesFromInput, messagesFromOutput, getModel } from "./threadView.ut
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -965,6 +983,14 @@ const startTime = computed(() =>
   typeof route.query.from === "string" ? Number(route.query.from) : 0,
 );
 const endTime = computed(() => (typeof route.query.to === "string" ? Number(route.query.to) : 0));
+// Session user, carried from the list row (SessionsList puts it on the route).
+// The session-detail endpoint doesn't return a user id — it aggregates per
+// trace, not per session — so the route is the only source. Absent on a
+// hand-typed URL, or when the session has no identified user; the chip simply
+// doesn't render then rather than showing a hollow "Unknown".
+const sessionUser = computed(() =>
+  typeof route.query.user_id === "string" ? route.query.user_id.trim() : "",
+);
 const orgIdentifier = computed(
   () =>
     (typeof route.query.org_identifier === "string" ? route.query.org_identifier : "") ||

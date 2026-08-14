@@ -21,6 +21,7 @@ const mockLastRunAt = ref<number | null>(null);
 const mockLoadedOrg = ref<string | null>(null);
 const mockCurrentPage = ref(1);
 const mockRowsPerPage = ref(20);
+const mockSearchQuery = ref("");
 const mockAgents = ref<any[]>([]);
 const mockAgentsLoaded = ref(false);
 const mockFetchPage = vi.fn();
@@ -42,6 +43,7 @@ vi.mock("./composables/useSessions", () => ({
     loadedOrg: mockLoadedOrg,
     currentPage: mockCurrentPage,
     rowsPerPage: mockRowsPerPage,
+    searchQuery: mockSearchQuery,
     agents: mockAgents,
     agentsLoaded: mockAgentsLoaded,
     fetchPage: mockFetchPage,
@@ -84,11 +86,20 @@ vi.mock("vuex", () => ({
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",
-    props: ["data", "columns", "loading", "rowKey", "totalCount", "totalCountExact", "footerTitle"],
+    props: [
+      "data",
+      "columns",
+      "loading",
+      "rowKey",
+      "totalCount",
+      "totalCountExact",
+      "footerTitle",
+    ],
     emits: ["row-click"],
-    // Mirrors the OTable contract the component relies on: a loading state, one
-    // row per item, the `#empty` slot when there are no rows, and a footer that
-    // surfaces the server-side total (the old count pill now lives here).
+    // Mirrors the OTable contract the component relies on: the `#toolbar` slot
+    // (which carries the search input), a loading state, one row per item, the
+    // `#empty` slot when there are no rows, and a footer that surfaces the
+    // server-side total (the old count pill now lives here).
     template: `
       <div class="otable-mock">
         <div data-test="sessions-list-toolbar">
@@ -179,7 +190,7 @@ vi.mock("./llmInsightsDashboard.utils", () => ({
 
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SessionsList from "./SessionsList.vue";
 
@@ -226,6 +237,7 @@ beforeEach(() => {
   mockLoadedOrg.value = null;
   mockCurrentPage.value = 1;
   mockRowsPerPage.value = 20;
+  mockSearchQuery.value = "";
   mockAgents.value = [];
   mockAgentsLoaded.value = false;
   mockRouteQuery = {};
@@ -241,6 +253,12 @@ beforeEach(() => {
   });
 });
 
+// Mounted components are tracked and torn down after each test. `searchQuery`
+// (like the pagination refs) is module-scoped in useSessions, so a component
+// left mounted keeps watching it — a later test's search would then also drive
+// the previous test's instance and add stray fetchPage calls.
+const mountedWrappers: any[] = [];
+
 async function mountComponent(props = defaultProps) {
   const wrapper = mount(SessionsList, {
     props,
@@ -248,9 +266,14 @@ async function mountComponent(props = defaultProps) {
       stubs: {},
     },
   });
+  mountedWrappers.push(wrapper);
   await flushPromises();
   return wrapper;
 }
+
+afterEach(() => {
+  while (mountedWrappers.length) mountedWrappers.pop()?.unmount();
+});
 
 async function refreshComponent(wrapper: any, startTime?: number, endTime?: number) {
   await wrapper.vm.refresh(startTime, endTime);
@@ -523,5 +546,116 @@ describe("SessionsList — row click", () => {
     const emitted = wrapper.emitted("sessionSelected");
     expect(emitted).toBeTruthy();
     expect(emitted![0][0]).toMatchObject({ sessionId: "sess-click" });
+  });
+});
+
+describe("SessionsList — search", () => {
+  // The list is server-paginated, so the search term has to travel to the
+  // backend as part of the `filter` predicate rather than filtering the loaded
+  // page client-side.
+  // The search field is an OSearchInput in OTable's #toolbar slot — the same
+  // shape the other list pages use.
+  const SEARCH_INPUT = "[data-test='sessions-list-toolbar'] input";
+
+  async function typeSearch(wrapper: any, term: string) {
+    const input = wrapper.find(SEARCH_INPUT);
+    expect(input.exists()).toBe(true);
+    await input.setValue(term);
+    // Clear OSearchInput's 350ms debounce before the re-fetch lands.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await flushPromises();
+  }
+
+  it("renders the search box in the table toolbar once streams exist", async () => {
+    const wrapper = await mountComponent();
+    const input = wrapper.find(SEARCH_INPUT);
+    expect(input.exists()).toBe(true);
+    expect(input.attributes("placeholder")).toBe("Search Session ID Or User");
+  });
+
+  it("sends the typed term to the backend as a session-id / user predicate", async () => {
+    mockRouteQuery = { type: "stream" };
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+    mockFetchPage.mockClear();
+
+    await typeSearch(wrapper, "acme");
+
+    expect(mockFetchPage).toHaveBeenCalledWith(
+      "test-stream",
+      1000,
+      2000,
+      0,
+      20,
+      "(str_match_ignore_case(gen_ai_conversation_id, 'acme')" +
+        " OR str_match_ignore_case(user_id, 'acme'))",
+    );
+  });
+
+  it("resets to the first page when the term changes", async () => {
+    mockRouteQuery = { type: "stream" };
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+    mockCurrentPage.value = 3;
+    mockFetchPage.mockClear();
+
+    await typeSearch(wrapper, "acme");
+
+    expect(mockCurrentPage.value).toBe(1);
+    // page arg is zero-indexed
+    expect(mockFetchPage.mock.calls[0][3]).toBe(0);
+  });
+
+  it("ANDs the search term with the selected agent scope", async () => {
+    const supportAgent = {
+      id: "agent-1",
+      name: "support-bot",
+      source_stream: "agent-stream",
+      source_stream_type: "traces",
+    };
+    mockListAgents.mockResolvedValue({ agents: [supportAgent] });
+    const wrapper = await mountComponent({ streamName: "", startTime: 1000, endTime: 2000 });
+    await refreshComponent(wrapper);
+    mockFetchPage.mockClear();
+
+    await typeSearch(wrapper, "acme");
+
+    expect(mockFetchPage.mock.calls[0][5]).toBe(
+      "(gen_ai_agent_id = 'agent-1') AND " +
+        "((str_match_ignore_case(gen_ai_conversation_id, 'acme')" +
+        " OR str_match_ignore_case(user_id, 'acme')))",
+    );
+  });
+
+  it("shows a no-matches empty state (not the instrument hero) while a term is active", async () => {
+    mockRouteQuery = { type: "stream" };
+    mockHasLoadedOnce.value = true;
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+
+    await typeSearch(wrapper, "nope");
+
+    expect(wrapper.find("[data-test='sessions-empty-no-search-results']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='sessions-empty']").exists()).toBe(false);
+    expect(wrapper.text()).toContain("No Matching Sessions");
+  });
+
+  it("clears the term and re-fetches unfiltered from the empty state action", async () => {
+    mockRouteQuery = { type: "stream" };
+    mockHasLoadedOnce.value = true;
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+    await typeSearch(wrapper, "nope");
+    mockFetchPage.mockClear();
+
+    const clearBtn = wrapper
+      .findAll(".o-button")
+      .find((btn: any) => btn.text().includes("Clear Search"));
+    expect(clearBtn).toBeTruthy();
+    await clearBtn!.trigger("click");
+    await flushPromises();
+
+    expect(mockSearchQuery.value).toBe("");
+    expect(mockFetchPage.mock.calls[0][5]).toBe("");
   });
 });
