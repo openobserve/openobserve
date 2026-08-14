@@ -839,3 +839,46 @@ export function resolveLadder(rung: PriorityRung, slots: OnCallSlot[]): Resolved
       };
     });
 }
+
+/**
+ * The dimensions an ownership rule is worth writing against.
+ *
+ * The server accepts any dimension, so this is a product judgement, not a wire
+ * fact. The test for membership: does the value survive a pod restart and a
+ * redeploy? `service` does; `k8s-pod-name` names one incarnation of one
+ * process, so a rule against it matches until the next restart and then
+ * nothing, forever. Evidence stays on the signal; identity goes in the rule.
+ */
+export const IDENTITY_DIMENSION_IDS = new Set([
+  "service",
+  "service-namespace",
+  "k8s-cluster",
+  "k8s-namespace",
+  "k8s-deployment",
+  "k8s-statefulset",
+  "k8s-daemonset",
+  "k8s-replicaset",
+  "k8s-job",
+  "k8s-container-name",
+  "host",
+  "environment",
+  "region",
+  "availability-zone",
+  "cloud-provider",
+  "cloud-platform",
+  "cloud-account",
+  "aws-ecs-cluster",
+  "faas-name",
+  "gcp-cloud-run",
+  "azure-resource-group",
+  "azure-cloud-role",
+  "db-system",
+  "db-name",
+]);
+
+/** The subset of a signal's dimensions a rule should be written against. */
+export function identityDimensions(dimensions: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(dimensions).filter(([name]) => IDENTITY_DIMENSION_IDS.has(name)),
+  );
+}

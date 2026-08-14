@@ -59,9 +59,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-subtle flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-2 last:border-b-0"
         :data-test="`oncall-unrouted-row-${signal.id}`"
       >
-        <span class="flex min-w-0 flex-col">
+        <span class="flex min-w-0 flex-col gap-0.5">
           <span class="text-text-heading truncate text-sm font-medium">{{ titleOf(signal) }}</span>
-          <code class="text-text-secondary truncate text-xs">{{ raw(pathOf(signal)) }}</code>
+          <!-- The dimensions a rule would be written against, and nothing
+               else. Pod names, node names and status codes are evidence about
+               ONE firing — showing them here made every row an unreadable dump
+               and implied the claim would pin to them. The full set stays a
+               hover away for whoever is identifying the alert. -->
+          <code class="text-text-secondary truncate text-xs" :title="pathOf(signal)">
+            {{ raw(routablePathOf(signal)) }}
+          </code>
         </span>
 
         <span class="text-text-secondary ms-auto shrink-0 text-xs">
@@ -98,9 +105,9 @@ import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import type { UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { dimensionsSentence } from "@/utils/oncall";
+import { dimensionsSentence, identityDimensions } from "@/utils/oncall";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     signals?: UnroutedSignal[];
     /** The team a claim would assign to — this screen's team. */
@@ -131,5 +138,13 @@ function titleOf(signal: UnroutedSignal): I18nText {
 /// written against.
 function pathOf(signal: UnroutedSignal): string {
   return dimensionsSentence(signal.dimensions) || signal.path;
+}
+
+/// Only the identity dimensions — the ones the claim will write into a rule.
+/// The row shows exactly what claiming does, and the full evidence stays a
+/// hover away for whoever is identifying the alert.
+function routablePathOf(signal: UnroutedSignal): string {
+  const kept = identityDimensions(signal.dimensions);
+  return Object.keys(kept).length ? dimensionsSentence(kept) : pathOf(signal);
 }
 </script>

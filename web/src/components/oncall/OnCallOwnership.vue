@@ -40,7 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rules="rules"
       :aliases="aliases"
       :loading="loadingRules"
-      @add="addOpen = true"
+      @add="openAdd"
+      @edit="openEdit"
       @remove="(rule) => (ruleToDelete = rule)"
     />
 
@@ -59,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          matching a dimension nothing ever emits. -->
     <ODialog
       :open="addOpen"
-      :title="t('oncall.addOwnershipRule')"
+      :title="editingRule ? t('oncall.editOwnershipRule') : t('oncall.addOwnershipRule')"
       :primary-label="t('oncall.saveRule')"
       :secondary-label="t('oncall.cancel')"
       :primary-disabled="!draftPairs.length"
@@ -170,6 +171,7 @@ import type {
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { identityDimensions } from "@/utils/oncall";
 import { normalizeDimensionValue, ownershipPath } from "@/utils/oncall";
 
 const props = defineProps<{ teamId: string; teams: OnCallTeam[] }>();
@@ -272,6 +274,26 @@ async function fetchSignals() {
   }
 }
 
+/// There is no update route for a rule, deliberately or not — so an edit is a
+/// create followed by a delete, in that order: if the create fails the old
+/// rule still stands, and the team never has a window with no rule at all.
+const editingRule = ref<OwnershipRuleStats | null>(null);
+
+function openAdd() {
+  editingRule.value = null;
+  draftPairs.value = [];
+  addOpen.value = true;
+}
+
+function openEdit(rule: OwnershipRuleStats) {
+  editingRule.value = rule;
+  draftPairs.value = Object.entries(rule.dimensions ?? {}).map(([name, value]) => ({
+    name,
+    value: String(value),
+  }));
+  addOpen.value = true;
+}
+
 async function createRule() {
   saving.value = true;
   try {
@@ -282,9 +304,17 @@ async function createRule() {
         dimensions: Object.fromEntries(draftPairs.value.map((pair) => [pair.name, pair.value])),
       },
     });
+    if (editingRule.value) {
+      await oncallService.deleteOwnershipRule({
+        org_identifier: orgId.value,
+        rule_id: editingRule.value.rule_id,
+      });
+    }
+    const edited = !!editingRule.value;
+    editingRule.value = null;
     draftPairs.value = [];
     addOpen.value = false;
-    toast({ variant: "success", message: t("oncall.ruleCreated") });
+    toast({ variant: "success", message: edited ? t("oncall.ruleUpdated") : t("oncall.ruleCreated") });
     await fetchRules();
   } catch (err) {
     failed(err, t("oncall.saveRuleFailed"));
@@ -351,12 +381,23 @@ async function sendTestPage(value: { team_id: string; priority: string }) {
 /// signal is not dismissed afterwards — once the path is owned it stops being
 /// unrouted on its own, and dismissing it as well would hide the evidence if
 /// the rule turns out to be wrong.
+/// Only the org's identity dimensions belong in a rule. A signal arrives
+/// carrying everything the alert knew — pod name, node, status code — and a
+/// rule written against those matches exactly one pod until it restarts, then
+/// nothing, forever. Routable facts route; evidence stays on the signal.
+function routableDimensions(signal: UnroutedSignal): Record<string, string> {
+  const kept = identityDimensions(signal.dimensions);
+  // A signal with no identity dimensions at all still deserves a rule: claim
+  // what it carried rather than writing one that matches everything.
+  return Object.keys(kept).length ? kept : signal.dimensions;
+}
+
 async function claimSignal(signal: UnroutedSignal) {
   claiming.value = true;
   try {
     await oncallService.createOwnershipRule({
       org_identifier: orgId.value,
-      data: { team_id: props.teamId, dimensions: signal.dimensions },
+      data: { team_id: props.teamId, dimensions: routableDimensions(signal) },
     });
     toast({ variant: "success", message: t("oncall.ruleCreated") });
     await Promise.all([fetchRules(), fetchSignals()]);
@@ -378,7 +419,7 @@ async function claimAll() {
     try {
       await oncallService.createOwnershipRule({
         org_identifier: orgId.value,
-        data: { team_id: props.teamId, dimensions: signal.dimensions },
+        data: { team_id: props.teamId, dimensions: routableDimensions(signal) },
       });
       claimed += 1;
     } catch {

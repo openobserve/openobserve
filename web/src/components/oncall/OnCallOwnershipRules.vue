@@ -83,14 +83,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-actions="{ row }">
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="delete-outline"
-          :aria-label="t('oncall.removeRule')"
-          :data-test="`oncall-ownership-delete-${row.rule_id}`"
-          @click.stop="emit('remove', row)"
-        />
+        <span class="flex items-center justify-end gap-1">
+          <OButton
+            variant="outline"
+            size="xs"
+            :data-test="`oncall-ownership-edit-${row.rule_id}`"
+            @click.stop="emit('edit', row)"
+          >
+            {{ t("oncall.edit") }}
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            icon-left="delete-outline"
+            :aria-label="t('oncall.removeRule')"
+            :data-test="`oncall-ownership-delete-${row.rule_id}`"
+            @click.stop="emit('remove', row)"
+          />
+        </span>
       </template>
 
       <template #empty>
@@ -133,6 +143,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: "add"): void;
+  (e: "edit", rule: OwnershipRuleStats): void;
   (e: "remove", rule: OwnershipRuleStats): void;
 }>();
 
@@ -192,7 +203,7 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     isAction: true,
     sortable: false,
     size: 70,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
 
