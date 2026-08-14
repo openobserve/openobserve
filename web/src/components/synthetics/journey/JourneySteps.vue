@@ -42,6 +42,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
 import { ACTION_ICONS, stepActionLabelKey } from "@/constants/synthetics";
@@ -74,6 +75,13 @@ const props = withDefaults(
      * button label alone cannot: the label is gone the moment recording starts.
      */
     anchorId?: string | null;
+    /**
+     * Whether the installed extension can restore the journey before recording.
+     *
+     * The row action promises a restore, so without it the button is offered and cannot
+     * be honoured. Defaults true, leaving the results-mode caller unaffected.
+     */
+    canRecordFrom?: boolean;
     /** When true, the step list is read-only (no drag, no selection). */
     readonly?: boolean;
     /** Whether drag reorder is enabled (editor mode, disabled during record/replay/filter). */
@@ -106,6 +114,7 @@ const props = withDefaults(
     nameKey: "name",
     detailKey: "detail",
     iconKey: "icon",
+    canRecordFrom: true,
     enableReorder: false,
     filterActive: false,
     locked: false,
@@ -274,6 +283,18 @@ function isFirstRow(row: TData): boolean {
   return props.data[0] === row;
 }
 
+/**
+ * What the record-before action does, or why it cannot.
+ *
+ * Only the capability is spelled out: a first-row disable is legible from where the row
+ * sits, but an extension too old to restore looks identical to one that works.
+ */
+const recordBeforeTooltip = computed(() =>
+  props.canRecordFrom
+    ? t("synthetics.journey.recordBeforeStepHint")
+    : t("synthetics.journey.recordBeforeNeedsNewerExtension"),
+);
+
 function handleRowReorder(data: TData[]) {
   emit("update:data", data);
 }
@@ -430,21 +451,28 @@ function handleUpdateExpanded(ids: string[]) {
         <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
 
         <!-- Disabled on the first row: inserting before it would leave the journey
-             starting with something other than a navigate, which validation rejects. -->
-        <OButton
-          v-if="!readonly"
-          variant="ghost"
-          size="xs"
-          :aria-label="t('synthetics.journey.recordBeforeStep')"
-          :title="t('synthetics.journey.recordBeforeStepHint')"
-          data-test="synthetics-journey-step-record-before-btn"
-          :disabled="isLocked || isFirstRow(row)"
-          @click="emit('record-before', row)"
-        >
-          <!-- The same icon as the toolbar's Record button: this row action starts a
-               recording too, just anchored, so the two must read as one action. -->
-          <OIcon name="smart-display" size="sm" aria-hidden="true" />
-        </OButton>
+             starting with something other than a navigate, which validation rejects.
+             Disabled without `canRecordFrom` because the action promises a restore the
+             installed extension cannot perform. -->
+        <OTooltip v-if="!readonly" :content="recordBeforeTooltip">
+          <!-- The span is the hover target, not the button: a disabled control
+               dispatches no pointer events, so a tooltip bound straight to it would
+               stay shut in the one state that has something to explain. -->
+          <span class="inline-flex">
+            <OButton
+              variant="ghost"
+              size="xs"
+              :aria-label="t('synthetics.journey.recordBeforeStep')"
+              data-test="synthetics-journey-step-record-before-btn"
+              :disabled="isLocked || isFirstRow(row) || !canRecordFrom"
+              @click="emit('record-before', row)"
+            >
+              <!-- The same icon as the toolbar's Record button: this row action starts a
+                   recording too, just anchored, so the two must read as one action. -->
+              <OIcon name="smart-display" size="sm" aria-hidden="true" />
+            </OButton>
+          </span>
+        </OTooltip>
 
         <OButton
           v-if="!readonly"

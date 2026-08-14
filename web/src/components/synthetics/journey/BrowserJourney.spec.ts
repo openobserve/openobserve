@@ -1546,6 +1546,41 @@ describe("BrowserJourney restore-then-record", () => {
     expect(lastCommand()?.action).toBe("startRecording");
   });
 
+  // The fallback records on a browser that knows nothing about the prefix, so those
+  // steps cannot be filed where a restore would have put them. The row action is
+  // disabled without the capability, which is what the author sees; this is the
+  // guarantee behind it, so a future caller cannot reintroduce the mid-journey splice.
+  it("should append, not insert, when an anchored record falls back to plain recording", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: false });
+
+    await wrapper.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[2]);
+    await settleProbeDelay();
+
+    expect(lastCommand()?.action).toBe("startRecording");
+
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [{ id: "n1", action: "click", selector: "#consent", name: "Accept cookies" }],
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const emitted = wrapper.emitted("update:modelValue");
+    const next = emitted![emitted!.length - 1][0] as any[];
+    expect(next).toHaveLength(4);
+    expect(next[0].id).toBe("s1");
+    expect(next[1].id).toBe("s2");
+    expect(next[2].id).toBe("s3");
+    expect(next[3].name).toBe("Accept cookies");
+  });
+
   // P2 commit. Anchored at the end, the recorded steps land after everything.
   it("should append recorded steps when the anchor is the end of the journey", async () => {
     wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });

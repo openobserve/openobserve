@@ -616,6 +616,9 @@ function startRecording() {
   const prefix = props.modelValue.slice(0, insertAt);
 
   if (prefix.length === 0 || !props.canRecordFrom) {
+    // Nothing was restored, so the capture starts on a browser that knows nothing about
+    // the prefix — steps from it cannot be filed at the anchor.
+    anchorStepId.value = null;
     recorder.startRecording(props.startUrl ?? "", props.testIdAttr).catch((err) => {
       recorder.error.value = err instanceof Error ? err.message : String(err);
     });
@@ -679,6 +682,14 @@ function currentInsertAt(): number {
   const idx = props.modelValue.findIndex((s) => s.id === anchorStepId.value);
   return idx < 0 ? props.modelValue.length : idx;
 }
+
+/**
+ * Whether the row action is offered at all.
+ *
+ * Not `canRecordFrom` itself: with no extension installed the click still has somewhere
+ * useful to go — the setup dialog — so only "installed but too old" disables it.
+ */
+const canOfferRecordBefore = computed(() => !props.extensionReady || !!props.canRecordFrom);
 
 /**
  * Anchor on `row` and start recording — "Record before this step".
@@ -1680,6 +1691,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       @delete="handleDelete"
       @duplicate="handleDuplicate"
       :anchor-id="anchorStepId"
+      :can-record-from="canOfferRecordBefore"
       @record-before="onRecordBefore"
       @insert-below="handleInsertBelow"
       @retry-replay="emit('replay')"

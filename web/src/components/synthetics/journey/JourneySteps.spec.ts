@@ -17,6 +17,11 @@ import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import type { BrowserStep } from "@/types/synthetics";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+// The setup file installs these as the real messages, so a tooltip arrives resolved.
+// Asserting against the file rather than a copy-pasted sentence keeps a wording change
+// from failing a test about behaviour.
+import enUS from "@/locales/languages/en-US.json";
 
 // Set up i18n so OTable sub-components can use useI18n()
 const i18n = createI18n({
@@ -293,6 +298,75 @@ describe("JourneySteps", () => {
       // second row is the one that proves the lock is not what disabled them.
       const rows = wrapper.findAll('[data-test="synthetics-journey-step-insert-btn"]');
       expect(rows[0].attributes("disabled")).toBeUndefined();
+    });
+  });
+
+  // ── Extension too old to restore ───────────────────────────────────
+  //
+  // The action promises a restore, so an extension that cannot perform one makes it
+  // unhonourable rather than merely slower: the capture would start on a browser that
+  // knows nothing about the prefix, and those steps cannot be filed at the anchor.
+
+  describe("canRecordFrom", () => {
+    /** The second row — the first carries its own disable, so it proves nothing here. */
+    function secondRowRecordBefore(w: VueWrapper) {
+      return w.findAll('[data-test="synthetics-journey-step-record-before-btn"]')[1];
+    }
+
+    function mountWithCapability(canRecordFrom: boolean) {
+      return mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor", canRecordFrom },
+        global: { stubs: STUBS },
+      }) as VueWrapper;
+    }
+
+    it("should disable record-before when the extension cannot restore", async () => {
+      wrapper = mountWithCapability(false);
+      await flushPromises();
+
+      expect(secondRowRecordBefore(wrapper).attributes("disabled")).toBeDefined();
+    });
+
+    it("should leave record-before available when the extension can restore", async () => {
+      wrapper = mountWithCapability(true);
+      await flushPromises();
+
+      expect(secondRowRecordBefore(wrapper).attributes("disabled")).toBeUndefined();
+    });
+
+    // The results-mode caller never passes the prop, and its rows are readonly anyway —
+    // defaulting to false would disable an action nobody had opted out of.
+    it("should treat the capability as present when the prop is omitted", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor" },
+        global: { stubs: STUBS },
+      }) as VueWrapper;
+      await flushPromises();
+
+      expect(secondRowRecordBefore(wrapper).attributes("disabled")).toBeUndefined();
+    });
+
+    /** The tooltip bodies on screen. Read as props: the bubble only renders once open. */
+    function tooltipContents(w: VueWrapper) {
+      return w.findAllComponents(OTooltip).map((c) => c.props("content"));
+    }
+
+    // Disabled, the button cannot say why on its own — a disabled control dispatches no
+    // pointer events, so the reason has to hang off the wrapper around it.
+    it("should explain the outdated extension rather than repeat the action hint", async () => {
+      wrapper = mountWithCapability(false);
+      await flushPromises();
+
+      const contents = tooltipContents(wrapper);
+      expect(contents).toContain(enUS.synthetics.journey.recordBeforeNeedsNewerExtension);
+      expect(contents).not.toContain(enUS.synthetics.journey.recordBeforeStepHint);
+    });
+
+    it("should describe what the action does when it can be honoured", async () => {
+      wrapper = mountWithCapability(true);
+      await flushPromises();
+
+      expect(tooltipContents(wrapper)).toContain(enUS.synthetics.journey.recordBeforeStepHint);
     });
   });
 

@@ -11412,6 +11412,7 @@
       "recordingHere": "Recording here",
       "recordBeforeStep": "Record before this step",
       "recordBeforeStepHint": "Replay the journey up to this point, then record new steps before it.",
+      "recordBeforeNeedsNewerExtension": "Update the recorder extension to record from a specific step.",
       "insertStepBelow": "Insert step below",
       "journeyHeading": "Journey",
       "noSteps": "No steps yet",
