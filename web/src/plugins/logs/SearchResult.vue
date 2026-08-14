@@ -23,27 +23,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b"
       >
-        <!-- Field panel toggle — same style as add-panel config sidebar -->
+        <!-- Field panel toggle — same style as add-panel config sidebar.
+             < md the field list is a drawer, so this button opens it instead
+             of collapsing an (absent) side pane. -->
         <OButton
           variant="outline"
           size="icon-xs-sq"
           class="ml-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
-          @click="toggleFieldList"
+          @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
         >
           <OIcon
             :name="
-              searchObj.meta.showFields
-                ? 'keyboard-double-arrow-left'
-                : 'keyboard-double-arrow-right'
+              isMobile
+                ? 'menu'
+                : searchObj.meta.showFields
+                  ? 'keyboard-double-arrow-left'
+                  : 'keyboard-double-arrow-right'
             "
             size="sm"
           />
           <OTooltip
             :content="
-              searchObj.meta.showFields
-                ? t('logs.searchResult.collapseFields')
-                : t('logs.searchResult.openFields')
+              isMobile
+                ? t('search.showFields')
+                : searchObj.meta.showFields
+                  ? t('logs.searchResult.collapseFields')
+                  : t('logs.searchResult.openFields')
             "
             side="bottom"
             shortcut-id="logsToggleSidebar"
@@ -868,6 +874,7 @@ import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   buildPatternVolumeContext,
   fetchWindowTotal,
@@ -925,6 +932,7 @@ export default defineComponent({
     "sendToAiChat",
     "run-query",
     "jump-to-stream-data",
+    "open-mobile-fields",
   ],
   props: {
     expandedLogs: {
@@ -1132,6 +1140,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
+    const { isMobile } = useBreakpoint();
     const searchListContainer = ref<HTMLElement | null>(null);
 
     // Responsive: observe the outer container (reacts to splitter + window resize)
@@ -2342,6 +2351,7 @@ export default defineComponent({
     return {
       raw,
       isDark,
+      isMobile,
       t,
       store,
       config,

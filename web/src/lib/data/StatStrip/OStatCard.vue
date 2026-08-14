@@ -150,7 +150,7 @@ const trendClass = computed(() =>
              the squeeze is absorbed by the label below, which stays readable
              truncated because the tone icon already identifies the metric. -->
         <span
-          class="shrink-0 text-2xl leading-none font-semibold whitespace-nowrap"
+          class="shrink-0 text-2xl leading-none font-semibold whitespace-nowrap max-md:text-lg"
           :class="isMuted ? 'text-text-muted' : tc.value"
         >
           <slot name="value">{{ displayValue }}</slot>
@@ -164,7 +164,7 @@ const trendClass = computed(() =>
       </div>
       <span
         v-if="icon || slots.icon"
-        class="rounded-default grid h-7 w-7 shrink-0 place-items-center"
+        class="rounded-default grid h-7 w-7 shrink-0 place-items-center max-md:h-6 max-md:w-6"
         :class="tc.chip"
       >
         <slot name="icon">

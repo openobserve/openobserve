@@ -163,8 +163,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Main region — a filled resources rail beside the two status charts, so
            Functions/Dashboards live somewhere purposeful and the vertical space
            is actually used. Rail carries counts + one-click access to every area. -->
+      <!-- < lg the three columns stack; the region must scroll then, or the
+           fixed-height grid compresses its auto rows and the cards overlap. -->
       <div
-        class="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]"
+        class="grid min-h-0 flex-1 grid-cols-1 gap-3 max-lg:auto-rows-min max-lg:overflow-y-auto lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]"
       >
         <!-- Resources rail -->
         <aside

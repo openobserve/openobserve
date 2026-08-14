@@ -1049,7 +1049,7 @@ defineExpose({
       <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
-        class="px-page-edge border-table-row-divider flex items-center gap-2 border-b py-2"
+        class="px-page-edge border-table-row-divider flex items-center gap-2 border-b py-2 max-md:flex-wrap max-md:gap-y-1.5"
         data-test="o2-table-toolbar"
       >
         <slot name="toolbar" />

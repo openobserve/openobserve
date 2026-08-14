@@ -16,8 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full">
-    <div class="w-25 p-0">
-      <ul class="m-0 flex list-none flex-wrap p-0">
+    <!-- < md the two-column grid spreads into a wrapping icon grid across
+         the full width — every chart type stays visible without a scroller. -->
+    <div class="w-25 p-0 max-md:w-full">
+      <ul class="m-0 flex list-none flex-wrap p-0 max-md:justify-center">
         <li
           class="w-12.5"
           v-for="(item, index) in ChartsArray"

@@ -65,7 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
     <!-- Subnav row — same shape as the Agent Graph page: page-scope controls on
          the left, view-type + layout pushed to the right corner with ml-auto. -->
     <template #subnav>
-      <div class="px-page-edge flex items-center gap-2 py-1.5">
+      <!-- < md the row wraps: scope+search line, then view controls. -->
+      <div class="px-page-edge flex items-center gap-2 py-1.5 max-md:flex-wrap max-md:gap-y-1">
         <!-- Stream scope + search on the left. Both are hidden inside the graph
              (`hide-stream-selector` / `hide-search-input`) so each renders once,
              here on this row. -->
@@ -83,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         <div data-test="service-graph-search-input" class="flex-shrink-0">
           <OSearchInput
             v-model="searchText"
-            class="w-56!"
+            class="w-56! max-md:w-40!"
             :placeholder="t('traces.serviceGraph.searchPlaceholder')"
             :debounce="300"
             clearable

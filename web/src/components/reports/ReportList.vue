@@ -35,9 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
-      <div data-test="report-list-splitter" class="report-list-table flex min-h-0 flex-1">
-        <!-- Left: folder list -->
-        <div class="w-rail h-full shrink-0">
+      <div
+        data-test="report-list-splitter"
+        class="report-list-table flex min-h-0 flex-1 max-md:flex-col"
+      >
+        <!-- Left: folder list (< md: stacks above the table, bounded height) -->
+        <div
+          class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:max-h-52 max-md:w-full max-md:border-b"
+        >
           <div class="h-full">
             <FolderList type="reports" @update:activeFolderId="updateActiveFolderId" />
           </div>
@@ -65,8 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               table-id="reports-report-list"
             >
               <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
+              <!-- < md the toolbar wraps: tabs row, then a full-width search row. -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2">
+                <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
                   <div class="app-tabs-container">
                     <AppTabs
                       class="tabs-selection-container"
@@ -80,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     />
                   </div>
-                  <div class="min-w-0 flex-1">
+                  <div class="min-w-0 flex-1 max-md:basis-full">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="

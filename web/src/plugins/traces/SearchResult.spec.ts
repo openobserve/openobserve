@@ -358,6 +358,7 @@ describe("SearchResult", () => {
         "error-only-toggled",
         "ask-ai",
         "send-to-ai-chat",
+        "open-mobile-fields",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);

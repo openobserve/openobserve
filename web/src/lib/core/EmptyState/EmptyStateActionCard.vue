@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md focus-visible:ring-[0.125rem]"
+    class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md focus-visible:ring-[0.125rem] max-md:max-w-full max-md:basis-full"
   >
     <span
       class="rounded-default bg-tabs-active-bg text-tabs-active-text group-hover:bg-accent group-hover:text-text-inverse relative inline-flex h-10 w-10 shrink-0 items-center justify-center transition-colors"

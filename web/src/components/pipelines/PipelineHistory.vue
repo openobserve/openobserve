@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onPipelineSelected"
         :placeholder="t('pipeline.searchHistory')"
         data-test="pipeline-history-search-select"
-        class="min-w-62.5"
+        class="min-w-62.5 max-md:min-w-0"
         clearable
       >
         <template #empty>

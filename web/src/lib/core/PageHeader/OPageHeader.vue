@@ -37,7 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Tailwind utilities (unlayered CSS wins over layered utilities in v4).
 
   Props: title | titleDataTest | subtitle | icon | back | tabsBelow
-  Slots: title-prefix | title | subtitle | actions | tabs | back
+  Slots: title-prefix | title | subtitle | actions | actions-overflow | tabs | back
+
+  #actions-overflow — secondary actions. Inline on desktop; < md they collapse
+  behind a single "More" button so the primary ones keep one row.
 -->
 <template>
   <!-- No overflow-hidden here: it clipped the focus ring of the right-most
@@ -50,13 +53,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        61px on some pages and 60px on others. -->
   <header
     class="app-page-header px-page-edge border-border-default shrink-0 border-b"
-    :class="[tabsBelow ? 'flex flex-col' : 'flex h-15 items-center justify-between gap-4']"
+    :class="[
+      tabsBelow
+        ? 'flex flex-col'
+        : // < md the fixed 60px row relaxes: actions may wrap under the title
+          // instead of crushing it to zero width.
+          'flex items-center justify-between gap-x-4 gap-y-1 max-md:min-h-15 max-md:flex-wrap max-md:py-1.5 md:h-15',
+    ]"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
          (display:contents) so the title block + actions stay direct children of
          the header — preserving the original single-row inline-tabs layout. -->
-    <div :class="tabsBelow ? 'flex h-15 items-center justify-between gap-4' : 'contents'">
-      <div class="flex h-full min-w-0 flex-1 items-center gap-3.25">
+    <div
+      :class="
+        tabsBelow
+          ? 'flex items-center justify-between gap-x-4 gap-y-1 max-md:min-h-15 max-md:flex-wrap max-md:py-1.5 md:h-15'
+          : 'contents'
+      "
+    >
+      <!-- max-md:min-w-24 is the floor that decides the mobile header's shape:
+           actions share this row while the title keeps 6rem (it truncates below
+           that), and only wrap once even that can't hold — so a page that keeps
+           its toolbar compact, with the rest behind #actions-overflow, stays on
+           one line. Without a floor min-w-0 lets this shrink towards nothing, so
+           the actions never wrap and overlap the title instead. -->
+      <div class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-md:min-w-24">
         <slot name="title-prefix" />
 
         <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
@@ -89,9 +110,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              An interactive title (titleOverflow="visible") holds a real name
              that can be long, so it may instead consume the free space in the
              row and only ellipsise once genuinely out of room. -->
+        <!-- max-md:shrink: a long subtitle must not push the block past the
+             viewport on phones — it truncates instead (desktop keeps shrink-0
+             so inline tabs can't squeeze a short title). -->
         <div
           class="flex min-w-0 flex-col justify-center"
-          :class="titleOverflow === 'visible' ? '' : 'shrink-0'"
+          :class="titleOverflow === 'visible' ? '' : 'shrink-0 max-md:shrink'"
         >
           <h1
             class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
@@ -125,13 +149,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Module tabs (Level-2 nav), inline to the right of the title.
            Two-row mode renders them as a full-width strip below instead. -->
-        <div v-if="hasTabs && !tabsBelow" class="flex h-full min-w-0 flex-1 items-center">
+        <div
+          v-if="hasTabs && !tabsBelow"
+          class="flex h-full min-w-0 flex-1 items-center max-md:flex-wrap"
+        >
           <slot name="tabs" />
         </div>
       </div>
 
-      <div v-if="hasActions" class="flex shrink-0 items-center gap-2">
+      <!-- < md the actions stay on the title's row while it still has its 8rem
+           floor (above), and wrap to their own row only when it doesn't — so a
+           short title with one button keeps a single-row header instead of
+           always spending a second row on a button beside empty space. -->
+      <!-- max-w-full + shrink are what let the wrap above actually happen: with
+           shrink-0 and no max-width a five-button group just runs off the screen
+           instead of wrapping within its own row. -->
+      <div
+        v-if="hasActions || hasActionsOverflow"
+        class="flex shrink-0 items-center gap-2 max-md:ml-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
+      >
         <slot name="actions" />
+
+        <!-- Secondary actions. Inline on desktop; < md they collapse behind one
+             "More" button so a long toolbar keeps the primary actions on a
+             single row instead of wrapping into a block of icons. -->
+        <template v-if="hasActionsOverflow">
+          <slot v-if="!isMobile" name="actions-overflow" />
+          <ODropdown v-else side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                data-test="app-page-header-more-btn"
+                :aria-label="t('common.more')"
+              >
+                <OIcon name="more-vert" size="sm" />
+              </OButton>
+            </template>
+            <div class="flex max-w-56 flex-wrap gap-1 p-1.5">
+              <slot name="actions-overflow" />
+            </div>
+          </ODropdown>
+        </template>
       </div>
     </div>
 
@@ -148,11 +207,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { raw, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { Comment, Text, computed, useSlots } from "vue";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
@@ -194,6 +256,9 @@ const props = withDefaults(
 
 const router = useRouter();
 const slots = useSlots();
+const { t } = useI18nTyped();
+// < md the secondary actions collapse behind a "More" button (see template).
+const { isMobile } = useBreakpoint();
 
 // A slot passed with an always-present <template> but a falsy inner v-if still
 // yields a comment placeholder node — so checking `$slots.x` is truthy even
@@ -212,6 +277,7 @@ const slotHasContent = (name: string): boolean => {
 const hasSubtitle = computed(() => Boolean(props.subtitle) || slotHasContent("subtitle"));
 const hasTabs = computed(() => slotHasContent("tabs"));
 const hasActions = computed(() => slotHasContent("actions"));
+const hasActionsOverflow = computed(() => slotHasContent("actions-overflow"));
 const hasBack = computed(() => Boolean(props.back) || slotHasContent("back"));
 const backLabel = computed(() => (props.back?.label ? `Back to ${props.back.label}` : "Back"));
 

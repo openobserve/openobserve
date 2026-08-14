@@ -108,15 +108,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Note: Splitter max-height to be dynamically calculated with JS -->
               <OSplitter
                 v-model="searchObj.config.splitterModel"
-                :limits="searchObj.config.splitterLimit"
+                :limits="isMobile ? [0, 0] : searchObj.config.splitterLimit"
                 separatorClass="w-px"
                 @update:model-value="onSplitterUpdate"
                 class="h-full w-full"
               >
                 <template #before>
                   <div class="border-border-default bg-surface-panel h-full border-r">
+                    <!-- < md the field list moves into a drawer (see below). -->
                     <IndexList
-                      v-show="searchObj.meta.showFields"
+                      v-show="searchObj.meta.showFields && !isMobile"
                       ref="indexListRef"
                       :field-list="searchObj.data.stream.selectedStreamFields"
                       :active-include-field-values="activeIncludeFilterValues"
@@ -263,6 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error-only-toggled="onErrorOnlyToggled"
                         @ask-ai="onAskAiTracing"
                         @send-to-ai-chat="sendToAiChat"
+                        @open-mobile-fields="mobileFieldsOpen = true"
                       />
                     </div>
                   </div>
@@ -273,6 +275,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
+
+    <!-- < md: the field list, hosted in a left drawer instead of a side pane. -->
+    <ODrawer
+      v-if="isMobile"
+      v-model:open="mobileFieldsOpen"
+      side="left"
+      size="sm"
+      bleed
+      seamless
+      data-test="traces-mobile-fields-drawer"
+    >
+      <div class="flex h-full flex-col overflow-hidden pt-2.5">
+        <IndexList
+          :field-list="searchObj.data.stream.selectedStreamFields"
+          :active-include-field-values="activeIncludeFilterValues"
+          :active-exclude-field-values="activeExcludeFilterValues"
+          data-test="traces-search-index-list-mobile"
+          class="h-full"
+          :key="searchObj.data.stream.streamLists"
+          @update:changeStream="onChangeStream"
+          @update:selectedFields="updateFieldVisibility"
+        />
+      </div>
+    </ODrawer>
 
     <ODialog
       v-model:open="streamChangeDialog.show"
@@ -341,6 +367,8 @@ import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -405,6 +433,22 @@ const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
 const fieldValues = ref({});
+
+// ── Mobile (< md) field-list handling — same recipe as the Logs page: the
+// side pane is locked shut and the same IndexList opens as a left drawer.
+const { isMobile } = useBreakpoint();
+const mobileFieldsOpen = ref(false);
+watch(
+  isMobile,
+  (mobile) => {
+    if (mobile) {
+      searchObj.config.splitterModel = 0;
+    } else if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
+      searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
+    }
+  },
+  { immediate: true },
+);
 const { showErrorNotification } = useNotifications();
 const disableMoreErrorDetails = ref(false);
 const toggleErrorDetails = () => {

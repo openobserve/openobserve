@@ -30,9 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="create-report-page flex min-h-0 w-full flex-1 flex-col"
     >
       <div class="bg-card-glass-bg flex min-h-0 flex-1 overflow-auto">
-        <div ref="addAlertFormRef" class="my-3 px-4" style="width: 64rem">
+        <!-- w-256 (64rem) capped to the viewport — the fixed inline width made
+             the whole form overflow on phones. The arbitrary variant caps the
+             form's many inline `style="width: …"` fields the same way (< md);
+             max-width beats an inline width without touching each field. -->
+        <div
+          ref="addAlertFormRef"
+          class="my-3 w-256 max-w-full px-4 max-md:[&_[style*=width]]:max-w-full"
+        >
           <OForm :id="formId" :form="form" class="create-report-form">
-            <div class="flex items-start gap-4 px-2 pt-3">
+            <div class="flex items-start gap-4 px-2 pt-3 max-md:flex-wrap">
               <div data-test="add-report-name-input" class="o2-input">
                 <OFormInput
                   data-test="add-report-name-input"
@@ -107,10 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- items-start (not items-center): keeps all selects
                          top-aligned when a validation error appears under one and
                          grows its cell taller. -->
-                    <div class="flex items-start justify-start">
+                    <div class="flex items-start justify-start max-md:flex-col max-md:gap-2">
                       <div
                         data-test="add-report-folder-select"
-                        class="o2-input mr-2 pt-0"
+                        class="o2-input mr-2 pt-0 max-md:w-full!"
                         style="width: 30%"
                       >
                         <OFormSelect
@@ -121,12 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           required
                           :loading="isFetchingFolders"
                           @update:model-value="(v: any) => onFolderSelection(v, index)"
-                          style="min-width: 15.625rem !important; width: 100% !important"
+                          class="max-md:min-w-0!"
+                          style="min-width: 15.625rem; width: 100% !important"
                         />
                       </div>
                       <div
                         data-test="add-report-dashboard-select"
-                        class="o2-input mr-2 pt-0"
+                        class="o2-input mr-2 pt-0 max-md:w-full!"
                         style="width: 30%"
                       >
                         <OFormSelect
@@ -137,12 +145,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
                           @update:model-value="(v: any) => onDashboardSelection(v, index)"
-                          style="min-width: 15.625rem !important; width: 100% !important"
+                          class="max-md:min-w-0!"
+                          style="min-width: 15.625rem; width: 100% !important"
                         />
                       </div>
                       <div
                         data-test="add-report-tab-select"
-                        class="o2-input pt-0"
+                        class="o2-input pt-0 max-md:w-full!"
                         style="width: 30%"
                       >
                         <OFormSelect
@@ -152,7 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('reports.dashboardTab')"
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
-                          style="min-width: 15.625rem !important; width: 100% !important"
+                          class="max-md:min-w-0!"
+                          style="min-width: 15.625rem; width: 100% !important"
                         />
                       </div>
                     </div>
@@ -181,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("reports.reportFormat") }}
                       </div>
-                      <div class="flex gap-3">
+                      <div class="flex gap-3 max-md:flex-col">
                         <!-- Report Type -->
                         <div class="o2-input col-auto" data-test="add-report-type-select">
                           <OFormSelect

@@ -65,10 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTab>
       </OTabs>
     </template>
-    <!-- CONTENT AREA: sidebar + main -->
-    <div class="flex flex-1 overflow-hidden">
+    <!-- CONTENT AREA: sidebar + main (< md: sidebar stacks above main) -->
+    <div class="flex flex-1 overflow-hidden max-md:flex-col">
       <!-- LEFT SIDEBAR: folder navigation (locations are org-level, no folders) -->
-      <div v-if="activeSection === 'checks'" class="w-rail shrink-0 overflow-y-auto">
+      <div
+        v-if="activeSection === 'checks'"
+        class="w-rail max-md:border-border-default shrink-0 overflow-y-auto max-md:h-auto max-md:max-h-52 max-md:w-full max-md:border-b"
+      >
         <FolderList
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"

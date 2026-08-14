@@ -522,7 +522,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           size="icon-xs-sq"
           :data-test="`o2-table-cell-copy-${cell.column.id}`"
           :data-copied="copied ? 'true' : undefined"
-          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
+          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 max-md:opacity-100"
           :class="align === 'right' ? 'order-first mr-1' : 'ml-1'"
           :title="copied ? t('common.copiedExclaim') : t('common.copy')"
           @click="handleCopy"

@@ -48,7 +48,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div class="flex min-h-0 w-full flex-1">
       <div class="flex min-h-0 w-full min-w-0">
-        <OSplitter v-model="splitterModel" class="h-full min-h-0 w-full min-w-0">
+        <!-- < md the form/preview panes stack: side by side leaves the upload pane
+             ~224px and clips its controls. -->
+        <OSplitter
+          v-model="splitterModel"
+          :horizontal="isMobile"
+          class="h-full min-h-0 w-full min-w-0"
+        >
           <template #before>
             <OForm id="import-dashboard-form" :form="form" class="flex h-full min-h-0 flex-col">
               <div class="flex h-full min-h-0 w-full flex-col">
@@ -272,6 +278,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDashboard.schema";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 export default defineComponent({
@@ -310,6 +317,7 @@ export default defineComponent({
     const activeTab = ref("import_json_file");
 
     const dashboardErrorsToDisplay = ref([]);
+    const { isMobile } = useBreakpoint();
     const splitterModel = ref(60);
 
     // holds the value of the loading for any of the import type
@@ -844,6 +852,7 @@ export default defineComponent({
       activeTab,
       dashboardErrorsToDisplay,
       splitterModel,
+      isMobile,
       updateActiveTab,
       queryEditorPlaceholderFlag,
       importDashboard,

@@ -212,13 +212,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Body: left rail (entity-type filter) + table — mirrors the Dashboards
          folder-rail + table layout (panel bg + vertical separator, 230px). -->
-    <div class="flex min-h-0 flex-1">
+    <!-- < md: entity-filter rail stacks above the table. -->
+    <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Left rail: the entity-type filter. Panel background + right border
            match FolderList.vue so the rail reads like the app's other left
            rails. The stream selector lives in the top toolbar alongside the
            search. -->
       <div
-        class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-2 border-r px-1.5 py-2"
+        class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-2 border-r px-1.5 py-2 max-md:h-auto max-md:w-full max-md:flex-row max-md:flex-wrap max-md:border-r-0 max-md:border-b"
       >
         <!-- Entity-type filter: All / Services / Datastores / Queues /
              External / RPC. A vertical nav rail — same OTabs pattern as the

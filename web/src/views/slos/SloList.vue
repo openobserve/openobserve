@@ -70,7 +70,7 @@
       @row-click="onRowClick"
     >
       <template #toolbar>
-        <div class="flex w-full items-center gap-2">
+        <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1.5">
           <OButton
             v-if="selectedIds.length"
             variant="outline"

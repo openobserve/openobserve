@@ -26,23 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="shield-alert-outline"
     >
       <template #actions>
-        <!-- Import button -->
-        <OButton
-          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
-          variant="outline"
-          size="sm"
-          @click="importAlert"
-          data-test="alert-import"
-          icon-left="upload-file"
-        >
-          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-          <OTooltip
-            v-if="isCompactToolbar"
-            :content="t('dashboard.import')"
-            side="bottom"
-            shortcut-id="alertsImport"
-          />
-        </OButton>
         <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
         <OButton
           data-test="alert-list-add-alert-btn"
@@ -66,9 +49,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
 
-      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1">
-        <!-- Left: FolderList -->
-        <div class="w-rail h-full shrink-0">
+      <!-- Secondary: inline on desktop, behind "More" < md. -->
+      <template #actions-overflow>
+        <!-- Import button -->
+        <OButton
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="outline"
+          size="sm"
+          @click="importAlert"
+          data-test="alert-import"
+          icon-left="upload-file"
+        >
+          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
+          <OTooltip
+            v-if="isCompactToolbar"
+            :content="t('dashboard.import')"
+            side="bottom"
+            shortcut-id="alertsImport"
+          />
+        </OButton>
+      </template>
+
+      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
+        <!-- Left: FolderList (< md: stacks above the table, bounded height) -->
+        <div
+          class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:max-h-52 max-md:w-full max-md:border-b"
+        >
           <div class="h-full">
             <FolderList type="alerts" @update:activeFolderId="updateActiveFolderId" />
           </div>
@@ -119,9 +125,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
 
-              <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
+              <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh.
+                   < md it wraps: type filter row, then the search row. -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2">
+                <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
                   <OToggleGroup
                     :model-value="activeTab"
                     @update:model-value="
@@ -155,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("alerts.anomalyDetection") }}
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1">
+                  <div class="min-w-0 flex-1 max-md:basis-full">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
