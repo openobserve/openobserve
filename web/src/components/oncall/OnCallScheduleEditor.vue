@@ -103,60 +103,104 @@
     <!-- Editing gets room and a preview rather than expanding the page. -->
     <ODrawer
       v-model:open="editing"
-      :title="t('oncall.rotationTitle')"
+      :title="isNew ? t('oncall.rotationAddTitle') : t('oncall.rotationTitle')"
+      :subtitle="t('oncall.rotationDrawerHint')"
       data-test="oncall-rotation-drawer"
     >
-      <div v-if="active" class="flex flex-col gap-5">
-        <OInput
-          v-model="active.name"
-          :label="t('oncall.rotationName')"
-          data-test="oncall-schedule-name"
-        />
+      <!-- Three questions in the order somebody answers them — what is it, who
+           is in it, when does it turn over — then what that produces. A flat
+           stack of four controls made the last two read as afterthoughts. -->
+      <div v-if="active" class="flex flex-col gap-6">
+        <section class="flex flex-col gap-4">
+          <OText variant="section">{{ t("oncall.rotationSectionWhat") }}</OText>
 
-        <OSelect
-          :model-value="active.members"
-          multiple
-          searchable
-          :label="t('oncall.rotationOrder')"
-          :help-text="t('oncall.rotationOrderHint')"
-          :placeholder="t('oncall.rotationPickPlaceholder')"
-          :options="memberOptions"
-          data-test="oncall-schedule-members"
-          @update:model-value="(v: unknown) => setMembers(active as Rotation, v as string[])"
-        />
+          <OInput
+            v-model="active.name"
+            :label="t('oncall.rotationName')"
+            data-test="oncall-schedule-name"
+          />
 
-        <OSelect
-          v-model="active.shift_micros"
-          :label="t('oncall.shiftLength')"
-          :options="shiftOptions"
-          data-test="oncall-schedule-shift"
-        />
+          <!-- The field that makes a secondary a separate pool rather than
+               next week's primary. Without it a team can staff one and no rung
+               can ever name it. -->
+          <OSelect
+            :model-value="active.slot ?? DEFAULT_SLOT"
+            :label="t('oncall.rotationSlot')"
+            :help-text="t('oncall.rotationSlotHint')"
+            :options="slotOptions"
+            data-test="oncall-schedule-slot"
+            @update:model-value="(v: unknown) => setSlot(active as Rotation, String(v))"
+          />
+        </section>
 
-        <!-- Without this the anchor was silently "now", so a rotation created
-             at 14:32 handed over at 14:32 forever. -->
-        <OInput
-          :model-value="handoverInput(active)"
-          type="datetime-local"
-          :label="t('oncall.firstHandover')"
-          data-test="oncall-schedule-handover"
-          @update:model-value="(v: string | number) => setAnchor(active as Rotation, String(v))"
-        />
+        <section class="flex flex-col gap-4">
+          <OText variant="section">{{ t("oncall.rotationSectionWho") }}</OText>
 
-        <div v-if="active.members.length" class="flex flex-col gap-1">
-          <span class="text-text-label text-xs">{{ t("oncall.upcoming") }}</span>
+          <OSelect
+            :model-value="active.members"
+            multiple
+            searchable
+            :label="t('oncall.rotationOrder')"
+            :help-text="t('oncall.rotationOrderHint')"
+            :placeholder="t('oncall.rotationPickPlaceholder')"
+            :options="memberOptions"
+            data-test="oncall-schedule-members"
+            @update:model-value="(v: unknown) => setMembers(active as Rotation, v as string[])"
+          />
+        </section>
+
+        <section class="flex flex-col gap-4">
+          <OText variant="section">{{ t("oncall.rotationSectionWhen") }}</OText>
+
+          <OSelect
+            v-model="active.shift_micros"
+            :label="t('oncall.shiftLength')"
+            :options="shiftOptions"
+            data-test="oncall-schedule-shift"
+          />
+
+          <!-- Without this the anchor was silently "now", so a rotation created
+               at 14:32 handed over at 14:32 forever. -->
+          <OInput
+            :model-value="handoverInput(active)"
+            type="datetime-local"
+            :label="t('oncall.firstHandover')"
+            :help-text="handoverHint"
+            data-test="oncall-schedule-handover"
+            @update:model-value="(v: string | number) => setAnchor(active as Rotation, String(v))"
+          />
+        </section>
+
+        <!-- The answer the form produces. It is the reason to have a drawer at
+             all: a cadence and an anchor are not readable as a rota until you
+             see the dates they generate. -->
+        <section class="flex flex-col gap-2">
+          <OText variant="section">{{ t("oncall.upcoming") }}</OText>
+
           <div
-            v-for="shift in preview(active)"
-            :key="shift.startMicros"
-            class="flex flex-wrap items-center gap-2"
-            data-test="oncall-schedule-preview-shift"
+            v-if="active.members.length"
+            class="border-border-default rounded-surface flex flex-col divide-y divide-border-default border"
           >
-            <OUserCell :value="shift.member" />
-            <span class="text-text-muted text-xs">{{ raw(shiftRange(shift)) }}</span>
-            <OTag v-if="isCurrent(shift)" variant="success-soft" size="xs">
-              {{ t("oncall.onCallNowTag") }}
-            </OTag>
+            <div
+              v-for="shift in preview(active)"
+              :key="shift.startMicros"
+              class="flex flex-wrap items-center gap-2 px-3 py-2"
+              data-test="oncall-schedule-preview-shift"
+            >
+              <OUserCell :value="shift.member" />
+              <span class="text-text-muted ms-auto text-xs">{{ raw(shiftRange(shift)) }}</span>
+              <OTag v-if="isCurrent(shift)" variant="success-soft" size="xs">
+                {{ t("oncall.onCallNowTag") }}
+              </OTag>
+            </div>
           </div>
-        </div>
+
+          <!-- An empty preview is the most common state of a NEW rotation, and
+               saying why beats showing nothing. -->
+          <p v-else class="text-text-secondary text-sm" data-test="oncall-schedule-preview-empty">
+            {{ t("oncall.rotationPreviewEmpty") }}
+          </p>
+        </section>
       </div>
 
       <template #footer>
@@ -189,6 +233,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OnCallScheduleCalendar from "@/components/oncall/OnCallScheduleCalendar.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -199,21 +244,28 @@ import type {
   OnCallSchedule,
   OnCallTeamMember,
   Rotation,
+  ScheduleEditorIntent,
 } from "@/ts/interfaces/oncall";
-import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Shift } from "@/utils/oncall";
 import { SHIFT_PRESETS, upcomingShifts } from "@/utils/oncall";
 
 const PREVIEW_SHIFTS = 5;
 
+/// The second pool a team reaches for. Offered by name so the common case does
+/// not depend on somebody spelling it the same way the ladder does.
+const SECONDARY_SLOT = "secondary";
+
 const props = defineProps<{
   teamId: string;
   timezone: string;
   schedule: OnCallSchedule | null;
   members: OnCallTeamMember[];
+  /** What the user asked for when they opened this. See `ScheduleEditorIntent`. */
+  intent?: ScheduleEditorIntent | null;
 }>();
-const emit = defineEmits<{ saved: [] }>();
+const emit = defineEmits<{ saved: []; "intent-handled": [] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -267,10 +319,31 @@ const dirty = computed(
   () => JSON.stringify(draft.value) !== JSON.stringify(props.schedule?.rotations ?? []),
 );
 
+/// A rotation the user has not saved yet: the drawer says "Add", and its empty
+/// preview is expected rather than a fault.
+const isNew = ref(false);
+
 function editRotation(rotation: Rotation) {
   active.value = rotation;
   editing.value = true;
 }
+
+/// The slots this team already staffs, plus the two everyone starts from.
+/// Offered as a list rather than free text because a typo is a rotation that
+/// resolves on its own and is reached by no rung.
+const slotOptions = computed(() => {
+  const used = draft.value.map((r) => r.slot ?? DEFAULT_SLOT);
+  const names = [...new Set([DEFAULT_SLOT, SECONDARY_SLOT, ...used])];
+  return names.map((name) => ({ label: raw(name), value: name }));
+});
+
+function setSlot(rotation: Rotation, slot: string) {
+  rotation.slot = slot;
+}
+
+/// The zone the handover is measured in. It is the team's, never the browser's,
+/// and getting that wrong is the single easiest mistake in this form.
+const handoverHint = computed(() => t("oncall.firstHandoverHint", { zone: raw(props.timezone) }));
 
 function removeRotation(rotation: Rotation) {
   draft.value = draft.value.filter((r) => r !== rotation);
@@ -334,6 +407,26 @@ function reset() {
 
 watch(() => props.schedule, reset, { immediate: true });
 
+/// Act on the intent once the draft exists — opening the drawer against a
+/// rotation the reset had not copied yet would edit a row that vanishes.
+watch(
+  () => props.intent,
+  (intent) => {
+    if (!intent) return;
+    if (intent.mode === "new") {
+      addRotation();
+    } else {
+      const found = draft.value.find((r) => r.name === intent.name);
+      if (found) {
+        isNew.value = false;
+        editRotation(found);
+      }
+    }
+    emit("intent-handled");
+  },
+  { immediate: true, flush: "post" },
+);
+
 function addRotation() {
   // NOT named "Primary". Primary and secondary are POSITIONS within a
   // rotation, so naming the rotation itself "Primary" reads as though a
@@ -359,6 +452,7 @@ function addRotation() {
   };
   draft.value.push(rotation);
   // Straight into the editor: an empty row is not something anybody can act on.
+  isNew.value = true;
   editRotation(rotation);
 }
 

@@ -246,8 +246,8 @@
               :rotations="schedule?.rotations ?? []"
               :timezone="team?.timezone ?? 'UTC'"
               :load="teamLoad"
-              @edit="editingSchedule = true"
-              @add="editingSchedule = true"
+              @edit="openScheduleEditor({ mode: 'edit', name: $event })"
+              @add="openScheduleEditor({ mode: 'new' })"
             />
           </template>
 
@@ -269,7 +269,9 @@
               :timezone="team?.timezone ?? 'UTC'"
               :schedule="schedule"
               :members="members"
+              :intent="scheduleIntent"
               @saved="onScheduleSaved"
+              @intent-handled="scheduleIntent = null"
             />
           </template>
         </OContent>
@@ -395,6 +397,7 @@ import type {
   ResolvedSegment,
   TeamLoad,
   TeamReachability,
+  ScheduleEditorIntent,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -429,6 +432,18 @@ const segments = ref<ResolvedSegment[]>([]);
 const segmentsLoading = ref(false);
 /// Read or edit, never both — the editor brings its own calendar and table.
 const editingSchedule = ref(false);
+
+/// "Add rotation" used to mean "show me the bulk editor", so adding one cost
+/// two clicks on a button of the same name — and clicking a rotation row threw
+/// away the name it emitted and opened the same undifferentiated editor. The
+/// intent rides with the mode switch so one click lands on the rotation the
+/// user actually pointed at.
+const scheduleIntent = ref<ScheduleEditorIntent | null>(null);
+
+function openScheduleEditor(intent: ScheduleEditorIntent) {
+  scheduleIntent.value = intent;
+  editingSchedule.value = true;
+}
 const coverOpen = ref(false);
 const coverSaving = ref(false);
 const coverGap = ref<{ from: number; to: number } | null>(null);

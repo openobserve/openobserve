@@ -136,6 +136,17 @@ export interface TimeWindow {
   end_minute: number;
 }
 
+/**
+ * What the user asked for when the schedule editor opened.
+ *
+ * The rotation table already emits which row was clicked; carrying that
+ * through means one click lands on that rotation's form instead of on a bulk
+ * editor the user then has to navigate a second time.
+ *
+ * `name` is a rotation's stored name — data, not display text.
+ */
+export type ScheduleEditorIntent = { mode: "new" } | { mode: "edit"; name: string };
+
 export interface Rotation {
   /** What this rotation is called — a label for a shift, not a rung of the
    *  ladder. Two rotations in different slots may share a name. */
