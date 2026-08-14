@@ -12734,6 +12734,8 @@
   },
   "slos": {
     "title": "SLO'lar",
+    "notFound": "SLO bulunamadı",
+    "notFoundDescription": "Bu SLO artık mevcut değil veya ona erişiminiz yok. Silinmiş olabilir.",
     "subtitle": "Hizmet düzeyi hedefleri: hedefler, hata bütçeleri, yanma hızı uyarıları",
     "new": "Yeni SLO",
     "newTitle": "Yeni SLO",
@@ -12833,7 +12835,9 @@
       "sli": "SLI: \"iyi\" ne demek",
       "objective": "Amaç",
       "grouping": "Gruplama",
-      "summary": "Özet"
+      "summary": "Özet",
+      "definition": "Tanım",
+      "definitionEmpty": "Bu SLO'nun saklanmış bir tanımı yok."
     },
     "field": {
       "name": "SLO adı",

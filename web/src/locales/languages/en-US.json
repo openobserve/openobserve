@@ -12751,6 +12751,8 @@
   },
   "slos": {
     "title": "SLOs",
+    "notFound": "SLO not found",
+    "notFoundDescription": "This SLO no longer exists, or you do not have access to it. It may have been deleted.",
     "subtitle": "Service level objectives: targets, error budgets, burn-rate alerts",
     "new": "New SLO",
     "newTitle": "New SLO",
@@ -12850,7 +12852,9 @@
       "sli": "SLI: what \"good\" means",
       "objective": "Objective",
       "grouping": "Grouping",
-      "summary": "Summary"
+      "summary": "Summary",
+      "definition": "Definition",
+      "definitionEmpty": "This SLO has no stored definition."
     },
     "field": {
       "name": "SLO name",

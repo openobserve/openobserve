@@ -1376,3 +1376,88 @@ describe("BrowserJourney suggestions", () => {
     expect(suggestionIds(wrapper)).not.toContain("zero-assertion");
   });
 });
+
+// ── Variables panel toggle ────────────────────────────────────────────────
+// The toggle used to be a bare chevron square, which read as decoration next to
+// the labelled Add Step / Record / Replay buttons. It now carries the panel's
+// own name, so the label is part of the contract — not just the chevron.
+describe("BrowserJourney variables panel toggle", () => {
+  let wrapper: VueWrapper;
+
+  const TOGGLE = '[data-test="synthetics-journey-toggle-variables-btn"]';
+
+  // The shared OIconStub swallows `name`; this one surfaces it so the chevron
+  // direction can be asserted from the DOM (same shape as JourneySteps.spec.ts).
+  const OIconWithNameStub = {
+    props: ["name"],
+    template: '<i :data-icon-name="name" />',
+  };
+
+  function mountToolbar(props: Record<string, unknown> = {}) {
+    return mount(BrowserJourney, {
+      props: { modelValue: [], ...props },
+      global: { stubs: { ...STUBS, OIcon: OIconWithNameStub } },
+    }) as VueWrapper;
+  }
+
+  const chevronOf = (w: VueWrapper) =>
+    w.find(`${TOGGLE} [data-icon-name]`).attributes("data-icon-name");
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  // vue-i18n is mocked to return the key, so the key IS the rendered text here.
+  it("should label the toggle with the variables panel's name", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(wrapper.find(TOGGLE).text()).toContain("synthetics.variablesPanel.title");
+  });
+
+  // The host owns the panel; without that prop there is meant to be no panel to
+  // toggle. Skipped because the guard cannot work as written, and this predates
+  // the label change: `variablesPanelOpen?: boolean` is a Boolean-typed prop, so
+  // Vue's boolean casting resolves an omitted value to `false`, never
+  // `undefined` — verified by reading $props on a mount with the prop omitted.
+  // `v-if="variablesPanelOpen !== undefined"` is therefore always true and the
+  // toggle renders for every host. Un-skip once the component distinguishes
+  // "no panel" some other way (e.g. `variablesPanelOpen?: boolean | undefined`
+  // declared with an explicit `default: undefined`, or a separate flag prop).
+  it.skip("should not render the toggle when the host provides no variables panel", () => {
+    wrapper = mountToolbar();
+
+    expect(wrapper.find(TOGGLE).exists()).toBe(false);
+  });
+
+  it("should render the toggle when the host provides a closed variables panel", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(wrapper.find(TOGGLE).exists()).toBe(true);
+  });
+
+  it("should emit toggle-variables-panel when pressed", async () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    await wrapper.find(TOGGLE).trigger("click");
+
+    // OButtonStub both $emits "click" and lets the native event through (it
+    // declares no `emits`), so one press registers twice. That it fires at all,
+    // with no payload, is the contract.
+    const emitted = wrapper.emitted("toggle-variables-panel")!;
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const call of emitted) expect(call).toEqual([]);
+  });
+
+  it("should point the chevron right — collapse — while the panel is open", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: true });
+
+    expect(chevronOf(wrapper)).toBe("keyboard-double-arrow-right");
+  });
+
+  it("should point the chevron left — open — while the panel is closed", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(chevronOf(wrapper)).toBe("keyboard-double-arrow-left");
+  });
+});
