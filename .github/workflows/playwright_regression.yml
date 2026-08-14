@@ -226,8 +226,6 @@ jobs:
           path: /tmp/dist
 
       - name: Start OpenObserve
-        env:
-          ZO_ALERT_COMPOSITE_WRITES_ENABLED: 'true'
         run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start

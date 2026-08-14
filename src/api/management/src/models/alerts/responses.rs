@@ -50,7 +50,7 @@ pub struct ListAlertsResponseBodyItem {
     pub name: String,
     pub owner: Option<String>,
     pub description: Option<String>,
-    /// Discriminator: "scheduled" | "realtime" | "anomaly_detection"
+    /// Discriminator: "scheduled" | "realtime" | "slo" | "anomaly_detection" | "composite"
     pub alert_type: String,
     pub condition: Option<QueryCondition>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 68;
+pub const DB_SCHEMA_VERSION: u64 = 69;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -815,14 +815,14 @@ pub struct Slo {
 
 /// Composite alerts tunables (§19.2).
 ///
-/// Writes are opt-in: until delivery-failure outcomes and metrics land,
-/// composite mutation stays OFF unless explicitly enabled.
+/// Writes are on by default; `ZO_ALERT_COMPOSITE_WRITES_ENABLED` is an opt-out
+/// kill-switch for operators who want to disable composite mutation.
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct AlertComposite {
     #[env_config(
         name = "ZO_ALERT_COMPOSITE_WRITES_ENABLED",
-        default = false,
-        help = "Enable composite-alert mutation (create/update/move/trigger). Opt-in: default OFF until observability lands."
+        default = true,
+        help = "Enable composite-alert mutation (create/update/move/trigger). Opt-out kill-switch: set to \"false\" to disable."
     )]
     pub writes_enabled: bool,
     #[env_config(

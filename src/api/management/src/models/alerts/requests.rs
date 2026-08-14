@@ -74,6 +74,10 @@ pub struct CreateAlertRequestBody {
 }
 
 impl CreateAlertRequestBody {
+    /// Returns the name of the first field this payload carries that a
+    /// composite alert does not support (query conditions, realtime, etc.), or
+    /// `None` when it is a valid composite definition. Callers use the returned
+    /// name to emit a precise `composite_unsupported_field` error.
     pub fn composite_unsupported_field(&self) -> Option<&'static str> {
         if self.anomaly_config.is_some() {
             return Some("anomaly_config");
@@ -199,16 +203,27 @@ pub struct CompositeCondition {
     pub stale_child_policy: CompositeStaleChildPolicy,
 }
 
+/// How a composite treats a child whose latest state is stale (no recent
+/// evaluation within its freshness deadline).
+///
+/// The `storage_id` mapping below is persisted in the `stale_child_policy`
+/// column and is **append-only**: never renumber an existing variant, or rows
+/// already on disk will silently decode to the wrong policy.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CompositeStaleChildPolicy {
+    /// Use the child's last known truth value (the default).
     #[default]
     UseLastState,
+    /// Treat a stale child as evaluating `false`.
     TreatAsFalse,
+    /// Treat a stale child as evaluating `true`.
     TreatAsTrue,
 }
 
 impl CompositeStaleChildPolicy {
+    /// Persisted integer id (0/1/2). Append-only: the ids are part of the
+    /// on-disk contract and must not be reordered.
     pub fn storage_id(self) -> i16 {
         match self {
             Self::UseLastState => 0,
@@ -232,6 +247,10 @@ pub struct ValidateCompositeRequestBody {
 }
 
 impl UpdateAlertRequestBody {
+    /// Returns the name of the first field this payload carries that a
+    /// composite alert does not support (query conditions, realtime, etc.), or
+    /// `None` when it is a valid composite definition. Callers use the returned
+    /// name to emit a precise `composite_unsupported_field` error.
     pub fn composite_unsupported_field(&self) -> Option<&'static str> {
         if self.anomaly_config.is_some() {
             return Some("anomaly_config");

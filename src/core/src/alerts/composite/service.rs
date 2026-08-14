@@ -735,8 +735,8 @@ fn map_update_error(error: sea_orm::DbErr) -> CompositeServiceError {
 
 /// Gates every composite write (create/update/move/trigger).
 ///
-/// `ZO_ALERT_COMPOSITE_WRITES_ENABLED` is opt-in: composite mutation is OFF by
-/// default and only enabled when the flag is explicitly set (see
+/// `ZO_ALERT_COMPOSITE_WRITES_ENABLED` is an opt-out kill-switch: composite
+/// mutation is enabled unless the flag is explicitly set to `false` (see
 /// [`config::AlertComposite::writes_enabled`]).
 fn ensure_mutation_allowed() -> Result<(), CompositeServiceError> {
     #[cfg(feature = "enterprise")]

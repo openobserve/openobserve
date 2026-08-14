@@ -329,6 +329,18 @@ async fn composite_detail_response(
     .ok()
     .flatten();
 
+    // Resolve every child in a fixed pair of queries (`resolve_many`) instead of
+    // one `resolve_by_id` per child on the hot detail read path.
+    let child_ids: Vec<String> = composite
+        .children
+        .iter()
+        .map(|child| child.child_alert_id.clone())
+        .collect();
+    let resolutions =
+        infra::table::alert_composites::resolve_many(db, &definition.org, &child_ids)
+            .await
+            .unwrap_or_default();
+
     let mut children = Vec::with_capacity(composite.children.len());
     for child in composite.children {
         #[cfg(feature = "enterprise")]
@@ -358,27 +370,21 @@ async fn composite_detail_response(
             }));
             continue;
         }
-        let resolution = infra::table::alert_composites::resolve_by_id(
-            db,
-            &definition.org,
-            &child.child_alert_id,
-        )
-        .await;
-        let (name, alert_type, folder_id, enabled) = match resolution {
-            Ok(infra::table::alert_composites::Resolution::Alert(alert)) => (
-                Some(alert.name),
+        let (name, alert_type, folder_id, enabled) = match resolutions.get(&child.child_alert_id) {
+            Some(infra::table::alert_composites::Resolution::Alert(alert)) => (
+                Some(alert.name.clone()),
                 Some(if alert.slo_id.is_some() {
                     "slo"
                 } else {
                     "scheduled"
                 }),
-                Some(alert.folder_id),
+                Some(alert.folder_id.clone()),
                 Some(alert.enabled),
             ),
-            Ok(infra::table::alert_composites::Resolution::Composite(composite)) => (
-                Some(composite.name),
+            Some(infra::table::alert_composites::Resolution::Composite(composite)) => (
+                Some(composite.name.clone()),
                 Some("composite"),
-                Some(composite.folder_id),
+                Some(composite.folder_id.clone()),
                 Some(composite.enabled),
             ),
             _ => (None, None, None, None),
@@ -664,6 +670,16 @@ pub async fn validate_composite_alert(
                     "folder_id": alert.folder_id,
                     "enabled": alert.enabled,
                 }));
+            }
+            Ok(infra::table::alert_composites::Resolution::Alert(_)) => {
+                // A realtime alert is ineligible as a composite child: report it
+                // as a 400 `child_not_eligible` rather than masking it as 403
+                // `child_not_accessible`.
+                return composite_machine_error(
+                    StatusCode::BAD_REQUEST,
+                    "child_not_eligible",
+                    format!("child alert {id} is not eligible for composite evaluation"),
+                );
             }
             Ok(infra::table::alert_composites::Resolution::Composite(composite)) => {
                 children.push(serde_json::json!({
@@ -2108,7 +2124,7 @@ pub async fn list_alert_tags(
         Err(e) => return e.into(),
     };
 
-    let mut counts = db::alerts::alert::tag_counts_for_alerts(&org_id, &visible_ids).await;
+    let counts = db::alerts::alert::tag_counts_for_alerts(&org_id, &visible_ids).await;
 
     // Resolve composite visibility in bulk (one query), mirroring the
     // regular-alert `visible_ids` path, rather than a per-composite
@@ -2137,13 +2153,14 @@ pub async fn list_alert_tags(
             }
         }
     }
+    // Index the alert tag counts by tag so the composite merge is O(1) per tag
+    // instead of a linear scan over every existing tag.
+    let mut count_map: std::collections::HashMap<String, u64> =
+        counts.iter().cloned().collect();
     for (tag, count) in composite_counts {
-        if let Some((_, current)) = counts.iter_mut().find(|(existing, _)| existing == &tag) {
-            *current += count;
-        } else {
-            counts.push((tag, count));
-        }
+        *count_map.entry(tag).or_default() += count;
     }
+    let mut counts: Vec<(String, u64)> = count_map.into_iter().collect();
 
     if let Some(prefix) = query.prefix.as_deref() {
         let prefix = prefix.trim().to_lowercase();
@@ -2205,6 +2222,14 @@ pub async fn list_alerts(
     let user_id = None;
     #[cfg(feature = "enterprise")]
     let user_id = Some(user_email.user_id.as_str());
+
+    // Resolve the caller's visible object set once per request; it gates both
+    // the composite merge below and the `referenced_by_composite_count`
+    // enrichment, so we don't run per-row or duplicate permission lookups.
+    let visibility = match user_id {
+        Some(user_id) => permitted_alert_visibility(&org_id, user_id).await,
+        None => None,
+    };
 
     let folder_slug = query.folder.clone();
     let name_substring = query.alert_name_substring.clone();
@@ -2359,20 +2384,7 @@ pub async fn list_alerts(
             {
                 continue;
             }
-            #[cfg(feature = "enterprise")]
-            if !check_permissions(
-                &definition.id,
-                &org_id,
-                user_email.user_id.as_str(),
-                "alerts",
-                "GET",
-                Some(&definition.folder_id),
-                false,
-                true,
-                false,
-            )
-            .await
-            {
+            if !visible_alert(&visibility, &definition.id, &definition.folder_id, &definition.name) {
                 continue;
             }
             let folder_name = folder_names
@@ -2462,12 +2474,15 @@ pub async fn list_alerts(
     // over the page that is actually being returned — not per alert.
     let mut list = list;
     enrich_with_run_state(&mut list).await;
-    enrich_with_composite_metadata(&org_id, user_id, &mut list).await;
+    enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
 
     MetaHttpResponse::json(ListAlertsResponseBody { list })
 }
 
-#[cfg(feature = "enterprise")]
+/// Resolve the caller's visible alert/composite object set in one bulk query,
+/// mirroring `alert::list_v2`'s `permitted_alerts` path. `None` means "no
+/// filtering" (root user, OpenFGA disabled, or list-only-off), which is also the
+/// only result in OSS builds.
 async fn permitted_alert_visibility(
     org_id: &str,
     user_id: &str,
@@ -2482,7 +2497,6 @@ async fn permitted_alert_visibility(
     Some((is_all_permitted, permitted.into_iter().collect()))
 }
 
-#[cfg(feature = "enterprise")]
 fn visible_alert(
     visibility: &Option<(bool, hashbrown::HashSet<String>)>,
     id: &str,
@@ -2502,11 +2516,9 @@ fn visible_alert(
 
 async fn enrich_with_composite_metadata(
     org_id: &str,
-    user_id: Option<&str>,
+    visibility: &Option<(bool, hashbrown::HashSet<String>)>,
     list: &mut [ListAlertsResponseBodyItem],
 ) {
-    #[cfg(not(feature = "enterprise"))]
-    let _ = user_id;
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     // Split the page by kind and resolve everything in bulk: one child-count
@@ -2547,12 +2559,6 @@ async fn enrich_with_composite_metadata(
     .await
     .unwrap_or_default();
 
-    #[cfg(feature = "enterprise")]
-    let visibility = match user_id {
-        Some(user_id) => permitted_alert_visibility(org_id, user_id).await,
-        None => None,
-    };
-
     for item in list.iter_mut() {
         if !matches!(item.alert_type.as_str(), "scheduled" | "slo" | "composite") {
             continue;
@@ -2571,19 +2577,12 @@ async fn enrich_with_composite_metadata(
         let readable = parents
             .get(&id)
             .map(|parents| {
-                #[cfg(feature = "enterprise")]
-                {
-                    parents
-                        .iter()
-                        .filter(|parent| {
-                            visible_alert(&visibility, &parent.id, &parent.folder_id, &parent.name)
-                        })
-                        .count()
-                }
-                #[cfg(not(feature = "enterprise"))]
-                {
-                    parents.len()
-                }
+                parents
+                    .iter()
+                    .filter(|parent| {
+                        visible_alert(visibility, &parent.id, &parent.folder_id, &parent.name)
+                    })
+                    .count()
             })
             .unwrap_or(0);
         item.referenced_by_composite_count = Some(readable);

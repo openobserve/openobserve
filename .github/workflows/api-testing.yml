@@ -146,7 +146,7 @@ jobs:
         # ~3x the real test count). Letting the plugin load via discovery
         # alone keeps the counter honest.
         run: |
-          ZO_ALERT_COMPOSITE_WRITES_ENABLED=true ${{ github.workspace }}/target/debug/openobserve > o2_default.log 2>&1 &
+          ${{ github.workspace }}/target/debug/openobserve > o2_default.log 2>&1 &
           SERVER_PID_DEFAULT=$!
           echo "OpenObserve PID for default tests: $SERVER_PID_DEFAULT"
           for i in $(seq 1 60); do
@@ -510,7 +510,7 @@ jobs:
         working-directory: tests/api-testing/
 
       - name: Start OpenObserve
-        run: ZO_ALERT_COMPOSITE_WRITES_ENABLED=true target/debug/openobserve > o2_fuzz.log 2>&1 &
+        run: target/debug/openobserve > o2_fuzz.log 2>&1 &
 
       - name: Wait for /healthz
         run: |
