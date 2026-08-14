@@ -272,6 +272,12 @@ async fn postgres_migration_and_repository_crud_execute_when_ci_provides_postgre
         // this same contract against the real supported backend.
         return;
     };
+    // The SQLite lane sets the variable to an empty string rather than leaving
+    // it unset; treat that the same as unset so this contract only runs
+    // against a real PostgreSQL.
+    if dsn.trim().is_empty() {
+        return;
+    }
     let admin = Database::connect(&dsn).await.unwrap();
     let schema_name = format!("composite_alerts_test_{}", id().to_ascii_lowercase());
     assert!(
