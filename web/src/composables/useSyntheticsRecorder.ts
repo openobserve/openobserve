@@ -355,8 +355,10 @@ const useSyntheticsRecorder = () => {
       case "recordingStopped":
         // Commit steps synchronously if a listener is registered (external stop).
         // For explicit stopRecording(), the listener is temporarily nulled, so this is a no-op.
+        // `recordedSteps()` rather than the raw list: this fires for a restore-then-record
+        // session too, whose `liveSteps` still carries the replayed prefix in front.
         if (onExternalStop) {
-          onExternalStop([...liveSteps.value]);
+          onExternalStop(recordedSteps());
         }
         isRecording.value = false;
         break;
@@ -445,7 +447,7 @@ const useSyntheticsRecorder = () => {
     bridgeConnect();
     bridgeDisconnectHandler = () => {
       if (onExternalStop && isRecording.value) {
-        onExternalStop([...liveSteps.value]);
+        onExternalStop(recordedSteps());
       }
       isRecording.value = false;
     };

@@ -15,7 +15,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import useSyntheticsRecorder, { isExtensionOutdated } from "./useSyntheticsRecorder";
-import type { WireStep } from "@/types/synthetics";
+import type { BrowserStep, WireStep } from "@/types/synthetics";
 
 // ── Bridge test helpers ───────────────────────────────────────────────────
 
@@ -430,6 +430,34 @@ describe("useSyntheticsRecorder", () => {
       })();
 
       expect(steps.map((s) => s.action)).toEqual(["click", "type"]);
+    });
+
+    // The same rule, on the exit the author is far more likely to take: closing the
+    // recorder window ends the session through `recordingStopped` rather than the Stop
+    // button. Handing the raw list over there splices the whole replayed prefix back
+    // into the journey at the anchor, so a 15-step journey returns with 19.
+    it("should return only the post-baseline steps when the extension stops the session", async () => {
+      const r = useSyntheticsRecorder();
+      const committed: BrowserStep[][] = [];
+      r.setOnExternalStop((steps) => committed.push(steps));
+
+      await startInsertSession(r);
+
+      emitStreamEvent({
+        method: "setActions",
+        actions: [],
+        sources: [],
+        browserSteps: [
+          { id: "art", action: "navigate", url: "https://app.test/dashboard" },
+          { id: "n1", action: "click", selector: "#new" },
+          { id: "n2", action: "type", selector: "#q", value: "hello" },
+        ],
+      });
+
+      emitStreamEvent({ method: "recordingStopped" });
+
+      expect(committed).toHaveLength(1);
+      expect(committed[0].map((s) => s.action)).toEqual(["click", "type"]);
     });
 
     // A plain recording has no baseline, so the same stopRecording must not slice.
