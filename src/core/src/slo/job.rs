@@ -108,22 +108,20 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
     // we will get error in downstream processing and the slo will freeze. Thus instead we check
     // here and skip early
     match &slo.definition.sli_config {
-        SliConfig::TimeSlice { query_language, .. } => {
-            if matches!(query_language, QueryLanguage::PromQl) {
-                if range.start + slo.definition.slice_interval_secs >= range.end {
-                    log::warn!("here, skipped the pass for promql");
-                    return Ok(PassOutcome::NothingToDo);
-                }
-            }
+        SliConfig::TimeSlice { query_language, .. }
+            if matches!(query_language, QueryLanguage::PromQl)
+                && range.start + slo.definition.slice_interval_secs >= range.end =>
+        {
+            return Ok(PassOutcome::NothingToDo);
         }
-        SliConfig::Count { source } => {
-            if matches!(source, CountSource::PromQl { .. }) {
-                if range.start + slo.definition.slice_interval_secs >= range.end {
-                    log::warn!("here, skipped the pass for promql");
-                    return Ok(PassOutcome::NothingToDo);
-                }
-            }
+
+        SliConfig::Count { source }
+            if matches!(source, CountSource::PromQl { .. })
+                && range.start + slo.definition.slice_interval_secs >= range.end =>
+        {
+            return Ok(PassOutcome::NothingToDo);
         }
+
         _ => {}
     }
 
