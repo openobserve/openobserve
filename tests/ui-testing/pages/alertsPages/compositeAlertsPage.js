@@ -7,8 +7,7 @@ export class CompositeAlertsPage {
   constructor(page) {
     this.page = page;
     this.locators = {
-      typeSelect: '[data-test="add-alert-type-select-dropdown"]',
-      typeOption: '[data-test="add-alert-type-select-dropdown-option"]',
+      typeSelect: '[data-test="add-alert-type-tab-composite"]',
       childSearch: '[data-test="alerts-composite-child-search-field"]',
       childOption: (id) => `[data-test="alerts-composite-child-option-${id}"]`,
       childCap: '[data-test="alerts-composite-child-cap"]',
@@ -52,7 +51,6 @@ export class CompositeAlertsPage {
 
   async chooseCompositeType() {
     await this.page.locator(this.locators.typeSelect).click();
-    await this.page.locator(this.locators.typeOption).filter({ hasText: 'Composite' }).click();
   }
 
   async searchAndSelect(name, id) {

@@ -80,7 +80,7 @@ export class AlertsPage {
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
             streamNamePopover: '[data-test="add-alert-stream-name-select-dropdown-popover"]',
             streamNameOption: '[data-test="add-alert-stream-name-select-dropdown-option"]',
-            alertTypeSelect: '[data-test="add-alert-type-select-dropdown"]',
+            alertTypeSelect: '[data-test="add-alert-type-tabs"]',
 
             // Step 2: Query/Conditions selectors
             queryTabsContainer: '[data-test="step2-query-tabs"]',
