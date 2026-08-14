@@ -34,7 +34,16 @@ export type DbmNotCollectingNamespace = "activity" | "blocked" | "deadlocks";
 export interface DbmNotCollectingSignals {
   /** Distinct statements the shared badge fan-out counted. `null` = unknown. */
   queryCount: number | null;
-  /** Databases the shared fan-out saw. `null` = unknown. */
+  /**
+   * Databases the shared fan-out saw. `null` = unknown.
+   *
+   * ZERO IS NOT A DATABASE COUNT HERE. The fan-out's `databaseCount` is the
+   * TRACE-vantage fleet row count, so a server-only org — collector recipes
+   * wired, no APM anywhere — legitimately reports 0 while its databases are
+   * reporting statements normally. Interpolating that 0 produced "50 kinds of
+   * query from 0 databases", a sentence that contradicts itself and blames the
+   * absence of tracing for a healthy deployment. See `detailFor` below.
+   */
   databaseCount: number | null;
   /** Whether the org's DBM feature flag is on. */
   dbmEnabled: boolean;
@@ -60,10 +69,18 @@ export const buildDbmNotCollectingChecks = (
       status: hasQueries ? "ok" : "fail",
       title: hasQueries ? t(`${prefix}.queries.ok`) : t(`${prefix}.queries.no`),
       detail: hasQueries
-        ? t(`${prefix}.queries.okDetail`, {
-            queries: t("dbm.queries.queryCount", signals.queryCount ?? 0),
-            databases: t("dbm.databases.databaseCount", signals.databaseCount ?? 0),
-          })
+        ? // The database clause is DROPPED when the trace vantage counted no
+          // fleet rows, rather than printed as "from 0 databases". A
+          // server-only org is the ordinary case for these three pages, and
+          // the queries half of the sentence is true and useful on its own.
+          signals.databaseCount
+          ? t(`${prefix}.queries.okDetail`, {
+              queries: t("dbm.queries.queryCount", signals.queryCount ?? 0),
+              databases: t("dbm.databases.databaseCount", signals.databaseCount),
+            })
+          : t(`${prefix}.queries.okDetailNoFleet`, {
+              queries: t("dbm.queries.queryCount", signals.queryCount ?? 0),
+            })
         : t(`${prefix}.queries.noDetail`),
     },
     {

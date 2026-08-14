@@ -36,7 +36,7 @@ import { dirname, join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { badgeCount } from "@/utils/dbm/format";
+import { badgeCount, claimedCount } from "@/utils/dbm/format";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (file: string) => readFileSync(join(here, file), "utf8");
@@ -109,13 +109,19 @@ describe("the one badges request answers every tab's badge at once", () => {
     }
   });
 
-  /** One request, and every one of the seven badges comes out of it populated. */
+  /**
+   * One request, and every one of the seven badges comes out of it populated.
+   *
+   * The two badges fed by the TRACE rollup carry `vantage: "client"` — a call
+   * count is an overlap measure, so D2 makes the qualifier mandatory wherever
+   * it renders, and the strip can only qualify what the fold hands it.
+   */
   it("fills all seven badges from that one request", async () => {
     const counts = await fetchDbmTabCounts("acme", WINDOW);
     expect(tabCountProps(counts)).toEqual({
       databaseCount: 3,
-      queryCount: 42,
-      sampleCallsCount: 1200,
+      queryCount: { count: 42, complete: true, vantage: "client" },
+      sampleCallsCount: { count: 1200, complete: true, vantage: "client" },
       activityCount: 7,
       deadlockCount: { count: 90, complete: false },
       blockedCount: { count: 100, complete: false },
@@ -224,8 +230,10 @@ describe("the zero-trace fallback counts what the tabs actually show", () => {
    */
   it("keeps the client answers when no fallback member is present", async () => {
     const counts = await fetchDbmTabCounts("acme", WINDOW);
-    expect(counts.queryCount).toBe(42);
-    expect(counts.sampleCallsCount).toBe(1200);
+    // Value AND vantage: the client answer standing is only honest if the
+    // badge still says the trace vantage produced it.
+    expect(counts.queryCount).toEqual({ count: 42, complete: true, vantage: "client" });
+    expect(counts.sampleCallsCount).toEqual({ count: 1200, complete: true, vantage: "client" });
     expect(service.getServerQueries).not.toHaveBeenCalled();
     expect(service.getServerSamples).not.toHaveBeenCalled();
   });
@@ -255,7 +263,10 @@ describe("the zero-trace fallback counts what the tabs actually show", () => {
       server_queries: null,
     });
     const counts = await fetchDbmTabCounts("acme", WINDOW);
-    expect(counts.queryCount).toBe(0);
+    // A measured zero, still printed as "0" — distinct from the blank a failed
+    // read produces. The count is a claim now, so the badge is what is pinned.
+    expect(badgeCount(counts.queryCount)).toBe("0");
+    expect(claimedCount(counts.queryCount)).toBe(0);
   });
 
   /** An org with nothing anywhere keeps its honest zeros. */
@@ -268,8 +279,8 @@ describe("the zero-trace fallback counts what the tabs actually show", () => {
       server_samples: { hits: [], truncated: false },
     });
     const counts = await fetchDbmTabCounts("acme", WINDOW);
-    expect(counts.queryCount).toBe(0);
-    expect(counts.sampleCallsCount).toBe(0);
+    expect(badgeCount(counts.queryCount)).toBe("0");
+    expect(badgeCount(counts.sampleCallsCount)).toBe("0");
     expect(counts.databaseCount).toBe(0);
   });
 });
@@ -309,7 +320,7 @@ describe("a failed slice blanks its own badge and nothing else", () => {
     const counts = await fetchDbmTabCounts("acme", WINDOW);
     expect(counts.activityCount).toBeNull();
     expect(counts.databaseCount).toBe(3);
-    expect(counts.queryCount).toBe(42);
+    expect(badgeCount(counts.queryCount)).toBe("42");
     expect(counts.tableHealthCount).toBe(12);
   });
 

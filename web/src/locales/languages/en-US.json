@@ -15359,6 +15359,14 @@
         "setUp": "Set up",
         "readFailed": "Server-side metrics could not be read",
         "readFailedHint": "The read failed, so this says nothing about whether your database is reporting statements. Everything above is still measured from your application."
+      },
+      "callingServices": {
+        "title": "Which of your services called this",
+        "unjoinable": "Not shown — this statement runs on more than one kind of database here, and matching callers without knowing which one would name the wrong services.",
+        "tracedCalls": "{calls} calls traced",
+        "coverage": "{count} services seen in {traced} of the {executions} executions above. The rest came from callers you are not tracing yet.",
+        "coverageUnknown": "{count} services seen in {traced} traced calls. Your database did not report a total for this statement, so there is no share to give.",
+        "noneNamed": "{traced} calls were traced, but none of them could be tied back to a service — their traces start outside this time range."
       }
     },
     "list": {
@@ -15375,7 +15383,9 @@
         "overview": "Overview",
         "queries": "Top queries",
         "samples": "Slowest calls",
-        "samplesHint": "Every finished call in this window — the table shows the slowest of them",
+        "samplesHintClient": "Finished calls your instrumented services observed in this window — callers without tracing are not counted, so this is a floor, not the total. The table shows the slowest of them.",
+        "samplesHintServer": "Statements your databases reported completing in this window, counted inside the database. The table shows the slowest of them.",
+        "samplesHintUnknown": "The slowest individual database calls in this window.",
         "deadlocks": "Deadlocks",
         "blocked": "Blocked queries",
         "deadlocksHint": "Deadlocks your databases reported",
@@ -15530,7 +15540,9 @@
           "reading": {
             "title": "We are reading your databases' logs",
             "detail": "{databases} · most recent line read {age}",
-            "detailUnknown": "{databases} — the log pipeline is connected"
+            "detailNoFleet": "Most recent line read {age}",
+            "detailUnknown": "{databases} — the log pipeline is connected",
+            "detailUnknownNoFleet": "The log pipeline is connected"
           },
           "reporting": {
             "title": "Deadlock reporting is switched on",
@@ -15561,6 +15573,7 @@
           "queries": {
             "ok": "Your query data is arriving",
             "okDetail": "{queries} from {databases} — the Top queries tab works",
+            "okDetailNoFleet": "{queries} — the Top queries tab works",
             "no": "No query data is arriving either",
             "noDetail": "Start with the Top queries tab — nothing is reaching us from these databases yet."
           },
@@ -15693,6 +15706,7 @@
           "queries": {
             "ok": "Your query data is arriving",
             "okDetail": "{queries} from {databases} — the Top queries tab works",
+            "okDetailNoFleet": "{queries} — the Top queries tab works",
             "no": "No query data is arriving either",
             "noDetail": "Start with the Top queries tab — nothing is reaching us from these databases yet."
           },
@@ -15792,6 +15806,7 @@
           "queries": {
             "ok": "Your query data is arriving",
             "okDetail": "{queries} from {databases} — the Top queries tab works",
+            "okDetailNoFleet": "{queries} — the Top queries tab works",
             "no": "No query data is arriving either",
             "noDetail": "Start with the Top queries tab — nothing is reaching us from these databases yet."
           },

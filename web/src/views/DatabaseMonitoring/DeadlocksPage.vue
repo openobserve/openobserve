@@ -786,14 +786,25 @@ const healthyChecks = computed<DbmLockCheck[]>(() => {
       id: "reading",
       status: "ok",
       title: t("dbm.deadlocks.healthy.checks.reading.title"),
+      // `databaseCount` is the TRACE-vantage fleet count, and this page is
+      // server-vantage: a collector-only org reports 0 here while its deadlock
+      // log is being read normally. So the clause is dropped rather than
+      // printed as "0 databases", which would deny the very reading this
+      // healthy state exists to confirm.
       detail: readUpTo.value
-        ? t("dbm.deadlocks.healthy.checks.reading.detail", {
-            databases: t("dbm.databases.databaseCount", databaseCount.value ?? 0),
-            age: formatAge(readUpTo.value),
-          })
-        : t("dbm.deadlocks.healthy.checks.reading.detailUnknown", {
-            databases: t("dbm.databases.databaseCount", databaseCount.value ?? 0),
-          }),
+        ? databaseCount.value
+          ? t("dbm.deadlocks.healthy.checks.reading.detail", {
+              databases: t("dbm.databases.databaseCount", databaseCount.value),
+              age: formatAge(readUpTo.value),
+            })
+          : t("dbm.deadlocks.healthy.checks.reading.detailNoFleet", {
+              age: formatAge(readUpTo.value),
+            })
+        : databaseCount.value
+          ? t("dbm.deadlocks.healthy.checks.reading.detailUnknown", {
+              databases: t("dbm.databases.databaseCount", databaseCount.value),
+            })
+          : t("dbm.deadlocks.healthy.checks.reading.detailUnknownNoFleet"),
     },
     {
       id: "reporting",
