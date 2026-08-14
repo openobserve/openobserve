@@ -161,6 +161,9 @@ pub struct CompositeChildResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub level_at: Option<i64>,
     /// Effective evaluation cadence in seconds.
+    ///
+    /// Reserved and currently unpopulated (always omitted) — cadence is not yet
+    /// propagated through child evaluation. Do not rely on this field being set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effective_cadence_seconds: Option<i64>,
     /// Deadline after which a missing evaluation marks the child stale.

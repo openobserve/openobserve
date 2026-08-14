@@ -655,23 +655,27 @@ pub async fn validate_composite_alert(
         }
     }
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // Resolve every reference in one batched query instead of per-ID round trips.
+    let resolutions = infra::table::alert_composites::resolve_many(db, &org_id, &references)
+        .await
+        .unwrap_or_default();
     let mut children = Vec::with_capacity(references.len());
     for id in references {
         if inaccessible.contains(&id) {
             continue;
         }
-        match infra::table::alert_composites::resolve_by_id(db, &org_id, &id).await {
-            Ok(infra::table::alert_composites::Resolution::Alert(alert)) if !alert.is_real_time => {
+        match resolutions.get(&id) {
+            Some(infra::table::alert_composites::Resolution::Alert(alert)) if !alert.is_real_time => {
                 children.push(serde_json::json!({
                     "alert_id": id,
                     "accessible": true,
-                    "name": alert.name,
+                    "name": alert.name.clone(),
                     "alert_type": if alert.slo_id.is_some() { "slo" } else { "scheduled" },
-                    "folder_id": alert.folder_id,
+                    "folder_id": alert.folder_id.clone(),
                     "enabled": alert.enabled,
                 }));
             }
-            Ok(infra::table::alert_composites::Resolution::Alert(_)) => {
+            Some(infra::table::alert_composites::Resolution::Alert(_)) => {
                 // A realtime alert is ineligible as a composite child: report it
                 // as a 400 `child_not_eligible` rather than masking it as 403
                 // `child_not_accessible`.
@@ -681,13 +685,13 @@ pub async fn validate_composite_alert(
                     format!("child alert {id} is not eligible for composite evaluation"),
                 );
             }
-            Ok(infra::table::alert_composites::Resolution::Composite(composite)) => {
+            Some(infra::table::alert_composites::Resolution::Composite(composite)) => {
                 children.push(serde_json::json!({
                     "alert_id": id,
                     "accessible": true,
-                    "name": composite.name,
+                    "name": composite.name.clone(),
                     "alert_type": "composite",
-                    "folder_id": composite.folder_id,
+                    "folder_id": composite.folder_id.clone(),
                     "enabled": composite.enabled,
                 }));
             }

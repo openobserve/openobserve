@@ -196,9 +196,13 @@ pub struct UpdateAlertRequestBody {
 /// Composite expression and truth-policy configuration.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CompositeCondition {
+    /// Boolean expression over child alert IDs, e.g. `{child_a} && ({child_b} || {child_c})`.
     pub expression: String,
+    /// Whether a child at `warning` severity counts as firing (`true`) or only
+    /// `critical` does (`false`). Defaults to `true`.
     #[serde(default = "default_true")]
     pub warning_counts_as_firing: bool,
+    /// How a child with a stale (out-of-freshness) state is treated.
     #[serde(default)]
     pub stale_child_policy: CompositeStaleChildPolicy,
 }
@@ -241,8 +245,12 @@ const fn default_true() -> bool {
 /// the organization graph lock.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct ValidateCompositeRequestBody {
+    /// The composite expression and truth policy to validate.
     pub composite_condition: CompositeCondition,
+    /// When editing an existing composite, its ID (so the graph check can exempt
+    /// the composite being updated); `None` when validating a new definition.
     pub composite_id: Option<String>,
+    /// Folder the composite would live in, for folder existence checks.
     pub folder_id: Option<String>,
 }
 

@@ -26,6 +26,8 @@ use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
     config::get_config as get_openfga_config,
 };
+use common::meta::authz::Authz;
+use db::authz::{remove_ownership, set_ownership};
 use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait};
 use svix_ksuid::{Ksuid, KsuidLike as _};
 
@@ -323,6 +325,21 @@ async fn persist(
     let definition = mutation?;
     unlock?;
 
+    // Register the composite as an OpenFGA object owned by its folder, exactly
+    // like regular alerts (alert.rs `set_ownership`). A no-op in OSS; in
+    // enterprise this is what makes folder-scoped RBAC apply. Idempotent, so
+    // safe to re-assert on update as well as create.
+    set_ownership(
+        &definition.org,
+        "alerts",
+        Authz {
+            obj_id: definition.id.clone(),
+            parent_type: "alert_folders".to_owned(),
+            parent: definition.folder_id.clone(),
+        },
+    )
+    .await;
+
     schedule_definition(&definition).await;
     Ok(definition)
 }
@@ -397,22 +414,23 @@ async fn resolve_children(
     org: &str,
     references: &[String],
 ) -> Result<Vec<(String, alert_composites::ChildKind)>, CompositeServiceError> {
+    // Resolve the whole reference set in one batched query, rather than a
+    // `resolve_by_id` round trip per child.
+    let resolved_map = alert_composites::resolve_many(db, org, references).await?;
     let mut resolved = Vec::with_capacity(references.len());
     let mut inaccessible = Vec::new();
     for id in references {
-        match alert_composites::resolve_by_id(db, org, id).await? {
-            alert_composites::Resolution::Alert(alert) => {
+        match resolved_map.get(id) {
+            Some(alert_composites::Resolution::Alert(alert)) => {
                 if alert.is_real_time {
                     return Err(CompositeServiceError::ChildNotEligible(id.clone()));
                 }
                 resolved.push((id.clone(), alert_composites::ChildKind::Alert));
             }
-            alert_composites::Resolution::Composite(_) => {
+            Some(alert_composites::Resolution::Composite(_)) => {
                 resolved.push((id.clone(), alert_composites::ChildKind::Composite));
             }
-            alert_composites::Resolution::NotFound | alert_composites::Resolution::DuplicateId => {
-                inaccessible.push(id.clone())
-            }
+            _ => inaccessible.push(id.clone()),
         }
     }
     if inaccessible.is_empty() {
@@ -710,6 +728,7 @@ pub async fn delete_composite(org: &str, id: &str) -> Result<(), CompositeServic
                 .await?;
         if parents.is_empty() {
             alert_composites::delete_by_id(db, org, id).await?;
+            remove_ownership(org, "alerts", Authz::new(id)).await;
             Ok(())
         } else {
             Err(CompositeServiceError::ChildReferenced(parents))

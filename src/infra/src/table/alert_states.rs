@@ -768,6 +768,7 @@ pub async fn list_transitions_between_many(
     }
     let rows = query
         .order_by_asc(alert_state_transitions::Column::At)
+        .limit(per_alert_limit.saturating_mul(alert_ids.len() as u64))
         .all(client)
         .await?;
     for m in rows {
