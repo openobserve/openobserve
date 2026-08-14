@@ -30,6 +30,7 @@
     icon="track-changes"
     :back="{ to: backTarget, label: t('slos.title') }"
     scroll
+    pad-y
     title-data-test="slos-addslo-title"
   >
     <template #actions>
