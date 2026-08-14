@@ -655,6 +655,7 @@ mod tests {
             tags: None,
             sort_by: None,
             sort_order: None,
+            include_dependencies: None,
         };
         let params = q.into("my_org");
         assert_eq!(params.org_id, "my_org");
@@ -681,6 +682,7 @@ mod tests {
             tags: None,
             sort_by: None,
             sort_order: None,
+            include_dependencies: None,
         };
         let params = q.into("org2");
         assert_eq!(params.org_id, "org2");
@@ -705,6 +707,7 @@ mod tests {
             tags: None,
             sort_by: None,
             sort_order: None,
+            include_dependencies: None,
         };
         let params = q.into("org3");
         assert_eq!(params.page_size_and_idx, Some((5, 0)));
@@ -756,6 +759,7 @@ mod priority_tag_query_tests {
             tags: tags.map(|s| s.to_string()),
             sort_by: sort_by.map(|s| s.to_string()),
             sort_order: order.map(|s| s.to_string()),
+            include_dependencies: None,
         }
     }
 
