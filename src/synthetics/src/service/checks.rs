@@ -57,10 +57,24 @@ pub async fn create_synthetic(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
+    // The public slug behind the stored PK. Derived from what was written
+    // rather than from the request, so a request that named its folder by PK
+    // still yields a slug — and computed once, because the broadcast below and
+    // the API response at the bottom both want it.
+    let stored_folder_slug = folders::get_name_by_pk(&result.folder_id)
+        .await
+        .unwrap_or(None)
+        .unwrap_or_else(|| result.folder_id.clone());
+
     // Broadcast before the response is reshaped: `result` still carries the
-    // folder KSUID PK (the FK the other regions need) and the encrypted
-    // credential blobs, both of which are stripped further down for the UI.
+    // encrypted credential blobs, which are stripped further down for the UI.
     // The id travels with it so every region stores the same primary key.
+    //
+    // The folder travels as its SLUG. `result.folder_id` is a KSUID this region
+    // minted for itself — the default synthetics folder is created lazily and
+    // locally, so no two regions agree on it, and a check carrying one fails
+    // the folder FK everywhere else, forever. The receiver resolves the slug
+    // against its own folders table.
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
@@ -68,7 +82,10 @@ pub async fn create_synthetic(
     {
         o2_enterprise::enterprise::super_cluster::queue::synthetics_check_create(
             org_id,
-            (&result).into(),
+            o2_enterprise::enterprise::super_cluster::queue::SyntheticsCheckPayload::new(
+                &result,
+                &stored_folder_slug,
+            ),
         )
         .await?;
     }
@@ -83,10 +100,7 @@ pub async fn create_synthetic(
     }
 
     // Translate stored KSUID PK back to public slug for the API response.
-    result.folder_id = folders::get_name_by_pk(&result.folder_id)
-        .await
-        .unwrap_or(None)
-        .unwrap_or_else(|| result.folder_id.clone());
+    result.folder_id = stored_folder_slug;
     // Never return encrypted credential blobs to the UI.
     redact_synthetic_auth(&mut result);
     Ok(result)
@@ -164,12 +178,19 @@ pub async fn update_synthetic(
         .await
         .map_err(|e| anyhow::anyhow!("[synthetics] advance_schedule after update: {e}"))?;
 
+    // Same as create: the folder travels as its public slug, because the PK is
+    // this region's alone. Derived from the row that was written, not from
+    // `body.folder_id` — the request may name the folder either way.
+    let stored_folder_slug = folders::get_name_by_pk(&check.folder_id)
+        .await
+        .unwrap_or(None)
+        .unwrap_or_else(|| check.folder_id.clone());
+
     // Config only, and after every local write has landed. The
     // `advance_schedule` above is deliberately NOT replicated: `next_run_at` is
     // owned by whichever region runs the scheduler, and a region that takes the
     // role over skips forward to the next slot on its own. `check` still holds
-    // the folder KSUID PK and the encrypted credential blobs, both stripped
-    // further down for the UI.
+    // the encrypted credential blobs, stripped further down for the UI.
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
@@ -178,7 +199,10 @@ pub async fn update_synthetic(
         o2_enterprise::enterprise::super_cluster::queue::synthetics_check_update(
             org_id,
             id,
-            (&check).into(),
+            o2_enterprise::enterprise::super_cluster::queue::SyntheticsCheckPayload::new(
+                &check,
+                &stored_folder_slug,
+            ),
         )
         .await?;
     }
@@ -205,10 +229,7 @@ pub async fn update_synthetic(
     }
 
     // Translate stored KSUID PK back to public slug for the API response.
-    check.folder_id = folders::get_name_by_pk(&check.folder_id)
-        .await
-        .unwrap_or(None)
-        .unwrap_or_else(|| check.folder_id.clone());
+    check.folder_id = stored_folder_slug;
     // Never return encrypted credential blobs to the UI.
     redact_synthetic_auth(&mut check);
 
@@ -461,25 +482,30 @@ pub async fn move_synthetics(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
-    // The destination is the folders KSUID PK, and folders replicate by PK too,
-    // so the same value satisfies the FK in every region.
+    // Public slug for the destination — needed by the broadcast below and by
+    // the OpenFGA tuples further down, so resolved once for both.
+    let dst_slug = folders::get_name_by_pk(&dst_pk)
+        .await
+        .unwrap_or(None)
+        .unwrap_or_else(|| dst_pk.clone());
+
+    // The slug travels, not `dst_pk`. The default synthetics folder is minted
+    // lazily per region, so its KSUID is local to this one and would fail the
+    // folder FK in every other region; the receiver resolves the slug against
+    // its own folders table.
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
     {
         o2_enterprise::enterprise::super_cluster::queue::synthetics_checks_move_to_folder(
-            org_id, ids, &dst_pk,
+            org_id, ids, &dst_slug,
         )
         .await?;
     }
 
     if ofga {
         // Tuples use public folder slugs — consistent with alerts and the roles UI.
-        let dst_slug = folders::get_name_by_pk(&dst_pk)
-            .await
-            .unwrap_or(None)
-            .unwrap_or_else(|| dst_pk.clone());
         let syntype = get_ofga_type("synthetics");
         let foltype = get_ofga_type("synthetic_folder");
         for (id, old_pk) in &old_folder_pks {

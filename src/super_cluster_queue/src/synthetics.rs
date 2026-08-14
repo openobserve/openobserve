@@ -31,7 +31,15 @@
 //! Applies are idempotent because the queue redelivers: `Create` is a no-op
 //! when the row is already here, `Update` and `SetEnabled` are last-write-wins,
 //! and `Delete` is a delete.
+//!
+//! The one field that is NOT applied as it arrives is `folder_id`. It is a
+//! `folders` KSUID, and the default synthetics folder is minted lazily by
+//! whichever region a user first created a check in — so the same folder has a
+//! different primary key in each region, and a check applied with the origin's
+//! fails `synthetics_folder_fk` here, forever. Messages carry the folder's
+//! public slug instead and it is resolved against this region's table below.
 
+use config::meta::folder::{DEFAULT_FOLDER, Folder, FolderType};
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     errors::{Error, Result},
@@ -56,11 +64,118 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
     Ok(())
 }
 
+/// What to do about the folder a replicated write names.
+///
+/// Split out of [`resolve_folder_pk`] because the rule is the part worth
+/// testing and the two lookups either side of it need a database. The inputs
+/// are the slug the message carried and whatever this region's folders table
+/// says about it.
+#[derive(Debug, PartialEq)]
+enum FolderAction {
+    /// The slug is known here; this is the local primary key for it.
+    Use(String),
+    /// The default synthetics folder is minted lazily, on first use, by
+    /// whichever region a user happens to create a check in — so a region that
+    /// has not had one created in it yet simply does not have the row. That is
+    /// an absence to fill, not a replication that has not arrived.
+    CreateDefault,
+    /// Any other folder is created through the folders API and replicates on
+    /// its own topic. Failing here leaves the message unacked so it redelivers
+    /// after that folder lands — the same ordering behaviour alerts relies on.
+    Missing,
+}
+
+fn folder_action(slug: &str, local_pk: Option<String>) -> FolderAction {
+    match local_pk {
+        Some(pk) => FolderAction::Use(pk),
+        None if slug == DEFAULT_FOLDER => FolderAction::CreateDefault,
+        None => FolderAction::Missing,
+    }
+}
+
+/// Translates the folder slug a message carried into THIS region's
+/// `folders.id`.
+///
+/// The slug is the only folder reference that means the same thing in two
+/// regions. `folders.id` is a KSUID, and the default synthetics folder is
+/// minted lazily and locally, so each region ends up with a different one for
+/// the same folder; a check replicated with the origin's PK fails
+/// `synthetics_folder_fk` in every other region and redelivers until it dies.
+async fn resolve_folder_pk(org_id: &str, slug: &str) -> Result<String> {
+    let local_pk = table::folders::get_pk_by_name(org_id, slug, FolderType::Synthetics).await?;
+    match folder_action(slug, local_pk) {
+        FolderAction::Use(pk) => Ok(pk),
+        FolderAction::CreateDefault => create_default_folder(org_id).await,
+        FolderAction::Missing => Err(Error::Message(format!(
+            "synthetics folder {org_id}/{slug} is not in this region yet"
+        ))),
+    }
+}
+
+/// Mints this region's default synthetics folder.
+///
+/// The raw table write on purpose. The layer that creates this folder for a
+/// user lives in the crate that also publishes every write it makes, and it is
+/// deliberately not a dependency of this one — applying a replicated message
+/// through it is how a message becomes a loop.
+///
+/// The KSUID is deliberately this region's own and will not match the origin's.
+/// Nothing compares folder primary keys across regions — that assumption is
+/// exactly what this file no longer makes.
+async fn create_default_folder(org_id: &str) -> Result<String> {
+    let (id, _) = table::folders::put(
+        org_id,
+        None,
+        Folder {
+            folder_id: DEFAULT_FOLDER.to_owned(),
+            name: "default".to_owned(),
+            description: "default".to_owned(),
+        },
+        FolderType::Synthetics,
+    )
+    .await?;
+    Ok(id.to_string())
+}
+
+/// The destination of a move, which is a slug from a current producer and a
+/// folders primary key from one still on the previous build.
+///
+/// The unknown-slug arm probes for a primary key before giving up: a folder
+/// created through the folders API replicates *with* its KSUID, so an in-flight
+/// move message carrying one of those is valid here and applying it is what
+/// this region did before. A create or update needs no such probe — its slug
+/// travels in a field of its own, and an old producer leaves it empty.
+async fn resolve_move_destination(org_id: &str, dst: &str) -> Result<String> {
+    let local_pk = table::folders::get_pk_by_name(org_id, dst, FolderType::Synthetics).await?;
+    match folder_action(dst, local_pk) {
+        FolderAction::Use(pk) => Ok(pk),
+        FolderAction::CreateDefault => create_default_folder(org_id).await,
+        FolderAction::Missing => {
+            // Read the primary key back as a slug and resolve that, rather than
+            // writing it through: `folders.id` is unique across every folder
+            // type and org, so an id alone would satisfy the FK while putting
+            // the check in another org's dashboard folder. The round trip
+            // constrains it to a synthetics folder of this org.
+            if let Some(slug) = table::folders::get_name_by_pk(dst).await?
+                && let Some(pk) =
+                    table::folders::get_pk_by_name(org_id, &slug, FolderType::Synthetics).await?
+            {
+                Ok(pk)
+            } else {
+                Err(Error::Message(format!(
+                    "synthetics folder {org_id}/{dst} is not in this region yet"
+                )))
+            }
+        }
+    }
+}
+
 async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match msg {
         SyntheticsMessage::Create { org_id, payload } => {
-            let check = payload.into_check();
+            let folder_slug = payload.folder_slug.clone();
+            let mut check = payload.into_check();
             if table::synthetics_checks::get(conn, &org_id, &check.id)
                 .await?
                 .is_some()
@@ -69,13 +184,16 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
                 // the row is here and overwriting it could undo a later edit.
                 return Ok(());
             }
+            // The incoming `folder_id` is the ORIGIN region's KSUID and means
+            // nothing here. Replace it with the local primary key for the same
+            // slug. An empty slug is a message from a producer that predates
+            // the field: keep the old behaviour rather than inventing a folder.
+            if !folder_slug.is_empty() {
+                check.folder_id = resolve_folder_pk(&org_id, &folder_slug).await?;
+            }
             // `use_given_id` — the origin region's primary key is the identity
-            // every other region has to agree on.
-            //
-            // `folder_id` is the folders KSUID PK. If that folder has not
-            // replicated yet the FK rejects the insert, which surfaces as an
-            // error here, the message goes unacked, and the redelivery lands
-            // after the folder. That is the same ordering behaviour alerts has.
+            // every other region has to agree on. That applies to the CHECK's
+            // id; the folder's does not travel at all.
             table::synthetics_checks::create(conn, &org_id, check, true).await?;
         }
         SyntheticsMessage::Update {
@@ -83,10 +201,18 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
             id,
             payload,
         } => {
+            let folder_slug = payload.folder_slug.clone();
+            let mut check = payload.into_check();
+            // `update` writes `folder_id` like any other editable column, so the
+            // same translation as `Create` is needed or an edit would move the
+            // check into the origin's folder id and fail the FK.
+            if !folder_slug.is_empty() {
+                check.folder_id = resolve_folder_pk(&org_id, &folder_slug).await?;
+            }
             // Errors if the row is missing rather than creating it: an update
             // that outran its create is redelivered, and one that arrives after
             // a delete must not resurrect the check.
-            table::synthetics_checks::update(conn, &org_id, &id, payload.into_check()).await?;
+            table::synthetics_checks::update(conn, &org_id, &id, check).await?;
         }
         SyntheticsMessage::Delete { org_id, id } => {
             table::synthetics_checks::delete(conn, &org_id, &id).await?;
@@ -111,14 +237,18 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
             ids,
             dst_folder_id,
         } => {
-            // Deliberately tolerant of a partial move, unlike the branch above.
+            // The destination is a slug, so it has to become a local primary
+            // key first. Unresolvable IS an error, unlike the partial move
+            // below: moving nothing anywhere is not a partial result, and the
+            // redelivery lands once the folder does.
+            let dst_pk = resolve_move_destination(&org_id, &dst_folder_id).await?;
+            // Deliberately tolerant of ids it cannot find, unlike enable/pause.
             // A bulk move can legitimately race a delete of one of its ids, and
             // erroring would retry that message until it dead-lettered. A check
             // left in its old folder is cosmetic and the next edit to it carries
-            // `folder_id` anyway.
+            // its folder anyway.
             let moved =
-                table::synthetics_checks::move_to_folder(conn, &org_id, &ids, &dst_folder_id)
-                    .await?;
+                table::synthetics_checks::move_to_folder(conn, &org_id, &ids, &dst_pk).await?;
             if moved != ids.len() as u64 {
                 log::warn!(
                     "[SUPER_CLUSTER:DB] moved {moved} of {} synthetics checks into folder {dst_folder_id}; the rest are not in this region",
@@ -185,6 +315,60 @@ mod tests {
             MessageType::SyntheticsTable,
         );
         assert!(process(msg).await.is_err());
+    }
+
+    /// The bug this whole slug detour exists for: the incoming `folder_id` is
+    /// the origin region's KSUID and satisfies nothing here, so when the slug
+    /// is known locally the LOCAL primary key is what gets written.
+    #[test]
+    fn a_known_slug_resolves_to_this_regions_primary_key() {
+        let incoming_pk = "2A1b3C4d5E6f7G8h9I0jK1L2m3N".to_string();
+        let local_pk = "9Z8y7X6w5V4u3T2s1R0qP9o8N7m".to_string();
+
+        let action = folder_action("default", Some(local_pk.clone()));
+
+        assert_eq!(action, FolderAction::Use(local_pk.clone()));
+        assert_ne!(
+            FolderAction::Use(local_pk),
+            FolderAction::Use(incoming_pk),
+            "the primary key that travelled must never be the one written"
+        );
+    }
+
+    /// The default folder is created lazily by whichever region a user first
+    /// creates a check in, so a receiving region legitimately has none. Waiting
+    /// for it to replicate would wait forever — nothing publishes it.
+    #[test]
+    fn a_missing_default_folder_is_created_here_rather_than_waited_for() {
+        assert_eq!(
+            folder_action(DEFAULT_FOLDER, None),
+            FolderAction::CreateDefault
+        );
+    }
+
+    /// Any other folder does replicate, on the folders topic. Erroring leaves
+    /// the message unacked so it redelivers after the folder arrives; inventing
+    /// the folder instead would give this region one the origin never had.
+    #[test]
+    fn a_missing_named_folder_makes_the_message_redeliver() {
+        assert_eq!(folder_action("team-a", None), FolderAction::Missing);
+    }
+
+    /// An empty slug means the producer predates the field. The apply must fall
+    /// back to what it did before rather than resolving `""` — which would be
+    /// `Missing`, and would stall every message from an older region.
+    #[test]
+    fn an_absent_slug_is_not_treated_as_a_folder_named_nothing() {
+        assert_eq!(folder_action("", None), FolderAction::Missing);
+        // …which is why both call sites test the slug before resolving it.
+        // Assembled at runtime so this assertion cannot match its own text.
+        let guard = ["folder_slug", "is_empty()"].join(".");
+        let source = include_str!("synthetics.rs");
+        assert_eq!(
+            source.matches(&guard).count(),
+            2,
+            "create and update must both guard the resolve on a non-empty slug"
+        );
     }
 
     /// The one hazard this file exists to avoid.

@@ -220,17 +220,55 @@ pub async fn get_cached<C: ConnectionTrait>(
     Ok(found)
 }
 
+/// Converts a batch of rows, dropping the ones that will not convert.
+///
+/// A row whose stored shape no longer parses — a `synthetics_type` written by a
+/// newer build, a corrupt `locations` blob — is one check that cannot be read.
+/// Collecting the batch with `?` made it every check: one such row 500s the
+/// whole org's list API and stops `claim_due` for the entire deployment, so the
+/// blast radius of one unreadable row was the fleet. Skipping keeps the other
+/// 999 working.
+///
+/// Loud on purpose. The failure it replaces was at least obvious; a silent skip
+/// would trade one visible outage for a check that quietly never runs, so every
+/// dropped row is logged with its id and the parse error, and its id is
+/// returned so the caller can surface it too.
+fn convert_batch<T>(models: Vec<synthetics_checks::Model>, caller: &str) -> (Vec<T>, Vec<String>)
+where
+    T: TryFrom<synthetics_checks::Model, Error = errors::Error>,
+{
+    let mut converted = Vec::with_capacity(models.len());
+    let mut skipped = Vec::new();
+    for m in models {
+        let id = m.id.clone();
+        let org_id = m.org_id.clone();
+        match T::try_from(m) {
+            Ok(v) => converted.push(v),
+            Err(e) => {
+                log::error!("[synthetics] {caller}: skipping unreadable check {org_id}/{id}: {e}");
+                config::metrics::SYNTHETICS_UNREADABLE_CHECKS_TOTAL.inc();
+                skipped.push(id);
+            }
+        }
+    }
+    (converted, skipped)
+}
+
 pub async fn list<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     params: &ListSyntheticsParams,
 ) -> Result<Vec<Synthetic>, errors::Error> {
     let _lock = super::get_lock().await;
-    list_models(conn, org_id, params)
-        .await?
-        .into_iter()
-        .map(Synthetic::try_from)
-        .collect()
+    let models = list_models(conn, org_id, params).await?;
+    // A single unreadable row used to 500 the whole org's list — the UI renders
+    // that as "no checks yet", so a total outage looked like an empty state.
+    //
+    // `count` still counts the skipped row, so a page can come back one short of
+    // the total. That is the same shape any server-side filter has, and it beats
+    // the alternative of a second full read just to make the number agree.
+    let (checks, _skipped) = convert_batch(models, "list");
+    Ok(checks)
 }
 
 pub async fn count<C: ConnectionTrait>(
@@ -586,7 +624,8 @@ pub async fn fetch_due<C: ConnectionTrait>(
     let _lock = super::get_lock().await;
     let models = due_checks_query(now_us, limit).all(conn).await?;
 
-    models.into_iter().map(DueCheck::try_from).collect()
+    let (due, _skipped) = convert_batch(models, "fetch_due");
+    Ok(due)
 }
 
 /// A check the orphan detector may need to report.
@@ -727,10 +766,16 @@ where
     }
     let models = query.all(&txn).await?;
 
-    let due: Vec<DueCheck> = models
-        .into_iter()
-        .map(DueCheck::try_from)
-        .collect::<Result<Vec<_>, _>>()?;
+    // Skip-and-log rather than fail the batch: an unreadable row is one check
+    // that cannot be scheduled, and it must not cost the other 999. Failing
+    // here stopped the scheduler for the whole deployment every five seconds,
+    // and nothing anywhere ran.
+    //
+    // The skipped rows are not silently dropped twice over: they stay enabled
+    // and overdue, so the orphan detector — which reads the same predicate
+    // through an infallible projection — keeps reporting them, and that is the
+    // signal that says a check is not running.
+    let (due, _skipped): (Vec<DueCheck>, _) = convert_batch(models, "claim_due");
 
     for check in &due {
         Entity::update_many()
@@ -1109,6 +1154,100 @@ mod tests {
         assert_eq!(check.next_run_at, 1750000001000000);
         assert_eq!(check.last_triggered_at, 1750000000500000);
         assert_eq!(check.last_check_status, SyntheticStatus::Passed);
+    }
+
+    /// A row whose `synthetics_type` no longer parses — written by a newer
+    /// build, or by a bad migration. One of these disabled scheduling for an
+    /// entire deployment and 500ed the list API for a whole org.
+    fn an_unreadable_model() -> Model {
+        Model {
+            id: "poison-1".to_string(),
+            synthetics_type: "NOT_A_VALID_TYPE".to_string(),
+            ..make_model()
+        }
+    }
+
+    /// The blast radius of one bad row is one check. `claim_due` must return
+    /// every readable check in the batch and advance those, not fail.
+    #[tokio::test]
+    async fn test_claim_due_skips_an_unreadable_row_and_keeps_the_rest() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+        let good = Model {
+            id: "mon-2".to_string(),
+            ..make_model()
+        };
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![an_unreadable_model(), make_model(), good]])
+            .append_exec_results(vec![
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+            ])
+            .into_connection();
+
+        let claimed = claim_due(&db, 500, 10, |_| 900).await.unwrap();
+
+        let ids: Vec<&str> = claimed.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["mon-1", "mon-2"],
+            "the readable checks must still be claimed"
+        );
+    }
+
+    /// The skip is a decision, not an accident: the caller is handed the ids it
+    /// dropped, and each one is logged. Asserted on the returned set because a
+    /// skip nobody can see is a worse failure than the one it replaced.
+    #[test]
+    fn test_convert_batch_reports_every_row_it_skips() {
+        let (checks, skipped): (Vec<Synthetic>, _) =
+            convert_batch(vec![an_unreadable_model(), make_model()], "test");
+
+        assert_eq!(skipped, vec!["poison-1".to_string()]);
+        assert_eq!(checks.len(), 1);
+        assert_eq!(checks[0].id, "mon-1");
+    }
+
+    /// The ordinary case has to stay ordinary — no dropped rows, nothing to
+    /// report.
+    #[test]
+    fn test_convert_batch_leaves_a_healthy_batch_alone() {
+        let good = Model {
+            id: "mon-2".to_string(),
+            ..make_model()
+        };
+        let (checks, skipped): (Vec<DueCheck>, _) = convert_batch(vec![make_model(), good], "test");
+
+        assert!(skipped.is_empty());
+        assert_eq!(
+            checks.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+            vec!["mon-1", "mon-2"]
+        );
+    }
+
+    /// The list path had the same shape, and its failure mode was worse than an
+    /// error: the UI renders a 500 from this endpoint as "Create your first
+    /// Check", so one bad row made a working org look empty.
+    #[tokio::test]
+    async fn test_list_returns_the_readable_checks_despite_a_bad_row() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![an_unreadable_model(), make_model()]])
+            .into_connection();
+
+        let checks = list(&db, "org1", &ListSyntheticsParams::default())
+            .await
+            .unwrap();
+
+        assert_eq!(checks.len(), 1);
+        assert_eq!(checks[0].id, "mon-1");
     }
 
     /// The lock clause is the whole HA fix: without FOR UPDATE SKIP LOCKED the

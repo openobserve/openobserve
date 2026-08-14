@@ -105,6 +105,19 @@ fn db() -> anyhow::Result<&'static sea_orm::DatabaseConnection> {
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))
 }
 
+/// Mints this org's default synthetics folder, in THIS region only.
+///
+/// It deliberately does not broadcast, and broadcasting would not help.
+/// `folders::put` upserts on `(org, folder_id, type)` and keeps the row it
+/// finds, so a `FolderMessage::Create` carrying this KSUID is *ignored* by any
+/// region that has already lazily minted its own `default` — no error, no
+/// convergence, and the two primary keys stay different. Which is precisely the
+/// case that matters, since this folder is created on demand in whichever
+/// region a user first happens to save a check.
+///
+/// So no cross-region reference may name a folder by primary key: replicated
+/// checks carry the folder's public SLUG, and the receiving region resolves it
+/// against — or creates it in — its own table.
 async fn create_default_synthetics_folder(org_id: &str) -> anyhow::Result<()> {
     let folder = Folder {
         folder_id: DEFAULT_FOLDER.to_owned(),

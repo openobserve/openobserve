@@ -248,6 +248,34 @@ pub static SYNTHETICS_ORPHAN_SCANS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+/// Check rows this node read and could not parse, and therefore skipped.
+///
+/// Skipping is the right call — one unreadable row must not stop the scheduler
+/// or the list API for everything else — but it has to be visible, or a check
+/// silently stops running. Every skip also logs with the row's id; this counter
+/// is the part an alert can watch.
+///
+/// Deliberately unlabelled. The one question worth alerting on is "is this node
+/// dropping rows at all", the log line answers "which", and a per-org label
+/// would put an attacker- or migration-controlled string into the cardinality
+/// of a metric that should normally sit at zero.
+///
+/// Orphan detection covers only part of this: it runs on scheduler nodes only,
+/// so a row skipped on the list path in a non-scheduler region has nothing else
+/// to report it.
+pub static SYNTHETICS_UNREADABLE_CHECKS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_unreadable_checks_total",
+            "Synthetics check rows skipped because they could not be parsed.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
 pub static INGEST_PACK_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -2192,6 +2220,9 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(SYNTHETICS_ORPHAN_SCANS_TOTAL.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(INGEST_PACK_FILES.clone()))
         .expect("Metric registered");
     registry
@@ -2808,6 +2839,7 @@ mod tests {
         let _ = SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone();
         let _ = SYNTHETICS_ORPHANED_CHECKS.clone();
         let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
+        let _ = SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone();
         let _ = INGEST_PACK_FILES.clone();
         let _ = INGEST_PACK_SEGMENTS.clone();
         let _ = INGEST_WAL_WRITE_BYTES.clone();
