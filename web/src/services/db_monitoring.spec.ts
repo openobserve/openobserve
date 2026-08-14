@@ -358,6 +358,77 @@ describe("db_monitoring service · getQueryInsights", () => {
 });
 
 /**
+ * The standalone endpoints read carries the REST of the join key.
+ *
+ * A fingerprint hashes statement TEXT ONLY, so it is not a join key: one
+ * statement running on two engines is one fingerprint, and aggregating callers
+ * under it alone returns both engines' services in a list that describes
+ * neither. Measured live on org `default`, fp `69219a9c7fc5039d`: unscoped
+ * returns 343,055 calls INCLUDING `dbm-sv-workload` (a MySQL-only caller);
+ * `system=postgresql` returns 125,195 calls and does not name it. Dropping
+ * these params does not fail the request — it returns a fused answer, which is
+ * why the loss must be caught here rather than as an error at runtime.
+ *
+ * The param SPELLING is pinned against the Rust `EndpointsQuery` struct
+ * (`api.rs`), which deserializes `system` and `namespace`. Serde silently drops
+ * a key it does not know, so a misspelling reintroduces the fusion with a 200.
+ */
+describe("db_monitoring service · getQueryEndpoints join key", () => {
+  const mockClient = (http as unknown as ReturnType<typeof vi.fn>)();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const paramsOf = () => (mockClient.get as ReturnType<typeof vi.fn>).mock.calls[0][1].params;
+
+  it("sends the engine and database as the params the handler reads", () => {
+    dbMonitoringService.getQueryEndpoints("myorg", {
+      fingerprint: "69219a9c7fc5039d",
+      stream: "default",
+      startTime: 1_754_880_000_000_000,
+      endTime: 1_754_883_600_000_000,
+      system: "postgresql",
+      namespace: "orders",
+      limit: 20,
+    });
+    expect(paramsOf()).toEqual({
+      fingerprint: "69219a9c7fc5039d",
+      stream: "default",
+      start_time: 1_754_880_000_000_000,
+      end_time: 1_754_883_600_000_000,
+      system: "postgresql",
+      namespace: "orders",
+      limit: 20,
+    });
+  });
+
+  it("omits the scope rather than blanking it when the caller has none", () => {
+    // An empty predicate matches EVERY engine, so a blank must never reach the
+    // wire — absent is the only honest encoding of "no engine given".
+    dbMonitoringService.getQueryEndpoints("myorg", {
+      fingerprint: "fp",
+      stream: "default",
+      system: "",
+      namespace: undefined,
+    });
+    expect(paramsOf()).not.toHaveProperty("system");
+    expect(paramsOf()).not.toHaveProperty("namespace");
+  });
+
+  it("does not let the UI's `all` sentinel widen the scope on the wire", () => {
+    dbMonitoringService.getQueryEndpoints("myorg", {
+      fingerprint: "fp",
+      stream: "default",
+      system: "all",
+      namespace: "all",
+    });
+    expect(paramsOf()).not.toHaveProperty("system");
+    expect(paramsOf()).not.toHaveProperty("namespace");
+  });
+});
+
+/**
  * The history endpoint's folded calling-endpoints section. Endpoints REQUIRES a
  * trace stream, and the stream this page uses is the one history itself
  * resolves — so the flag is what lets one request answer both, instead of the
