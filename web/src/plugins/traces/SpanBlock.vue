@@ -24,8 +24,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :id="span.spanId"
     data-test="span-block-container"
   >
+    <!-- The row owns the horizontal clip. It used to live on the bar row below,
+         which worked only because that row was unpositioned: an absolutely
+         positioned box escapes an `overflow` ancestor that is not in its
+         containing-block chain, so the duration label and the markers were never
+         actually clipped there. Making the bar row `relative` puts them inside
+         its clip, and it is only as tall as the bar — the label would lose half
+         its line box. Clipping at the row keeps the same left and right edges,
+         since both boxes are the same width. -->
     <div
-      class="span-block relative-position bg-surface-base flex w-full cursor-pointer items-end justify-between pb-1.5"
+      class="span-block relative-position bg-surface-base flex w-full cursor-pointer items-end justify-between overflow-hidden pb-1.5"
       :style="{
         height: spanDimensions.height + 'px',
       }"
@@ -34,8 +42,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @mouseover="onSpanHover"
       data-test="span-block"
     >
+      <!-- `relative` is load-bearing: it makes this box — which is exactly as
+           tall as the bar — the containing block for the event markers and the
+           duration label. It carried a dead Quasar `position-relative` class (no
+           such rule exists in this codebase), so it was a static box and both
+           escaped up to the waterfall row wrapper, where `top-1/2` centred the
+           markers on the 30px row instead of on the 8px bar. It stays `w-full`
+           so marker `left` percentages keep resolving against the trace window,
+           which is the space they are computed in. Do not move `relative` onto
+           the bar itself — that would rebase them onto the span. -->
       <div
-        class="position-relative flex w-full cursor-pointer flex-nowrap items-center overflow-hidden"
+        class="relative flex w-full cursor-pointer flex-nowrap items-center"
         :class="defocusSpan ? 'opacity-30' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
@@ -122,6 +139,20 @@ const DEFAULT_SPAN_COLOR = "#58508d";
  * sub-6px spans to zero width. It belongs to the label, not the bar.
  */
 const BAR_LABEL_GUTTER_PX = 6;
+
+/**
+ * Vertical offset that centres the duration label on the span bar.
+ *
+ * The label's containing block is the bar row, which is `barHeight` tall (8px —
+ * see TraceDetails' spanDimensions), so `top: 0` aligns the label's top edge
+ * with the bar's top edge. The label is one `text-xs` line box: 0.75rem at a
+ * 4/3 line-height, i.e. 1rem = 16px. Centring 16px on 8px needs
+ * (8 - 16) / 2 = -4px = -0.25rem.
+ *
+ * The right-aligned branch keeps its own -0.3125rem; it was already written
+ * against this 8px box.
+ */
+const BAR_LABEL_TOP_REM = "-0.25rem";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -308,12 +339,19 @@ export default defineComponent({
 
     const getDurationStyle = () => {
       const style: any = {
-        top: "0.625rem",
+        top: BAR_LABEL_TOP_REM,
       };
 
       const onePercent = Number((spanBlockWidth.value / 100).toFixed(2));
       const labelWidth = 60;
-      if ((leftPosition.value + spanWidth.value) * onePercent + labelWidth > spanBlockWidth.value) {
+      // The label is placed `BAR_LABEL_GUTTER_PX` past the bar's right edge, so
+      // its own right edge sits at boxRight + gutter + labelWidth. The gutter
+      // has to be in this comparison too, or the last 6px of the label is
+      // clipped by this container's `overflow-hidden`.
+      if (
+        (leftPosition.value + spanWidth.value) * onePercent + labelWidth + BAR_LABEL_GUTTER_PX >
+        spanBlockWidth.value
+      ) {
         style.right = 0;
         style.top = "-0.3125rem";
       } else if (leftPosition.value > 50) {
@@ -321,9 +359,14 @@ export default defineComponent({
       } else {
         const left = leftPosition.value + (Math.floor(spanWidth.value) ? spanWidth.value : 1);
 
+        // Below 19px of bar the label is pinned to a fixed offset from the bar's
+        // start rather than tracking its end. That offset used to clear the fill
+        // by `19 + 6 - barWidth` px, because the fill was drawn 6px shorter than
+        // its geometry box; now that the bar is truthful, the gutter has to be
+        // added back here or the label touches a ~19px bar.
         style.left =
           (left * onePercent - leftPosition.value * onePercent < 19
-            ? leftPosition.value * onePercent + 19
+            ? leftPosition.value * onePercent + 19 + BAR_LABEL_GUTTER_PX
             : left * onePercent + BAR_LABEL_GUTTER_PX) + "px";
       }
 

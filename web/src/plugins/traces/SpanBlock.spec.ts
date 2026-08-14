@@ -441,6 +441,40 @@ describe("SpanBlock", () => {
       const style = wrapper.vm.getDurationStyle();
       expect(style.left).toBe(`${91.72 * 10 + 6}px`);
     });
+
+    // Regression: below 19px of bar the label stops tracking the bar's end and
+    // pins to a fixed offset from its start. That offset used to clear the fill
+    // by `19 + 6 - barWidth`, because the fill was drawn 6px shorter than its
+    // geometry box. Once the bar became truthful the clearance fell to
+    // `19 - barWidth`, i.e. to ~0 for a bar just under the threshold.
+    it("keeps the gutter's clearance on a bar too narrow to track", async () => {
+      // 5255 / 350372 → spanWidth 1.50%, i.e. a 15px bar in a 1000px row.
+      await wrapper.setProps({ span: { ...mockSpan, durationUs: 5255 } });
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 1000 });
+      await wrapper.vm.onResize();
+      await flushPromises();
+
+      expect(wrapper.vm.spanWidth).toBe(1.5);
+      expect(wrapper.vm.getDurationStyle().left).toBe(`${19 + 6}px`);
+    });
+
+    // Regression: the right-align threshold was still written for a label
+    // placed flush against the bar. With the gutter the label's right edge is
+    // `barEnd + 6 + 60`, so a band of 6px worth of bar widths fell through to
+    // the left-aligned branch and got clipped by `overflow-hidden`.
+    it("right-aligns the label before the gutter pushes it out of the container", async () => {
+      // 329350 / 350372 → spanWidth 94.00%, so the bar ends at 940px of 1000px.
+      // Label at 946px + 60px wide = 1006px, past the container's edge.
+      await wrapper.setProps({ span: { ...mockSpan, durationUs: 329350 } });
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 1000 });
+      await wrapper.vm.onResize();
+      await flushPromises();
+
+      expect(wrapper.vm.spanWidth).toBe(94);
+      expect(wrapper.vm.getDurationStyle()).toHaveProperty("right", 0);
+    });
   });
 
   describe("durationStyle reactive ref", () => {
@@ -581,6 +615,30 @@ describe("SpanBlock", () => {
 
     it("renders no markers for a span with no events", () => {
       expect(markers()).toHaveLength(0);
+    });
+
+    // Regression: this div carried Quasar's `position-relative`, a class no rule
+    // in this codebase defines, so it was a static box. The markers and the
+    // duration label are absolutely positioned inside it; with no positioned
+    // ancestor here they escaped to the waterfall row wrapper and `top-1/2`
+    // centred them on the 30px row instead of the 8px bar. jsdom does no layout,
+    // so this can only assert the containing block exists, not where it lands.
+    it("makes the bar row the markers' containing block", () => {
+      const trigger = wrapper.find('[data-test="span-block-select-trigger"]');
+
+      expect(trigger.classes()).toContain("relative");
+      expect(trigger.classes()).not.toContain("position-relative");
+    });
+
+    // The bar row is only as tall as the bar, so once it became the containing
+    // block its `overflow-hidden` would have cut the duration label's 1rem line
+    // box down to the bar's 8px. The clip belongs on the full-height row, which
+    // has the same left and right edges.
+    it("clips at the row, not at the bar row", () => {
+      expect(wrapper.find('[data-test="span-block"]').classes()).toContain("overflow-hidden");
+      expect(wrapper.find('[data-test="span-block-select-trigger"]').classes()).not.toContain(
+        "overflow-hidden",
+      );
     });
 
     it("positions markers across the trace window and flags exceptions", async () => {
