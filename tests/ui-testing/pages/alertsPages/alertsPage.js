@@ -1292,6 +1292,25 @@ export class AlertsPage {
         testLogger.info('Selected first available destination');
     }
 
+    /**
+     * Select a destination by exact name. Prefer this over selectFirstDestination:
+     * the "first" option can be a stale destination created by a parallel spec
+     * and deleted before save, which surfaces as a 404 "destination not found".
+     */
+    async selectDestinationByName(name) {
+        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
+        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
+        await openOSelectDropdown(this.page, dropdown);
+        const option = this.page
+            .locator('[data-test$="-popover"] [data-test$="-option"]')
+            .filter({ hasText: name })
+            .first();
+        await expect(option).toBeVisible({ timeout: 5000 });
+        await option.click();
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected destination by name', { name });
+    }
+
     /** Assert the list row for `name` renders the given priority (string or RegExp). */
     async expectAlertPriorityInList(name, matcher) {
         const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
