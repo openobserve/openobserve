@@ -17,6 +17,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, config } from "@vue/test-utils";
 import i18n from "@/locales";
 import FlameGraphView from "@/components/traces/FlameGraphView.vue";
+import { SEVERITY_MARKER_TOKEN } from "@/composables/traces/useSpanEvents";
 
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
@@ -1425,5 +1426,15 @@ describe("FlameGraphView span event markers", () => {
     };
 
     expect(mountView().vm.buildSpanEventMarkers(withError, 10)[0].severity).toBe("error");
+  });
+});
+
+describe("FlameGraphView severity colours", () => {
+  // renderItem returns raw ECharts shapes, which cannot take Tailwind classes,
+  // so this surface resolves token values at draw time. It must resolve the
+  // same tokens the DOM surfaces use, or the two drift apart.
+  it("names the shared marker tokens rather than its own copy", () => {
+    expect(SEVERITY_MARKER_TOKEN.info).toBe("--color-trace-event-info");
+    expect(Object.keys(SEVERITY_MARKER_TOKEN).sort()).toEqual(["error", "info", "warning"]);
   });
 });

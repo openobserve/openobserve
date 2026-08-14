@@ -166,6 +166,7 @@ import {
   normalizeSpanEvents,
   toSpanEventMarkers,
   clusterSpanEventMarkers,
+  SEVERITY_MARKER_TOKEN,
   type SpanEventSeverity,
 } from "@/composables/traces/useSpanEvents";
 
@@ -291,16 +292,14 @@ const buildSpanEventMarkers = (span: any, blockWidthPx: number): FlameEventMarke
  * Severity colours read from the design tokens.
  *
  * `renderItem` returns raw ECharts shapes, which cannot take Tailwind classes,
- * so the token values are resolved at draw time rather than hardcoded.
+ * so the token values are resolved at draw time rather than hardcoded. The token
+ * names come from the shared vocabulary so this surface cannot drift from the
+ * waterfall and the sidebar mini-timeline.
  */
-const severityColor = (severity: SpanEventSeverity): string => {
-  const token = {
-    error: "--color-badge-error-solid-bg",
-    warning: "--color-badge-warning-solid-bg",
-    info: "--color-badge-blue-solid-bg",
-  }[severity];
-  return getComputedStyle(document.documentElement).getPropertyValue(token).trim();
-};
+const severityColor = (severity: SpanEventSeverity): string =>
+  getComputedStyle(document.documentElement)
+    .getPropertyValue(SEVERITY_MARKER_TOKEN[severity])
+    .trim();
 
 defineExpose({ buildSpanEventMarkers });
 
