@@ -817,6 +817,49 @@ describe("TraceDetailsSidebar", async () => {
         expect(timelineMarkers()[0].attributes("data-event-count")).toBe("2");
       });
 
+      // Regression: the observer was attached in `onMounted`, but the track is
+      // inside the Events tab panel — rendered `v-if="isActive"` with no
+      // keep-alive — and further gated on the span having events, so it does not
+      // exist at mount. Nothing ever observed it, the width stayed 0, and every
+      // event rendered as its own overlapping marker. The test above hand-calls
+      // `onEventTimelineResize`, so it cannot see that; this one drives the
+      // observer the component attached for itself.
+      it("attaches the resize observer when the timeline appears", async () => {
+        const observed: Array<{ element: Element; notify: () => void }> = [];
+        const OriginalResizeObserver = globalThis.ResizeObserver;
+
+        class CapturingResizeObserver {
+          constructor(private callback: () => void) {}
+          observe(element: Element) {
+            observed.push({ element, notify: () => this.callback() });
+          }
+          unobserve() {}
+          disconnect() {}
+        }
+
+        vi.stubGlobal("ResizeObserver", CapturingResizeObserver);
+
+        try {
+          await setSpanEvents([
+            { name: "a", _timestamp: eventNsAt(0.5) },
+            { name: "b", _timestamp: eventNsAt(0.5005) },
+          ]);
+
+          const track = (wrapper.vm as any).eventTimelineRef;
+          const entry = observed.find((o) => o.element === track);
+          expect(entry).toBeDefined();
+
+          Object.defineProperty(track, "clientWidth", { value: 400, configurable: true });
+          entry!.notify();
+          await flushPromises();
+
+          expect(timelineMarkers()).toHaveLength(1);
+          expect(timelineMarkers()[0].attributes("data-event-count")).toBe("2");
+        } finally {
+          vi.stubGlobal("ResizeObserver", OriginalResizeObserver);
+        }
+      });
+
       // Regression: `duration` is truncated integer microseconds, so an event
       // firing at the real span end landed past 100% and was dropped here.
       it("shows an event that fires at the exact span end", async () => {

@@ -1398,22 +1398,33 @@ export default defineComponent({
     // derived from the track's measured width rather than a fixed percentage.
     const eventTimelineRef = ref<HTMLElement | null>(null);
     const eventTimelineWidth = ref(0);
-    let eventTimelineObserver: ResizeObserver | null = null;
 
     const onEventTimelineResize = () => {
       eventTimelineWidth.value = eventTimelineRef.value?.clientWidth ?? 0;
     };
 
-    onMounted(() => {
-      if (typeof ResizeObserver === "undefined" || !eventTimelineRef.value) return;
-      eventTimelineObserver = new ResizeObserver(onEventTimelineResize);
-      eventTimelineObserver.observe(eventTimelineRef.value);
-    });
+    /**
+     * The track is not in the DOM at mount: it lives inside the Events tab
+     * panel, which renders `v-if="isActive"` with no keep-alive, and is further
+     * gated on the span having events. Observing in `onMounted` therefore found
+     * nothing and never retried, leaving the width at 0 — where the cluster
+     * threshold is 0 and every event renders as its own overlapping marker.
+     * Watching the template ref attaches whenever the track appears and
+     * re-attaches after the user leaves the tab and comes back.
+     */
+    watch(
+      eventTimelineRef,
+      (element, _previous, onCleanup) => {
+        if (!element || typeof ResizeObserver === "undefined") return;
 
-    onUnmounted(() => {
-      eventTimelineObserver?.disconnect();
-      eventTimelineObserver = null;
-    });
+        onEventTimelineResize();
+
+        const observer = new ResizeObserver(onEventTimelineResize);
+        observer.observe(element);
+        onCleanup(() => observer.disconnect());
+      },
+      { flush: "post" },
+    );
 
     const spanEventClusters = computed(() =>
       clusterSpanEventMarkers(spanEventMarkers.value, eventTimelineWidth.value),
