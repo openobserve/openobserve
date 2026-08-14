@@ -47,6 +47,8 @@ pub(super) struct Case {
     pub(super) fingerprint_class: Option<String>,
     #[serde(default)]
     literals: Vec<String>,
+    /// Never read — but REQUIRED (no `#[serde(default)]`) so every corpus case must declare
+    /// its provenance or deserialization fails. Schema enforcement, not dead code.
     #[allow(dead_code)]
     source: String,
 }
@@ -255,103 +257,31 @@ fn run_file(name: &str) {
     }
 }
 
-// -- one table test per corpus file -----------------------------------------
+// -- the table test over every corpus file -----------------------------------
+// (includes the captured corpus: real SDK fixtures from tests/dbm-capture)
 
+/// One loop over all corpus files. Each file runs under `catch_unwind` so a failure in one
+/// file never hides failures in another, and every reported failure carries the FILE name
+/// (case ids are already in `check_case`'s assert messages).
 #[test]
-fn corpus_placeholders_case() {
-    run_file("placeholders_case");
-}
-
-#[test]
-fn corpus_in_lists() {
-    run_file("in_lists");
-}
-
-#[test]
-fn corpus_dialect_quoting() {
-    run_file("dialect_quoting");
-}
-
-#[test]
-fn corpus_sqlcommenter() {
-    run_file("sqlcommenter");
-}
-
-#[test]
-fn corpus_identifiers() {
-    run_file("identifiers");
-}
-
-#[test]
-fn corpus_batches_tcl() {
-    run_file("batches_tcl");
-}
-
-#[test]
-fn corpus_stmt_class() {
-    run_file("stmt_class");
-}
-
-#[test]
-fn corpus_redis() {
-    run_file("redis");
-}
-
-#[test]
-fn corpus_mongodb() {
-    run_file("mongodb");
-}
-
-#[test]
-fn corpus_elasticsearch() {
-    run_file("elasticsearch");
-}
-
-#[test]
-fn corpus_cassandra_clickhouse() {
-    run_file("cassandra_clickhouse");
-}
-
-#[test]
-fn corpus_semconv() {
-    run_file("semconv");
-}
-
-#[test]
-fn corpus_instance_status() {
-    run_file("instance_status");
-}
-
-#[test]
-fn corpus_fallbacks() {
-    run_file("fallbacks");
-}
-
-#[test]
-fn corpus_negative() {
-    run_file("negative");
-}
-
-// -- captured corpus (real SDK fixtures, extracted from tests/dbm-capture) ---
-
-#[test]
-fn corpus_captured_sql() {
-    run_file("captured_sql");
-}
-
-#[test]
-fn corpus_captured_redis() {
-    run_file("captured_redis");
-}
-
-#[test]
-fn corpus_captured_mongodb() {
-    run_file("captured_mongodb");
-}
-
-#[test]
-fn corpus_captured_degraded() {
-    run_file("captured_degraded");
+fn corpus_all_files() {
+    let mut failures: Vec<String> = Vec::new();
+    for (name, _) in CORPUS {
+        if let Err(payload) = std::panic::catch_unwind(|| run_file(name)) {
+            let msg = payload
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| payload.downcast_ref::<&str>().copied())
+                .unwrap_or("non-string panic payload");
+            failures.push(format!("corpus file {name}: {msg}"));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "corpus failures in {} file(s):\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 // -- cross-corpus invariants -------------------------------------------------
@@ -629,8 +559,8 @@ fn normalize_cached_hit_matches_direct_normalize_and_caches_failures() {
     // Miss then hit — both must equal the uncached result.
     let miss = normalize_cached(text, Dialect::Postgresql, true).unwrap();
     let hit = normalize_cached(text, Dialect::Postgresql, true).unwrap();
-    assert_eq!(miss, direct);
-    assert_eq!(hit, direct);
+    assert_eq!(*miss, direct);
+    assert_eq!(*hit, direct);
     // Fold flag is part of the key — a different flag is a different entry.
     let unfolded = normalize_cached(
         "SELECT * FROM events_20260807 WHERE id = 5",
@@ -738,6 +668,41 @@ fn resource_only_db_attrs_do_not_qualify_span() {
         resource: &resource,
     };
     assert!(enrich(&merged, 3).is_none());
+}
+
+// ---------------------------------------------------------------------------
+// UTF-8 pass-through in the Mongo command-doc folder (regression: bytes were
+// pushed `as char`, so any byte >= 0x80 re-encoded as a Latin-1 codepoint —
+// non-ASCII keys/collection names became mojibake in query_norm)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn mongodb_non_ascii_keys_survive_normalization_intact() {
+    // Quoted non-ASCII keys (pymongo dict-repr shape): preserved verbatim, values fold.
+    let ns = normalize("find {'名前': 'アリス', 'café': 3}", Dialect::Mongodb).unwrap();
+    assert_eq!(
+        ns.query_norm.as_deref(),
+        Some("find {'名前': \"?\", 'café': \"?\"}")
+    );
+    assert_eq!(ns.operation.as_deref(), Some("find"));
+
+    // Bare (unquoted) non-ASCII key with an array value: must survive BOTH the doc folder
+    // and the array collapser, with the $in-style repeat collapse still applied.
+    let ns = normalize("{café: [1, 2, 3]}", Dialect::Mongodb).unwrap();
+    assert_eq!(ns.query_norm.as_deref(), Some("{café: [\"?\"]}"));
+    assert_eq!(ns.operation.as_deref(), Some("café"));
+
+    // Non-ASCII collection name as the command value is preserved — it is the identity.
+    let ns = normalize(
+        r#"{"find": "ユーザー", "filter": {"名前": "x"}}"#,
+        Dialect::Mongodb,
+    )
+    .unwrap();
+    assert_eq!(
+        ns.query_norm.as_deref(),
+        Some(r#"{"find": "ユーザー", "filter": {"名前": "?"}}"#)
+    );
+    assert_eq!(ns.operation.as_deref(), Some("find"));
 }
 
 #[test]

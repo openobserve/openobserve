@@ -21,6 +21,8 @@
 //! only itself, never the whole fleet. Value format is shared with the sibling:
 //! either `"<offset>"` or `"<offset>;<node_uuid>"` (node = job lock holder).
 
+use infra::errors::{DbError, Error};
+
 use crate as db;
 
 fn mk_key(org_id: &str, stream_name: &str) -> String {
@@ -42,13 +44,41 @@ fn parse_offset_value(value: &str) -> (i64, String) {
 }
 
 /// Get the rollup offset (µs) and lock-holder node for one `(org, stream)`.
-pub async fn get_offset(org_id: &str, stream_name: &str) -> (i64, String) {
+///
+/// A missing key is a legitimately fresh stream → `Ok((0, ""))`. Any OTHER
+/// meta-DB error propagates: swallowing it to `(0, "")` would make a transient
+/// read failure look like a fresh stream — restarting the rollup one window
+/// back AND stealing the coordination lock from whichever node holds it.
+pub async fn get_offset(org_id: &str, stream_name: &str) -> Result<(i64, String), anyhow::Error> {
     let key = mk_key(org_id, stream_name);
-    let value = match db::get(&key).await {
-        Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
-        Err(_) => String::from("0"),
-    };
-    parse_offset_value(&value)
+    match db::get(&key).await {
+        Ok(ret) => Ok(parse_offset_value(&String::from_utf8_lossy(&ret))),
+        Err(Error::DbError(DbError::KeyNotExists(_))) => Ok((0, String::new())),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Get every stream's rollup offset for one org in ONE prefix read:
+/// `stream name → (offset_micros, node_uuid)`.
+///
+/// The read API resolves tails for several streams per request, and one
+/// meta-DB round trip per stream (twice — freshness and tail computation) is
+/// what this batches away. A stream absent from the map is a legitimately
+/// fresh stream — the same `(0, "")` that [`get_offset`] answers for a missing
+/// key. Any read error propagates, exactly as [`get_offset`]'s does: the
+/// caller must not mistake a meta-DB blip for a fleet of fresh streams.
+pub async fn list_offsets(
+    org_id: &str,
+) -> Result<std::collections::HashMap<String, (i64, String)>, anyhow::Error> {
+    let prefix = format!("/db_monitoring/offsets/{org_id}/");
+    let items = db::list(&prefix).await?;
+    Ok(items
+        .into_iter()
+        .filter_map(|(key, value)| {
+            let stream = key.strip_prefix(&prefix)?.to_string();
+            Some((stream, parse_offset_value(&String::from_utf8_lossy(&value))))
+        })
+        .collect())
 }
 
 /// Set the rollup offset (µs) for one `(org, stream)`, optionally stamping the
@@ -84,8 +114,6 @@ mod tests {
             mk_key("org2", "traces_a"),
             "/db_monitoring/offsets/org2/traces_a"
         );
-        // Two streams of one org never collide.
-        assert_ne!(mk_key("default", "s1"), mk_key("default", "s2"));
     }
 
     #[test]

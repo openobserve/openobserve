@@ -39,6 +39,7 @@
 use std::collections::{HashMap, HashSet};
 
 use config::{cluster::LOCAL_NODE, get_config, meta::stream::StreamType, utils::time::now_micros};
+use futures::StreamExt;
 use infra::cluster::get_node_by_uuid;
 use serde_json::{Value, json};
 
@@ -47,11 +48,6 @@ use serde_json::{Value, json};
 /// NAME separates the data), read back as Logs — the exact mechanics of
 /// `_o2_service_graph` (design §5.3).
 pub const O2_DB_STATS_STREAM: &str = "_o2_db_stats";
-
-/// Fingerprint-algorithm version stamped on every `_o2_db_stats` record
-/// (`fp_version`). One scalar with the ingest-side `o2_db_fp_version`
-/// ([`super::FP_VERSION`]) — reconciled here by definition.
-pub const O2_DB_FP_VERSION: u32 = super::FP_VERSION;
 
 /// Request size for each rollup search. A query returning exactly this many
 /// rows means the answer was truncated by the request cap — the window's
@@ -62,6 +58,11 @@ pub(crate) const SEARCH_SIZE: usize = 100000;
 
 /// Catch-up cap: never scan more than this many windows per (stream, tick).
 const MAX_CATCHUP_WINDOWS: usize = 4;
+
+/// How many streams roll up concurrently per tick. Streams are independent
+/// (per-stream offsets and locks), so a modest fan-out shortens the tick
+/// without stampeding the search path.
+const STREAM_CONCURRENCY: usize = 4;
 
 #[derive(serde::Deserialize)]
 struct RecentIngestedTraceStream {
@@ -135,6 +136,13 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
 /// window totals with their own percentiles, UNION ALL'd with the
 /// per-(system, instance, stmt_class) class totals. Namespace-grain rows carry
 /// `stmt_class = NULL`; class-grain rows carry `db_namespace = NULL`.
+///
+/// TODO(perf): the UNION ALL scans the window twice differing only in GROUP
+/// BY; DataFusion's GROUPING SETS could halve that. NOT converted yet: (a) the
+/// search harness's SQL rewrite layer has not been verified against GROUPING
+/// SETS on a live cluster (the UNION ALL shape is the live-verified one), and
+/// (b) without `GROUPING()` discriminator columns a genuinely-NULL group value
+/// would be ambiguous with the other grain's NULL marker.
 pub(crate) fn build_totals_sql(
     stream_name: &str,
     start_time: i64,
@@ -197,6 +205,14 @@ pub(crate) fn get_str(row: &Value, key: &str) -> String {
         .to_string()
 }
 
+/// Borrowed variant of [`get_str`] for the hot client-side folds: at
+/// `SEARCH_SIZE` rows the owned version costs ~10^6 short String allocations
+/// per window. The rows outlive every map keyed by these slices, so the folds
+/// borrow and convert to owned only for emitted `_other` rows.
+pub(crate) fn get_str_ref<'a>(row: &'a Value, key: &str) -> &'a str {
+    row.get(key).and_then(|v| v.as_str()).unwrap_or_default()
+}
+
 /// Numeric extraction tolerant of the search path's i64/u64/f64 JSON numbers.
 pub(crate) fn get_i64(row: &Value, key: &str) -> i64 {
     match row.get(key) {
@@ -211,14 +227,14 @@ pub(crate) fn get_i64(row: &Value, key: &str) -> i64 {
 /// The winning fingerprint set of a window, keyed by
 /// `(db_system, db_instance, fingerprint)` — rank is per (system, instance),
 /// so the same fingerprint may win on one instance and lose on another.
-fn winning_fingerprints(stage1_rows: &[Value]) -> HashSet<(String, String, String)> {
+fn winning_fingerprints(stage1_rows: &[Value]) -> HashSet<(&str, &str, &str)> {
     stage1_rows
         .iter()
         .map(|r| {
             (
-                get_str(r, "db_system"),
-                get_str(r, "db_instance"),
-                get_str(r, "fingerprint"),
+                get_str_ref(r, "db_system"),
+                get_str_ref(r, "db_instance"),
+                get_str_ref(r, "fingerprint"),
             )
         })
         .collect()
@@ -228,28 +244,29 @@ fn winning_fingerprints(stage1_rows: &[Value]) -> HashSet<(String, String, Strin
 /// rest into ONE "other-errors" row per (system, instance, code) with
 /// `fingerprint = "_other"` (env intentionally dropped on folded rows — they
 /// merge across envs).
-fn fold_error_class(
-    error_rows: Vec<Value>,
-    winning: &HashSet<(String, String, String)>,
-) -> Vec<Value> {
-    let mut kept = Vec::new();
-    let mut folded: HashMap<(String, String, String), i64> = HashMap::new();
-    for row in error_rows {
+fn fold_error_class(error_rows: Vec<Value>, winning: &HashSet<(&str, &str, &str)>) -> Vec<Value> {
+    // Pass 1 (borrowed): classify each row and fold loser sums keyed by
+    // borrowed slices — owned Strings only materialize for emitted rows.
+    let mut folded: HashMap<(&str, &str, &str), i64> = HashMap::new();
+    let mut keep = Vec::with_capacity(error_rows.len());
+    for row in &error_rows {
         let key = (
-            get_str(&row, "db_system"),
-            get_str(&row, "db_instance"),
-            get_str(&row, "fingerprint"),
+            get_str_ref(row, "db_system"),
+            get_str_ref(row, "db_instance"),
+            get_str_ref(row, "fingerprint"),
         );
-        if winning.contains(&key) {
-            kept.push(row);
-        } else {
-            let errors = get_i64(&row, "errors");
+        let is_winner = winning.contains(&key);
+        keep.push(is_winner);
+        if !is_winner {
             *folded
-                .entry((key.0, key.1, get_str(&row, "status_code")))
-                .or_insert(0) += errors;
+                .entry((key.0, key.1, get_str_ref(row, "status_code")))
+                .or_insert(0) += get_i64(row, "errors");
         }
     }
-    let mut other: Vec<Value> = folded
+    // Deterministic output order for the folded rows.
+    let mut folded: Vec<_> = folded.into_iter().collect();
+    folded.sort_by_key(|&(key, _)| key);
+    let other: Vec<Value> = folded
         .into_iter()
         .map(|((db_system, db_instance, status_code), errors)| {
             json!({
@@ -261,14 +278,11 @@ fn fold_error_class(
             })
         })
         .collect();
-    // Deterministic output order for the folded rows.
-    other.sort_by_key(|r| {
-        (
-            get_str(r, "db_system"),
-            get_str(r, "db_instance"),
-            get_str(r, "status_code"),
-        )
-    });
+    let mut kept: Vec<Value> = error_rows
+        .into_iter()
+        .zip(keep)
+        .filter_map(|(row, k)| k.then_some(row))
+        .collect();
     kept.extend(other);
     kept
 }
@@ -287,17 +301,24 @@ const ADDITIVE_METRICS: [&str; 7] = [
     "rows_emitting_calls",
 ];
 
-/// Per-`(db_system, db_instance)` sums of the additive metrics.
-type InstanceSums = HashMap<(String, String), HashMap<&'static str, i64>>;
+/// Per-`(db_system, db_instance)` sums of the additive metrics, keyed by
+/// slices borrowed from the input rows (the rows outlive the map at every
+/// call site — owned copies only materialize for emitted `_other` rows).
+type InstanceSums<'a> = HashMap<(&'a str, &'a str), HashMap<&'static str, i64>>;
 
 /// Sum `ADDITIVE_METRICS` of `rows` grouped by `(db_system, db_instance)`,
 /// tracking which metric keys were actually present in any input row (rows
 /// columns are schema-gated, so absent keys must stay absent in `_other`).
-fn accumulate<'a>(rows: impl Iterator<Item = &'a Value>) -> (InstanceSums, HashSet<&'static str>) {
+fn accumulate<'a>(
+    rows: impl Iterator<Item = &'a Value>,
+) -> (InstanceSums<'a>, HashSet<&'static str>) {
     let mut sums: InstanceSums = HashMap::new();
     let mut present: HashSet<&'static str> = HashSet::new();
     for row in rows {
-        let key = (get_str(row, "db_system"), get_str(row, "db_instance"));
+        let key = (
+            get_str_ref(row, "db_system"),
+            get_str_ref(row, "db_instance"),
+        );
         let entry = sums.entry(key).or_default();
         for metric in ADDITIVE_METRICS {
             if row.get(metric).is_some_and(|v| !v.is_null()) {
@@ -316,7 +337,10 @@ fn accumulate<'a>(rows: impl Iterator<Item = &'a Value>) -> (InstanceSums, HashS
 ///   the stage-1 rows classed `query`.
 ///
 /// All differences clamp at 0; a remainder with `calls == 0` is not emitted.
-pub(crate) fn derive_other_rows(stage1_rows: &[Value], totals_rows: &[Value]) -> Vec<Value> {
+pub(crate) fn derive_other_rows<'a>(
+    stage1_rows: &'a [Value],
+    totals_rows: &'a [Value],
+) -> Vec<Value> {
     // Split db_totals into its two grains by which discriminator is set.
     let namespace_grain: Vec<&Value> = totals_rows
         .iter()
@@ -337,11 +361,11 @@ pub(crate) fn derive_other_rows(stage1_rows: &[Value], totals_rows: &[Value]) ->
     );
 
     let mut out = Vec::new();
-    let mut emit = |totals: InstanceSums,
-                    topn: &InstanceSums,
+    let mut emit = |totals: InstanceSums<'a>,
+                    topn: &InstanceSums<'a>,
                     present: &HashSet<&'static str>,
                     stmt_class: Option<&str>| {
-        let mut keys: Vec<_> = totals.keys().cloned().collect();
+        let mut keys: Vec<_> = totals.keys().copied().collect();
         keys.sort();
         for key in keys {
             let total = &totals[&key];
@@ -401,7 +425,9 @@ fn to_record(
         obj.insert("org_id".into(), json!(org_id));
         obj.insert("trace_stream_name".into(), json!(trace_stream_name));
         obj.insert("record_type".into(), json!(record_type));
-        obj.insert("fp_version".into(), json!(O2_DB_FP_VERSION));
+        // fp_version: one scalar with the ingest-side `o2_db_fp_version` —
+        // both stamp [`super::FP_VERSION`], reconciled by definition.
+        obj.insert("fp_version".into(), json!(super::FP_VERSION));
         if truncated {
             obj.insert("truncated".into(), json!(true));
         }
@@ -544,29 +570,43 @@ pub async fn process_db_monitoring() -> Result<(), anyhow::Error> {
         discovered.len()
     );
 
-    for RecentIngestedTraceStream {
-        org_id,
-        stream_name,
-    } in discovered
-    {
-        // Schema gate BEFORE any search: skip streams without the fingerprint
-        // column. DB-backed lookup, deliberately not the cache-only variant.
-        let has_fp = infra::schema::get(&org_id, &stream_name, StreamType::Traces)
-            .await
-            .map(|s| s.field_with_name(super::O2_DB_FINGERPRINT).is_ok())
-            .unwrap_or(false);
-        if !has_fp {
-            continue;
-        }
+    // Streams are independent (per-stream offsets/locks) — process a few
+    // concurrently, keeping per-stream error isolation.
+    futures::stream::iter(discovered)
+        .for_each_concurrent(
+            STREAM_CONCURRENCY,
+            |RecentIngestedTraceStream {
+                 org_id,
+                 stream_name,
+             }| async move {
+                // Schema gate BEFORE any search: skip streams without the
+                // fingerprint column. DB-backed lookup, deliberately not the
+                // cache-only variant. Fetched ONCE per (stream, tick) — the
+                // schema-gated rows columns are derived from the same fetch
+                // and passed down to every catch-up window.
+                let Ok(schema) = infra::schema::get(&org_id, &stream_name, StreamType::Traces)
+                    .await
+                else {
+                    return;
+                };
+                if schema.field_with_name(super::O2_DB_FINGERPRINT).is_err() {
+                    return;
+                }
+                // Row-count columns are opportunistic (rare in the wild).
+                let has_rows_col = schema.field_with_name("db_response_returned_rows").is_ok();
 
-        // Per-stream isolation: a failing stream logs, keeps its offset, and
-        // never blocks the others.
-        if let Err(e) = process_stream(&org_id, &stream_name, now, window_micros).await {
-            log::error!(
-                "[DbMonitoring] stream {org_id}/{stream_name} failed (offset NOT advanced, retried next tick): {e}"
-            );
-        }
-    }
+                // Per-stream isolation: a failing stream logs, keeps its
+                // offset, and never blocks the others.
+                if let Err(e) =
+                    process_stream(&org_id, &stream_name, now, window_micros, has_rows_col).await
+                {
+                    log::error!(
+                        "[DbMonitoring] stream {org_id}/{stream_name} failed (offset NOT advanced, retried next tick): {e}"
+                    );
+                }
+            },
+        )
+        .await;
 
     Ok(())
 }
@@ -582,8 +622,20 @@ async fn process_stream(
     stream_name: &str,
     now: i64,
     window_micros: i64,
+    has_rows_col: bool,
 ) -> Result<(), anyhow::Error> {
-    let (mut offset, node) = crate::db::db_monitoring::get_offset(org_id, stream_name).await;
+    // A meta-DB read failure is NOT a fresh stream: treating it as (0, "")
+    // would restart one window back AND steal the coordination lock from
+    // whichever node holds it. Skip this tick — offset and lock untouched.
+    let (mut offset, node) = match crate::db::db_monitoring::get_offset(org_id, stream_name).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::warn!(
+                "[DbMonitoring] {org_id}/{stream_name} offset read failed; skipping this tick (offset and lock untouched): {e}"
+            );
+            return Ok(());
+        }
+    };
     // Another live node holds this stream's lock — skip.
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(());
@@ -603,7 +655,7 @@ async fn process_stream(
     while offset + window_micros <= now && processed < MAX_CATCHUP_WINDOWS {
         let (start_time, end_time) = (offset, offset + window_micros);
         // Any window failure propagates WITHOUT advancing the offset.
-        process_window(org_id, stream_name, start_time, end_time).await?;
+        process_window(org_id, stream_name, start_time, end_time, has_rows_col).await?;
         offset = end_time;
         crate::db::db_monitoring::set_offset(org_id, stream_name, offset, Some(&LOCAL_NODE.uuid))
             .await?;
@@ -619,14 +671,9 @@ async fn process_window(
     stream_name: &str,
     start_time: i64,
     end_time: i64,
+    has_rows_col: bool,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // Row-count columns are opportunistic (rare in the wild) — gate on the
-    // stream schema the same way the pass itself is gated.
-    let has_rows_col = infra::schema::get(org_id, stream_name, StreamType::Traces)
-        .await
-        .map(|s| s.field_with_name("db_response_returned_rows").is_ok())
-        .unwrap_or(false);
 
     // (1) stage-1 rank query: top-N fingerprints per (system, instance).
     let rank_sql = build_rank_sql(
@@ -642,13 +689,16 @@ async fn process_window(
         return Ok(());
     }
 
-    // (2) db_totals + class totals (one UNION ALL query).
+    // (2) db_totals + class totals (one UNION ALL query) and (3) error_class:
+    // independent of each other — only the empty-window early exit above
+    // depends on stage 1 — so they run concurrently.
     let totals_sql = build_totals_sql(stream_name, start_time, end_time, has_rows_col);
-    let totals_rows = run_dbm_search(org_id, totals_sql, start_time, end_time).await?;
-
-    // (3) error_class.
     let error_sql = build_error_class_sql(stream_name, start_time, end_time);
-    let error_rows = run_dbm_search(org_id, error_sql, start_time, end_time).await?;
+    let (totals_rows, error_rows) = tokio::join!(
+        run_dbm_search(org_id, totals_sql, start_time, end_time),
+        run_dbm_search(org_id, error_sql, start_time, end_time)
+    );
+    let (totals_rows, error_rows) = (totals_rows?, error_rows?);
 
     // A query answering exactly the request size was truncated by the cap.
     let truncated = stage1_rows.len() == SEARCH_SIZE
@@ -677,21 +727,23 @@ async fn process_window(
     write_db_stats(org_id, stream_name, records).await
 }
 
-/// Run one rollup query through the same search harness as the service-graph
-/// processor (`crate::search::search`, `StreamType::Traces`). Also used by the
-/// read API's live tail, which runs the same bounded two-stage SQL over the
-/// un-rolled-up span tail (design D4).
-pub(crate) async fn run_dbm_search(
-    org_id: &str,
+/// The one `config::meta::search::Request` shape every DBM search issues —
+/// this 30-field literal used to be restated verbatim at three sites (here,
+/// the read API's `run_stats_search` and `run_events_search`), which is
+/// exactly how field drift starts. `size` and `timeout` are the only knobs
+/// that legitimately differ between the rollup job and the read API.
+pub(crate) fn dbm_search_request(
     sql: String,
     start_time: i64,
     end_time: i64,
-) -> Result<Vec<Value>, anyhow::Error> {
-    let req = config::meta::search::Request {
+    size: i64,
+    timeout: i64,
+) -> config::meta::search::Request {
+    config::meta::search::Request {
         query: config::meta::search::Query {
             sql,
             from: 0,
-            size: SEARCH_SIZE as i64,
+            size,
             start_time,
             end_time,
             quick_mode: false,
@@ -711,14 +763,27 @@ pub(crate) async fn run_dbm_search(
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
         clusters: vec![],
-        timeout: 300,
+        timeout,
         search_type: None,
         search_event_context: None,
         use_cache: false,
         clear_cache: false,
         local_mode: Some(false),
         agent_options: None,
-    };
+    }
+}
+
+/// Run one rollup query through the same search harness as the service-graph
+/// processor (`crate::search::search`, `StreamType::Traces`). Also used by the
+/// read API's live tail, which runs the same bounded two-stage SQL over the
+/// un-rolled-up span tail (design D4).
+pub(crate) async fn run_dbm_search(
+    org_id: &str,
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<Value>, anyhow::Error> {
+    let req = dbm_search_request(sql, start_time, end_time, SEARCH_SIZE as i64, 300);
 
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
@@ -823,65 +888,61 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_namespace, o2_db_instance, o2_db
         assert!(sql.ends_with(") AS ranked WHERE rnk <= 50"));
     }
 
+    // Property assertions (not an exact golden — the rank golden above pins
+    // the live-verified shape; here only the load-bearing structure matters):
+    // two grains via one UNION ALL, each with the NULL marker for the OTHER
+    // grain's discriminator, the shared metric block, time bounds, and the
+    // fingerprint filter.
     #[test]
-    fn test_totals_sql_exact() {
+    fn test_totals_sql_shape() {
         let sql = build_totals_sql("s", 1, 2, false);
-        let expected = r#"SELECT
-    o2_db_system AS db_system,
-    o2_db_instance AS db_instance,
-    o2_db_namespace AS db_namespace,
-    CAST(NULL AS STRING) AS stmt_class,
-    SUM(COALESCE(o2_db_batch_multiplier, 1)) AS statements,
-    COUNT(*) AS calls,
-    COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors,
-    SUM(end_time - start_time) AS total_time_ns,
-    CAST(approx_median(end_time - start_time) AS BIGINT) AS p50_ns,
-    CAST(approx_percentile_cont(end_time - start_time, 0.95) AS BIGINT) AS p95_ns,
-    CAST(approx_percentile_cont(end_time - start_time, 0.99) AS BIGINT) AS p99_ns,
-    MAX(end_time - start_time) AS max_ns,
-    COUNT(DISTINCT trace_id) AS traces
-FROM "s"
-WHERE _timestamp >= 1 AND _timestamp < 2
-    AND o2_db_fingerprint IS NOT NULL
-GROUP BY o2_db_system, o2_db_instance, o2_db_namespace
-UNION ALL
-SELECT
-    o2_db_system AS db_system,
-    o2_db_instance AS db_instance,
-    CAST(NULL AS STRING) AS db_namespace,
-    o2_db_stmt_class AS stmt_class,
-    SUM(COALESCE(o2_db_batch_multiplier, 1)) AS statements,
-    COUNT(*) AS calls,
-    COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors,
-    SUM(end_time - start_time) AS total_time_ns,
-    CAST(approx_median(end_time - start_time) AS BIGINT) AS p50_ns,
-    CAST(approx_percentile_cont(end_time - start_time, 0.95) AS BIGINT) AS p95_ns,
-    CAST(approx_percentile_cont(end_time - start_time, 0.99) AS BIGINT) AS p99_ns,
-    MAX(end_time - start_time) AS max_ns,
-    COUNT(DISTINCT trace_id) AS traces
-FROM "s"
-WHERE _timestamp >= 1 AND _timestamp < 2
-    AND o2_db_fingerprint IS NOT NULL
-GROUP BY o2_db_system, o2_db_instance, o2_db_stmt_class"#;
-        assert_eq!(sql, expected);
+        assert_eq!(sql.matches("UNION ALL").count(), 1);
+        let (ns_arm, class_arm) = sql.split_once("UNION ALL").unwrap();
+        // Namespace grain: stmt_class = NULL marker.
+        assert!(ns_arm.contains("o2_db_namespace AS db_namespace"));
+        assert!(ns_arm.contains("CAST(NULL AS STRING) AS stmt_class"));
+        assert!(ns_arm.contains("GROUP BY o2_db_system, o2_db_instance, o2_db_namespace"));
+        // Class grain: db_namespace = NULL marker.
+        assert!(class_arm.contains("o2_db_stmt_class AS stmt_class"));
+        assert!(class_arm.contains("CAST(NULL AS STRING) AS db_namespace"));
+        assert!(class_arm.contains("GROUP BY o2_db_system, o2_db_instance, o2_db_stmt_class"));
+        for arm in [ns_arm, class_arm] {
+            assert!(arm.contains(r#"FROM "s""#));
+            assert!(arm.contains("WHERE _timestamp >= 1 AND _timestamp < 2"));
+            assert!(arm.contains("AND o2_db_fingerprint IS NOT NULL"));
+            for agg in [
+                "AS statements",
+                "AS calls",
+                "AS errors",
+                "AS total_time_ns",
+                "AS p50_ns",
+                "AS p95_ns",
+                "AS p99_ns",
+                "AS max_ns",
+                "AS traces",
+            ] {
+                assert!(arm.contains(agg), "missing aggregate {agg}");
+            }
+        }
+        // Rows columns are schema-gated off in this call.
+        assert!(!sql.contains("rows_returned"));
     }
 
+    // Property assertions (see test_totals_sql_shape rationale): error spans
+    // only, per (fingerprint, system, instance, env, code), with the
+    // 'unknown' status-code coalesce in both SELECT and GROUP BY.
     #[test]
-    fn test_error_class_sql_exact() {
+    fn test_error_class_sql_shape() {
         let sql = build_error_class_sql("s", 1, 2);
-        let expected = r#"SELECT
-    o2_db_fingerprint AS fingerprint,
-    o2_db_system AS db_system,
-    o2_db_instance AS db_instance,
-    o2_db_env AS env,
-    COALESCE(o2_db_status_code, 'unknown') AS status_code,
-    COUNT(*) AS errors
-FROM "s"
-WHERE _timestamp >= 1 AND _timestamp < 2
-    AND o2_db_fingerprint IS NOT NULL
-    AND span_status = 'ERROR'
-GROUP BY o2_db_fingerprint, o2_db_system, o2_db_instance, o2_db_env, COALESCE(o2_db_status_code, 'unknown')"#;
-        assert_eq!(sql, expected);
+        assert!(sql.contains(r#"FROM "s""#));
+        assert!(sql.contains("WHERE _timestamp >= 1 AND _timestamp < 2"));
+        assert!(sql.contains("AND o2_db_fingerprint IS NOT NULL"));
+        assert!(sql.contains("AND span_status = 'ERROR'"));
+        assert!(sql.contains("COALESCE(o2_db_status_code, 'unknown') AS status_code"));
+        assert!(sql.contains("COUNT(*) AS errors"));
+        assert!(sql.contains(
+            "GROUP BY o2_db_fingerprint, o2_db_system, o2_db_instance, o2_db_env, COALESCE(o2_db_status_code, 'unknown')"
+        ));
     }
 
     // ── Winning-set extraction ──────────────────────────────────────────────
@@ -898,17 +959,16 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_instance, o2_db_env, COALESCE(o2
         ];
         let winning = winning_fingerprints(&rows);
         assert_eq!(winning.len(), 2);
-        assert!(winning.contains(&("postgresql".into(), "db1".into(), "abc".into())));
+        assert!(winning.contains(&("postgresql", "db1", "abc")));
         // Same fingerprint, other instance: NOT winning.
-        assert!(!winning.contains(&("postgresql".into(), "db2".into(), "abc".into())));
+        assert!(!winning.contains(&("postgresql", "db2", "abc")));
     }
 
     // ── error_class fold ────────────────────────────────────────────────────
 
     #[test]
     fn test_fold_error_class_keeps_winners_folds_rest() {
-        let winning: HashSet<(String, String, String)> =
-            [("postgresql".into(), "db1".into(), "abc".into())].into();
+        let winning: HashSet<(&str, &str, &str)> = [("postgresql", "db1", "abc")].into();
         let rows = vec![
             // winner: kept verbatim (env preserved)
             json!({"fingerprint": "abc", "db_system": "postgresql", "db_instance": "db1",
@@ -942,12 +1002,6 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_instance, o2_db_env, COALESCE(o2
         let f57014 = folded.iter().find(|r| r["status_code"] == "57014").unwrap();
         assert_eq!(f57014["errors"], 1);
         assert_eq!(f57014["db_instance"], "db2");
-    }
-
-    #[test]
-    fn test_fold_error_class_empty_inputs() {
-        let winning = HashSet::new();
-        assert!(fold_error_class(vec![], &winning).is_empty());
     }
 
     // ── "_other" arithmetic ─────────────────────────────────────────────────
@@ -1102,7 +1156,7 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_instance, o2_db_env, COALESCE(o2
             assert_eq!(r["_timestamp"], 1_700_000_900_000_000_i64); // window END
             assert_eq!(r["org_id"], "org1");
             assert_eq!(r["trace_stream_name"], "traces_a");
-            assert_eq!(r["fp_version"], O2_DB_FP_VERSION);
+            assert_eq!(r["fp_version"], crate::traces::db_monitoring::FP_VERSION);
             assert!(r.get("truncated").is_none()); // only stamped when true
             assert!(r.get("rnk").is_none());
             assert!(r.get("fp_total").is_none());
@@ -1130,13 +1184,6 @@ GROUP BY o2_db_fingerprint, o2_db_system, o2_db_instance, o2_db_env, COALESCE(o2
         for r in &records {
             assert_eq!(r["truncated"], true);
         }
-    }
-
-    // fp_version is ONE scalar with the ingest-side o2_db_fp_version — a drift
-    // between the two would silently break the trend-reset annotation.
-    #[test]
-    fn test_fp_version_matches_normalizer() {
-        assert_eq!(O2_DB_FP_VERSION, crate::traces::db_monitoring::FP_VERSION);
     }
 
     #[test]

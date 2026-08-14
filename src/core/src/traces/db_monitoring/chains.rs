@@ -269,7 +269,8 @@ fn assemble_scope(
         return Vec::new();
     }
 
-    // 2. Children adjacency from the winning parent edges.
+    // 2. Children adjacency from the winning parent edges. (`mut` beyond this build: the cycle
+    //    handling below temporarily detaches a cycle root's parent edge.)
     let mut children: HashMap<i64, Vec<i64>> = HashMap::new();
     for (&blocked, &(blocking, _)) in &parent {
         children.entry(blocking).or_default().push(blocked);
@@ -303,18 +304,25 @@ fn assemble_scope(
         // Walk the parent pointers to find the cycle this node feeds into.
         let cycle = find_cycle(start, &parent);
         let root = cycle.iter().copied().min().unwrap_or(start);
-        // Break the cycle at the root by treating the root as parentless for traversal.
-        let mut cyc_children = children.clone();
-        if let Some((root_parent, _)) = parent.get(&root)
-            && let Some(sibs) = cyc_children.get_mut(root_parent)
+        // Break the cycle at the root by treating the root as parentless for
+        // traversal: detach ONLY the root's parent edge (restored after) —
+        // cloning the whole adjacency map per detected cycle was the
+        // alternative, and all the traversal needs is this one edge gone.
+        let detached_from = parent.get(&root).map(|&(root_parent, _)| root_parent);
+        if let Some(root_parent) = detached_from
+            && let Some(sibs) = children.get_mut(&root_parent)
         {
             sibs.retain(|c| *c != root);
         }
-        let node = build_node(root, 0, &cyc_children, &sessions, &mut visited);
+        let node = build_node(root, 0, &children, &sessions, &mut visited);
+        if let Some(root_parent) = detached_from
+            && let Some(sibs) = children.get_mut(&root_parent)
+        {
+            sibs.push(root);
+        }
         for p in collect_pids(&node) {
             remaining.remove(&p);
         }
-        remaining.remove(&root);
         chains.push(finish(node, true, &engine, &instance, &database));
     }
 
@@ -365,11 +373,7 @@ fn build_node(
     let mut kids: Vec<ChainNode> = Vec::new();
     if let Some(list) = children.get(&pid) {
         // Deterministic child order: longest wait first, then pid.
-        let mut sorted: Vec<i64> = list
-            .iter()
-            .copied()
-            .filter(|c| !visited.contains(c))
-            .collect();
+        let mut sorted: Vec<i64> = list.to_vec();
         sorted.sort_by(|a, b| {
             let wa = sessions.get(a).and_then(|s| s.wait_seconds).unwrap_or(0.0);
             let wb = sessions.get(b).and_then(|s| s.wait_seconds).unwrap_or(0.0);
@@ -378,6 +382,9 @@ fn build_node(
                 .then(a.cmp(b))
         });
         for c in sorted {
+            // The load-bearing visited guard: a child can become visited by an
+            // earlier sibling's recursion after the sort above, and skipping
+            // it here is what makes a cycle terminate.
             if visited.contains(&c) {
                 continue;
             }

@@ -40,8 +40,9 @@ mod tests_server_vantage;
 
 use std::{
     collections::BTreeMap,
+    hash::{Hash, Hasher},
     num::NonZeroUsize,
-    sync::{LazyLock, Mutex},
+    sync::{Arc, LazyLock, Mutex},
 };
 
 pub use normalizer::{
@@ -110,34 +111,61 @@ const NORMALIZE_CACHE_ENTRIES: usize = 4096;
 /// `NORMALIZE_CACHE_ENTRIES × 16 KB` of memory.
 const NORMALIZE_CACHE_MAX_TEXT: usize = 8 * 1024;
 
-type NormalizeCacheKey = (Dialect, bool, String);
-/// `None` caches a lexer failure — failing texts repeat exactly like succeeding ones.
-type NormalizeCache = lru::LruCache<NormalizeCacheKey, Option<NormalizedStatement>>;
+/// Cache shards: every trace-ingest thread hits this cache per DB span, so a single global
+/// mutex would serialize them all — the key hash picks the shard, each with its own LRU slice.
+const NORMALIZE_CACHE_SHARDS: usize = 16;
 
-static NORMALIZE_CACHE: LazyLock<Mutex<NormalizeCache>> = LazyLock::new(|| {
-    Mutex::new(lru::LruCache::new(
-        NonZeroUsize::new(NORMALIZE_CACHE_ENTRIES).unwrap(),
-    ))
+/// 64-bit hash of `(dialect, fold_identifiers, text)`, computed without copying the up-to-8 KB
+/// raw text. A key collision maps two texts onto one cached result — the risk is of the same
+/// order as the fingerprint hash's own collision risk and accepted on the same grounds.
+type NormalizeCacheKey = u64;
+/// `None` caches a lexer failure — failing texts repeat exactly like succeeding ones.
+/// `Arc` so a cache hit is a refcount bump, never a deep clone of the normalized statement.
+type NormalizeCache = lru::LruCache<NormalizeCacheKey, Option<Arc<NormalizedStatement>>>;
+
+static NORMALIZE_CACHE: LazyLock<Vec<Mutex<NormalizeCache>>> = LazyLock::new(|| {
+    (0..NORMALIZE_CACHE_SHARDS)
+        .map(|_| {
+            Mutex::new(lru::LruCache::new(
+                NonZeroUsize::new(NORMALIZE_CACHE_ENTRIES / NORMALIZE_CACHE_SHARDS).unwrap(),
+            ))
+        })
+        .collect()
 });
 
-/// [`normalize_with_opts`] behind the per-node LRU. Returns `None` on lexer failure (the caller's
-/// standard failure rule applies — no query_norm, operation+collection fallback fingerprint).
+fn normalize_cache_key(text: &str, dialect: Dialect, fold_identifiers: bool) -> NormalizeCacheKey {
+    // Workspace default hasher (gxhash; DefaultHasher on archs without AES).
+    let mut h = config::utils::hash::gxhash::new_hasher();
+    dialect.hash(&mut h);
+    fold_identifiers.hash(&mut h);
+    text.hash(&mut h);
+    h.finish()
+}
+
+/// [`normalize_with_opts`] behind the per-node sharded LRU. Returns `None` on lexer failure (the
+/// caller's standard failure rule applies — no query_norm, operation+collection fallback
+/// fingerprint).
 pub(crate) fn normalize_cached(
     text: &str,
     dialect: Dialect,
     fold_identifiers: bool,
-) -> Option<NormalizedStatement> {
+) -> Option<Arc<NormalizedStatement>> {
     if text.len() > NORMALIZE_CACHE_MAX_TEXT {
-        return normalize_with_opts(text, dialect, fold_identifiers).ok();
+        return normalize_with_opts(text, dialect, fold_identifiers)
+            .ok()
+            .map(Arc::new);
     }
-    let key = (dialect, fold_identifiers, text.to_string());
-    if let Ok(mut cache) = NORMALIZE_CACHE.lock()
+    let key = normalize_cache_key(text, dialect, fold_identifiers);
+    let shard = &NORMALIZE_CACHE[key as usize % NORMALIZE_CACHE_SHARDS];
+    if let Ok(mut cache) = shard.lock()
         && let Some(cached) = cache.get(&key)
     {
         return cached.clone();
     }
-    let result = normalize_with_opts(text, dialect, fold_identifiers).ok();
-    if let Ok(mut cache) = NORMALIZE_CACHE.lock() {
+    let result = normalize_with_opts(text, dialect, fold_identifiers)
+        .ok()
+        .map(Arc::new);
+    if let Ok(mut cache) = shard.lock() {
         cache.put(key, result.clone());
     }
     result
@@ -151,30 +179,46 @@ pub trait SpanAttrs {
     fn has_db_attr(&self) -> bool;
 }
 
-impl SpanAttrs for Map<String, Value> {
-    fn get_attr(&self, key: &str) -> Option<&Value> {
-        // Flat JSON-path records carry resource attributes under the
-        // `service_` prefix (the stored-span shape) — fall back to that form
-        // so resource-level dimensions (o2_db_env, design §3.1) resolve.
-        self.get(key)
-            .or_else(|| self.get(format!("service_{key}").as_str()))
-    }
-    fn has_db_attr(&self) -> bool {
-        self.keys()
-            .any(|k| k.starts_with("db.") || k.starts_with("db_"))
+const SERVICE_PREFIX: &str = "service_";
+
+/// Run `f` with `service_{key}` built in a stack buffer — attr probes run ~20–40 times per DB
+/// span, so the prefixed lookup key must not heap-allocate. All resolver candidate names fit;
+/// the heap fallback exists only for defensive completeness.
+#[inline]
+fn with_service_key<R>(key: &str, f: impl FnOnce(&str) -> R) -> R {
+    let mut buf = [0u8; 64];
+    let total = SERVICE_PREFIX.len() + key.len();
+    if total <= buf.len() {
+        buf[..SERVICE_PREFIX.len()].copy_from_slice(SERVICE_PREFIX.as_bytes());
+        buf[SERVICE_PREFIX.len()..total].copy_from_slice(key.as_bytes());
+        // Both halves are valid UTF-8 and the join is at an ASCII boundary.
+        f(std::str::from_utf8(&buf[..total]).expect("ascii prefix + utf8 key"))
+    } else {
+        f(&format!("{SERVICE_PREFIX}{key}"))
     }
 }
 
-impl SpanAttrs for std::collections::HashMap<String, Value> {
-    fn get_attr(&self, key: &str) -> Option<&Value> {
-        self.get(key)
-            .or_else(|| self.get(format!("service_{key}").as_str()))
-    }
-    fn has_db_attr(&self) -> bool {
-        self.keys()
-            .any(|k| k.starts_with("db.") || k.starts_with("db_"))
-    }
+/// `Map` and `HashMap` need byte-identical impls — one macro body keeps them from drifting.
+macro_rules! impl_span_attrs_for_map {
+    ($ty:ty) => {
+        impl SpanAttrs for $ty {
+            fn get_attr(&self, key: &str) -> Option<&Value> {
+                // Flat JSON-path records carry resource attributes under the
+                // `service_` prefix (the stored-span shape) — fall back to that form
+                // so resource-level dimensions (o2_db_env, design §3.1) resolve.
+                self.get(key)
+                    .or_else(|| with_service_key(key, |sk| self.get(sk)))
+            }
+            fn has_db_attr(&self) -> bool {
+                self.keys()
+                    .any(|k| k.starts_with("db.") || k.starts_with("db_"))
+            }
+        }
+    };
 }
+
+impl_span_attrs_for_map!(Map<String, Value>);
+impl_span_attrs_for_map!(std::collections::HashMap<String, Value>);
 
 /// Attribute view for the OTLP call site, where span attributes and resource
 /// attributes live in two separate maps (`span_att_map` / `service_att_map`).
@@ -195,7 +239,7 @@ impl SpanAttrs for SpanWithResource<'_> {
         self.span
             .get(key)
             .or_else(|| self.resource.get(key))
-            .or_else(|| self.resource.get(format!("service_{key}").as_str()))
+            .or_else(|| with_service_key(key, |sk| self.resource.get(sk)))
     }
     fn has_db_attr(&self) -> bool {
         self.span
@@ -265,18 +309,36 @@ pub fn enrich_with_opts<A: SpanAttrs>(
         return None;
     }
 
-    let system_raw = resolve(attrs, &["db.system.name", "db.system"]);
+    let system_raw = resolve(
+        attrs,
+        &[
+            ("db.system.name", "db_system_name"),
+            ("db.system", "db_system"),
+        ],
+    );
     let system = system_raw.as_deref().map(canonical_system);
     let dialect = system.as_deref().and_then(route_dialect);
-    let text = resolve(attrs, &["db.query.text", "db.statement"]);
-    let op_attr = resolve(attrs, &["db.operation.name", "db.operation"]);
+    let text = resolve(
+        attrs,
+        &[
+            ("db.query.text", "db_query_text"),
+            ("db.statement", "db_statement"),
+        ],
+    );
+    let op_attr = resolve(
+        attrs,
+        &[
+            ("db.operation.name", "db_operation_name"),
+            ("db.operation", "db_operation"),
+        ],
+    );
     let collection = resolve(
         attrs,
         &[
-            "db.collection.name",
-            "db.sql.table",
-            "db.mongodb.collection",
-            "db.cassandra.table",
+            ("db.collection.name", "db_collection_name"),
+            ("db.sql.table", "db_sql_table"),
+            ("db.mongodb.collection", "db_mongodb_collection"),
+            ("db.cassandra.table", "db_cassandra_table"),
         ],
     );
 
@@ -284,18 +346,21 @@ pub fn enrich_with_opts<A: SpanAttrs>(
     // `http.request.method` (fallback `db.operation[.name]`), path from the URL path component of
     // `url.full` (fallback: first line of statement text, which ES clients populate with
     // method+endpoint). The request body is never normalized into the template.
+    // `text` is moved in (not cloned) — nothing below reads it; the later checks use
+    // `effective_text`.
     let effective_text: Option<String> = if dialect == Some(Dialect::Elasticsearch) {
-        let method = resolve(attrs, &["http.request.method"]).or_else(|| op_attr.clone());
+        let method = resolve(attrs, &[("http.request.method", "http_request_method")])
+            .or_else(|| op_attr.clone());
         match (
             method,
-            resolve(attrs, &["url.full"]).and_then(|u| url_path_of(&u)),
+            resolve(attrs, &[("url.full", "url_full")]).and_then(|u| url_path_of(&u)),
         ) {
             (Some(m), Some(p)) => Some(format!("{m} {p}")),
             (None, Some(p)) => Some(p),
-            (_, None) => text.clone(),
+            (_, None) => text,
         }
     } else {
-        text.clone()
+        text
     };
 
     // Failure rule (design §3.2): on lexer error (or an unlisted `db.system` route) the raw text
@@ -339,7 +404,7 @@ pub fn enrich_with_opts<A: SpanAttrs>(
         n.fingerprint.clone()
     } else if let Some(summary) = effective_text
         .is_none()
-        .then(|| resolve(attrs, &["db.query.summary"]))
+        .then(|| resolve(attrs, &[("db.query.summary", "db_query_summary")]))
         .flatten()
     {
         normalizer::fingerprint_hex(&format!("summary:{}", summary.to_lowercase()))
@@ -371,25 +436,40 @@ pub fn enrich_with_opts<A: SpanAttrs>(
     put(O2_DB_SYSTEM, system);
     put(
         O2_DB_NAMESPACE,
-        resolve(attrs, &["db.namespace", "db.name"]),
+        resolve(
+            attrs,
+            &[("db.namespace", "db_namespace"), ("db.name", "db_name")],
+        ),
     );
     put(
         O2_DB_INSTANCE,
-        resolve(attrs, &["server.address", "net.peer.name"])
-            .as_deref()
-            .map(strip_port),
+        resolve(
+            attrs,
+            &[
+                ("server.address", "server_address"),
+                ("net.peer.name", "net_peer_name"),
+            ],
+        )
+        .as_deref()
+        .map(strip_port),
     );
     put(O2_DB_OPERATION, operation);
     put(
         O2_DB_STATUS_CODE,
-        resolve(attrs, &["db.response.status_code"]),
+        resolve(
+            attrs,
+            &[("db.response.status_code", "db_response_status_code")],
+        ),
     );
-    put(O2_DB_USER, resolve(attrs, &["db.user"]));
+    put(O2_DB_USER, resolve(attrs, &[("db.user", "db_user")]));
     put(
         O2_DB_ENV,
         resolve(
             attrs,
-            &["deployment.environment.name", "deployment.environment"],
+            &[
+                ("deployment.environment.name", "deployment_environment_name"),
+                ("deployment.environment", "deployment_environment"),
+            ],
         ),
     );
     if let Some(n) = &ns
@@ -404,12 +484,19 @@ pub fn enrich_with_opts<A: SpanAttrs>(
 }
 
 /// Dual-semconv attribute lookup: first non-empty value among `names`, each tried in dotted and
-/// flattened (underscore) form.
-fn resolve<A: SpanAttrs>(attrs: &A, names: &[&str]) -> Option<String> {
-    for name in names {
+/// flattened (underscore) form. Both forms are precomputed const pairs — `resolve` runs ~10
+/// times per DB span, and a runtime `replace('.', "_")` per candidate would allocate a String
+/// for every probe.
+fn resolve<A: SpanAttrs>(attrs: &A, names: &[(&str, &str)]) -> Option<String> {
+    for (dotted, underscored) in names {
+        debug_assert_eq!(
+            *underscored,
+            dotted.replace('.', "_"),
+            "const underscore form out of sync with its dotted name"
+        );
         let val = attrs
-            .get_attr(name)
-            .or_else(|| attrs.get_attr(name.replace('.', "_").as_str()));
+            .get_attr(dotted)
+            .or_else(|| attrs.get_attr(underscored));
         if let Some(v) = val {
             let s = match v {
                 Value::String(s) => s.clone(),

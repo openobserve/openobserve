@@ -43,7 +43,8 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    sync::{LazyLock, Mutex},
+    future::Future,
+    sync::{Arc, LazyLock, Mutex},
 };
 
 use axum::{
@@ -52,6 +53,7 @@ use axum::{
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::{get_config, meta::stream::StreamType, utils::time::now_micros};
+use futures::{StreamExt, future::join_all};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 use serde::Deserialize;
@@ -59,7 +61,7 @@ use serde_json::{Value, json};
 
 use super::{
     chains,
-    rollup::{self, O2_DB_STATS_STREAM, get_i64, get_str},
+    rollup::{self, O2_DB_STATS_STREAM, get_i64, get_str, get_str_ref},
     server_vantage,
 };
 use crate::auth::UserEmail;
@@ -121,6 +123,37 @@ async fn can_read_stream(
     }
 }
 
+/// Which VANTAGE a DBM read is taken from — the one fact that decides which
+/// OFGA object its permission check must consult.
+///
+/// §5.1: the client vantage is application trace spans (a TRACES stream); the
+/// server vantage is the database's own records, which arrive as LOGS. Copying
+/// a permission check between the two consults the wrong OFGA object and
+/// SILENTLY AUTHORIZES — the one wire-up mistake in this file with a security
+/// consequence, and one no behavioural test can catch on OSS (where
+/// [`can_read_stream`] is permissive by design; see
+/// `can_read_stream_is_permissive_on_oss`).
+///
+/// So the mapping is a VALUE rather than a literal repeated at fifteen call
+/// sites: [`required_stream_for`] is pure and asserted directly, and a read
+/// that names its vantage cannot name the wrong stream type by copy-paste.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DbmVantage {
+    /// What the APPLICATION saw — raw trace spans and the rollup over them.
+    Client,
+    /// What the DATABASE reported about itself — top queries, plans, activity,
+    /// deadlocks, blocking, table health.
+    Server,
+}
+
+/// The OFGA object type a read from this vantage must be authorized against.
+pub(crate) const fn required_stream_for(vantage: DbmVantage) -> StreamType {
+    match vantage {
+        DbmVantage::Client => StreamType::Traces,
+        DbmVantage::Server => StreamType::Logs,
+    }
+}
+
 /// The response for a stream the caller may not read.
 ///
 /// Deliberately identical to the app-wide wording (`"Unauthorized Access"`) and
@@ -150,6 +183,12 @@ const MAX_ENDPOINTS_LIMIT: usize = 500;
 /// than a reader scans. Well under the 100k search cap by construction.
 const DEFAULT_SAMPLES_LIMIT: usize = 100;
 const MAX_SAMPLES_LIMIT: usize = 500;
+/// Rows per instance in the `include_breakdown` split. Matches the `limit=200`
+/// the page passed on its per-row `GET /queries` call, so folding the split
+/// into the overview response shows the same rows it always showed — the
+/// breakdown is a SHAPE, not a ranking, and the long tail past this adds
+/// pixels rather than meaning.
+const DEFAULT_BREAKDOWN_LIMIT: usize = 200;
 
 /// Metrics merged additively across windows/rows. `traces` is deliberately in
 /// this list but is an UPPER BOUND, not exact (§5.1 merge rule) — the response
@@ -291,35 +330,66 @@ pub(crate) fn build_stats_sql(
     end_time: i64,
     preds: &str,
 ) -> String {
+    build_stats_sql_projected(org_id, record_type, start_time, end_time, preds, "*")
+}
+
+/// [`build_stats_sql`] with an explicit projection, for the reads that consume
+/// a handful of columns from rows that drag an up-to-4 KB `query_norm` each
+/// under `SELECT *`. `projection` must come from [`stats_projection`] (or be
+/// `"*"`): naming a column absent from the stream schema fails the WHOLE query
+/// with a schema error, so projections are schema-gated, never assumed.
+pub(crate) fn build_stats_sql_projected(
+    org_id: &str,
+    record_type: &str,
+    start_time: i64,
+    end_time: i64,
+    preds: &str,
+    projection: &str,
+) -> String {
     format!(
-        "SELECT * FROM \"{O2_DB_STATS_STREAM}\"\nWHERE _timestamp > {start_time} AND _timestamp <= {end_time}\n    AND org_id = '{}'\n    AND record_type = '{record_type}'{preds}\nLIMIT {STATS_READ_SIZE}",
+        "SELECT {projection} FROM \"{O2_DB_STATS_STREAM}\"\nWHERE _timestamp > {start_time} AND _timestamp <= {end_time}\n    AND org_id = '{}'\n    AND record_type = '{record_type}'{preds}\nLIMIT {STATS_READ_SIZE}",
         escape_sq(org_id)
     )
 }
 
-/// The `query_stats` read for the queries endpoint. The free-text `search`
-/// parameter is DELIBERATELY not part of this SQL — it is applied at merge
-/// time in Rust (it must filter the cached unfiltered tail anyway), so user
-/// search text never reaches the SQL string at all.
-pub(crate) fn build_queries_stats_sql(
-    org_id: &str,
-    start_time: i64,
-    end_time: i64,
-    filters: &ScopeFilters,
-    _search: Option<&str>,
-) -> String {
-    build_stats_sql(
-        org_id,
-        "query_stats",
-        start_time,
-        end_time,
-        &filters.sql_preds(),
-    )
+/// The subset of `wanted` columns actually present on the `_o2_db_stats`
+/// schema, as a projection list. Falls back to `*` when the schema cannot be
+/// read (never fail a read over an optimization) or when nothing intersects
+/// (the stream is brand new; the read returns empty anyway).
+async fn stats_projection(org_id: &str, wanted: &[&str]) -> String {
+    match infra::schema::get(org_id, O2_DB_STATS_STREAM, StreamType::Logs).await {
+        Ok(schema) => {
+            let cols: Vec<&str> = wanted
+                .iter()
+                .copied()
+                .filter(|c| schema.field_with_name(c).is_ok())
+                .collect();
+            if cols.is_empty() {
+                "*".to_string()
+            } else {
+                cols.join(", ")
+            }
+        }
+        Err(_) => "*".to_string(),
+    }
 }
 
 /// Escaped `AND fingerprint = '…'` fragment.
 pub(crate) fn fingerprint_pred(fingerprint: &str) -> String {
     format!("\n    AND fingerprint = '{}'", escape_sq(fingerprint))
+}
+
+/// The same predicate over RAW TRACE SPANS, which carry the column under its
+/// `o2_db_` name — the split [`ScopeFilters::span_sql_preds`] exists for.
+///
+/// This is the last piece of DBM SQL the BROWSER used to build. The query
+/// detail page could not scope `/samples` to one statement, so it hand-rolled
+/// `SELECT … WHERE o2_db_fingerprint = '…'` against the trace stream and
+/// carried its own `escapeSingleQuotes` and `isSafeStreamName` defenses to do
+/// it. Both the escaping and the stream-name validation now live here, where
+/// the rest of this module's SQL is built and injection-tested.
+pub(crate) fn span_fingerprint_pred(fingerprint: &str) -> String {
+    format!("\n    AND o2_db_fingerprint = '{}'", escape_sq(fingerprint))
 }
 
 /// History backfill: flat single-fingerprint aggregate over raw spans for ONE
@@ -717,15 +787,16 @@ pub(crate) fn group_query_rows(
         if fp != "_other" {
             // Representative text/operation/class (longest non-empty text wins
             // — constituents can differ at the 4 KB truncation boundary) plus
-            // distinct dimension sets.
-            let mut norm = String::new();
+            // distinct dimension sets. `query_norm` is up to 4 KB per row, so
+            // the candidates are BORROWED and only the winner is cloned.
+            let mut norm: &str = "";
             let mut operation = String::new();
             let mut stmt_class = String::new();
             let mut namespaces: BTreeSet<String> = BTreeSet::new();
             let mut envs: BTreeSet<String> = BTreeSet::new();
             let mut services: BTreeSet<String> = BTreeSet::new();
             for row in &rows {
-                let n = get_str(row, "query_norm");
+                let n = get_str_ref(row, "query_norm");
                 if n.len() > norm.len() {
                     norm = n;
                 }
@@ -857,10 +928,25 @@ pub(crate) fn sort_rows(rows: &mut [Value], sort: Option<&str>) {
 
 /// Case-insensitive substring match over `query_norm` (and exact-prefix over
 /// the fingerprint, as a convenience). Applied at merge time — never in SQL.
-pub(crate) fn search_matches(row: &Value, search: &str) -> bool {
-    let needle = search.to_lowercase();
-    get_str(row, "query_norm").to_lowercase().contains(&needle)
-        || get_str(row, "fingerprint").starts_with(&needle)
+///
+/// Takes the ALREADY-LOWERCASED needle: the caller hoists the one
+/// `to_lowercase()` out of its retain loop instead of paying it per row. For
+/// an ASCII needle (SQL search terms, overwhelmingly) the match compares in
+/// place instead of allocating a lowered copy of up-to-4 KB query text per
+/// row; non-ASCII needles keep the full Unicode-folding comparison.
+pub(crate) fn search_matches(row: &Value, needle_lower: &str) -> bool {
+    let norm = get_str_ref(row, "query_norm");
+    let norm_hit = if needle_lower.is_empty() {
+        true
+    } else if needle_lower.is_ascii() {
+        let needle = needle_lower.as_bytes();
+        norm.as_bytes()
+            .windows(needle.len())
+            .any(|w| w.eq_ignore_ascii_case(needle))
+    } else {
+        norm.to_lowercase().contains(needle_lower)
+    };
+    norm_hit || get_str_ref(row, "fingerprint").starts_with(needle_lower)
 }
 
 // ─── Live-tail cache (D4) ────────────────────────────────────────────────────
@@ -888,7 +974,10 @@ pub(crate) struct TailData {
 struct TailCacheEntry {
     computed_at: i64, // µs
     offset: i64,      // the rollup offset the tail was computed against
-    data: TailData,
+    /// `Arc`, so a hit hands out a pointer copy instead of deep-cloning two
+    /// row vectors under the global mutex — the hold time is what every other
+    /// request in the process queues on.
+    data: Arc<TailData>,
 }
 
 /// In-process tail cache. Keyed per `(org, stream)` with the rollup OFFSET as
@@ -918,29 +1007,49 @@ impl TailCache {
         offset: i64,
         now: i64,
         ttl_micros: i64,
-    ) -> Option<TailData> {
+    ) -> Option<Arc<TailData>> {
         let map = self.map.lock().unwrap();
         let entry = map.get(&(org_id.to_string(), stream.to_string()))?;
         if entry.offset != offset || now - entry.computed_at >= ttl_micros {
             return None;
         }
-        Some(entry.data.clone())
+        Some(Arc::clone(&entry.data))
     }
 
-    pub(crate) fn put(&self, org_id: &str, stream: &str, offset: i64, now: i64, data: TailData) {
+    /// Store one computed tail; returns the shared handle so the computing
+    /// caller keeps the same allocation it just cached.
+    pub(crate) fn put(
+        &self,
+        org_id: &str,
+        stream: &str,
+        offset: i64,
+        now: i64,
+        data: TailData,
+    ) -> Arc<TailData> {
+        let data = Arc::new(data);
         let mut map = self.map.lock().unwrap();
         map.insert(
             (org_id.to_string(), stream.to_string()),
             TailCacheEntry {
                 computed_at: now,
                 offset,
-                data,
+                data: Arc::clone(&data),
             },
         );
+        data
     }
 }
 
 static TAIL_CACHE: LazyLock<TailCache> = LazyLock::new(TailCache::new);
+
+/// Single-flight guard for tail computation. The current and the Δ-baseline
+/// windows resolve the same `(org, stream)` tails CONCURRENTLY, and on a cache
+/// miss both used to compute the identical tail — two full two-stage searches
+/// for one answer. One caller computes under the per-key lock, the other
+/// awaits it and re-reads the cache. Entries are one small `Arc` per
+/// `(org, stream)` — the same bounded population the cache itself holds.
+type TailFlights = HashMap<(String, String), Arc<tokio::sync::Mutex<()>>>;
+static TAIL_FLIGHTS: LazyLock<Mutex<TailFlights>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Tail cache TTL: `min(30 s, interval/10)` (D4), floored at 1 s.
 pub(crate) fn tail_ttl_micros(interval_secs: u64) -> i64 {
@@ -949,8 +1058,13 @@ pub(crate) fn tail_ttl_micros(interval_secs: u64) -> i64 {
 }
 
 /// Compute (or serve from cache) the live tail for one `(org, trace stream)`.
-/// Returns `None` only when the live tail is disabled.
-async fn get_or_compute_tail(org_id: &str, stream: &str) -> Option<TailData> {
+/// Returns `None` when the live tail is disabled.
+///
+/// `offset` is the stream's rollup offset, resolved by the caller — the whole
+/// fleet's offsets come from ONE prefix read in [`collect_tails`], where this
+/// function used to issue its own per-stream meta-DB round trip on every
+/// request.
+async fn get_or_compute_tail(org_id: &str, stream: &str, offset: i64) -> Option<Arc<TailData>> {
     let cfg = get_config();
     if !cfg.db_monitoring.live_tail {
         return None;
@@ -958,9 +1072,23 @@ async fn get_or_compute_tail(org_id: &str, stream: &str) -> Option<TailData> {
     let now = now_micros();
     let interval_micros = (cfg.db_monitoring.interval_secs as i64).max(1) * 1_000_000;
     let ttl = tail_ttl_micros(cfg.db_monitoring.interval_secs);
-    let (offset, _) = crate::db::db_monitoring::get_offset(org_id, stream).await;
 
     if let Some(t) = TAIL_CACHE.get(org_id, stream, offset, now, ttl) {
+        return Some(t);
+    }
+
+    // Single-flight: whoever holds the per-key lock computes; everyone else
+    // waits and finds the fresh entry on the re-check below.
+    let flight = {
+        let mut flights = TAIL_FLIGHTS.lock().unwrap();
+        Arc::clone(
+            flights
+                .entry((org_id.to_string(), stream.to_string()))
+                .or_default(),
+        )
+    };
+    let _guard = flight.lock().await;
+    if let Some(t) = TAIL_CACHE.get(org_id, stream, offset, now_micros(), ttl) {
         return Some(t);
     }
 
@@ -983,8 +1111,7 @@ async fn get_or_compute_tail(org_id: &str, stream: &str) -> Option<TailData> {
             tail_end: now,
             ..Default::default()
         };
-        TAIL_CACHE.put(org_id, stream, offset, now, data.clone());
-        return Some(data);
+        return Some(TAIL_CACHE.put(org_id, stream, offset, now, data));
     }
 
     // The BOUNDED two-stage form (§5.2), reusing the rollup's own builders —
@@ -1004,8 +1131,12 @@ async fn get_or_compute_tail(org_id: &str, stream: &str) -> Option<TailData> {
         relevant: true,
         ..Default::default()
     };
-    let rank_rows = rollup::run_dbm_search(org_id, rank_sql, tail_start, now).await;
-    let totals_rows = rollup::run_dbm_search(org_id, totals_sql, tail_start, now).await;
+    // Rank and totals are independent stages of the same bounded form — run
+    // them concurrently rather than back to back.
+    let (rank_rows, totals_rows) = tokio::join!(
+        rollup::run_dbm_search(org_id, rank_sql, tail_start, now),
+        rollup::run_dbm_search(org_id, totals_sql, tail_start, now),
+    );
     match (rank_rows, totals_rows) {
         (Ok(rank), Ok(totals)) => {
             data.truncated =
@@ -1038,8 +1169,7 @@ async fn get_or_compute_tail(org_id: &str, stream: &str) -> Option<TailData> {
             data.failed = true;
         }
     }
-    TAIL_CACHE.put(org_id, stream, offset, now, data.clone());
-    Some(data)
+    Some(TAIL_CACHE.put(org_id, stream, offset, now, data))
 }
 
 // ─── Search harnesses ────────────────────────────────────────────────────────
@@ -1063,38 +1193,7 @@ async fn run_stats_search(
     if !infra::schema::exists(org_id, StreamType::Logs, O2_DB_STATS_STREAM).await {
         return Ok(Vec::new());
     }
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size: STATS_READ_SIZE as i64,
-            start_time,
-            end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            action_id: None,
-            histogram_interval: 0,
-            streaming_id: None,
-            streaming_output: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            timezone: None,
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 30,
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        clear_cache: false,
-        local_mode: Some(false),
-        agent_options: None,
-    };
+    let req = rollup::dbm_search_request(sql, start_time, end_time, STATS_READ_SIZE as i64, 30);
     // `user_id: None` is deliberate HERE: stream scoping happens up-front in
     // `involved_streams`, which filters to what the caller may read and drives
     // both the rollup rows and the tail. Passing a user here as well would
@@ -1140,7 +1239,8 @@ async fn involved_streams(
     rollup_rows: &[&[Value]],
 ) -> Option<Vec<String>> {
     if let Some(s) = stream_param {
-        return if can_read_stream(org_id, user_id, s, StreamType::Traces).await {
+        return if can_read_stream(org_id, user_id, s, required_stream_for(DbmVantage::Client)).await
+        {
             Some(vec![s.clone()])
         } else {
             None
@@ -1165,13 +1265,25 @@ async fn involved_streams(
         }
     }
 
-    let mut readable = Vec::with_capacity(set.len());
-    for stream in set {
-        if can_read_stream(org_id, user_id, &stream, StreamType::Traces).await {
-            readable.push(stream);
-        }
-    }
-    Some(readable)
+    // One RBAC check per stream, CONCURRENTLY — on enterprise each is a
+    // network OFGA round trip, and the serial form summed them.
+    let streams: Vec<String> = set.into_iter().collect();
+    let verdicts = join_all(streams.iter().map(|stream| {
+        can_read_stream(
+            org_id,
+            user_id,
+            stream,
+            required_stream_for(DbmVantage::Client),
+        )
+    }))
+    .await;
+    Some(
+        streams
+            .into_iter()
+            .zip(verdicts)
+            .filter_map(|(stream, ok)| ok.then_some(stream))
+            .collect(),
+    )
 }
 
 /// Freshness block carried by every rollup-backed response (D4).
@@ -1209,7 +1321,7 @@ impl Freshness {
 
 /// Tails + freshness bookkeeping for the involved streams.
 struct CollectedTails {
-    tails: Vec<TailData>,
+    tails: Vec<Arc<TailData>>,
     data_through: i64,
     tail_covers_from: Option<i64>,
     tail_through: Option<i64>,
@@ -1247,12 +1359,37 @@ async fn collect_tails(
     end_time: i64,
 ) -> CollectedTails {
     let cfg = get_config();
+    // ONE prefix read for every stream's offset — this used to be a meta-DB
+    // round trip per stream here, plus a second one inside each tail
+    // computation. A stream absent from the map is a fresh stream (offset 0),
+    // exactly as `get_offset` answers for a missing key; a failed LIST is not
+    // a fleet of fresh streams — the tails are skipped for this request and
+    // staleness surfaces through `data_through` alone, the same degradation
+    // the per-stream read failure produced.
+    let offsets = match crate::db::db_monitoring::list_offsets(org_id).await {
+        Ok(map) => Some(map),
+        Err(e) => {
+            log::warn!(
+                "[DbMonitoring] {org_id} offsets read failed; live tails skipped, streams excluded from data_through: {e}"
+            );
+            None
+        }
+    };
+    let offset_of = |stream: &str| -> i64 {
+        offsets
+            .as_ref()
+            .and_then(|m| m.get(stream))
+            .map_or(0, |o| o.0)
+    };
+
     let mut data_through = i64::MAX;
-    for stream in streams {
-        let (offset, _) = crate::db::db_monitoring::get_offset(org_id, stream).await;
-        data_through = data_through.min(offset);
+    if offsets.is_some() {
+        for stream in streams {
+            data_through = data_through.min(offset_of(stream));
+        }
     }
-    if streams.is_empty() {
+    // No streams, or no readable offset at all.
+    if data_through == i64::MAX {
         data_through = 0;
     }
 
@@ -1260,23 +1397,29 @@ async fn collect_tails(
     let mut tail_covers_from: Option<i64> = None;
     let mut tail_through: Option<i64> = None;
     let mut truncated = false;
-    if cfg.db_monitoring.live_tail {
-        for stream in streams {
-            if let Some(t) = get_or_compute_tail(org_id, stream).await {
-                if t.failed || !t.relevant {
-                    continue;
-                }
-                // Half-open overlap test against the caller's window.
-                if !tail_overlaps(t.tail_start, t.tail_end, start_time, end_time) {
-                    continue;
-                }
-                // Latest tail start across streams: any stream whose tail
-                // begins after its offset has a stall gap (D4 staleness).
-                tail_covers_from = Some(tail_covers_from.unwrap_or(i64::MIN).max(t.tail_start));
-                tail_through = Some(tail_through.unwrap_or(0).max(t.tail_end));
-                truncated |= t.truncated;
-                tails.push(t);
+    if cfg.db_monitoring.live_tail && offsets.is_some() {
+        // Every stream's tail concurrently — each is its own bounded pair of
+        // searches (or a cache hit), with no ordering between streams.
+        let computed = join_all(
+            streams
+                .iter()
+                .map(|stream| get_or_compute_tail(org_id, stream, offset_of(stream))),
+        )
+        .await;
+        for t in computed.into_iter().flatten() {
+            if t.failed || !t.relevant {
+                continue;
             }
+            // Half-open overlap test against the caller's window.
+            if !tail_overlaps(t.tail_start, t.tail_end, start_time, end_time) {
+                continue;
+            }
+            // Latest tail start across streams: any stream whose tail
+            // begins after its offset has a stall gap (D4 staleness).
+            tail_covers_from = Some(tail_covers_from.unwrap_or(i64::MIN).max(t.tail_start));
+            tail_through = Some(tail_through.unwrap_or(0).max(t.tail_end));
+            truncated |= t.truncated;
+            tails.push(t);
         }
     }
     CollectedTails {
@@ -1290,6 +1433,59 @@ async fn collect_tails(
 
 fn disabled_response() -> HttpResponse {
     MetaHttpResponse::not_found("Database Monitoring is disabled (ZO_DB_MONITORING_ENABLED=false)")
+}
+
+// ─── Δ-baseline plumbing (shared by the databases and queries bodies) ────────
+
+/// Validate the Δ baseline pair: both or neither, start before end.
+fn parse_baseline_pair(
+    start: Option<i64>,
+    end: Option<i64>,
+) -> Result<Option<(i64, i64)>, HttpResponse> {
+    match (start, end) {
+        (Some(bs), Some(be)) if bs < be => Ok(Some((bs, be))),
+        (None, None) => Ok(None),
+        _ => Err(MetaHttpResponse::bad_request(
+            "baseline_start_time and baseline_end_time must be supplied together, start before end",
+        )),
+    }
+}
+
+/// Run one window reader for the current window and — CONCURRENTLY, when one
+/// was requested — the Δ baseline window. The pair used to be two sequential
+/// HTTP requests from the page.
+async fn read_current_and_baseline<T, F, Fut>(
+    read_window: F,
+    start_time: i64,
+    end_time: i64,
+    baseline: Option<(i64, i64)>,
+) -> (Result<T, HttpResponse>, Option<Result<T, HttpResponse>>)
+where
+    F: Fn(i64, i64) -> Fut,
+    Fut: Future<Output = Result<T, HttpResponse>>,
+{
+    let current_fut = read_window(start_time, end_time);
+    match baseline {
+        Some((bs, be)) => {
+            let (c, b) = tokio::join!(current_fut, read_window(bs, be));
+            (c, Some(b))
+        }
+        None => (current_fut.await, None),
+    }
+}
+
+/// Insert the baseline enrichment keys plus the `baseline_read_failed` flag.
+///
+/// The baseline is enrichment — it feeds the Δ comparison, not the table — so
+/// its failure degrades to empty sections, STATED rather than implied by
+/// emptiness (each section key gets `[]` and the flag says why), exactly as
+/// table_health's index section does.
+fn stamp_baseline_sections(body: &mut Value, sections: Vec<(&str, Value)>, failed: bool) {
+    let extra = body.as_object_mut().expect("body is an object");
+    for (key, value) in sections {
+        extra.insert(key.to_string(), value);
+    }
+    extra.insert("baseline_read_failed".into(), json!(failed));
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -1309,6 +1505,18 @@ pub struct DatabasesQuery {
     /// requests for them.
     pub baseline_start_time: Option<i64>,
     pub baseline_end_time: Option<i64>,
+    /// Fold the per-instance schema → service split into THIS response, keyed
+    /// by instance, instead of the page issuing `GET /queries?instance=<row>`
+    /// once per expanded row (and re-issuing all of them on every window
+    /// change). Opt-in for the same reason `include_indexes` is: the split is
+    /// a drill-down nobody has opened yet on first paint.
+    ///
+    /// It costs no additional search: the fingerprint rows the split needs are
+    /// the `query_stats` pool this window ALREADY read to compute
+    /// `calling_services`. The fold is the same `group_query_rows(.., None,
+    /// false)` the queries endpoint runs for `stmt_class=all` under an
+    /// instance scope, so the rows are the ones the page used to receive.
+    pub include_breakdown: Option<bool>,
 }
 
 /// GET /{org_id}/traces/db_monitoring/databases — FR-1 overview.
@@ -1336,6 +1544,7 @@ pub struct DatabasesQuery {
         ("service" = Option<String>, Query, description = "Calling service filter"),
         ("baseline_start_time" = Option<i64>, Query, description = "Δ baseline window start (microseconds); returns baseline_hits in the same response"),
         ("baseline_end_time" = Option<i64>, Query, description = "Δ baseline window end (microseconds)"),
+        ("include_breakdown" = Option<bool>, Query, description = "Also return the per-instance schema→service split as `breakdown` (one entry per instance), folded from the query_stats rows this window already read"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -1371,27 +1580,15 @@ async fn read_databases_body(
             "start_time must be before end_time",
         ));
     }
-    let baseline = match (q.baseline_start_time, q.baseline_end_time) {
-        (Some(bs), Some(be)) if bs < be => Some((bs, be)),
-        (None, None) => None,
-        _ => {
-            return Err(MetaHttpResponse::bad_request(
-                "baseline_start_time and baseline_end_time must be supplied together, start before end",
-            ));
-        }
-    };
+    let baseline = parse_baseline_pair(q.baseline_start_time, q.baseline_end_time)?;
 
-    let current_fut = read_databases_window(org_id, user_id, q, start_time, end_time);
-    let (current, baseline_out) = match baseline {
-        Some((bs, be)) => {
-            // Both windows CONCURRENTLY — this pair used to be two sequential
-            // HTTP requests from the page.
-            let baseline_fut = read_databases_window(org_id, user_id, q, bs, be);
-            let (c, b) = tokio::join!(current_fut, baseline_fut);
-            (c, Some(b))
-        }
-        None => (current_fut.await, None),
-    };
+    let (current, baseline_out) = read_current_and_baseline(
+        |s, e| read_databases_window(org_id, user_id, q, s, e),
+        start_time,
+        end_time,
+        baseline,
+    )
+    .await;
     let window = current?;
 
     let mut body = json!({
@@ -1399,21 +1596,23 @@ async fn read_databases_body(
         "top_n_subset": window.top_n_subset,
         "freshness": window.freshness.to_json(),
     });
-    if let Some(baseline_result) = baseline_out {
+    if let Some(breakdown) = window.breakdown {
         let extra = body.as_object_mut().expect("body is an object");
+        extra.insert("breakdown".into(), breakdown);
+        // Stated, never implied by emptiness — the same rule `index_read_failed`
+        // follows. The split rides the pool this window already read, so the
+        // only way it can be absent is the whole window failing (which is a
+        // 500, not this flag); the flag exists so the page can tell "no rows
+        // to attribute" from "we could not attribute", and stays wired for a
+        // future fold that CAN fail independently.
+        extra.insert("breakdown_read_failed".into(), json!(false));
+    }
+    if let Some(baseline_result) = baseline_out {
         match baseline_result {
             Ok(b) => {
-                extra.insert("baseline_hits".into(), json!(b.hits));
-                extra.insert("baseline_read_failed".into(), json!(false));
+                stamp_baseline_sections(&mut body, vec![("baseline_hits", json!(b.hits))], false)
             }
-            Err(_) => {
-                // The baseline is enrichment — it feeds the Δ comparison, not
-                // the table. Its failure degrades to an empty section, stated
-                // rather than implied by emptiness, exactly as table_health's
-                // index section does.
-                extra.insert("baseline_hits".into(), json!([]));
-                extra.insert("baseline_read_failed".into(), json!(true));
-            }
+            Err(_) => stamp_baseline_sections(&mut body, vec![("baseline_hits", json!([]))], true),
         }
     }
     Ok(body)
@@ -1424,6 +1623,11 @@ struct DatabasesWindow {
     hits: Vec<Value>,
     top_n_subset: bool,
     freshness: Freshness,
+    /// The per-instance split, present only when `include_breakdown` asked for
+    /// it. A JSON object `{ db_instance: [query_stats rows] }` — see
+    /// [`fold_breakdown_by_instance`]. Only the CURRENT window's is serialized;
+    /// the Δ baseline has no drill-down to draw.
+    breakdown: Option<Value>,
 }
 
 /// The whole per-window pipeline of the databases overview — searches, RBAC,
@@ -1461,12 +1665,41 @@ async fn read_databases_window(
         end_time,
         &totals_filters.sql_preds(),
     );
-    let qs_sql = build_stats_sql(
+    // The overview consumes only dimensions, `calling_services` inputs and the
+    // merge metrics from `query_stats` rows — never `query_norm` (up to 4 KB
+    // per row) nor `operation`/`stmt_class`. Projecting spares the columnar
+    // read its dominant column. Schema-gated (see `stats_projection`).
+    let qs_projection = stats_projection(
+        org_id,
+        &[
+            "fingerprint",
+            "db_system",
+            "db_instance",
+            "db_namespace",
+            "env",
+            "service_name",
+            "trace_stream_name",
+            "statements",
+            "calls",
+            "errors",
+            "total_time_ns",
+            "traces",
+            "rows_returned",
+            "rows_emitting_calls",
+            "p50_ns",
+            "p95_ns",
+            "p99_ns",
+            "max_ns",
+        ],
+    )
+    .await;
+    let qs_sql = build_stats_sql_projected(
         org_id,
         "query_stats",
         start_time,
         end_time,
         &filters.sql_preds(),
+        &qs_projection,
     );
     // Concurrent, where they were awaited one after the other: two independent
     // record families over the same summary stream have no ordering to honour.
@@ -1577,11 +1810,54 @@ async fn read_databases_window(
         percentiles_estimated,
     };
 
+    // The drill-down, folded from the pool this window ALREADY read — it is
+    // the same `query_stats` set `calling_services` above consumed, so the
+    // split costs no search of its own. This replaced one
+    // `GET /queries?instance=<row>&stmt_class=all` PER EXPANDED ROW, re-fired
+    // for every open row on every window change.
+    let breakdown = q
+        .include_breakdown
+        .unwrap_or(false)
+        .then(|| fold_breakdown_by_instance(&qs_pool));
+
     Ok(DatabasesWindow {
         hits,
         top_n_subset,
         freshness,
+        breakdown,
     })
+}
+
+/// Fold scope-filtered `query_stats` rows into `{ db_instance: [rows] }` — the
+/// per-instance drill-down the overview's expandable rows render.
+///
+/// Each instance's rows are EXACTLY what `GET /queries?instance=<it>&
+/// stmt_class=all&sort=<default>` returns for the same window and scope: the
+/// same [`group_query_rows`] fold, with `class_filter: None` (the row's own
+/// total counts every statement class, so filtering to one would manufacture a
+/// shortfall) and `allow_other: false` (an instance scope is narrower than the
+/// grain `_other` reconciles at — §5.2 — which is why the standalone call also
+/// dropped the remainder and reported `top_n_subset`). Sorted and truncated the
+/// same way, so an expanded row shows the rows it always showed.
+fn fold_breakdown_by_instance(qs_pool: &[Value]) -> Value {
+    let mut by_instance: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+    for row in qs_pool {
+        let instance = get_str(row, "db_instance");
+        if instance.is_empty() {
+            continue;
+        }
+        by_instance.entry(instance).or_default().push(row.clone());
+    }
+    let folded: serde_json::Map<String, Value> = by_instance
+        .into_iter()
+        .map(|(instance, rows)| {
+            let (mut hits, _other) = group_query_rows(&rows, None, false);
+            sort_rows(&mut hits, None);
+            hits.truncate(DEFAULT_BREAKDOWN_LIMIT);
+            (instance, json!(hits))
+        })
+        .collect();
+    Value::Object(folded)
 }
 
 #[derive(Debug, Deserialize)]
@@ -1609,6 +1885,31 @@ pub struct QueriesQuery {
     /// sets are comparable row-for-row.
     pub baseline_start_time: Option<i64>,
     pub baseline_end_time: Option<i64>,
+    /// Narrows the SERVER FALLBACK to one statement — it does not filter the
+    /// client-vantage rows, which the detail page already selects from the
+    /// ranked page it reads.
+    ///
+    /// The query-detail page looks up ONE fingerprint. Its client read is a
+    /// ranked page it filters in the browser, which is fine while traces
+    /// exist; with none, the fallback below is the only vantage that can
+    /// answer, and it must answer about THIS statement rather than handing
+    /// back the org's fifty most-frequent.
+    pub fingerprint: Option<String>,
+    /// Run the database-reported fallback list in this same request when — and
+    /// only when — the client-vantage answer is an EXACT zero, returning it as
+    /// `server_fallback`.
+    ///
+    /// On a deployment with the collector wired but no traced application
+    /// traffic, this page's client read is honestly empty while the databases
+    /// have been reporting their statement counters all along. The page
+    /// handled that by awaiting this response and THEN issuing
+    /// `/server_queries` — two sequential round trips on every load, in the
+    /// deployment least able to spare them.
+    ///
+    /// The server already runs exactly this conditional inside `/badges`; this
+    /// exposes it to the tab that renders the rows. Armed only by an exact
+    /// zero: a failed read is unknown, and unknown is not zero.
+    pub include_server_fallback: Option<bool>,
 }
 
 /// GET /{org_id}/traces/db_monitoring/queries — FR-2 top queries.
@@ -1639,6 +1940,8 @@ pub struct QueriesQuery {
         ("sort" = Option<String>, Query, description = "Sort key (whitelist; default total_time_ns)"),
         ("limit" = Option<usize>, Query, description = "Max rows (default 100)"),
         ("search" = Option<String>, Query, description = "Free-text search over normalized query text"),
+        ("include_server_fallback" = Option<bool>, Query, description = "When the client-vantage answer is an exact zero, also run the database-reported list and return it as `server_fallback` (with per-section forbidden/read-failed flags)"),
+        ("fingerprint" = Option<String>, Query, description = "Narrows the `server_fallback` section to one statement (the query-detail row lookup). Does not filter the client-vantage rows."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -1653,10 +1956,66 @@ pub async fn get_dbm_queries(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
-    match read_queries_body(&org_id, &user_email.user_id, &q).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(resp) => resp,
+    let mut body = match read_queries_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => body,
+        Err(resp) => return resp,
+    };
+
+    // ── The zero-trace fallback, folded server-side ──────────────────────
+    //
+    // The SAME conditional `/badges` runs, exposed to the tab that draws the
+    // rows: the page used to await this response and then issue
+    // `/server_queries` itself, which is two sequential round trips on the one
+    // deployment where the second is guaranteed to be needed.
+    //
+    // Armed only by an EXACT zero. A `total` of 0 is the client vantage saying
+    // truthfully "no traced traffic", which is false about the ORG when the
+    // databases themselves are reporting; a failed read says nothing, and
+    // unknown is not zero.
+    if q.include_server_fallback.unwrap_or(false) && queries_body_reports_zero(&body) {
+        let sq = ServerQueriesQuery {
+            start_time: q.start_time,
+            end_time: q.end_time,
+            stream: None,
+            system: q.system.clone(),
+            instance: q.instance.clone(),
+            database: None,
+            namespace: q.namespace.clone(),
+            // Forwarded so the detail page's single-statement lookup gets that
+            // statement, not the ranked browse list it would have to search —
+            // and could miss entirely below the cap.
+            fingerprint: q.fingerprint.clone(),
+            limit: None,
+        };
+        stamp_server_fallback(
+            &mut body,
+            read_server_queries_body(&org_id, &user_email.user_id, &sq).await,
+        );
     }
+    MetaHttpResponse::json(body)
+}
+
+/// Attach the database-reported fallback list as `server_fallback`, with the
+/// two flags that keep its three outcomes apart.
+///
+/// The fallback body reads a LOGS stream while the primary is Traces-auth, so
+/// a caller may legitimately be allowed one and denied the other. That must
+/// NOT become a whole-request 403 — the client-vantage rows the caller IS
+/// entitled to are already in this response — so a denial is a section flag,
+/// exactly as `/badges` treats a denied slice. `server_fallback_forbidden`
+/// separates "you may not see this" from `server_fallback_read_failed`'s "it
+/// broke", because the page's copy for the two is different: one is a
+/// permission to request, the other is a retry.
+fn stamp_server_fallback(body: &mut Value, result: Result<Value, HttpResponse>) {
+    let (section, forbidden, failed) = match result {
+        Ok(section) => (section, false, false),
+        Err(resp) if is_forbidden(&resp) => (Value::Null, true, false),
+        Err(_) => (Value::Null, false, true),
+    };
+    let extra = body.as_object_mut().expect("body is an object");
+    extra.insert("server_fallback".into(), section);
+    extra.insert("server_fallback_forbidden".into(), json!(forbidden));
+    extra.insert("server_fallback_read_failed".into(), json!(failed));
 }
 
 /// The top-queries endpoint's whole body as a callable — same extraction as
@@ -1672,25 +2031,15 @@ async fn read_queries_body(
             "start_time must be before end_time",
         ));
     }
-    let baseline = match (q.baseline_start_time, q.baseline_end_time) {
-        (Some(bs), Some(be)) if bs < be => Some((bs, be)),
-        (None, None) => None,
-        _ => {
-            return Err(MetaHttpResponse::bad_request(
-                "baseline_start_time and baseline_end_time must be supplied together, start before end",
-            ));
-        }
-    };
+    let baseline = parse_baseline_pair(q.baseline_start_time, q.baseline_end_time)?;
 
-    let current_fut = read_queries_window(org_id, user_id, q, start_time, end_time);
-    let (current, baseline_out) = match baseline {
-        Some((bs, be)) => {
-            let baseline_fut = read_queries_window(org_id, user_id, q, bs, be);
-            let (c, b) = tokio::join!(current_fut, baseline_fut);
-            (c, Some(b))
-        }
-        None => (current_fut.await, None),
-    };
+    let (current, baseline_out) = read_current_and_baseline(
+        |s, e| read_queries_window(org_id, user_id, q, s, e),
+        start_time,
+        end_time,
+        baseline,
+    )
+    .await;
     let window = current?;
 
     let mut body = json!({
@@ -1701,22 +2050,23 @@ async fn read_queries_body(
         "freshness": window.freshness.to_json(),
     });
     if let Some(baseline_result) = baseline_out {
-        let extra = body.as_object_mut().expect("body is an object");
         match baseline_result {
-            Ok(b) => {
-                extra.insert("baseline_hits".into(), json!(b.hits));
-                // The remainder too: the page measures Δ shares against the
-                // WHOLE scope (shown + `_other`), so a baseline without its
-                // remainder would silently inflate every previous-window share.
-                extra.insert("baseline_other".into(), json!(b.other));
-                extra.insert("baseline_read_failed".into(), json!(false));
-            }
-            Err(_) => {
-                // Enrichment only — the Δ column goes quiet, the table stands.
-                extra.insert("baseline_hits".into(), json!([]));
-                extra.insert("baseline_other".into(), json!([]));
-                extra.insert("baseline_read_failed".into(), json!(true));
-            }
+            // The remainder too: the page measures Δ shares against the
+            // WHOLE scope (shown + `_other`), so a baseline without its
+            // remainder would silently inflate every previous-window share.
+            Ok(b) => stamp_baseline_sections(
+                &mut body,
+                vec![
+                    ("baseline_hits", json!(b.hits)),
+                    ("baseline_other", json!(b.other)),
+                ],
+                false,
+            ),
+            Err(_) => stamp_baseline_sections(
+                &mut body,
+                vec![("baseline_hits", json!([])), ("baseline_other", json!([]))],
+                true,
+            ),
         }
     }
     Ok(body)
@@ -1758,7 +2108,16 @@ async fn read_queries_window(
     // (§5.2): narrower scopes and free-text search show `top_n_subset` instead.
     let allow_other = !filters.narrower_than_other_grain() && search.is_none();
 
-    let qs_sql = build_queries_stats_sql(org_id, start_time, end_time, &filters, search);
+    // The free-text `search` is DELIBERATELY not part of this SQL — it is
+    // applied at merge time in Rust (it must filter the cached unfiltered tail
+    // anyway), so user search text never reaches the SQL string at all.
+    let qs_sql = build_stats_sql(
+        org_id,
+        "query_stats",
+        start_time,
+        end_time,
+        &filters.sql_preds(),
+    );
     let qs_rows = match run_stats_search(org_id, qs_sql, start_time, end_time).await {
         Ok(rows) => rows,
         Err(e) => {
@@ -1791,7 +2150,12 @@ async fn read_queries_window(
         tail_used |= pool.len() > before;
     }
     if let Some(s) = search {
-        pool.retain(|r| get_str(r, "fingerprint") == "_other" || search_matches(r, s));
+        // Lowered ONCE, here — `search_matches` takes the pre-lowered needle
+        // so the loop never re-lowercases it per row.
+        let needle_lower = s.to_lowercase();
+        pool.retain(|r| {
+            get_str_ref(r, "fingerprint") == "_other" || search_matches(r, &needle_lower)
+        });
     }
 
     let (mut hits, other) = group_query_rows(&pool, class_filter.as_deref(), allow_other);
@@ -1832,6 +2196,22 @@ pub struct HistoryQuery {
     pub namespace: Option<String>,
     pub env: Option<String>,
     pub service: Option<String>,
+    /// Also return the FR-5 calling-endpoints aggregation as `endpoints`, in
+    /// this same response.
+    ///
+    /// The query-detail page fired `/query/history` and `/query/endpoints`
+    /// together on every entry, with the identical fingerprint and window —
+    /// and endpoints REQUIRES a `stream` the page had to resolve first, which
+    /// is the very stream this handler already resolves for its own backfill
+    /// (`trace_stream_name` in the response below). So the second request was
+    /// waiting on a fact this one had computed.
+    ///
+    /// Opt-in, like `include_indexes`: a caller who wants the series alone
+    /// should not pay for a raw-span aggregation.
+    pub include_endpoints: Option<bool>,
+    /// Cap for the `endpoints` section — the standalone endpoint's `limit`,
+    /// under the same default and clamp.
+    pub endpoints_limit: Option<usize>,
 }
 
 /// GET /{org_id}/traces/db_monitoring/query/history — FR-5 per-fingerprint
@@ -1858,6 +2238,8 @@ pub struct HistoryQuery {
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
         ("stream" = Option<String>, Query, description = "Trace stream filter"),
+        ("include_endpoints" = Option<bool>, Query, description = "Also return the FR-5 calling-endpoints aggregation as `endpoints`, run against the trace stream this handler already resolves"),
+        ("endpoints_limit" = Option<usize>, Query, description = "Max endpoint rows when include_endpoints is set (default 50, max 500)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -1891,7 +2273,13 @@ pub async fn get_dbm_query_history(
     // than rejects (a fan-out over whatever streams hold data is not an explicit
     // ask); this early return is only for the explicit one.
     if let Some(stream) = q.stream.as_deref().filter(|s| !s.is_empty())
-        && !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Traces).await
+        && !can_read_stream(
+            &org_id,
+            &user_email.user_id,
+            stream,
+            required_stream_for(DbmVantage::Client),
+        )
+        .await
     {
         return unauthorized_response();
     }
@@ -1923,24 +2311,28 @@ pub async fn get_dbm_query_history(
         end_time,
         &format!("{}{}", filters.sql_preds(), fingerprint_pred(fingerprint)),
     );
-    let totals_sql = build_stats_sql(
+    // The history `db_totals` read feeds only window existence (distinct
+    // `_timestamp`s under the totals filters) and backfill-stream resolution —
+    // never the metrics — so it projects the four columns those consume
+    // instead of dragging every stored column per row.
+    let totals_projection = stats_projection(
+        &org_id,
+        &[
+            "_timestamp",
+            "trace_stream_name",
+            "db_system",
+            "db_instance",
+        ],
+    )
+    .await;
+    let totals_sql = build_stats_sql_projected(
         &org_id,
         "db_totals",
         start_time,
         end_time,
         &totals_filters.sql_preds(),
+        &totals_projection,
     );
-    let (fp_rows, totals_rows) = match (
-        run_stats_search(&org_id, fp_sql, start_time, end_time).await,
-        run_stats_search(&org_id, totals_sql, start_time, end_time).await,
-    ) {
-        (Ok(f), Ok(t)) => (f, t),
-        (f, t) => {
-            let e = f.err().or(t.err()).unwrap();
-            log::error!("[DbMonitoring] history rollup read failed for {org_id}: {e}");
-            return MetaHttpResponse::internal_error(e);
-        }
-    };
 
     // FR-5 errors-by-code: the rollup's EXACT per-status-code counts
     // (`error_class` records), summed across the windows in range. The detail
@@ -1962,7 +2354,10 @@ pub async fn get_dbm_query_history(
         stream: q.stream.clone(),
         ..Default::default()
     };
-    let error_classes: Vec<Value> = if q.namespace.is_none() && q.service.is_none() {
+    let error_classes_fut = async {
+        if q.namespace.is_some() || q.service.is_some() {
+            return Vec::new();
+        }
         let ec_sql = build_stats_sql(
             &org_id,
             "error_class",
@@ -1984,8 +2379,23 @@ pub async fn get_dbm_query_history(
                 Vec::new()
             }
         }
-    } else {
-        Vec::new()
+    };
+
+    // Three independent reads over the same summary stream, CONCURRENTLY —
+    // this chain (plus the backfill and tails below) used to be a serial
+    // sequence of up to ~10 awaited searches.
+    let (fp_res, totals_res, error_classes) = tokio::join!(
+        run_stats_search(&org_id, fp_sql, start_time, end_time),
+        run_stats_search(&org_id, totals_sql, start_time, end_time),
+        error_classes_fut,
+    );
+    let (fp_rows, totals_rows) = match (fp_res, totals_res) {
+        (Ok(f), Ok(t)) => (f, t),
+        (f, t) => {
+            let e = f.err().or(t.err()).unwrap();
+            log::error!("[DbMonitoring] history rollup read failed for {org_id}: {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
     };
 
     // Per-window fingerprint points (constituent rows merged per window).
@@ -2024,17 +2434,21 @@ pub async fn get_dbm_query_history(
         point["timestamp"] = json!(window_end);
         series.push(point);
     }
-    for window_end in &to_backfill {
+    // The K backfill windows run CONCURRENTLY (`HISTORY_BACKFILL_MAX_WINDOWS`
+    // bounds the fan-out), overlapped with stream resolution + tail
+    // collection, which depend on `totals_rows` but not on the backfill.
+    let org = org_id.as_str();
+    let backfill_stream_ref = backfill_stream.as_ref();
+    let backfill_fut = join_all(to_backfill.iter().map(|window_end| async move {
         let mut point = json!({ "timestamp": window_end, "below_top_n": true });
-        if let Some(stream) = &backfill_stream {
+        if let Some(stream) = backfill_stream_ref {
             let sql = build_backfill_sql(
                 stream,
                 fingerprint,
                 window_end - interval_micros,
                 *window_end,
             );
-            match rollup::run_dbm_search(&org_id, sql, window_end - interval_micros, *window_end)
-                .await
+            match rollup::run_dbm_search(org, sql, window_end - interval_micros, *window_end).await
             {
                 Ok(rows) if !rows.is_empty() && get_i64(&rows[0], "calls") > 0 => {
                     let mut merged = rows[0].clone();
@@ -2051,29 +2465,59 @@ pub async fn get_dbm_query_history(
                     point["calls"] = json!(0);
                 }
                 Err(e) => {
-                    log::warn!("[DbMonitoring] history backfill failed for {org_id}: {e}");
+                    log::warn!("[DbMonitoring] history backfill failed for {org}: {e}");
                 }
             }
         }
-        series.push(point);
-    }
+        point
+    }));
+    // Live-tail point inputs (D4 — the series' live segment, never flat/zero).
+    let tails_fut = async {
+        let streams = involved_streams(
+            &org_id,
+            &user_email.user_id,
+            q.stream.as_ref(),
+            &[&totals_rows[..]],
+        )
+        .await?;
+        Some(collect_tails(&org_id, &streams, start_time, end_time).await)
+    };
+    // FR-5 calling endpoints, folded into this response when asked for.
+    //
+    // It runs against `backfill_stream` — the stream THIS handler resolved,
+    // which is exactly what the standalone `/query/endpoints` call had to be
+    // told and what the page had to wait to learn. Concurrent with the
+    // backfill and the tail collection, so the section costs latency only when
+    // it is the slowest of the three.
+    //
+    // `None` (the stream is ambiguous or absent) is not a failure: it is the
+    // same "no stream, no answer" the page already renders, stated as an
+    // absent section rather than an empty list that would read as "no callers".
+    let want_endpoints = q.include_endpoints.unwrap_or(false);
+    let endpoints_limit = q
+        .endpoints_limit
+        .unwrap_or(DEFAULT_ENDPOINTS_LIMIT)
+        .clamp(1, MAX_ENDPOINTS_LIMIT);
+    let endpoints_fut = async {
+        if !want_endpoints {
+            return None;
+        }
+        let stream = backfill_stream_ref?;
+        let sql = build_endpoints_sql(stream, fingerprint, start_time, end_time, endpoints_limit);
+        Some(rollup::run_dbm_search(org, sql, start_time, end_time).await)
+    };
+
+    let (backfill_points, collected, endpoints) =
+        tokio::join!(backfill_fut, tails_fut, endpoints_fut);
+    series.extend(backfill_points);
     for window_end in &flag_only {
         series.push(json!({ "timestamp": window_end, "below_top_n": true }));
     }
     series.sort_by_key(|p| get_i64(p, "timestamp"));
 
-    // Live-tail point (D4 — the series' live segment, never flat/zero).
-    let Some(streams) = involved_streams(
-        &org_id,
-        &user_email.user_id,
-        q.stream.as_ref(),
-        &[&totals_rows[..]],
-    )
-    .await
-    else {
+    let Some(collected) = collected else {
         return unauthorized_response();
     };
-    let collected = collect_tails(&org_id, &streams, start_time, end_time).await;
     let tail_rows: Vec<Value> = collected
         .tails
         .iter()
@@ -2109,7 +2553,7 @@ pub async fn get_dbm_query_history(
         tail_truncated: collected.tail_truncated,
         percentiles_estimated: true,
     };
-    MetaHttpResponse::json(json!({
+    let mut body = json!({
         "fingerprint": fingerprint,
         "series": series,
         // The raw trace stream this fingerprint resolves to (same resolution as
@@ -2128,7 +2572,26 @@ pub async fn get_dbm_query_history(
         // contribute nothing, so these are floors, not exact window totals.
         "breakdown": breakdown,
         "freshness": freshness.to_json(),
-    }))
+    });
+
+    if want_endpoints {
+        let extra = body.as_object_mut().expect("body is an object");
+        // Three outcomes, kept apart because the page renders three different
+        // sentences: rows (the answer), `null` (no stream to aggregate — the
+        // "which stream?" prompt, NOT "no callers"), and the failure flag (a
+        // read that ran and broke). An empty list would collapse the first two.
+        let (hits, failed) = match endpoints {
+            Some(Ok(hits)) => (json!(hits), false),
+            Some(Err(e)) => {
+                log::error!("[DbMonitoring] endpoints section failed for {org_id}: {e}");
+                (Value::Null, true)
+            }
+            None => (Value::Null, false),
+        };
+        extra.insert("endpoints".into(), hits);
+        extra.insert("endpoints_read_failed".into(), json!(failed));
+    }
+    MetaHttpResponse::json(body)
 }
 
 #[derive(Debug, Deserialize)]
@@ -2184,7 +2647,14 @@ pub async fn get_dbm_query_endpoints(
     // `stream` is caller-supplied and feeds a raw-trace aggregation, so it is
     // checked BEFORE the range/limit parsing below — a caller must not be able
     // to probe stream existence through error-message differences.
-    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Traces).await {
+    if !can_read_stream(
+        &org_id,
+        &user_email.user_id,
+        stream,
+        required_stream_for(DbmVantage::Client),
+    )
+    .await
+    {
         return unauthorized_response();
     }
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
@@ -2217,6 +2687,22 @@ pub struct SamplesQuery {
     pub env: Option<String>,
     pub service: Option<String>,
     pub limit: Option<usize>,
+    /// Run the database-reported fallback list (`/server_samples`) in this same
+    /// request when the client-vantage answer is an EXACT zero, returning it as
+    /// `server_fallback`. See [`QueriesQuery::include_server_fallback`] — same
+    /// contract, same reason, same per-section permission handling.
+    pub include_server_fallback: Option<bool>,
+    /// Scope the ranking to ONE statement — "show me the slowest executions of
+    /// this query", the question the detail page asks.
+    ///
+    /// Without it that page had no endpoint to ask, so it built the SQL in the
+    /// BROWSER: raw `SELECT … FROM "<stream>" WHERE o2_db_fingerprint = '…'`,
+    /// with its own single-quote escaping and its own stream-name validator,
+    /// against a stream name that arrives from `route.query`. The predicate is
+    /// built here now, through the same escaping every other predicate in this
+    /// module uses, and the stream is resolved through `involved_streams`
+    /// rather than interpolated from a URL.
+    pub fingerprint: Option<String>,
 }
 
 /// GET /{org_id}/traces/db_monitoring/samples — FR-6 global slow samples: the
@@ -2260,6 +2746,8 @@ pub struct SamplesQuery {
         ("env" = Option<String>, Query, description = "Deployment environment filter"),
         ("service" = Option<String>, Query, description = "Calling service filter"),
         ("limit" = Option<usize>, Query, description = "Max spans (default 100, max 500)"),
+        ("fingerprint" = Option<String>, Query, description = "Scope the ranking to one query fingerprint — the slowest executions of THAT statement"),
+        ("include_server_fallback" = Option<bool>, Query, description = "When the client-vantage answer is an exact zero, also run the database-reported list and return it as `server_fallback`"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -2274,19 +2762,46 @@ pub async fn get_dbm_samples(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
+    match read_samples_body(&org_id, &user_email.user_id, &q).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The samples endpoint's whole body as a callable — the same extraction as
+/// [`read_databases_body`], and here it is also what keeps the ROUTE
+/// compiling: the per-stream reads run through `buffered` closures capturing
+/// `&org_id`, and awaiting the `include_server_fallback` section after them
+/// inside the handler itself made those lifetimes early-bound, so
+/// `get_dbm_samples` stopped satisfying axum's `for<'a>` Handler bound. That
+/// fails at the route registration in `api/http`, naming neither the closure
+/// nor the await. Inside a plain `async fn` the same code is fine.
+async fn read_samples_body(
+    org_id: &str,
+    user_id: &str,
+    q: &SamplesQuery,
+) -> Result<Value, HttpResponse> {
     // An explicit `stream` is checked HERE, before range parsing and before any
     // read runs — same placement and same reasoning as `get_dbm_query_endpoints`
     // and `get_dbm_query_history`: the caller must not be able to run raw-span
     // work on an unreadable stream, nor probe stream existence through the
     // difference between a 400 and a 403.
     if let Some(stream) = q.stream.as_deref().filter(|s| !s.is_empty())
-        && !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Traces).await
+        && !can_read_stream(
+            org_id,
+            user_id,
+            stream,
+            required_stream_for(DbmVantage::Client),
+        )
+        .await
     {
-        return unauthorized_response();
+        return Err(unauthorized_response());
     }
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
     }
     let limit = q
         .limit
@@ -2315,52 +2830,84 @@ pub async fn get_dbm_samples(
         ..Default::default()
     };
     let totals_sql = build_stats_sql(
-        &org_id,
+        org_id,
         "db_totals",
         start_time,
         end_time,
         &totals_filters.sql_preds(),
     );
-    let totals_rows = match run_stats_search(&org_id, totals_sql, start_time, end_time).await {
+    let totals_rows = match run_stats_search(org_id, totals_sql, start_time, end_time).await {
         Ok(rows) => rows,
         Err(e) => {
             log::warn!("[DbMonitoring] samples stream discovery failed for {org_id}: {e}");
             Vec::new()
         }
     };
-    let Some(streams) = involved_streams(
-        &org_id,
-        &user_email.user_id,
-        q.stream.as_ref(),
-        &[&totals_rows[..]],
-    )
-    .await
+    let Some(streams) =
+        involved_streams(org_id, user_id, q.stream.as_ref(), &[&totals_rows[..]]).await
     else {
-        return unauthorized_response();
+        return Err(unauthorized_response());
     };
 
     // Schema gate (the rollup discovery's own rule): only streams that carry
     // `o2_db_fingerprint` have DB spans to rank, and querying one that does not
-    // would error on the column rather than answer empty.
-    let mut db_streams = Vec::with_capacity(streams.len());
-    for stream in streams {
-        let has_fp = infra::schema::get(&org_id, &stream, StreamType::Traces)
-            .await
-            .map(|s| s.field_with_name(super::O2_DB_FINGERPRINT).is_ok())
-            .unwrap_or(false);
-        if has_fp {
-            db_streams.push(stream);
-        }
-    }
+    // would error on the column rather than answer empty. Probes run
+    // CONCURRENTLY (capped — the list can be every trace stream in the org),
+    // `buffered` so the stream order — and with it `streams_scanned` — stays
+    // deterministic.
+    const SAMPLES_CONCURRENCY: usize = 4;
+    let org = org_id;
+    let probes: Vec<(String, bool)> =
+        futures::stream::iter(streams.into_iter().map(|stream| async move {
+            let has_fp = infra::schema::get(org, &stream, StreamType::Traces)
+                .await
+                .map(|s| s.field_with_name(super::O2_DB_FINGERPRINT).is_ok())
+                .unwrap_or(false);
+            (stream, has_fp)
+        }))
+        .buffered(SAMPLES_CONCURRENCY)
+        .collect()
+        .await;
+    let db_streams: Vec<String> = probes
+        .into_iter()
+        .filter_map(|(stream, has_fp)| has_fp.then_some(stream))
+        .collect();
 
-    let preds = filters.span_sql_preds();
+    // One ranked read per stream, CONCURRENTLY under the same cap; results
+    // arrive in stream order, so the per-item error semantics (`first_err` =
+    // first failing stream) are exactly the serial loop's.
+    let mut preds = filters.span_sql_preds();
+    // The per-query scope rides the same predicate string as every other
+    // filter, so it inherits the same escaping and the same injection tests.
+    if let Some(fp) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) {
+        preds.push_str(&span_fingerprint_pred(fp));
+    }
+    let reads: Vec<(String, Result<Vec<Value>, anyhow::Error>)> =
+        // `into_iter`, not `iter`, and that is load-bearing rather than
+        // stylistic. With `iter()` this closure takes a `&String`, which makes
+        // its lifetime EARLY-bound; once anything is awaited after the fold —
+        // which `include_server_fallback` now is — `get_dbm_samples` stops
+        // satisfying axum's `for<'a>` Handler bound, and the build fails at the
+        // ROUTE REGISTRATION in `api/http` with "implementation of `FnOnce` is
+        // not general enough", naming neither this closure nor the await.
+        // Taking the `String` by value keeps the lifetimes late-bound.
+        // `db_streams` is not read after this point.
+        futures::stream::iter(db_streams.clone().into_iter().map(|stream| {
+            let sql = build_samples_sql(&stream, start_time, end_time, &preds, limit);
+            async move {
+                let rows = rollup::run_dbm_search(org, sql, start_time, end_time).await;
+                (stream, rows)
+            }
+        }))
+        .buffered(SAMPLES_CONCURRENCY)
+        .collect()
+        .await;
     let mut per_stream: Vec<(String, Vec<Value>)> = Vec::new();
     let mut first_err: Option<anyhow::Error> = None;
     let mut failed = 0usize;
-    for stream in &db_streams {
-        let sql = build_samples_sql(stream, start_time, end_time, &preds, limit);
-        match rollup::run_dbm_search(&org_id, sql, start_time, end_time).await {
-            Ok(rows) => per_stream.push((stream.clone(), rows)),
+    for (stream, result) in reads {
+        match result {
+            Ok(rows) => per_stream.push((stream, rows)),
             Err(e) => {
                 log::warn!("[DbMonitoring] samples read failed for {org_id}/{stream}: {e}");
                 failed += 1;
@@ -2376,11 +2923,12 @@ pub async fn get_dbm_samples(
         && let Some(e) = first_err
     {
         log::error!("[DbMonitoring] samples: all {failed} stream reads failed for {org_id}");
-        return MetaHttpResponse::internal_error(e);
+        return Err(MetaHttpResponse::internal_error(e));
     }
 
     let (hits, truncated) = fold_sample_rows(per_stream, limit);
-    MetaHttpResponse::json(json!({
+    let client_reports_zero = hits.is_empty();
+    let mut body = json!({
         "hits": hits,
         // More qualifying spans existed than were returned (same disclosure
         // convention as the rollup responses' `tail_truncated`/`truncated`).
@@ -2390,7 +2938,49 @@ pub async fn get_dbm_samples(
         // from — and, when a read failed, that the answer is partial.
         "streams_scanned": db_streams,
         "streams_failed": failed,
-    }))
+    });
+
+    // The zero-trace fallback, folded server-side — the `/queries` twin, and
+    // the same conditional `/badges` already runs for `server_samples`. The
+    // page awaited this response and then issued `/server_samples`: two
+    // sequential round trips on the deployment least able to spare them.
+    //
+    // Armed by an EXACT zero, and only when no read failed: a partial answer
+    // (`streams_failed > 0`) that happens to be empty is UNKNOWN, not zero, and
+    // firing the fallback there would present database-reported rows as the
+    // answer to a question whose client half simply broke.
+    if q.include_server_fallback.unwrap_or(false) && client_reports_zero && failed == 0 {
+        stamp_samples_server_fallback(org_id, user_id, q, &mut body).await;
+    }
+    Ok(body)
+}
+
+/// Run and attach `/samples`' database-reported fallback section.
+///
+/// A separate `async fn` rather than an inline block, and deliberately so: the
+/// handler's per-stream reads go through a `buffered` closure over a borrowed
+/// `Vec<String>`, and awaiting anything after it inside the same body extends
+/// that closure's inferred region past the await — which makes the whole
+/// handler fail axum's `for<'a>` Handler bound with "implementation of `FnOnce`
+/// is not general enough", at the ROUTE registration in another crate rather
+/// than here. Moving the await out keeps the closure's lifetimes late-bound.
+async fn stamp_samples_server_fallback(
+    org_id: &str,
+    user_id: &str,
+    q: &SamplesQuery,
+    body: &mut Value,
+) {
+    let ss = ServerSamplesQuery {
+        start_time: q.start_time,
+        end_time: q.end_time,
+        stream: None,
+        system: q.system.clone(),
+        instance: q.instance.clone(),
+        database: None,
+        namespace: q.namespace.clone(),
+        limit: None,
+    };
+    stamp_server_fallback(body, read_server_samples_body(org_id, user_id, &ss).await);
 }
 
 // ─── Server-vantage endpoints (deadlocks / blocking) ─────────────────────────
@@ -2563,11 +3153,11 @@ pub(crate) fn build_dbm_activity_breakdown_sql(
     };
     // GROUP BY names the storage columns; the projection aliases them to the
     // wire names the DTOs read.
-    let group_cols = match second_col {
+    let cols_group = match second_col {
         Some(c) => format!("{group_col}, {c}"),
         None => group_col.to_string(),
     };
-    let projected = match second_col {
+    let cols = match second_col {
         Some(c) => format!(
             "{group_col} AS {}, {c} AS {}",
             wire_alias_of(group_col),
@@ -2575,8 +3165,6 @@ pub(crate) fn build_dbm_activity_breakdown_sql(
         ),
         None => format!("{group_col} AS {}", wire_alias_of(group_col)),
     };
-    let cols = projected;
-    let cols_group = group_cols;
     // COUNT(DISTINCT pid), not COUNT(*): activity writes one row per session
     // per poll, so COUNT(*) counts OBSERVATIONS. Over an hour at a 10s interval
     // a 200-session instance would report ~72,000 "sessions" — inflated by the
@@ -2700,7 +3288,6 @@ fn state_breakdown(rows: &[Value]) -> Vec<Value> {
 }
 
 /// Read canonical server-vantage events of one kind from a LOGS stream.
-/// Read canonical server-vantage events of one kind from a LOGS stream.
 pub(crate) fn build_dbm_events_sql(
     stream_name: &str,
     kind: &str,
@@ -2755,38 +3342,7 @@ async fn run_events_search(
     if !infra::schema::exists(org_id, StreamType::Logs, stream).await {
         return Ok(Vec::new());
     }
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size: STATS_READ_SIZE as i64,
-            start_time,
-            end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            action_id: None,
-            histogram_interval: 0,
-            streaming_id: None,
-            streaming_output: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            timezone: None,
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 30,
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        clear_cache: false,
-        local_mode: Some(false),
-        agent_options: None,
-    };
+    let req = rollup::dbm_search_request(sql, start_time, end_time, STATS_READ_SIZE as i64, 30);
     // `user_id: None` is deliberate HERE: the caller's read permission on
     // `stream` is verified by every handler that reaches this function (see
     // `can_read_stream`), so re-resolving it per search would re-query OFGA on
@@ -3275,16 +3831,33 @@ async fn probe_collection(
     let probe_start = start_time - LIVENESS_PROBE_MICROS;
     let probe_end = end_time + LIVENESS_PROBE_MICROS;
     let sql = build_probe_sql(stream, probe_start, probe_end);
-    let rows = run_events_search(org_id, stream, sql, probe_start, probe_end)
-        .await
-        .unwrap_or_else(|e| {
-            // A failed probe must not turn into a false "collection is broken".
-            // Reporting `records_seen == 0` on a read error would name a
-            // prerequisite that is in fact fine; an empty vec here yields the
-            // same conservative default, so we log and carry on with "unknown".
-            log::warn!("[DbMonitoring] liveness probe failed for {org_id}/{stream}: {e}");
-            Vec::new()
-        });
+    // The liveness scan and the "last one before the window" lookup are
+    // independent bounded reads — run them concurrently.
+    let last_seen_sql = build_last_seen_sql(
+        stream,
+        kind,
+        start_time - LAST_SEEN_LOOKBACK_MICROS,
+        start_time,
+        preds,
+    );
+    let (rows, last_seen_rows) = tokio::join!(
+        run_events_search(org_id, stream, sql, probe_start, probe_end),
+        run_events_search(
+            org_id,
+            stream,
+            last_seen_sql,
+            start_time - LAST_SEEN_LOOKBACK_MICROS,
+            start_time,
+        ),
+    );
+    let rows = rows.unwrap_or_else(|e| {
+        // A failed probe must not turn into a false "collection is broken".
+        // Reporting `records_seen == 0` on a read error would name a
+        // prerequisite that is in fact fine; an empty vec here yields the
+        // same conservative default, so we log and carry on with "unknown".
+        log::warn!("[DbMonitoring] liveness probe failed for {org_id}/{stream}: {e}");
+        Vec::new()
+    });
 
     let mut probe = CollectionProbe {
         records_seen: rows.len() as i64,
@@ -3308,23 +3881,9 @@ async fn probe_collection(
     probe.kind_sample_times.sort_unstable_by(|a, b| b.cmp(a));
     probe.kind_sample_times.dedup();
 
-    // The "last one was 3 days ago" lookup, strictly before the window so it can
-    // never restate a row the table is already showing.
-    let sql = build_last_seen_sql(
-        stream,
-        kind,
-        start_time - LAST_SEEN_LOOKBACK_MICROS,
-        start_time,
-        preds,
-    );
-    if let Ok(rows) = run_events_search(
-        org_id,
-        stream,
-        sql,
-        start_time - LAST_SEEN_LOOKBACK_MICROS,
-        start_time,
-    )
-    .await
+    // The "last one was 3 days ago" lookup, strictly before the window so it
+    // can never restate a row the table is already showing.
+    if let Ok(rows) = last_seen_rows
         && let Some(ts) = rows
             .first()
             .map(|r| get_i64(r, "_timestamp"))
@@ -3365,7 +3924,6 @@ pub struct DeadlocksQuery {
     /// rollup endpoints use for the same concept (`db_namespace`), and the UI
     /// sends one vocabulary to every DBM endpoint.
     pub database: Option<String>,
-    #[serde(alias = "namespace")]
     pub namespace: Option<String>,
     /// Free text matched over participant statements, applications and objects.
     /// Applied in Rust AFTER stitching so a term matching only one MySQL side
@@ -3374,15 +3932,29 @@ pub struct DeadlocksQuery {
     pub limit: Option<usize>,
 }
 
-impl DeadlocksQuery {
-    /// The database filter, under either spelling.
-    fn database(&self) -> Option<&str> {
-        self.database
-            .as_deref()
-            .or(self.namespace.as_deref())
-            .filter(|s| !s.is_empty())
-    }
+/// The database filter, under either spelling (`database` or the rollup
+/// endpoints' `namespace`) — one accessor for the five server-vantage query
+/// structs that carry the pair.
+macro_rules! impl_database_filter {
+    ($($query:ty),+ $(,)?) => {$(
+        impl $query {
+            fn database(&self) -> Option<&str> {
+                self.database
+                    .as_deref()
+                    .or(self.namespace.as_deref())
+                    .filter(|s| !s.is_empty())
+            }
+        }
+    )+};
 }
+
+impl_database_filter!(
+    DeadlocksQuery,
+    BlockingQuery,
+    ActivityQuery,
+    ServerQueriesQuery,
+    ServerSamplesQuery,
+);
 
 /// Does this assembled event match the free-text term?
 ///
@@ -3453,20 +4025,83 @@ pub async fn get_dbm_deadlocks(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
-    match read_deadlocks_body(&org_id, &user_email.user_id, &q).await {
+    match read_deadlocks_body(&org_id, &user_email.user_id, &q, false, None).await {
         Ok(body) => MetaHttpResponse::json(body),
         Err(resp) => resp,
     }
 }
 
+/// The deadlocks badge member — only the count-bearing fields the tab strip
+/// consumes: `total` (post-stitch, post-filter — the same count the tab
+/// renders), `truncated` and `stream`; shape ranking, the DTO serialization
+/// and the probe reads are enrichment it never consumes. A callable, like
+/// [`server_metrics_envelope`], so the shape is tested for real instead of
+/// scraped out of the handler's source text.
+pub(crate) fn deadlocks_badge_envelope(total: usize, truncated: bool, stream: &str) -> Value {
+    json!({
+        "total": total,
+        "truncated": truncated,
+        "stream": stream,
+    })
+}
+
+/// The full deadlocks response envelope — pure shape assembly (no I/O), same
+/// extraction rationale as [`server_metrics_envelope`]: the contract keys are
+/// asserted on real JSON instead of scraped out of the handler's source text.
+pub(crate) fn deadlocks_envelope(
+    hits: &[Value],
+    shapes: &[Value],
+    truncated: bool,
+    stream: &str,
+    probe: &CollectionProbe,
+) -> Value {
+    json!({
+        "hits": hits,
+        "query_shapes": shapes,
+        // EVENT count (post-stitch), which is what the tab badge means by
+        // "how many deadlocks happened".
+        "total": hits.len(),
+        // The RAW READ hit its cap, so events older than the oldest returned one
+        // exist. Measured on rows, because that is what was capped.
+        "truncated": truncated,
+        "stream": stream,
+        // ── collection diagnostics (empty state) ──────────────────────────
+        // Empty AND no evidence of life: name the missing prerequisite rather
+        // than reporting healthy silence.
+        "not_collecting": hits.is_empty() && probe.not_collecting(),
+        // Log lines the tail carried that were not deadlocks — "we looked at N
+        // lines and none was a deadlock".
+        "log_lines_seen": probe.log_lines_seen(),
+        // The most recent deadlock BEFORE this window, so an empty window can
+        // still say "the last one was 3 days ago".
+        "last_seen_before": probe.last_seen_before,
+        // HONESTY: this is a MySQL server variable
+        // (`SET GLOBAL innodb_print_all_deadlocks`). It is not present in any
+        // telemetry we receive — with it OFF the engine simply writes nothing,
+        // so its absence is indistinguishable from "no deadlocks happened".
+        // Detecting it would mean fabricating a fact, so we return `null` =
+        // UNKNOWN and the UI phrases it as a checklist item to verify rather
+        // than as something we observed.
+        "innodb_print_all_deadlocks": Value::Null,
+        "freshness": event_freshness(probe),
+    })
+}
+
 /// The deadlocks endpoint's whole body as a callable — same extraction as
-/// [`read_databases_body`], for the same badges-agree-with-tabs reason. The
-/// stream permission check stays INSIDE the body, so a badges caller is held
-/// to exactly the auth this endpoint enforces.
+/// [`read_databases_body`]. The stream permission check stays INSIDE the
+/// body, so a badges caller is held to exactly the auth this endpoint
+/// enforces.
+///
+/// `badge_mode` (the badges fan-in) returns [`deadlocks_badge_envelope`] —
+/// computed by this same assembly, so agreement with the tab holds — and
+/// skips the enrichment nothing on the strip reads. `prologue` shares the
+/// fan-in's one (auth, schema) prologue when it covers this body's stream.
 async fn read_deadlocks_body(
     org_id: &str,
     user_id: &str,
     q: &DeadlocksQuery,
+    badge_mode: bool,
+    prologue: Option<&DbmServerPrologue>,
 ) -> Result<Value, HttpResponse> {
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
@@ -3479,10 +4114,20 @@ async fn read_deadlocks_body(
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
+    let shared_prologue = prologue.filter(|p| p.stream == stream);
     // Server-vantage events live in a LOGS stream (`dbm_server` by default),
     // not a trace stream — the permission is checked against the type actually
-    // read, or the check would consult the wrong OFGA object.
-    if !can_read_stream(org_id, user_id, stream, StreamType::Logs).await {
+    // read, or the check would consult the wrong OFGA object. A shared
+    // prologue already verified exactly this check for this stream.
+    if shared_prologue.is_none()
+        && !can_read_stream(
+            org_id,
+            user_id,
+            stream,
+            required_stream_for(DbmVantage::Server),
+        )
+        .await
+    {
         return Err(unauthorized_response());
     }
     let limit = q
@@ -3498,12 +4143,17 @@ async fn read_deadlocks_body(
     // emit events with no engine, no participants and no victim, and the probe
     // would be skipped because `hits` is non-empty — content-free rows with no
     // diagnostic. See `present_dbm_columns`.
-    let present = match present_dbm_columns(org_id, stream).await {
-        Ok(present) => present,
-        Err(e) => {
-            log::error!("[DbMonitoring] deadlocks schema read failed for {org_id}/{stream}: {e}");
-            return Err(MetaHttpResponse::internal_error(e));
-        }
+    let present = match shared_prologue {
+        Some(p) => p.present.clone(),
+        None => match present_dbm_columns(org_id, stream).await {
+            Ok(present) => present,
+            Err(e) => {
+                log::error!(
+                    "[DbMonitoring] deadlocks schema read failed for {org_id}/{stream}: {e}"
+                );
+                return Err(MetaHttpResponse::internal_error(e));
+            }
+        },
     };
     let sql = build_dbm_events_sql(
         stream,
@@ -3536,6 +4186,14 @@ async fn read_deadlocks_body(
         .filter(|e| deadlock_matches_search(e, &needle))
         .collect();
 
+    if badge_mode {
+        return Ok(deadlocks_badge_envelope(
+            events.len(),
+            row_count >= limit,
+            stream,
+        ));
+    }
+
     // Shapes are ranked over the SAME assembled, filtered set the rows come
     // from, so the ranking and the table can never disagree.
     let shapes = rank_deadlock_shapes(&events);
@@ -3557,36 +4215,13 @@ async fn read_deadlocks_body(
         CollectionProbe::default()
     };
 
-    Ok(json!({
-        "hits": hits,
-        "query_shapes": shapes,
-        // EVENT count (post-stitch), which is what the tab badge means by
-        // "how many deadlocks happened".
-        "total": hits.len(),
-        // The RAW READ hit its cap, so events older than the oldest returned one
-        // exist. Measured on rows, because that is what was capped.
-        "truncated": row_count >= limit,
-        "stream": stream,
-        // ── collection diagnostics (empty state) ──────────────────────────
-        // Empty AND no evidence of life: name the missing prerequisite rather
-        // than reporting healthy silence.
-        "not_collecting": hits.is_empty() && probe.not_collecting(),
-        // Log lines the tail carried that were not deadlocks — "we looked at N
-        // lines and none was a deadlock".
-        "log_lines_seen": probe.log_lines_seen(),
-        // The most recent deadlock BEFORE this window, so an empty window can
-        // still say "the last one was 3 days ago".
-        "last_seen_before": probe.last_seen_before,
-        // HONESTY: this is a MySQL server variable
-        // (`SET GLOBAL innodb_print_all_deadlocks`). It is not present in any
-        // telemetry we receive — with it OFF the engine simply writes nothing,
-        // so its absence is indistinguishable from "no deadlocks happened".
-        // Detecting it would mean fabricating a fact, so we return `null` =
-        // UNKNOWN and the UI phrases it as a checklist item to verify rather
-        // than as something we observed.
-        "innodb_print_all_deadlocks": Value::Null,
-        "freshness": event_freshness(&probe),
-    }))
+    Ok(deadlocks_envelope(
+        &hits,
+        &shapes,
+        row_count >= limit,
+        stream,
+        &probe,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -3605,15 +4240,6 @@ pub struct BlockingQuery {
     /// Drop samples whose blocked session waited less than this.
     pub min_wait_seconds: Option<f64>,
     pub limit: Option<usize>,
-}
-
-impl BlockingQuery {
-    fn database(&self) -> Option<&str> {
-        self.database
-            .as_deref()
-            .or(self.namespace.as_deref())
-            .filter(|s| !s.is_empty())
-    }
 }
 
 /// Free-text match over one blocking sample.
@@ -3702,19 +4328,65 @@ pub async fn get_dbm_blocking(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
-    match read_blocking_body(&org_id, &user_email.user_id, &q).await {
+    match read_blocking_body(&org_id, &user_email.user_id, &q, false, None).await {
         Ok(body) => MetaHttpResponse::json(body),
         Err(resp) => resp,
     }
 }
 
+/// The blocking badge member — the strip reads `total`/`truncated` for the
+/// badge and `hits` for its high-impact-blocker rule — the same samples the
+/// tab renders; chain assembly and the probe reads are enrichment it never
+/// consumes. A callable, like [`server_metrics_envelope`], so the shape is
+/// tested for real instead of scraped out of the handler's source text.
+pub(crate) fn blocking_badge_envelope(hits: &[Value], truncated: bool, stream: &str) -> Value {
+    json!({
+        "hits": hits,
+        "total": hits.len(),
+        "truncated": truncated,
+        "stream": stream,
+    })
+}
+
+/// The full blocking response envelope — pure shape assembly (no I/O), same
+/// extraction rationale as [`server_metrics_envelope`].
+pub(crate) fn blocking_envelope(
+    hits: &[Value],
+    chains: &[Value],
+    truncated: bool,
+    stream: &str,
+    probe: &CollectionProbe,
+) -> Value {
+    json!({
+        "hits": hits,
+        "chains": chains,
+        "total": hits.len(),
+        "truncated": truncated,
+        "stream": stream,
+        // ── collection diagnostics (empty state) ──────────────────────────
+        "not_collecting": hits.is_empty() && probe.not_collecting(),
+        // When the lock tables were last read AT ALL. Blocking is a STATE, not
+        // an event: the poll that finds nothing is the healthy case and leaves
+        // no blocking record, so this is the newest record of ANY kind — the
+        // only honest evidence that the sampler ran.
+        "sampled_at": probe.newest_record,
+        // Inferred from the spacing of observed samples; `null` when too few to
+        // infer, and the UI falls back to non-numeric copy.
+        "sample_interval_seconds": probe.sample_interval_seconds(),
+        "freshness": event_freshness(probe),
+    })
+}
+
 /// The blocking endpoint's whole body as a callable — same extraction as
-/// [`read_databases_body`], for the same badges-agree-with-tabs reason, auth
-/// included.
+/// [`read_databases_body`], auth included. `badge_mode`/`prologue`: see
+/// [`read_deadlocks_body`] — the badge member is [`blocking_badge_envelope`],
+/// which skips chain assembly and the probe reads.
 async fn read_blocking_body(
     org_id: &str,
     user_id: &str,
     q: &BlockingQuery,
+    badge_mode: bool,
+    prologue: Option<&DbmServerPrologue>,
 ) -> Result<Value, HttpResponse> {
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
@@ -3727,8 +4399,17 @@ async fn read_blocking_body(
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
+    let shared_prologue = prologue.filter(|p| p.stream == stream);
     // Logs stream, same reasoning as `get_dbm_deadlocks`.
-    if !can_read_stream(org_id, user_id, stream, StreamType::Logs).await {
+    if shared_prologue.is_none()
+        && !can_read_stream(
+            org_id,
+            user_id,
+            stream,
+            required_stream_for(DbmVantage::Server),
+        )
+        .await
+    {
         return Err(unauthorized_response());
     }
     let limit = q
@@ -3741,12 +4422,17 @@ async fn read_blocking_body(
     // loud one: an empty set drops the pid columns, `BlockingSample::from_record`
     // then filters out every row, and the page tells the operator
     // `not_collecting: true` — a healthy collector reported as broken.
-    let present = match present_dbm_columns(org_id, stream).await {
-        Ok(present) => present,
-        Err(e) => {
-            log::error!("[DbMonitoring] blocking schema read failed for {org_id}/{stream}: {e}");
-            return Err(MetaHttpResponse::internal_error(e));
-        }
+    let present = match shared_prologue {
+        Some(p) => p.present.clone(),
+        None => match present_dbm_columns(org_id, stream).await {
+            Ok(present) => present,
+            Err(e) => {
+                log::error!(
+                    "[DbMonitoring] blocking schema read failed for {org_id}/{stream}: {e}"
+                );
+                return Err(MetaHttpResponse::internal_error(e));
+            }
+        },
     };
     let sql = build_dbm_events_sql(
         stream,
@@ -3776,9 +4462,13 @@ async fn read_blocking_body(
         .filter(|s| s.wait_seconds.unwrap_or(0.0) >= min_wait)
         .filter(|s| blocking_matches_search(s, &needle))
         .collect();
+    let hits: Vec<Value> = samples.iter().map(blocking_sample_to_dto).collect();
+
+    if badge_mode {
+        return Ok(blocking_badge_envelope(&hits, rows.len() >= limit, stream));
+    }
 
     let chains = chains::assemble_chains(&samples);
-    let hits: Vec<Value> = samples.iter().map(blocking_sample_to_dto).collect();
 
     // See the deadlocks handler: diagnose only the empty case.
     let probe = if hits.is_empty() {
@@ -3795,24 +4485,14 @@ async fn read_blocking_body(
         CollectionProbe::default()
     };
 
-    Ok(json!({
-        "hits": hits,
-        "chains": chains.iter().map(|c| c.to_json()).collect::<Vec<_>>(),
-        "total": hits.len(),
-        "truncated": rows.len() >= limit,
-        "stream": stream,
-        // ── collection diagnostics (empty state) ──────────────────────────
-        "not_collecting": hits.is_empty() && probe.not_collecting(),
-        // When the lock tables were last read AT ALL. Blocking is a STATE, not
-        // an event: the poll that finds nothing is the healthy case and leaves
-        // no blocking record, so this is the newest record of ANY kind — the
-        // only honest evidence that the sampler ran.
-        "sampled_at": probe.newest_record,
-        // Inferred from the spacing of observed samples; `null` when too few to
-        // infer, and the UI falls back to non-numeric copy.
-        "sample_interval_seconds": probe.sample_interval_seconds(),
-        "freshness": event_freshness(&probe),
-    }))
+    let chain_hits: Vec<Value> = chains.iter().map(|c| c.to_json()).collect();
+    Ok(blocking_envelope(
+        &hits,
+        &chain_hits,
+        rows.len() >= limit,
+        stream,
+        &probe,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -3827,15 +4507,6 @@ pub struct ActivityQuery {
     pub database: Option<String>,
     pub namespace: Option<String>,
     pub limit: Option<usize>,
-}
-
-impl ActivityQuery {
-    fn database(&self) -> Option<&str> {
-        self.database
-            .as_deref()
-            .or(self.namespace.as_deref())
-            .filter(|s| !s.is_empty())
-    }
 }
 
 /// GET /{org_id}/traces/db_monitoring/activity — sampled active sessions.
@@ -3875,19 +4546,85 @@ pub async fn get_dbm_activity(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
-    match read_activity_body(&org_id, &user_email.user_id, &q).await {
+    match read_activity_body(&org_id, &user_email.user_id, &q, false, None).await {
         Ok(body) => MetaHttpResponse::json(body),
         Err(resp) => resp,
     }
 }
 
+/// The activity badge member — the strip reads `hits` (its long-running-query
+/// rule's sessions), `by_state` (the badge counts the POPULATION, never the
+/// row-capped sample) and `truncated`; the wait-event breakdown, the probe
+/// pair and the sample-times read are enrichment nothing on the strip
+/// consumes. A callable, like [`server_metrics_envelope`], so the shape is
+/// tested for real instead of scraped out of the handler's source text.
+pub(crate) fn activity_badge_envelope(
+    hits: &[Value],
+    by_state: &[Value],
+    truncated: bool,
+    stream: &str,
+) -> Value {
+    json!({
+        "hits": hits,
+        "sampled_sessions": true,
+        "by_state": by_state,
+        "total": hits.len(),
+        "truncated": truncated,
+        "stream": stream,
+    })
+}
+
+/// The full activity response envelope — pure shape assembly (no I/O), same
+/// extraction rationale as [`server_metrics_envelope`]: the W2.3 contract
+/// keys are asserted on real JSON instead of scraped out of the handler's
+/// source text.
+pub(crate) fn activity_envelope(
+    hits: &[Value],
+    by_wait_event: &[Value],
+    by_state: &[Value],
+    truncated: bool,
+    stream: &str,
+    probe: &CollectionProbe,
+) -> Value {
+    json!({
+        // A SAMPLE of sessions, not the population — the breakdowns below are
+        // the population. `truncated` says whether this sample hit its cap.
+        "hits": hits,
+        "sampled_sessions": true,
+        "by_wait_event": by_wait_event,
+        "by_state": by_state,
+        "total": hits.len(),
+        // Measured on the ROW query, independently of the aggregates: the
+        // aggregates carry no LIMIT and so are never truncated, and reading
+        // `truncated` off them would report a capped sample as complete.
+        "truncated": truncated,
+        "stream": stream,
+        // ── collection diagnostics (empty state) ──────────────────────────
+        // BOTH conditions, never either: the probe read can fail independently
+        // (swallowed into an empty row set by design), and under `OR` that blip
+        // would announce a broken collector WHILE RENDERING SESSIONS.
+        "not_collecting": hits.is_empty() && probe.not_collecting(),
+        "log_lines_seen": probe.log_lines_seen(),
+        "sampled_at": probe.newest_record,
+        // The honesty requirement: how often the collector actually polls,
+        // inferred from the spacing of observed samples. Null when too few
+        // samples to infer, and the UI falls back to non-numeric copy.
+        "sample_interval_seconds": probe.sample_interval_seconds(),
+        "freshness": event_freshness(probe),
+    })
+}
+
 /// The activity endpoint's whole body as a callable — same extraction as
-/// [`read_databases_body`], for the same badges-agree-with-tabs reason, auth
-/// included.
+/// [`read_databases_body`], auth included. `badge_mode`/`prologue`: see
+/// [`read_deadlocks_body`] — the badge member is [`activity_badge_envelope`],
+/// which skips the wait-event breakdown, the probe and the sample-times
+/// reads.
 async fn read_activity_body(
     org_id: &str,
     user_id: &str,
     q: &ActivityQuery,
+    badge_mode: bool,
+    prologue: Option<&DbmServerPrologue>,
 ) -> Result<Value, HttpResponse> {
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
@@ -3900,9 +4637,18 @@ async fn read_activity_body(
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
+    let shared_prologue = prologue.filter(|p| p.stream == stream);
     // A LOGS stream, same as deadlocks/blocking. StreamType::Traces here would
     // consult the wrong OFGA object and silently authorize.
-    if !can_read_stream(org_id, user_id, stream, StreamType::Logs).await {
+    if shared_prologue.is_none()
+        && !can_read_stream(
+            org_id,
+            user_id,
+            stream,
+            required_stream_for(DbmVantage::Server),
+        )
+        .await
+    {
         return Err(unauthorized_response());
     }
     let limit = q
@@ -3911,15 +4657,19 @@ async fn read_activity_body(
         .clamp(1, MAX_EVENTS_LIMIT);
     let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
 
-    // A failed schema read is reported, never absorbed into an empty set — an
-    // empty set drops the projection and the page would report a healthy
-    // collector as broken. See `present_dbm_columns`.
-    let present = match present_dbm_columns(org_id, stream).await {
-        Ok(present) => present,
-        Err(e) => {
-            log::error!("[DbMonitoring] activity schema read failed for {org_id}/{stream}: {e}");
-            return Err(MetaHttpResponse::internal_error(e));
-        }
+    // Same rule as `read_deadlocks_body`: a failed schema read is reported,
+    // never absorbed into an empty set. See `present_dbm_columns`.
+    let present = match shared_prologue {
+        Some(p) => p.present.clone(),
+        None => match present_dbm_columns(org_id, stream).await {
+            Ok(present) => present,
+            Err(e) => {
+                log::error!(
+                    "[DbMonitoring] activity schema read failed for {org_id}/{stream}: {e}"
+                );
+                return Err(MetaHttpResponse::internal_error(e));
+            }
+        },
     };
 
     let sql = build_dbm_events_sql(
@@ -3975,6 +4725,31 @@ async fn read_activity_body(
             None => Vec::new(),
         }
     };
+
+    if badge_mode {
+        // The strip reads `hits` (its long-running-query rule's sessions),
+        // `by_state` (the badge counts the POPULATION, never the row-capped
+        // sample) and `truncated` — two searches instead of six; the
+        // wait-event breakdown, the probe pair and the sample-times read are
+        // enrichment nothing on the strip consumes.
+        let (rows, by_state) = tokio::join!(rows_fut, by_state_fut);
+        let rows = match rows {
+            Ok(rows) => rows,
+            Err(e) => {
+                log::error!("[DbMonitoring] activity read failed for {org_id}/{stream}: {e}");
+                return Err(MetaHttpResponse::internal_error(e));
+            }
+        };
+        let row_count = rows.len();
+        let hits: Vec<Value> = rows.iter().map(activity_row_to_dto).collect();
+        return Ok(activity_badge_envelope(
+            &hits,
+            &by_state,
+            row_count >= limit,
+            stream,
+        ));
+    }
+
     // The probe runs UNCONDITIONALLY here, unlike the deadlocks/blocking
     // template which computes it only on an empty tab.
     //
@@ -4032,29 +4807,14 @@ async fn read_activity_body(
         interval_probe.kind_sample_times = ts;
     }
 
-    Ok(json!({
-        // A SAMPLE of sessions, not the population — the breakdowns below are
-        // the population. `truncated` says whether this sample hit its cap.
-        "hits": hits,
-        "sampled_sessions": true,
-        "by_wait_event": by_wait_event,
-        "by_state": by_state,
-        "total": hits.len(),
-        // Measured on the ROW query, independently of the aggregates: the
-        // aggregates carry no LIMIT and so are never truncated, and reading
-        // `truncated` off them would report a capped sample as complete.
-        "truncated": row_count >= limit,
-        "stream": stream,
-        // ── collection diagnostics (empty state) ──────────────────────────
-        "not_collecting": hits.is_empty() && interval_probe.not_collecting(),
-        "log_lines_seen": interval_probe.log_lines_seen(),
-        "sampled_at": interval_probe.newest_record,
-        // The honesty requirement: how often the collector actually polls,
-        // inferred from the spacing of observed samples. Null when too few
-        // samples to infer, and the UI falls back to non-numeric copy.
-        "sample_interval_seconds": interval_probe.sample_interval_seconds(),
-        "freshness": event_freshness(&interval_probe),
-    }))
+    Ok(activity_envelope(
+        &hits,
+        &by_wait_event,
+        &by_state,
+        row_count >= limit,
+        stream,
+        &interval_probe,
+    ))
 }
 
 // ─── W3.4 · Plans read API ───────────────────────────────────────────────────
@@ -4565,6 +5325,12 @@ pub struct ServerMetricsQuery {
 /// reads the `_o2_db_stats` rollup AND live trace tails under
 /// `StreamType::Traces` auth, and folding a Logs-auth server source into it
 /// would put three provenances under two auth models in one response.
+///
+/// SUPERSEDED by [`get_dbm_query_insights`], which returns this exact envelope
+/// as its `server_metrics` section. That merge is the one this endpoint's own
+/// doc comment argued FOR: `/query/plans` shares this handler's stream, auth
+/// model and schema read, so the pair costs nothing to fold — unlike
+/// `/queries`, which does not. Kept registered and unchanged for compatibility.
 #[utoipa::path(
     get,
     path = "/{org_id}/traces/db_monitoring/query/server_metrics",
@@ -4584,11 +5350,25 @@ pub async fn get_dbm_query_server_metrics(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
+    match read_server_metrics_body(&org_id, &user_email.user_id, &q, None).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The server-metrics endpoint's whole body as a callable — same extraction and
+/// same `prologue` contract as [`read_plans_body`].
+async fn read_server_metrics_body(
+    org_id: &str,
+    user_id: &str,
+    q: &ServerMetricsQuery,
+    prologue: Option<&DbmServerPrologue>,
+) -> Result<Value, HttpResponse> {
     let Some(fingerprint) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) else {
-        return MetaHttpResponse::bad_request("fingerprint is required");
+        return Err(MetaHttpResponse::bad_request("fingerprint is required"));
     };
     let Some(engine) = q.engine.as_deref().filter(|e| !e.is_empty()) else {
-        return MetaHttpResponse::bad_request("engine is required");
+        return Err(MetaHttpResponse::bad_request("engine is required"));
     };
     // The database is part of the join key WHERE THE ENGINE'S RECORDS CARRY
     // ONE — for those engines an absent database cannot be defaulted, since an
@@ -4598,10 +5378,15 @@ pub async fn get_dbm_query_server_metrics(
     // dropped: the match is (fingerprint, engine), instance ambiguity is
     // still refused by the envelope, and the response says the attribution is
     // instance-wide so the UI can caption it honestly.
+    //
+    // The rule itself lives in [`has_server_metrics_join_key`], shared with
+    // `/query/insights` so its decision to skip the section and this handler's
+    // decision to 400 are the SAME rule — a drift would show up as a failed
+    // section where the truth is "there was no key to join on".
     let database_less_engine = matches!(engine.to_ascii_lowercase().as_str(), "mysql" | "mariadb");
     let database = q.database.as_deref().filter(|d| !d.is_empty());
-    if database.is_none() && !database_less_engine {
-        return MetaHttpResponse::bad_request("database is required");
+    if !has_server_metrics_join_key(Some(engine), database) {
+        return Err(MetaHttpResponse::bad_request("database is required"));
     }
     // Sent-but-unusable: a database predicate against records that carry no
     // database column matches nothing forever — the exact bug this branch
@@ -4615,30 +5400,46 @@ pub async fn get_dbm_query_server_metrics(
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
-    // Checked BEFORE the range parsing, so a caller cannot probe stream
-    // existence through error-message differences. A LOGS stream — these are
-    // server-vantage records, and `StreamType::Traces` (which the
-    // client-vantage endpoints correctly use) would consult the wrong OFGA
-    // object and silently authorize.
-    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
-        return unauthorized_response();
+    // The shared prologue only applies to the stream it was computed for — see
+    // `read_plans_body`.
+    let shared = prologue.filter(|p| p.stream == stream);
+    if shared.is_none() {
+        // Checked BEFORE the range parsing, so a caller cannot probe stream
+        // existence through error-message differences. A LOGS stream — these
+        // are server-vantage records, and `StreamType::Traces` (which the
+        // client-vantage endpoints correctly use) would consult the wrong OFGA
+        // object and silently authorize.
+        if !can_read_stream(
+            org_id,
+            user_id,
+            stream,
+            required_stream_for(DbmVantage::Server),
+        )
+        .await
+        {
+            return Err(unauthorized_response());
+        }
     }
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
     }
 
-    // A failed schema read is reported, never absorbed into an empty set — an
-    // empty set drops the projection and the page reports a healthy collector
-    // as broken. See `present_dbm_columns`.
-    let present = match present_dbm_columns(&org_id, stream).await {
-        Ok(present) => present,
-        Err(e) => {
-            log::error!(
-                "[DbMonitoring] server metrics schema read failed for {org_id}/{stream}: {e}"
-            );
-            return MetaHttpResponse::internal_error(e);
-        }
+    // Same rule as `read_deadlocks_body`: a failed schema read is reported,
+    // never absorbed into an empty set. See `present_dbm_columns`.
+    let present = match shared {
+        Some(p) => p.present.clone(),
+        None => match present_dbm_columns(org_id, stream).await {
+            Ok(present) => present,
+            Err(e) => {
+                log::error!(
+                    "[DbMonitoring] server metrics schema read failed for {org_id}/{stream}: {e}"
+                );
+                return Err(MetaHttpResponse::internal_error(e));
+            }
+        },
     };
 
     let rows = match build_dbm_server_metrics_sql(
@@ -4650,11 +5451,11 @@ pub async fn get_dbm_query_server_metrics(
         end_time,
         &present,
     ) {
-        Some(sql) => match run_events_search(&org_id, stream, sql, start_time, end_time).await {
+        Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
             Ok(rows) => rows,
             Err(e) => {
                 log::error!("[DbMonitoring] server metrics read failed for {org_id}/{stream}: {e}");
-                return MetaHttpResponse::internal_error(e);
+                return Err(MetaHttpResponse::internal_error(e));
             }
         },
         // The stream has never carried server counters — an empty section, not
@@ -4662,7 +5463,7 @@ pub async fn get_dbm_query_server_metrics(
         None => Vec::new(),
     };
 
-    MetaHttpResponse::json(server_metrics_envelope(
+    Ok(server_metrics_envelope(
         &rows,
         engine,
         stream,
@@ -4867,16 +5668,15 @@ pub struct ServerQueriesQuery {
     /// the rollup endpoints' spelling.
     pub database: Option<String>,
     pub namespace: Option<String>,
+    /// Narrow the list to ONE statement, for the query-detail page's row
+    /// lookup on a deployment with no traced traffic. Without it that page can
+    /// only find its row by paging the whole ranked list, and a statement
+    /// ranked below the cap is indistinguishable from one that does not exist.
+    ///
+    /// Additive and optional: absent, this endpoint is byte-identically the
+    /// ranked browse list it has always been.
+    pub fingerprint: Option<String>,
     pub limit: Option<usize>,
-}
-
-impl ServerQueriesQuery {
-    fn database(&self) -> Option<&str> {
-        self.database
-            .as_deref()
-            .or(self.namespace.as_deref())
-            .filter(|s| !s.is_empty())
-    }
 }
 
 /// GET /{org_id}/traces/db_monitoring/server_queries — the statement list as
@@ -4902,6 +5702,7 @@ impl ServerQueriesQuery {
         ("system" = Option<String>, Query, description = "Database engine filter"),
         ("instance" = Option<String>, Query, description = "Database instance filter"),
         ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
+        ("fingerprint" = Option<String>, Query, description = "Narrow to one statement — the query-detail row lookup on a deployment with no traced traffic. Omit for the ranked browse list."),
         ("limit" = Option<usize>, Query, description = "Max statements returned (default 50, cap 200)"),
     ),
     responses(
@@ -4936,11 +5737,16 @@ async fn read_server_queries_body(
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
-    // Checked BEFORE the range parsing, so a caller cannot probe stream
-    // existence through error-message differences. A LOGS stream — these are
-    // server-vantage records, and `StreamType::Traces` here would consult the
-    // wrong OFGA object and silently authorize.
-    if !can_read_stream(org_id, user_id, stream, StreamType::Logs).await {
+    // Same rule as `get_dbm_query_server_metrics`: Logs-stream auth, checked
+    // BEFORE range parsing so stream existence cannot be probed.
+    if !can_read_stream(
+        org_id,
+        user_id,
+        stream,
+        required_stream_for(DbmVantage::Server),
+    )
+    .await
+    {
         return Err(unauthorized_response());
     }
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
@@ -4953,11 +5759,21 @@ async fn read_server_queries_body(
         .limit
         .unwrap_or(DEFAULT_SERVER_QUERIES_LIMIT)
         .clamp(1, MAX_SERVER_QUERIES_LIMIT);
-    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
+    let mut preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
+    // The fingerprint narrows to ONE statement. Safe to name unguarded: the
+    // SQL builder below already refuses to run at all unless the fingerprint
+    // column is present (it is the GROUP key), so this predicate can never
+    // name a column the stream lacks.
+    if let Some(fp) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) {
+        preds.push_str("\n    AND ");
+        preds.push_str(server_vantage::O2_DBM_FINGERPRINT);
+        preds.push_str(" = '");
+        preds.push_str(&escape_sq(fp));
+        preds.push('\'');
+    }
 
-    // A failed schema read is reported, never absorbed into an empty set — an
-    // empty set would report a healthy capture pipeline as `off`. See
-    // `present_dbm_columns`.
+    // Same rule as `read_deadlocks_body` (see `present_dbm_columns`), and here
+    // an absorbed error would report a healthy capture pipeline as `off`.
     let present = match present_dbm_columns(org_id, stream).await {
         Ok(present) => present,
         Err(e) => {
@@ -5254,15 +6070,6 @@ pub struct ServerSamplesQuery {
     pub limit: Option<usize>,
 }
 
-impl ServerSamplesQuery {
-    fn database(&self) -> Option<&str> {
-        self.database
-            .as_deref()
-            .or(self.namespace.as_deref())
-            .filter(|s| !s.is_empty())
-    }
-}
-
 /// GET /{org_id}/traces/db_monitoring/server_samples — the slowest executions
 /// the DATABASE ITSELF captured, for deployments with no traced traffic.
 #[utoipa::path(
@@ -5327,7 +6134,7 @@ async fn read_server_samples_body(
     // who may see nothing gets the 403.
     let mut streams: Vec<&str> = Vec::with_capacity(candidates.len());
     for s in candidates {
-        if can_read_stream(org_id, user_id, s, StreamType::Logs).await {
+        if can_read_stream(org_id, user_id, s, required_stream_for(DbmVantage::Server)).await {
             streams.push(s);
         }
     }
@@ -5346,10 +6153,12 @@ async fn read_server_samples_body(
         .clamp(1, MAX_SAMPLES_LIMIT);
     let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
 
-    let mut rows: Vec<Value> = Vec::new();
-    let mut any_truncated = false;
-    let mut capture = "off";
-    for stream in &streams {
+    // The two default streams are processed CONCURRENTLY (schema read, then
+    // ranked search, per stream); results are folded in stream order so the
+    // first failing stream's error is the one reported, as the serial loop
+    // did.
+    let preds = preds.as_str();
+    let per_stream = join_all(streams.iter().map(|stream| async move {
         // Reported, never absorbed — see `present_dbm_columns`.
         let present = match present_dbm_columns(org_id, stream).await {
             Ok(present) => present,
@@ -5360,26 +6169,36 @@ async fn read_server_samples_body(
                 return Err(MetaHttpResponse::internal_error(e));
             }
         };
-        if server_samples_capture_state(&present) == "on" {
-            capture = "on";
-        }
+        let capture_on = server_samples_capture_state(&present) == "on";
         // A stream that never captured contributes nothing — not an error.
-        if let Some(sql) =
-            build_dbm_server_samples_sql(stream, start_time, end_time, &preds, limit, &present)
-        {
-            match run_events_search(org_id, stream, sql, start_time, end_time).await {
-                Ok(stream_rows) => {
-                    any_truncated |= stream_rows.len() >= limit;
-                    rows.extend(stream_rows);
-                }
+        let stream_rows = match build_dbm_server_samples_sql(
+            stream, start_time, end_time, preds, limit, &present,
+        ) {
+            Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
+                Ok(stream_rows) => stream_rows,
                 Err(e) => {
                     log::error!(
                         "[DbMonitoring] server samples read failed for {org_id}/{stream}: {e}"
                     );
                     return Err(MetaHttpResponse::internal_error(e));
                 }
-            }
+            },
+            None => Vec::new(),
+        };
+        Ok((capture_on, stream_rows))
+    }))
+    .await;
+
+    let mut rows: Vec<Value> = Vec::new();
+    let mut any_truncated = false;
+    let mut capture = "off";
+    for result in per_stream {
+        let (capture_on, stream_rows) = result?;
+        if capture_on {
+            capture = "on";
         }
+        any_truncated |= stream_rows.len() >= limit;
+        rows.extend(stream_rows);
     }
 
     // Merge to ONE ranked list: each stream returned its own top-N, so the
@@ -5418,6 +6237,11 @@ pub struct PlansQuery {
 ///
 /// Distinct generic plans captured for one fingerprint over the window. See the
 /// module comment above for what this data is and is not.
+///
+/// SUPERSEDED by [`get_dbm_query_insights`], which returns this exact envelope
+/// as its `plans` section alongside the server counters the detail page always
+/// requested in the same breath. Kept registered and unchanged for
+/// compatibility; new callers should use `/query/insights`.
 #[utoipa::path(
     get,
     path = "/{org_id}/traces/db_monitoring/query/plans",
@@ -5437,8 +6261,28 @@ pub async fn get_dbm_query_plans(
     if !cfg.db_monitoring.enabled {
         return disabled_response();
     }
+    match read_plans_body(&org_id, &user_email.user_id, &q, None).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(resp) => resp,
+    }
+}
+
+/// The plans endpoint's whole body as a callable — same extraction as
+/// [`read_databases_body`], so [`get_dbm_query_insights`] emits a section
+/// byte-identical to the standalone response rather than a re-derivation of it.
+///
+/// `prologue` shares the `(stream, schema)` pair with the sibling section when
+/// both read the SAME default stream; `None` computes its own, exactly as the
+/// standalone handler does.
+async fn read_plans_body(
+    org_id: &str,
+    user_id: &str,
+    q: &PlansQuery,
+    prologue: Option<&DbmServerPrologue>,
+) -> Result<Value, HttpResponse> {
+    let cfg = get_config();
     let Some(fingerprint) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) else {
-        return MetaHttpResponse::bad_request("fingerprint is required");
+        return Err(MetaHttpResponse::bad_request("fingerprint is required"));
     };
     // The stream DEFAULTS, unlike `get_dbm_query_endpoints` which this handler
     // otherwise mirrors: that one aggregates a caller-chosen TRACE stream, while
@@ -5450,36 +6294,51 @@ pub async fn get_dbm_query_plans(
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
-    // Checked BEFORE the range parsing, so a caller cannot probe stream
-    // existence through error-message differences. A LOGS stream — these are
-    // server-vantage records, and `StreamType::Traces` here (as the endpoints
-    // handler this mirrors uses) would consult the wrong OFGA object and
-    // silently authorize.
-    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
-        return unauthorized_response();
+    // The shared prologue only applies when this section reads the very stream
+    // it was computed for — an explicit `?stream=` must get its own auth and
+    // schema, never the default stream's.
+    let shared = prologue.filter(|p| p.stream == stream);
+    if shared.is_none() {
+        // Same rule as `get_dbm_query_server_metrics`: Logs-stream auth (never
+        // the endpoints handler's Traces, the wrong OFGA object), checked
+        // BEFORE range parsing so stream existence cannot be probed.
+        if !can_read_stream(
+            org_id,
+            user_id,
+            stream,
+            required_stream_for(DbmVantage::Server),
+        )
+        .await
+        {
+            return Err(unauthorized_response());
+        }
     }
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
-        return MetaHttpResponse::bad_request("start_time must be before end_time");
+        return Err(MetaHttpResponse::bad_request(
+            "start_time must be before end_time",
+        ));
     }
 
-    // A failed schema read is reported, never absorbed into an empty set — an
-    // empty set drops the projection and the page reports a healthy collector as
-    // broken. See `present_dbm_columns`.
-    let present = match present_dbm_columns(&org_id, stream).await {
-        Ok(present) => present,
-        Err(e) => {
-            log::error!("[DbMonitoring] plans schema read failed for {org_id}/{stream}: {e}");
-            return MetaHttpResponse::internal_error(e);
-        }
+    // Same rule as `read_deadlocks_body`: a failed schema read is reported,
+    // never absorbed into an empty set. See `present_dbm_columns`.
+    let present = match shared {
+        Some(p) => p.present.clone(),
+        None => match present_dbm_columns(org_id, stream).await {
+            Ok(present) => present,
+            Err(e) => {
+                log::error!("[DbMonitoring] plans schema read failed for {org_id}/{stream}: {e}");
+                return Err(MetaHttpResponse::internal_error(e));
+            }
+        },
     };
 
     let rows = match build_dbm_plans_sql(stream, fingerprint, start_time, end_time, "", &present) {
-        Some(sql) => match run_events_search(&org_id, stream, sql, start_time, end_time).await {
+        Some(sql) => match run_events_search(org_id, stream, sql, start_time, end_time).await {
             Ok(rows) => rows,
             Err(e) => {
                 log::error!("[DbMonitoring] plans read failed for {org_id}/{stream}: {e}");
-                return MetaHttpResponse::internal_error(e);
+                return Err(MetaHttpResponse::internal_error(e));
             }
         },
         // The stream has never carried plans — an empty section, not an error.
@@ -5488,7 +6347,198 @@ pub async fn get_dbm_query_plans(
 
     let hits: Vec<Value> = rows.iter().map(plan_row_to_dto).collect();
 
+    Ok(plans_envelope(
+        &hits,
+        stream,
+        plan_capture_state(&present),
+        cfg.db_monitoring.explain_enabled,
+    ))
+}
+
+// ─── The query-detail Logs-side pair (`/query/insights`) ─────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct QueryInsightsQuery {
+    pub fingerprint: Option<String>,
+    pub stream: Option<String>,
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    /// The server-metrics join key. Absent (or, for a database-carrying engine,
+    /// an absent `database`) means there IS no key — the section comes back
+    /// `null` and the page renders its "no join key" line, exactly as it did
+    /// when it decided not to send the second request at all.
+    pub engine: Option<String>,
+    pub database: Option<String>,
+}
+
+/// GET /{org_id}/traces/db_monitoring/query/insights — the query-detail page's
+/// Logs-side pair in one round trip.
+///
+/// `/query/plans` and `/query/server_metrics` were ALWAYS co-fired from the
+/// detail page: both default to `dbm_server`, both run the same
+/// `present_dbm_columns` schema read, both query `KIND_TOP_QUERY` records for
+/// the same fingerprint and window. That is two OFGA round trips, two schema
+/// reads and two HTTP round trips to answer one question about one statement.
+///
+/// The two sections are the SAME envelopes the standalone endpoints return —
+/// produced by the same `read_*_body` callables, so a section here and the
+/// endpoint it came from cannot drift. Both standalone routes keep working
+/// (they are marked superseded, not removed).
+///
+/// Per-section failure, never a whole-request failure: this page is about the
+/// query, and a server-counters read that failed must not take the plans list
+/// down with it. Each section carries its own `*_read_failed` flag rather than
+/// letting an empty section imply "nothing captured".
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/db_monitoring/query/insights",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringQueryInsights",
+    summary = "Database Monitoring: plans + server counters for a query",
+    description = "The query-detail page's server-vantage pair in one response: `plans` (the /query/plans envelope) and `server_metrics` (the /query/server_metrics envelope), each nullable with its own read-failed flag.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("fingerprint" = String, Query, description = "Query fingerprint (required)"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (defaults to dbm_server)"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+        ("engine" = Option<String>, Query, description = "Server-metrics join key: database engine. Omit and `server_metrics` is null."),
+        ("database" = Option<String>, Query, description = "Server-metrics join key: database name. Required for engines whose records carry one."),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Missing fingerprint", content_type = "application/json", body = ()),
+    )
+)]
+pub async fn get_dbm_query_insights(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<QueryInsightsQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    let org = org_id.as_str();
+    let user = user_email.user_id.as_str();
+    // Validated ONCE, up front: a missing fingerprint is a malformed request
+    // for both sections, so it stays a 400 rather than becoming two nulls the
+    // page would render as "nothing captured".
+    if q.fingerprint.as_deref().filter(|f| !f.is_empty()).is_none() {
+        return MetaHttpResponse::bad_request("fingerprint is required");
+    }
+
+    let plans_q = PlansQuery {
+        fingerprint: q.fingerprint.clone(),
+        stream: q.stream.clone(),
+        start_time: q.start_time,
+        end_time: q.end_time,
+    };
+    let metrics_q = ServerMetricsQuery {
+        fingerprint: q.fingerprint.clone(),
+        engine: q.engine.clone(),
+        database: q.database.clone(),
+        stream: q.stream.clone(),
+        start_time: q.start_time,
+        end_time: q.end_time,
+    };
+
+    // One (auth, schema) prologue for both sections — the same sharing the
+    // badges fan-out does, and for the same reason: they read the SAME default
+    // stream. `None` merely declines to share; each section then computes its
+    // own and owns its own denial/error, byte-identically to the standalone
+    // endpoints. An explicit `?stream=` is not the prologue's stream, so
+    // `read_*_body` ignores the share and re-authorizes.
+    let prologue = server_prologue(org, user).await;
+    let prologue = prologue.as_ref();
+
+    // No join key, no request — the same decision the page used to make in the
+    // browser.
+    let wants_metrics = has_server_metrics_join_key(q.engine.as_deref(), q.database.as_deref());
+
+    let (plans, server_metrics) =
+        tokio::join!(read_plans_body(org, user, &plans_q, prologue), async {
+            if !wants_metrics {
+                return None;
+            }
+            Some(read_server_metrics_body(org, user, &metrics_q, prologue).await)
+        },);
+
+    // A denial on BOTH sections is a denial of the request: returning 200 with
+    // two nulls would let the page render "nothing captured" over a permission
+    // problem. One section failing is a section flag — the other still answers.
+    let plans_forbidden = plans.as_ref().err().is_some_and(is_forbidden);
+    let metrics_forbidden = server_metrics
+        .as_ref()
+        .and_then(|r| r.as_ref().err())
+        .is_some_and(is_forbidden);
+    if plans_forbidden && (metrics_forbidden || !wants_metrics) {
+        return unauthorized_response();
+    }
+
+    let (plans_section, plans_read_failed) = match plans {
+        Ok(body) => (body, false),
+        Err(_) => (Value::Null, true),
+    };
+    let (metrics_section, metrics_read_failed) = match server_metrics {
+        // Not asked for: `null` with the flag FALSE. "We did not look" and "we
+        // looked and could not read" are different sentences, and the page
+        // renders different copy for each.
+        None => (Value::Null, false),
+        Some(Ok(body)) => (body, false),
+        Some(Err(_)) => (Value::Null, true),
+    };
+
     MetaHttpResponse::json(json!({
+        "plans": plans_section,
+        "plans_read_failed": plans_read_failed,
+        "server_metrics": metrics_section,
+        "server_metrics_read_failed": metrics_read_failed,
+    }))
+}
+
+/// Whether a ready `HttpResponse` this module produced is the 403 the stream
+/// gate returns. Used to distinguish "may not read" from "read failed" when
+/// folding sections — the two must not collapse into one flag.
+fn is_forbidden(resp: &HttpResponse) -> bool {
+    resp.status() == axum::http::StatusCode::FORBIDDEN
+}
+
+/// Whether the server-counters join key is complete enough to ask at all.
+///
+/// The key is (engine, database, fingerprint) — WHERE THE ENGINE'S RECORDS
+/// CARRY A DATABASE. mysql/mariadb top_query records carry no database field
+/// (receiver contract, verified live), so for them (engine, fingerprint) is the
+/// whole key and a missing database is no obstacle. For every other engine an
+/// absent database cannot be defaulted: an empty predicate matches every
+/// database and attributes the wrong one's counters.
+///
+/// Pure, and shared with [`read_server_metrics_body`]'s own validation, so the
+/// merged endpoint's decision to SKIP the section and the standalone endpoint's
+/// decision to 400 cannot drift apart into "asked and got a 400" — the case
+/// that would surface to the reader as a failed section rather than a missing
+/// join key.
+pub(crate) fn has_server_metrics_join_key(engine: Option<&str>, database: Option<&str>) -> bool {
+    let Some(engine) = engine.filter(|e| !e.is_empty()) else {
+        return false;
+    };
+    let database_less_engine = matches!(engine.to_ascii_lowercase().as_str(), "mysql" | "mariadb");
+    database_less_engine || database.is_some_and(|d| !d.is_empty())
+}
+
+/// The plans response envelope — pure shape assembly (no I/O), same
+/// extraction rationale as [`server_metrics_envelope`]: the D-H honesty flags
+/// are asserted on real JSON instead of scraped out of the handler's source
+/// text.
+pub(crate) fn plans_envelope(
+    hits: &[Value],
+    stream: &str,
+    plan_capture: &str,
+    explain_enabled: bool,
+) -> Value {
+    json!({
         "hits": hits,
         "stream": stream,
         // The honesty contract, stated by the API so the UI cannot mislabel
@@ -5497,7 +6547,7 @@ pub async fn get_dbm_query_plans(
         // `auto_explain` when every hit is a real executed plan, `mixed` when
         // the window holds both. The per-hit `plan_source` is authoritative;
         // this summary exists for the response-level consumers that predate it.
-        "plan_source": derived_plan_source(&hits),
+        "plan_source": derived_plan_source(hits),
         // Which of the TWO causes of an empty `hits` this is. `off` means the
         // stream never carried a plan hash column, so nothing ever looked and
         // the collector hint is the right advice. `on` means capture ran and
@@ -5505,12 +6555,12 @@ pub async fn get_dbm_query_plans(
         // COMMIT, ROLLBACK or SHOW. Without this the UI can only render one
         // sentence for both and tells a DBA whose capture is already running
         // to go switch it on.
-        "plan_capture": plan_capture_state(&present),
+        "plan_capture": plan_capture,
         // Whether auto_explain ingest is switched on (W-E3). With capture on,
         // hits empty AND this true, the UI can render the third empty state —
         // "capture is running; no execution of this query was slow enough" —
         // which is good news and must not be blamed on config.
-        "explain_enabled": cfg.db_monitoring.explain_enabled,
+        "explain_enabled": explain_enabled,
         // More than one distinct plan in the window. Named `drift_detected`
         // rather than `plan_changed` deliberately: this detects STRUCTURAL DRIFT
         // in the generic plan, and its absence is NOT evidence that no plan
@@ -5518,7 +6568,7 @@ pub async fn get_dbm_query_plans(
         // observed here at all.
         "drift_detected": hits.len() > 1,
         "total": hits.len(),
-    }))
+    })
 }
 
 // ─── W10 · Table health read API ─────────────────────────────────────────────
@@ -5724,31 +6774,43 @@ pub(crate) fn build_dbm_index_health_sql(
     ))
 }
 
-/// One index's size and usage, in WIRE names.
-///
-/// Reads both the SQL aggregate's aliases and the canonicalizer's storage names,
-/// for the same reason `table_health_row_to_dto` does: a DTO that only
-/// understood the aggregate could not be fed what ingest wrote, and a
-/// write/read name split would go unnoticed.
+// ─── Wire-or-storage column readers (shared by the two health DTOs) ──────────
+//
+// Health rows arrive from two shapes: the SQL aggregates' wire aliases and, in
+// tests, the canonicalizer's own storage names. Reading both keeps the
+// writer/reader loop closeable — a DTO that only understood the aggregate
+// could not be fed what ingest wrote, and a write/read name split would go
+// unnoticed.
+
+/// The column under its wire alias, falling back to its storage name.
+fn pick_col(row: &Value, wire: &str, storage: &str) -> Value {
+    match row.get(wire) {
+        Some(v) if !v.is_null() => v.clone(),
+        _ => row.get(storage).cloned().unwrap_or(Value::Null),
+    }
+}
+
+/// [`pick_col`] as an integer, or null.
+fn int_col(row: &Value, wire: &str, storage: &str) -> Value {
+    match server_vantage::as_i64_loose(&pick_col(row, wire, storage)) {
+        Some(n) => json!(n),
+        None => Value::Null,
+    }
+}
+
+/// [`pick_col`] as a non-empty string, or null.
+fn text_col(row: &Value, wire: &str, storage: &str) -> Value {
+    match pick_col(row, wire, storage) {
+        Value::String(s) if !s.is_empty() => json!(s),
+        _ => Value::Null,
+    }
+}
+
+/// One index's size and usage, in WIRE names (see the reader helpers above).
 fn index_health_row_to_dto(row: &Value) -> Value {
-    let pick = |wire: &str, storage: &str| -> Value {
-        match row.get(wire) {
-            Some(v) if !v.is_null() => v.clone(),
-            _ => row.get(storage).cloned().unwrap_or(Value::Null),
-        }
-    };
-    let int = |wire: &str, storage: &str| -> Value {
-        match server_vantage::as_i64_loose(&pick(wire, storage)) {
-            Some(n) => json!(n),
-            None => Value::Null,
-        }
-    };
-    let text = |wire: &str, storage: &str| -> Value {
-        match pick(wire, storage) {
-            Value::String(s) if !s.is_empty() => json!(s),
-            _ => Value::Null,
-        }
-    };
+    let pick = |wire: &str, storage: &str| pick_col(row, wire, storage);
+    let int = |wire: &str, storage: &str| int_col(row, wire, storage);
+    let text = |wire: &str, storage: &str| text_col(row, wire, storage);
     json!({
         "index_name": text("index_name", server_vantage::O2_DBM_INDEX_NAME),
         "relation": text("relation", server_vantage::O2_DBM_RELATION),
@@ -5781,29 +6843,9 @@ fn index_health_row_to_dto(row: &Value) -> Value {
 /// properties of the feed, not of a table, and repeating them on every row
 /// would invite a reader to assume a row without them is exact.
 fn table_health_row_to_dto(row: &Value) -> Value {
-    // Rows arrive from two shapes: the SQL aggregate above (wire aliases) and,
-    // in tests, the canonicalizer's own output (storage names). Reading both
-    // keeps the writer/reader loop closeable — a DTO that only understood the
-    // aggregate could not be fed the canonicalizer's output, which is the one
-    // test that catches a write/read name split.
-    let pick = |wire: &str, storage: &str| -> Value {
-        match row.get(wire) {
-            Some(v) if !v.is_null() => v.clone(),
-            _ => row.get(storage).cloned().unwrap_or(Value::Null),
-        }
-    };
-    let int = |wire: &str, storage: &str| -> Value {
-        match server_vantage::as_i64_loose(&pick(wire, storage)) {
-            Some(n) => json!(n),
-            None => Value::Null,
-        }
-    };
-    let text = |wire: &str, storage: &str| -> Value {
-        match pick(wire, storage) {
-            Value::String(s) if !s.is_empty() => json!(s),
-            _ => Value::Null,
-        }
-    };
+    let pick = |wire: &str, storage: &str| pick_col(row, wire, storage);
+    let int = |wire: &str, storage: &str| int_col(row, wire, storage);
+    let text = |wire: &str, storage: &str| text_col(row, wire, storage);
     json!({
         "relation": text("relation", server_vantage::O2_DBM_RELATION),
         "schema": text("schema_name", server_vantage::O2_DBM_SCHEMA),
@@ -5893,8 +6935,7 @@ pub async fn get_dbm_table_health(
 }
 
 /// The table-health endpoint's whole body as a callable — same extraction as
-/// [`read_databases_body`], for the same badges-agree-with-tabs reason, auth
-/// included.
+/// [`read_databases_body`], auth included.
 async fn read_table_health_body(
     org_id: &str,
     user_id: &str,
@@ -5905,11 +6946,16 @@ async fn read_table_health_body(
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
-    // Checked BEFORE the range parsing, so a caller cannot probe stream
-    // existence through error-message differences. A LOGS stream — these are
-    // server-vantage records, and `StreamType::Traces` here would consult the
-    // wrong OFGA object and silently authorize.
-    if !can_read_stream(org_id, user_id, stream, StreamType::Logs).await {
+    // Same rule as `get_dbm_query_server_metrics`: Logs-stream auth, checked
+    // BEFORE range parsing so stream existence cannot be probed.
+    if !can_read_stream(
+        org_id,
+        user_id,
+        stream,
+        required_stream_for(DbmVantage::Server),
+    )
+    .await
+    {
         return Err(unauthorized_response());
     }
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
@@ -5927,9 +6973,8 @@ async fn read_table_health_body(
     // nothing for every value a user could pass.
     let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), None);
 
-    // A failed schema read is reported, never absorbed into an empty set — an
-    // empty set drops the projection and the page would report a healthy
-    // collector as broken. See `present_dbm_columns`.
+    // Same rule as `read_deadlocks_body`: a failed schema read is reported,
+    // never absorbed into an empty set. See `present_dbm_columns`.
     let present = match present_dbm_columns(org_id, stream).await {
         Ok(present) => present,
         Err(e) => {
@@ -5993,6 +7038,25 @@ async fn read_table_health_body(
 
     let hits: Vec<Value> = rows.iter().map(table_health_row_to_dto).collect();
 
+    Ok(table_health_envelope(
+        &hits,
+        stream,
+        q.system.as_deref().unwrap_or(""),
+        want_indexes.then_some((index_hits.as_slice(), index_read_failed)),
+    ))
+}
+
+/// The table-health response envelope — pure shape assembly (no I/O), same
+/// extraction rationale as [`server_metrics_envelope`]: the
+/// cumulative/estimated disclosures are asserted on real JSON instead of
+/// scraped out of the handler's source text. `index_section` is
+/// `(index_hits, index_read_failed)` when the caller asked for indexes.
+pub(crate) fn table_health_envelope(
+    hits: &[Value],
+    stream: &str,
+    engine_filter: &str,
+    index_section: Option<(&[Value], bool)>,
+) -> Value {
     let mut body = json!({
         "hits": hits,
         "stream": stream,
@@ -6017,9 +7081,9 @@ async fn read_table_health_body(
         // Whether this signal is collected for the filtered engine at all.
         // Without it a MySQL user sees an empty table and reads it as "no
         // problems found" — an all-clear about a check that never ran.
-        "engine_coverage": table_health_engine_support(q.system.as_deref().unwrap_or("")),
+        "engine_coverage": table_health_engine_support(engine_filter),
     });
-    if want_indexes {
+    if let Some((index_hits, index_read_failed)) = index_section {
         let extra = body.as_object_mut().expect("body is an object");
         extra.insert("index_hits".into(), json!(index_hits));
         extra.insert("index_total".into(), json!(index_hits.len()));
@@ -6028,9 +7092,7 @@ async fn read_table_health_body(
         extra.insert("index_counters_are_cumulative".into(), json!(true));
         extra.insert(
             "index_engine_coverage".into(),
-            json!(index_health_engine_support(
-                q.system.as_deref().unwrap_or("")
-            )),
+            json!(index_health_engine_support(engine_filter)),
         );
         // Stated, not implied by emptiness: an empty index list is the honest
         // answer on a fresh install, but "we could not read" must not wear
@@ -6038,7 +7100,45 @@ async fn read_table_health_body(
         // declaring every index healthy.
         extra.insert("index_read_failed".into(), json!(index_read_failed));
     }
-    Ok(body)
+    body
+}
+
+// ─── Shared dbm_server prologue (badges fan-in) ──────────────────────────────
+
+/// The `(stream, schema)` prologue the deadlocks / blocking / activity bodies
+/// each compute for the shared server-vantage stream: read permission plus the
+/// present-column set. Under the badges fan-in all three ask about the SAME
+/// default stream, so the OFGA round trip and the schema read need not run
+/// three times.
+struct DbmServerPrologue {
+    stream: String,
+    present: HashSet<String>,
+}
+
+/// Compute the shared prologue for [`DEFAULT_SERVER_STREAM`], or `None` when
+/// the caller may not read it or the schema read failed — each slice then runs
+/// its own prologue and owns its own denial/error, byte-identically to the
+/// standalone endpoints. `None` is deliberately NOT a verdict (see
+/// [`present_dbm_columns`] on why a flattened schema error lies): it only
+/// declines to share, never absorbs.
+async fn server_prologue(org_id: &str, user_id: &str) -> Option<DbmServerPrologue> {
+    if !can_read_stream(
+        org_id,
+        user_id,
+        DEFAULT_SERVER_STREAM,
+        required_stream_for(DbmVantage::Server),
+    )
+    .await
+    {
+        return None;
+    }
+    match present_dbm_columns(org_id, DEFAULT_SERVER_STREAM).await {
+        Ok(present) => Some(DbmServerPrologue {
+            stream: DEFAULT_SERVER_STREAM.to_string(),
+            present,
+        }),
+        Err(_) => None,
+    }
 }
 
 // ─── Badges (`/badges`) — the tab strip's one fan-in ─────────────────────────
@@ -6138,11 +7238,23 @@ impl BadgeSliceResults {
 /// answer may simply have blipped.
 pub(crate) fn queries_slice_reports_zero(queries: &Result<Value, HttpResponse>) -> bool {
     match queries {
-        // `total` is counted before the row cap, so it is the population —
-        // the body always carries it.
-        Ok(body) => body.get("total").and_then(Value::as_i64) == Some(0),
+        Ok(body) => queries_body_reports_zero(body),
         Err(_) => false,
     }
+}
+
+/// The same rule on a body that already succeeded — what `/queries` itself
+/// uses to arm `include_server_fallback`.
+///
+/// Shared with [`queries_slice_reports_zero`] deliberately: the badge and the
+/// tab must fall back under the SAME condition, or the strip counts a
+/// database-reported list the page did not render (or vice versa) and the
+/// badges-agree-with-tabs invariant breaks at exactly the deployment this
+/// fallback exists for.
+pub(crate) fn queries_body_reports_zero(body: &Value) -> bool {
+    // `total` is counted before the row cap, so it is the population — the
+    // body always carries it.
+    body.get("total").and_then(Value::as_i64) == Some(0)
 }
 
 /// Whether the client-vantage databases slice summed EXACTLY zero finished
@@ -6218,6 +7330,9 @@ pub async fn get_dbm_badges(
         service: None,
         baseline_start_time: None,
         baseline_end_time: None,
+        // A badge is a COUNT of rows; the per-instance split is a drill-down
+        // nothing in the strip renders.
+        include_breakdown: None,
     };
     let queries_q = QueriesQuery {
         start_time: q.start_time,
@@ -6234,6 +7349,12 @@ pub async fn get_dbm_badges(
         search: None,
         baseline_start_time: None,
         baseline_end_time: None,
+        // The strip runs its OWN fallback below, over both slices at once and
+        // under the same arming rule (`queries_slice_reports_zero`). Setting
+        // the flag here would run it twice.
+        include_server_fallback: None,
+        // A badge counts the window's statements, never one.
+        fingerprint: None,
     };
     let activity_q = ActivityQuery {
         start_time: q.start_time,
@@ -6278,12 +7399,19 @@ pub async fn get_dbm_badges(
         include_indexes: None,
     };
 
+    // One (auth, schema) prologue for the three dbm_server slices — they all
+    // read the same default stream, so the OFGA check and the schema read need
+    // not run three times. `None` merely declines to share: each slice then
+    // computes its own and owns its own denial/error, exactly as before.
+    let prologue = server_prologue(org, user).await;
+    let prologue = prologue.as_ref();
+
     let (databases, queries, activity, deadlocks, blocking, table_health) = tokio::join!(
         read_databases_body(org, user, &databases_q),
         read_queries_body(org, user, &queries_q),
-        read_activity_body(org, user, &activity_q),
-        read_deadlocks_body(org, user, &deadlocks_q),
-        read_blocking_body(org, user, &blocking_q),
+        read_activity_body(org, user, &activity_q, true, prologue),
+        read_deadlocks_body(org, user, &deadlocks_q, true, prologue),
+        read_blocking_body(org, user, &blocking_q, true, prologue),
         read_table_health_body(org, user, &table_health_q),
     );
 
@@ -6309,6 +7437,9 @@ pub async fn get_dbm_badges(
                 instance: None,
                 database: None,
                 namespace: None,
+                // The badges slice counts the window's statements — narrowing
+                // it to one would make the badge report 1.
+                fingerprint: None,
                 limit: None,
             };
             Some(read_server_queries_body(org, user, &sq).await)
@@ -6389,6 +7520,106 @@ mod tests {
         assert!(
             can_read_stream("org", "", "any_stream", StreamType::Logs).await,
             "even an empty user resolves permissively on OSS"
+        );
+    }
+
+    /// **The vantage → OFGA-object mapping, asserted directly.**
+    ///
+    /// §5.1: the client vantage is application trace spans; the server vantage
+    /// is the database's own records, which arrive as LOGS. Getting this
+    /// backwards consults the wrong OFGA object and SILENTLY AUTHORIZES.
+    ///
+    /// This used to be five separate tests that GREPPED each handler's source
+    /// for the literal `StreamType::Logs` near its `can_read_stream(` call —
+    /// which is how they kept surviving refactors vacuously: when a check moved
+    /// out of the function the grep was pointed at, the scrape found a
+    /// different function's body (or a wrapper with no check in it) and either
+    /// panicked on an unrelated message or passed on someone else's gate. The
+    /// mapping is a pure function now, so the rule itself is a behavioural
+    /// assertion, and `assert_gates_on_vantage` only has to prove each read
+    /// NAMES its vantage — a much weaker thing to scrape, with a guard that
+    /// fails loudly if the function it scraped is not the one it meant.
+    #[test]
+    fn test_required_stream_matches_the_vantage() {
+        assert_eq!(
+            required_stream_for(DbmVantage::Server),
+            StreamType::Logs,
+            "server-vantage records arrive as LOGS; Traces here checks the wrong \
+             OFGA object and silently authorizes"
+        );
+        assert_eq!(
+            required_stream_for(DbmVantage::Client),
+            StreamType::Traces,
+            "client-vantage reads are application trace spans"
+        );
+        assert_ne!(
+            required_stream_for(DbmVantage::Client),
+            required_stream_for(DbmVantage::Server),
+            "the two vantages must never resolve to the same OFGA object — \
+             collapsing them is the copy-paste hazard §5.1 names explicitly"
+        );
+    }
+
+    /// Prove one read gates on the vantage it belongs to.
+    ///
+    /// Still a source assertion, because it cannot be a behavioural one:
+    /// `can_read_stream` is unconditionally permissive on OSS (see
+    /// `can_read_stream_is_permissive_on_oss`), so no OSS-observable response
+    /// distinguishes a Logs check from a Traces one. What CHANGED is how much
+    /// this has to scrape — the stream-type rule is asserted for real in
+    /// `test_required_stream_matches_the_vantage`, leaving this to check only
+    /// that the named function exists, contains a gate, and names the right
+    /// vantage at it.
+    ///
+    /// The guards are the point: a moved or renamed function fails LOUDLY here
+    /// (not found, or found but trivial) rather than silently scraping a
+    /// neighbour and passing on its gate.
+    fn assert_gates_on_vantage(fn_name: &str, vantage: DbmVantage) {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find(&format!("async fn {fn_name}"))
+            .unwrap_or_else(|| panic!("{fn_name} must exist — a renamed fn must fail, not pass"));
+        let body = code[start..]
+            .split("\n}\n")
+            .next()
+            .unwrap_or_else(|| panic!("{fn_name} must have a body"));
+
+        // Guard: the scrape found a REAL function body, not a stub or the tail
+        // of a doc comment. Every read gated here parses a range and reads a
+        // stream, so both landmarks must be present.
+        assert!(
+            body.len() > 300,
+            "{fn_name}'s scraped body is {} bytes — too short to be the real \
+             function; the scrape is pointing at the wrong place",
+            body.len()
+        );
+        assert!(
+            body.contains("resolve_range(") || body.contains("start_time"),
+            "{fn_name}'s scraped body carries no window handling — the scrape \
+             is pointing at the wrong function"
+        );
+
+        let call = body
+            .find("can_read_stream(")
+            .unwrap_or_else(|| panic!("{fn_name} must check read permission at all"));
+        let args = &body[call..body.len().min(call + 200)];
+        let expected = match vantage {
+            DbmVantage::Server => "DbmVantage::Server",
+            DbmVantage::Client => "DbmVantage::Client",
+        };
+        assert!(
+            args.contains(expected),
+            "{fn_name} reads from the {vantage:?} vantage, so its gate must name \
+             {expected}; naming the other one checks the wrong OFGA object and \
+             silently authorizes"
+        );
+        // And never the raw literal: a hand-written StreamType at a gate is the
+        // copy-paste this mapping exists to prevent.
+        assert!(
+            !args.contains("StreamType::"),
+            "{fn_name} must reach its stream type through required_stream_for, \
+             never by writing StreamType:: at the gate"
         );
     }
 
@@ -6523,20 +7754,80 @@ mod tests {
 
     // The queries endpoint's free-text search NEVER reaches the SQL string —
     // it is applied at merge time in Rust (it must filter the cached
-    // unfiltered tail anyway), so no escaping question even arises.
+    // unfiltered tail anyway), so no escaping question even arises. The read
+    // builds its SQL through `build_stats_sql` from the scope filters ALONE:
+    // there is no parameter a search term could even travel through, and the
+    // source scrape pins the call site so one cannot be reintroduced.
     #[test]
     fn test_queries_search_text_never_in_sql() {
-        let hostile = "' OR 1=1 UNION SELECT password FROM users --";
-        let sql = build_queries_stats_sql("default", 1, 2, &ScopeFilters::default(), Some(hostile));
+        let sql = build_stats_sql(
+            "default",
+            "query_stats",
+            1,
+            2,
+            &ScopeFilters::default().sql_preds(),
+        );
         assert!(!sql.contains("OR 1=1"));
         assert!(!sql.contains("UNION"));
         assert!(!sql.contains("password"));
+
+        // The call site takes only the filters — `search` must not appear in
+        // the statement that builds the queries SQL.
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let window_fn = code
+            .find("async fn read_queries_window")
+            .expect("the queries window fn must exist");
+        let body = code[window_fn..].split("\n}\n").next().expect("body");
+        let build = body
+            .find("let qs_sql = build_stats_sql(")
+            .expect("the queries read must build its SQL through build_stats_sql");
+        let stmt = body[build..].split(';').next().expect("statement");
+        assert!(
+            !stmt.contains("search"),
+            "user search text must never reach the queries SQL: {stmt}"
+        );
     }
 
     #[test]
     fn test_fingerprint_pred_escaped() {
         let pred = fingerprint_pred("abc'; DELETE FROM t;--");
         assert_eq!(pred, "\n    AND fingerprint = 'abc''; DELETE FROM t;--'");
+    }
+
+    /// The raw-span twin, on the `o2_db_` column name spans actually carry.
+    /// This predicate replaced a SQL string the BROWSER built with its own
+    /// escaping helper — the escaping is here now, and tested here.
+    #[test]
+    fn test_span_fingerprint_pred_escaped() {
+        let pred = span_fingerprint_pred("abc'; DROP TABLE t;--");
+        assert_eq!(
+            pred,
+            "\n    AND o2_db_fingerprint = 'abc''; DROP TABLE t;--'"
+        );
+    }
+
+    /// The per-query scope rides the SAME predicate string every other samples
+    /// filter uses, so it lands inside the fixed-shape SQL rather than beside
+    /// it — the whole reason the browser no longer needs to build one.
+    #[test]
+    fn test_samples_sql_carries_a_fingerprint_scope() {
+        let preds = format!(
+            "{}{}",
+            ScopeFilters {
+                system: Some("postgresql".into()),
+                ..Default::default()
+            }
+            .span_sql_preds(),
+            span_fingerprint_pred("deadbeef'x")
+        );
+        let sql = build_samples_sql("otel_demo", 100, 200, &preds, 50);
+        assert!(sql.contains("AND o2_db_system = 'postgresql'"));
+        assert!(sql.contains("AND o2_db_fingerprint = 'deadbeef''x'"));
+        // Still the one fixed shape — the scope narrows the WHERE, it does not
+        // rewrite the projection or the ordering.
+        assert!(sql.contains("ORDER BY duration_ns DESC\nLIMIT 50"));
+        assert!(sql.contains("FROM \"otel_demo\""));
     }
 
     #[test]
@@ -6876,7 +8167,7 @@ mod tests {
     // deterministic (instance, namespace) tiebreak.
     #[test]
     fn test_fold_instance_breakdown_groups_and_sums() {
-        let rows = vec![
+        let rows = [
             json!({"db_instance": "db1", "db_namespace": "orders", "calls": 10, "errors": 1, "total_time_ns": 500}),
             json!({"db_instance": "db1", "db_namespace": "orders", "calls": 5, "errors": 0, "total_time_ns": 300}),
             json!({"db_instance": "db2", "db_namespace": "orders", "calls": 100, "errors": 2, "total_time_ns": 900}),
@@ -6900,7 +8191,7 @@ mod tests {
     // coalesce the spellings or one instance splits into two rows.
     #[test]
     fn test_fold_instance_breakdown_coalesces_absent_dims() {
-        let rows = vec![
+        let rows = [
             json!({"db_instance": "db1", "db_namespace": null, "calls": 3, "total_time_ns": 30}),
             json!({"db_instance": "db1", "db_namespace": "", "calls": 4, "total_time_ns": 40}),
             json!({"db_instance": "db1", "calls": 5, "total_time_ns": 50}),
@@ -6917,7 +8208,7 @@ mod tests {
     // every constituent stays absent (never a fabricated 0).
     #[test]
     fn test_fold_instance_breakdown_weighted_percentiles_and_absence() {
-        let rows = vec![
+        let rows = [
             json!({"db_instance": "db1", "db_namespace": "d", "calls": 1, "p95_ns": 100}),
             json!({"db_instance": "db1", "db_namespace": "d", "calls": 3, "p95_ns": 500}),
         ];
@@ -7076,6 +8367,436 @@ mod tests {
         ];
         let (hits, _) = group_query_rows(&pool, Some("query"), true);
         assert_eq!(hits.len(), 2);
+    }
+
+    // ── The zero-trace fallback, folded into the tab endpoints ─────────────
+
+    /// The badge and the tab must arm the fallback under the SAME rule.
+    ///
+    /// The strip's counts are produced by the same assembly the pages render,
+    /// so if `/queries` fell back where `/badges` did not (or the reverse) the
+    /// tab would show a database-reported list under a badge reading 0 — at
+    /// precisely the deployment this fallback exists for.
+    #[test]
+    fn test_queries_fallback_arms_on_the_same_rule_for_badge_and_tab() {
+        let zero = json!({"hits": [], "other": [], "total": 0, "top_n_subset": false});
+        let some = json!({"hits": [{}], "other": [], "total": 1, "top_n_subset": false});
+
+        // The body-level rule, which `/queries` uses…
+        assert!(queries_body_reports_zero(&zero));
+        assert!(!queries_body_reports_zero(&some));
+        // …is literally the rule the badge slice uses.
+        assert!(queries_slice_reports_zero(&Ok(zero)));
+        assert!(!queries_slice_reports_zero(&Ok(some)));
+
+        // A FAILED slice must never arm it: unknown is not zero, and firing
+        // there puts a database-reported claim over a client answer that
+        // merely blipped.
+        assert!(!queries_slice_reports_zero(&Err(
+            MetaHttpResponse::internal_error("boom")
+        )));
+        // A body with no `total` at all is not a zero either.
+        assert!(!queries_body_reports_zero(&json!({"hits": []})));
+    }
+
+    /// The fallback's three outcomes stay three, and a DENIAL is one of them.
+    ///
+    /// The fallback body reads a LOGS stream while the primary is Traces-auth,
+    /// so a caller can be entitled to one and not the other. Collapsing that
+    /// into a whole-request 403 would withhold the client-vantage rows the
+    /// caller IS entitled to; collapsing it into "read failed" would tell them
+    /// to retry something that will never succeed.
+    #[test]
+    fn test_server_fallback_section_keeps_denied_apart_from_failed() {
+        let mut body = json!({"hits": [], "total": 0});
+        stamp_server_fallback(&mut body, Ok(json!({"hits": [{"query": "SELECT 1"}]})));
+        assert_eq!(body["server_fallback"]["hits"][0]["query"], "SELECT 1");
+        assert_eq!(body["server_fallback_forbidden"], json!(false));
+        assert_eq!(body["server_fallback_read_failed"], json!(false));
+
+        let mut body = json!({"hits": [], "total": 0});
+        stamp_server_fallback(&mut body, Err(unauthorized_response()));
+        assert!(body["server_fallback"].is_null());
+        assert_eq!(
+            body["server_fallback_forbidden"],
+            json!(true),
+            "a denial must be stated as a denial, not as a failed read"
+        );
+        assert_eq!(body["server_fallback_read_failed"], json!(false));
+
+        let mut body = json!({"hits": [], "total": 0});
+        stamp_server_fallback(&mut body, Err(MetaHttpResponse::internal_error("boom")));
+        assert!(body["server_fallback"].is_null());
+        assert_eq!(body["server_fallback_forbidden"], json!(false));
+        assert_eq!(body["server_fallback_read_failed"], json!(true));
+
+        // And the primary's own rows are untouched in every case — the section
+        // is additive, never a replacement.
+        let mut body = json!({"hits": [{"fingerprint": "abc"}], "total": 1});
+        stamp_server_fallback(&mut body, Err(unauthorized_response()));
+        assert_eq!(body["hits"][0]["fingerprint"], "abc");
+        assert_eq!(body["total"], 1);
+    }
+
+    /// Opt-in, exact-zero-armed, and — on samples — never armed by a PARTIAL
+    /// answer. A stream read that failed makes an empty list unknown rather
+    /// than zero, and the fallback must not answer an unknown.
+    #[test]
+    fn test_samples_fallback_is_opt_in_and_refuses_partial_answers() {
+        let body = samples_body_src();
+        assert!(
+            body.contains(
+                "q.include_server_fallback.unwrap_or(false) && client_reports_zero && failed == 0"
+            ),
+            "the fallback must be opt-in, armed by an exact zero, and refused \
+             on a partial answer"
+        );
+    }
+
+    /// **The samples read must take its stream names BY VALUE.**
+    ///
+    /// This is not style. `db_streams.iter().map(|stream| ...)` gives the
+    /// closure a `&String` parameter, which makes its lifetime EARLY-bound.
+    /// That was harmless until `include_server_fallback` added an await AFTER
+    /// the fold: with an early-bound closure alive across it, `get_dbm_samples`
+    /// stops satisfying axum's `for<'a>` Handler bound and the build fails —
+    /// not here, but at the ROUTE REGISTRATION in `api/http`, with
+    /// "implementation of `FnOnce` is not general enough", naming neither this
+    /// closure nor the await that caused it.
+    ///
+    /// It broke exactly that way once, and `cargo check -p openobserve-core`
+    /// stayed green throughout. Nothing in this crate's own tests can catch it,
+    /// so the shape is pinned here instead.
+    #[test]
+    fn test_samples_reads_take_stream_names_by_value() {
+        let body = samples_body_src();
+        assert!(
+            body.contains("db_streams.clone().into_iter().map(|stream|"),
+            "the per-stream reads must take owned String names — `.iter()` here \
+             makes the closure early-bound and breaks the route's Handler bound \
+             in api/http, with an error that names neither this line nor the \
+             await that exposes it"
+        );
+        assert!(
+            !body.contains("db_streams.iter().map("),
+            "borrowing the stream names is the exact shape that broke the route"
+        );
+    }
+
+    /// The samples body is a plain `async fn`, not the handler — the extraction
+    /// every other DBM read follows, and here also what keeps axum's Handler
+    /// bound satisfiable while the body awaits its optional section.
+    #[test]
+    fn test_samples_body_is_extracted_from_the_handler() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        assert!(
+            code.contains("async fn read_samples_body("),
+            "the samples body must be a callable, like every other DBM read"
+        );
+        let start = code
+            .find("pub async fn get_dbm_samples")
+            .expect("the handler must exist");
+        let handler = code[start..]
+            .split("\n/// The samples endpoint's whole body")
+            .next()
+            .expect("handler body");
+        assert!(
+            handler.contains("read_samples_body(&org_id, &user_email.user_id, &q)"),
+            "the handler must delegate to the body fn"
+        );
+        assert!(
+            handler.len() < 700,
+            "the handler must stay thin — {} bytes suggests the body moved back in",
+            handler.len()
+        );
+    }
+
+    /// The samples body's source, with the guard every scrape in this file
+    /// carries: a fn that moved or was renamed fails LOUDLY here rather than
+    /// silently scraping a neighbour and passing on its code.
+    fn samples_body_src() -> &'static str {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("async fn read_samples_body(")
+            .expect("read_samples_body must exist — a renamed fn must fail, not pass");
+        let body = code[start..]
+            .split("\n/// Run and attach")
+            .next()
+            .expect("the body fn must have a body");
+        assert!(
+            body.len() > 1500 && body.contains("fold_sample_rows("),
+            "scraped the wrong function — read_samples_body must be the fn that \
+             folds the per-stream reads"
+        );
+        body
+    }
+
+    // ── The history endpoint's folded endpoints section ────────────────────
+
+    /// The calling-endpoints aggregation, folded into `/query/history`.
+    ///
+    /// It runs against the stream THIS handler resolves for its own backfill —
+    /// the fact the standalone `/query/endpoints` had to be told, and which the
+    /// page could only learn from this very response. Concurrent with the
+    /// backfill and the tail collection, opt-in, and three-valued: rows, `null`
+    /// (no stream), or the read-failed flag.
+    #[test]
+    fn test_history_folds_the_endpoints_section() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_query_history")
+            .expect("the history handler must exist");
+        let handler = code[start..]
+            .split("\n#[derive")
+            .next()
+            .expect("the handler must have a body");
+        // Guard: prove the scrape landed on the real handler.
+        assert!(
+            handler.len() > 2000 && handler.contains("build_backfill_sql("),
+            "scraped the wrong function — get_dbm_query_history must be found \
+             and be the fn that backfills"
+        );
+
+        // Opt-in, and against the stream this handler already resolved.
+        assert!(handler.contains("q.include_endpoints.unwrap_or(false)"));
+        assert!(
+            handler.contains("build_endpoints_sql(") && handler.contains("backfill_stream_ref"),
+            "the section must aggregate the stream this handler resolved, not a \
+             second one the caller had to supply"
+        );
+        // Concurrent with the reads it joins, not sequenced after them.
+        assert!(
+            handler.contains("tokio::join!(backfill_fut, tails_fut, endpoints_fut)"),
+            "the section must ride the existing fan-out"
+        );
+        // Three outcomes, kept apart.
+        assert!(handler.contains("endpoints_read_failed"));
+        assert!(
+            handler.contains("Value::Null"),
+            "a missing stream must be a null section, never an empty list that \
+             reads as 'no callers'"
+        );
+        // The standalone route survives — this wave adds, never removes.
+        assert!(src.contains("pub async fn get_dbm_query_endpoints("));
+    }
+
+    /// The section's cap is the standalone endpoint's cap, under the same
+    /// default and clamp — a fold that silently returned a different number of
+    /// rows would not be the same answer.
+    #[test]
+    fn test_history_endpoints_section_shares_the_endpoints_limit() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_query_history")
+            .expect("handler");
+        let handler = code[start..].split("\n#[derive").next().expect("body");
+        assert!(handler.len() > 2000, "scraped the wrong function");
+        assert!(handler.contains("DEFAULT_ENDPOINTS_LIMIT"));
+        assert!(handler.contains("MAX_ENDPOINTS_LIMIT"));
+    }
+
+    // ── The query-detail Logs-side pair (/query/insights) ──────────────────
+
+    /// The join-key rule, which decides whether the `server_metrics` section is
+    /// asked for at all. Shared with the standalone handler's 400, so the two
+    /// answers to "is this key usable?" cannot drift.
+    #[test]
+    fn test_server_metrics_join_key_rule() {
+        // Engine is always required — the counters are engine-specific tables.
+        assert!(!has_server_metrics_join_key(None, Some("orders")));
+        assert!(!has_server_metrics_join_key(Some(""), Some("orders")));
+        // Postgres records carry a database, so an absent one cannot be
+        // defaulted: an empty predicate matches every database.
+        assert!(!has_server_metrics_join_key(Some("postgresql"), None));
+        assert!(!has_server_metrics_join_key(Some("postgresql"), Some("")));
+        assert!(has_server_metrics_join_key(
+            Some("postgresql"),
+            Some("orders")
+        ));
+        // mysql/mariadb top_query records carry NO database field, so
+        // (engine, fingerprint) is the whole key there.
+        assert!(has_server_metrics_join_key(Some("mysql"), None));
+        assert!(has_server_metrics_join_key(Some("mariadb"), None));
+        // Case-insensitively — the engine arrives from a row, not a constant.
+        assert!(has_server_metrics_join_key(Some("MySQL"), None));
+    }
+
+    /// The merged endpoint's contract: two nullable sections, each with its own
+    /// read-failed flag, from the SAME callables the standalone endpoints use
+    /// (so a section cannot drift from the endpoint it supersedes), and a 403
+    /// only when every section the caller asked for was denied.
+    #[test]
+    fn test_query_insights_folds_two_nullable_sections() {
+        let src = include_str!("api.rs");
+        let handler = src
+            .split("pub async fn get_dbm_query_insights(")
+            .nth(1)
+            .expect("the merged handler must exist")
+            .split("\n/// Whether a ready")
+            .next()
+            .unwrap();
+        assert!(
+            handler.len() > 800 && handler.contains("tokio::join!"),
+            "scraped the wrong function — get_dbm_query_insights must be found and non-trivial"
+        );
+
+        // Same callables, not a re-derivation.
+        assert!(handler.contains("read_plans_body("));
+        assert!(handler.contains("read_server_metrics_body("));
+        // Concurrent, like every other fan-out in this file.
+        assert!(handler.contains("tokio::join!"));
+        // One prologue for the pair — the whole point of merging two reads of
+        // the same stream.
+        assert!(handler.contains("server_prologue("));
+        // Per-section failure, never a whole-request failure.
+        for flag in ["plans_read_failed", "server_metrics_read_failed"] {
+            assert!(handler.contains(flag), "missing section flag {flag}");
+        }
+        // A 403 survives as a 403 rather than becoming "nothing captured".
+        assert!(handler.contains("unauthorized_response()"));
+        // Both superseded routes stay registered — this wave adds, never
+        // removes.
+        assert!(src.contains("pub async fn get_dbm_query_plans("));
+        assert!(src.contains("pub async fn get_dbm_query_server_metrics("));
+    }
+
+    /// A missing fingerprint is malformed for BOTH sections, so it must stay a
+    /// 400 rather than degrading into two nulls the page reads as "nothing
+    /// captured".
+    #[test]
+    fn test_query_insights_rejects_a_missing_fingerprint_up_front() {
+        let src = include_str!("api.rs");
+        let handler = src
+            .split("pub async fn get_dbm_query_insights(")
+            .nth(1)
+            .expect("the merged handler must exist")
+            .split("\n/// Whether a ready")
+            .next()
+            .unwrap();
+        let reject = handler
+            .find("fingerprint is required")
+            .expect("insights must reject a missing fingerprint");
+        let join = handler
+            .find("tokio::join!")
+            .expect("insights must fan out to both sections");
+        assert!(
+            reject < join,
+            "the fingerprint check must precede the fan-out, or a malformed \
+             request runs two searches before failing"
+        );
+    }
+
+    // ── The per-instance breakdown fold (include_breakdown) ────────────────
+
+    /// The split is keyed by instance and each key holds ONLY that instance's
+    /// rows — this is the whole reason one response can replace one request per
+    /// expanded row.
+    #[test]
+    fn test_fold_breakdown_by_instance_keys_by_instance() {
+        let pool = vec![
+            json!({"fingerprint": "abc", "db_system": "pg", "db_instance": "db1",
+                   "stmt_class": "query", "calls": 1, "total_time_ns": 10, "statements": 1, "traces": 1}),
+            json!({"fingerprint": "xyz", "db_system": "pg", "db_instance": "db2",
+                   "stmt_class": "query", "calls": 2, "total_time_ns": 20, "statements": 2, "traces": 1}),
+        ];
+        let folded = fold_breakdown_by_instance(&pool);
+        let obj = folded.as_object().expect("breakdown is an object");
+        assert_eq!(obj.len(), 2);
+        assert_eq!(obj["db1"].as_array().unwrap().len(), 1);
+        assert_eq!(obj["db1"][0]["fingerprint"], "abc");
+        assert_eq!(obj["db2"][0]["fingerprint"], "xyz");
+    }
+
+    /// Every statement class, exactly as the page's `stmt_class=all` call did.
+    /// Filtering to `query` here would drop COMMIT/SET time out of the split
+    /// while the parent row's total still counted it, manufacturing a
+    /// shortfall the reader would be told to worry about.
+    #[test]
+    fn test_fold_breakdown_by_instance_keeps_every_class() {
+        let folded = fold_breakdown_by_instance(&query_pool());
+        let rows = folded["db1"].as_array().expect("db1 rows");
+        let fps: Vec<&str> = rows
+            .iter()
+            .map(|r| r["fingerprint"].as_str().unwrap())
+            .collect();
+        assert!(fps.contains(&"abc"), "the query-class fingerprint survives");
+        assert!(
+            fps.contains(&"tcl"),
+            "the transaction-control fingerprint survives too — the parent total counts it"
+        );
+    }
+
+    /// `_other` never enters the split. An instance scope is narrower than the
+    /// grain the remainder reconciles at (§5.2), so passing it through would
+    /// present a synthetic row as if it were a service's own time — and the
+    /// standalone per-row call dropped it for the same reason.
+    #[test]
+    fn test_fold_breakdown_by_instance_drops_the_other_remainder() {
+        let folded = fold_breakdown_by_instance(&query_pool());
+        let rows = folded["db1"].as_array().expect("db1 rows");
+        assert!(
+            rows.iter().all(|r| r["fingerprint"] != "_other"),
+            "the _other remainder must not be attributed to a schema or service"
+        );
+    }
+
+    /// A row with no instance has no drill-down to belong to; keying it under
+    /// `""` would invent an instance the overview never rendered.
+    #[test]
+    fn test_fold_breakdown_by_instance_skips_instanceless_rows() {
+        let pool = vec![json!({"fingerprint": "abc", "db_system": "pg",
+                               "stmt_class": "query", "calls": 1, "total_time_ns": 10})];
+        let folded = fold_breakdown_by_instance(&pool);
+        assert!(folded.as_object().unwrap().is_empty());
+    }
+
+    /// Capped per instance at the same limit the page used to pass, and ranked
+    /// heaviest first so the cap keeps the rows that carry the shape.
+    #[test]
+    fn test_fold_breakdown_by_instance_ranks_and_caps() {
+        let pool: Vec<Value> = (0..DEFAULT_BREAKDOWN_LIMIT + 10)
+            .map(|i| {
+                json!({"fingerprint": format!("fp{i}"), "db_system": "pg", "db_instance": "db1",
+                       "stmt_class": "query", "calls": 1, "total_time_ns": i, "statements": 1, "traces": 1})
+            })
+            .collect();
+        let folded = fold_breakdown_by_instance(&pool);
+        let rows = folded["db1"].as_array().unwrap();
+        assert_eq!(rows.len(), DEFAULT_BREAKDOWN_LIMIT);
+        // Heaviest first: the highest total_time_ns survives the cap, the
+        // lightest does not.
+        assert_eq!(rows[0]["total_time_ns"], json!(DEFAULT_BREAKDOWN_LIMIT + 9));
+        assert!(rows.iter().all(|r| r["fingerprint"] != "fp0"));
+    }
+
+    /// The split is opt-in: without the flag the response is byte-identical to
+    /// what every existing caller already receives.
+    #[test]
+    fn test_databases_breakdown_is_opt_in() {
+        let src = include_str!("api.rs");
+        let body = src
+            .split("async fn read_databases_body(")
+            .nth(1)
+            .expect("read_databases_body must exist")
+            .split("\n/// One window")
+            .next()
+            .unwrap();
+        assert!(
+            body.len() > 500 && body.contains("read_current_and_baseline"),
+            "scraped the wrong function — read_databases_body must be found and non-trivial"
+        );
+        assert!(
+            body.contains("if let Some(breakdown) = window.breakdown"),
+            "the breakdown section must be conditional on the caller having asked"
+        );
+        assert!(
+            body.contains("breakdown_read_failed"),
+            "a partial section must state its own failure, never imply it by emptiness"
+        );
     }
 
     // ── Databases grouping ──────────────────────────────────────────────────
@@ -7254,10 +8975,12 @@ mod tests {
     fn test_search_matches_case_insensitive() {
         let row =
             json!({"fingerprint": "deadbeef", "query_norm": "SELECT * FROM Users WHERE id = ?"});
-        assert!(search_matches(&row, "from users"));
-        assert!(search_matches(&row, "SELECT"));
-        assert!(search_matches(&row, "deadbe"));
-        assert!(!search_matches(&row, "DELETE"));
+        // The caller lowers the needle once per request (the fn's contract);
+        // the match itself must stay case-insensitive over the HAYSTACK.
+        assert!(search_matches(&row, &"from users".to_lowercase()));
+        assert!(search_matches(&row, &"SELECT".to_lowercase()));
+        assert!(search_matches(&row, &"deadbe".to_lowercase()));
+        assert!(!search_matches(&row, &"DELETE".to_lowercase()));
     }
 
     // ── Scope filter row matching (merge-time, applied to cached tail) ──────
@@ -8957,22 +10680,34 @@ mod tests {
     /// other test in this file while the page reports a healthy idle database as
     /// broken — the false alarm `LIVENESS_PROBE_MICROS` exists to prevent.
     ///
-    /// A source-scrape, matching the four existing `include_str!` guards in this
-    /// file: assembling the envelope needs a live search backend, so the keys
-    /// cannot be asserted behaviourally in a unit test.
+    /// Asserted on the real JSON: [`activity_envelope`] is the pure shape
+    /// assembly the endpoint itself calls, so the keys are proven on the wire
+    /// value rather than scraped out of the handler's source text. The FULL
+    /// standalone envelope, never [`activity_badge_envelope`] — the badge
+    /// member deliberately drops most of this contract.
     #[test]
     fn test_activity_response_carries_every_contract_key() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
-        // The handler is a thin wrapper since the badges extraction — the
-        // envelope is assembled in the body fn, so that is what gets scraped.
-        let start = code
-            .find("async fn read_activity_body")
-            .expect("the activity body fn must exist");
-        let body = code[start..]
-            .split("\n}\n")
-            .next()
-            .expect("the body fn must have a body");
+        let probe = CollectionProbe {
+            records_seen: 12,
+            non_event_records: 4,
+            newest_record: Some(1_700_000_000_000_000),
+            kind_sample_times: vec![
+                1_700_000_020_000_000,
+                1_700_000_010_000_000,
+                1_700_000_000_000_000,
+            ],
+            ..Default::default()
+        };
+        let hits = vec![json!({"query": "SELECT 1"})];
+        let env = activity_envelope(
+            &hits,
+            &[json!({"wait_event": "Lock", "count": 3i64})],
+            &[json!({"state": "active", "count": 2i64})],
+            true,
+            "dbm_server",
+            &probe,
+        );
+        let body = env.as_object().expect("the envelope is a JSON object");
 
         for key in [
             "hits",
@@ -8984,7 +10719,7 @@ mod tests {
             "freshness",
         ] {
             assert!(
-                body.contains(&format!("\"{key}\"")),
+                body.contains_key(key),
                 "the activity response must carry `{key}` (spec W2.3 response shape)"
             );
         }
@@ -8992,9 +10727,24 @@ mod tests {
         // `truncated` comes from the ROW query, independently of the aggregates.
         // Setting it from the aggregate — which has no LIMIT and so is never
         // truncated — would report a capped 1000-row sample as complete.
-        assert!(
-            body.contains("\"truncated\""),
+        assert_eq!(
+            body.get("truncated"),
+            Some(&json!(true)),
             "the activity response must report whether the ROW sample was capped"
+        );
+        // The three load-bearing keys must carry VALUES, not just exist: a
+        // null `sample_interval_seconds` on a probe with three evenly spaced
+        // samples would drop the sampling disclosure silently.
+        assert_eq!(
+            body.get("sample_interval_seconds"),
+            Some(&json!(10i64)),
+            "the sampling disclosure must be computed, not nulled"
+        );
+        assert_eq!(body.get("log_lines_seen"), Some(&json!(4i64)));
+        assert_eq!(
+            body.get("sampled_sessions"),
+            Some(&json!(true)),
+            "the page renders a SAMPLE of sessions and must say so"
         );
     }
 
@@ -9007,31 +10757,7 @@ mod tests {
     /// behavioural unit test.
     #[test]
     fn test_activity_checks_read_permission_against_the_logs_stream() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
-        // The permission check lives in the body fn, which both the endpoint
-        // and the badges fan-in call — one gate, scraped where it is.
-        let start = code
-            .find("async fn read_activity_body")
-            .expect("the activity body fn must exist");
-        let body = code[start..]
-            .split("\n}\n")
-            .next()
-            .expect("the body fn must have a body");
-
-        let call = body
-            .find("can_read_stream(")
-            .expect("the activity body must check read permission at all");
-        let args = &body[call..body.len().min(call + 200)];
-        assert!(
-            args.contains("StreamType::Logs"),
-            "activity reads a LOGS stream; StreamType::Traces here checks the wrong \
-             OFGA object and silently authorizes"
-        );
-        assert!(
-            !args.contains("StreamType::Traces"),
-            "the trace stream type is the copy-paste hazard §5.1 names explicitly"
-        );
+        assert_gates_on_vantage("read_activity_body", DbmVantage::Server);
     }
 
     /// **The breakdown must be gated on the stream schema, exactly as the rows
@@ -9156,30 +10882,35 @@ mod tests {
     /// RENDERING SESSIONS. Found by a surviving `&& → ||` mutation.
     #[test]
     fn test_not_collecting_requires_both_an_empty_page_and_a_silent_probe() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
-        let start = code
-            .find("async fn read_activity_body")
-            .expect("the activity body fn must exist");
-        let body = code[start..]
-            .split("\n}\n")
-            .next()
-            .expect("the body fn must have a body");
+        let silent = CollectionProbe::default();
+        let alive = CollectionProbe {
+            records_seen: 9,
+            ..Default::default()
+        };
+        let session = vec![json!({"query": "SELECT 1"})];
+        let flag = |hits: &[Value], probe: &CollectionProbe| {
+            activity_envelope(hits, &[], &[], false, "dbm_server", probe)["not_collecting"].clone()
+        };
 
-        let line = body
-            .lines()
-            .find(|l| l.contains("\"not_collecting\""))
-            .expect("the response must carry not_collecting");
-        assert!(
-            line.contains("hits.is_empty()") && line.contains("&&"),
+        // The only true case: nothing on the page AND no evidence of life.
+        assert_eq!(flag(&[], &silent), json!(true));
+        // Each half alone must NOT trip it. The second of these is the one a
+        // `&& → ||` mutation breaks: a probe read blip (swallowed into an empty
+        // row set by design) would announce a broken collector WHILE RENDERING
+        // SESSIONS.
+        assert_eq!(
+            flag(&[], &alive),
+            json!(false),
+            "records prove the pipe carries traffic — an empty page alone is not a broken collector"
+        );
+        assert_eq!(
+            flag(&session, &silent),
+            json!(false),
             "not_collecting must require BOTH an empty page AND a silent probe: a \
              failed probe read alone would otherwise report a healthy collector \
-             as broken while the table shows sessions. Got: {line}"
+             as broken while the table shows sessions"
         );
-        assert!(
-            !line.contains("||"),
-            "a disjunction here turns a probe read blip into a false alarm: {line}"
-        );
+        assert_eq!(flag(&session, &alive), json!(false));
     }
 
     /// **Closes the breakdown seam: the SQL's output keys must be the keys the
@@ -9529,20 +11260,16 @@ mod tests {
     ///
     /// The UI cannot phrase the disclosure correctly unless the API states the
     /// nature of the data: the plan is generic and NULL-bound, and a stable hash
-    /// is not an all-clear. Asserted as a source-scrape, matching the four
-    /// existing `include_str!` guards in this file — assembling the envelope
-    /// needs a live search backend.
+    /// is not an all-clear. Asserted on the real JSON: [`plans_envelope`] is
+    /// the pure shape assembly `get_dbm_query_plans` itself calls.
     #[test]
     fn test_plans_response_carries_every_contract_key() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
-        let start = code
-            .find("pub async fn get_dbm_query_plans")
-            .expect("the plans handler must exist");
-        let body = code[start..]
-            .split("\n}\n")
-            .next()
-            .expect("the handler must have a body");
+        let hits = vec![
+            json!({"plan_hash": "a", "plan_source": "generic_null_bound"}),
+            json!({"plan_hash": "b", "plan_source": "generic_null_bound"}),
+        ];
+        let env = plans_envelope(&hits, "dbm_server", "on", true);
+        let body = env.as_object().expect("the envelope is a JSON object");
 
         for key in [
             "hits",
@@ -9552,22 +11279,38 @@ mod tests {
             "plan_capture",
         ] {
             assert!(
-                body.contains(&format!("\"{key}\"")),
+                body.contains_key(key),
                 "the plans response must carry `{key}`"
             );
         }
-        // EXTENDED for W-E3, never relaxed: the response-level source is now
+        assert_eq!(body.get("plan_capture"), Some(&json!("on")));
+        assert_eq!(body.get("explain_enabled"), Some(&json!(true)));
+        // Two distinct plans in the window: structural drift, and its absence
+        // is not evidence that no regression occurred.
+        assert_eq!(body.get("drift_detected"), Some(&json!(true)));
+
+        // EXTENDED for W-E3, never relaxed: the response-level source is
         // DERIVED per window rather than hardcoded — a hardcoded value would
-        // mislabel every executed plan (or, worse, every generic one).
-        assert!(
-            body.contains("derived_plan_source"),
-            "the response-level plan_source must be derived from the hits, not a constant — \
-             a window holding both producers is `mixed` and neither single label is honest"
-        );
-        assert!(
-            !body.contains("\"plan_source\": \"generic_null_bound\""),
+        // mislabel every executed plan (or, worse, every generic one). A
+        // constant `generic_null_bound` passes the all-generic case above, so
+        // the executed and mixed windows are what pin it.
+        assert_eq!(body.get("plan_source"), Some(&json!("generic_null_bound")));
+        let executed = json!({"plan_hash": "a", "plan_source": "auto_explain"});
+        assert_eq!(
+            plans_envelope(std::slice::from_ref(&executed), "dbm_server", "on", true)["plan_source"],
+            json!("auto_explain"),
             "hardcoding generic_null_bound at the response level mislabels every \
              executed plan in the window (E-C)"
+        );
+        assert_eq!(
+            plans_envelope(
+                &[executed, json!({"plan_source": "generic_null_bound"})],
+                "dbm_server",
+                "on",
+                true
+            )["plan_source"],
+            json!("mixed"),
+            "a window holding both producers is `mixed` and neither single label is honest"
         );
     }
 
@@ -9748,22 +11491,9 @@ mod tests {
     /// object and SILENTLY AUTHORIZES.
     #[test]
     fn test_plans_checks_read_permission_against_the_logs_stream() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
-        let start = code
-            .find("pub async fn get_dbm_query_plans")
-            .expect("the plans handler must exist");
-        let body = code[start..].split("\n}\n").next().expect("body");
-
-        let call = body
-            .find("can_read_stream(")
-            .expect("the plans handler must check read permission at all");
-        let args = &body[call..body.len().min(call + 200)];
-        assert!(
-            args.contains("StreamType::Logs"),
-            "plans read a LOGS stream; StreamType::Traces here checks the wrong OFGA object \
-             and silently authorizes"
-        );
+        // The gate lives in the body fn, which both the endpoint and
+        // `/query/insights` call — one gate, asserted where it is.
+        assert_gates_on_vantage("read_plans_body", DbmVantage::Server);
     }
 
     /// The fingerprint is required; the STREAM defaults, as it does for every
@@ -9781,9 +11511,17 @@ mod tests {
         let src = include_str!("api.rs");
         let code = src.split("\nmod tests {").next().unwrap_or(src);
         let start = code
-            .find("pub async fn get_dbm_query_plans")
-            .expect("handler");
+            .find("async fn read_plans_body")
+            .expect("the plans body fn must exist");
         let body = code[start..].split("\n}\n").next().expect("body");
+        // Guard: prove the scrape landed on the real body fn, not a wrapper or
+        // a doc-comment tail. Without this the assertions below can all pass
+        // against someone else's function.
+        assert!(
+            body.len() > 500 && body.contains("build_dbm_plans_sql("),
+            "scraped the wrong function — read_plans_body must be found and be \
+             the fn that builds the plans query"
+        );
 
         assert!(
             body.contains("fingerprint is required"),
@@ -9800,12 +11538,7 @@ mod tests {
         );
         // The permission check must precede the range/limit parsing, so a caller
         // cannot probe stream existence through error-message differences.
-        let perm = body.find("can_read_stream(").expect("permission check");
-        let range = body.find("resolve_range(").expect("range parse");
-        assert!(
-            perm < range,
-            "the stream permission check must run BEFORE the range parsing"
-        );
+        assert_gate_precedes_range("read_plans_body");
     }
 
     // ─── W6 · server-side query metrics ──────────────────────────────────────
@@ -10178,35 +11911,10 @@ mod tests {
     /// slip is a one-word copy/paste from the neighbouring handler.
     #[test]
     fn test_server_metrics_authorizes_against_the_logs_stream() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
-        let start = code
-            .find("pub async fn get_dbm_query_server_metrics")
-            .expect("the server-metrics handler must exist");
-        let body = code[start..]
-            .split("\n}\n")
-            .next()
-            .expect("the handler must have a body");
-
-        // Comments are stripped before asserting. The handler's prose
-        // deliberately NAMES `StreamType::Traces` to explain the hazard (as
-        // `get_dbm_query_plans` does), and a test that banned the literal
-        // would be satisfied by deleting the warning rather than by keeping
-        // the call correct. What must be pinned is the CODE.
-        let code_only: String = body
-            .lines()
-            .filter(|l| !l.trim_start().starts_with("//"))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        assert!(
-            code_only.contains("can_read_stream(") && code_only.contains("StreamType::Logs"),
-            "server-vantage reads must authorize against the LOGS stream: {code_only}"
-        );
-        assert!(
-            !code_only.contains("StreamType::Traces"),
-            "Traces is the client-vantage stream type — wrong OFGA object: {code_only}"
-        );
+        // The gate lives in the body fn, which both the endpoint and
+        // `/query/insights` call.
+        assert_gates_on_vantage("read_server_metrics_body", DbmVantage::Server);
+        assert_gate_precedes_range("read_server_metrics_body");
     }
 
     // ── W10 · Table health read API ─────────────────────────────────────────
@@ -10442,28 +12150,49 @@ mod tests {
     /// does not support — and "137,268 rows" as an exact count.
     #[test]
     fn test_table_health_response_declares_cumulative_and_estimated() {
-        let src = include_str!("api.rs");
-        let code = src.split("\nmod tests {").next().unwrap_or(src);
-        // Assembled in the body fn since the badges extraction; the handler
-        // is a thin wrapper.
-        let start = code
-            .find("async fn read_table_health_body")
-            .expect("the table-health body fn must exist");
-        let body = code[start..].split("\n}\n").next().expect("body");
+        // Asserted on the real JSON: [`table_health_envelope`] is the pure
+        // shape assembly the body fn itself calls.
+        let hits = vec![json!({"relation": "orders", "total_bytes": 1000i64})];
+        let env = table_health_envelope(&hits, "dbm_server", "postgresql", None);
+        let body = env.as_object().expect("the envelope is a JSON object");
 
         for key in ["counters_are_cumulative", "tuples_are_estimated"] {
-            assert!(
-                body.contains(&format!("\"{key}\"")),
+            assert_eq!(
+                body.get(key),
+                Some(&json!(true)),
                 "the response must carry `{key}` — the UI cannot phrase the \
                  disclosure correctly unless the API states it"
             );
         }
         for key in ["hits", "stream", "engine_coverage"] {
             assert!(
-                body.contains(&format!("\"{key}\"")),
+                body.contains_key(key),
                 "the table-health response must carry `{key}`"
             );
         }
+        assert_eq!(body.get("engine_coverage"), Some(&json!("supported")));
+
+        // The index section rides the same envelope when asked for, and carries
+        // its own cumulative disclosure plus the read-failed flag — an empty
+        // index list must not be able to wear "we could not read" as a costume.
+        let with_indexes =
+            table_health_envelope(&hits, "dbm_server", "postgresql", Some((&[], true)));
+        for key in [
+            "index_hits",
+            "index_total",
+            "index_counters_are_cumulative",
+            "index_engine_coverage",
+            "index_read_failed",
+        ] {
+            assert!(
+                with_indexes.get(key).is_some(),
+                "the index section must carry `{key}`"
+            );
+        }
+        assert_eq!(with_indexes["index_read_failed"], json!(true));
+        // Absent by default: a caller that did not ask for indexes must not be
+        // handed an empty list it could read as "no unused indexes".
+        assert!(body.get("index_hits").is_none());
     }
 
     /// **Per-engine honesty: the surface must SAY which engines collect this.**
@@ -10504,29 +12233,40 @@ mod tests {
     /// AUTHORIZES.
     #[test]
     fn test_table_health_checks_read_permission_against_the_logs_stream() {
+        assert_gates_on_vantage("read_table_health_body", DbmVantage::Server);
+        // The permission check must precede the range parsing, so a caller
+        // cannot probe stream existence through error-message differences.
+        assert_gate_precedes_range("read_table_health_body");
+    }
+
+    /// The gate must run BEFORE the range parsing, or a caller distinguishes an
+    /// existing stream from a missing one by whether they get a 400 or a 403.
+    ///
+    /// Same guard discipline as [`assert_gates_on_vantage`]: a scrape that
+    /// cannot find its landmarks fails rather than passing vacuously.
+    fn assert_gate_precedes_range(fn_name: &str) {
         let src = include_str!("api.rs");
         let code = src.split("\nmod tests {").next().unwrap_or(src);
         let start = code
-            .find("async fn read_table_health_body")
-            .expect("the table-health body fn must exist");
-        let body = code[start..].split("\n}\n").next().expect("body");
-
-        let call = body
-            .find("can_read_stream(")
-            .expect("the handler must check read permission at all");
-        let args = &body[call..body.len().min(call + 200)];
+            .find(&format!("async fn {fn_name}"))
+            .unwrap_or_else(|| panic!("{fn_name} must exist"));
+        let body = code[start..]
+            .split("\n}\n")
+            .next()
+            .unwrap_or_else(|| panic!("{fn_name} must have a body"));
         assert!(
-            args.contains("StreamType::Logs"),
-            "table health reads a LOGS stream; StreamType::Traces here checks the \
-             wrong OFGA object and silently authorizes"
+            body.len() > 300,
+            "{fn_name}'s scraped body is too short to be the real function"
         );
-        // The permission check must precede the range parsing, so a caller
-        // cannot probe stream existence through error-message differences.
-        let perm = body.find("can_read_stream(").expect("permission check");
-        let range = body.find("resolve_range(").expect("range parse");
+        let perm = body
+            .find("can_read_stream(")
+            .unwrap_or_else(|| panic!("{fn_name} must check read permission"));
+        let range = body
+            .find("resolve_range(")
+            .unwrap_or_else(|| panic!("{fn_name} must resolve a range"));
         assert!(
             perm < range,
-            "the stream permission check must run BEFORE the range parsing"
+            "{fn_name}'s stream permission check must run BEFORE the range parsing"
         );
     }
 
@@ -10626,6 +12366,114 @@ mod tests {
         assert!(sql.contains("o2_dbm_stmt_duration_ms AS duration_ms"));
         assert!(!sql.contains("COALESCE"));
         assert!(!sql.contains(server_vantage::O2_DBM_PLAN_DURATION_MS));
+    }
+
+    // ── `/server_queries` — the single-statement lookup (A6) ────────────────
+
+    /// The fingerprint predicate reaches the SQL, escaped, on the fingerprint
+    /// COLUMN — this is the query-detail page's only way to resolve its row on
+    /// a deployment with no traced traffic, and it must narrow rather than
+    /// re-rank (`ORDER BY calls` is the feed's only honest ordering).
+    #[test]
+    fn test_server_queries_sql_takes_a_fingerprint_predicate() {
+        let present = all_cols();
+        let preds = format!(
+            "\n    AND {} = 'abc''123'",
+            server_vantage::O2_DBM_FINGERPRINT
+        );
+        let sql = build_dbm_server_queries_sql("s", 100, 200, &preds, 50, &present).unwrap();
+        assert!(
+            sql.contains("o2_dbm_fingerprint = 'abc''123'"),
+            "the quote must stay doubled or the predicate is an injection: {sql}"
+        );
+        // Still the grouped, calls-ranked fold — narrowing must not turn this
+        // into a different question.
+        assert!(sql.contains("GROUP BY") && sql.contains("ORDER BY calls DESC"));
+    }
+
+    /// Narrowing to one statement returns that statement's REAL counters —
+    /// `calls`, the summed in-database time, the derived mean, and the
+    /// per-engine `exec_time_kind` that says which measurement it is. These
+    /// are exactly the figures the list page showed and the detail page used
+    /// to lose.
+    #[test]
+    fn test_server_queries_envelope_carries_the_figures_the_list_showed() {
+        let rows = vec![json!({
+            "fingerprint": "17e5b5a191ddb2f8",
+            "query": "SELECT sku, qty FROM order_lines WHERE order_id = ?",
+            "db_system": "postgresql",
+            "db_namespace": "dbmlab",
+            "db_instance": "postgres",
+            "calls": 1000i64,
+            "exec_time_s": 20.0f64,
+            "first_seen": 100i64,
+            "last_seen": 200i64,
+        })];
+        let env = server_queries_envelope(&rows, "dbm_server", "on", 50);
+        let hit = &env["hits"][0];
+
+        assert_eq!(hit["fingerprint"], json!("17e5b5a191ddb2f8"));
+        assert_eq!(hit["calls"], json!(1000));
+        assert_eq!(hit["exec_time_s"], json!(20.0));
+        assert_eq!(hit["mean_exec_time_s"], json!(0.02));
+        // Postgres measures EXECUTION; MySQL measures WAIT. One generic "time"
+        // label would tell a reader the database measured something it did not.
+        assert_eq!(hit["exec_time_kind"], json!("execution"));
+        assert!(
+            hit.get("p95_ns").is_none() && hit.get("p50_ns").is_none(),
+            "this feed has no percentile — a mean must never be dressed as one: {hit}"
+        );
+        // A one-row answer under a cap of 50 is the whole answer.
+        assert_eq!(env["truncated"], json!(false));
+    }
+
+    /// A statement the server never reported comes back as an empty list with
+    /// capture still `"on"` — "we looked and it is not there", which is a
+    /// different sentence from "nothing is captured". The detail page renders
+    /// different copy for each, so the two must not collapse.
+    #[test]
+    fn test_server_queries_envelope_empty_lookup_keeps_capture_state() {
+        let found_nothing = server_queries_envelope(&[], "dbm_server", "on", 50);
+        assert_eq!(found_nothing["total"], json!(0));
+        assert_eq!(found_nothing["server_queries_capture"], json!("on"));
+        assert_eq!(found_nothing["truncated"], json!(false));
+
+        let never_captured = server_queries_envelope(&[], "dbm_server", "off", 50);
+        assert_eq!(never_captured["server_queries_capture"], json!("off"));
+    }
+
+    /// A row whose engine reports WAIT time must say so — the label is the
+    /// only thing distinguishing two different physical measurements sharing
+    /// one field.
+    #[test]
+    fn test_server_queries_envelope_labels_mysql_wait_time() {
+        let rows = vec![json!({
+            "fingerprint": "f1",
+            "db_system": "mysql",
+            "calls": 10i64,
+            "exec_time_s": 1.0f64,
+        })];
+        let env = server_queries_envelope(&rows, "dbm_server", "on", 50);
+        assert_eq!(env["hits"][0]["exec_time_kind"], json!("wait"));
+    }
+
+    /// An absent exec-time column stays ABSENT: no total, and therefore no
+    /// mean. A zero would claim the database measured no time at all.
+    #[test]
+    fn test_server_queries_envelope_absent_exec_time_is_null_not_zero() {
+        let rows = vec![json!({
+            "fingerprint": "f1",
+            "db_system": "postgresql",
+            "calls": 10i64,
+            "exec_time_s": Value::Null,
+        })];
+        let env = server_queries_envelope(&rows, "dbm_server", "on", 50);
+        assert_eq!(env["hits"][0]["exec_time_s"], Value::Null);
+        assert_eq!(
+            env["hits"][0]["mean_exec_time_s"],
+            Value::Null,
+            "no total means no mean — 0 would be a measurement nobody made"
+        );
     }
 
     /// No per-execution duration column has ever landed → no SQL, an empty
