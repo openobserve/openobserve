@@ -30,8 +30,7 @@ const DATE_BIN_ORIGIN_MS = Date.UTC(2001, 0, 1);
 const expectedIndex = (key: string, startUs: number, intervalSecs: number) => {
   const bucketMs = intervalSecs * 1000;
   const gridStart =
-    DATE_BIN_ORIGIN_MS +
-    Math.floor((startUs / 1000 - DATE_BIN_ORIGIN_MS) / bucketMs) * bucketMs;
+    DATE_BIN_ORIGIN_MS + Math.floor((startUs / 1000 - DATE_BIN_ORIGIN_MS) / bucketMs) * bucketMs;
   return Math.floor((Date.parse(`${key}Z`) - gridStart) / bucketMs);
 };
 
@@ -40,18 +39,12 @@ describe("parseBucketKey", () => {
     // The backend emits `2026-07-20T20:48:00` meaning UTC. `new Date()` would
     // treat a zone-less date-time as LOCAL, shifting the bucket by the
     // viewer's offset — which slid whole sparklines off their window.
-    expect(parseBucketKey("2026-07-20T20:48:00")).toBe(
-      Date.parse("2026-07-20T20:48:00Z"),
-    );
+    expect(parseBucketKey("2026-07-20T20:48:00")).toBe(Date.parse("2026-07-20T20:48:00Z"));
   });
 
   it("respects an explicit zone when the key carries one", () => {
-    expect(parseBucketKey("2026-07-20T20:48:00Z")).toBe(
-      Date.parse("2026-07-20T20:48:00Z"),
-    );
-    expect(parseBucketKey("2026-07-20T20:48:00+02:00")).toBe(
-      Date.parse("2026-07-20T18:48:00Z"),
-    );
+    expect(parseBucketKey("2026-07-20T20:48:00Z")).toBe(Date.parse("2026-07-20T20:48:00Z"));
+    expect(parseBucketKey("2026-07-20T20:48:00+02:00")).toBe(Date.parse("2026-07-20T18:48:00Z"));
   });
 
   it("passes numeric keys through and rejects junk", () => {
@@ -68,12 +61,7 @@ describe("bucketizeHistogram", () => {
 
   it("places a naive-UTC key in the correct bucket", () => {
     const key = "2026-07-20T20:48:00";
-    const out = bucketizeHistogram(
-      [{ zo_key: key, zo_cnt: 14557 }],
-      start,
-      end,
-      interval,
-    );
+    const out = bucketizeHistogram([{ zo_key: key, zo_cnt: 14557 }], start, end, interval);
     // Lands on the backend's own bucket index, and nothing is lost.
     expect(out[expectedIndex(key, start, interval)]).toBe(14557);
     expect(out.reduce((a, b) => a + b, 0)).toBe(14557);
@@ -172,9 +160,9 @@ describe("resolveBaseFilter", () => {
   });
 
   it("reuses a plain top-level WHERE", async () => {
-    expect(
-      await resolveBaseFilter("SELECT * FROM \"logs\" WHERE level = 'error'"),
-    ).toBe("level = 'error'");
+    expect(await resolveBaseFilter("SELECT * FROM \"logs\" WHERE level = 'error'")).toBe(
+      "level = 'error'",
+    );
   });
 
   // The volume query is a fresh `SELECT ... FROM "<stream>"`, so a condition
@@ -184,21 +172,13 @@ describe("resolveBaseFilter", () => {
     expect(
       await resolveBaseFilter("SELECT * FROM \"logs\" AS l WHERE l.level = 'error'"),
     ).toBeNull();
-    expect(
-      await resolveBaseFilter("SELECT * FROM logs l WHERE l.level = 'error'"),
-    ).toBeNull();
+    expect(await resolveBaseFilter("SELECT * FROM logs l WHERE l.level = 'error'")).toBeNull();
   });
 
   it("refuses CTEs, joins and subqueries whose filters aren't top-level", async () => {
-    expect(
-      await resolveBaseFilter('WITH x AS (SELECT * FROM "logs") SELECT * FROM x'),
-    ).toBeNull();
-    expect(
-      await resolveBaseFilter('SELECT * FROM "a" JOIN "b" ON a.id = b.id'),
-    ).toBeNull();
-    expect(
-      await resolveBaseFilter('SELECT * FROM (SELECT * FROM "logs") WHERE x = 1'),
-    ).toBeNull();
+    expect(await resolveBaseFilter('WITH x AS (SELECT * FROM "logs") SELECT * FROM x')).toBeNull();
+    expect(await resolveBaseFilter('SELECT * FROM "a" JOIN "b" ON a.id = b.id')).toBeNull();
+    expect(await resolveBaseFilter('SELECT * FROM (SELECT * FROM "logs") WHERE x = 1')).toBeNull();
   });
 
   // A clause-keyword right after the table name must not be mistaken for an alias.
@@ -213,9 +193,7 @@ describe("buildPatternVolumeContext", () => {
 
   it("returns null without a stream or window", () => {
     expect(buildPatternVolumeContext({ orgId: "o", window })).toBeNull();
-    expect(
-      buildPatternVolumeContext({ orgId: "o", streamName: "s", window: null }),
-    ).toBeNull();
+    expect(buildPatternVolumeContext({ orgId: "o", streamName: "s", window: null })).toBeNull();
   });
 
   // Re-running with a relative range must re-query the NEW window. The caller's

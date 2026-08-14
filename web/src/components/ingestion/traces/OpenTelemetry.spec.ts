@@ -68,9 +68,7 @@ const SUBS = {
 };
 
 const buildCard = async () =>
-  (await import("@/components/ingestion/setupCard/content/otlpTraces")).default(
-    SUBS,
-  );
+  (await import("@/components/ingestion/setupCard/content/otlpTraces")).default(SUBS);
 
 describe("otlpTracesCard builder", () => {
   beforeEach(() => {
@@ -98,10 +96,7 @@ describe("otlpTracesCard builder", () => {
   it("drops gRPC on cloud, which terminates HTTP only", async () => {
     mockConfig.isCloud = "true";
     vi.resetModules();
-    expect((await buildCard()).steps[0].variants?.map((v) => v.id)).toEqual([
-      "http",
-      "sdk",
-    ]);
+    expect((await buildCard()).steps[0].variants?.map((v) => v.id)).toEqual(["http", "sdk"]);
   });
 
   it("substitutes endpoint, org and token into every transport", async () => {
@@ -123,9 +118,7 @@ describe("otlpTracesCard builder", () => {
   });
 
   it("derives the gRPC tls.insecure flag from the endpoint scheme", async () => {
-    const grpc = (await buildCard()).steps[0].variants!.find(
-      (v) => v.id === "grpc",
-    )!;
+    const grpc = (await buildCard()).steps[0].variants!.find((v) => v.id === "grpc")!;
     // HTTPS endpoint → insecure must be false, else the handshake fails.
     expect(grpc.code.raw).toContain("insecure: false");
     expect(grpc.code.raw).toContain("test.openobserve.ai:5081");
@@ -140,14 +133,10 @@ describe("OpenTelemetry.vue", () => {
   });
 
   it("renders the shared setup card for the otlpTraces slug", () => {
-    expect(getDataSourceCard("otlpTraces", SUBS)?.provider.name).toContain(
-      "Traces",
-    );
+    expect(getDataSourceCard("otlpTraces", SUBS)?.provider.name).toContain("Traces");
     wrapper = mount(OpenTelemetry, {
       global: { plugins: [mockStore, mockI18n] },
     });
-    expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(
-      true,
-    );
+    expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });
 });

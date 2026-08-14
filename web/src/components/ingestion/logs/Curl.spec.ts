@@ -18,14 +18,13 @@ import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import Curl from "@/components/ingestion/logs/Curl.vue";
 
-
 // Mock CopyContent component
 vi.mock("@/components/CopyContent.vue", () => ({
   default: {
     name: "CopyContent",
     props: ["content"],
-    template: "<div class='copy-content-mock'>{{ content }}</div>"
-  }
+    template: "<div class='copy-content-mock'>{{ content }}</div>",
+  },
 }));
 
 // Mock the utility functions
@@ -50,16 +49,16 @@ vi.mock("../../../aws-exports", () => ({
 }));
 
 const mockStore = createStore({
-  state: {  
+  state: {
     organizationPasscode: 11,
     API_ENDPOINT: "http://localhost:5080",
     selectedOrganization: {
       identifier: "test_org_123",
-      name: "Test Organization"
+      name: "Test Organization",
     },
     zoConfig: {
-      ingestion_url: ""
-    }
+      ingestion_url: "",
+    },
   },
 });
 
@@ -76,8 +75,8 @@ describe("Curl", () => {
       global: {
         plugins: [customStore],
         mocks: {
-          $store: customStore
-        }
+          $store: customStore,
+        },
       },
     });
   };
@@ -99,13 +98,13 @@ describe("Curl", () => {
 
     it("should render CopyContent component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.find('.copy-content-mock');
+      const copyContent = wrapper.find(".copy-content-mock");
       expect(copyContent.exists()).toBe(true);
     });
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.p-3').exists()).toBe(true);
+      expect(wrapper.find(".p-3").exists()).toBe(true);
     });
   });
 
@@ -133,9 +132,9 @@ describe("Curl", () => {
     });
 
     it("should handle empty string props", () => {
-      wrapper = createWrapper({ 
+      wrapper = createWrapper({
         currOrgIdentifier: "",
-        currUserEmail: ""
+        currUserEmail: "",
       });
       expect(wrapper.props().currOrgIdentifier).toBe("");
       expect(wrapper.props().currUserEmail).toBe("");
@@ -167,7 +166,7 @@ describe("Curl", () => {
           selectedOrganization: { identifier: "fallback_org" },
         },
       });
-      
+
       wrapper = createWrapper({}, storeWithoutOrg);
       expect(wrapper.exists()).toBe(true);
     });
@@ -186,11 +185,11 @@ describe("Curl", () => {
     it("should have correct endpoint structure", () => {
       wrapper = createWrapper();
       const endpoint = wrapper.vm.endpoint;
-      expect(endpoint).toHaveProperty('url');
-      expect(endpoint).toHaveProperty('host');
-      expect(endpoint).toHaveProperty('port');
-      expect(endpoint).toHaveProperty('protocol');
-      expect(endpoint).toHaveProperty('tls');
+      expect(endpoint).toHaveProperty("url");
+      expect(endpoint).toHaveProperty("host");
+      expect(endpoint).toHaveProperty("port");
+      expect(endpoint).toHaveProperty("protocol");
+      expect(endpoint).toHaveProperty("tls");
     });
 
     it("should handle different endpoint configurations", () => {
@@ -220,16 +219,16 @@ describe("Curl", () => {
 
     it("should include JSON data structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.content).toContain('_json');
+      expect(wrapper.vm.content).toContain("_json");
       expect(wrapper.vm.content).toContain('\\"level\\":\\"info\\"');
       expect(wrapper.vm.content).toContain('\\"job\\":\\"test\\"');
     });
 
     it("should include proper curl flags", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.content).toContain('-u');
-      expect(wrapper.vm.content).toContain('-k');
-      expect(wrapper.vm.content).toContain('-d');
+      expect(wrapper.vm.content).toContain("-u");
+      expect(wrapper.vm.content).toContain("-k");
+      expect(wrapper.vm.content).toContain("-d");
     });
 
     it("should generate valid JSON payload", () => {
@@ -248,13 +247,13 @@ describe("Curl", () => {
     it("should expose getImageURL function", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.getImageURL).toBeDefined();
-      expect(typeof wrapper.vm.getImageURL).toBe('function');
+      expect(typeof wrapper.vm.getImageURL).toBe("function");
     });
 
     it("should expose maskText function", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.maskText).toBeDefined();
-      expect(typeof wrapper.vm.maskText).toBe('function');
+      expect(typeof wrapper.vm.maskText).toBe("function");
     });
 
     it("should call maskText function correctly", () => {
@@ -285,13 +284,13 @@ describe("Curl", () => {
   describe("CopyContent Component Integration", () => {
     it("should pass content to CopyContent component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.find('.copy-content-mock');
+      const copyContent = wrapper.find(".copy-content-mock");
       expect(copyContent.text()).toContain("curl");
     });
 
     it("should render CopyContent with correct classes", () => {
       wrapper = createWrapper();
-      const copyContentContainer = wrapper.find('.copy-content-container-cls');
+      const copyContentContainer = wrapper.find(".copy-content-container-cls");
       expect(copyContentContainer.exists()).toBe(true);
     });
   });
@@ -342,13 +341,13 @@ describe("Curl", () => {
   describe("Template Rendering", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.p-3');
+      const container = wrapper.find(".p-3");
       expect(container.exists()).toBe(true);
     });
 
     it("should render only one CopyContent component", () => {
       wrapper = createWrapper();
-      const copyComponents = wrapper.findAll('.copy-content-mock');
+      const copyComponents = wrapper.findAll(".copy-content-mock");
       expect(copyComponents).toHaveLength(1);
     });
   });
@@ -378,9 +377,9 @@ describe("Curl", () => {
         const unescapedJson = jsonMatch[1].replace(/\\"/g, '"');
         const jsonData = JSON.parse(unescapedJson);
         expect(Array.isArray(jsonData)).toBe(true);
-        expect(jsonData[0]).toHaveProperty('level');
-        expect(jsonData[0]).toHaveProperty('job');
-        expect(jsonData[0]).toHaveProperty('log');
+        expect(jsonData[0]).toHaveProperty("level");
+        expect(jsonData[0]).toHaveProperty("job");
+        expect(jsonData[0]).toHaveProperty("log");
       }
     });
   });
@@ -395,7 +394,7 @@ describe("Curl", () => {
     it("should handle special characters in props", () => {
       wrapper = createWrapper({
         currOrgIdentifier: "org-with-special_chars@123",
-        currUserEmail: "user+test@example-domain.co.uk"
+        currUserEmail: "user+test@example-domain.co.uk",
       });
       expect(wrapper.exists()).toBe(true);
     });
@@ -404,10 +403,10 @@ describe("Curl", () => {
       const storeWithEmptyOrg = createStore({
         state: {
           selectedOrganization: { identifier: "" },
-          API_ENDPOINT: "http://localhost:5080"
+          API_ENDPOINT: "http://localhost:5080",
         },
       });
-      
+
       wrapper = createWrapper({}, storeWithEmptyOrg);
       expect(wrapper.exists()).toBe(true);
     });

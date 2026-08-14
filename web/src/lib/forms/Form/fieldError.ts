@@ -7,9 +7,7 @@
 // (`{ message, path, ... }`). `String(issue)` would render "[object Object]",
 // so normalize: strings pass through, issue objects yield their `.message`.
 
-export function firstFieldError(
-  errors: readonly unknown[] | undefined,
-): string | undefined {
+export function firstFieldError(errors: readonly unknown[] | undefined): string | undefined {
   const e = errors?.[0];
   if (e == null) return undefined;
   if (typeof e === "string") return e;

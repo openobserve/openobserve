@@ -18,6 +18,8 @@
 // the UI which tab (category) each rich card belongs to and in what order — so
 // adding/moving a card is a content-repo-only change, no web edit required.
 
+import type { I18nText } from "@/types/i18n";
+
 export interface ManifestEntry {
   /** Folder slug under datasource-ui-content/ — matches the markdown content. */
   slug: string;
@@ -43,7 +45,7 @@ export interface ManifestCategory {
   /** Tab slug. Matches an existing tab to merge into it, or a new one to create it. */
   slug: string;
   /** Tab display name (used when creating a new tab). */
-  label?: string;
+  label?: I18nText;
   /** Tab position in the sidebar (ascending). */
   order?: number;
 }
@@ -60,10 +62,10 @@ interface Manifest {
 // `manifest.json` — excluding `.fetch.json` — using endsWith WITHOUT a leading
 // slash (Vite's glob keys differ between dev and build), and (2) still require
 // an `integrations` array as a content guard.
-const files = import.meta.glob(
-  "@/assets/ai-datasource-content/generated/*.json",
-  { import: "default", eager: true },
-) as Record<string, Manifest>;
+const files = import.meta.glob("@/assets/ai-datasource-content/generated/*.json", {
+  import: "default",
+  eager: true,
+}) as Record<string, Manifest>;
 
 const manifest = Object.entries(files)
   .filter(([path]) => path.endsWith("manifest.json"))

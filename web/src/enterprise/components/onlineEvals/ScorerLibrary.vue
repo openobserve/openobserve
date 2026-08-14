@@ -6,10 +6,10 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <div class="flex flex-col h-full p-4 min-h-0" data-test="scorer-library">
+  <div class="flex h-full min-h-0 flex-col p-4" data-test="scorer-library">
     <div
       v-if="isLoadingCatalog"
-      class="flex flex-col items-center justify-center flex-1 p-8"
+      class="flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-loading"
     >
       <OSpinner size="lg" />
@@ -17,32 +17,34 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="loadError"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-text-secondary"
+      class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-error"
     >
-      <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
+      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
       <div class="text-status-error-text">{{ loadError }}</div>
       <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
-        Retry
+        {{ t("common.retry") }}
       </OButton>
     </div>
 
     <div
       v-else-if="providers.length === 0"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-text-secondary"
+      class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-no-providers"
     >
-      Create a Provider first before importing LLM Judge scorers.
+      {{ t("onlineEvals.scorerLibrary.noProvidersMessage") }}
     </div>
 
-    <div v-else class="flex flex-col min-h-0 flex-1">
-      <div class="flex items-end gap-3 mb-4">
-        <div class="flex items-center gap-2 shrink-0 w-60">
-          <label class="text-xs font-semibold text-text-secondary whitespace-nowrap">Provider</label>
+    <div v-else class="flex min-h-0 flex-1 flex-col">
+      <div class="mb-4 flex items-end gap-3">
+        <div class="flex w-60 shrink-0 items-center gap-2">
+          <label class="text-text-secondary text-xs font-semibold whitespace-nowrap">{{
+            t("onlineEvals.scorer.providerLabel")
+          }}</label>
           <OSelect
             v-model="selectedProviderId"
             :options="providerOptions"
-            placeholder="Select provider"
+            :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
             size="md"
             class="w-full"
             data-test="scorer-library-provider-select"
@@ -50,52 +52,49 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
         <OSearchInput
           v-model="searchQuery"
-          placeholder="Search Scorers..."
+          :placeholder="t('onlineEvals.scorerLibrary.searchPlaceholder')"
           clearable
-          class="flex-1 min-w-0"
+          class="min-w-0 flex-1"
           data-test="scorer-library-search"
         />
       </div>
 
-      <div class="flex items-center justify-between gap-3 mb-2 pl-4.25 pr-3">
+      <div class="mb-2 flex items-center justify-between gap-3 pr-3 pl-4.25">
         <label
           v-if="filteredEntries.length > 0"
-          class="inline-flex items-center gap-2 py-0.5 px-1 text-xs font-medium text-text-secondary select-none"
+          class="text-text-secondary inline-flex items-center gap-2 px-1 py-0.5 text-xs font-medium select-none"
           data-test="scorer-library-select-all"
         >
-          <OCheckbox
-            :model-value="allVisibleSelected"
-            @update:model-value="toggleSelectAll"
-          />
-          <span>{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
+          <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
+          <span>{{ allVisibleSelected ? t("common.clearAll") : t("common.selectAll") }}</span>
         </label>
-        <span class="text-xs text-text-secondary">
-          {{ filteredEntries.length }} scorer(s)
+        <span class="text-text-secondary text-xs">
+          {{ t("onlineEvals.scorerLibrary.scorerCountSuffix", { count: filteredEntries.length }) }}
         </span>
       </div>
 
-      <div class="overflow-y-auto flex-1 min-h-0">
+      <div class="min-h-0 flex-1 overflow-y-auto">
         <section
           v-for="group in groupedEntries"
           :key="group.category"
           class="mt-4 first:mt-0"
           :data-test="`scorer-library-section-${group.category}`"
         >
-          <h4 class="flex items-baseline gap-1.5 m-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-text-heading">
-            <span>{{ group.category }}</span>
-            <span class="font-medium text-text-secondary">({{ group.entries.length }})</span>
-          </h4>
-          <ul
-            class="flex flex-col rounded-default border border-border-default"
+          <h4
+            class="text-text-heading m-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-bold tracking-[0.04em] uppercase"
           >
+            <span>{{ group.category }}</span>
+            <span class="text-text-secondary font-medium">({{ group.entries.length }})</span>
+          </h4>
+          <ul class="rounded-default border-border-default flex flex-col border">
             <li
               v-for="entry in group.entries"
               :key="entry.name"
-              class="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors duration-200 border-l-4"
+              class="flex cursor-pointer items-center gap-2 border-l-4 px-3 py-2 transition-colors duration-200"
               :class="[
                 isSelected(entry.name)
-                  ? 'selected-item bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)] border-primary'
-                  : 'border-transparent hover:bg-table-row-hover-bg',
+                  ? 'selected-item border-primary bg-[color-mix(in_srgb,var(--color-accent)_6%,transparent)]'
+                  : 'hover:bg-table-row-hover-bg border-transparent',
               ]"
               :data-test="`scorer-library-item-${entry.name}`"
               @click="toggle(entry)"
@@ -107,12 +106,9 @@ the Free Software Foundation, either version 3 of the License, or
                   @click.stop
                 />
               </div>
-              <div class="flex flex-col flex-1 min-w-0">
+              <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-sm font-medium">{{ entry.displayName }}</span>
-                <span
-                  v-if="entry.description"
-                  class="block text-xs text-text-secondary"
-                >
+                <span v-if="entry.description" class="text-text-secondary block text-xs">
                   {{ entry.description }}
                 </span>
               </div>
@@ -126,6 +122,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -144,6 +141,8 @@ import {
 } from "@/services/online-evals-catalog.service";
 import { entityId } from "./utils/evalEntity";
 import { showError } from "./utils/evalFormat";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   orgId: string;
@@ -167,7 +166,7 @@ const isImporting = ref(false);
 const selectedProviderId = ref("");
 
 const providerOptions = computed(() =>
-  props.providers.map((p) => ({ label: p.name, value: p.id })),
+  props.providers.map((p) => ({ label: raw(p.name), value: p.id })),
 );
 
 onMounted(loadCatalog);
@@ -245,16 +244,18 @@ function toggleSelectAll() {
   selectedNames.value = next;
 }
 
-watch(
-  selectedNames,
-  (val) => emit("update:selected-count", val.size),
-  { deep: true, immediate: true },
-);
+watch(selectedNames, (val) => emit("update:selected-count", val.size), {
+  deep: true,
+  immediate: true,
+});
 
 async function importSelected() {
   if (isImporting.value || selectedNames.value.size === 0) return;
   if (!selectedProviderId.value) {
-    toast({ variant: "warning", message: "Select a provider before importing scorers." });
+    toast({
+      variant: "warning",
+      message: t("toastMessages.onlineEvals.selectAProviderBeforeImportingScorers"),
+    });
     return;
   }
   isImporting.value = true;
@@ -293,7 +294,7 @@ async function importSelected() {
     if (failCount) parts.push(`${failCount} failed`);
     toast({
       variant: failCount > 0 && successCount === 0 ? "error" : "success",
-      message: parts.join(" · "),
+      message: raw(parts.join(" · ")),
     });
   }
 }
@@ -352,4 +353,3 @@ function scorerPayload(entry: CatalogScorer, scoreConfigId: string) {
 
 defineExpose({ importSelected });
 </script>
-

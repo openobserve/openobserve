@@ -6,9 +6,12 @@ license.workspace = true
 
 [features]
 default = []
+enterprise = []
 
 [dependencies]
 anyhow.workspace = true
+arrow.workspace = true
+arrow-schema.workspace = true
 async-trait.workspace = true
 bitflags.workspace = true
 byteorder.workspace = true
@@ -20,10 +23,12 @@ infra.workspace = true
 log.workspace = true
 object_store.workspace = true
 parking_lot.workspace = true
+parquet.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tantivy.workspace = true
 tokio.workspace = true
+vortex = { workspace = true }
 zstd.workspace = true
 
 [dev-dependencies]

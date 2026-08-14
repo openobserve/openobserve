@@ -255,7 +255,6 @@ describe("preview queue", () => {
   });
 });
 
-
 describe("all-NaN detection", () => {
   const matrix = (values: any[][]) => ({
     resultType: "matrix",
@@ -263,7 +262,14 @@ describe("all-NaN detection", () => {
   });
 
   it("flags a populated series whose samples are all NaN", () => {
-    expect(isAllNaN(matrix([[1, "NaN"], [2, "NaN"]]))).toBe(true);
+    expect(
+      isAllNaN(
+        matrix([
+          [1, "NaN"],
+          [2, "NaN"],
+        ]),
+      ),
+    ).toBe(true);
   });
 
   it("does not flag a genuinely empty result", () => {
@@ -274,7 +280,14 @@ describe("all-NaN detection", () => {
   });
 
   it("does not flag a series with even one real sample", () => {
-    expect(isAllNaN(matrix([[1, "NaN"], [2, "0.5"]]))).toBe(false);
+    expect(
+      isAllNaN(
+        matrix([
+          [1, "NaN"],
+          [2, "0.5"],
+        ]),
+      ),
+    ).toBe(false);
     expect(isAllNaN(matrix([[1, "0"]]))).toBe(false);
   });
 });
@@ -315,12 +328,7 @@ describe("owner-scoped cancellation", () => {
       },
       "cardA",
     );
-    const b = queue.run(
-      "shared",
-      PRIORITY.VISIBLE,
-      () => new Promise<string>(() => {}),
-      "cardB",
-    );
+    const b = queue.run("shared", PRIORITY.VISIBLE, () => new Promise<string>(() => {}), "cardB");
     await Promise.resolve();
 
     queue.cancel("shared", "cardA");
@@ -338,12 +346,7 @@ describe("owner-scoped cancellation", () => {
     const queue = createPreviewQueue();
     const gate = deferred<string>();
 
-    const cardPreview = queue.run(
-      "q",
-      PRIORITY.VISIBLE,
-      () => gate.promise,
-      "node_cpu",
-    );
+    const cardPreview = queue.run("q", PRIORITY.VISIBLE, () => gate.promise, "node_cpu");
     const dialogTile = queue.run("q", PRIORITY.DIALOG, () => gate.promise, DIALOG);
     await Promise.resolve();
 
@@ -356,18 +359,8 @@ describe("owner-scoped cancellation", () => {
 
   it("an ownerless cancel still aborts outright (time / filter change)", async () => {
     const queue = createPreviewQueue();
-    const a = queue.run(
-      "k",
-      PRIORITY.VISIBLE,
-      () => new Promise<string>(() => {}),
-      "cardA",
-    );
-    const b = queue.run(
-      "k",
-      PRIORITY.VISIBLE,
-      () => new Promise<string>(() => {}),
-      "cardB",
-    );
+    const a = queue.run("k", PRIORITY.VISIBLE, () => new Promise<string>(() => {}), "cardA");
+    const b = queue.run("k", PRIORITY.VISIBLE, () => new Promise<string>(() => {}), "cardB");
     await Promise.resolve();
 
     queue.cancel("k");

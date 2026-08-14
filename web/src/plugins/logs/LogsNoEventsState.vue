@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="jumpTarget"
         icon="schedule"
         :label="t('logs.noEvents.jumpToData')"
-        :sublabel="jumpTargetSublabel"
+        :sublabel="raw(jumpTargetSublabel)"
         data-test="logs-no-events-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget!.from, jumpTarget!.to)"
       />
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #extra>
-      <div class="flex items-center justify-center gap-2 flex-wrap">
+      <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
           variant="ghost"
           size="sm"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <img :src="aiIconSrc" class="w-4 h-4 shrink-0" alt="" />
+            <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
           </template>
           {{ t("logs.noEvents.askAi") }}
         </OButton>
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -125,7 +125,7 @@ const emit = defineEmits<{
   "ask-ai": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { aiIconSrc } = useAiIcon();
 
 // --- filter detection -------------------------------------------------------
@@ -173,13 +173,13 @@ const jumpTarget = computed<{ from: number; to: number } | null>(() => {
 const jumpTargetSublabel = computed(() => {
   if (!jumpTarget.value) return "";
   const tz = props.timezone || "UTC";
-  const zone = tz.toLowerCase() === "local" || tz.toLowerCase() === "browser"
-    ? Intl.DateTimeFormat().resolvedOptions().timeZone
-    : tz;
+  const zone =
+    tz.toLowerCase() === "local" || tz.toLowerCase() === "browser"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : tz;
   // Show doc_time_max (before nudge) as the "last data" label
   const lastDataUs = props.streamDocTimeRange!.max;
-  const formatted = DateTime
-    .fromMillis(lastDataUs / 1000)
+  const formatted = DateTime.fromMillis(lastDataUs / 1000)
     .setZone(zone)
     .toFormat("MMM d, yyyy HH:mm:ss");
   return t("logs.logsNoEventsState.lastData", { formatted, zone });
@@ -193,5 +193,4 @@ const isRelative = computed(() => props.dateType === "relative" && !!props.relat
 const currentPeriodLabel = computed(() =>
   isRelative.value ? periodToLabel(props.relativeTimePeriod) : t("logs.noEvents.selectedRange"),
 );
-
 </script>

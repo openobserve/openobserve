@@ -69,14 +69,7 @@ describe("useFunctions", () => {
       await getAllFunctions();
 
       expect(TransformService.list).toHaveBeenCalledOnce();
-      expect(TransformService.list).toHaveBeenCalledWith(
-        1,
-        100000,
-        "name",
-        false,
-        "",
-        "test-org"
-      );
+      expect(TransformService.list).toHaveBeenCalledWith(1, 100000, "name", false, "", "test-org");
     });
 
     it("dispatches setFunctions with the list from the response", async () => {
@@ -115,9 +108,7 @@ describe("useFunctions", () => {
     });
 
     it("throws an Error when TransformService.list rejects", async () => {
-      vi.mocked(TransformService.list).mockRejectedValueOnce(
-        new Error("Service unavailable")
-      );
+      vi.mocked(TransformService.list).mockRejectedValueOnce(new Error("Service unavailable"));
 
       const { getAllFunctions } = useFunctions();
       await expect(getAllFunctions()).rejects.toThrow("Service unavailable");
@@ -125,18 +116,14 @@ describe("useFunctions", () => {
 
     it("propagates the error message correctly on rejection", async () => {
       const errorMessage = "Network timeout";
-      vi.mocked(TransformService.list).mockRejectedValueOnce(
-        new Error(errorMessage)
-      );
+      vi.mocked(TransformService.list).mockRejectedValueOnce(new Error(errorMessage));
 
       const { getAllFunctions } = useFunctions();
       await expect(getAllFunctions()).rejects.toThrow(errorMessage);
     });
 
     it("does not dispatch setFunctions when the service call fails", async () => {
-      vi.mocked(TransformService.list).mockRejectedValueOnce(
-        new Error("fail")
-      );
+      vi.mocked(TransformService.list).mockRejectedValueOnce(new Error("fail"));
 
       const { getAllFunctions } = useFunctions();
       try {
@@ -166,7 +153,7 @@ describe("useFunctions", () => {
         "name",
         false,
         "",
-        "another-org"
+        "another-org",
       );
 
       // Restore

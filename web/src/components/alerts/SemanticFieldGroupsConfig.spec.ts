@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 
 // Minimal stub for the in-house ODrawer. Mirrors the public surface
@@ -87,22 +86,40 @@ describe("SemanticFieldGroupsConfig - rendering", () => {
 
   it("renders the export button", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test="correlation-semanticfieldgroup-export-json-btn"]').exists()).toBe(true);
+    expect(w.find('[data-test="correlation-semanticfieldgroup-export-json-btn"]').exists()).toBe(
+      true,
+    );
   });
 
   it("renders the import button", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test="correlation-semanticfieldgroup-import-json-btn"]').exists()).toBe(true);
+    expect(w.find('[data-test="correlation-semanticfieldgroup-import-json-btn"]').exists()).toBe(
+      true,
+    );
   });
 
   it("renders the add custom group button", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test="correlation-semanticfieldgroup-add-custom-group-btn"]').exists()).toBe(true);
+    expect(
+      w.find('[data-test="correlation-semanticfieldgroup-add-custom-group-btn"]').exists(),
+    ).toBe(true);
   });
 
-  it("renders the category select", async () => {
+  it("renders a category tab per category with counts", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test="semantic-group-category-select"]').exists()).toBe(true);
+    await flushPromises();
+    expect(w.find('[data-test="semantic-group-category-tab-Infrastructure"]').exists()).toBe(true);
+    expect(w.find('[data-test="semantic-group-category-tab-Cloud"]').exists()).toBe(true);
+  });
+
+  it("renders the search input", async () => {
+    const w = await mountComp();
+    expect(w.find('[data-test="semantic-group-search-input"]').exists()).toBe(true);
+  });
+
+  it("hides the category strip when there are no groups", async () => {
+    const w = await mountComp({ semanticFieldGroups: [] });
+    expect(w.find('[data-test="semantic-group-search-input"]').exists()).toBe(false);
   });
 
   it("renders the ImportSemanticGroupsDrawer for import flow", async () => {
@@ -165,6 +182,84 @@ describe("SemanticFieldGroupsConfig - filteredGroups computed", () => {
     const w = await mountComp();
     (w.vm as any).selectedCategory = "NonExistent";
     expect((w.vm as any).filteredGroups).toHaveLength(0);
+  });
+});
+
+describe("SemanticFieldGroupsConfig - search", () => {
+  it("matches groups by display name across categories", async () => {
+    const w = await mountComp();
+    (w.vm as any).selectedCategory = "Infrastructure";
+    (w.vm as any).searchQuery = "region";
+    const visible = (w.vm as any).visibleGroups;
+    expect(visible.map((g: any) => g.id)).toEqual(["g3"]);
+  });
+
+  it("matches groups by field name", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "service";
+    const ids = (w.vm as any).visibleGroups.map((g: any) => g.id);
+    expect(ids).toContain("g2");
+  });
+
+  it("matches groups by id", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "g1";
+    const ids = (w.vm as any).visibleGroups.map((g: any) => g.id);
+    expect(ids).toContain("g1");
+  });
+
+  it("is case-insensitive", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "REGION";
+    expect((w.vm as any).visibleGroups.map((g: any) => g.id)).toEqual(["g3"]);
+  });
+
+  it("orders results by category name", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "group";
+    const cats = (w.vm as any).visibleGroups.map((g: any) => g.group);
+    expect(cats).toEqual([...cats].sort());
+  });
+
+  it("tab counts flip to match counts while searching", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "region";
+    const infra = (w.vm as any).categoryTabs.find((o: any) => o.value === "Infrastructure");
+    const cloud = (w.vm as any).categoryTabs.find((o: any) => o.value === "Cloud");
+    expect(infra.count).toBe(0);
+    expect(cloud.count).toBe(1);
+  });
+
+  it("clicking a category tab clears the search", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "region";
+    (w.vm as any).onCategoryTabChange("Infrastructure");
+    expect((w.vm as any).searchQuery).toBe("");
+    expect((w.vm as any).selectedCategory).toBe("Infrastructure");
+  });
+
+  it("addGroup clears the search so the new group stays visible", async () => {
+    const w = await mountComp();
+    (w.vm as any).selectedCategory = "Infrastructure";
+    (w.vm as any).searchQuery = "region";
+    (w.vm as any).addGroup();
+    expect((w.vm as any).searchQuery).toBe("");
+    expect((w.vm as any).visibleGroups[0].display).toBe("");
+  });
+
+  it("shows the no-results message for a non-matching query", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "zzz-no-such-thing";
+    await flushPromises();
+    expect(w.find('[data-test="semantic-group-search-no-results"]').exists()).toBe(true);
+  });
+
+  it("removeGroupByFilter removes the right group from search results", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "region";
+    (w.vm as any).removeGroupByFilter(0);
+    expect((w.vm as any).localGroups.some((g: any) => g.id === "g3")).toBe(false);
+    expect((w.vm as any).localGroups.some((g: any) => g.id === "g1")).toBe(true);
   });
 });
 

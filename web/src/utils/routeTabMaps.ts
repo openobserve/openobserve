@@ -106,6 +106,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     prometheus: "prometheus",
     vmagent: "vmagent",
     nightingale: "nightingale",
+    categraf: "categraf",
     otelCollector: "otelCollector",
     telegraf: "telegraf",
     cloudwatchMetrics: "cloudwatchMetrics",
@@ -159,7 +160,7 @@ export function resolveTab(
   fallback: string,
 ): string {
   const map = ROUTE_TAB_MAPS[section];
-  return (map && routeName && map[routeName]) ? map[routeName] : fallback;
+  return map && routeName && map[routeName] ? map[routeName] : fallback;
 }
 
 /** Expose the raw maps for consumers that need to iterate over valid tab names. */

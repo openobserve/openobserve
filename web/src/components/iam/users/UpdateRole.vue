@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="update-role-dialog"
+  <ODialog
+    data-test="update-role-dialog"
     :open="open"
     size="sm"
     :title="t('user.editUser')"
@@ -33,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFormInput
           name="first_name"
           :label="t('user.name')"
-          class="py-3 showLabelOnTop"
+          class="showLabelOnTop py-3"
           readonly
         />
 
@@ -42,11 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('user.role')"
           :options="roleOptions"
           required
-          class="pt-3 pb-2 showLabelOnTop"
+          class="showLabelOnTop pt-3 pb-2"
           data-test="iam-update-role-select"
         />
 
-        <div class="flex justify-center mt-4 gap-2">
+        <div class="mt-4 flex justify-center gap-2">
           <OButton
             @click="$emit('update:open', false)"
             variant="outline"
@@ -54,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isSubmitting"
             data-test="iam-update-role-cancel-btn"
           >
-            {{ t('user.cancel') }}
+            {{ t("user.cancel") }}
           </OButton>
           <OButton
             variant="primary"
@@ -63,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="isSubmitting"
             data-test="iam-update-role-save-btn"
           >
-            {{ t('user.save') }}
+            {{ t("user.save") }}
           </OButton>
         </div>
       </OForm>
@@ -78,7 +79,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import organizationsService from "@/services/organizations";
@@ -110,7 +111,7 @@ export default defineComponent({
   emits: ["update:modelValue", "updated", "finish", "update:open"],
   setup(props) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const roleOptions = ["admin"];
 
     const updateRoleSchema = makeUpdateRoleSchema(t);
@@ -167,9 +168,7 @@ export default defineComponent({
       } catch (err: any) {
         toast({
           variant: "error",
-          message:
-            err?.response?.data?.message ||
-            this.t("iam.updateRole.errorUpdatingMember"),
+          message: err?.response?.data?.message || this.t("iam.updateRole.errorUpdatingMember"),
         });
       }
     },

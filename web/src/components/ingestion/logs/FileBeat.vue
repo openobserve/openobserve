@@ -16,11 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
   </IngestionContent>
 </template>
 
 <script lang="ts">
+import { raw } from "@/types/i18n";
 import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
@@ -47,7 +48,7 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
-    
+
     const ingestionURL = getIngestionURL();
     endpoint.value = getEndPoint(ingestionURL);
     const content = `setup.ilm.enabled: false
@@ -67,6 +68,7 @@ output.elasticsearch:
   username: "[EMAIL]"
   password: "[PASSCODE]"`;
     return {
+      raw,
       store,
       config,
       endpoint,

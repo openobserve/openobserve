@@ -5,16 +5,22 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-use std::sync::{Arc, LazyLock as Lazy, OnceLock};
+use std::{
+    sync::{Arc, LazyLock as Lazy, OnceLock},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Datelike, Timelike};
 use config::{
-    SIZE_IN_MB, get_config,
+    SIZE_IN_MB,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         self_reporting::{
-            ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
-            usage::{RequestStats, UsageData, UsageEvent, UsageType},
+            EnqueueError, ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
+            error::ErrorData,
+            usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
         },
         stream::StreamType,
     },
@@ -41,6 +47,175 @@ pub fn set_batch_publisher(
     publisher: Arc<dyn BatchPublisher>,
 ) -> Result<(), Arc<dyn BatchPublisher>> {
     BATCH_PUBLISHER.set(publisher)
+}
+
+/// Start the reporting queues.
+///
+/// Deliberately NOT gated on `usage_enabled`. Trigger records — alert and
+/// report execution history — are published unconditionally (see
+/// [`publish_triggers_usage`]), so the queue has to be running even on a
+/// deployment that has usage reporting switched off. Usage and error records
+/// keep their own gates at their own publish sites, so starting the queue does
+/// not cause anything extra to be written.
+pub async fn run() {
+    if let Err(error) = start().await {
+        log::error!("[SELF-REPORTING] Reporting queue initialization failed: {error}");
+        return;
+    }
+
+    log::debug!("[SELF-REPORTING] successfully initialized reporting queues");
+}
+
+/// Publish one trigger execution record.
+///
+/// **Unconditional, in every build.** A trigger record is not telemetry about
+/// the customer — it is the execution history of a feature the customer
+/// configured, and it is what answers "did my alert run, and why did it not
+/// fire". Several product surfaces read it directly: alert history, pipeline
+/// execution history (`api/pipelines`, which queries the `triggers` stream),
+/// and the SLO alert-based SLI.
+///
+/// It used to be gated on `ZO_USAGE_REPORTING_ENABLED` (default `false`), so
+/// switching off what reads as billing telemetry silently disabled alert
+/// history as well. That coupling is not discoverable from the flag's name.
+/// Volume is bounded by alert count x evaluation frequency, not by request
+/// rate, so there is no cost argument for gating it the way there is for
+/// `UsageData`.
+///
+/// Where the record lands is still configurable: `ZO_USAGE_REPORT_TO_OWN_ORG`
+/// governs own-org delivery, and `_meta` always receives a copy.
+pub fn publish_triggers_usage(trigger: TriggerData) {
+    log::debug!(
+        "[SELF-REPORTING] Publishing trigger usage: org={}, module={:?}, key={}, status={:?}",
+        trigger.org,
+        trigger.module,
+        trigger.key,
+        trigger.status
+    );
+
+    match try_enqueue(ReportingData::Trigger(Box::new(trigger))) {
+        Ok(()) => {
+            log::debug!(
+                "[SELF-REPORTING] Successfully queued trigger usage data to be ingested (non-blocking)"
+            )
+        }
+        Err(tokio::sync::mpsc::error::TrySendError::Full(message)) => {
+            let dropped_info = match message {
+                ReportingMessage::Data(ReportingData::Trigger(trigger)) => {
+                    Some((trigger.org.clone(), trigger.key.clone()))
+                }
+                _ => None,
+            };
+
+            if let Some((org, key)) = dropped_info {
+                log::warn!(
+                    "[SELF-REPORTING] Usage queue full, dropping trigger data for org={}, key={}. \
+                     System is overloaded. Consider increasing ZO_USAGE_REPORTING_THREAD_NUM or ZO_USAGE_BATCH_SIZE.",
+                    org,
+                    key
+                );
+            } else {
+                log::warn!(
+                    "[SELF-REPORTING] Usage queue full, dropping trigger data. \
+                     System is overloaded. Consider increasing ZO_USAGE_REPORTING_THREAD_NUM or ZO_USAGE_BATCH_SIZE."
+                );
+            }
+
+            metrics::SELF_REPORTING_DROPPED_TRIGGERS
+                .with_label_values(&["usage"])
+                .inc();
+        }
+        Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+            log::error!(
+                "[SELF-REPORTING] Usage queue closed, cannot send trigger data. \
+                 Self-reporting service may have shut down."
+            );
+        }
+    }
+}
+
+pub async fn publish_error(error_data: ErrorData) {
+    let cfg = get_config();
+    #[cfg(not(feature = "enterprise"))]
+    {
+        if !cfg.common.usage_enabled {
+            log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
+            return;
+        }
+    }
+
+    let timeout_duration = Duration::from_secs(cfg.common.error_publish_timeout_secs);
+    let org = error_data.stream_params.org_id.clone();
+    let error_source = match &error_data.error_source {
+        config::meta::self_reporting::error::ErrorSource::Alert => "Alert",
+        config::meta::self_reporting::error::ErrorSource::Dashboard => "Dashboard",
+        config::meta::self_reporting::error::ErrorSource::Function(_) => "Function",
+        config::meta::self_reporting::error::ErrorSource::Ingestion => "Ingestion",
+        config::meta::self_reporting::error::ErrorSource::Pipeline(_) => "Pipeline",
+        config::meta::self_reporting::error::ErrorSource::Search => "Search",
+        config::meta::self_reporting::error::ErrorSource::Other => "Other",
+        config::meta::self_reporting::error::ErrorSource::SsoClaimParser(_) => "SsoClaimParser",
+        config::meta::self_reporting::error::ErrorSource::OrgStorage(_) => "OrgStorage",
+    };
+
+    log::debug!(
+        "[SELF-REPORTING] Publishing error data: org={}, source={}, timeout={:?}",
+        org,
+        error_source,
+        timeout_duration
+    );
+
+    let start = std::time::Instant::now();
+    match enqueue_error_with_timeout(ReportingData::Error(Box::new(error_data)), timeout_duration)
+        .await
+    {
+        Ok(()) => {
+            log::debug!(
+                "[SELF-REPORTING] Successfully queued error data to be ingested (took {:?}, timeout-based)",
+                start.elapsed()
+            );
+        }
+        Err(EnqueueError::Timeout) => {
+            log::warn!(
+                "[SELF-REPORTING] Timeout ({:?}) queueing error data for org={}, source={}. \
+                 System overloaded, error reporting degraded. \
+                 Consider increasing ZO_USAGE_REPORTING_THREAD_NUM or ZO_USAGE_BATCH_SIZE.",
+                timeout_duration,
+                org,
+                error_source
+            );
+            metrics::SELF_REPORTING_TIMEOUT_ERRORS
+                .with_label_values(&["error"])
+                .inc();
+        }
+        Err(EnqueueError::SendFailed(error)) => {
+            log::error!(
+                "[SELF-REPORTING] Failed to send error data for org={}, source={}: {error}",
+                org,
+                error_source
+            );
+        }
+    }
+}
+
+/// Drain the reporting queues at shutdown.
+///
+/// Not gated on `usage_enabled` either: trigger records are always queued, so
+/// a deployment with usage reporting off still has buffered alert history that
+/// must reach a stream before the process exits.
+///
+/// The scheduler is included in the role test because it is the node that
+/// publishes trigger records. On a dedicated scheduler node the old
+/// ingester-or-querier test was false, so every trigger still sitting in the
+/// batch was discarded on shutdown.
+pub async fn flush() {
+    let cfg = get_config();
+
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_scheduler() {
+        return;
+    }
+
+    shutdown(cfg.limit.usage_reporting_thread_num).await;
 }
 
 pub async fn report_request_usage_stats(
@@ -391,7 +566,7 @@ mod tests {
     use config::meta::{
         self_reporting::{
             error::ErrorData,
-            usage::{TriggerData, TriggerDataStatus, TriggerDataType},
+            usage::{RunOutcome, TriggerData, TriggerDataType},
         },
         stream::StreamParams,
     };
@@ -446,7 +621,7 @@ mod tests {
             next_run_at: 1234567890,
             is_realtime: false,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Succeeded,
             start_time: 1234567890,
             end_time: 1234567890,
             retries: 0,
@@ -465,6 +640,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         }
     }
 

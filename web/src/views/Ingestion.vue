@@ -25,126 +25,159 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     tabs-below
     bleed
   >
-      <template #actions>
-        <div class="w-50 flex-none">
-          <OSearchInput
-            v-model="globalSearchQuery"
-            :placeholder="t('common.search')"
-            clearable
-            class="w-full indexlist-search-input"
-            data-test="recommended-list-search-input"
-          />
-        </div>
-        <OSelect
-          v-if="!isRUMPage && tokenOptions.length > 0"
-          v-model="selectedTokenName"
-          :options="tokenOptions"
-          label-key="label"
-          value-key="value"
-          class="max-w-xs"
-          style="min-width: 220px"
-          @update:model-value="onTokenSelected"
+    <template #actions>
+      <div class="w-50 flex-none">
+        <OSearchInput
+          v-model="globalSearchQuery"
+          :placeholder="t('common.search')"
+          clearable
+          class="indexlist-search-input w-full"
+          data-test="recommended-list-search-input"
         />
-        <OButton
-          v-if="!isRUMPage"
-          variant="primary"
-          size="sm"
-          icon-left="key"
-          @click="navigateToIngestionTokens"
-        >
-          {{ t('ingestion.manageTokensBtnLabel') }}
-        </OButton>
-        <OButton
-          v-if="
-            rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
-            store.state.organizationData.rumToken.rum_token != ''
-          "
-          variant="primary"
-          size="sm"
-          data-test="ingestion-reset-token-btn"
-          @click="showRUMUpdateDialogFn"
-        >
-          {{ t(`ingestion.resetRUMTokenLabel`) }}
-        </OButton>
-        <OButton
-          v-else-if="
-            rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
-            store.state.organizationData.rumToken.rum_token == ''
-          "
-          variant="primary"
-          size="sm"
-          data-test="ingestion-reset-token-btn"
-          @click="generateRUMToken"
-        >
-          {{ t(`ingestion.generateRUMTokenLabel`) }}
-        </OButton>
-      </template>
-      <template #header-tabs>
-        <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
+      </div>
+      <OSelect
+        v-if="!isRUMPage && tokenOptions.length > 0"
+        v-model="selectedTokenName"
+        :options="tokenOptions"
+        label-key="label"
+        value-key="value"
+        class="max-w-xs"
+        style="min-width: 13.75rem"
+        @update:model-value="onTokenSelected"
+      />
+      <OButton
+        v-if="!isRUMPage"
+        variant="primary"
+        size="sm"
+        icon-left="key"
+        @click="navigateToIngestionTokens"
+      >
+        {{ t("ingestion.manageTokensBtnLabel") }}
+      </OButton>
+      <OButton
+        v-if="
+          rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+          store.state.organizationData.rumToken.rum_token != ''
+        "
+        variant="primary"
+        size="sm"
+        data-test="ingestion-reset-token-btn"
+        @click="showRUMUpdateDialogFn"
+      >
+        {{ t(`ingestion.resetRUMTokenLabel`) }}
+      </OButton>
+      <OButton
+        v-else-if="
+          rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+          store.state.organizationData.rumToken.rum_token == ''
+        "
+        variant="primary"
+        size="sm"
+        data-test="ingestion-reset-token-btn"
+        @click="generateRUMToken"
+      >
+        {{ t(`ingestion.generateRUMTokenLabel`) }}
+      </OButton>
+    </template>
+    <template #header-tabs>
+      <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
-        <div class="-ml-3 w-full">
+      <div class="-ml-3 w-full">
         <OTabs v-model="ingestTabType" align="left">
           <ORouteTab
             name="recommended"
-            :to="{ name: 'recommended', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'recommended',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.recommendedLabel')"
           />
           <ORouteTab
             name="custom"
-            :to="{ name: 'custom', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'custom',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.customLabel')"
           />
           <ORouteTab
             name="server"
-            :to="{ name: 'servers', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'servers',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.serverLabel')"
           />
           <ORouteTab
             name="database"
-            :to="{ name: 'databases', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'databases',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.databaseLabel')"
           />
           <ORouteTab
             name="security"
-            :to="{ name: 'security', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'security',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.securityLabel')"
           />
           <ORouteTab
             name="devops"
-            :to="{ name: 'devops', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'devops',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.devopsLabel')"
           />
           <ORouteTab
             name="networking"
-            :to="{ name: 'networking', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'networking',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.networkingLabel')"
           />
           <ORouteTab
             name="message-queues"
-            :to="{ name: 'message-queues', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'message-queues',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.messageQueuesLabel')"
           />
           <ORouteTab
             name="languages"
-            :to="{ name: 'languages', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'languages',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.languagesLabel')"
           />
           <ORouteTab
             name="ai-integrations"
-            :to="{ name: 'ai-integrations', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'ai-integrations',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.aiLabel')"
           />
           <ORouteTab
             name="others"
-            :to="{ name: 'others', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :to="{
+              name: 'others',
+              query: { org_identifier: store.state.selectedOrganization.identifier },
+            }"
             :label="t('ingestion.otherLabel')"
           />
         </OTabs>
-        </div>
-      </template>
+      </div>
+    </template>
     <ConfirmDialog
-      title="Reset RUM Token"
-      message="Are you sure you want to update rum token for this organization?"
+      :title="t('ingestion.resetRUMTokenLabel')"
+      :message="t('ingestion.updateRUMTokenMessage')"
       @update:ok="updateRUMToken"
       @update:cancel="confirmRUMUpdate = false"
       v-model="confirmRUMUpdate"
@@ -156,11 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       "
-      class="text-subtitle bg-warning p-2 font-bold mx-2.5 mt-1 rounded-default"
+      class="text-subtitle bg-warning rounded-default mx-2.5 mt-1 p-2 font-bold"
     >
       {{ t("ingestion.redirectionIngestionMsg") }}
     </div>
-    <div class="flex-1 min-h-0">
+    <div class="min-h-0 flex-1">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"
@@ -179,16 +212,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 // @ts-ignore
-import {
-  defineComponent,
-  ref,
-  onBeforeMount,
-  onMounted,
-  onUpdated,
-  watch,
-  computed,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, onBeforeMount, onMounted, onUpdated, watch, computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -206,20 +231,16 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { OPageLayout, ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput,
-    OSelect,
-},
+  components: { OPageLayout, ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput, OSelect },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const route = useRoute();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
     const confirmRUMUpdate = ref<boolean>(false);
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier,
-    );
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
 
@@ -239,7 +260,10 @@ export default defineComponent({
     watch(
       tokenOptions,
       (opts) => {
-        if (opts.length > 0 && !opts.find((o: { value: string }) => o.value === selectedTokenName.value)) {
+        if (
+          opts.length > 0 &&
+          !opts.find((o: { value: string }) => o.value === selectedTokenName.value)
+        ) {
           selectedTokenName.value = opts[0].value;
           const tokens = store.state.organizationData.orgTokens || [];
           const token = tokens.find((t: any) => t.name === opts[0].value);
@@ -262,6 +286,8 @@ export default defineComponent({
     const metricRoutes = [
       "prometheus",
       "vmagent",
+      "nightingale",
+      "categraf",
       "otelCollector",
       "telegraf",
       "cloudwatchMetrics",
@@ -284,9 +310,7 @@ export default defineComponent({
       },
     ];
 
-    const isRUMPage = computed(() =>
-      rumRoutes.indexOf(router.currentRoute.value.name) > -1,
-    );
+    const isRUMPage = computed(() => rumRoutes.indexOf(router.currentRoute.value.name) > -1);
 
     onBeforeMount(() => {
       if (store.state.selectedOrganization.identifier != undefined) {
@@ -349,14 +373,13 @@ export default defineComponent({
           if (res.data.data.passcode == "") {
             toast({
               variant: "error",
-              message: "Passcode not found.",
+              message: t("toastMessages.views.passcodeNotFound"),
               timeout: 5000,
             });
           } else {
             store.dispatch("setOrganizationPasscode", res.data.data.passcode);
             store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
-            currentOrgIdentifier.value =
-              store.state.selectedOrganization.identifier;
+            currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
           }
         })
         .catch(() => {
@@ -365,42 +388,37 @@ export default defineComponent({
     };
 
     const getRUMToken = () => {
-      apiKeysService
-        .listRUMTokens(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          store.dispatch("setRUMToken", res.data.data);
-        });
+      apiKeysService.listRUMTokens(store.state.selectedOrganization.identifier).then((res) => {
+        store.dispatch("setRUMToken", res.data.data);
+      });
     };
 
     const updatePasscode = () => {
       organizationsService
-        .update_organization_passcode(
-          store.state.selectedOrganization.identifier,
-        )
+        .update_organization_passcode(store.state.selectedOrganization.identifier)
         .then((res) => {
           if (res.data.data.passcode == "") {
             toast({
               variant: "error",
-              message: "Passcode not found.",
+              message: t("toastMessages.views.passcodeNotFound"),
               timeout: 5000,
             });
           } else {
             toast({
               variant: "success",
-              message: "Token reset successfully.",
+              message: t("toastMessages.views.tokenResetSuccessfully"),
               timeout: 5000,
             });
             store.dispatch("setOrganizationPasscode", res.data.data.passcode);
             store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
-            currentOrgIdentifier.value =
-              store.state.selectedOrganization.identifier;
+            currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
           }
         })
         .catch((e) => {
           if (e.response.status != 403) {
             toast({
               variant: "error",
-              message: "Error while updating Token." + e.error,
+              message: t("toastMessages.views.errorWhileUpdatingToken", { error: e.error }),
               timeout: 5000,
             });
           }
@@ -424,9 +442,7 @@ export default defineComponent({
 
     const fetchOrgTokens = () => {
       organizationsService
-        .list_org_ingestion_tokens(
-          store.state.selectedOrganization.identifier,
-        )
+        .list_org_ingestion_tokens(store.state.selectedOrganization.identifier)
         .then((res) => {
           store.dispatch("setOrgTokens", res.data.data);
         })
@@ -445,9 +461,9 @@ export default defineComponent({
     };
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText, {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
+      copyToClipboard(content.innerText, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("ingestion.copyContentError"),
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
@@ -472,7 +488,7 @@ export default defineComponent({
           getRUMToken();
           toast({
             variant: "success",
-            message: "RUM Token generated successfully.",
+            message: t("toastMessages.views.rumTokenGeneratedSuccessfully"),
             timeout: 5000,
           });
         })
@@ -480,9 +496,7 @@ export default defineComponent({
           if (e.response.status != 403) {
             toast({
               variant: "error",
-              message:
-                e.response?.data?.message ||
-                "Error while generating RUM Token.",
+              message: e.response?.data?.message || "Error while generating RUM Token.",
               timeout: 5000,
             });
           }
@@ -506,7 +520,7 @@ export default defineComponent({
           getRUMToken();
           toast({
             variant: "success",
-            message: "RUM Token updated successfully.",
+            message: t("toastMessages.views.rumTokenUpdatedSuccessfully"),
             timeout: 5000,
           });
         })
@@ -514,9 +528,7 @@ export default defineComponent({
           if (e.response.status != 403) {
             toast({
               variant: "error",
-              message:
-                e.response?.data?.message ||
-                "Error while refreshing RUM Token.",
+              message: e.response?.data?.message || "Error while refreshing RUM Token.",
               timeout: 5000,
             });
           }
@@ -638,4 +650,3 @@ export default defineComponent({
   },
 });
 </script>
-

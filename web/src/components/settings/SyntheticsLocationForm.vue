@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     @update:open="$emit('update:open', $event)"
     :title="isEdit ? t('synthetics.locations.editTitle') : t('synthetics.locations.createTitle')"
-    :primary-button-label="isEdit ? t('synthetics.locations.updateClose') : t('synthetics.locations.createClose')"
+    :primary-button-label="
+      isEdit ? t('synthetics.locations.updateClose') : t('synthetics.locations.createClose')
+    "
     :secondary-button-label="t('synthetics.locations.cancel')"
     form-id="synthetics-location-form"
     @click:secondary="handleClose"
@@ -65,13 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="synthetics-location-label-input"
         />
         <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium text-text-secondary">
-            {{ t('synthetics.locations.locationId') }}
+          <label class="text-text-secondary text-sm font-medium">
+            {{ t("synthetics.locations.locationId") }}
           </label>
           <div
-            class="text-sm text-text-secondary rounded-default border border-input-border bg-surface-subtle px-3 py-2"
+            class="text-text-secondary rounded-default border-input-border bg-surface-subtle border px-3 py-2 text-sm"
           >
-            {{ derivedId || '-' }}
+            {{ derivedId || "-" }}
           </div>
         </div>
         <OFormSwitch
@@ -86,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -125,7 +127,7 @@ export default defineComponent({
     OFormSwitch,
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const locationFormRef = ref<any>(null);
@@ -133,9 +135,9 @@ export default defineComponent({
 
     // Provider options for the select dropdown.
     const providerOptions = computed(() => [
-      { label: "AWS", value: "aws" },
-      { label: "GCP", value: "gcp" },
-      { label: "Azure", value: "azure" },
+      { label: raw("AWS"), value: "aws" },
+      { label: raw("GCP"), value: "gcp" },
+      { label: raw("Azure"), value: "azure" },
       { label: t("synthetics.locations.providerOther"), value: "custom" },
     ]);
 
@@ -150,7 +152,7 @@ export default defineComponent({
           provider: isCustom ? "custom" : provider,
           customProvider: isCustom ? provider : "",
           region: (props.data as any)?.region ?? "",
-          label: (props.data as any)?.name ?? "",
+          label: (props.data as any)?.label ?? "",
           enabled: (props.data as any)?.enabled ?? true,
         };
       }
@@ -166,7 +168,13 @@ export default defineComponent({
         const f = formRef?.form;
         if (!f) return;
         const liveProvider = f.useStore((s: any) => s.values.provider ?? "aws");
-        watch(liveProvider, (v: string) => { providerValue.value = v; }, { immediate: true });
+        watch(
+          liveProvider,
+          (v: string) => {
+            providerValue.value = v;
+          },
+          { immediate: true },
+        );
       },
       { immediate: true },
     );
@@ -196,7 +204,7 @@ export default defineComponent({
 
     const saveLocation = async (value: SyntheticsLocationForm) => {
       const resolvedProvider =
-        value.provider === "custom" ? value.customProvider?.trim() ?? "custom" : value.provider;
+        value.provider === "custom" ? (value.customProvider?.trim() ?? "custom") : value.provider;
       const id = `${resolvedProvider}-${value.region.trim()}`;
       try {
         const response = props.isEdit
@@ -205,17 +213,14 @@ export default defineComponent({
               (props.data as any).id,
               { label: value.label.trim(), enabled: value.enabled },
             )
-          : await syntheticsService.createLocation(
-              store.state.selectedOrganization.identifier,
-              {
-                kind: "public",
-                id,
-                provider: resolvedProvider,
-                region: value.region.trim(),
-                label: value.label.trim(),
-                enabled: value.enabled,
-              },
-            );
+          : await syntheticsService.createLocation(store.state.selectedOrganization.identifier, {
+              kind: "public",
+              id,
+              provider: resolvedProvider,
+              region: value.region.trim(),
+              label: value.label.trim(),
+              enabled: value.enabled,
+            });
         if (response.status == 200) {
           toast({
             message: props.isEdit
@@ -231,7 +236,7 @@ export default defineComponent({
         if (e.response?.status != 403) {
           toast({
             message:
-              e.response?.data?.message ||
+              raw(e.response?.data?.message) ||
               (props.isEdit
                 ? t("synthetics.locations.updateFailed")
                 : t("synthetics.locations.createFailed")),

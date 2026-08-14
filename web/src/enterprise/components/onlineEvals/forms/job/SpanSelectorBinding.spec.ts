@@ -61,13 +61,9 @@ describe("SpanSelectorBinding", () => {
     const wrapper = mountBinding();
     await openEditor(wrapper);
 
-    const chip = wrapper.get(
-      '[data-test="span-selector-default-field-gen_ai_input_messages"]',
-    );
+    const chip = wrapper.get('[data-test="span-selector-default-field-gen_ai_input_messages"]');
     expect(chip.text()).toBe("gen_ai_input_messages");
     // All eight standard fields are listed, not just a sample.
-    expect(
-      wrapper.findAll('[data-test^="span-selector-default-field-"]'),
-    ).toHaveLength(8);
+    expect(wrapper.findAll('[data-test^="span-selector-default-field-"]')).toHaveLength(8);
   });
 });

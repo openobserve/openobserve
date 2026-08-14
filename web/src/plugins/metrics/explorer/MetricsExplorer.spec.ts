@@ -107,9 +107,11 @@ vi.mock("vuex", async (importOriginal) => ({
 // Controllable route/router so the URL-state tests can seed `route.query` before
 // mount (hydration) and inspect `router.replace` (sync). `name` must be "metrics"
 // or syncVisualizeUrl and the route.query watcher short-circuit.
+// Both verbs resolve a promise, as the real router does — syncUrlState chains
+// `.catch()` on whichever it picks.
 const routerState = vi.hoisted(() => ({
   replace: vi.fn().mockResolvedValue(undefined),
-  push: vi.fn(),
+  push: vi.fn().mockResolvedValue(undefined),
   query: {} as Record<string, any>,
 }));
 vi.mock("vue-router", () => ({
@@ -125,10 +127,11 @@ vi.mock("vue-router", () => ({
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
 vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@tanstack/vue-virtual", () => ({
-  useVirtualizer: () => computed(() => ({
-    getTotalSize: () => 0,
-    getVirtualItems: () => [],
-  })),
+  useVirtualizer: () =>
+    computed(() => ({
+      getTotalSize: () => 0,
+      getVirtualItems: () => [],
+    })),
 }));
 
 import MetricsExplorer from "./MetricsExplorer.vue";
@@ -174,13 +177,13 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
         // would drop the item children and the group would look empty regardless
         // of correctness. Render-through so the items' data-test attrs exist.
         OToggleGroup: {
-          template: '<div><slot /></div>',
+          template: "<div><slot /></div>",
         },
         OToggleGroupItem: {
           template: '<button type="button"><slot /></button>',
         },
         OTag: {
-          template: '<span><slot /></span>',
+          template: "<span><slot /></span>",
         },
         // Pulls in the dashboard PanelEditor (ECharts + useDashboardPanelData),
         // which needs far more context than this wiring test provides. The
@@ -195,8 +198,7 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
             runQuery: visualizeRunQuery,
             dashboardPanelData: visualizePanel,
           }),
-          template:
-            '<div data-test="metrics-explorer-visualize">visualize</div>',
+          template: '<div data-test="metrics-explorer-visualize">visualize</div>',
         },
         ...stubOverrides,
       },
@@ -251,15 +253,9 @@ describe("MetricsExplorer wiring", () => {
       // three-way choice to say so.
       const wrapper = mountExplorer();
 
-      expect(
-        wrapper.find('[data-test="metrics-explorer-sort-a-z"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-sort-z-a"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-sort-recent"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-sort-a-z"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-sort-z-a"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-sort-recent"]').exists()).toBe(false);
     });
   });
 
@@ -269,12 +265,8 @@ describe("MetricsExplorer wiring", () => {
       // one is exactly what a user needs when the filter has hidden everything.
       const wrapper = mountExplorer();
 
-      expect(
-        wrapper.find('[data-test="metrics-explorer-hide-empty"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-show-all"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-hide-empty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-show-all"]').exists()).toBe(true);
     });
 
     it("maps 'All' to showing no-data panels and 'With data' to hiding them", async () => {
@@ -359,29 +351,18 @@ describe("MetricsExplorer wiring", () => {
       // panel body for whichever facet is selected.
       const wrapper = mountExplorer();
 
-      expect(
-        wrapper.find('[data-test="metrics-explorer-rail-prefix"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-rail-suffix"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-rail-type"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-rail-prefix"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-rail-suffix"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-rail-type"]').exists()).toBe(true);
     });
 
     it("does not show the old Saved Views dialog on Explore (it moved to Workspace)", () => {
       // The mystery dialog is gone: saved views now live in the Workspace rail.
       const wrapper = mountExplorer();
-      expect(
-        wrapper.find('[data-test="metrics-saved-views"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-saved-views"]').exists()).toBe(false);
       // The Workspace rail is not shown in Explore mode either.
-      expect(
-        wrapper.find('[data-test="metrics-workspace-rail"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-workspace-rail"]').exists()).toBe(false);
     });
-
   });
 
   describe("Convert to dashboard", () => {
@@ -417,9 +398,7 @@ describe("MetricsExplorer wiring", () => {
       // default and the panel is on screen at mount.
       const wrapper = mountExplorer();
 
-      expect(wrapper.findComponent({ name: "PrefixFilterPanel" }).exists()).toBe(
-        true,
-      );
+      expect(wrapper.findComponent({ name: "PrefixFilterPanel" }).exists()).toBe(true);
     });
 
     it("selecting a facet switches it — and a re-click deselect never collapses the panel", async () => {
@@ -439,15 +418,9 @@ describe("MetricsExplorer wiring", () => {
     it("defaults to Explore — the browse grid, not the Visualize pane", () => {
       const wrapper = mountExplorer();
       expect((wrapper.vm as any).isExplore).toBe(true);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-mode-explore"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-mode-visualize"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-visualize"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-mode-explore"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-mode-visualize"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-visualize"]').exists()).toBe(false);
     });
 
     it("switches the body to the Visualize pane when the mode flips", async () => {
@@ -455,9 +428,7 @@ describe("MetricsExplorer wiring", () => {
       (wrapper.vm as any).setMode("visualize");
       await wrapper.vm.$nextTick();
       expect((wrapper.vm as any).mode).toBe("visualize");
-      expect(
-        wrapper.find('[data-test="metrics-explorer-visualize"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-visualize"]').exists()).toBe(true);
     });
 
     it("ignores the OToggleGroup deselect so mode never goes blank", () => {
@@ -474,9 +445,7 @@ describe("MetricsExplorer wiring", () => {
 
       expect((wrapper.vm as any).isGridMode).toBe(true); // shares the grid body
       expect((wrapper.vm as any).isWorkspace).toBe(true);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-visualize"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-visualize"]').exists()).toBe(false);
     });
 
     it("Workspace shows only pinned metrics (the scratchpad); Explore browses all", async () => {
@@ -555,8 +524,35 @@ describe("MetricsExplorer wiring", () => {
       (wrapper.vm as any).onSelect(CARD);
 
       expect(grid.effectiveVariant).toHaveBeenCalled();
+      // The default handoff: `$__rate_interval`, for the editor to re-derive
+      // against its own range and width.
+      expect(grid.effectiveVariant).toHaveBeenCalledWith(
+        CARD,
+        undefined,
+        expect.objectContaining({ rateWindow: "$__rate_interval" }),
+      );
       expect((wrapper.vm as any).mode).toBe("visualize");
       expect((wrapper.vm as any).visualizeSeed).toBeTruthy();
+    });
+
+    it("a card that charted through a WIDENED window hands the editor that window", () => {
+      // The editor resolves `$__rate_interval` from the org's scrape interval —
+      // the very value whose overstatement forced the card to widen — so the
+      // variable would resolve straight back to the window that returned
+      // nothing, and the drill-in would open on an empty chart of a metric the
+      // card is visibly charting.
+      grid.previews.value[CARD.name] = { widenedRateWindow: "4m" };
+      const wrapper = mountExplorer();
+
+      (wrapper.vm as any).onSelect(CARD);
+
+      expect(grid.effectiveVariant).toHaveBeenCalledWith(
+        CARD,
+        undefined,
+        expect.objectContaining({ rateWindow: "4m" }),
+      );
+      expect((wrapper.vm as any).mode).toBe("visualize");
+      delete grid.previews.value[CARD.name];
     });
   });
 
@@ -568,10 +564,7 @@ describe("MetricsExplorer wiring", () => {
       const wrapper = mountExplorer();
 
       // Set -> array, for the group's model-value.
-      expect((wrapper.vm as any).selectedTypesArray).toEqual([
-        "counter",
-        "gauge",
-      ]);
+      expect((wrapper.vm as any).selectedTypesArray).toEqual(["counter", "gauge"]);
 
       // array -> Set, on the group's update. A NEW Set (not a mutation) so the
       // composable's watchers fire.
@@ -741,9 +734,7 @@ describe("MetricsExplorer wiring", () => {
         await enterVisualizeWith(wrapper, "sum(rate(http_requests_total[5m]))");
 
         const blob = paramBlob((wrapper.vm as any).shareUrl);
-        expect(blob?.data?.queries?.[0]?.query).toBe(
-          "sum(rate(http_requests_total[5m]))",
-        );
+        expect(blob?.data?.queries?.[0]?.query).toBe("sum(rate(http_requests_total[5m]))");
       });
 
       it("drops volatile keys (id/title) from the shared blob", async () => {
@@ -781,8 +772,7 @@ describe("MetricsExplorer wiring", () => {
     });
 
     describe("hydrate on load", () => {
-      const blobFor = (data: any) =>
-        encodeMetricsConfig(getMetricsConfig({ data }));
+      const blobFor = (data: any) => encodeMetricsConfig(getMetricsConfig({ data }));
 
       it("seeds Visualize from a metrics_data URL on mount", () => {
         routerState.query = {
@@ -831,9 +821,7 @@ describe("MetricsExplorer wiring", () => {
       afterEach(() => vi.useRealTimers());
 
       const blobWrites = () =>
-        routerState.replace.mock.calls
-          .map((c: any) => c[0]?.query?.metrics_data)
-          .filter(Boolean);
+        routerState.replace.mock.calls.map((c: any) => c[0]?.query?.metrics_data).filter(Boolean);
 
       it("writes the blob to the URL when a chart is built in Visualize", async () => {
         const wrapper = mountExplorer();
@@ -842,9 +830,7 @@ describe("MetricsExplorer wiring", () => {
 
         const wrote = blobWrites().at(-1);
         expect(wrote).toBeTruthy();
-        expect(decodeMetricsConfig(wrote)?.data?.queries?.[0]?.query).toBe(
-          "node_load1",
-        );
+        expect(decodeMetricsConfig(wrote)?.data?.queries?.[0]?.query).toBe("node_load1");
       });
 
       it("strips a stale blob from the URL when leaving Visualize", async () => {
@@ -862,6 +848,57 @@ describe("MetricsExplorer wiring", () => {
           (c: any) => c[0]?.query && !("metrics_data" in c[0].query),
         );
         expect(stripped).toBe(true);
+      });
+
+      // Explore -> Visualize never changes ROUTE (mode is a query param on
+      // `metrics`), so a `replace` here overwrote the Explore entry outright and
+      // Back jumped clean over the page to whatever preceded it — /logs, in
+      // practice, since useLogs pushes an entry per search. The mode transition
+      // has to push; nothing else may.
+      it("pushes a history entry when switching to Visualize, so Back returns here", async () => {
+        routerState.query = { org_identifier: "org1" };
+        const wrapper = mountExplorer();
+        routerState.push.mockClear();
+        routerState.replace.mockClear();
+
+        await enterVisualizeWith(wrapper, "up");
+
+        const pushedModes = routerState.push.mock.calls.map((c: any) => c[0]?.query?.mode);
+        expect(pushedModes).toContain("visualize");
+        expect(routerState.replace.mock.calls.map((c: any) => c[0]?.query?.mode)).not.toContain(
+          "visualize",
+        );
+      });
+
+      it("pushes on the way back out of Visualize too", async () => {
+        const wrapper = mountExplorer();
+        await enterVisualizeWith(wrapper, "up");
+        // The mock's route.query does not follow navigations, so stand it up by
+        // hand: this is the URL the push above just produced.
+        routerState.query = { mode: "visualize" };
+        routerState.push.mockClear();
+
+        (wrapper.vm as any).setMode("explore");
+        await wrapper.vm.$nextTick();
+
+        // `explore` serializes to an absent key, so the pushed query has no mode.
+        expect(routerState.push).toHaveBeenCalled();
+        expect(routerState.push.mock.calls.at(-1)[0].query.mode).toBeUndefined();
+      });
+
+      it("still REPLACES a same-mode edit — those must not stack history", async () => {
+        const wrapper = mountExplorer();
+        routerState.push.mockClear();
+        routerState.replace.mockClear();
+
+        // refreshInterval is a real component ref (the grid mock's fields are
+        // plain objects and drive nothing), so this exercises syncUrlState with
+        // mode held constant.
+        (wrapper.vm as any).refreshInterval = 60;
+        await wrapper.vm.$nextTick();
+
+        expect(routerState.replace).toHaveBeenCalled();
+        expect(routerState.push).not.toHaveBeenCalled();
       });
 
       it("does not touch metrics_data while in a grid mode", async () => {
@@ -883,8 +920,7 @@ describe("MetricsExplorer wiring", () => {
    * prefix/suffix/type, so "Clear prefix/suffix/type" must not appear there.
    */
   describe("empty-state remedies gate on what would actually help", () => {
-    const actionIds = (wrapper: any) =>
-      (wrapper.vm as any).noMatchActions.map((a: any) => a.id);
+    const actionIds = (wrapper: any) => (wrapper.vm as any).noMatchActions.map((a: any) => a.id);
 
     it("offers Clear prefix/suffix/type in Explore when a facet is selected", () => {
       const wrapper = mountExplorer();

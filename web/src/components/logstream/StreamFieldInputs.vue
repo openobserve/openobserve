@@ -1,7 +1,10 @@
 <template>
   <div data-test="add-stream-fields-section">
-    <div v-if="showHeader" data-test="alert-conditions-text" class="o-input-label text-compact font-medium leading-tight text-input-label-text">
-
+    <div
+      v-if="showHeader"
+      data-test="alert-conditions-text"
+      class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+    >
       {{ t("logStream.fields") }}
     </div>
     <template v-if="!formRows.length">
@@ -27,10 +30,10 @@
       <div
         v-for="(row, index) in formRows as any[]"
         :key="index"
-        class="flex flex-wrap items-start gap-2 mt-2"
+        class="mt-2 flex flex-wrap items-start gap-2"
         :data-test="`add-stream-field-row-${index}`"
       >
-        <div data-test="add-stream-field-name-input" class="flex-1 min-w-40">
+        <div data-test="add-stream-field-name-input" class="min-w-40 flex-1">
           <OFormInput
             :data-test="`add-stream-field-name-input-${index}`"
             :name="`${formFieldName}[${index}].name`"
@@ -53,10 +56,7 @@
             clearable
           />
         </div>
-        <div
-          v-if="visibleInputs.data_type"
-          class="min-w-25"
-        >
+        <div v-if="visibleInputs.data_type" class="min-w-25">
           <OFormSelect
             data-test="add-stream-field-data-type-select"
             :name="`${formFieldName}[${index}].type`"
@@ -73,12 +73,13 @@
              invisible, label-height spacer pushes the buttons down past the
              header labels — no magic pixel offset (same typography as the real
              OInput/OSelect labels). -->
-        <div class="flex flex-col gap-1 shrink-0">
+        <div class="flex shrink-0 flex-col gap-1">
           <span
             v-if="index === 0"
             aria-hidden="true"
-            class="text-sm font-semibold leading-tight select-none invisible"
-          >&nbsp;</span>
+            class="invisible text-sm leading-tight font-semibold select-none"
+            >&nbsp;</span
+          >
           <div class="flex items-center gap-1">
             <OButton
               data-test="add-stream-add-field-btn"
@@ -106,15 +107,13 @@
 </template>
 
 <script lang="ts" setup>
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { inject } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import {
-  makeStreamFieldRow,
-} from "./StreamFieldInputs.schema";
+import { makeStreamFieldRow } from "./StreamFieldInputs.schema";
 
 // FORM-ONLY. The rows are owned by the parent's TanStack form: this component
 // `inject`s that form, reads the array reactively via form.useStore, renders
@@ -146,39 +145,51 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // The parent's form (provided by <OForm>). Rows are read reactively so add /
 // delete re-render immediately (a form.state.values read inside a computed would
 // not track).
 const form = inject(FORM_CONTEXT_KEY, null) as any;
-const formRows = form.useStore(
-  (s: any) => (s.values?.[props.formFieldName] as any[]) ?? [],
-);
+const formRows = form.useStore((s: any) => (s.values?.[props.formFieldName] as any[]) ?? []);
 
 const addRow = () => form.pushFieldValue(props.formFieldName, makeStreamFieldRow());
-const removeRow = (index: number) =>
-  form.removeFieldValue(props.formFieldName, index);
+const removeRow = (index: number) => form.removeFieldValue(props.formFieldName, index);
 
 const streamIndexType = [
-  { label: "Full text search", value: "fullTextSearchKey" },
-  { label: "Secondary index", value: "secondaryIndexKey" },
-  { label: "Bloom filter", value: "bloomFilterKey" },
-  { label: "KeyValue partition", value: "keyPartition" },
-  { label: "Prefix partition", value: "prefixPartition" },
-  { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
-  { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
-  { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
-  { label: "Hash partition (64 Buckets)", value: "hashPartition_64" },
-  { label: "Hash partition (128 Buckets)", value: "hashPartition_128" },
+  { label: t("logStream.indexTypeOptions.fullTextSearch"), value: "fullTextSearchKey" },
+  { label: t("logStream.indexTypeOptions.secondaryIndex"), value: "secondaryIndexKey" },
+  { label: t("logStream.indexTypeOptions.bloomFilter"), value: "bloomFilterKey" },
+  { label: t("logStream.indexTypeOptions.keyValuePartition"), value: "keyPartition" },
+  { label: t("logStream.indexTypeOptions.prefixPartition"), value: "prefixPartition" },
+  {
+    label: t("logStream.indexTypeOptions.hashPartition", { buckets: 8 }),
+    value: "hashPartition_8",
+  },
+  {
+    label: t("logStream.indexTypeOptions.hashPartition", { buckets: 16 }),
+    value: "hashPartition_16",
+  },
+  {
+    label: t("logStream.indexTypeOptions.hashPartition", { buckets: 32 }),
+    value: "hashPartition_32",
+  },
+  {
+    label: t("logStream.indexTypeOptions.hashPartition", { buckets: 64 }),
+    value: "hashPartition_64",
+  },
+  {
+    label: t("logStream.indexTypeOptions.hashPartition", { buckets: 128 }),
+    value: "hashPartition_128",
+  },
 ];
 
 const dataTypes = [
-  { label: "Utf8", value: "Utf8" },
-  { label: "Int64", value: "Int64" },
-  { label: "Uint64", value: "Uint64" },
-  { label: "Float64", value: "Float64" },
-  { label: "Boolean", value: "Boolean" },
+  { label: raw("Utf8"), value: "Utf8" },
+  { label: raw("Int64"), value: "Int64" },
+  { label: raw("Uint64"), value: "Uint64" },
+  { label: raw("Float64"), value: "Float64" },
+  { label: raw("Boolean"), value: "Boolean" },
 ];
 
 const getIndexTypeOptions = (field: any) => {
@@ -199,16 +210,10 @@ const disableOptions = (schema: any, option: any) => {
     }
     selectedIndices += schema.index_type[i];
   }
-  if (
-    selectedIndices.includes("prefixPartition") &&
-    option.value.includes("keyPartition")
-  ) {
+  if (selectedIndices.includes("prefixPartition") && option.value.includes("keyPartition")) {
     return true;
   }
-  if (
-    selectedIndices.includes("keyPartition") &&
-    option.value.includes("prefixPartition")
-  ) {
+  if (selectedIndices.includes("keyPartition") && option.value.includes("prefixPartition")) {
     return true;
   }
   if (
@@ -220,8 +225,7 @@ const disableOptions = (schema: any, option: any) => {
   )
     return true;
   if (
-    (selectedIndices.includes("keyPartition") ||
-      selectedIndices.includes("prefixPartition")) &&
+    (selectedIndices.includes("keyPartition") || selectedIndices.includes("prefixPartition")) &&
     option.value.includes("hashPartition")
   )
     return true;

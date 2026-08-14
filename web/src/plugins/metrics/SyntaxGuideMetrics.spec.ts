@@ -29,14 +29,13 @@ const i18n = createI18n({
   messages: { en: enLocale },
 });
 
-
 describe("SyntaxGuideMetrics.vue", () => {
   let wrapper: any;
 
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
-    
+
     // Setup default store state
     store.state.theme = "dark";
   });
@@ -51,12 +50,9 @@ describe("SyntaxGuideMetrics.vue", () => {
   const createWrapper = (propsData = {}) => {
     return mount(SyntaxGuideMetrics, {
       global: {
-        plugins: [
-          i18n,
-          store
-        ]
+        plugins: [i18n, store],
       },
-      props: propsData
+      props: propsData,
     });
   };
 
@@ -105,12 +101,12 @@ describe("SyntaxGuideMetrics.vue", () => {
   describe("Props Validation", () => {
     it("should accept boolean true for sqlmode prop", () => {
       wrapper = createWrapper({ sqlmode: true });
-      expect(wrapper.props('sqlmode')).toBe(true);
+      expect(wrapper.props("sqlmode")).toBe(true);
     });
 
     it("should accept boolean false for sqlmode prop", () => {
       wrapper = createWrapper({ sqlmode: false });
-      expect(wrapper.props('sqlmode')).toBe(false);
+      expect(wrapper.props("sqlmode")).toBe(false);
     });
 
     it("should use default value false when sqlmode prop is not provided", () => {
@@ -121,7 +117,7 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should handle sqlmode prop reactivity", async () => {
       wrapper = createWrapper({ sqlmode: false });
       expect(wrapper.vm.sqlmode).toBe(false);
-      
+
       await wrapper.setProps({ sqlmode: true });
       expect(wrapper.vm.sqlmode).toBe(true);
     });
@@ -150,8 +146,8 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should have both t and store available in setup return", () => {
       wrapper = createWrapper();
       const setupReturn = wrapper.vm;
-      expect(setupReturn).toHaveProperty('t');
-      expect(setupReturn).toHaveProperty('store');
+      expect(setupReturn).toHaveProperty("t");
+      expect(setupReturn).toHaveProperty("store");
     });
 
     it("should maintain setup function structure", () => {
@@ -171,10 +167,10 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should react to store theme changes", async () => {
       wrapper = createWrapper();
       expect(wrapper.vm.store.state.theme).toBe("dark");
-      
+
       store.state.theme = "light";
       await nextTick();
-      
+
       expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
@@ -288,7 +284,7 @@ describe("SyntaxGuideMetrics.vue", () => {
 
     it("should handle SQL mode prop correctly", () => {
       wrapper = createWrapper({ sqlmode: true });
-      expect(wrapper.props('sqlmode')).toBe(true);
+      expect(wrapper.props("sqlmode")).toBe(true);
       expect(wrapper.vm.sqlmode).toBe(true);
     });
 
@@ -322,10 +318,10 @@ describe("SyntaxGuideMetrics.vue", () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
       expect(wrapper.vm.store.state.theme).toBe("dark");
-      
+
       store.state.theme = "light";
       await nextTick();
-      
+
       expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
@@ -354,7 +350,7 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should have proper button attributes", () => {
       wrapper = createWrapper();
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.attributes('type')).toBe('button');
+      expect(button.attributes("type")).toBe("button");
       // OButton does not set tabindex="0" explicitly; native browser behavior handles focus
     });
 
@@ -371,7 +367,7 @@ describe("SyntaxGuideMetrics.vue", () => {
 
     it("should contain data-cy attribute for testing", () => {
       wrapper = createWrapper();
-      expect(wrapper.html()).toContain("data-cy=\"syntax-guide-button\"");
+      expect(wrapper.html()).toContain('data-cy="syntax-guide-button"');
     });
   });
 
@@ -379,7 +375,7 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should handle props changes correctly", async () => {
       wrapper = createWrapper({ sqlmode: false });
       expect(wrapper.vm.sqlmode).toBe(false);
-      
+
       await wrapper.setProps({ sqlmode: true });
       expect(wrapper.vm.sqlmode).toBe(true);
     });
@@ -388,19 +384,19 @@ describe("SyntaxGuideMetrics.vue", () => {
       wrapper = createWrapper({ sqlmode: false });
       const initialStore = wrapper.vm.store;
       const initialT = wrapper.vm.t;
-      
+
       await wrapper.setProps({ sqlmode: true });
-      
+
       expect(wrapper.vm.store).toBe(initialStore);
       expect(wrapper.vm.t).toBe(initialT);
     });
 
     it("should handle multiple prop updates", async () => {
       wrapper = createWrapper({ sqlmode: false });
-      
+
       await wrapper.setProps({ sqlmode: true });
       expect(wrapper.vm.sqlmode).toBe(true);
-      
+
       await wrapper.setProps({ sqlmode: false });
       expect(wrapper.vm.sqlmode).toBe(false);
     });
@@ -426,10 +422,10 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should handle store state mutations without breaking", () => {
       wrapper = createWrapper();
       const originalTheme = store.state.theme;
-      
+
       store.state.theme = "custom-theme";
       expect(wrapper.vm.store.state.theme).toBe("custom-theme");
-      
+
       store.state.theme = originalTheme; // Reset
     });
 

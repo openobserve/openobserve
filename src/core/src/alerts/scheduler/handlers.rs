@@ -25,7 +25,7 @@ use config::{
         pipeline::components::NodeData,
         self_reporting::{
             error::{ErrorData, ErrorSource, PipelineError},
-            usage::{TriggerData, TriggerDataStatus, TriggerDataType},
+            usage::{RunOutcome, TriggerData, TriggerDataType},
         },
         stream::{StreamParams, StreamType},
         triggers::ScheduledTriggerData,
@@ -44,6 +44,7 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::recommendations::service::QueryRecommendationService;
 use proto::cluster_rpc;
+use usage_reporting::publish_triggers_usage;
 
 #[cfg(feature = "enterprise")]
 use crate::alerts::scheduler::query_optimization_recommendation::QueryOptimizerContext;
@@ -51,15 +52,440 @@ use crate::alerts::scheduler::query_optimization_recommendation::QueryOptimizerC
 use crate::organization::is_org_in_free_trial_period;
 use crate::{
     alerts::{
-        alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
+        alert::{
+            AlertExt, NotificationOutcome, get_alert_start_end_time, get_by_id_db,
+            get_row_column_map,
+        },
         derived_streams::DerivedStreamExt,
     },
     dashboards::reports::SendReport,
     db::{self, alerts::alert::set_without_updating_trigger},
     ingestion::ingestion_service,
     pipeline::batch_execution::ExecutablePipeline,
-    self_reporting::publish_triggers_usage,
 };
+
+/// Fold this evaluation's outcome into the alert's durable state (Part IV of
+/// `alerts.md`).
+///
+/// Best-effort by design: state persistence must never fail an evaluation that
+/// has already run and notified. Failures are logged, not propagated.
+/// Returns `false` when a write was attempted and failed. Best-effort for the
+/// single-row path (a state write must never fail an evaluation that already
+/// notified), but the per-group caller MUST check it: dispatching against
+/// stale state would send a group's page under the previous episode, and its
+/// delivery callback would then be rejected as stale — a page with no record
+/// that it happened.
+#[must_use]
+async fn persist_alert_run_state(
+    alert: &config::meta::alerts::alert::Alert,
+    alert_id: &str,
+    outcome: &RunOutcome,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+    grouped: Option<&config::meta::alerts::grouping::GroupClassification>,
+) -> bool {
+    use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
+
+    // ── Per-group fan-out (M-1/M-2/M-3) ─────────────────────────────────────
+    // Only reachable for an alert that opted in (M-9); everything else falls
+    // through to the single-row path below, unchanged.
+    //
+    // `Skipped` is excluded here as well as below: a silenced or paused run
+    // observed nothing, and the planner — unlike `apply_outcome` — has no
+    // notion of an outcome that must not be written, so it would happily
+    // stamp every group as healthy.
+    if let Some(classification) = grouped
+        && !matches!(outcome, RunOutcome::Skipped)
+    {
+        let prev = match load_tracked_group_states(alert_id).await {
+            Ok(p) => p,
+            Err(e) => {
+                log::warn!("[SCHEDULER] could not read group states for {alert_id}: {e}");
+                return false;
+            }
+        };
+        let plan = config::meta::alerts::grouping::plan_group_updates(
+            alert_id,
+            classification,
+            &prev,
+            now_micros(),
+        );
+        if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
+            log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
+            return false;
+        }
+        return true;
+    }
+
+    // `Skipped` runs are dropped by `apply_outcome` so a silenced evaluation
+    // cannot erase a real firing state.
+    let prev = match infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY).await {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!("[SCHEDULER] could not read alert state for {alert_id}: {e}");
+            return false;
+        }
+    };
+
+    // One instant for both writes: `level_at` and the ledger's `to_us` describe
+    // the same evaluation, and two `now_micros()` calls would let the coverage
+    // record and the freshness clock disagree about when it happened.
+    let now = now_micros();
+    let update = apply_outcome(
+        alert_id,
+        ROLLUP_GROUP_KEY,
+        prev.as_ref(),
+        outcome.clone(),
+        level,
+        now,
+    );
+
+    // ── Availability ledger (S-16) ──────────────────────────────────────────
+    // Fleet-wide from the day this ships, deliberately: a lazy
+    // per-referenced-alert scheme would start history at SLO creation and
+    // forfeit every day of retroactive measurement. It writes in the state
+    // transaction below, so a failure loses the state refresh and the coverage
+    // together — and the ledger consequence of that is a gap, the safe
+    // direction under D34.
+    //
+    // "Grouped" here means *maintains per-group state* (§2), not the `group_by`
+    // column list alone. A PromQL multi-alert has no `group_by` list at all,
+    // and reaches this single-row path on the `NotifyFailed` re-persist below;
+    // a column-list test would let it write a sparse ledger it can never
+    // explain, since a grouped source cannot say which of its groups were
+    // measured (D65).
+    let is_grouped = config::meta::alerts::grouping::maintains_group_state(&alert.query_condition);
+    let ledger = config::meta::alerts::state::ledger_write_for_evaluation(
+        &alert.org_id,
+        alert_id,
+        outcome,
+        level,
+        is_grouped,
+        &alert.trigger_condition,
+        now,
+    );
+
+    if update.is_noop() && ledger.is_none() {
+        return true;
+    }
+    if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
+        log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
+        return false;
+    }
+    true
+}
+
+/// Every state row this alert currently tracks, keyed by `group_key` — the
+/// rollup row included, since [`plan_group_updates`] diffs against it too.
+///
+/// Two queries rather than one per group: the planner needs the previous row
+/// for every group it is about to write, and fetching them individually would
+/// put a query per group on the hottest write path in the system.
+async fn load_tracked_group_states(
+    alert_id: &str,
+) -> Result<
+    std::collections::HashMap<String, config::meta::alerts::state::AlertState>,
+    infra::errors::Error,
+> {
+    use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+
+    let mut prev: std::collections::HashMap<_, _> =
+        infra::table::alert_states::list_groups(alert_id)
+            .await?
+            .into_iter()
+            .map(|s| (s.group_key.clone(), s))
+            .collect();
+
+    if let Some(rollup) = infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY).await? {
+        prev.insert(ROLLUP_GROUP_KEY.to_string(), rollup);
+    }
+    Ok(prev)
+}
+
+/// Per-group notification dispatch (§5.5 MN-1..MN-8) — the OSS tail.
+///
+/// Returns `Some((delivered, failed))` when this alert dispatched per group,
+/// and `None` when it is not a multi-alert and the caller should fall through
+/// to the ordinary alert-level send.
+///
+/// **This replaces the alert-level send; it does not supplement it.** Sending
+/// both would page the worst group twice per incident — once as itself and
+/// once as the rollup.
+///
+/// Order is load-bearing: the group plan is committed BEFORE anything is sent,
+/// so `plan_dispatch` reads back this evaluation's own level axis, and a send
+/// that fails leaves durable state describing what was observed.
+#[allow(clippy::too_many_arguments)]
+/// What [`dispatch_per_group`] actually did, per group.
+struct GroupDispatchOutcome {
+    delivered: usize,
+    failed: usize,
+    errors: Vec<String>,
+    /// Group keys whose send succeeded. A dedup reservation is confirmed by
+    /// its OWN group's delivery, never a sibling's (§5.5 MN-6).
+    delivered_groups: std::collections::HashSet<String>,
+    /// The state layer failed, so nothing was even attempted. Distinct from
+    /// "delivered nothing": a zero/zero result otherwise reads as a clean run
+    /// and the caller would advance the trigger as if the alert had been
+    /// handled — no notification, no error recorded, no retry.
+    state_failed: bool,
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn dispatch_per_group(
+    alert: &config::meta::alerts::alert::Alert,
+    trace_id: &str,
+    classification: Option<&config::meta::alerts::grouping::GroupClassification>,
+    records: &[config::utils::json::Map<String, config::utils::json::Value>],
+    rows_end_time: i64,
+    rollup_level: Option<config::meta::alerts::level::AlertLevel>,
+    start_time: Option<i64>,
+    triggered_at: i64,
+) -> Option<GroupDispatchOutcome> {
+    use config::meta::alerts::dispatch::{plan_dispatch, rows_by_group_key};
+
+    let classification = classification?;
+    let alert_id = alert.id.as_ref()?.to_string();
+    // How this alert's rows carry their group identity. A PromQL alert has no
+    // `group_by` at all — feeding its rows to the column-list extractor would
+    // hand every series the SAME empty label set, so all of them would collapse
+    // into one group key and each other's notification payloads.
+    let is_promql = alert.query_condition.query_type == config::meta::alerts::QueryType::PromQL;
+    let group_by = alert
+        .query_condition
+        .aggregation
+        .as_ref()
+        .and_then(|a| a.group_by.clone())
+        .unwrap_or_default();
+
+    // Durable state first (MN-1), then read it back: the delivery decision is
+    // made against the rows this evaluation just committed.
+    // The rollup outcome follows the classification, not an assumption: an
+    // evaluation can reach dispatch with every group healthy.
+    let rollup_outcome = config::meta::alerts::grouping::group_outcome(classification.rollup);
+    if !persist_alert_run_state(
+        alert,
+        &alert_id,
+        &rollup_outcome,
+        rollup_level,
+        Some(classification),
+    )
+    .await
+    {
+        // MN-1: dispatch only AFTER the plan commits. Sending against stale
+        // state would page a group under the previous episode and its delivery
+        // callback would be rejected as stale — a page with nothing recording
+        // that it went out. The next evaluation retries cleanly.
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] alert {alert_id}: group plan did not commit; \
+             skipping per-group dispatch this evaluation"
+        );
+        return Some(GroupDispatchOutcome {
+            delivered: 0,
+            failed: 0,
+            errors: vec!["group state did not commit".to_string()],
+            delivered_groups: Default::default(),
+            state_failed: true,
+        });
+    }
+
+    let states = match load_tracked_group_states(&alert_id).await {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("[SCHEDULER trace_id {trace_id}] group dispatch: state read failed: {e}");
+            return Some(GroupDispatchOutcome {
+                delivered: 0,
+                failed: 0,
+                errors: vec![format!("group state read failed: {e}")],
+                delivered_groups: Default::default(),
+                state_failed: true,
+            });
+        }
+    };
+
+    // M-6 is explicit that silent truncation is unacceptable. The pre-cap
+    // counts persisted on the rollup row are what the UI banner renders, but
+    // an operator reading logs gets nothing from them — so say it here too,
+    // once per evaluation that actually overflowed.
+    if let config::meta::alerts::grouping::GroupCapOutcome::Exceeded { observed, cap } =
+        classification.cap
+    {
+        log::warn!(
+            "[SCHEDULER trace_id {trace_id}] alert {alert_id}: {observed} groups observed exceeds \
+             the tracked-group cap of {cap} (ZO_ALERT_MAX_GROUPS); {} group(s) were not persisted \
+             and cannot page. Raise the cap or narrow the group_by.",
+            observed.saturating_sub(cap)
+        );
+    }
+
+    let rows = if is_promql {
+        config::meta::alerts::dispatch::rows_by_series_key(records)
+    } else {
+        rows_by_group_key(records, &group_by)
+    };
+    let cfg = get_config();
+
+    let plan = plan_dispatch(
+        classification,
+        &states,
+        &rows,
+        &alert.trigger_condition,
+        now_micros(),
+        cfg.limit.alert_max_group_notifications_per_eval,
+    );
+
+    // Never silent: both the volume cap and any consistency failure are
+    // reported, because a page that did not go out is exactly what an
+    // operator needs to know about.
+    if !plan.dropped_by_knob.is_empty() {
+        log::warn!(
+            "[SCHEDULER trace_id {trace_id}] alert {alert_id}: {} group notification(s) dropped by \
+             ZO_ALERT_MAX_GROUP_NOTIFICATIONS_PER_EVAL={}: {:?}",
+            plan.dropped_by_knob.len(),
+            cfg.limit.alert_max_group_notifications_per_eval,
+            plan.dropped_by_knob
+        );
+    }
+    if !plan.inconsistent.is_empty() {
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] alert {alert_id}: {} group(s) skipped as \
+             inconsistent (missing state/payload row, or a duplicate key): {:?}",
+            plan.inconsistent.len(),
+            plan.inconsistent
+        );
+    }
+
+    let (mut delivered, mut failed) = (0usize, 0usize);
+    let mut errors: Vec<String> = Vec::new();
+    let mut delivered_groups: std::collections::HashSet<String> = Default::default();
+    for item in &plan.items {
+        // The group's OWN row, level and value — never the worst group's
+        // (MN-3). One send per group is what makes host-a and host-b page
+        // independently.
+        let outcome = alert
+            .send_notification(
+                trace_id,
+                std::slice::from_ref(&item.row),
+                rows_end_time,
+                start_time,
+                triggered_at,
+                Some(item.level),
+                Some(item.actual_value),
+                // M-4: this group's labels become `{group.*}`, substituted
+                // last so a label value containing `{...}` cannot expand.
+                Some(&item.labels),
+                &[],
+            )
+            .await;
+
+        // MN-7: at least one destination delivering counts as delivered —
+        // the alert-level semantics, and the alternative would re-page
+        // destinations that already succeeded.
+        // Timed when the send RESOLVES, not before the loop: destinations can
+        // be slow, and a window opened before its own notification landed can
+        // expire while that notification is still in flight.
+        let resolved_at = now_micros();
+
+        let ok = match outcome {
+            Ok(outcome) => {
+                let err_msg = outcome.error_message.trim().to_owned();
+                if !err_msg.is_empty() {
+                    // MN-7: partial-destination errors belong in the
+                    // evaluation's trigger record, not only in the log.
+                    log::error!(
+                        "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: partial \
+                         delivery failure: {err_msg}",
+                        item.group_key
+                    );
+                    errors.push(format!("group {}: {err_msg}", item.group_key));
+                }
+                true
+            }
+            Err(e) => {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: delivery failed: {e}",
+                    item.group_key
+                );
+                errors.push(format!("group {}: {e}", item.group_key));
+                false
+            }
+        };
+
+        // MN-6: delivery state advances ONLY on success, which is what makes
+        // a failed group re-qualify at its next evaluation with no retry
+        // machinery. The write is episode- and attempt-guarded, so a callback
+        // that lost a race is dropped rather than applied.
+        // The window itself is computed by `delivery_success_update` — the
+        // scheduler only says how long the alert's silence is. Computing it
+        // here as well would put the same rule in two places, which is exactly
+        // how the pure and SQL layers drifted apart before.
+        let record = if ok {
+            delivered += 1;
+            delivered_groups.insert(item.group_key.clone());
+            infra::table::alert_states::DeliveryOutcome::Delivered {
+                silence_minutes: alert.trigger_condition.silence,
+                at: resolved_at,
+            }
+        } else {
+            failed += 1;
+            infra::table::alert_states::DeliveryOutcome::Failed { at: resolved_at }
+        };
+
+        if let Err(e) = db::alerts::alert_states::advance_delivery_state(
+            &alert_id,
+            &item.group_key,
+            item.episode,
+            record,
+        )
+        .await
+        {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: could not record \
+                 delivery outcome: {e}",
+                item.group_key
+            );
+        }
+    }
+
+    log::info!(
+        "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
+         failed={failed} suppressed={} candidates={}",
+        plan.suppressed,
+        plan.items.len()
+    );
+    Some(GroupDispatchOutcome {
+        delivered,
+        failed,
+        errors,
+        delivered_groups,
+        state_failed: false,
+    })
+}
+
+/// Confirm this evaluation's dedup reservations once a notification landed
+/// (§5.5 MN-6).
+///
+/// Unconfirmed reservations do not suppress, so skipping this on failure is
+/// exactly what allows the next evaluation through. Best-effort: failing to
+/// confirm costs at most one duplicate notification, while failing the
+/// evaluation over it would cost the alert.
+async fn confirm_dedup_reservations(fingerprints: &[String], delivered: bool) {
+    if !delivered || fingerprints.is_empty() {
+        return;
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        let db = infra::db::ORM_CLIENT
+            .get_or_init(infra::db::connect_to_orm)
+            .await;
+        if let Err(e) =
+            crate::alerts::deduplication::confirm_notification_sent(db, fingerprints).await
+        {
+            log::warn!("[SCHEDULER] could not confirm dedup reservations: {e}");
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = fingerprints;
+}
 
 pub async fn handle_triggers(
     trace_id: &str,
@@ -97,6 +523,8 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::AnomalyDetection => {
             handle_anomaly_detection_triggers(trigger).await
         }
+        db::scheduler::TriggerModule::Slo => handle_slo_triggers(trigger).await,
+        db::scheduler::TriggerModule::SloBackfill => handle_slo_backfill_triggers(trigger).await,
     }
 }
 
@@ -161,7 +589,7 @@ async fn handle_anomaly_detection_triggers(
         trigger.status = db::scheduler::TriggerStatus::Waiting;
         db::scheduler::update_trigger(trigger.clone(), true, "").await?;
 
-        crate::self_reporting::publish_triggers_usage(TriggerData {
+        usage_reporting::publish_triggers_usage(TriggerData {
             _timestamp: now_micros(),
             org: trigger.org.clone(),
             module: TriggerDataType::AnomalyDetection,
@@ -169,7 +597,7 @@ async fn handle_anomaly_detection_triggers(
             next_run_at: trigger.next_run_at,
             is_realtime: false,
             is_silenced: false,
-            status: TriggerDataStatus::Skipped,
+            status: RunOutcome::Skipped,
             start_time: now_micros(),
             end_time: now_micros(),
             retries: trigger.retries,
@@ -194,22 +622,29 @@ async fn handle_anomaly_detection_triggers(
             )
             .await
             {
+                // The outcome now carries whether anything was FOUND, not merely
+                // that detection ran. This is what lets the history API stop
+                // deriving `anomaly`/`normal` from `success_response`.
                 Ok(count) => (
-                    TriggerDataStatus::Completed,
+                    if count > 0 {
+                        RunOutcome::Firing
+                    } else {
+                        RunOutcome::Normal
+                    },
                     None,
                     Some(serde_json::json!({ "anomalies_found": count }).to_string()),
                     count,
                 ),
                 Err(e) => {
                     log::error!("[anomaly_detection] detection failed for {anomaly_id}: {e}");
-                    (TriggerDataStatus::Failed, Some(e.to_string()), None, 0i32)
+                    (RunOutcome::Error, Some(e.to_string()), None, 0i32)
                 }
             }
         }
         #[cfg(not(feature = "enterprise"))]
         {
             (
-                TriggerDataStatus::Skipped,
+                RunOutcome::Skipped,
                 Some("enterprise feature not enabled".to_string()),
                 None,
                 0i32,
@@ -221,7 +656,7 @@ async fn handle_anomaly_detection_triggers(
     // Publish trigger run record to the triggers stream (same as alerts).
     let interval_us = parse_detection_interval_to_micros(&config.schedule_interval);
     let next_run = now_micros() + interval_us;
-    crate::self_reporting::publish_triggers_usage(TriggerData {
+    usage_reporting::publish_triggers_usage(TriggerData {
         _timestamp: run_start_us,
         org: trigger.org.clone(),
         module: TriggerDataType::AnomalyDetection,
@@ -254,7 +689,9 @@ async fn handle_anomaly_detection_triggers(
     // processed by the training scheduler yet, or processed but status not yet
     // flipped), move it to Active so the UI reflects the real state.
     #[cfg(feature = "enterprise")]
-    if trigger_status == TriggerDataStatus::Completed && config.is_trained {
+    // "Detection ran cleanly" is now either Firing or Normal — both mean the
+    // model executed; they differ only in whether anomalies were found.
+    if matches!(trigger_status, RunOutcome::Firing | RunOutcome::Normal) && config.is_trained {
         use o2_enterprise::enterprise::anomaly_detection::types::Status as AnomalyStatus;
         if config.status != AnomalyStatus::Active.to_i32() {
             use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
@@ -375,6 +812,25 @@ fn _get_max_considerable_delay(frequency: i64) -> i64 {
     std::cmp::min(max_delay, max_considerable_delay)
 }
 
+/// Merge this attempt's successful destinations into the retry ledger
+/// (templates-v2 §6.1).
+///
+/// Append-only and order-preserving: `prior` entries keep their positions and
+/// duplicates are dropped, so a destination that landed on attempt 1 is listed
+/// exactly once no matter how many attempts follow. The result is what the
+/// NEXT attempt passes as `skip_destinations`, so a double entry would be
+/// harmless but an ordering change makes the persisted data harder to reason
+/// about in an incident.
+pub(crate) fn merge_ledger(prior: &[String], succeeded: &[String]) -> Vec<String> {
+    let mut out = prior.to_vec();
+    for s in succeeded {
+        if !out.iter().any(|p| p == s) {
+            out.push(s.clone());
+        }
+    }
+    out
+}
+
 async fn handle_alert_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
@@ -424,7 +880,7 @@ async fn handle_alert_triggers(
                     org: trigger.org.clone(),
                     module: TriggerDataType::Alert,
                     key: format!("/{}", trigger.module_key),
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     scheduler_trace_id: Some(scheduler_trace_id.clone()),
                     error: Some("Alert not found. Deleting trigger job.".to_string()),
                     time_in_queue_ms: Some(time_in_queue),
@@ -468,7 +924,7 @@ async fn handle_alert_triggers(
                     org: trigger.org.clone(),
                     module: TriggerDataType::Alert,
                     key: format!("/{}", trigger.module_key),
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     scheduler_trace_id: Some(scheduler_trace_id.clone()),
                     error: Some(format!("Error getting alert by id: {e}")),
                     time_in_queue_ms: Some(time_in_queue),
@@ -506,7 +962,7 @@ async fn handle_alert_triggers(
             org: trigger.org.clone(),
             module: TriggerDataType::Alert,
             key: format!("/{}", trigger.module_key),
-            status: TriggerDataStatus::Failed,
+            status: RunOutcome::Error,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             error: Some("Alert id is not a valid ksuid. Deleting trigger job.".to_string()),
             time_in_queue_ms: Some(time_in_queue),
@@ -623,11 +1079,19 @@ async fn handle_alert_triggers(
     let mut trigger_data = if let Ok(trigger_data) = trigger_data {
         trigger_data
     } else {
+        // A parse failure loses the retry ledger along with everything else.
+        // That is the SAFE direction (re-send, never suppress), but it means
+        // any new field added above must also be listed here or it silently
+        // resets on a malformed row.
         ScheduledTriggerData {
             period_end_time: None,
             tolerance: 0,
             last_satisfied_at: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
             backfill_job: None,
+            notified_destinations: vec![],
+            chart_id: None,
         }
     };
 
@@ -703,7 +1167,7 @@ async fn handle_alert_triggers(
                 next_run_at: triggered_at,
                 is_realtime: trigger.is_realtime,
                 is_silenced: trigger.is_silenced,
-                status: TriggerDataStatus::Skipped,
+                status: RunOutcome::Skipped,
                 start_time,
                 end_time: *skipped_last_timestamp,
                 retries: trigger.retries,
@@ -727,7 +1191,7 @@ async fn handle_alert_triggers(
     // This will be used in alert evaluation as the start time.
     // If this is None, alert will use the period to evaluate alert
     let start_time =
-        // approximate the start time involving the alert manager delay
+        // approximate the start time involving the scheduler delay
             final_end_time - Duration::try_minutes(alert.trigger_condition.period)
                 .unwrap()
                 .num_microseconds()
@@ -735,6 +1199,16 @@ async fn handle_alert_triggers(
 
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
+    // Set when per-group dispatch handled delivery (§5.5 MN-1): it commits the
+    // group plan itself, before sending, so the alert-level state write at the
+    // end of this function must not run and clobber the delivery callbacks.
+    let mut multi_alert_dispatched = false;
+    // Dedup `(group_key, fingerprint)` pairs, confirmed only after a
+    // successful send (§5.5 MN-6) — per group, so group A's success does not
+    // confirm group B's. Tuples rather than the dedup module's type, which is
+    // enterprise-gated.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut dedup_reservations: Vec<(Option<String>, String)> = Vec::new();
     let mut trigger_data_stream: TriggerData = TriggerData {
         _timestamp: now,
         org: trigger.org.clone(),
@@ -743,7 +1217,7 @@ async fn handle_alert_triggers(
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
-        status: TriggerDataStatus::Completed,
+        status: RunOutcome::Firing,
         start_time,
         end_time: final_end_time,
         retries: trigger.retries,
@@ -772,7 +1246,7 @@ async fn handle_alert_triggers(
     trigger_data_stream.evaluation_took_in_secs = Some(evaluation_took);
     if result.is_err() {
         let err = result.err().unwrap();
-        trigger_data_stream.status = TriggerDataStatus::Failed;
+        trigger_data_stream.status = RunOutcome::Error;
         let err_string = err.to_string();
         log::error!(
             "[SCHEDULER trace_id {scheduler_trace_id}] alert {} evaluation failed: {}",
@@ -823,6 +1297,23 @@ async fn handle_alert_triggers(
             )
             .await?;
         }
+        // Persist the error outcome (Part IV): without this, a previously
+        // firing alert whose query starts failing keeps `firing` in
+        // alert_states indefinitely while every evaluation errors.
+        if let Some(alert_id) = alert.id.as_ref() {
+            // Query failed: no level was computed, so the level axis carries
+            // forward untouched (including its freshness clock).
+            // Best-effort: a state write must not fail an evaluation that has
+            // already run. Only the per-group caller checks the result.
+            let _ = persist_alert_run_state(
+                &alert,
+                &alert_id.to_string(),
+                &trigger_data_stream.status,
+                None,
+                None,
+            )
+            .await;
+        }
         publish_triggers_usage(trigger_data_stream);
 
         // [ENTERPRISE] Mark completion even on failure
@@ -833,6 +1324,48 @@ async fn handle_alert_triggers(
     }
 
     let trigger_results = result.unwrap();
+    // Classified severity for this evaluation (alerts_2.md Feature 1). Captured
+    // once here so every downstream path — state persistence and the trigger
+    // record — reports the same level.
+    // `matched_level` is None when no threshold matched. `eval_level` is the
+    // level to RECORD for this completed evaluation — Ok in that case, never
+    // None. Both the state row and the stream record use `eval_level`, so they
+    // cannot disagree; passing the raw `matched_level` to state persistence is
+    // what previously wrote NULL level on healthy runs.
+    let matched_level = trigger_results.level;
+    let recorded_level =
+        config::meta::alerts::level::level_for_successful_evaluation(matched_level);
+    // A FROZEN evaluation (SLO alert, every window unobserved — §7.6) records
+    // no level at all: `None` sends state persistence down the same
+    // carry-forward path as a query error, so `level`, `level_since` and
+    // `level_at` rot rather than reset. `recorded_level` (Ok) is still what
+    // the delivery decision sees, which correctly reads as NotFiring.
+    let eval_level = config::meta::alerts::level::level_for_completed_evaluation(
+        trigger_results.frozen,
+        matched_level,
+    );
+
+    // T-9 value context: what was observed, against what, with which operator.
+    //
+    // Aggregation alerts carry their thresholds in `having` / `warning_value`,
+    // not in `trigger_condition` — reporting the count-path operator and
+    // threshold here would describe a comparison that never happened.
+    trigger_data_stream.actual_value = trigger_results.actual_value;
+    trigger_data_stream.group_label = trigger_results.group_label.clone();
+    trigger_data_stream.value_is_lower_bound = trigger_results.value_is_lower_bound.then_some(true);
+    // One function per family, so a new family cannot be added to evaluation
+    // without also being described correctly in history — an SLO alert
+    // compares against `slo_condition`, not the count gate SA-4 pins at its
+    // default.
+    let (ctx_operator, ctx_critical, ctx_warning) =
+        config::meta::alerts::level::threshold_context(&alert);
+    trigger_data_stream.threshold_operator = Some(ctx_operator.to_string());
+    // Only a MATCHED threshold is recorded — a healthy run has none (T-10).
+    trigger_data_stream.threshold_value = matched_level.map(|l| match l {
+        config::meta::alerts::level::AlertLevel::Warning => ctx_warning.unwrap_or(ctx_critical),
+        _ => ctx_critical,
+    });
+    trigger_data_stream.level = eval_level.map(|l| l.to_i32());
     trigger_data_stream.query_took = trigger_results.query_took;
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] result of alert {} evaluation matched condition: {}",
@@ -856,7 +1389,36 @@ async fn handle_alert_triggers(
             trigger_data.tolerance = tolerance;
         }
     }
-    if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 {
+    // ── Silence: evaluation-skip vs delivery-suppression (alerts_2.md §7.1) ──
+    //
+    // Single-level alerts keep the legacy behaviour: push `next_run_at` past
+    // the silence window, i.e. stop evaluating (G5 — no behaviour change).
+    //
+    // Multi-level alerts must keep evaluating, otherwise a Warning->Critical
+    // escalation inside the window is never observed and no fingerprint scheme
+    // can recover it. For them, silence suppresses DELIVERY only; the decision
+    // is made by `delivery_decision` further down.
+    // Multi-level if ANY warning source is configured. There are four, one per
+    // threshold family, and checking only `trigger_condition` would leave the
+    // aggregation-, PromQL- and SLO-warning alerts on the legacy silence path
+    // where an escalation can never be observed. Kept in `level` so a fifth
+    // family cannot be added to evaluation without answering this question.
+    let multi_level = config::meta::alerts::level::is_multi_level(&alert);
+    let notify_on_warning = alert.trigger_condition.notify_on_warning;
+    // §5.5 MN-10: a multi-alert evaluates through silence UNCONDITIONALLY,
+    // warning configured or not. Its silence state is per group, so pausing
+    // the whole trigger after host-a pages would leave host-b unevaluated and
+    // unpaged for the entire window — the cross-group blindness this feature
+    // exists to remove — and would freeze every group's `last_seen`, which
+    // M-7 reads as disappearance.
+    let evaluates_through_silence = config::meta::alerts::dispatch::evaluates_through_silence(
+        alert.query_condition.multi_alert_enabled(),
+        multi_level,
+    );
+    if trigger_results.data.is_some()
+        && alert.trigger_condition.silence > 0
+        && !evaluates_through_silence
+    {
         new_trigger.next_run_at =
             alert
                 .trigger_condition
@@ -877,20 +1439,107 @@ async fn handle_alert_triggers(
     }
 
     // send notification
+    // ── §7.1 delivery decision ──────────────────────────────────────────────
+    // Computed for multi-level alerts only; single-level alerts short-circuit
+    // to `Deliver` so their behaviour is bit-for-bit unchanged (G5).
+    // MN-1/MN-2: a multi-alert's suppression is per group, decided inside
+    // `dispatch_per_group` from each row's own `silenced_until`. The
+    // alert-level decision must not run in front of it — one window for the
+    // whole alert would mute every group at once, and a group that starts
+    // firing mid-window would never page at all.
+    let alert_level_delivery = config::meta::alerts::dispatch::alert_level_delivery_applies(
+        alert.query_condition.multi_alert_enabled(),
+        multi_level,
+    );
+    let delivery = if alert_level_delivery {
+        config::meta::alerts::level::delivery_decision(
+            recorded_level,
+            trigger_data
+                .last_notified_level
+                .and_then(config::meta::alerts::level::AlertLevel::from_i32),
+            trigger_data.delivery_silenced_until,
+            triggered_at,
+            notify_on_warning,
+        )
+    } else {
+        config::meta::alerts::level::DeliveryDecision::Deliver
+    };
+    if !delivery.should_deliver() && alert_level_delivery {
+        log::info!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] delivery suppressed ({delivery:?}) for {}/{}",
+            new_trigger.org,
+            alert.name
+        );
+    }
+    // Record the delivery outcome so the NEXT evaluation can detect escalation.
+    // Both fields must move together: `last_notified_level` is the baseline
+    // escalation is measured against, and the silence window restarts from this
+    // delivery. Writing only one would either re-page forever or never again.
+    //
+    // Called ONLY on paths where the notification was actually delivered (or
+    // handed to a delivery mechanism that owns it: grouping batch, incident
+    // correlation). `last_notified_level`'s contract is the last DELIVERED
+    // level — stamping it before a send that then FAILS would make the retry
+    // look like a repeat inside an active silence window and suppress it.
+    // MN-2: multi-alerts keep their delivery state on the per-group rows, so
+    // they never write these alert-level fields. Leaving them stale would be
+    // harmless now that nothing reads them for this path, but writing them
+    // would resurrect the alert-level window the moment anything did.
+    let record_delivery = |trigger_data: &mut ScheduledTriggerData| {
+        if alert_level_delivery && delivery.resets_silence() {
+            trigger_data.last_notified_level = eval_level.map(|l| l.to_i32());
+            trigger_data.delivery_silenced_until = if alert.trigger_condition.silence > 0 {
+                Some(
+                    triggered_at
+                        + Duration::try_minutes(alert.trigger_condition.silence)
+                            .unwrap_or_default()
+                            .num_microseconds()
+                            .unwrap_or(0),
+                )
+            } else {
+                None
+            };
+        }
+    };
+
+    // Whether the condition MATCHED this evaluation. Kept separate from the
+    // notification predicate below: a `<`/`<=` alert can match with an EMPTY
+    // payload, and a matched evaluation can be delivery-suppressed — in both
+    // cases outcome/state/history must still say "fired", only the
+    // notification is skipped.
+    let condition_matched = trigger_results.data.is_some();
+    let payload_empty = trigger_results.data.as_ref().is_none_or(|d| d.is_empty());
+
     if let Some(data) = trigger_results.data
         && !data.is_empty()
+        // Suppressed deliveries still record state and history; only the
+        // notification is skipped.
+        && delivery.should_deliver()
     {
+        // Per-group dispatch IS this alert's batching unit (§5.5 MN-1), so a
+        // multi-alert never takes the alert-level grouping path. Letting it
+        // through would batch every group under one alert-scoped fingerprint
+        // and record delivery at ENQUEUE time — no per-group fingerprint
+        // (M-5), no per-group delivery state (MN-6), and no per-group failure
+        // accounting (MN-7). The groups would be silently collapsed back into
+        // the single notification multi-alerts exist to split apart.
+        let is_multi_alert = alert.query_condition.multi_alert_enabled();
+
         // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
         #[cfg(feature = "enterprise")]
-        let grouping_enabled = alert
-            .deduplication
-            .as_ref()
-            .and_then(|d| d.grouping.as_ref())
-            .map(|g| g.enabled)
-            .unwrap_or(false);
+        let grouping_enabled = !is_multi_alert
+            && alert
+                .deduplication
+                .as_ref()
+                .and_then(|d| d.grouping.as_ref())
+                .map(|g| g.enabled)
+                .unwrap_or(false);
 
         #[cfg(not(feature = "enterprise"))]
-        let grouping_enabled = false;
+        let grouping_enabled = {
+            let _ = is_multi_alert;
+            false
+        };
 
         if grouping_enabled {
             #[cfg(feature = "enterprise")]
@@ -916,12 +1565,16 @@ async fn handle_alert_triggers(
                             .await;
 
                     if let Some(first_row) = data.first() {
+                        // Level is an implicit fingerprint component: a
+                        // Warning batch must never absorb a Critical
+                        // escalation (§7.1).
                         crate::alerts::deduplication::calculate_fingerprint(
                             &alert,
                             first_row,
                             dedup_config,
                             org_config.as_ref(),
                             &semantic_groups,
+                            eval_level,
                         )
                     } else {
                         alert.get_unique_key()
@@ -945,8 +1598,21 @@ async fn handle_alert_triggers(
                     data.clone(),
                     grouping_config.group_wait_seconds,
                     grouping_config.max_group_size,
+                    eval_level,
+                    // Alert-level batch: multi-alerts never reach here (they
+                    // dispatch per group instead), so there is no group
+                    // identity to carry. Per-group batching is the post-v1
+                    // enhancement specified in §5.5.
+                    None,
                 );
 
+                // Whether the batch handoff counts as a DELIVERY for the
+                // silence/escalation baseline. Queued = yes (the flush worker
+                // owns it from here). Immediately flushed = only if the send
+                // actually succeeded — stamping a failed send would start a
+                // silence window with zero destinations reached and suppress
+                // the retry.
+                let mut grouped_delivery_ok = true;
                 if batch_ready {
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
@@ -962,6 +1628,7 @@ async fn handle_alert_triggers(
                             "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
                             e
                         );
+                        grouped_delivery_ok = false;
                     }
                 } else {
                     log::debug!(
@@ -979,7 +1646,10 @@ async fn handle_alert_triggers(
                     1
                 });
 
-                // Alert added to batch, don't send individual notification
+                // Alert added to batch, don't send individual notification.
+                if grouped_delivery_ok {
+                    record_delivery(&mut trigger_data);
+                }
                 trigger_data.period_end_time = if should_store_last_end_time {
                     Some(trigger_results.end_time)
                 } else {
@@ -987,6 +1657,18 @@ async fn handle_alert_triggers(
                 };
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                // The alert fired; grouping only batches the delivery. State
+                // must reflect the firing (Part IV write-coverage).
+                if let Some(alert_id) = alert.id.as_ref() {
+                    let _ = persist_alert_run_state(
+                        &alert,
+                        &alert_id.to_string(),
+                        &trigger_data_stream.status,
+                        eval_level,
+                        trigger_results.group_classification.as_ref(),
+                    )
+                    .await;
+                }
                 publish_triggers_usage(trigger_data_stream);
                 return Ok(());
             }
@@ -995,9 +1677,25 @@ async fn handle_alert_triggers(
         // Apply deduplication if enabled (enterprise-only feature)
         #[cfg(feature = "enterprise")]
         let data = if let Some(db) = ORM_CLIENT.get() {
-            match crate::alerts::deduplication::apply_deduplication(db, &alert, data.clone()).await
+            match crate::alerts::deduplication::apply_deduplication(
+                db,
+                &alert,
+                data.clone(),
+                eval_level,
+            )
+            .await
             {
-                Ok((deduplicated_data, deduplicated)) => {
+                Ok(outcome) => {
+                    let (deduplicated_data, deduplicated) = (outcome.rows, outcome.applied);
+                    // Reserved, NOT yet suppressing. Confirmed only once the
+                    // notification actually goes out (§5.5 MN-6), so a send
+                    // that fails is retried rather than swallowed as a
+                    // duplicate for the rest of the window.
+                    dedup_reservations = outcome
+                        .reserved
+                        .into_iter()
+                        .map(|r| (r.group_key, r.fingerprint))
+                        .collect();
                     if deduplicated_data.is_empty() && deduplicated {
                         log::debug!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
@@ -1018,6 +1716,18 @@ async fn handle_alert_triggers(
                         };
                         new_trigger.data = json::to_string(&trigger_data).unwrap();
                         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        // Condition matched; only the notification was
+                        // deduplicated away. State must reflect the firing.
+                        if let Some(alert_id) = alert.id.as_ref() {
+                            let _ = persist_alert_run_state(
+                                &alert,
+                                &alert_id.to_string(),
+                                &trigger_data_stream.status,
+                                eval_level,
+                                trigger_results.group_classification.as_ref(),
+                            )
+                            .await;
+                        }
                         publish_triggers_usage(trigger_data_stream);
                         return Ok(());
                     }
@@ -1081,6 +1791,7 @@ async fn handle_alert_triggers(
                 first_row,
                 &data,
                 triggered_at,
+                eval_level,
             )
             .await
             {
@@ -1148,6 +1859,97 @@ async fn handle_alert_triggers(
         if incident_handled_notification {
             // Notification was handled (sent or suppressed) inside correlate_alert_to_incident.
             // Still advance the trigger state so the scheduler moves forward normally.
+            record_delivery(&mut trigger_data);
+            trigger_data.period_end_time = if should_store_last_end_time {
+                Some(trigger_results.end_time)
+            } else {
+                None
+            };
+            new_trigger.data = json::to_string(&trigger_data).unwrap();
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        } else if let Some(dispatch) = dispatch_per_group(
+            &alert,
+            &scheduler_trace_id,
+            trigger_results.group_classification.as_ref(),
+            &data,
+            trigger_results.end_time,
+            eval_level,
+            Some(start_time),
+            triggered_at,
+        )
+        .await
+        {
+            // Per-group dispatch REPLACES the alert-level send (§5.5 MN-1):
+            // sending both would page the worst group twice per incident.
+            // Durable state was already committed inside, before anything was
+            // sent, so the later `persist_alert_run_state` call is skipped for
+            // this path.
+            multi_alert_dispatched = true;
+            if dispatch.state_failed {
+                // Nothing was sent and nothing can be: the group plan is the
+                // input to every delivery decision. Treated as an evaluation
+                // failure rather than a completed run — record `error`, leave
+                // the silence window and last-notified level alone, and take
+                // the retry path so the next attempt comes soon instead of a
+                // full interval later with the firing silently unpaged.
+                trigger_data_stream.status = RunOutcome::Error;
+                trigger_data_stream.error = Some(dispatch.errors.join("; "));
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] alert {}/{}: per-group state \
+                     unavailable, nothing dispatched; retrying",
+                    new_trigger.org,
+                    new_trigger.module_key
+                );
+                db::scheduler::update_status(
+                    &new_trigger.org,
+                    new_trigger.module,
+                    &new_trigger.module_key,
+                    db::scheduler::TriggerStatus::Waiting,
+                    trigger.retries + 1,
+                    None,
+                    true,
+                    &query_trace_id,
+                )
+                .await?;
+                publish_triggers_usage(trigger_data_stream);
+                return Ok(());
+            }
+            if dispatch.failed > 0 {
+                // MN-7: the evaluation's single trigger record (D8) reports a
+                // delivery failure if ANY group's send failed; the per-group
+                // detail lives on each group's own state row.
+                trigger_data_stream.status = RunOutcome::NotifyFailed;
+                // The rollup row was committed as Firing before anything was
+                // sent; leave it and the detail page contradicts both the
+                // record and the failed groups.
+                if let Some(alert_id) = alert.id.as_ref() {
+                    let _ = persist_alert_run_state(
+                        &alert,
+                        &alert_id.to_string(),
+                        &RunOutcome::NotifyFailed,
+                        eval_level,
+                        None,
+                    )
+                    .await;
+                }
+            }
+            if !dispatch.errors.is_empty() {
+                // Partial-destination failures reach the record too, even when
+                // the group counts as delivered.
+                trigger_data_stream.error = Some(dispatch.errors.join("; "));
+            }
+            // MN-6: a reservation is confirmed by its own group's delivery.
+            // An unkeyed one falls back to "any delivery confirms".
+            let confirmable: Vec<String> = dedup_reservations
+                .iter()
+                .filter(|(group_key, _)| match group_key.as_deref() {
+                    Some(k) => dispatch.delivered_groups.contains(k),
+                    None => dispatch.delivered > 0,
+                })
+                .map(|(_, fingerprint)| fingerprint.clone())
+                .collect();
+            confirm_dedup_reservations(&confirmable, !confirmable.is_empty()).await;
+            record_delivery(&mut trigger_data);
             trigger_data.period_end_time = if should_store_last_end_time {
                 Some(trigger_results.end_time)
             } else {
@@ -1164,10 +1966,33 @@ async fn handle_alert_triggers(
                     trigger_results.end_time,
                     Some(start_time),
                     triggered_at,
+                    eval_level,
+                    trigger_results.actual_value,
+                    None,
+                    // Retry ledger (§6.1): destinations that already landed on
+                    // a prior attempt of THIS notification cycle are skipped,
+                    // so a retry driven by one flaky destination cannot
+                    // double-page the ones that succeeded.
+                    &trigger_data.notified_destinations,
                 )
                 .await
             {
-                Ok((success_msg, err_msg)) => {
+                Ok(outcome) => {
+                    let NotificationOutcome {
+                        succeeded,
+                        failed,
+                        success_message: success_msg,
+                        error_message: err_msg,
+                    } = outcome;
+                    let partial_failure = !failed.is_empty();
+                    // At least one destination delivered, so the reservations
+                    // this evaluation made are now real suppressions — one
+                    // send covered every reserved row.
+                    let fingerprints: Vec<String> = dedup_reservations
+                        .iter()
+                        .map(|(_, fingerprint)| fingerprint.clone())
+                        .collect();
+                    confirm_dedup_reservations(&fingerprints, true).await;
                     let success_msg = success_msg.trim().to_owned();
                     let err_msg = err_msg.trim().to_owned();
                     if !err_msg.is_empty() {
@@ -1185,17 +2010,104 @@ async fn handle_alert_triggers(
                         );
                     }
                     trigger_data_stream.success_response = Some(success_msg);
-                    // Notification was sent successfully, store the last used end_time in the
-                    // triggers
-                    trigger_data.period_end_time = if should_store_last_end_time {
-                        Some(trigger_results.end_time)
+
+                    if partial_failure && trigger.retries + 1 < max_retries {
+                        // `record_delivery` is deliberately NOT called on this
+                        // path. Stamping `delivery_silenced_until` /
+                        // `last_notified_level` here and then persisting them
+                        // into the retry row makes the retry's own
+                        // `delivery_decision` return `SuppressedBySilence`
+                        // (silenced=true because next_run_at is in the past,
+                        // escalated=false because the level is unchanged), so
+                        // the guard above the notification block skips the send
+                        // entirely and the failed destinations are NEVER
+                        // retried. This is exactly the hazard the doc comment
+                        // on `record_delivery` describes: "stamping it before a
+                        // send that then FAILS would make the retry look like a
+                        // repeat inside an active silence window and suppress
+                        // it." The stamp happens only on the cycle-terminating
+                        // branch below.
+                        //
+                        // BEHAVIOR CHANGE (§6.1): a partial failure used to
+                        // return here as a completed run and the failed
+                        // destinations were never retried. Now the failed ones
+                        // are retried while the ones that landed are recorded
+                        // in the ledger and skipped next attempt.
+                        //
+                        // period_end_time is deliberately NOT advanced: the
+                        // retry must re-evaluate the SAME window so the
+                        // re-rendered content matches what the succeeded
+                        // destinations already received.
+                        trigger_data.notified_destinations =
+                            merge_ledger(&trigger_data.notified_destinations, &succeeded);
+                        log::warn!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{}: {} of {} \
+                             destinations failed, retrying only those; ledger now {:?}",
+                            new_trigger.org,
+                            new_trigger.module_key,
+                            failed.len(),
+                            failed.len() + succeeded.len(),
+                            trigger_data.notified_destinations,
+                        );
+                        // Delivery-retry accounting: this run is published to
+                        // the `triggers` self-reporting stream with
+                        // status=notify_failed and the incremented `retries`,
+                        // while EVALUATION failures publish status=error. The
+                        // two are therefore separable without a new metric:
+                        //   SELECT key, max(retries) FROM triggers
+                        //   WHERE status = 'notify_failed' GROUP BY key
+                        // surfaces alerts burning their retry budget on a
+                        // chronically broken destination. See the rollout note
+                        // in the task report: `pause_alerts_on_retries` is only
+                        // reachable from the evaluation-error path, so that
+                        // safety valve does NOT trip for delivery failures.
+                        trigger_data_stream.status = RunOutcome::NotifyFailed;
+                        let retry_data = json::to_string(&trigger_data).unwrap();
+                        db::scheduler::update_status(
+                            &new_trigger.org,
+                            new_trigger.module,
+                            &new_trigger.module_key,
+                            db::scheduler::TriggerStatus::Waiting,
+                            trigger.retries + 1,
+                            Some(&retry_data),
+                            true,
+                            &query_trace_id,
+                        )
+                        .await?;
+                        trigger_data_stream.next_run_at = now;
                     } else {
-                        None
-                    };
-                    new_trigger.data = json::to_string(&trigger_data).unwrap();
-                    // Notification is already sent to some destinations,
-                    // hence in case of partial errors, no need to retry
-                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        // Full success, or a partial failure that has run out
+                        // of retries. Either way the notification cycle is
+                        // OVER, so the ledger MUST be cleared here — leaving it
+                        // set would make the next firing skip every listed
+                        // destination and silently deliver nothing to them.
+                        //
+                        // The notification was sent (possibly partially) — this
+                        // IS a delivery for silence/escalation purposes. Stamped
+                        // only here, on the terminal branch, so no retry can be
+                        // suppressed by a window this same cycle opened.
+                        record_delivery(&mut trigger_data);
+                        if partial_failure {
+                            log::error!(
+                                "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{}: \
+                                 destinations {:?} still failing at max retries, giving up",
+                                new_trigger.org,
+                                new_trigger.module_key,
+                                failed,
+                            );
+                            trigger_data_stream.status = RunOutcome::NotifyFailed;
+                        }
+                        trigger_data.notified_destinations.clear();
+                        // Notification cycle done, store the last used end_time in the
+                        // triggers
+                        trigger_data.period_end_time = if should_store_last_end_time {
+                            Some(trigger_results.end_time)
+                        } else {
+                            None
+                        };
+                        new_trigger.data = json::to_string(&trigger_data).unwrap();
+                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                    }
                 }
                 Err(e) => {
                     log::error!(
@@ -1222,6 +2134,11 @@ async fn handle_alert_triggers(
                         // So, in the next run, the period will be used to
                         // evaluate the alert.
                         trigger_data.period_end_time = None;
+                        // Max retries reached = the notification cycle is over.
+                        // The ledger MUST NOT survive it: any destination left
+                        // listed here would be skipped on the NEXT firing and
+                        // silently receive nothing.
+                        trigger_data.notified_destinations.clear();
                         new_trigger.data = json::to_string(&trigger_data).unwrap();
                         trigger_data_stream.next_run_at = new_trigger.next_run_at;
                         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
@@ -1241,20 +2158,58 @@ async fn handle_alert_triggers(
                         .await?;
                         trigger_data_stream.next_run_at = now;
                     }
-                    trigger_data_stream.status = TriggerDataStatus::Failed;
+                    // The condition DID match; only delivery failed. Recording
+                    // this as a plain error would lose the firing entirely and
+                    // undercount every time a destination is down.
+                    trigger_data_stream.status = RunOutcome::NotifyFailed;
                     trigger_data_stream.error =
                         Some(format!("error sending notification for alert: {e}"));
                 }
             }
         }
     } else {
-        log::info!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] Alert conditions not satisfied, org: {}, module_key: {}",
-            new_trigger.org,
-            new_trigger.module_key
-        );
-        // Condition did not match, store the last used end_time in the triggers
-        // In the next run, the alert will be checked from the last end_time
+        if condition_matched {
+            // The condition DID match — this branch was reached because the
+            // payload is empty (`<`/`<=` matching zero rows) or delivery was
+            // suppressed (silence window / warning policy). Outcome, state and
+            // history must still say "fired"; only the notification is
+            // skipped. `trigger_data_stream.status` is initialised to Firing,
+            // so it is deliberately NOT overwritten here.
+            log::info!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Alert fired without notification ({delivery:?}, payload empty: {payload_empty}), org: {}, module_key: {}",
+                new_trigger.org,
+                new_trigger.module_key
+            );
+        } else if trigger_results.frozen {
+            // Frozen is not Normal: nothing was measured (§7.6). `Skipped` is
+            // the outcome `should_persist` drops entirely, so BOTH state axes
+            // carry forward — recording `Normal` would flip a firing alert's
+            // outcome to healthy on a measurement outage, the same D34
+            // collapse as the level axis.
+            log::info!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] SLO alert evaluation frozen (unobserved), org: {}, module_key: {}",
+                new_trigger.org,
+                new_trigger.module_key
+            );
+            trigger_data_stream.status = RunOutcome::Skipped;
+        } else {
+            log::info!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Alert conditions not satisfied, org: {}, module_key: {}",
+                new_trigger.org,
+                new_trigger.module_key
+            );
+            trigger_data_stream.status = RunOutcome::Normal;
+        }
+        // FIFTH cycle exit. Reached when the condition stopped matching, the
+        // payload is empty, or delivery was suppressed. It terminates the
+        // notification cycle via `update_trigger`, so the ledger MUST be
+        // cleared: a partial failure whose retry then re-evaluates to
+        // "not matching" (entirely plausible for a flapping alert on a short
+        // frequency) would otherwise end the cycle with a populated ledger,
+        // and the NEXT firing would silently skip those destinations.
+        trigger_data.notified_destinations.clear();
+        // Store the last used end_time in the triggers; in the next run, the
+        // alert will be checked from the last end_time
         trigger_data.period_end_time = if should_store_last_end_time {
             Some(trigger_results.end_time)
         } else {
@@ -1264,7 +2219,23 @@ async fn handle_alert_triggers(
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         trigger_data_stream.start_time = start_time;
         trigger_data_stream.end_time = trigger_results.end_time;
-        trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
+    }
+
+    // Persist durable run state BEFORE the lossy stream publish (Part IV of
+    // alerts.md). `alert.id` is the ksuid the state rows are keyed on.
+    //
+    // Skipped when per-group dispatch ran: it committed the group plan itself,
+    // before sending, and re-running it here would overwrite the delivery
+    // state those callbacks just recorded.
+    if let Some(alert_id) = alert.id.as_ref().filter(|_| !multi_alert_dispatched) {
+        let _ = persist_alert_run_state(
+            &alert,
+            &alert_id.to_string(),
+            &trigger_data_stream.status,
+            eval_level,
+            trigger_results.group_classification.as_ref(),
+        )
+        .await;
     }
 
     log::debug!(
@@ -1427,7 +2398,7 @@ async fn handle_report_triggers(
                 next_run_at: now,
                 is_realtime: trigger.is_realtime,
                 is_silenced: trigger.is_silenced,
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 start_time: trigger.start_time.unwrap_or_default(),
                 end_time: trigger.end_time.unwrap_or_default(),
                 retries: trigger.retries,
@@ -1578,7 +2549,7 @@ async fn handle_report_triggers(
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
-        status: TriggerDataStatus::Completed,
+        status: RunOutcome::Succeeded,
         start_time: trigger.start_time.unwrap_or_default(),
         end_time: trigger.end_time.unwrap_or_default(),
         retries: trigger.retries,
@@ -1678,7 +2649,7 @@ async fn handle_report_triggers(
                 .await?;
             }
             trigger_data_stream.end_time = now_micros();
-            trigger_data_stream.status = TriggerDataStatus::Failed;
+            trigger_data_stream.status = RunOutcome::Error;
             trigger_data_stream.error = Some(format!("error processing report: {e}"));
         }
     }
@@ -1732,7 +2703,7 @@ async fn handle_derived_stream_triggers(
     };
     // Try to get pipeline from cache first, fallback to database if not found
     let pipeline = if let Some(cached_pipeline) =
-        crate::pipeline::store::get_scheduled_pipeline_from_cache(&pipeline_id).await
+        crate::pipeline::db::get_scheduled_pipeline_from_cache(&pipeline_id).await
     {
         log::debug!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} found in cache"
@@ -1746,7 +2717,7 @@ async fn handle_derived_stream_triggers(
         match infra::pipeline::get_by_id(&pipeline_id).await {
             Ok(pipeline) => {
                 // Cache the pipeline for future use
-                crate::pipeline::store::cache_scheduled_pipeline(&pipeline).await;
+                crate::pipeline::db::cache_scheduled_pipeline(&pipeline).await;
                 log::debug!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} fetched from database and cached"
                 );
@@ -1769,7 +2740,7 @@ async fn handle_derived_stream_triggers(
                     next_run_at: new_trigger.next_run_at,
                     is_realtime: new_trigger.is_realtime,
                     is_silenced: new_trigger.is_silenced,
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     start_time: 0,
                     end_time: 0,
                     retries: new_trigger.retries,
@@ -1851,7 +2822,7 @@ async fn handle_derived_stream_triggers(
             next_run_at: new_trigger.next_run_at,
             is_realtime: new_trigger.is_realtime,
             is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Failed,
+            status: RunOutcome::Error,
             start_time: 0,
             end_time: 0,
             retries: new_trigger.retries,
@@ -1888,7 +2859,7 @@ async fn handle_derived_stream_triggers(
             next_run_at: new_trigger.next_run_at,
             is_realtime: new_trigger.is_realtime,
             is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Failed,
+            status: RunOutcome::Error,
             start_time: 0,
             end_time: 0,
             retries: new_trigger.retries,
@@ -2033,7 +3004,7 @@ async fn handle_derived_stream_triggers(
         next_run_at: new_trigger.next_run_at,
         is_realtime: new_trigger.is_realtime,
         is_silenced: new_trigger.is_silenced,
-        status: TriggerDataStatus::Completed,
+        status: RunOutcome::Firing,
         start_time: if let Some(start) = start {
             start
         } else {
@@ -2075,7 +3046,7 @@ async fn handle_derived_stream_triggers(
             false,
             Some(trigger.next_run_at),
         )?;
-        trigger_data_stream.status = TriggerDataStatus::Skipped;
+        trigger_data_stream.status = RunOutcome::Skipped;
         trigger_data_stream.end_time = aligned_end_time;
         trigger_data_stream.next_run_at = new_trigger.next_run_at;
         trigger_data_stream.start_time = start_time;
@@ -2144,7 +3115,7 @@ async fn handle_derived_stream_triggers(
             );
 
             // update TriggerData that's to be reported to _meta
-            trigger_data_stream.status = TriggerDataStatus::Failed;
+            trigger_data_stream.status = RunOutcome::Error;
             trigger_data_stream.error = Some(err_msg.clone());
             trigger_data_stream.retries += 1;
 
@@ -2155,7 +3126,7 @@ async fn handle_derived_stream_triggers(
                 error: Some(err_msg),
                 node_errors: HashMap::new(),
             };
-            crate::self_reporting::publish_error(ErrorData {
+            usage_reporting::publish_error(ErrorData {
                 _timestamp: Utc::now().timestamp_micros(),
                 stream_params: pipeline.get_source_stream_params(),
                 error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2292,7 +3263,7 @@ async fn handle_derived_stream_triggers(
                     new_trigger.retries += 1;
 
                     // trigger_data_stream
-                    trigger_data_stream.status = TriggerDataStatus::Failed;
+                    trigger_data_stream.status = RunOutcome::Error;
                     trigger_data_stream.error = Some(err.clone());
                     trigger_data_stream.retries += 1;
 
@@ -2303,7 +3274,7 @@ async fn handle_derived_stream_triggers(
                         error: Some(err),
                         node_errors: HashMap::new(),
                     };
-                    crate::self_reporting::publish_error(ErrorData {
+                    usage_reporting::publish_error(ErrorData {
                         _timestamp: Utc::now().timestamp_micros(),
                         stream_params: pipeline.get_source_stream_params(),
                         error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2322,7 +3293,7 @@ async fn handle_derived_stream_triggers(
                     new_trigger.org,
                     new_trigger.module_key
                 );
-                trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
+                trigger_data_stream.status = RunOutcome::Normal;
                 trigger_data_stream.query_took = trigger_results.query_took;
 
                 // move the time range forward by frequency and continue
@@ -2337,9 +3308,7 @@ async fn handle_derived_stream_triggers(
         new_trigger.data = json::to_string(&ScheduledTriggerData {
             // updated start_time as end_time
             period_end_time: Some(start_time),
-            tolerance: 0,
-            last_satisfied_at: None,
-            backfill_job: None,
+            ..Default::default()
         })
         .unwrap();
     }
@@ -2348,17 +3317,15 @@ async fn handle_derived_stream_triggers(
     // run at In that case, the trigger will be picked up again by the scheduler
     // at the next batch immediately Once it reaches max retries, the trigger
     // will be run again at the next scheduled time.
-    if !(trigger_data_stream.status == TriggerDataStatus::Failed
-        && new_trigger.retries < max_retries)
-    {
+    if !(trigger_data_stream.status == RunOutcome::Error && new_trigger.retries < max_retries) {
         let need_to_catch_up = end < aligned_supposed_to_be_run_at;
         // If the trigger didn't fail, we need to reset the `retries` count.
         // Only cumulative failures should be used to check with `max_retries`
-        if trigger_data_stream.status != TriggerDataStatus::Failed {
+        if trigger_data_stream.status != RunOutcome::Error {
             new_trigger.retries = 0;
         }
 
-        if trigger_data_stream.status != TriggerDataStatus::Failed && need_to_catch_up {
+        if trigger_data_stream.status != RunOutcome::Error && need_to_catch_up {
             // Go to the next nun at, but use the same trigger start time
             new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
                 false,
@@ -2400,7 +3367,7 @@ async fn handle_derived_stream_triggers(
             error: Some(err_msg),
             node_errors: HashMap::new(),
         };
-        crate::self_reporting::publish_error(ErrorData {
+        usage_reporting::publish_error(ErrorData {
             _timestamp: Utc::now().timestamp_micros(),
             stream_params: pipeline.get_source_stream_params(),
             error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2486,7 +3453,7 @@ async fn handle_backfill_triggers(
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
                 key: job_id.clone(),
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 error: Some(format!(
                     "Failed to fetch backfill job config: {e}. Deleting trigger job."
@@ -2569,7 +3536,7 @@ async fn handle_backfill_triggers(
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
                 key: job_id.clone(),
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 error: Some(format!("Failed to parse backfill trigger data: {e}")),
                 time_in_queue_ms: Some(
@@ -2627,7 +3594,7 @@ async fn handle_backfill_triggers(
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
                 key: job_id.clone(),
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 error: Some("Missing backfill job data in trigger".to_string()),
                 time_in_queue_ms: Some(
@@ -2647,7 +3614,7 @@ async fn handle_backfill_triggers(
     };
 
     // 3. Fetch the source pipeline configuration
-    let pipeline = match crate::pipeline::store::get_by_id(&config.pipeline_id).await {
+    let pipeline = match crate::pipeline::db::get_by_id(&config.pipeline_id).await {
         Ok(pipeline) => pipeline,
         Err(e) => {
             log::error!(
@@ -2668,7 +3635,7 @@ async fn handle_backfill_triggers(
                     org: trigger.org.clone(),
                     module: TriggerDataType::Backfill,
                     key: job_id.clone(),
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     scheduler_trace_id: Some(scheduler_trace_id.clone()),
                     error: Some(format!(
                         "Failed to fetch pipeline after max retries: {e}. Deleting trigger job."
@@ -2702,7 +3669,7 @@ async fn handle_backfill_triggers(
                     org: trigger.org.clone(),
                     module: TriggerDataType::Backfill,
                     key: job_id.clone(),
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     scheduler_trace_id: Some(scheduler_trace_id.clone()),
                     error: Some(format!("Failed to fetch pipeline: {e}. Retrying.")),
                     time_in_queue_ms: Some(
@@ -2743,7 +3710,7 @@ async fn handle_backfill_triggers(
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
                 key: job_id.clone(),
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 error: Some("Pipeline is not scheduled. Deleting trigger job.".to_string()),
                 time_in_queue_ms: Some(
@@ -2781,7 +3748,7 @@ async fn handle_backfill_triggers(
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
                 key: job_id.clone(),
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 error: Some(format!(
                     "Failed to get destination streams: {e}. Deleting trigger job."
@@ -3102,7 +4069,7 @@ async fn handle_backfill_triggers(
                 next_run_at,
                 is_realtime: false,
                 is_silenced: false,
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 start_time: query_start_time,
                 end_time: query_end_time,
                 retries: new_retries,
@@ -3192,7 +4159,7 @@ async fn handle_backfill_triggers(
                 next_run_at,
                 is_realtime: false,
                 is_silenced: false,
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 start_time: query_start_time,
                 end_time: query_end_time,
                 retries: new_retries,
@@ -3295,7 +4262,7 @@ async fn handle_backfill_triggers(
                     next_run_at,
                     is_realtime: false,
                     is_silenced: false,
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     start_time: query_start_time,
                     end_time: query_end_time,
                     retries: new_retries,
@@ -3451,7 +4418,7 @@ async fn handle_backfill_triggers(
             next_run_at,
             is_realtime: false,
             is_silenced: false,
-            status: TriggerDataStatus::Failed,
+            status: RunOutcome::Error,
             start_time: query_start_time,
             end_time: query_end_time,
             retries: new_retries,
@@ -3507,11 +4474,11 @@ async fn handle_backfill_triggers(
 
         // Determine trigger status based on data availability and ingestion success
         let trigger_status = if ingestion_error.is_some() {
-            TriggerDataStatus::Failed
+            RunOutcome::Error
         } else if has_data {
-            TriggerDataStatus::Completed
+            RunOutcome::Succeeded
         } else {
-            TriggerDataStatus::ConditionNotSatisfied
+            RunOutcome::Normal
         };
 
         // Publish trigger usage for completion (last chunk)
@@ -3589,11 +4556,11 @@ async fn handle_backfill_triggers(
 
         // Determine trigger status based on data availability and ingestion success
         let trigger_status = if ingestion_error.is_some() {
-            TriggerDataStatus::Failed
+            RunOutcome::Error
         } else if has_data {
-            TriggerDataStatus::Completed
+            RunOutcome::Succeeded
         } else {
-            TriggerDataStatus::ConditionNotSatisfied
+            RunOutcome::Normal
         };
 
         // Publish trigger usage for this chunk
@@ -3738,11 +4705,465 @@ async fn check_deletion_status(job_id: &str) -> Result<String, anyhow::Error> {
     Ok(status_str.to_string())
 }
 
+/// One SLI ingest pass (`alerts_2.md` §6b.4a, §6b.9).
+///
+/// The failure policy is the part worth reading: a failed pass writes no
+/// slice, so coverage falls and the SLO eventually freezes. It does NOT write
+/// zeros. Zeros would report a search outage as 100% downtime and page
+/// everyone, which is the opposite of what an absence of measurement means.
+async fn handle_slo_triggers(mut trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+    use config::utils::time::{now_micros, second_micros};
+
+    let slo_id = trigger.module_key.clone();
+
+    let db = infra::db::ORM_CLIENT
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let slo = infra::table::slos::get(db, &trigger.org, &slo_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    // Not found locally may be a super-cluster race (the trigger row arrived
+    // before the SLO synced). Reschedule rather than delete — the trigger is
+    // cleaned up by the delete path, not here.
+    let Some(slo) = slo else {
+        log::warn!(
+            "[slo] definition not found locally for id={slo_id} org={} — rescheduling +60s",
+            trigger.org
+        );
+        trigger.next_run_at = now_micros() + second_micros(60);
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        db::scheduler::update_trigger(trigger, true, "").await?;
+        return Ok(());
+    };
+
+    if !slo.enabled {
+        trigger.next_run_at = now_micros() + second_micros(slo.definition.slice_interval_secs);
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        db::scheduler::update_trigger(trigger.clone(), true, "").await?;
+        publish_slo_pass(&trigger, &slo_id, RunOutcome::Skipped, None);
+        return Ok(());
+    }
+
+    let now_secs = now_micros() / 1_000_000;
+    let started = now_micros();
+    let (outcome, error) = match crate::slo::job::run_pass(&slo, now_secs).await {
+        Ok(o) => {
+            log::debug!("[slo] pass for {slo_id}: {o:?}");
+            (RunOutcome::Succeeded, None)
+        }
+        Err(e) => {
+            // Deliberately not propagated: the scheduler would retry, and a
+            // retry storm against a failing search helps nobody. Coverage
+            // falling is the designed response.
+            log::error!("[slo] pass failed for {slo_id} org={}: {e}", trigger.org);
+            (RunOutcome::NotifyFailed, Some(e.to_string()))
+        }
+    };
+
+    trigger.next_run_at = crate::slo::job::next_run_at(slo.definition.slice_interval_secs);
+    trigger.status = db::scheduler::TriggerStatus::Waiting;
+    let published = trigger.clone();
+    db::scheduler::update_trigger(trigger, true, "").await?;
+    publish_slo_pass_timed(&published, &slo_id, outcome, error, started);
+    Ok(())
+}
+
+/// One backfill chunk. Its own module so a bulk historical scan never shares a
+/// concurrency budget with latency-sensitive incremental passes (§6b.9).
+async fn handle_slo_backfill_triggers(
+    mut trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use config::utils::time::{now_micros, second_micros};
+
+    let slo_id = trigger.module_key.clone();
+
+    let db = infra::db::ORM_CLIENT
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let Some(slo) = infra::table::slos::get(db, &trigger.org, &slo_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+    else {
+        // The SLO is gone, so its backfill has nothing to fill.
+        db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::SloBackfill,
+            &slo_id,
+        )
+        .await?;
+        return Ok(());
+    };
+
+    match crate::slo::backfill::run_chunk(&slo).await {
+        Ok(crate::slo::backfill::ChunkOutcome::Done) => {
+            log::info!("[slo] backfill complete for {slo_id}");
+            db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::SloBackfill,
+                &slo_id,
+            )
+            .await?;
+            return Ok(());
+        }
+        Ok(crate::slo::backfill::ChunkOutcome::More) => {}
+        Err(e) => {
+            log::error!("[slo] backfill chunk failed for {slo_id}: {e}");
+        }
+    }
+
+    // Paced: chunks are bulk scans, and running them back-to-back would use
+    // the whole lane even though the lane exists to bound exactly that.
+    trigger.next_run_at = now_micros() + second_micros(30);
+    trigger.status = db::scheduler::TriggerStatus::Waiting;
+    db::scheduler::update_trigger(trigger, true, "").await?;
+    Ok(())
+}
+
+fn publish_slo_pass(
+    trigger: &db::scheduler::Trigger,
+    slo_id: &str,
+    outcome: RunOutcome,
+    error: Option<String>,
+) {
+    publish_slo_pass_timed(trigger, slo_id, outcome, error, now_micros());
+}
+
+fn publish_slo_pass_timed(
+    trigger: &db::scheduler::Trigger,
+    slo_id: &str,
+    outcome: RunOutcome,
+    error: Option<String>,
+    started: i64,
+) {
+    usage_reporting::publish_triggers_usage(TriggerData {
+        _timestamp: now_micros(),
+        org: trigger.org.clone(),
+        module: TriggerDataType::Slo,
+        key: slo_id.to_string(),
+        next_run_at: trigger.next_run_at,
+        is_realtime: false,
+        is_silenced: false,
+        status: outcome,
+        start_time: started,
+        end_time: now_micros(),
+        retries: trigger.retries,
+        error,
+        ..Default::default()
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
+
+    // ── Task 11: per-destination retry ledger (§6.1) ────────────────────────
+
+    #[test]
+    fn ledger_merge_dedups_and_preserves_order() {
+        assert_eq!(
+            merge_ledger(&["a".into()], &["b".into(), "a".into()]),
+            vec!["a", "b"]
+        );
+    }
+
+    #[test]
+    fn ledger_merge_edge_cases() {
+        // Nothing succeeded: the ledger is unchanged, so the next attempt
+        // retries exactly the same set.
+        assert_eq!(merge_ledger(&["a".into()], &[]), vec!["a"]);
+        // First attempt: prior is empty.
+        assert_eq!(merge_ledger(&[], &["a".into(), "b".into()]), vec!["a", "b"]);
+        // Repeated merges are idempotent — a destination is never listed twice
+        // no matter how many attempts report it.
+        let once = merge_ledger(&[], &["a".into()]);
+        assert_eq!(merge_ledger(&once, &["a".into()]), vec!["a"]);
+    }
+
+    use config::meta::alerts::level::{AlertLevel, DeliveryDecision, delivery_decision};
+
+    const SILENCE_MINS: i64 = 30;
+    const SILENCE_MICROS: i64 = SILENCE_MINS * 60 * 1_000_000;
+
+    /// The real `record_delivery` field writes (handlers.rs `record_delivery`
+    /// closure) for the alert-level, silence>0, delivering case. Kept in sync
+    /// by shape: it stamps exactly these two fields.
+    fn record_delivery_model(
+        data: &mut ScheduledTriggerData,
+        level: AlertLevel,
+        triggered_at: i64,
+    ) {
+        data.last_notified_level = Some(level.to_i32());
+        data.delivery_silenced_until = Some(triggered_at + SILENCE_MICROS);
+    }
+
+    /// Models ONE attempt of the handler's `Ok(outcome)` arm end-to-end,
+    /// including the delivery gate that runs before the notification block.
+    ///
+    /// This deliberately carries `ScheduledTriggerData` through
+    /// `delivery_decision` rather than testing the branch condition alone. The
+    /// earlier version of these tests modelled only the branch and therefore
+    /// passed while the real retry was being suppressed by the silence window
+    /// the same cycle had just stamped (C1).
+    ///
+    /// Returns `(data_after, delivered_to)`. `delivered_to` is empty when the
+    /// delivery gate suppressed the attempt.
+    fn run_attempt(
+        mut data: ScheduledTriggerData,
+        all_destinations: &[&str],
+        // Destinations that fail transport on this attempt.
+        failing: &[&str],
+        level: AlertLevel,
+        triggered_at: i64,
+        retries: i32,
+        max_retries: i32,
+    ) -> (ScheduledTriggerData, Vec<String>) {
+        // The gate at handlers.rs `if !delivery.should_deliver()`.
+        let delivery = delivery_decision(
+            level,
+            data.last_notified_level.and_then(AlertLevel::from_i32),
+            data.delivery_silenced_until,
+            triggered_at,
+            None,
+        );
+        if !delivery.should_deliver() {
+            // Falls through to the FIFTH exit, which clears the ledger.
+            data.notified_destinations.clear();
+            return (data, vec![]);
+        }
+
+        // Task 9's send loop: ledgered destinations are skipped.
+        let attempted: Vec<String> = all_destinations
+            .iter()
+            .filter(|d| !data.notified_destinations.contains(&d.to_string()))
+            .map(|d| d.to_string())
+            .collect();
+        let succeeded: Vec<String> = attempted
+            .iter()
+            .filter(|d| !failing.contains(&d.as_str()))
+            .cloned()
+            .collect();
+        let failed: Vec<String> = attempted
+            .iter()
+            .filter(|d| failing.contains(&d.as_str()))
+            .cloned()
+            .collect();
+
+        let partial_failure = !failed.is_empty();
+        if partial_failure && retries + 1 < max_retries {
+            // Retry branch: ledger merged, delivery state NOT stamped.
+            data.notified_destinations = merge_ledger(&data.notified_destinations, &succeeded);
+        } else {
+            // Terminal branch: stamp delivery state, clear ledger.
+            record_delivery_model(&mut data, level, triggered_at);
+            data.notified_destinations.clear();
+        }
+        (data, succeeded)
+    }
+
+    /// C1 regression. A retry scheduled after a partial failure must actually
+    /// deliver — to the ledger's complement — instead of being suppressed by a
+    /// silence window this same notification cycle opened.
+    #[test]
+    fn ledger_retry_within_silence_window_still_delivers_to_failed_destinations() {
+        let dests = ["slack", "pagerduty"];
+        let t0 = 1_700_000_000_000_000;
+        let max_retries = 3;
+
+        // Attempt 1: pagerduty fails.
+        let (data, delivered) = run_attempt(
+            ScheduledTriggerData::default(),
+            &dests,
+            &["pagerduty"],
+            AlertLevel::Critical,
+            t0,
+            0,
+            max_retries,
+        );
+        assert_eq!(delivered, vec!["slack"]);
+        assert_eq!(data.notified_destinations, vec!["slack"]);
+        // The retry must not be pre-suppressed by a window from this cycle.
+        assert!(
+            data.delivery_silenced_until.is_none(),
+            "delivery state stamped on the retry path would suppress the retry (C1)"
+        );
+
+        // Attempt 2 runs immediately, WELL inside what would have been the
+        // silence window, and at the same level (no escalation).
+        let (data2, delivered2) = run_attempt(
+            data,
+            &dests,
+            &[],
+            AlertLevel::Critical,
+            t0 + 1_000_000,
+            1,
+            max_retries,
+        );
+        assert_eq!(
+            delivered2,
+            vec!["pagerduty"],
+            "the failed destination must be retried, and only it"
+        );
+        assert!(
+            !delivered2.contains(&"slack".to_string()),
+            "slack already landed — re-sending would double-page"
+        );
+        // Cycle complete: ledger cleared, delivery state now stamped.
+        assert!(data2.notified_destinations.is_empty());
+        assert!(data2.delivery_silenced_until.is_some());
+    }
+
+    /// Proves the C1 hazard is real, not hypothetical: if delivery state IS
+    /// stamped on the retry path, the retry is suppressed and the failed
+    /// destination never receives anything.
+    #[test]
+    fn stamping_delivery_state_on_retry_path_would_suppress_the_retry() {
+        let t0 = 1_700_000_000_000_000;
+        let mut data = ScheduledTriggerData {
+            notified_destinations: vec!["slack".into()],
+            ..Default::default()
+        };
+        // The buggy ordering: stamp before persisting the retry row.
+        record_delivery_model(&mut data, AlertLevel::Critical, t0);
+
+        let decision = delivery_decision(
+            AlertLevel::Critical,
+            data.last_notified_level.and_then(AlertLevel::from_i32),
+            data.delivery_silenced_until,
+            t0 + 1_000_000,
+            None,
+        );
+        assert_eq!(
+            decision,
+            DeliveryDecision::SuppressedBySilence,
+            "this is the C1 defect: the retry would be gated out before sending"
+        );
+    }
+
+    #[test]
+    fn ledger_full_success_clears_the_cycle() {
+        let (data, delivered) = run_attempt(
+            ScheduledTriggerData::default(),
+            &["a", "b"],
+            &[],
+            AlertLevel::Critical,
+            1_700_000_000_000_000,
+            0,
+            3,
+        );
+        assert_eq!(delivered, vec!["a", "b"]);
+        assert!(
+            data.notified_destinations.is_empty(),
+            "a ledger surviving full success would suppress the NEXT firing"
+        );
+        // Full success still stamps the silence window, exactly as today.
+        assert!(data.delivery_silenced_until.is_some());
+    }
+
+    #[test]
+    fn ledger_partial_failure_persists_only_succeeded() {
+        let (data, _) = run_attempt(
+            ScheduledTriggerData::default(),
+            &["slack", "pagerduty"],
+            &["pagerduty"],
+            AlertLevel::Critical,
+            1_700_000_000_000_000,
+            0,
+            3,
+        );
+        // No double-send: the destination that landed is skipped next attempt.
+        assert!(data.notified_destinations.contains(&"slack".to_string()));
+        // No silent loss: the failed destination is NOT skipped, so it retries.
+        assert!(
+            !data
+                .notified_destinations
+                .contains(&"pagerduty".to_string())
+        );
+    }
+
+    #[test]
+    fn ledger_max_retries_clears_even_with_failures_outstanding() {
+        // retries + 1 == max_retries -> terminal branch despite the failure.
+        let (data, _) = run_attempt(
+            ScheduledTriggerData {
+                notified_destinations: vec!["slack".into()],
+                ..Default::default()
+            },
+            &["slack", "pagerduty"],
+            &["pagerduty"],
+            AlertLevel::Critical,
+            1_700_000_000_000_000,
+            2,
+            3,
+        );
+        assert!(
+            data.notified_destinations.is_empty(),
+            "ledger must not outlive a cycle abandoned at max retries"
+        );
+    }
+
+    /// C2 regression. The fifth cycle exit — condition no longer matches, or
+    /// delivery suppressed — terminates the cycle and must clear the ledger.
+    #[test]
+    fn ledger_cleared_when_retry_reevaluates_to_not_matching() {
+        let t0 = 1_700_000_000_000_000;
+        // Attempt 1 leaves a populated ledger.
+        let (data, _) = run_attempt(
+            ScheduledTriggerData::default(),
+            &["slack", "pagerduty"],
+            &["pagerduty"],
+            AlertLevel::Critical,
+            t0,
+            0,
+            3,
+        );
+        assert_eq!(data.notified_destinations, vec!["slack"]);
+
+        // The retry re-evaluates and the condition no longer matches: the run
+        // takes the fifth exit. `AlertLevel::Ok` is not firing, so
+        // `delivery_decision` returns `NotFiring` and the send is skipped.
+        let (data2, delivered2) = run_attempt(
+            data,
+            &["slack", "pagerduty"],
+            &[],
+            AlertLevel::Ok,
+            t0 + 1_000_000,
+            1,
+            3,
+        );
+        assert!(delivered2.is_empty());
+        assert!(
+            data2.notified_destinations.is_empty(),
+            "fifth exit must clear the ledger, else the NEXT firing skips slack (C2)"
+        );
+    }
+
+    /// The real clearing mechanism used by every cycle-terminating path in
+    /// this file (max retries, abandoned run).
+    #[test]
+    fn scheduled_trigger_data_reset_clears_ledger() {
+        let mut data = ScheduledTriggerData {
+            notified_destinations: vec!["slack".into()],
+            period_end_time: Some(123),
+            ..Default::default()
+        };
+        data.reset();
+        assert!(data.notified_destinations.is_empty());
+        assert!(data.period_end_time.is_none());
+    }
+
+    /// A trigger row written by a pre-upgrade node (rolling upgrade, retry in
+    /// flight) must still parse, with an empty ledger — i.e. re-send rather
+    /// than suppress.
+    #[test]
+    fn ledger_absent_from_pre_upgrade_trigger_row_parses_empty() {
+        let row = r#"{"period_end_time":1700000000,"tolerance":5}"#;
+        let data: ScheduledTriggerData = json::from_str(row).unwrap();
+        assert!(data.notified_destinations.is_empty());
+        assert_eq!(data.period_end_time, Some(1_700_000_000));
+    }
 
     #[test]
     fn test_get_pipeline_info_from_module_key_valid_input() {

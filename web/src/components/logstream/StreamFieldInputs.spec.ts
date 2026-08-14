@@ -46,10 +46,7 @@ const mockFields = [
 // Renders the child inside a real <OForm> (form-only contract) and seeds the
 // `fields` array from `initialFields`. Extra props (showHeader/visibleInputs)
 // are forwarded to the child.
-const makeHarness = (
-  initialFields: any[] = [],
-  childProps: Record<string, any> = {},
-) => {
+const makeHarness = (initialFields: any[] = [], childProps: Record<string, any> = {}) => {
   const Harness = defineComponent({
     components: { OForm, StreamFieldInputs },
     setup() {
@@ -85,25 +82,19 @@ describe("StreamFieldInputs (form-mode)", () => {
     it("renders the fields section", async () => {
       const wrapper = makeHarness([]);
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-stream-fields-section"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-fields-section"]').exists()).toBe(true);
     });
 
     it("shows the header when showHeader is true (default)", async () => {
       const wrapper = makeHarness([]);
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="alert-conditions-text"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-conditions-text"]').exists()).toBe(true);
     });
 
     it("hides the header when showHeader is false", async () => {
       const wrapper = makeHarness([], { showHeader: false });
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="alert-conditions-text"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="alert-conditions-text"]').exists()).toBe(false);
     });
 
     it("shows the add-field button when the array is empty", async () => {
@@ -119,23 +110,15 @@ describe("StreamFieldInputs (form-mode)", () => {
     it("renders a row per field", async () => {
       const wrapper = makeHarness(mockFields);
       await flushPromises();
-      expect(
-        wrapper.findAll('[data-test^="add-stream-field-row-"]'),
-      ).toHaveLength(2);
+      expect(wrapper.findAll('[data-test^="add-stream-field-row-"]')).toHaveLength(2);
     });
 
     it("renders a name input, index-type and data-type select per row", async () => {
       const wrapper = makeHarness(mockFields);
       await flushPromises();
-      expect(
-        wrapper.findAll('[data-test="add-stream-field-name-input"]'),
-      ).toHaveLength(2);
-      expect(
-        wrapper.findAll('[data-test="add-stream-field-index-type-select"]'),
-      ).toHaveLength(2);
-      expect(
-        wrapper.findAll('[data-test="add-stream-field-data-type-select"]'),
-      ).toHaveLength(2);
+      expect(wrapper.findAll('[data-test="add-stream-field-name-input"]')).toHaveLength(2);
+      expect(wrapper.findAll('[data-test="add-stream-field-index-type-select"]')).toHaveLength(2);
+      expect(wrapper.findAll('[data-test="add-stream-field-data-type-select"]')).toHaveLength(2);
     });
 
     it("binds each row's name to the rendered input", async () => {
@@ -147,12 +130,8 @@ describe("StreamFieldInputs (form-mode)", () => {
     it("shows the add button only on the last row + a delete button per row", async () => {
       const wrapper = makeHarness(mockFields);
       await flushPromises();
-      expect(
-        wrapper.findAll('[data-test="add-stream-add-field-btn"]'),
-      ).toHaveLength(1);
-      expect(
-        wrapper.findAll('[data-test="add-stream-delete-field-btn"]'),
-      ).toHaveLength(2);
+      expect(wrapper.findAll('[data-test="add-stream-add-field-btn"]')).toHaveLength(1);
+      expect(wrapper.findAll('[data-test="add-stream-delete-field-btn"]')).toHaveLength(2);
     });
   });
 
@@ -162,9 +141,7 @@ describe("StreamFieldInputs (form-mode)", () => {
         visibleInputs: { name: true, data_type: true, index_type: false },
       });
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-stream-field-index-type-select"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="add-stream-field-index-type-select"]').exists()).toBe(false);
     });
 
     it("hides the data_type select when visibleInputs.data_type is false", async () => {
@@ -172,9 +149,7 @@ describe("StreamFieldInputs (form-mode)", () => {
         visibleInputs: { name: true, data_type: false, index_type: true },
       });
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-stream-field-data-type-select"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="add-stream-field-data-type-select"]').exists()).toBe(false);
     });
   });
 
@@ -182,9 +157,7 @@ describe("StreamFieldInputs (form-mode)", () => {
     it("adds a blank row to the form when the add button is clicked", async () => {
       const wrapper = makeHarness(mockFields);
       await flushPromises();
-      await wrapper
-        .find('[data-test="add-stream-add-field-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="add-stream-add-field-btn"]').trigger("click");
       await flushPromises();
       expect(getForm(wrapper).state.values.fields).toHaveLength(3);
     });
@@ -192,9 +165,7 @@ describe("StreamFieldInputs (form-mode)", () => {
     it("adds the first row from the empty state", async () => {
       const wrapper = makeHarness([]);
       await flushPromises();
-      await wrapper
-        .find('[data-test="add-stream-add-field-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="add-stream-add-field-btn"]').trigger("click");
       await flushPromises();
       expect(getForm(wrapper).state.values.fields).toHaveLength(1);
     });
@@ -202,9 +173,7 @@ describe("StreamFieldInputs (form-mode)", () => {
     it("removes a row from the form when the delete button is clicked", async () => {
       const wrapper = makeHarness(mockFields);
       await flushPromises();
-      await wrapper
-        .findAll('[data-test="add-stream-delete-field-btn"]')[0]
-        .trigger("click");
+      await wrapper.findAll('[data-test="add-stream-delete-field-btn"]')[0].trigger("click");
       await flushPromises();
       const rows = getForm(wrapper).state.values.fields;
       expect(rows).toHaveLength(1);
@@ -225,36 +194,29 @@ describe("StreamFieldInputs (form-mode)", () => {
         { visibleInputs: { name: true, data_type: false, index_type: false } },
       );
       await flushPromises();
-      expect(renderedRowNames(wrapper)).toEqual([
-        "row_one",
-        "row_two",
-        "row_three",
-      ]);
+      expect(renderedRowNames(wrapper)).toEqual(["row_one", "row_two", "row_three"]);
 
       childVm(wrapper).removeRow(1);
       await flushPromises();
 
       expect(renderedRowNames(wrapper)).toEqual(["row_one", "row_three"]);
-      expect(
-        getForm(wrapper).state.values.fields.map((r: any) => r.name),
-      ).toEqual(["row_one", "row_three"]);
+      expect(getForm(wrapper).state.values.fields.map((r: any) => r.name)).toEqual([
+        "row_one",
+        "row_three",
+      ]);
     }, 20000);
   });
 
   describe("Button States", () => {
     it("disables the add button when the last row name is empty", async () => {
-      const wrapper = makeHarness([
-        { uuid: "1", name: "", type: "", index_type: [] },
-      ]);
+      const wrapper = makeHarness([{ uuid: "1", name: "", type: "", index_type: [] }]);
       await flushPromises();
       const addBtn = wrapper.find('[data-test="add-stream-add-field-btn"]');
       expect(addBtn.element.hasAttribute("disabled")).toBe(true);
     });
 
     it("enables the add button when the last row name is filled", async () => {
-      const wrapper = makeHarness([
-        { uuid: "1", name: "test", type: "", index_type: [] },
-      ]);
+      const wrapper = makeHarness([{ uuid: "1", name: "test", type: "", index_type: [] }]);
       await flushPromises();
       const addBtn = wrapper.find('[data-test="add-stream-add-field-btn"]');
       expect(addBtn.element.hasAttribute("disabled")).toBe(false);
@@ -263,9 +225,7 @@ describe("StreamFieldInputs (form-mode)", () => {
 
   describe("Schema validation (through the real OForm)", () => {
     it("blocks submit and shows per-row errors for an empty row", async () => {
-      const wrapper = makeHarness([
-        { uuid: "1", name: "", type: "", index_type: [] },
-      ]);
+      const wrapper = makeHarness([{ uuid: "1", name: "", type: "", index_type: [] }]);
       await flushPromises();
 
       // Nothing validates before the first submit.
@@ -280,9 +240,7 @@ describe("StreamFieldInputs (form-mode)", () => {
     });
 
     it("rejects a row name with disallowed characters", async () => {
-      const wrapper = makeHarness([
-        { uuid: "1", name: "bad name!", type: "Utf8", index_type: [] },
-      ]);
+      const wrapper = makeHarness([{ uuid: "1", name: "bad name!", type: "Utf8", index_type: [] }]);
       await flushPromises();
 
       await getForm(wrapper).handleSubmit();
@@ -305,9 +263,7 @@ describe("StreamFieldInputs (form-mode)", () => {
       await flushPromises();
 
       expect(getForm(wrapper).state.isValid).toBe(false);
-      expect(wrapper.text()).toContain(
-        "Use alphanumeric characters, underscore and colon only.",
-      );
+      expect(wrapper.text()).toContain("Use alphanumeric characters, underscore and colon only.");
     });
 
     it("passes when every row has a valid name + type", async () => {
@@ -380,58 +336,48 @@ describe("StreamFieldInputs (form-mode)", () => {
 
     it("returns false when no conflicting options selected", async () => {
       await setup();
-      expect(
-        disable({ index_type: ["fullTextSearchKey"] }, { value: "secondaryIndexKey" }),
-      ).toBe(false);
+      expect(disable({ index_type: ["fullTextSearchKey"] }, { value: "secondaryIndexKey" })).toBe(
+        false,
+      );
     });
 
     it("disables keyPartition when prefixPartition is selected", async () => {
       await setup();
-      expect(
-        disable({ index_type: ["prefixPartition"] }, { value: "keyPartition" }),
-      ).toBe(true);
+      expect(disable({ index_type: ["prefixPartition"] }, { value: "keyPartition" })).toBe(true);
     });
 
     it("disables prefixPartition when keyPartition is selected", async () => {
       await setup();
-      expect(
-        disable({ index_type: ["keyPartition"] }, { value: "prefixPartition" }),
-      ).toBe(true);
+      expect(disable({ index_type: ["keyPartition"] }, { value: "prefixPartition" })).toBe(true);
     });
 
     it("disables a different hash partition when one is already selected", async () => {
       await setup();
-      expect(
-        disable({ index_type: ["hashPartition_8"] }, { value: "hashPartition_16" }),
-      ).toBe(true);
+      expect(disable({ index_type: ["hashPartition_8"] }, { value: "hashPartition_16" })).toBe(
+        true,
+      );
     });
 
     it("allows the same hash partition that is already selected", async () => {
       await setup();
-      expect(
-        disable({ index_type: ["hashPartition_8"] }, { value: "hashPartition_8" }),
-      ).toBe(false);
+      expect(disable({ index_type: ["hashPartition_8"] }, { value: "hashPartition_8" })).toBe(
+        false,
+      );
     });
 
     it("disables hash partition when keyPartition is selected", async () => {
       await setup();
-      expect(
-        disable({ index_type: ["keyPartition"] }, { value: "hashPartition_8" }),
-      ).toBe(true);
+      expect(disable({ index_type: ["keyPartition"] }, { value: "hashPartition_8" })).toBe(true);
     });
 
     it("disables hash partition when prefixPartition is selected", async () => {
       await setup();
-      expect(
-        disable({ index_type: ["prefixPartition"] }, { value: "hashPartition_8" }),
-      ).toBe(true);
+      expect(disable({ index_type: ["prefixPartition"] }, { value: "hashPartition_8" })).toBe(true);
     });
 
     it("handles an empty index_type array", async () => {
       await setup();
-      expect(disable({ index_type: [] }, { value: "fullTextSearchKey" })).toBe(
-        false,
-      );
+      expect(disable({ index_type: [] }, { value: "fullTextSearchKey" })).toBe(false);
     });
 
     it("handles an undefined index_type", async () => {

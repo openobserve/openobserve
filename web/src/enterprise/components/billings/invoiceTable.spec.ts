@@ -164,7 +164,7 @@ describe("InvoiceTable Component", () => {
     it("calls BillingService.list_invoice_history on mount", () => {
       wrapper = mountInvoiceTable();
       expect(BillingService.list_invoice_history).toHaveBeenCalledWith(
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       );
     });
 

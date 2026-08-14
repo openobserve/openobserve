@@ -152,10 +152,7 @@ export function saveCorrelationFilters(
 ): void {
   if (!orgId || !streamType || !streamName || !filters.length) return;
 
-  localStorage.setItem(
-    storageKey(orgId, streamType, streamName),
-    JSON.stringify(filters),
-  );
+  localStorage.setItem(storageKey(orgId, streamType, streamName), JSON.stringify(filters));
 }
 
 export function loadCorrelationFilters(
@@ -174,9 +171,7 @@ export function loadCorrelationFilters(
 
 export function buildCorrelationWhereClause(filters: SavedFilter[]): string {
   if (!filters.length) return "";
-  return filters
-    .map((f) => `${f.field} = '${f.value.replace(/'/g, "''")}'`)
-    .join(" AND ");
+  return filters.map((f) => `${f.field} = '${f.value.replace(/'/g, "''")}'`).join(" AND ");
 }
 
 export function clearCorrelationFilters(

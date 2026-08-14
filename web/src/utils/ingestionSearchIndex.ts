@@ -18,11 +18,13 @@
  * This allows global search across all tabs and their sub-items
  */
 
+import { raw, type I18nText } from "@/types/i18n";
+
 import { aiCategories } from "@/components/ingestion/ai/data";
 
 export interface SearchableItem {
   name: string; // Route name
-  label: string; // Display name
+  label: I18nText; // Display name
   keywords: string[]; // Searchable keywords
   parentTab: string; // Parent tab route name
 }
@@ -30,7 +32,7 @@ export interface SearchableItem {
 const aiSearchEntries: SearchableItem[] = aiCategories.flatMap((cat) =>
   cat.integrations.map((integration) => ({
     name: integration.routeName,
-    label: integration.name,
+    label: raw(integration.name),
     keywords: integration.keywords,
     parentTab: "ai-integrations",
   })),
@@ -40,69 +42,79 @@ export const ingestionSearchIndex: SearchableItem[] = [
   // Recommended sub-tabs
   {
     name: "ingestFromKubernetes",
-    label: "Kubernetes",
+    label: raw("Kubernetes"),
     keywords: ["kubernetes", "k8s", "kubectl", "helm"],
     parentTab: "recommended",
   },
   {
     name: "ingestFromWindows",
-    label: "Windows",
+    label: raw("Windows"),
     keywords: ["windows", "win"],
     parentTab: "recommended",
   },
   {
     name: "ingestFromLinux",
-    label: "Linux",
+    label: raw("Linux"),
     keywords: ["linux", "unix"],
     parentTab: "recommended",
   },
   {
     name: "ingestFromMacOS",
-    label: "macOS",
+    label: raw("macOS"),
     keywords: ["macos", "mac", "osx", "darwin", "apple", "unified log"],
     parentTab: "recommended",
   },
   {
     name: "AWSConfig",
-    label: "AWS",
+    label: raw("AWS"),
     keywords: ["aws", "amazon"],
     parentTab: "recommended",
   },
   {
     name: "GCPConfig",
-    label: "GCP",
+    label: raw("GCP"),
     keywords: ["gcp", "google", "cloud"],
     parentTab: "recommended",
   },
   {
     name: "AzureConfig",
-    label: "Azure",
+    label: raw("Azure"),
     keywords: ["azure", "microsoft"],
     parentTab: "recommended",
   },
   {
     name: "ingestFromTraces",
-    label: "Traces",
+    label: raw("Traces"),
     keywords: ["traces", "otlp", "opentelemetry"],
     parentTab: "recommended",
   },
   {
     name: "frontendMonitoring",
-    label: "RUM",
-    keywords: ["rum", "frontend", "monitoring", "browser"],
+    label: raw("RUM"),
+    keywords: [
+      "rum",
+      "frontend",
+      "monitoring",
+      "browser",
+      "react native",
+      "mobile",
+      "ios",
+      "android",
+      "session replay",
+    ],
     parentTab: "recommended",
   },
 
   // Server sub-tabs
   {
     name: "nginx",
-    label: "Nginx",
+    label: raw("Nginx"),
     keywords: ["nginx", "web server"],
     parentTab: "servers",
   },
   {
     name: "iis",
-    label: "IIS",
+    label: raw("IIS"),
     keywords: ["iis", "microsoft", "windows server"],
     parentTab: "servers",
   },
@@ -110,31 +122,31 @@ export const ingestionSearchIndex: SearchableItem[] = [
   // Database sub-tabs
   {
     name: "sqlserver",
-    label: "SQL Server",
+    label: raw("SQL Server"),
     keywords: ["sqlserver", "mssql", "microsoft sql"],
     parentTab: "databases",
   },
   {
     name: "postgres",
-    label: "PostgreSQL",
+    label: raw("PostgreSQL"),
     keywords: ["postgres", "postgresql", "pg"],
     parentTab: "databases",
   },
   {
     name: "mongodb",
-    label: "MongoDB",
+    label: raw("MongoDB"),
     keywords: ["mongodb", "mongo", "nosql"],
     parentTab: "databases",
   },
   {
     name: "mysql",
-    label: "MySQL",
+    label: raw("MySQL"),
     keywords: ["mysql"],
     parentTab: "databases",
   },
   {
     name: "elasticsearch",
-    label: "Elasticsearch",
+    label: raw("Elasticsearch"),
     keywords: ["elasticsearch", "elastic", "es"],
     parentTab: "databases",
   },
@@ -142,19 +154,19 @@ export const ingestionSearchIndex: SearchableItem[] = [
   // Security sub-tabs
   {
     name: "auth0",
-    label: "Auth0",
+    label: raw("Auth0"),
     keywords: ["auth0", "authentication"],
     parentTab: "security",
   },
   {
     name: "cloudflare",
-    label: "Cloudflare",
+    label: raw("Cloudflare"),
     keywords: ["cloudflare", "cdn"],
     parentTab: "security",
   },
   {
     name: "okta",
-    label: "Okta",
+    label: raw("Okta"),
     keywords: ["okta", "identity"],
     parentTab: "security",
   },
@@ -162,37 +174,37 @@ export const ingestionSearchIndex: SearchableItem[] = [
   // DevOps sub-tabs
   {
     name: "jenkins",
-    label: "Jenkins",
+    label: raw("Jenkins"),
     keywords: ["jenkins", "ci", "cd"],
     parentTab: "devops",
   },
   {
     name: "gitlab",
-    label: "GitLab",
+    label: raw("GitLab"),
     keywords: ["gitlab", "git"],
     parentTab: "devops",
   },
   {
     name: "github",
-    label: "GitHub",
+    label: raw("GitHub"),
     keywords: ["github", "git"],
     parentTab: "devops",
   },
   {
     name: "circleci",
-    label: "CircleCI",
+    label: raw("CircleCI"),
     keywords: ["circleci", "ci"],
     parentTab: "devops",
   },
   {
     name: "ansible",
-    label: "Ansible",
+    label: raw("Ansible"),
     keywords: ["ansible", "automation"],
     parentTab: "devops",
   },
   {
     name: "terraform",
-    label: "Terraform",
+    label: raw("Terraform"),
     keywords: ["terraform", "infrastructure"],
     parentTab: "devops",
   },
@@ -200,19 +212,19 @@ export const ingestionSearchIndex: SearchableItem[] = [
   // Networking sub-tabs
   {
     name: "paloalto",
-    label: "Palo Alto",
+    label: raw("Palo Alto"),
     keywords: ["paloalto", "firewall"],
     parentTab: "networking",
   },
   {
     name: "cisco",
-    label: "Cisco",
+    label: raw("Cisco"),
     keywords: ["cisco", "router"],
     parentTab: "networking",
   },
   {
     name: "fortinet",
-    label: "Fortinet",
+    label: raw("Fortinet"),
     keywords: ["fortinet", "firewall"],
     parentTab: "networking",
   },
@@ -220,19 +232,19 @@ export const ingestionSearchIndex: SearchableItem[] = [
   // Message Queues sub-tabs
   {
     name: "kafka",
-    label: "Kafka",
+    label: raw("Kafka"),
     keywords: ["kafka", "streaming"],
     parentTab: "message-queues",
   },
   {
     name: "rabbitmq",
-    label: "RabbitMQ",
+    label: raw("RabbitMQ"),
     keywords: ["rabbitmq", "rabbit", "amqp"],
     parentTab: "message-queues",
   },
   {
     name: "redis",
-    label: "Redis",
+    label: raw("Redis"),
     keywords: ["redis", "cache"],
     parentTab: "message-queues",
   },
@@ -240,37 +252,37 @@ export const ingestionSearchIndex: SearchableItem[] = [
   // Languages sub-tabs
   {
     name: "python",
-    label: "Python",
+    label: raw("Python"),
     keywords: ["python", "py"],
     parentTab: "languages",
   },
   {
     name: "nodejs",
-    label: "Node.js",
+    label: raw("Node.js"),
     keywords: ["nodejs", "node", "javascript", "js"],
     parentTab: "languages",
   },
-  { name: "java", label: "Java", keywords: ["java"], parentTab: "languages" },
+  { name: "java", label: raw("Java"), keywords: ["java"], parentTab: "languages" },
   {
     name: "dotnet",
-    label: ".NET",
+    label: raw(".NET"),
     keywords: ["dotnet", ".net", "csharp", "c#"],
     parentTab: "languages",
   },
   {
     name: "go",
-    label: "Go",
+    label: raw("Go"),
     keywords: ["go", "golang"],
     parentTab: "languages",
   },
-  { name: "rust", label: "Rust", keywords: ["rust"], parentTab: "languages" },
+  { name: "rust", label: raw("Rust"), keywords: ["rust"], parentTab: "languages" },
   {
     name: "ruby",
-    label: "Ruby",
+    label: raw("Ruby"),
     keywords: ["ruby", "rails"],
     parentTab: "languages",
   },
-  { name: "php", label: "PHP", keywords: ["php"], parentTab: "languages" },
+  { name: "php", label: raw("PHP"), keywords: ["php"], parentTab: "languages" },
 
   ...aiSearchEntries,
 ];
@@ -294,8 +306,6 @@ export function searchIngestionItems(query: string): SearchableItem[] {
     }
 
     // Check if query matches any of the keywords
-    return item.keywords.some((keyword) =>
-      keyword.toLowerCase().includes(searchTerm),
-    );
+    return item.keywords.some((keyword) => keyword.toLowerCase().includes(searchTerm));
   });
 }

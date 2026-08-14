@@ -16,8 +16,25 @@ export class TracesPage {
     // Source: web/src/plugins/traces/SearchBar.vue
     this.searchToggle = '[data-test="traces-search-mode-traces-btn"]';
     this.spansToggle = '[data-test="traces-search-mode-spans-btn"]';
-    this.serviceMapsToggle = '[data-test="traces-service-graph-toggle"]';
-    this.servicesCatalogToggle = '[data-test="traces-search-mode-services-catalog-btn"]';
+    // Service Graph and Services are reachable two ways with different
+    // semantics: (a) the Traces rail tile's hover flyout navigates to the
+    // standalone routes (/traces/service-graph, /traces/services), and
+    // (b) toolbar tabs on the Traces page switch the view IN-PAGE — the URL
+    // stays on /traces and gains ?tab=. Keep both paths covered.
+    this.tracesRailTile = '[data-test="nav-group-traces"]';
+    this.serviceMapsNavItem = '[data-test="nav-group-item-serviceGraph"]';
+    this.servicesCatalogNavItem = '[data-test="nav-group-item-servicesCatalog"]';
+    this.serviceGraphTabToggle = '[data-test="traces-service-graph-toggle"]';
+    this.servicesCatalogTabToggle = '[data-test="traces-search-mode-services-catalog-btn"]';
+    // Inline-safe selectors (defined in the inner components, so they work for
+    // both the in-page tabs and the standalone pages).
+    this.servicesCatalogTable = '[data-test="services-catalog-table"]';
+    this.servicesCatalogEmpty = '[data-test="services-catalog-empty"]';
+    this.servicesCatalogRefreshButton = '[data-test="services-catalog-refresh-btn"]';
+    this.servicesCatalogDateTimePicker = '[data-test="services-catalog-date-time-picker"]';
+    // No-data state inside the graph panel (OEmptyState rendered by
+    // ServiceGraphNoDataState.vue within the graph container).
+    this.serviceGraphEmptyState = '[data-test="service-graph-container"] [data-test="o2-empty-state"]';
 
     // Search Bar - Controls
     this.showMetricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
@@ -35,9 +52,9 @@ export class TracesPage {
 
     // Search Results
     // Source: web/src/plugins/traces/components/TracesSearchResultList.vue
-    // Source: web/src/components/TenstackTable.vue (rows use o2-table-detail-{ts})
+    // Source: web/src/lib/core/Table/OTable.vue (rows use o2-table-row-{index})
     this.searchResultList = '[data-test="traces-search-result-list"]';
-    this.searchResultItem = '[data-test^="o2-table-detail-"]';
+    this.searchResultItem = '[data-test="traces-search-result-list"] [data-test^="o2-table-row-"]:not([data-test="o2-table-row-drag-handle"])';
     this.searchResultCount = '[data-test="traces-count-badge"]';
     this.tracesCountBadge = '[data-test="traces-count-badge"]';
     this.tracesErrorCountBadge = '[data-test="traces-error-count-badge"]';
@@ -62,6 +79,8 @@ export class TracesPage {
     // Service Graph (Enterprise)
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
+    // Standalone Service Graph page (rail-flyout route /traces/service-graph).
+    this.serviceGraphPage = '[data-test="service-graph-page"]';
 
     // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
     // TracesMetricsDashboard.vue: data-test="insights-button"
@@ -225,6 +244,28 @@ export class TracesPage {
     const wrapper = this.page.locator(this.streamSelect);
     await wrapper.waitFor({ state: 'visible', timeout: 10000 });
 
+    // The wrapper renders immediately, but its options arrive with the async
+    // stream-list fetch. Opening the popover before then finds an empty list,
+    // every retry below misses, and selection silently no-ops — which surfaces
+    // later as "Select Stream First" and zero query results. Wait for the
+    // option to exist in the DOM first.
+    const optionReady = `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`;
+    await this.page
+      .locator(optionReady)
+      .first()
+      .waitFor({ state: 'attached', timeout: 15000 })
+      .catch(async () => {
+        // Options are only mounted while the popover is open — open it, wait,
+        // then leave it open for the selection logic below.
+        const t = wrapper.locator('button[type="button"]').first();
+        await t.click({ force: false }).catch(() => {});
+        await this.page
+          .locator(optionReady)
+          .first()
+          .waitFor({ state: 'attached', timeout: 15000 })
+          .catch(() => {});
+      });
+
     // Check the popover-trigger button's aria-expanded state — already
     // selected streams will reflect in the trigger button text.
     const trigger = wrapper.locator('button[type="button"]').first();
@@ -233,11 +274,13 @@ export class TracesPage {
     if (currentText && currentText.includes(streamName)) {
       return;
     }
-    await trigger.click({ force: false });
-
-    // Wait for the popover (OSelect forwards the data-test slug + `-popover`).
+    // Only open the popover if it isn't already (the readiness wait above may
+    // have opened it) — an unconditional click would toggle it shut.
     const popover = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
-    await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    if (!(await popover.isVisible({ timeout: 500 }).catch(() => false))) {
+      await trigger.click({ force: false });
+      await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    }
 
     // Try clicking the matching option directly by data-test-value. Retry
     // up to 3 times — OSelect uses virtualised ListboxItem rendering which
@@ -364,8 +407,38 @@ export class TracesPage {
   }
 
   async switchToServiceMaps() {
-    await this.page.locator(this.serviceMapsToggle).click();
+    await this.page.locator(this.tracesRailTile).hover();
+    await this.page.locator(this.serviceMapsNavItem).click();
+    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  // In-page toolbar tab on the Traces page (NOT the rail flyout) — clicking it
+  // switches the view inline; the URL stays on /traces and gains
+  // ?tab=service-graph. Waits for the inline graph view: the chart when
+  // topology data exists, or the no-data state otherwise (topology needs the
+  // service-graph daemon, which this suite does not seed).
+  async navigateToServiceGraphViaTab() {
+    await this.page.locator(this.serviceGraphTabToggle).click();
+    await this.page.waitForURL(/\/traces\?.*tab=service-graph/, { timeout: 10000 });
+    await this.page
+      .locator(this.serviceGraphChart)
+      .or(this.page.locator(this.serviceGraphEmptyState))
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 });
+  }
+
+  // In-page toolbar tab on the Traces page (NOT the rail flyout) — clicking it
+  // switches the view inline; the URL stays on /traces and gains
+  // ?tab=services-catalog. Waits for the inline catalog (table or empty state).
+  async navigateToServicesViaTab() {
+    await this.page.locator(this.servicesCatalogTabToggle).click();
+    await this.page.waitForURL(/\/traces\?.*tab=services-catalog/, { timeout: 10000 });
+    await this.page
+      .locator(this.servicesCatalogTable)
+      .or(this.page.locator(this.servicesCatalogEmpty))
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 });
   }
 
   async switchToSearchView() {
@@ -374,6 +447,45 @@ export class TracesPage {
 
   async expectServiceGraphVisible() {
     await expect(this.page.locator(this.serviceGraphChart)).toBeVisible({ timeout: 10000 });
+  }
+
+  // In-page Service Graph tab view: the chart when topology data exists, else
+  // the no-data state (this suite does not seed the service-graph daemon).
+  async expectServiceGraphViewVisible() {
+    await expect(
+      this.page
+        .locator(this.serviceGraphChart)
+        .or(this.page.locator(this.serviceGraphEmptyState))
+        .first()
+    ).toBeVisible({ timeout: 15000 });
+  }
+
+  // In-page Services Catalog tab view: the table when data exists, else empty.
+  async expectServicesCatalogVisible() {
+    await expect(
+      this.page
+        .locator(this.servicesCatalogTable)
+        .or(this.page.locator(this.servicesCatalogEmpty))
+        .first()
+    ).toBeVisible({ timeout: 15000 });
+  }
+
+  // The catalog toolbar's date-time picker reflects the shared search period.
+  async expectServicesCatalogTimeRange(text) {
+    await expect(this.page.locator(this.servicesCatalogDateTimePicker))
+      .toContainText(text, { timeout: 10000 });
+  }
+
+  // The services-catalog toolbar tab is the active mode (data-state="on").
+  async expectServicesCatalogTabActive() {
+    await expect(this.page.locator(this.servicesCatalogTabToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
+  // Standalone Service Graph page rendered from the rail flyout route.
+  async expectStandaloneServiceGraphPageVisible() {
+    await expect(this.page.locator(this.serviceGraphPage))
+      .toBeVisible({ timeout: 10000 });
   }
 
   async refreshServiceGraph() {
@@ -740,7 +852,7 @@ export class TracesPage {
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        // A real row is rendered as a TR with data-test^="o2-table-detail-"
+        // A real row is rendered as a TR with data-test^="o2-table-row-"
         // — the count badge is shown even with 0 results, so do NOT use it
         // here as a positive signal.
         const firstRow = this.page.locator(this.searchResultItem).first();
@@ -1149,7 +1261,7 @@ export class TracesPage {
     // result-row error detection lives on TenstackTable cells; rely on the
     // top-level table row marker for error trace styling.
     const errorRow = this.page
-      .locator(`${this.searchResultList} [data-test^="o2-table-detail-"]`)
+      .locator(`${this.searchResultList} [data-test^="o2-table-row-"]:not([data-test="o2-table-row-drag-handle"])`)
       .first();
     if (await errorRow.isVisible({ timeout: 5000 }).catch(() => false)) {
       await errorRow.click();
@@ -1311,11 +1423,15 @@ export class TracesPage {
   }
 
   /**
-   * Check if service maps toggle is visible
+   * Check if the Service Graph entry is reachable from the Traces rail flyout.
    * @returns {Promise<boolean>}
    */
   async isServiceMapsToggleVisible() {
-    return await this.page.locator(this.serviceMapsToggle).isVisible({ timeout: 5000 }).catch(() => false);
+    await this.page.locator(this.tracesRailTile).hover().catch(() => {});
+    return await this.page
+      .locator(this.serviceMapsNavItem)
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
   }
 
   /**
@@ -2400,7 +2516,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getLogsTimestampHeader() {
-    return this.page.locator('[data-test="log-search-result-table-th-timestamp"]');
+    return this.page.locator('[data-test="o2-table-th-timestamp"]');
   }
 
   /**
@@ -2408,7 +2524,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getFirstLogTimestampCell() {
-    return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr:first-child td').first();
+    return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]').first().locator('[data-test^="o2-table-cell-"]').first();
   }
 
   /**
@@ -2441,6 +2557,55 @@ export class TracesPage {
    */
   getQueryEditorLocator() {
     return this.page.locator(this.queryEditor);
+  }
+
+  /**
+   * Get the traces field list table
+   * @returns {Locator}
+   */
+  getFieldsTableLocator() {
+    return this.page.locator(this.fieldsTable);
+  }
+
+  /**
+   * Get field expansion headers in the traces field list
+   * (.field-expansion-item is a framework component class, not a data-test hook)
+   * @returns {Locator}
+   */
+  getFieldExpansionHeaders() {
+    return this.page.locator('.field-expansion-item .field-expansion-header');
+  }
+
+  /**
+   * Get field expansion items anywhere on the page (fallback locator)
+   * @returns {Locator}
+   */
+  getFieldExpansionItems() {
+    return this.page.locator('.field-expansion-item');
+  }
+
+  /**
+   * Get the traces search bar "More" dropdown menu button
+   * @returns {Locator}
+   */
+  getMoreMenuButton() {
+    return this.page.locator('[data-test="traces-search-bar-more-menu-btn"]');
+  }
+
+  /**
+   * Get the page body (used to dismiss open menus/popups by clicking a corner)
+   * @returns {Locator}
+   */
+  getPageBody() {
+    return this.page.locator('body');
+  }
+
+  /**
+   * Get organization menu item labels in the org selector dropdown
+   * @returns {Locator}
+   */
+  getOrgMenuItemLabels() {
+    return this.page.locator('[data-test="organization-menu-item-label-item-label"]');
   }
 
 }

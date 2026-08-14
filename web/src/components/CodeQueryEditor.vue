@@ -15,10 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative w-full h-full flex flex-col" v-bind="$attrs">
+  <div class="relative flex h-full w-full flex-col" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor flex-1 min-h-0 bg-card-glass-bg"
+      class="logs-query-editor bg-card-glass-bg min-h-0 flex-1"
+      :class="{ 'promql-mode': language === 'promql' }"
       ref="editorRef"
       :id="editorId"
     />
@@ -27,17 +28,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="absolute! top-2 right-2 z-10 bg-card-glass-bg border border-card-glass-border transition-all duration-200 hover:bg-button-outline-hover-bg hover:border-accent"
-      :class="nlpMode ? 'bg-primary-100 border-accent' : ''"
+      class="bg-card-glass-bg border-card-glass-border hover:bg-button-outline-hover-bg hover:border-accent absolute! top-2 right-2 z-10 border transition-all duration-200"
+      :class="nlpMode ? 'bg-surface-accent-active border-accent' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
       <!-- name="" satisfies the required prop; empty name renders only the slot -->
       <OIcon name="" size="md">
-        <img :src="aiIcon" alt="AI" class="w-4.5 h-4.5" />
+        <img :src="aiIcon" :alt="t('search.aiIconAlt')" class="h-4.5 w-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">
-        <template #content>{{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}</template>
+        <template #content>{{
+          disableAiReason || t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
+        }}</template>
       </OTooltip>
     </OButton>
   </div>
@@ -49,12 +52,12 @@ import {
   ref,
   onMounted,
   nextTick,
-  type Ref,
   onDeactivated,
   onUnmounted,
   onActivated,
   watch,
   computed,
+  type PropType,
 } from "vue";
 
 import type * as MonacoEditor from "monaco-editor/esm/vs/editor/editor.api";
@@ -77,12 +80,48 @@ const loadMonaco = async () => {
 
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
+/**
+ * Per-editor configuration, keyed by model URI.
+ *
+ * Monaco aggregates every provider registered for a language, so registering
+ * one per component meant N providers answering each keystroke and N-1 of them
+ * returning an empty list for a model that did not ask. One provider set per
+ * language now, looking its editor up by model.
+ */
+interface EditorConfig {
+  enabled: () => boolean;
+  keywords: () => any[];
+  suggestions: () => any[];
+  resolveFieldValues: () => ((field: string) => Promise<string[]>) | null;
+}
+const editorConfigs = new Map<string, EditorConfig>();
+const registeredLanguages = new Set<string>();
+const modelKey = (model: any): string => model?.uri?.toString?.() ?? "";
+import {
+  resolveKeywords,
+  resolveSuggestions,
+  buildCompletionItems,
+} from "@/utils/query/sqlCompletion";
+import {
+  parseCallContext,
+  parseValueContext,
+  buildValueEntries,
+  buildSignatureHelp,
+  buildHoverContents,
+  findCatalogEntry,
+  findFunctionEntry,
+  wantsNumericColumn,
+  rankNumericFieldsFirst,
+} from "@/utils/query/editorProviders";
+import { findDoubleQuoteIssues } from "@/utils/query/doubleQuoteWarnings";
+import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
+
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
-import { useI18n } from "vue-i18n";
+import { type I18nText, useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import { isAuthError } from "@/utils/authErrors";
@@ -164,8 +203,17 @@ export default defineComponent({
       default: false,
     },
     disableAiReason: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
+    },
+    /**
+     * Resolves the values of one field, awaited by the completion provider.
+     * Absent on surfaces that have none — pass `undefined`, not `null`, so the
+     * declared default applies.
+     */
+    fieldValueResolver: {
+      type: Function as PropType<(field: string) => Promise<string[]>>,
+      default: null,
     },
   },
   emits: [
@@ -183,7 +231,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { isDark } = useTheme();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
     let editorObj: any = null;
@@ -191,204 +239,27 @@ export default defineComponent({
     // debounce. Assigned when the editor is created; see `commitModelChange`.
     let commitPendingChange: (() => void) | null = null;
     const { searchObj } = searchState();
-    const {
-      detectNaturalLanguage,
-      generateSQL,
-      transformToSQL,
-      isGenerating,
-      streamingResponse,
-    } = useNLQuery();
+    const { detectNaturalLanguage, generateSQL, transformToSQL, isGenerating, streamingResponse } =
+      useNLQuery();
 
-    let provider: Ref<any | null> = ref(null);
     const currentEditorText = ref("");
-
-    // These will be initialized when Monaco loads
-    let CompletionKind: any = null;
-    let insertTextRules: any = null;
-
-    const initializeMonacoConstants = () => {
-      if (!monaco || CompletionKind) return;
-
-      CompletionKind = {
-        Keyword: monaco.languages.CompletionItemKind.Keyword,
-        Operator: monaco.languages.CompletionItemKind.Operator,
-        Text: monaco.languages.CompletionItemKind.Text,
-        Value: monaco.languages.CompletionItemKind.Value,
-        Method: monaco.languages.CompletionItemKind.Method,
-        Function: monaco.languages.CompletionItemKind.Function,
-        Constructor: monaco.languages.CompletionItemKind.Constructor,
-        Field: monaco.languages.CompletionItemKind.Field,
-        Variable: monaco.languages.CompletionItemKind.Variable,
-      };
-
-      insertTextRules = {
-        InsertAsSnippet:
-          monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        KeepWhitespace:
-          monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
-        None: monaco.languages.CompletionItemInsertTextRule.None,
-      };
-    };
-
-    const defaultKeywords = [
-      {
-        label: "and",
-        kind: "Keyword",
-        insertText: "and ",
-      },
-      {
-        label: "or",
-        kind: "Keyword",
-        insertText: "or ",
-      },
-      {
-        label: "like",
-        kind: "Keyword",
-        insertText: "like '%${1:params}%' ",
-        insertTextRules: "InsertAsSnippet",
-      },
-      {
-        label: "in",
-        kind: "Keyword",
-        insertText: "in ('${1:params}') ",
-        insertTextRules: "InsertAsSnippet",
-      },
-      {
-        label: "not in",
-        kind: "Keyword",
-        insertText: "not in ('${1:params}') ",
-        insertTextRules: "InsertAsSnippet",
-      },
-      {
-        label: "between",
-        kind: "Keyword",
-        insertText: "between '${1:params}' and '${1:params}' ",
-        insertTextRules: "InsertAsSnippet",
-      },
-      {
-        label: "not between",
-        kind: "Keyword",
-        insertText: "not between '${1:params}' and '${1:params}' ",
-        insertTextRules: "InsertAsSnippet",
-      },
-      {
-        label: "is null",
-        kind: "Keyword",
-        insertText: "is null ",
-      },
-      {
-        label: "is not null",
-        kind: "Keyword",
-        insertText: "is not null ",
-      },
-      {
-        label: ">",
-        kind: "Operator",
-        insertText: "> ",
-      },
-      {
-        label: "<",
-        kind: "Operator",
-        insertText: "< ",
-      },
-      {
-        label: ">=",
-        kind: "Operator",
-        insertText: ">= ",
-      },
-      {
-        label: "<=",
-        kind: "Operator",
-        insertText: "<= ",
-      },
-      {
-        label: "<>",
-        kind: "Operator",
-        insertText: "<> ",
-      },
-      {
-        label: "=",
-        kind: "Operator",
-        insertText: "= ",
-      },
-      {
-        label: "!=",
-        kind: "Operator",
-        insertText: "!= ",
-      },
-      {
-        label: "()",
-        kind: "Keyword",
-        insertText: "(${1:condition}) ",
-        insertTextRules: "InsertAsSnippet",
-      },
-    ];
-    const defaultSuggestions = [
-      {
-        label: (_keyword: string) => `match_all('${_keyword}')`,
-        kind: "Text",
-        insertText: (_keyword: string) => `match_all('${_keyword}')`,
-      },
-      {
-        label: (_keyword: string) => `match_all_raw('${_keyword}')`,
-        kind: "Text",
-        insertText: (_keyword: string) => `match_all_raw('${_keyword}')`,
-      },
-      {
-        label: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
-        kind: "Text",
-        insertText: (_keyword: string) =>
-          `match_all_raw_ignore_case('${_keyword}')`,
-      },
-      {
-        label: () =>
-          `re_match(fieldname: string, regular_expression: string)`,
-        kind: "Text",
-        insertText: () => `re_match(fieldname, '')`,
-      },
-      {
-        label: () =>
-          `re_not_match(fieldname: string, regular_expression: string)`,
-        kind: "Text",
-        insertText: () => `re_not_match(fieldname, '')`,
-      },
-      {
-        label: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
-        kind: "Text",
-        insertText: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
-      },
-      {
-        label: (_keyword: string) =>
-          `str_match_ignore_case(fieldname, '${_keyword}')`,
-        kind: "Text",
-        insertText: (_keyword: string) =>
-          `str_match_ignore_case(fieldname, '${_keyword}')`,
-      },
-    ];
 
     watch(
       () => isDark.value,
       () => {
         if (!monaco) return;
-        monaco.editor.setTheme(
-          isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
-        );
+        monaco.editor.setTheme(isDark.value ? "myCustomDarkTheme" : "myCustomTheme");
       },
     );
 
-    const keywords = computed(() => {
-      if (props.language === "sql" && !props.keywords?.length) {
-        return defaultKeywords;
-      }
-      return props.keywords;
-    });
-
-    const suggestions = computed(() => {
-      if (props.language === "sql" && props.suggestions == null) {
-        return defaultSuggestions;
-      }
-      return props.suggestions ?? [];
-    });
+    // Both fall back to the shared catalog so every surface (Logs, Traces,
+    // Dashboards, Alerts, Pipelines) is served identical content. Traces passes
+    // no `suggestions` prop and used to get a 7-entry local list with no
+    // aggregate functions at all.
+    const keywords = computed(() => resolveKeywords(props.language, props.keywords as any[]));
+    const suggestions = computed(() =>
+      resolveSuggestions(props.language, props.suggestions as any[] | null),
+    );
 
     /**
      * Debounced function to detect natural language and auto-toggle NLP mode
@@ -402,7 +273,6 @@ export default defineComponent({
     const checkForNaturalLanguage = debounce((text: string) => {
       currentEditorText.value = text;
       const isNL = detectNaturalLanguage(text, props.language);
-
 
       // ONLY emit events if NOT already in NLP mode (auto-detection feature)
       // If already in NLP mode (user toggled it), don't change anything
@@ -455,19 +325,14 @@ export default defineComponent({
         const prompt = `${promptPrefix} : ${currentText}`;
 
         // Generate query from natural language
-        const generatedSQL = await generateSQL(
-          prompt,
-          orgId,
-          abortSignal,
-          sessionId,
-        );
+        const generatedSQL = await generateSQL(prompt, orgId, abortSignal, sessionId);
 
         if (!generatedSQL || generatedSQL.trim() === "") {
           // Show error notification - use streaming error message if available (e.g. Unauthorized Access)
           const errorMsg = isAuthError(streamingResponse.value)
             ? streamingResponse.value
             : t("search.nlQueryGenerationFailed");
-          showErrorNotification(errorMsg);
+          showErrorNotification(raw(errorMsg));
           if (isAuthError(streamingResponse.value)) {
             return; // Auth error already handled, don't trigger catch block
           }
@@ -476,9 +341,7 @@ export default defineComponent({
 
         // Check if this is a special action completion (dashboard/alert)
         if (generatedSQL.startsWith("✓ DASHBOARD_CREATED:")) {
-          const responseText = generatedSQL
-            .replace("✓ DASHBOARD_CREATED:", "")
-            .trim();
+          const responseText = generatedSQL.replace("✓ DASHBOARD_CREATED:", "").trim();
           emit("generation-success", {
             type: "dashboard",
             message: responseText,
@@ -488,29 +351,21 @@ export default defineComponent({
         }
 
         if (generatedSQL.startsWith("✓ ALERT_CREATED:")) {
-          const responseText = generatedSQL
-            .replace("✓ ALERT_CREATED:", "")
-            .trim();
+          const responseText = generatedSQL.replace("✓ ALERT_CREATED:", "").trim();
           emit("generation-success", { type: "alert", message: responseText });
           // Don't emit nlpModeDetected - keep user in current mode
           return; // Success without SQL
         }
 
         if (generatedSQL.startsWith("✓ ACTION_COMPLETED:")) {
-          const responseText = generatedSQL
-            .replace("✓ ACTION_COMPLETED:", "")
-            .trim();
+          const responseText = generatedSQL.replace("✓ ACTION_COMPLETED:", "").trim();
           emit("generation-success", { type: "action", message: responseText });
           // Don't emit nlpModeDetected - keep user in current mode
           return; // Success without SQL
         }
 
         // Normal query generation - transform and update editor with language-specific comments
-        const transformedText = transformToSQL(
-          currentText,
-          generatedSQL,
-          props.language,
-        );
+        const transformedText = transformToSQL(currentText, generatedSQL, props.language);
 
         // Update editor value
         setValue(transformedText);
@@ -524,7 +379,6 @@ export default defineComponent({
 
         // Emit SQL generation success
         emit("generation-success", { type: "sql", message: generatedSQL });
-
       } catch (error) {
         console.error("[NL2Q-UI] Exception during SQL generation:", error);
         showErrorNotification(t("search.nlQueryGenerationFailed"));
@@ -532,21 +386,19 @@ export default defineComponent({
       }
     };
 
-    const createDependencyProposals = (range: any) => {
-      if (!CompletionKind || !insertTextRules) return [];
-      return keywords.value.map((keyword: any) => {
-        const itemObj: any = {
-          ...keyword,
-          label: keyword["label"],
-          kind: CompletionKind[keyword["kind"]],
-          insertText: keyword["insertText"],
-          range: range,
-        };
-        if (insertTextRules[keyword["insertTextRule"]]) {
-          itemObj["insertTextRules"] =
-            insertTextRules[keyword["insertTextRule"]];
-        }
-        return itemObj;
+    /** Point this editor's model at its live configuration. */
+    let publishedKey: string | null = null;
+    const publishEditorConfig = () => {
+      const key = modelKey(editorObj?.getModel?.());
+      if (!key) return;
+      publishedKey = key;
+      // Getters, not snapshots: keywords and suggestions are computeds that
+      // change as the stream schema and server catalog arrive.
+      editorConfigs.set(key, {
+        enabled: () => props.showAutoComplete,
+        keywords: () => keywords.value as any[],
+        suggestions: () => suggestions.value as any[],
+        resolveFieldValues: () => (props.fieldValueResolver as any) ?? null,
       });
     };
 
@@ -561,27 +413,30 @@ export default defineComponent({
         (window as any).monaco = monacoModule;
       }
 
-      // Initialize Monaco constants after loading
-      initializeMonacoConstants();
-
       // Register custom languages after Monaco is loaded
       if (props.language === "promql") {
         monaco.languages.register({ id: "promql" });
+
+        // The vendored PromQL grammar — without a tokenizer the
+        // query renders monochrome (#9779, #9793).
+        const promql = await loadPromqlLanguage();
+        monaco.languages.setMonarchTokensProvider("promql", promql.language as any);
+        monaco.languages.setLanguageConfiguration("promql", promql.languageConfiguration as any);
       }
       if (props.language === "vrl") {
         monaco.languages.register({ id: "vrl" });
 
         // Register a tokens provider for the language
-        monaco.languages.setMonarchTokensProvider(
-          "vrl",
-          vrlLanguageDefinition as any,
-        );
+        monaco.languages.setMonarchTokensProvider("vrl", vrlLanguageDefinition as any);
       }
 
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
-        rules: [{ token: "comment", background: "FFFFFF" }],
+        rules: [
+          { token: "comment", background: "FFFFFF" },
+          // PromQL: no rules on purpose — built-in "vs" colours via inherit.
+        ],
         colors: {
           "editor.foreground": "#000000",
           "editor.background": "#fafafa",
@@ -599,13 +454,13 @@ export default defineComponent({
           { token: "string", foreground: "CE9178" },
           { token: "string.sql", foreground: "CE9178" },
           { token: "string.vrl", foreground: "CE9178" },
+          // PromQL: no rules on purpose — built-in "vs-dark" colours via inherit.
         ],
         colors: {},
       });
 
-      // Dispose the provider if it already exists before registering a new one
-      provider.value?.dispose();
-      registerAutoCompleteProvider();
+      // One provider set per language, shared by every editor of that language.
+      registerLanguageProviders(props.language);
 
       let editorElement = document.getElementById(props.editorId);
       let retryCount = 0;
@@ -698,10 +553,22 @@ export default defineComponent({
         minimap: { enabled: false },
         readOnly: props.readOnly,
         renderValidationDecorations: "on",
+        // Monaco defaults strings to 'off', which is why field-VALUE completion
+        // used to need a forced hide/re-trigger to appear at all.
+        quickSuggestions: { other: "on", comments: "off", strings: "on" },
+        // Default is 'matchingDocuments'. Off for the QUERY languages only,
+        // where every suggestion should come from the catalog and a word
+        // scraped out of the query text is noise. VRL, JS, JSON and the rest
+        // have no catalog, and there local word completion is the only
+        // completion they have.
+        wordBasedSuggestions:
+          props.language === "sql" || props.language === "promql" ? "off" : "matchingDocuments",
         stickyScroll: {
           enabled: props.stickyScroll,
         },
       });
+
+      publishEditorConfig();
 
       // The editor's content only reaches the parent after `debounceTime`. Held
       // as a named handle so it can be flushed on the paths that consume the
@@ -730,22 +597,14 @@ export default defineComponent({
       };
 
       editorObj.createContextKey("ctrlenter", true);
-      editorObj.addCommand(
-        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-        runQuery,
-        "ctrlenter",
-      );
+      editorObj.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery, "ctrlenter");
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
 
         // added hack to handle case where ctrl+enter / cmd+enter stops working after
         // user click on the result row and open sidebase or opensidebar from schedule search
         // This is because the editor loses focus and the context key "ctrlenter" is not active anymore, so we need to re-add the command on focus
-        editorObj.addCommand(
-          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-          runQuery,
-          "ctrlenter",
-        );
+        editorObj.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery, "ctrlenter");
       });
 
       editorObj.onDidBlurEditorWidget(() => {
@@ -753,8 +612,15 @@ export default defineComponent({
         const value = model?.getValue();
         const trimmedValue = value?.trim();
 
-        // Only apply trim if there are actually tailing and leading spaces to trim
-        if (value !== trimmedValue) {
+        // Trimming on blur exists so a query committed for execution doesn't
+        // carry incidental leading/trailing whitespace — but for markdown
+        // (the content-template body editor) trailing blank lines ARE
+        // meaningful content, not incidental whitespace, so skip the trim
+        // there. Without this guard, clicking a toolbar button (which blurs
+        // the editor) silently deletes trailing blank lines out from under
+        // the click before its handler reads the selection — see the
+        // list/heading toolbar cursor-position bug report.
+        if (props.language !== "markdown" && value !== trimmedValue) {
           const lastLine = model.getLineCount();
           const lastLineLength = model.getLineLength(lastLine);
 
@@ -802,8 +668,6 @@ export default defineComponent({
     };
 
     onMounted(async () => {
-      provider.value?.dispose();
-
       if (props.language === "sql") {
         await import("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js");
       }
@@ -835,18 +699,14 @@ export default defineComponent({
         setupEditor();
         editorObj?.layout();
       } else {
-        provider.value?.dispose();
-        registerAutoCompleteProvider();
+        registerLanguageProviders(props.language);
+        publishEditorConfig();
       }
     });
 
-    onDeactivated(() => {
-      provider.value?.dispose();
-    });
+    onDeactivated(() => {});
 
     onUnmounted(() => {
-      provider.value?.dispose();
-
       // Clean up global event listeners
       if (editorObj) {
         if (editorObj._windowClickHandler) {
@@ -855,6 +715,11 @@ export default defineComponent({
         if (editorObj._windowResizeHandler) {
           window.removeEventListener("resize", editorObj._windowResizeHandler);
         }
+
+        // Drop this editor's entry so the shared provider stops answering for
+        // a model that no longer exists.
+        if (publishedKey) editorConfigs.delete(publishedKey);
+        publishedKey = null;
 
         // Dispose the editor
         editorObj.dispose();
@@ -888,9 +753,7 @@ export default defineComponent({
       () => isDark.value,
       () => {
         if (!monaco) return;
-        monaco.editor.setTheme(
-          isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
-        );
+        monaco.editor.setTheme(isDark.value ? "myCustomDarkTheme" : "myCustomTheme");
       },
     );
 
@@ -909,8 +772,7 @@ export default defineComponent({
         // 2. It's readonly AND values are actually different
         // 3. Compare trimmed values to avoid cursor jumps from trailing spaces
         const shouldUpdate =
-          (props.readOnly || !hasFocus) &&
-          currentValue?.trim() !== newValue?.trim();
+          (props.readOnly || !hasFocus) && currentValue?.trim() !== newValue?.trim();
 
         if (shouldUpdate) {
           editorObj.getModel()?.setValue(newValue);
@@ -927,56 +789,163 @@ export default defineComponent({
       }
     };
 
-    const registerAutoCompleteProvider = () => {
-      if (!props.showAutoComplete || !monaco) return;
-      provider.value = monaco.languages.registerCompletionItemProvider(
-        props.language,
-        {
-          provideCompletionItems: function (
-            model: MonacoEditor.editor.ITextModel,
-            position: MonacoEditor.Position,
-          ) {
-            // find out if we are completing a property in the 'dependencies' object.
-            var textUntilPosition = model.getValueInRange({
-              startLineNumber: 1,
-              startColumn: 1,
-              endLineNumber: position.lineNumber,
-              endColumn: position.column,
-            });
+    /**
+     * Register the provider set for a language exactly once.
+     *
+     * Each provider resolves the asking editor from the model, so three SQL
+     * editors share one registration instead of stacking three.
+     */
+    const registerLanguageProviders = (language: string) => {
+      if (!monaco || registeredLanguages.has(language)) return;
+      registeredLanguages.add(language);
+      const kinds = () => monaco.languages.CompletionItemKind;
+      const rules = () => monaco.languages.CompletionItemInsertTextRule;
 
-            var word = model.getWordUntilPosition(position);
-            var range = {
+      monaco.languages.registerCompletionItemProvider(language, {
+        // Without these nothing opens after a paren, a comma or an opening
+        // quote — the positions where help is most wanted.
+        triggerCharacters: [".", "(", ",", "'", '"', " "],
+        provideCompletionItems: async (
+          model: MonacoEditor.editor.ITextModel,
+          position: MonacoEditor.Position,
+        ) => {
+          const config = editorConfigs.get(modelKey(model));
+          if (!config || !config.enabled()) return { suggestions: [] };
+
+          const textUntilPosition = model.getValueInRange({
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+          });
+          const word = model.getWordUntilPosition(position);
+          const range = {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: word.startColumn,
+            endColumn: word.endColumn,
+          };
+
+          // Field VALUES, resolved here rather than by the parent debouncing,
+          // fetching, pushing a prop down and force-reopening the widget.
+          const valueContext = parseValueContext(textUntilPosition);
+          const resolver = config.resolveFieldValues();
+          if (valueContext && resolver) {
+            const values = await resolver(valueContext.field);
+            if (values.length) {
+              // Monaco auto-closes a typed quote, so the closer is already
+              // sitting after the cursor — invisible to a parser that only sees
+              // the text before it. Without this the insert produced
+              // `level = 'error''`.
+              const closingQuoteAhead =
+                (model.getLineContent?.(position.lineNumber) ?? "").charAt(position.column - 1) ===
+                "'";
+              return {
+                suggestions: buildCompletionItems({
+                  keywords: buildValueEntries(values, {
+                    hasOpenQuote: valueContext.hasOpenQuote,
+                    closingQuoteAhead,
+                    range,
+                  }) as any[],
+                  suggestions: [],
+                  word: word.word,
+                  range,
+                  kinds: kinds(),
+                  insertTextRules: rules(),
+                  tags: monaco.languages.CompletionItemTag,
+                }),
+                incomplete: true,
+              };
+            }
+          }
+
+          // Inside avg( or approx_percentile_cont(, lift the numeric columns to
+          // the top. On a metrics stream every label sorts above `value` — the
+          // one column the function can take — which is a correct list and a
+          // useless one. Applied to both lists so it does not depend on which
+          // one a given host puts its fields in.
+          const numericFirst = wantsNumericColumn(parseCallContext(textUntilPosition));
+          const keywordList = numericFirst
+            ? rankNumericFieldsFirst(config.keywords())
+            : config.keywords();
+          const suggestionList = numericFirst
+            ? rankNumericFieldsFirst(config.suggestions())
+            : config.suggestions();
+          return {
+            suggestions: buildCompletionItems({
+              keywords: keywordList,
+              suggestions: suggestionList,
+              word: word.word,
+              range,
+              kinds: kinds(),
+              insertTextRules: rules(),
+              tags: monaco.languages.CompletionItemTag,
+            }),
+            // ALWAYS incomplete, which is not about the content: `severity = `
+            // turns this same static catalog into a value list, and monaco
+            // re-filters what it has unless the previous answer said otherwise
+            // (suggestModel.js). So the values waited for a trigger character,
+            // and a value fetched from the server after this call could never
+            // arrive at all. Costs one provider call per keystroke over a local
+            // catalog and a cached lookup.
+            incomplete: true,
+          };
+        },
+      });
+
+      monaco.languages.registerSignatureHelpProvider(language, {
+        signatureHelpTriggerCharacters: ["(", ","],
+        signatureHelpRetriggerCharacters: [","],
+        provideSignatureHelp: async (
+          model: MonacoEditor.editor.ITextModel,
+          position: MonacoEditor.Position,
+        ) => {
+          const config = editorConfigs.get(modelKey(model));
+          if (!config || !config.enabled()) return null;
+
+          const text = model.getValueInRange({
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+          });
+          const call = parseCallContext(text);
+          if (!call) return null;
+
+          // The parser reports any identifier before the paren; the catalog
+          // decides whether it is a function.
+          const entry = findFunctionEntry(call.name, config.keywords(), config.suggestions());
+          const value = buildSignatureHelp(entry as any, call.activeParameter);
+          if (!value) return null;
+          // monaco reads `.value` off a SignatureHelpResult and disposes it.
+          return { value, dispose: () => {} };
+        },
+      });
+
+      monaco.languages.registerHoverProvider(language, {
+        provideHover: async (
+          model: MonacoEditor.editor.ITextModel,
+          position: MonacoEditor.Position,
+        ) => {
+          const config = editorConfigs.get(modelKey(model));
+          if (!config || !config.enabled()) return null;
+
+          const word = model.getWordAtPosition(position);
+          if (!word?.word) return null;
+          const entry = findCatalogEntry(word.word, config.keywords(), config.suggestions());
+          const contents = buildHoverContents(entry as any);
+          if (!contents) return null;
+          return {
+            contents,
+            range: {
               startLineNumber: position.lineNumber,
               endLineNumber: position.lineNumber,
               startColumn: word.startColumn,
               endColumn: word.endColumn,
-            };
-
-            let arr = textUntilPosition.trim().split(" ");
-            let filteredSuggestions = [];
-            filteredSuggestions = createDependencyProposals(range);
-            filteredSuggestions = filteredSuggestions.filter((item) => {
-              return item.label.toLowerCase().includes(word.word.toLowerCase());
-            });
-
-            const lastElement = arr.pop();
-            suggestions.value.forEach((suggestion: any) => {
-              filteredSuggestions.push({
-                label: suggestion.label(lastElement),
-                kind: monaco.languages.CompletionItemKind[
-                  suggestion.kind || "Text"
-                ],
-                insertText: suggestion.insertText(lastElement),
-                range: range,
-              });
-            });
-
-            return {
-              suggestions: filteredSuggestions,
-            };
-          },
+            },
+          };
         },
-      );
+      });
     };
 
     const resetEditorLayout = () => {
@@ -997,13 +966,11 @@ export default defineComponent({
     };
 
     const disableSuggestionPopup = () => {
-      const escEvent = new KeyboardEvent("keydown", {
-        keyCode: 27,
-        code: "Escape",
-        key: "Escape",
-        bubbles: true,
-      });
-      editorRef.value.dispatchEvent(escEvent);
+      // monaco's own command, which this file already uses elsewhere. The
+      // synthetic Escape this replaced was a guess about monaco's internal key
+      // handling that nothing verified, and it bubbled out of the editor to
+      // anything else listening for Escape.
+      editorObj?.trigger("disableSuggestionPopup", "hideSuggestWidget", {});
     };
 
     const formatDocument = async () => {
@@ -1026,8 +993,7 @@ export default defineComponent({
 
     const getCursorIndex = () => {
       const currentPosition = editorObj.getPosition();
-      const cursorIndex =
-        editorObj?.getModel().getOffsetAt(currentPosition) - 1;
+      const cursorIndex = editorObj?.getModel().getOffsetAt(currentPosition) - 1;
       return cursorIndex || null;
     };
 
@@ -1106,8 +1072,7 @@ export default defineComponent({
         // field name). Otherwise highlight to end-of-line so a syntax-error
         // squiggle near the cursor stays visible.
         const lineContent = model?.getLineContent?.(endLine) ?? "";
-        const endCol =
-          range.endColumn ?? (lineContent.length + 1 || startCol + 1);
+        const endCol = range.endColumn ?? (lineContent.length + 1 || startCol + 1);
         return {
           severity: monaco.MarkerSeverity.Error,
           startLineNumber: startLine,
@@ -1133,43 +1098,23 @@ export default defineComponent({
       const model = editorObj.getModel();
       if (!model) return;
 
+      // Deciding WHAT is wrong lives in utils/query/doubleQuoteWarnings.ts,
+      // where it is comment- and string-aware and can be tested without an
+      // editor. What is left here is the monaco half: offsets to positions,
+      // positions to markers.
       const text = model.getValue();
-      const markers: any[] = [];
-
-      // Two patterns are flagged — both only within value position (after a
-      // SQL comparison/membership operator). FROM "table" / SELECT "col" are
-      // intentionally NOT matched.
-      //
-      //  Pattern A — fully double-quoted:  field = "value"
-      //  Pattern B — mismatched quotes:    field = "value'  or  field = 'value"
-      //    Capture group 1: the invalid quoted token
-      const regex =
-        /(?:NOT\s+LIKE|NOT\s+IN\s*\(|!=|<>|>=|<=|=|>|<|LIKE|IN\s*\()\s*("[^'"]*'|'[^'"]*"|"[^"]*")/gi;
-
-      let match;
-      while ((match = regex.exec(text)) !== null) {
-        const quotedStr = match[1]; // the invalid quoted token
-        const startOffset = match.index + match[0].length - quotedStr.length;
-        const endOffset = startOffset + quotedStr.length;
-
-        const startPos = model.getPositionAt(startOffset);
-        const endPos = model.getPositionAt(endOffset);
-
-        const isMixed =
-          (quotedStr.startsWith('"') && quotedStr.endsWith("'")) ||
-          (quotedStr.startsWith("'") && quotedStr.endsWith('"'));
-
-        markers.push({
+      const markers = findDoubleQuoteIssues(text).map((issue) => {
+        const startPos = model.getPositionAt(issue.startOffset);
+        const endPos = model.getPositionAt(issue.endOffset);
+        return {
           severity: monaco.MarkerSeverity.Warning,
           startLineNumber: startPos.lineNumber,
           startColumn: startPos.column,
           endLineNumber: endPos.lineNumber,
           endColumn: endPos.column,
-          message: isMixed
-            ? "Mismatched quotes. Use matching single quotes for string values."
-            : "Double quotes are not valid for string values. Use single quotes instead.",
-        });
-      }
+          message: issue.message,
+        };
+      });
 
       monaco.editor.setModelMarkers(model, "dq-validation", markers);
     };
@@ -1197,7 +1142,14 @@ export default defineComponent({
 
     return {
       editorRef,
-      editorObj,
+      // `editorObj` is reassigned by a plain closure variable (monaco.editor.create
+      // runs after mount), so exposing it directly here would freeze callers to
+      // whatever it was at setup() return time (null, since the editor hasn't
+      // mounted yet). Expose a getter instead so external callers (see
+      // ContentTemplateForm.vue's toolbar actions) always read the live instance.
+      get editorObj() {
+        return editorObj;
+      },
       setValue,
       resetEditorLayout,
       disableSuggestionPopup,
@@ -1251,11 +1203,35 @@ export default defineComponent({
   visibility: visible !important;
 }
 
+/* Monaco sizes the suggest documentation panel with
+   `layout(width, type.clientHeight + docs.clientHeight)` and assigns that height
+   to THIS element (suggestWidgetDetails.js:161) — arithmetic that assumes
+   content-box. The app's global reset makes everything border-box, so the
+   panel's own hairline top and bottom borders eat two pixels of the content it
+   just measured, and the documentation scrolls by that sliver every time.
+   Restoring content-box for this one node is less fragile than trying to
+   out-compute the library. */
+.logs-query-editor :deep(.suggest-details) {
+  box-sizing: content-box;
+}
+
 /* Error decoration — class name is handed to monaco.deltaDecorations(), so the
    element only ever exists inside Monaco's view-lines. */
 .logs-query-editor :deep(.highlight-error) {
   background-color: color-mix(in srgb, var(--color-status-negative) 10%, transparent);
   text-decoration: underline;
   text-decoration-color: var(--color-status-negative);
+}
+
+/* PromQL brackets render plain (like Prometheus). The rainbow colours are
+   theme-global and the disable option doesn't strip these classes — repaint. */
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-0),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-1),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-2),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-3),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-4),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-5),
+.logs-query-editor.promql-mode :deep(.bracket-highlighting-6) {
+  color: var(--vscode-editor-foreground, var(--color-text-body)) !important;
 }
 </style>

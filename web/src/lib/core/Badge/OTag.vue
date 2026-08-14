@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OTag — THE badge component for the whole app. It is a superset of OBadge:
@@ -50,7 +51,7 @@ const props = withDefaults(
     /** Override the corner shape: pill, rounded, or square. */
     shape?: BadgeShape;
     /** Override the resolved label with dynamic/runtime text. */
-    label?: string;
+    label?: I18nText;
     /** Override the resolved colour variant. */
     variant?: BadgeVariant;
     /** Override the resolved icon (OIcon name). Pass "" to suppress. */
@@ -66,12 +67,12 @@ const props = withDefaults(
     /** Mute + disable interaction (OBadge passthrough). */
     disabled?: boolean;
     /** Text shown when a typed value is empty. Default "—". */
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
   }>(),
   // `dot` MUST default to undefined (not Vue's Boolean-absent→false coercion) so
   // `props.dot ?? resolved.dot` falls back to the registry's dot when the caller
   // doesn't pass it. Without this, every dot-mode group silently loses its dot.
-  { emptyLabel: "—", dot: undefined },
+  { emptyLabel: raw("—"), dot: undefined },
 );
 
 const emit = defineEmits<{ click: [e: MouseEvent | KeyboardEvent] }>();
@@ -89,9 +90,7 @@ const hasManualContent = computed(
     props.variant !== undefined,
 );
 // The "—" dash is for a SEMANTIC badge whose value is missing.
-const isEmpty = computed(
-  () => !hasManualContent.value && normalizeKey(props.value) === "",
-);
+const isEmpty = computed(() => !hasManualContent.value && normalizeKey(props.value) === "");
 
 const variant = computed<BadgeVariant>(() => {
   if (props.variant) return props.variant;
@@ -101,13 +100,9 @@ const variant = computed<BadgeVariant>(() => {
   return resolved.value.variant;
 });
 // Size precedence: prop → registry → "sm".
-const size = computed<BadgeSize>(
-  () => props.size ?? resolved.value.size ?? "sm",
-);
+const size = computed<BadgeSize>(() => props.size ?? resolved.value.size ?? "sm");
 // Shape precedence: prop → registry group → "pill".
-const shape = computed<BadgeShape>(
-  () => props.shape ?? resolved.value.shape ?? "pill",
-);
+const shape = computed<BadgeShape>(() => props.shape ?? resolved.value.shape ?? "pill");
 // Label precedence: prop → labelKey (i18n) → registry label → humanised value.
 const label = computed(() => {
   if (props.label !== undefined) return props.label;
@@ -120,9 +115,7 @@ const icon = computed(() =>
 // Dot precedence: explicit prop → registry dot for a TYPED group → false.
 // Manual badges (no `type`) must NOT inherit the generic fallback's dot, or
 // every passthrough chip (counts, metric chips) would sprout a leading dot.
-const dot = computed(() =>
-  props.dot ?? (props.type ? resolved.value.dot : false),
-);
+const dot = computed(() => props.dot ?? (props.type ? resolved.value.dot : false));
 </script>
 
 <template>

@@ -6,6 +6,9 @@ import type { SearchInputProps, SearchInputEmits } from "./OSearchInput.types";
 import type { InputSize } from "@/lib/forms/Input/OInput.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -19,7 +22,9 @@ const wrapperAttrs = computed(() => {
 
 const props = withDefaults(defineProps<SearchInputProps>(), {
   modelValue: "",
-  placeholder: "Search...",
+  // No default here: a literal ships untranslated and `t()` at module scope would
+  // freeze the locale at page load. Resolved per-render below instead.
+  placeholder: undefined,
   size: "sm",
   clearable: true,
   debounce: 0,
@@ -29,19 +34,19 @@ const props = withDefaults(defineProps<SearchInputProps>(), {
 const emit = defineEmits<SearchInputEmits>();
 
 // OInput only supports sm | md; xs maps to sm for the wrapper height
-const inputSize = computed<InputSize>(() =>
-  props.size === "md" ? "md" : "sm",
-);
+const inputSize = computed<InputSize>(() => (props.size === "md" ? "md" : "sm"));
 
 // Icon size follows OSearchInput size 1-to-1
 const iconSize = computed(() => (props.size === "xs" ? "xs" : "sm"));
+
+const resolvedPlaceholder = computed(() => props.placeholder ?? t("common.searchEllipsis"));
 </script>
 
 <template>
   <OInput
     v-bind="wrapperAttrs"
     :model-value="modelValue"
-    :placeholder="placeholder"
+    :placeholder="resolvedPlaceholder"
     :size="inputSize"
     :clearable="clearable"
     :debounce="debounce"
@@ -51,11 +56,7 @@ const iconSize = computed(() => (props.size === "xs" ? "xs" : "sm"));
     @clear="emit('clear')"
   >
     <template #icon-left>
-      <OIcon
-        name="search"
-        :size="iconSize"
-        class="cursor-pointer"
-      />
+      <OIcon name="search" :size="iconSize" class="cursor-pointer" />
     </template>
 
     <!-- Forwarded so a search field can carry a control INSIDE its border — the

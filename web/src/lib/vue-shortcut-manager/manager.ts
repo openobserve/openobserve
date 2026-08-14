@@ -1,8 +1,4 @@
-import type {
-  RegisteredShortcut,
-  Shortcut,
-  ShortcutManagerOptions,
-} from "./types";
+import type { RegisteredShortcut, Shortcut, ShortcutManagerOptions } from "./types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 // ---------------------------------------------------------------------------
@@ -27,9 +23,7 @@ function _state(): ManagerState {
   return (window as any)[_KEY];
 }
 
-export function getManager(
-  options?: ShortcutManagerOptions,
-): ShortcutManager | null {
+export function getManager(options?: ShortcutManagerOptions): ShortcutManager | null {
   if (typeof window === "undefined") return null;
   const s = _state();
   if (!s.instance) {
@@ -103,9 +97,7 @@ export class ShortcutManager {
     const existing = this.shortcuts.get(key) ?? [];
 
     // Conflict detection — warn and overwrite
-    const conflict = existing.find(
-      (s) => (s.scope ?? "global") === (shortcut.scope ?? "global"),
-    );
+    const conflict = existing.find((s) => (s.scope ?? "global") === (shortcut.scope ?? "global"));
     if (conflict) {
       console.warn(
         `[vue-shortcut-manager] Conflict: "${key}" already registered in scope "${shortcut.scope ?? "global"}". Overwriting.`,
@@ -113,10 +105,7 @@ export class ShortcutManager {
       this.unregisterById(conflict.id);
     }
 
-    this.shortcuts.set(key, [
-      ...(this.shortcuts.get(key) ?? []),
-      { ...shortcut, key, id },
-    ]);
+    this.shortcuts.set(key, [...(this.shortcuts.get(key) ?? []), { ...shortcut, key, id }]);
 
     this.notify();
     return id;
@@ -259,17 +248,10 @@ export class ShortcutManager {
    * is typing in an input. Pure single-letter keys have no modifier.
    */
   private static hasModifier(key: string): boolean {
-    return (
-      key.includes("ctrl+") ||
-      key.includes("meta+") ||
-      key.includes("alt+")
-    );
+    return key.includes("ctrl+") || key.includes("meta+") || key.includes("alt+");
   }
 
-  private triggerShortcut(
-    shortcut: RegisteredShortcut,
-    e: KeyboardEvent,
-  ): void {
+  private triggerShortcut(shortcut: RegisteredShortcut, e: KeyboardEvent): void {
     // Guard: never intercept single-letter shortcuts while the user is typing
     // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,
     // ⌘+Enter, etc.) are always allowed through regardless of focus, and a

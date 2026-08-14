@@ -19,20 +19,8 @@ import { nextTick } from "vue";
 import AzureMarketplaceSetup from "./AzureMarketplaceSetup.vue";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import organizationsService from "@/services/organizations";
 import azureMarketplace from "@/services/azureMarketplace";
-
-// The component calls useI18n() to i18n-drive its schema messages, so the mount
-// needs an i18n plugin. Messages are irrelevant here (these tests assert
-// validity, not error text), so an empty message bag is enough.
-const i18n = createI18n({
-  legacy: false,
-  locale: "en",
-  messages: { en: {} },
-  missingWarn: false,
-  fallbackWarn: false,
-});
 
 // Mock the services the two card-forms drive on submit.
 vi.mock("@/services/organizations", () => ({
@@ -66,9 +54,7 @@ describe("AzureMarketplaceSetup", () => {
 
     router = createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: "/", name: "home", component: { template: "<div>Home</div>" } },
-      ],
+      routes: [{ path: "/", name: "home", component: { template: "<div>Home</div>" } }],
     });
 
     (organizationsService.list as any).mockResolvedValue({
@@ -86,7 +72,7 @@ describe("AzureMarketplaceSetup", () => {
   const mountSetup = () =>
     mount(AzureMarketplaceSetup, {
       global: {
-        plugins: [store, router, i18n],
+        plugins: [store, router],
       },
     });
 
@@ -139,12 +125,8 @@ describe("AzureMarketplaceSetup", () => {
     const wrapper = mountSetup();
     await flushPromises();
 
-    expect(
-      wrapper.find('[data-test="azure-marketplace-org-name"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="azure-marketplace-create-link-btn"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="azure-marketplace-org-name"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="azure-marketplace-create-link-btn"]').exists()).toBe(true);
   });
 
   it("should display processing state", async () => {
@@ -252,7 +234,7 @@ describe("AzureMarketplaceSetup", () => {
 
     const wrapper = mount(AzureMarketplaceSetup, {
       global: {
-        plugins: [darkStore, router, i18n],
+        plugins: [darkStore, router],
       },
     });
 
@@ -264,9 +246,7 @@ describe("AzureMarketplaceSetup", () => {
   // Real-OForm validation wiring (playbook §5 / R22): mount the real OForm and
   // prove the Zod schema — not a button-disabled gate — blocks an empty submit.
   describe("OForm schema validation (real forms)", () => {
-    const mountSelectOrg = async (
-      orgs: { identifier: string; name: string }[] = [],
-    ) => {
+    const mountSelectOrg = async (orgs: { identifier: string; name: string }[] = []) => {
       sessionStorage.setItem("azure_marketplace_token", "test_token");
       (organizationsService.list as any).mockResolvedValue({
         data: { data: orgs },
@@ -309,9 +289,7 @@ describe("AzureMarketplaceSetup", () => {
     });
 
     it("link form: blocks submit + does NOT link when no org is selected", async () => {
-      const wrapper = await mountSelectOrg([
-        { identifier: "org1", name: "Org 1" },
-      ]);
+      const wrapper = await mountSelectOrg([{ identifier: "org1", name: "Org 1" }]);
       const linkForm = wrapper.findAllComponents({ name: "OForm" })[1];
 
       await (linkForm.vm as any).form.handleSubmit();
@@ -326,9 +304,7 @@ describe("AzureMarketplaceSetup", () => {
         data: { success: true },
       });
 
-      const wrapper = await mountSelectOrg([
-        { identifier: "org1", name: "Org 1" },
-      ]);
+      const wrapper = await mountSelectOrg([{ identifier: "org1", name: "Org 1" }]);
       const linkForm = wrapper.findAllComponents({ name: "OForm" })[1];
 
       (linkForm.vm as any).form.setFieldValue("selectedOrg", "org1");
@@ -336,10 +312,7 @@ describe("AzureMarketplaceSetup", () => {
       await flushPromises();
 
       expect((linkForm.vm as any).form.state.isValid).toBe(true);
-      expect(azureMarketplace.linkSubscription).toHaveBeenCalledWith(
-        "org1",
-        "test_token",
-      );
+      expect(azureMarketplace.linkSubscription).toHaveBeenCalledWith("org1", "test_token");
     });
   });
 });

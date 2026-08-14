@@ -22,17 +22,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-      <template #title>
-        <span data-test="pipeline-destination-editor-title">
-          <template v-if="destination"
-            >{{ t("alert_destinations.updateTitle") }} -
-            {{ destination.name }}</template
-          >
-          <template v-else>{{ t("alert_destinations.addTitle") }}</template>
-        </span>
-      </template>
+    <template #title>
+      <span data-test="pipeline-destination-editor-title">
+        <template v-if="destination"
+          >{{ t("alert_destinations.updateTitle") }} - {{ destination.name }}</template
+        >
+        <template v-else>{{ t("alert_destinations.addTitle") }}</template>
+      </span>
+    </template>
 
-    <div class="rounded-default py-2 px-3 overflow-auto">
+    <div class="rounded-default overflow-auto px-3 py-2">
       <div class="w-full">
         <CreateDestinationForm
           :destination="destination"
@@ -46,11 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import CreateDestinationForm from "./NodeForm/CreateDestinationForm.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Props
 defineProps<{
@@ -75,4 +74,3 @@ const handleCancel = () => {
   emit("cancel");
 };
 </script>
-

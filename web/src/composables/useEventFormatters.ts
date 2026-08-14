@@ -13,10 +13,7 @@ export function useEventFormatters() {
    */
   const formatTimestamp = (timestamp: number): string => {
     if (!timestamp) return "N/A";
-    return formatDate(
-      Math.floor(timestamp),
-      "MMM DD, YYYY HH:mm:ss.SSS Z",
-    );
+    return formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss.SSS Z");
   };
 
   /**
@@ -52,10 +49,7 @@ export function useEventFormatters() {
   /**
    * Format resource duration (microseconds or milliseconds)
    */
-  const formatResourceDuration = (
-    duration: number,
-    fromMicroseconds = false,
-  ): string => {
+  const formatResourceDuration = (duration: number, fromMicroseconds = false): string => {
     if (!duration) return "N/A";
     const durationInMs = fromMicroseconds ? duration / 1000000 : duration / 1000;
     return formatDuration(durationInMs);
@@ -66,13 +60,10 @@ export function useEventFormatters() {
    */
   const getEventTypeClass = (type: string): string => {
     const classes: { [key: string]: string } = {
-      error:
-        "bg-error-100 text-error-700 border border-solid border-error-300",
-      action:
-        "bg-blue-100 text-blue-700 border border-solid border-blue-300",
+      error: "bg-error-100 text-error-700 border border-solid border-error-300",
+      action: "bg-blue-100 text-blue-700 border border-solid border-blue-300",
       view: "bg-success-100 text-success-700 border border-solid border-success-400",
-      resource:
-        "bg-purple-100 text-purple-700 border border-solid border-purple-400",
+      resource: "bg-purple-100 text-purple-700 border border-solid border-purple-400",
     };
     return classes[type] || "bg-grey-100 text-grey-700";
   };

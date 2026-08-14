@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full service-identity-setup mt-2">
+  <div class="service-identity-setup mt-2 w-full">
     <!-- Loading skeleton while fetching recommendations -->
     <div v-if="loading" class="flex flex-col gap-4 py-4">
       <OSkeleton class="rounded-default h-14 w-full" />
@@ -25,15 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-else>
       <!-- Section 1: Service Configuration -->
-      <div
-        class="mb-3 rounded-default overflow-hidden border border-card-glass-border"
-       
-      >
-        <div class="p-3 flex flex-col gap-3">
+      <div class="rounded-default border-card-glass-border mb-3 overflow-hidden border">
+        <div class="flex flex-col gap-3 p-3">
           <!-- Service name source banner -->
           <div
             v-if="!serviceOptional"
-            class="rounded-default border overflow-hidden transition-all"
+            class="rounded-default overflow-hidden border transition-all"
             :class="
               serviceNameDetected
                 ? 'bg-banner-info-bg border-banner-info-border'
@@ -43,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Collapsed row -->
             <div
               data-test="service-identity-service-name-header"
-              class="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
+              class="flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-opacity hover:opacity-80"
               @click="serviceNameExpanded = !serviceNameExpanded"
             >
               <OIcon
@@ -51,15 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 :class="serviceNameDetected ? 'text-status-positive' : 'text-status-warning-text'"
               />
-              <div class="flex-1 min-w-0 text-compact leading-tight">
+              <div class="text-compact min-w-0 flex-1 leading-tight">
                 <template v-if="serviceNameDetected">
                   {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
-                  <span class="font-bold text-primary">Service</span>
+                  <span class="text-primary font-bold">{{
+                    t("settings.correlation.service")
+                  }}</span>
                   {{ t("settings.serviceIdentitySetup.fieldAlias") }}
                   <span class="text-xs opacity-60"
-                    >({{
-                      detectedServiceFields.length + unseenServiceFields.length
-                    }})</span
+                    >({{ detectedServiceFields.length + unseenServiceFields.length }})</span
                   >
                 </template>
                 <template v-else>
@@ -69,59 +66,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </div>
               <OIcon
-                :name="
-                  serviceNameExpanded
-                    ? 'keyboard-arrow-up'
-                    : 'keyboard-arrow-down'
-                "
+                :name="serviceNameExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
                 size="sm"
-                class="opacity-40 shrink-0"
+                class="shrink-0 opacity-40"
               />
             </div>
 
             <!-- Expanded detail -->
             <div
               v-if="serviceNameExpanded"
-              class="px-3 pb-3 pt-2 border-t"
+              class="border-t px-3 pt-2 pb-3"
               :class="
-                serviceNameDetected
-                  ? 'border-banner-info-border'
-                  : 'border-banner-warning-border'
+                serviceNameDetected ? 'border-banner-info-border' : 'border-banner-warning-border'
               "
             >
               <!-- Inner card -->
-              <div
-                class="rounded-default p-2.5"
-                :class="
-                  'bg-surface-subtle'
-                "
-              >
-                <div
-                  class="text-xs font-medium mb-2"
-                  :class="
-                    'text-text-secondary'
-                  "
-                >
+              <div class="rounded-default p-2.5" :class="'bg-surface-subtle'">
+                <div class="mb-2 text-xs font-medium" :class="'text-text-secondary'">
                   {{ t("settings.correlation.serviceNameExpandedHelp") }}
                 </div>
 
                 <!-- Field pills -->
-                <div class="flex flex-wrap gap-1.5 mb-3">
+                <div class="mb-3 flex flex-wrap gap-1.5">
                   <!-- Detected fields (with stream type dots) -->
                   <div
                     v-for="field in detectedServiceFields"
                     :key="field.name"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-default font-mono text-xs font-medium border border-card-glass-border"
-                   
-                    :class="
-                      'bg-surface-base text-text-secondary'
-                    "
+                    class="rounded-default border-card-glass-border inline-flex items-center gap-1.5 border px-2.5 py-1 font-mono text-xs font-medium"
+                    :class="'bg-surface-base text-text-secondary'"
                   >
-                    <div class="flex items-center gap-0.5 mr-0.5">
+                    <div class="mr-0.5 flex items-center gap-0.5">
                       <span
                         v-for="st in field.streamTypes"
                         :key="st"
-                        class="w-1.5 h-1.5 rounded-full"
+                        class="h-1.5 w-1.5 rounded-full"
                         :class="{
                           'bg-badge-blue-solid-bg': st === 'logs',
                           'bg-badge-orange-solid-bg': st === 'traces',
@@ -137,63 +115,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="field in unseenServiceFields"
                     :key="field"
-                    class="inline-flex items-center px-2.5 py-1 rounded-default border-dashed font-mono text-xs border border-dashed border-card-glass-border"
-                   
-                    :class="
-                      'text-text-secondary'
-                    "
-                    :title="
-                      t('settings.correlation.serviceNameConfiguredNotSeen')
-                    "
+                    class="rounded-default border-card-glass-border inline-flex items-center border border-dashed px-2.5 py-1 font-mono text-xs"
+                    :class="'text-text-secondary'"
+                    :title="t('settings.correlation.serviceNameConfiguredNotSeen')"
                   >
                     {{ field }}
                   </div>
                 </div>
 
                 <!-- Legend row -->
-                <div
-                  class="flex flex-wrap items-center justify-between gap-2"
-                >
+                <div class="flex flex-wrap items-center justify-between gap-2">
                   <div
-                    class="flex flex-wrap items-center gap-3 text-3xs"
-                    :class="
-                      'text-text-secondary'
-                    "
+                    class="text-3xs flex flex-wrap items-center gap-3"
+                    :class="'text-text-secondary'"
                   >
                     <div class="flex items-center gap-1">
-                      <span
-                        class="w-1.5 h-1.5 rounded-full bg-badge-blue-solid-bg"
-                      />
+                      <span class="bg-badge-blue-solid-bg h-1.5 w-1.5 rounded-full" />
                       {{ t("settings.correlation.foundInLogs") }}
                     </div>
                     <div class="flex items-center gap-1">
-                      <span
-                        class="w-1.5 h-1.5 rounded-full bg-badge-orange-solid-bg"
-                      />
+                      <span class="bg-badge-orange-solid-bg h-1.5 w-1.5 rounded-full" />
                       {{ t("settings.correlation.foundInTraces") }}
                     </div>
                     <div class="flex items-center gap-1">
-                      <span
-                        class="w-1.5 h-1.5 rounded-full bg-badge-success-solid-bg"
-                      />
+                      <span class="bg-badge-success-solid-bg h-1.5 w-1.5 rounded-full" />
                       {{ t("settings.correlation.foundInMetrics") }}
                     </div>
-                    <div
-                      v-if="unseenServiceFields.length > 0"
-                      class="flex items-center gap-1"
-                    >
-                      <span
-                        class="w-1.5 h-1.5 rounded-full border border-dashed border-grey-4"
-                      />
-                      {{
-                        t("settings.correlation.serviceNameConfiguredNotSeen")
-                      }}
+                    <div v-if="unseenServiceFields.length > 0" class="flex items-center gap-1">
+                      <span class="border-grey-4 h-1.5 w-1.5 rounded-full border border-dashed" />
+                      {{ t("settings.correlation.serviceNameConfiguredNotSeen") }}
                     </div>
                   </div>
 
                   <!-- Customize link -->
                   <a
-                    class="config-link-btn cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+                    class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg inline-flex cursor-pointer items-center gap-1 border px-2 py-0.5 text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
                     @click.prevent="emit('navigate-to-aliases', 'service')"
                   >
                     {{ t("settings.correlation.customizeFieldMappings") }}
@@ -203,27 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Field Mapping Dialog -->
-          <ODialog
-            data-test="service-identity-setup-field-mapping-dialog"
-            v-model:open="showFieldMappingDialog"
-            size="sm"
-            :title="t('settings.correlation.customizeFieldMappings')"
-            :sub-title="t('settings.correlation.fieldMappingDialogHelp')"
-            :secondary-button-label="t('common.cancel')"
-            :primary-button-label="t('common.save')"
-            :primary-button-loading="savingFieldMappings"
-            @click:secondary="showFieldMappingDialog = false"
-            @click:primary="saveFieldMappings"
-          >
-            <OTagInput
-              :model-value="editableServiceFields"
-              @update:model-value="editableServiceFields = $event"
-              :placeholder="t('settings.correlation.fieldMappingPlaceholder')"
-              label=""
-            />
-          </ODialog>
-
           <!-- Service Optional toggle -->
           <div data-test="service-identity-service-optional" class="mb-3">
             <OSwitch
@@ -232,48 +167,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('settings.correlation.serviceOptionalLabel')"
               size="md"
             />
-            <div
-              class="text-xs mt-1 leading-snug ml-9"
-              :class="
-                'text-text-secondary'
-              "
-            >
+            <div class="mt-1 ml-9 text-xs leading-snug" :class="'text-text-secondary'">
               {{ t("settings.correlation.serviceOptionalHelp") }}
             </div>
           </div>
 
           <!-- Disambiguation Fields -->
           <div>
-            <div class="flex items-center gap-2 mb-1">
-              <span class="font-bold text-sm">{{
+            <div class="mb-1 flex items-center gap-2">
+              <span class="text-sm font-bold">{{
                 t("settings.correlation.distinguishByLabel")
               }}</span>
               <span class="flex-1"><OSeparator /></span>
             </div>
-            <div
-              class="text-xs mb-3"
-              :class="
-                'text-text-secondary'
-              "
-            >
+            <div class="mb-3 text-xs" :class="'text-text-secondary'">
               {{ t("settings.correlation.distinguishByHelp") }}
             </div>
 
             <!-- Empty state: nothing configured anywhere -->
             <div
               v-if="allConfiguredEnvs.length === 0 && !addingToEnv"
-              class="flex flex-col items-center gap-2 py-3 px-4 rounded-default border border-dashed"
-              :class="
-                'border-border-default bg-surface-subtle'
-              "
+              class="rounded-default flex flex-col items-center gap-2 border border-dashed px-4 py-3"
+              :class="'border-border-default bg-surface-subtle'"
             >
               <OIcon name="tune" size="lg" class="text-icon-color mb-1" />
-              <span
-                class="text-sm font-medium"
-                :class="
-                  'text-text-secondary'
-                "
-              >
+              <span class="text-sm font-medium" :class="'text-text-secondary'">
                 {{ t("settings.serviceIdentitySetup.noFieldsConfiguredYet") }}
               </span>
               <OButton
@@ -293,36 +211,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Auto-suggested banner (only when fields came from suggestion, not saved config) -->
               <div
                 v-if="isAutoSuggested"
-                class="flex items-start gap-2 px-3 py-2 rounded-default text-xs"
-                :class="
-                  'bg-status-info-bg text-status-info-text'
-                "
+                class="rounded-default flex items-start gap-2 px-3 py-2 text-xs"
+                :class="'bg-status-info-bg text-status-info-text'"
               >
-                <OIcon
-                  name="auto-awesome"
-                  size="xs"
-                  class="shrink-0 mt-0.5"
-                />
+                <OIcon name="auto-awesome" size="xs" class="mt-0.5 shrink-0" />
                 <span>{{ t("settings.correlation.autoSuggestedBanner") }}</span>
               </div>
 
               <!-- One row per configured env -->
-              <template
-                v-for="(envKey, envIdx) in allConfiguredEnvs"
-                :key="envKey"
-              >
+              <template v-for="(envKey, envIdx) in allConfiguredEnvs" :key="envKey">
                 <!-- Environment label -->
                 <div
                   v-if="allConfiguredEnvs.length > 1"
-                  class="flex items-center gap-2 mt-1"
-                  :class="{ 'pt-2 border-t': envIdx > 0 }"
+                  class="mt-1 flex items-center gap-2"
+                  :class="{ 'border-t pt-2': envIdx > 0 }"
                 >
-                  <span
-                    class="text-3xs font-bold"
-                    :class="
-                      'text-text-secondary'
-                    "
-                  >
+                  <span class="text-3xs font-bold" :class="'text-text-secondary'">
                     {{ getIdentitySetLabel(envKey) }}
                   </span>
                 </div>
@@ -330,22 +234,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex flex-wrap items-center gap-2">
                   <!-- Pills for this env's fields -->
                   <div
-                    v-for="fieldId in (setDistinguishBy[envKey] ?? []).filter(
-                      Boolean,
-                    )"
+                    v-for="fieldId in (setDistinguishBy[envKey] ?? []).filter(Boolean)"
                     :key="fieldId"
-                    class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-default text-xs font-medium transition-colors border border-card-glass-border"
-                   
-                    :class="
-                      'bg-surface-base text-text-secondary'
-                    "
+                    class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 pr-1 pl-3 text-xs font-medium transition-colors"
+                    :class="'bg-surface-base text-text-secondary'"
                   >
-                    <span>{{
-                      getGroupByValue(fieldId)?.display ?? fieldId
-                    }}</span>
+                    <span>{{ getGroupByValue(fieldId)?.display ?? fieldId }}</span>
                     <OTooltip
                       v-if="getFieldCardinalityTooltip(fieldId)"
-                      :content="getFieldCardinalityTooltip(fieldId) ?? ''"
+                      :content="raw(getFieldCardinalityTooltip(fieldId) ?? '')"
                       side="top"
                     />
                     <OButton
@@ -414,10 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- + Add field button -->
                   <OButton
-                    v-else-if="
-                      (setDistinguishBy[envKey] ?? []).filter(Boolean).length <
-                      5
-                    "
+                    v-else-if="(setDistinguishBy[envKey] ?? []).filter(Boolean).length < 5"
                     variant="outline"
                     size="sm"
                     @click="addingToEnv = envKey"
@@ -427,19 +321,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip
                       side="top"
                       :content="t('settings.correlation.addFieldTooltip')"
-                      max-width="240px"
+                      max-width="15rem"
                     />
                   </OButton>
                 </div>
               </template>
 
               <!-- Adding to a new env (not yet in the list) -->
-              <template
-                v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)"
-              >
+              <template v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)">
                 <div
-                  class="flex flex-wrap items-center gap-2 pt-2 border-t border-card-glass-border"
-                 
+                  class="border-card-glass-border flex flex-wrap items-center gap-2 border-t pt-2"
                 >
                   <OSelect
                     ref="addFieldSelectRef"
@@ -482,10 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <!-- Add group + Save — bottom row -->
-              <div
-                v-if="!addingToEnv"
-                class="flex items-center justify-between mt-2"
-              >
+              <div v-if="!addingToEnv" class="mt-2 flex items-center justify-between">
                 <OButton
                   variant="outline"
                   size="sm"
@@ -496,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip
                     side="top"
                     :content="t('settings.correlation.addGroupTooltip')"
-                    max-width="240px"
+                    max-width="15rem"
                   />
                 </OButton>
                 <OButton
@@ -520,69 +408,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Section 3: Workload Detection -->
       <div
         v-if="workloadDetectedGroups.length > 0"
-        class="mb-3 rounded-default overflow-hidden border border-card-glass-border"
-       
+        class="rounded-default border-card-glass-border mb-3 overflow-hidden border"
       >
         <!-- Section header -->
-        <div
-          class="px-4 py-3 flex items-center gap-2 border-b border-card-glass-border"
-         
-        >
+        <div class="border-card-glass-border flex items-center gap-2 border-b px-4 py-3">
           <OIcon name="radar" size="sm" class="text-teal-6" />
-          <span class="font-bold text-sm">{{ t("settings.serviceIdentitySetup.workloadDetection") }}</span>
+          <span class="text-sm font-bold">{{
+            t("settings.serviceIdentitySetup.workloadDetection")
+          }}</span>
         </div>
 
         <!-- Collapsible: Workload detected using fields (N) -->
         <div
-          class="mx-3 mt-3 rounded-default border overflow-hidden transition-all"
-          :class="
-            'bg-banner-info-bg border-banner-info-border'
-          "
+          class="rounded-default mx-3 mt-3 overflow-hidden border transition-all"
+          :class="'bg-banner-info-bg border-banner-info-border'"
         >
           <div
-            class="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
+            class="flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-opacity hover:opacity-80"
             @click="trackedAliasExpanded = !trackedAliasExpanded"
           >
             <OIcon name="check-circle" size="sm" />
-            <div class="flex-1 min-w-0 text-compact leading-tight">
+            <div class="text-compact min-w-0 flex-1 leading-tight">
               {{ t("settings.serviceIdentitySetup.workloadDetectedUsingFields") }}
-              <span class="text-xs opacity-60"
-                >({{ trackedAliasIds.length }})</span
-              >
+              <span class="text-xs opacity-60">({{ trackedAliasIds.length }})</span>
             </div>
             <OIcon
-              :name="
-                trackedAliasExpanded
-                  ? 'keyboard-arrow-up'
-                  : 'keyboard-arrow-down'
-              "
+              :name="trackedAliasExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
               size="sm"
-              class="opacity-40 shrink-0"
+              class="shrink-0 opacity-40"
             />
           </div>
 
           <div
             v-if="trackedAliasExpanded"
-            class="px-3 pb-3 pt-2 border-t"
-            :class="
-              'border-banner-info-border'
-            "
+            class="border-t px-3 pt-2 pb-3"
+            :class="'border-banner-info-border'"
           >
-            <div
-              class="rounded-default p-2.5"
-              :class="
-                'bg-surface-subtle'
-              "
-            >
-              <div
-                class="text-xs mb-3"
-                :class="
-                  'text-text-secondary'
-                "
-              >
+            <div class="rounded-default p-2.5" :class="'bg-surface-subtle'">
+              <div class="mb-3 text-xs" :class="'text-text-secondary'">
                 {{ t("settings.serviceIdentitySetup.workloadTrackedHelp") }}
                 <a
-                  class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+                  class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
                   >{{ t("settings.serviceIdentitySetup.goToFieldAliases") }}</a
                 >
@@ -593,21 +459,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="alias in resolvedTrackedAliases"
                   :key="alias.id"
-                  class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-default text-xs font-medium transition-colors border border-card-glass-border"
-                 
-                  :class="
-                    'bg-surface-base text-text-secondary'
-                  "
+                  class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 pr-1 pl-3 text-xs font-medium transition-colors"
+                  :class="'bg-surface-base text-text-secondary'"
                 >
                   <span>{{ alias.label }}</span>
                   <OButton
                     variant="ghost"
                     size="icon-xs-sq"
-                    @click="
-                      trackedAliasIds = trackedAliasIds.filter(
-                        (id) => id !== alias.id,
-                      )
-                    "
+                    @click="trackedAliasIds = trackedAliasIds.filter((id) => id !== alias.id)"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -676,7 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("settings.correlation.addField") }}
                 </OButton>
               </div>
-              <div class="flex justify-end mt-3">
+              <div class="mt-3 flex justify-end">
                 <OButton
                   variant="primary"
                   size="sm-action"
@@ -692,15 +551,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="px-4 pt-3 pb-1">
-          <div
-            class="text-xs"
-            :class="
-              'text-text-secondary'
-            "
-          >
+          <div class="text-xs" :class="'text-text-secondary'">
             {{ t("settings.serviceIdentitySetup.discoveredPatternsHelp") }}
             <a
-              class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+              class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
               @click.prevent="emit('navigate-to-services')"
               >{{ t("settings.serviceIdentitySetup.goToServices") }}</a
             >
@@ -709,95 +563,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Environment Tabs (Chrome-style) -->
-        <div
-          class="flex items-end gap-0 px-4 border-b border-card-glass-border"
-         
-        >
+        <div class="border-card-glass-border flex items-end gap-0 border-b px-4">
+          <!-- eslint-disable local/no-hardcoded-px -- hairline: the active tab pulls itself 1 device pixel over the panel border to hide it; that nudge must not scale with text -->
           <div
             v-for="env in detectedEnvironments"
             :key="env.key"
-            class="relative px-4 py-2 cursor-pointer transition-all text-xs font-medium min-w-17.5 text-center rounded-t-default border border-b-0"
+            class="rounded-t-default relative min-w-17.5 cursor-pointer border border-b-0 px-4 py-2 text-center text-xs font-medium transition-all"
             :class="
               activeEnvironment === env.key
                 ? 'text-text-body'
-                : 'bg-transparent text-text-muted border-transparent hover:text-text-secondary'
+                : 'text-text-muted hover:text-text-secondary border-transparent bg-transparent'
             "
             :style="
               activeEnvironment === env.key
-                ? 'margin-bottom: -1px; padding-bottom: 9px; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
+                ? 'margin-bottom: -1px; padding-bottom: 0.5625rem; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
                 : ''
             "
             @click="activeEnvironment = env.key"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             {{ env.label }}
             <span
-              v-if="
-                (setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0
+              v-if="(setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0"
+              class="bg-badge-success-solid-bg absolute top-1 right-1 h-1.5 w-1.5 rounded-full"
+              :title="
+                t('settings.serviceIdentitySetup.fieldsConfigured', {
+                  n: (setDistinguishBy[env.key] ?? []).filter(Boolean).length,
+                })
               "
-              class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-badge-success-solid-bg"
-              :title="t('settings.serviceIdentitySetup.fieldsConfigured', { n: (setDistinguishBy[env.key] ?? []).filter(Boolean).length })"
             />
           </div>
         </div>
 
         <!-- Tab content panel — connects to active tab -->
-        <div
-          v-if="primaryDim"
-          class="overflow-hidden px-4 pt-4 pb-2"
-        >
+        <div v-if="primaryDim" class="overflow-hidden px-4 pt-4 pb-2">
           <!-- Stat cards -->
           <div class="flex items-stretch gap-3">
             <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
               <!-- Plus connector between cards -->
-              <div v-if="idx > 0" class="flex items-center shrink-0">
+              <div v-if="idx > 0" class="flex shrink-0 items-center">
                 <OIcon name="add" size="sm" class="text-icon-color" />
               </div>
 
               <!-- Dim card -->
               <div
-                class="dim-stat-card flex-1 min-w-0 rounded-default p-3 flex flex-col"
+                class="dim-stat-card rounded-default flex min-w-0 flex-1 flex-col p-3"
                 :style="card.theme.border"
               >
-                <div class="flex items-center gap-2 mb-2">
-                  <OIcon
-                    :name="card.theme.icon"
-                    size="sm"
-                    :class="card.theme.iconClass"
-                  />
-                  <span
-                    class="text-2xs font-medium"
-                    :class="
-                      'text-text-secondary'
-                    "
-                    >{{ card.label }}</span
-                  >
-                  <span
-                    class="text-lg font-bold ml-auto"
-                    :class="card.theme.countClass"
-                    >{{ card.count }}</span
-                  >
+                <div class="mb-2 flex items-center gap-2">
+                  <OIcon :name="card.theme.icon" size="sm" :class="card.theme.iconClass" />
+                  <span class="text-2xs font-medium" :class="'text-text-secondary'">{{
+                    card.label
+                  }}</span>
+                  <span class="ml-auto text-lg font-bold" :class="card.theme.countClass">{{
+                    card.count
+                  }}</span>
                 </div>
                 <div class="dim-stat-pills flex flex-wrap gap-1 overflow-hidden">
                   <span
                     v-for="val in card.values.slice(0, 5)"
                     :key="val"
-                    class="max-w-[calc(50%-4px)] h-5.5 box-border text-2xs py-0.5 px-2 rounded-full border cursor-pointer hover:opacity-70 transition-opacity inline-flex items-center gap-1"
-                    :class="
-                      card.theme.pill
-                    "
+                    class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
+                    :class="card.theme.pill"
                     :title="val"
                     @click.stop="openInsightDialogByIdx(val, idx)"
                     ><span class="truncate">{{ val }}</span
-                    ><span
-                      v-if="card.dim"
-                      class="inline-flex gap-0.5 ml-0.5 shrink-0"
+                    ><span v-if="card.dim" class="ml-0.5 inline-flex shrink-0 gap-0.5"
                       ><span
-                        v-for="st in getValueStreamTypes(
-                          card.dim.group_id,
-                          val,
-                        )"
+                        v-for="st in getValueStreamTypes(card.dim.group_id, val)"
                         :key="st"
-                        class="w-1.5 h-1.5 rounded-full inline-block"
+                        class="inline-block h-1.5 w-1.5 rounded-full"
                         :class="{
                           'bg-badge-blue-solid-bg': st === 'logs',
                           'bg-badge-orange-solid-bg': st === 'traces',
@@ -812,39 +647,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #trigger>
                       <span
-                        class="max-w-[calc(50%-4px)] h-5.5 box-border text-2xs py-0.5 px-2 rounded-full cursor-pointer hover:opacity-70 transition-opacity"
-                        :class="
-                          'text-text-secondary'
-                        "
+                        class="text-2xs box-border h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer rounded-full px-2 py-0.5 transition-opacity hover:opacity-70"
+                        :class="'text-text-secondary'"
                         >+{{ card.values.length - 5 }}</span
                       >
                     </template>
                     <div
-                      class="p-2 flex flex-wrap gap-1 max-w-70 max-h-50 overflow-y-auto"
-                      :class="
-                        'bg-surface-overlay'
-                      "
+                      class="flex max-h-50 max-w-70 flex-wrap gap-1 overflow-y-auto p-2"
+                      :class="'bg-surface-overlay'"
                     >
                       <span
                         v-for="val in card.values.slice(5)"
                         :key="val"
-                        class="text-2xs py-0.5 px-2 rounded-full border cursor-pointer hover:opacity-70 transition-opacity inline-flex items-center gap-1"
-                        :class="
-                          card.theme.pill
-                        "
+                        class="text-2xs inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
+                        :class="card.theme.pill"
                         :title="val"
-                        @click.stop="openInsightDialogByIdx(val, idx); dimCardMoreMenuOpen[idx] = false"
+                        @click.stop="
+                          openInsightDialogByIdx(val, idx);
+                          dimCardMoreMenuOpen[idx] = false;
+                        "
                         ><span class="truncate">{{ val }}</span
-                        ><span
-                          v-if="card.dim"
-                          class="inline-flex gap-0.5 ml-0.5 shrink-0"
+                        ><span v-if="card.dim" class="ml-0.5 inline-flex shrink-0 gap-0.5"
                           ><span
-                            v-for="st in getValueStreamTypes(
-                              card.dim.group_id,
-                              val,
-                            )"
+                            v-for="st in getValueStreamTypes(card.dim.group_id, val)"
                             :key="st"
-                            class="w-1.5 h-1.5 rounded-full inline-block"
+                            class="inline-block h-1.5 w-1.5 rounded-full"
                             :class="{
                               'bg-badge-blue-solid-bg': st === 'logs',
                               'bg-badge-orange-solid-bg': st === 'traces',
@@ -859,38 +686,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Stream type legend -->
-          <div class="flex items-center gap-3 mt-2 ml-1">
-            <div
-              class="flex items-center gap-1 text-3xs"
-              :class="
-                'text-text-secondary'
-              "
-            >
-              <span
-                class="w-1.5 h-1.5 rounded-full inline-block bg-badge-blue-solid-bg"
-              />
+          <div class="mt-2 ml-1 flex items-center gap-3">
+            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <span class="bg-badge-blue-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
               <span>{{ t("settings.correlation.foundInLogs") }}</span>
             </div>
-            <div
-              class="flex items-center gap-1 text-3xs"
-              :class="
-                'text-text-secondary'
-              "
-            >
-              <span
-                class="w-1.5 h-1.5 rounded-full inline-block bg-badge-orange-solid-bg"
-              />
+            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <span class="bg-badge-orange-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
               <span>{{ t("settings.correlation.foundInTraces") }}</span>
             </div>
-            <div
-              class="flex items-center gap-1 text-3xs"
-              :class="
-                'text-text-secondary'
-              "
-            >
-              <span
-                class="w-1.5 h-1.5 rounded-full inline-block bg-badge-success-solid-bg"
-              />
+            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <span class="bg-badge-success-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
               <span>{{ t("settings.correlation.foundInMetrics") }}</span>
             </div>
           </div>
@@ -905,32 +711,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             !suggestionAlreadyApplied
           "
           class="flex items-center gap-3 px-4 py-2.5"
-          :class="
-            'bg-surface-subtle'
-          "
+          :class="'bg-surface-subtle'"
         >
-          <div
-            class="flex-1 min-w-0 text-xs truncate"
-            :class="
-              'text-text-secondary'
-            "
-          >
-            <span
-              class="font-bold"
-              :class="
-                'text-text-body'
-              "
-              >{{ t("settings.serviceIdentitySetup.recommended") }}</span
-            >
+          <div class="min-w-0 flex-1 truncate text-xs" :class="'text-text-secondary'">
+            <span class="font-bold" :class="'text-text-body'">{{
+              t("settings.serviceIdentitySetup.recommended")
+            }}</span>
             {{ " " }}{{ t("settings.serviceIdentitySetup.recommendedUse") }}
             <span class="font-semibold">{{
               suggestedConfig.distinguish_by
                 .map((id) => getGroupByValue(id)?.display ?? id)
                 .join(" + ")
             }}</span>
-            {{ t("settings.serviceIdentitySetup.coversTelemetry", { coverage: activeEnvCoverage ?? "–" }) }}
+            {{
+              t("settings.serviceIdentitySetup.coversTelemetry", {
+                coverage: activeEnvCoverage ?? "–",
+              })
+            }}
           </div>
-          <div class="shrink-0 flex items-center gap-1">
+          <div class="flex shrink-0 items-center gap-1">
             <OButton variant="outline" size="sm" @click="applySuggestion">
               {{ t("settings.serviceIdentitySetup.apply") }}
             </OButton>
@@ -955,40 +754,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                containing the title + tooltip; second line is a conditional coverage flex with icon.
                Cannot be expressed cleanly with title + sub-title props alone. -->
           <template #header>
-            <div class="flex-1 min-w-0">
-              <div class="text-base flex items-center">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center text-base">
                 {{ insightData.subtitle }}
                 <span
                   :class="[
-                    'font-semibold px-2 py-0.5 rounded-default ml-2 inline-block',
+                    'rounded-default ml-2 inline-block px-2 py-0.5 font-semibold',
                     'text-status-info-text bg-status-info-bg',
                   ]"
                 >
                   {{ insightData.title }}
                   <OTooltip
                     v-if="insightData.title.length > 25"
-                    :content="insightData.title"
+                    :content="raw(insightData.title)"
                     side="top"
                   />
                 </span>
               </div>
               <div
-                v-if="
-                  !(insightData as any).isCardLevel &&
-                  insightData.coverage !== null
-                "
-                class="flex items-center gap-1.5 text-xs mt-1"
-                :class="
-                  'text-text-secondary'
-                "
+                v-if="!(insightData as any).isCardLevel && insightData.coverage !== null"
+                class="mt-1 flex items-center gap-1.5 text-xs"
+                :class="'text-text-secondary'"
               >
                 <OIcon name="verified" size="xs" class="text-status-positive" />
                 <span
-                  >{{ t("settings.serviceIdentitySetup.percentOfServices", { coverage: insightData.coverage }) }}
-                  <span
-                    v-if="
-                      insightData.count !== null && insightData.total !== null
-                    "
+                  >{{
+                    t("settings.serviceIdentitySetup.percentOfServices", {
+                      coverage: insightData.coverage,
+                    })
+                  }}
+                  <span v-if="insightData.count !== null && insightData.total !== null"
                     >({{ insightData.count }}/{{ insightData.total }})</span
                   >
                 </span>
@@ -996,202 +791,151 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <!-- Stream contribution chart (single-value only) -->
-          <div class="flex flex-col h-full">
-          <template
-            v-if="
-              !(insightData as any).isCardLevel &&
-              (insightData as any).streamDetails?.length > 0
-            "
-          >
-            <div class="mb-3 shrink-0">
-              <div
-                class="text-2xs tracking-wide font-medium mb-2 text-text-label"
-               
-              >
-                {{ t("settings.serviceIdentitySetup.streamSources") }}
-              </div>
-              <div style="height: 40vh; min-height: 180px">
-                <CustomChartRenderer :data="insightChartData.options" />
-              </div>
-              <!-- Legend -->
-              <div
-                class="flex items-center justify-center gap-4 mt-2"
-              >
-                <div
-                  v-for="sd in (insightData as any).streamDetails"
-                  :key="sd.streamType"
-                  class="flex items-center gap-1.5 text-2xs"
-                  :class="
-                    'text-text-secondary'
-                  "
-                >
-                  <span
-                    class="w-2 h-2 rounded-full"
-                    :class="{
-                      'bg-badge-blue-solid-bg': sd.streamType === 'logs',
-                      'bg-badge-orange-solid-bg': sd.streamType === 'traces',
-                      'bg-badge-success-solid-bg': sd.streamType === 'metrics',
-                    }"
-                  />
-                  <span class="capitalize">{{ sd.streamType }}</span>
-                  <span class="font-medium">{{
-                    sd.streamNames.length
-                  }}</span>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <OSeparator class="mb-3 shrink-0" />
-
-          <!-- Card-level: all values with bars -->
-          <template
-            v-if="
-              (insightData as any).isCardLevel &&
-              insightData.children.length > 0
-            "
-          >
-            <div
-              class="text-2xs font-medium mb-3"
-              :class="
-                'text-text-secondary'
+          <div class="flex h-full flex-col">
+            <template
+              v-if="
+                !(insightData as any).isCardLevel && (insightData as any).streamDetails?.length > 0
               "
             >
-              {{ t("settings.serviceIdentitySetup.allValues", { count: insightData.children.length }) }}
-            </div>
-            <div class="flex flex-col gap-2.5">
-              <div
-                v-for="child in insightData.children"
-                :key="child.name"
-                class="flex flex-col gap-1"
-              >
-                <div
-                  class="flex items-center justify-between text-xs"
-                >
-                  <span class="truncate min-w-0 font-medium">{{
-                    child.name
-                  }}</span>
-                  <span
-                    class="shrink-0 ml-2 tabular-nums"
-                    :class="
-                      'text-text-secondary'
-                    "
-                    >{{ child.count }} {{ insightData.childCountLabel }}</span
-                  >
+              <div class="mb-3 shrink-0">
+                <div class="text-2xs text-text-label mb-2 font-medium tracking-wide">
+                  {{ t("settings.serviceIdentitySetup.streamSources") }}
                 </div>
-                <div
-                  class="w-full h-2 rounded-full overflow-hidden"
-                  :class="
-                    'bg-surface-subtle'
-                  "
-                >
+                <div style="height: 40vh; min-height: 11.25rem">
+                  <CustomChartRenderer :data="insightChartData.options" />
+                </div>
+                <!-- Legend -->
+                <div class="mt-2 flex items-center justify-center gap-4">
                   <div
-                    class="h-full rounded-full transition-all"
-                    :class="
-                      insightDialogLevel === 'primary'
-                        ? 'bg-blue-5'
-                        : insightDialogLevel === 'secondary'
-                          ? 'bg-teal-5'
-                          : 'bg-purple-5'
-                    "
-                    :style="{
-                      width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%`,
-                    }"
-                  />
+                    v-for="sd in (insightData as any).streamDetails"
+                    :key="sd.streamType"
+                    class="text-2xs flex items-center gap-1.5"
+                    :class="'text-text-secondary'"
+                  >
+                    <span
+                      class="h-2 w-2 rounded-full"
+                      :class="{
+                        'bg-badge-blue-solid-bg': sd.streamType === 'logs',
+                        'bg-badge-orange-solid-bg': sd.streamType === 'traces',
+                        'bg-badge-success-solid-bg': sd.streamType === 'metrics',
+                      }"
+                    />
+                    <span class="capitalize">{{ sd.streamType }}</span>
+                    <span class="font-medium">{{ sd.streamNames.length }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </template>
+            </template>
 
-          <!-- Single-value: related dimension columns (read-only) -->
-          <template
-            v-if="
-              !(insightData as any).isCardLevel &&
-              (insightData as any).relatedDimensions?.length > 0
-            "
-          >
-            <!-- Explanation -->
-            <div
-              class="flex items-center gap-1.5 text-2xs mb-2 shrink-0 py-1.5 px-2.5 rounded-default"
-              :class="
-                'bg-status-info-bg text-text-secondary'
+            <OSeparator class="mb-3 shrink-0" />
+
+            <!-- Card-level: all values with bars -->
+            <template v-if="(insightData as any).isCardLevel && insightData.children.length > 0">
+              <div class="text-2xs mb-3 font-medium" :class="'text-text-secondary'">
+                {{
+                  t("settings.serviceIdentitySetup.allValues", {
+                    count: insightData.children.length,
+                  })
+                }}
+              </div>
+              <div class="flex flex-col gap-2.5">
+                <div
+                  v-for="child in insightData.children"
+                  :key="child.name"
+                  class="flex flex-col gap-1"
+                >
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="min-w-0 truncate font-medium">{{ child.name }}</span>
+                    <span class="ml-2 shrink-0 tabular-nums" :class="'text-text-secondary'"
+                      >{{ child.count }} {{ insightData.childCountLabel }}</span
+                    >
+                  </div>
+                  <div class="h-2 w-full overflow-hidden rounded-full" :class="'bg-surface-subtle'">
+                    <div
+                      class="h-full rounded-full transition-all"
+                      :class="
+                        insightDialogLevel === 'primary'
+                          ? 'bg-blue-5'
+                          : insightDialogLevel === 'secondary'
+                            ? 'bg-teal-5'
+                            : 'bg-purple-5'
+                      "
+                      :style="{
+                        width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%`,
+                      }"
+                    />
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Single-value: related dimension columns (read-only) -->
+            <template
+              v-if="
+                !(insightData as any).isCardLevel &&
+                (insightData as any).relatedDimensions?.length > 0
               "
             >
-              <OIcon name="info" size="xs" />
-              <span
-                >{{ t("settings.serviceIdentitySetup.relatedValuesPre") }}
-                <strong>{{
-                  formatDimLabels((insightData as any).relatedDimensions)
-                }}</strong>
-                {{ t("settings.serviceIdentitySetup.valuesCoOccurringWith") }}
-                <strong>{{ insightData.title }}</strong
-                >.</span
-              >
-            </div>
-            <div class="flex flex-1 min-h-0 py-3">
+              <!-- Explanation -->
               <div
-                v-for="(dim, dimIdx) in insightRelatedDimensions"
-                :key="dim.label + dimIdx"
-                class="flex-1 min-w-0 flex flex-col px-3"
-                :class="[
-                  dimIdx > 0
-                    ? 'border-l border-border-default'
-                    : '',
-                ]"
+                class="text-2xs rounded-default mb-2 flex shrink-0 items-center gap-1.5 px-2.5 py-1.5"
+                :class="'bg-status-info-bg text-text-secondary'"
               >
-                <div
-                  class="text-compact font-bold mb-2"
-                  :class="
-                    'text-text-body'
-                  "
+                <OIcon name="info" size="xs" />
+                <span
+                  >{{ t("settings.serviceIdentitySetup.relatedValuesPre") }}
+                  <strong>{{ formatDimLabels((insightData as any).relatedDimensions) }}</strong>
+                  {{ t("settings.serviceIdentitySetup.valuesCoOccurringWith") }}
+                  <strong>{{ insightData.title }}</strong
+                  >.</span
                 >
-                  {{ dim.label }}
-                  <span
-                    class="font-normal"
-                    :class="
-                      'text-text-secondary'
-                    "
-                    >({{ dim.values.length }})</span
-                  >
-                </div>
+              </div>
+              <div class="flex min-h-0 flex-1 py-3">
                 <div
-                  class="flex flex-col gap-1 flex-1 overflow-y-auto min-h-0"
+                  v-for="(dim, dimIdx) in insightRelatedDimensions"
+                  :key="dim.label + dimIdx"
+                  class="flex min-w-0 flex-1 flex-col px-3"
+                  :class="[dimIdx > 0 ? 'border-border-default border-l' : '']"
                 >
-                  <span
-                    v-for="dVal in dim.values"
-                    :key="dVal"
-                    class="text-compact py-1 px-2.5 rounded-default border truncate shrink-0"
-                    :class="{
-                      'bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text': dim.color === 'teal',
-                      'bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-soft-text': dim.color === 'purple',
-                      'bg-badge-blue-soft-bg border-badge-blue-ol-border text-badge-blue-soft-text': dim.color === 'blue',
-                    }"
-                    :title="dVal"
-                    >{{ dVal }}</span
-                  >
-                  <span
-                    v-if="dim.values.length === 0"
-                    class="text-xs italic"
-                    :class="
-                      'text-text-secondary'
-                    "
-                    >{{ t("settings.serviceIdentitySetup.noValues") }}</span
-                  >
+                  <div class="text-compact mb-2 font-bold" :class="'text-text-body'">
+                    {{ dim.label }}
+                    <span class="font-normal" :class="'text-text-secondary'"
+                      >({{ dim.values.length }})</span
+                    >
+                  </div>
+                  <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+                    <span
+                      v-for="dVal in dim.values"
+                      :key="dVal"
+                      class="text-compact rounded-default shrink-0 truncate border px-2.5 py-1"
+                      :class="{
+                        'bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text':
+                          dim.color === 'teal',
+                        'bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-soft-text':
+                          dim.color === 'purple',
+                        'bg-badge-blue-soft-bg border-badge-blue-ol-border text-badge-blue-soft-text':
+                          dim.color === 'blue',
+                      }"
+                      :title="dVal"
+                      >{{ dVal }}</span
+                    >
+                    <span
+                      v-if="dim.values.length === 0"
+                      class="text-xs italic"
+                      :class="'text-text-secondary'"
+                      >{{ t("settings.serviceIdentitySetup.noValues") }}</span
+                    >
+                  </div>
                 </div>
               </div>
-            </div>
-          </template>
+            </template>
           </div>
         </ODrawer>
       </div>
 
       <!-- Section 3: Warnings -->
       <div v-if="warnings.length > 0" class="mb-6">
-        <OBanner
-          variant="warning"
-          icon="warning"
-          data-test="service-identity-warnings-banner"
-        >
+        <OBanner variant="warning" icon="warning" data-test="service-identity-warnings-banner">
           <div class="flex flex-col gap-1">
             <div v-for="(warn, idx) in warnings" :key="idx" class="text-sm">
               {{ warn }}
@@ -1214,27 +958,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }
         "
         size="md"
-        :title="primaryDim?.display"
-        :sub-title="popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined"
+        :title="raw(primaryDim?.display)"
+        :sub-title="raw(popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined)"
       >
-        <OCardSection class="flex flex-col gap-4 p-0 border-t">
+        <OCardSection class="flex flex-col gap-4 border-t p-0">
           <!-- Header section with cardinality details -->
-          <div class="flex items-center gap-3 p-4 border-b">
+          <div class="flex items-center gap-3 border-b p-4">
             <span class="font-medium">{{ t("settings.serviceIdentitySetup.cardinality") }}</span>
             <OTag
               type="cardinalityClass"
               :value="
-                dimensionAnalytics[primaryDim?.group_id ?? '']?.cardinality_class ||
-                'Unknown'
+                dimensionAnalytics[primaryDim?.group_id ?? '']?.cardinality_class || 'Unknown'
               "
             >
-              {{ t("settings.serviceIdentitySetup.uniqueValues", { n: dimensionAnalytics[primaryDim?.group_id ?? '']?.cardinality || 0 }) }}
+              {{
+                t("settings.serviceIdentitySetup.uniqueValues", {
+                  n: dimensionAnalytics[primaryDim?.group_id ?? ""]?.cardinality || 0,
+                })
+              }}
             </OTag>
             <OTag
               type="cardinalityClass"
               :value="
-                dimensionAnalytics[primaryDim?.group_id ?? '']?.cardinality_class ||
-                'Unknown'
+                dimensionAnalytics[primaryDim?.group_id ?? '']?.cardinality_class || 'Unknown'
               "
             />
           </div>
@@ -1248,12 +994,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex h-75"
           >
             <!-- Left Pane: Streams List -->
-            <div
-              class="w-1/3 border-r bg-surface-subtle flex flex-col"
-            >
+            <div class="bg-surface-subtle flex w-1/3 flex-col border-r">
               <!-- Static column header — never scrolls, never gets covered -->
               <div
-                class="px-4 py-2 font-medium text-xs uppercase text-text-label border-b flex items-center justify-between shrink-0 bg-surface-subtle"
+                class="text-text-label bg-surface-subtle flex shrink-0 items-center justify-between border-b px-4 py-2 text-xs font-medium uppercase"
               >
                 <span>{{
                   selectedStreamType ||
@@ -1261,16 +1005,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     (t) => selectedFieldAnalytics?.sample_values[t],
                   )
                 }}</span>
-                <span class="text-text-label">{{ t("settings.serviceIdentitySetup.streams") }}</span>
+                <span class="text-text-label">{{
+                  t("settings.serviceIdentitySetup.streams")
+                }}</span>
               </div>
 
               <!-- Scrollable content -->
-              <div class="overflow-y-auto flex-1">
+              <div class="flex-1 overflow-y-auto">
                 <!-- Filtered to one type: no section header needed -->
                 <template
                   v-if="
-                    selectedStreamType &&
-                    selectedFieldAnalytics.sample_values[selectedStreamType]
+                    selectedStreamType && selectedFieldAnalytics.sample_values[selectedStreamType]
                   "
                 >
                   <div
@@ -1278,10 +1023,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       selectedFieldAnalytics.sample_values[selectedStreamType],
                     )"
                     :key="streamName"
-                    class="px-4 py-3 cursor-pointer transition-colors text-sm font-mono truncate hover:bg-primary/10"
+                    class="hover:bg-primary/10 cursor-pointer truncate px-4 py-3 font-mono text-sm transition-colors"
                     :class="{
-                      'bg-primary/20 text-primary font-medium':
-                        activeStreamId === streamName,
+                      'bg-primary/20 text-primary font-medium': activeStreamId === streamName,
                     }"
                     @click="activeStreamId = streamName"
                   >
@@ -1292,16 +1036,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- All types: sticky section labels for 2nd+ types only; first is already in the static header -->
                 <template v-else>
                   <template
-                    v-for="(typeName, typeIdx) in [
-                      'logs',
-                      'metrics',
-                      'traces',
-                    ].filter((t) => selectedFieldAnalytics?.sample_values[t])"
+                    v-for="(typeName, typeIdx) in ['logs', 'metrics', 'traces'].filter(
+                      (t) => selectedFieldAnalytics?.sample_values[t],
+                    )"
                     :key="typeName"
                   >
                     <div
                       v-if="typeIdx > 0"
-                      class="px-4 py-1 text-3xs font-bold uppercase text-text-label sticky top-0 z-10 border-b border-t bg-surface-subtle"
+                      class="text-3xs text-text-label bg-surface-subtle sticky top-0 z-10 border-t border-b px-4 py-1 font-bold uppercase"
                     >
                       {{ typeName }}
                     </div>
@@ -1310,11 +1052,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         selectedFieldAnalytics.sample_values[typeName],
                       )"
                       :key="typeName + '-' + streamName"
-                      class="px-4 py-3 cursor-pointer transition-colors text-sm font-mono truncate hover:bg-primary/10"
+                      class="hover:bg-primary/10 cursor-pointer truncate px-4 py-3 font-mono text-sm transition-colors"
                       :class="{
                         'bg-primary/20 text-primary font-medium':
-                          activeStreamId === streamName &&
-                          activeStreamType === typeName,
+                          activeStreamId === streamName && activeStreamType === typeName,
                       }"
                       @click="
                         activeStreamId = streamName;
@@ -1329,9 +1070,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Right Pane: N-1 hierarchy columns -->
-            <div
-              class="flex-1 flex overflow-x-auto bg-surface-base"
-            >
+            <div class="bg-surface-base flex flex-1 overflow-x-auto">
               <div
                 v-for="(col, colIdx) in popupColumns"
                 :key="col.group_id"
@@ -1339,18 +1078,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="{ 'border-l': colIdx > 0 }"
               >
                 <div
-                  class="px-4 py-2 font-medium text-xs uppercase text-text-label sticky top-0 z-10 border-b bg-surface-subtle"
+                  class="text-text-label bg-surface-subtle sticky top-0 z-10 border-b px-4 py-2 text-xs font-medium uppercase"
                 >
                   {{ col.display }}
                 </div>
-                <div class="p-4 flex flex-col gap-2">
+                <div class="flex flex-col gap-2 p-4">
                   <div
                     v-for="val in getPopupColumnValues(colIdx)"
                     :key="val"
-                    class="px-3 py-2 rounded-default border transition-colors cursor-pointer font-mono truncate"
+                    class="rounded-default cursor-pointer truncate border px-3 py-2 font-mono transition-colors"
                     :class="
                       popupColumnSelections[colIdx] === val
-                        ? 'bg-primary/15 border-primary/40 text-primary ring-1 ring-primary/30'
+                        ? 'bg-primary/15 border-primary/40 text-primary ring-primary/30 ring-1'
                         : 'bg-surface-subtle border-border-default'
                     "
                     @click="selectPopupColumnValue(colIdx, val)"
@@ -1359,7 +1098,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-if="getPopupColumnValues(colIdx).length === 0"
-                    class="text-text-muted text-xs italic p-2"
+                    class="text-text-muted p-2 text-xs italic"
                   >
                     {{ t("settings.serviceIdentitySetup.noValues") }}
                   </div>
@@ -1368,14 +1107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Fallback when no ranked dims beyond the selected field -->
               <div
                 v-if="popupColumns.length === 0"
-                class="flex items-center justify-center flex-1 text-text-muted text-sm italic"
+                class="text-text-muted flex flex-1 items-center justify-center text-sm italic"
               >
                 {{ t("settings.serviceIdentitySetup.noAdditionalDimensions") }}
               </div>
             </div>
           </div>
 
-          <div v-else class="text-text-muted italic p-4 text-center">
+          <div v-else class="text-text-muted p-4 text-center italic">
             {{ t("settings.serviceIdentitySetup.noSampleData") }}
           </div>
         </OCardSection>
@@ -1387,11 +1126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
-import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1413,19 +1150,13 @@ import type {
   FieldAlias,
   ServiceFieldSource,
 } from "@/services/service_streams";
-import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
+import { groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface DetectedEnvironment {
-  environment_type: string;
-  description: string;
-  evidence_groups: string[];
-}
 
 interface SuggestedConfig {
   distinguish_by: string[];
@@ -1441,9 +1172,8 @@ const props = defineProps<{
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
-const store = useStore();
 const { isDark: isDarkTheme } = useTheme();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -1495,23 +1225,14 @@ const suggestionAlreadyApplied = computed(() => {
   if (!suggestedConfig.value?.distinguish_by?.length) return false;
   const suggested = [...suggestedConfig.value.distinguish_by].sort();
   const current = [...configuredFields.value].sort();
-  return (
-    suggested.length === current.length &&
-    suggested.every((v, i) => v === current[i])
-  );
+  return suggested.length === current.length && suggested.every((v, i) => v === current[i]);
 });
-
-/** Display label for the active environment tab */
-const activeEnvLabel = computed(() =>
-  getIdentitySetLabel(activeEnvironment.value),
-);
 
 /** Field Details Dialog State */
 const detailsDialogVisible = ref(false);
 const selectedField = ref<FoundGroup | null>(null);
 /** When set, the popup right pane highlights this value and scrolls to it */
 const preselectedValue = ref<string>("");
-const valuesScrollContainer = ref<HTMLElement | null>(null);
 /** Selected value per column index in the N-1 hierarchy columns */
 const popupColumnSelections = ref<(string | null)[]>([]);
 /** Selected value for the primary (title-level) dimension */
@@ -1560,22 +1281,6 @@ const trackedAliasIds = ref<string[]>([]);
 /** When true, correlation matches streams without requiring the `service` dimension */
 const serviceOptional = ref<boolean>(false);
 
-// Computed value for the right pane based on selected stream
-const activeStreamValues = computed(() => {
-  if (
-    !selectedFieldAnalytics.value?.sample_values ||
-    !activeStreamId.value ||
-    !activeStreamType.value
-  ) {
-    return [];
-  }
-  return (
-    selectedFieldAnalytics.value.sample_values[activeStreamType.value]?.[
-      activeStreamId.value
-    ] || []
-  );
-});
-
 /** Active environment tab - auto-selects first detected environment */
 const activeEnvironment = ref<string>("");
 
@@ -1608,10 +1313,7 @@ const detectedEnvironments = computed(() => {
 
     // Check if any workload groups match this environment's patterns
     return workloadGroups.some((group) =>
-      patterns.some(
-        (pattern) =>
-          pattern.test(group.group_id) || pattern.test(group.display),
-      ),
+      patterns.some((pattern) => pattern.test(group.group_id) || pattern.test(group.display)),
     );
   });
 
@@ -1640,9 +1342,7 @@ const activeEnvGroups = computed(() => {
   // Remove duplicates and sort alphabetically for consistent display
   const uniqueFieldIds = [...new Set(configuredFieldIds)];
   const groups = uniqueFieldIds
-    .map((fieldId) =>
-      availableGroups.value.find((group) => group.group_id === fieldId),
-    )
+    .map((fieldId) => availableGroups.value.find((group) => group.group_id === fieldId))
     .filter((group): group is FoundGroup => group !== undefined);
 
   // Sort groups by display name for consistent ordering
@@ -1653,10 +1353,7 @@ const activeEnvGroups = computed(() => {
 watch(
   detectedEnvironments,
   (envs) => {
-    if (
-      envs.length > 0 &&
-      !envs.some((e) => e.key === activeEnvironment.value)
-    ) {
+    if (envs.length > 0 && !envs.some((e) => e.key === activeEnvironment.value)) {
       activeEnvironment.value = envs[0].key;
     }
   },
@@ -1698,9 +1395,7 @@ const activeEnvCoverage = computed(() => {
   const coverages = activeEnvGroups.value
     .map((g) => {
       const dim = dimensionAnalytics.value[g.group_id];
-      return dim
-        ? Math.round((dim.service_count / totalServices.value) * 100)
-        : null;
+      return dim ? Math.round((dim.service_count / totalServices.value) * 100) : null;
     })
     .filter((v): v is number => v !== null);
   if (!coverages.length) return null;
@@ -1722,41 +1417,13 @@ const workloadDetectedGroups = computed(() => {
 const emit = defineEmits<{
   (e: "navigate-to-aliases", groupId: string): void;
   (e: "navigate-to-services"): void;
-  (e: "update-service-fields", fields: string[]): void;
 }>();
-
-// ─── Field Mapping Dialog ────────────────────────────────────────────────────
-
-const showFieldMappingDialog = ref(false);
-const editableServiceFields = ref<string[]>([]);
-const savingFieldMappings = ref(false);
-
-function openFieldMappingDialog() {
-  editableServiceFields.value = [...allServiceFieldNames.value];
-  showFieldMappingDialog.value = true;
-}
-
-async function saveFieldMappings() {
-  savingFieldMappings.value = true;
-  try {
-    emit("update-service-fields", editableServiceFields.value);
-    showFieldMappingDialog.value = false;
-  } finally {
-    savingFieldMappings.value = false;
-  }
-}
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 
 /** The FoundGroup for the "service" group (used for stream type chips) */
 const serviceGroup = computed<FoundGroup | undefined>(() =>
   availableGroups.value.find((g) => g.group_id === "service"),
-);
-const serviceGroupDisplay = computed(
-  () => serviceGroup.value?.display ?? "Service",
-);
-const serviceGroupStreamTypes = computed(
-  () => serviceGroup.value?.stream_types ?? [],
 );
 
 /** Service name banner: expanded/collapsed toggle */
@@ -1769,8 +1436,8 @@ const DIM_CARD_THEMES = [
     icon: "cloud",
     iconClass: "text-blue-5",
     countClass: "text-blue-6",
-    border:
-      "border: 1px solid rgba(59,130,246,0.4); background: rgba(59,130,246,0.06)",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
+    border: "border: 1px solid rgba(59,130,246,0.4); background: rgba(59,130,246,0.06)",
     pill: "bg-badge-blue-soft-bg border-badge-blue-ol-border text-badge-blue-soft-text",
   },
   {
@@ -1778,8 +1445,8 @@ const DIM_CARD_THEMES = [
     icon: "folder-open",
     iconClass: "text-teal-5",
     countClass: "text-teal-6",
-    border:
-      "border: 1px solid rgba(20,184,166,0.4); background: rgba(20,184,166,0.06)",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
+    border: "border: 1px solid rgba(20,184,166,0.4); background: rgba(20,184,166,0.06)",
     pill: "bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text",
   },
   {
@@ -1787,8 +1454,8 @@ const DIM_CARD_THEMES = [
     icon: "widgets",
     iconClass: "text-purple-5",
     countClass: "text-purple-6",
-    border:
-      "border: 1px solid rgba(168,85,247,0.4); background: rgba(168,85,247,0.06)",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
+    border: "border: 1px solid rgba(168,85,247,0.4); background: rgba(168,85,247,0.06)",
     pill: "bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-soft-text",
   },
   {
@@ -1796,8 +1463,8 @@ const DIM_CARD_THEMES = [
     icon: "lan",
     iconClass: "text-amber-5",
     countClass: "text-amber-6",
-    border:
-      "border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.06)",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
+    border: "border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.06)",
     pill: "bg-badge-amber-soft-bg border-badge-amber-ol-border text-badge-amber-soft-text",
   },
   {
@@ -1805,8 +1472,8 @@ const DIM_CARD_THEMES = [
     icon: "hub",
     iconClass: "text-red-4",
     countClass: "text-red-5",
-    border:
-      "border: 1px solid rgba(244,63,94,0.4); background: rgba(244,63,94,0.06)",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
+    border: "border: 1px solid rgba(244,63,94,0.4); background: rgba(244,63,94,0.06)",
     pill: "bg-badge-error-soft-bg border-badge-error-ol-border text-badge-error-soft-text",
   },
 ] as const;
@@ -1873,11 +1540,7 @@ const workloadSummary = computed(() => {
 
 /** Dynamic dim cards — built from workloadSummary.dims + themes */
 const dimCards = computed(() => {
-  const levels: Array<"primary" | "secondary" | "tertiary"> = [
-    "primary",
-    "secondary",
-    "tertiary",
-  ];
+  const levels: Array<"primary" | "secondary" | "tertiary"> = ["primary", "secondary", "tertiary"];
   return workloadSummary.value.dims
     .map((s, i) => ({
       dim: s.dim,
@@ -1892,11 +1555,7 @@ const dimCards = computed(() => {
 
 /** Open insight dialog by card index */
 function openInsightDialogByIdx(value: string, idx: number) {
-  const levels: Array<"primary" | "secondary" | "tertiary"> = [
-    "primary",
-    "secondary",
-    "tertiary",
-  ];
+  const levels: Array<"primary" | "secondary" | "tertiary"> = ["primary", "secondary", "tertiary"];
   openInsightDialog(value, levels[idx] ?? "tertiary");
 }
 
@@ -1907,10 +1566,7 @@ const insightDialogLevel = ref<"primary" | "secondary" | "tertiary">("primary");
 /** Tracks selected pill per dimension column for drill-down filtering (dimIdx → selected value) */
 const insightSelectedDim = ref<Record<number, string>>({});
 
-function openInsightDialog(
-  value: string,
-  level: "primary" | "secondary" | "tertiary",
-) {
+function openInsightDialog(value: string, level: "primary" | "secondary" | "tertiary") {
   insightDialogValue.value = value;
   insightDialogLevel.value = level;
   insightSelectedDim.value = {}; // Reset drill-down selections
@@ -1926,21 +1582,6 @@ function openInsightDialog(
       }
     }
   });
-}
-
-/** When a dimension pill is clicked inside the insight dialog, filter the next column */
-function selectDimValue(dimIdx: number, value: string) {
-  const current = { ...insightSelectedDim.value };
-  if (current[dimIdx] === value) {
-    // Already selected — do nothing (no deselect)
-    return;
-  }
-  current[dimIdx] = value;
-  // Clear downstream selections
-  for (const k of Object.keys(current)) {
-    if (Number(k) > dimIdx) delete current[Number(k)];
-  }
-  insightSelectedDim.value = current;
 }
 
 /** Get filtered values for a dimension column based on upstream selections.
@@ -1959,22 +1600,12 @@ function getFilteredDimValues(dimensions: any[], dimIdx: number): string[] {
   const prevDim = dimensions[prevIdx];
   if (prevDim?.groupId && dim.groupId) {
     const prevAnalytics = dimensionAnalytics.value[prevDim.groupId];
-    const filtered =
-      prevAnalytics?.value_children?.[prevSelected]?.[dim.groupId] ?? [];
+    const filtered = prevAnalytics?.value_children?.[prevSelected]?.[dim.groupId] ?? [];
     if (filtered.length > 0) return filtered.slice().sort();
   }
 
   // Fallback: show all values
   return dim.values;
-}
-
-/** Format a list of labels into proper English: "A", "A or B", "A, B, or C" */
-function formatSelectableLabels(dims: any[]): string {
-  const labels = dims.slice(0, -1).map((d: any) => d.label);
-  if (labels.length === 0) return "";
-  if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} or ${labels[1]}`;
-  return labels.slice(0, -1).join(", ") + ", or " + labels[labels.length - 1];
 }
 
 /** Format all dimension labels into proper English: "A", "A and B", "A, B, and C" */
@@ -1984,20 +1615,6 @@ function formatDimLabels(dims: any[]): string {
   if (labels.length === 1) return labels[0];
   if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
   return labels.slice(0, -1).join(", ") + ", and " + labels[labels.length - 1];
-}
-
-/** Returns inline style for selected dimension pill — subtle primary highlight */
-function getDimSelectedStyle(_color: string): Record<string, string> {
-  return {
-    backgroundColor: isDarkTheme.value
-      ? "rgba(59,130,246,0.15)"
-      : "rgba(59,130,246,0.1)",
-    borderColor: isDarkTheme.value
-      ? "rgba(59,130,246,0.5)"
-      : "rgba(59,130,246,0.4)",
-    color: isDarkTheme.value ? "#93c5fd" : "#1d4ed8",
-    fontWeight: "600",
-  };
 }
 
 /** Build insight data for the currently open popup */
@@ -2048,13 +1665,11 @@ const insightData = computed(() => {
     const count = dim?.value_counts?.[val] ?? null;
     const total = dim?.service_count ?? null;
 
-    const streamDetails = group
-      ? getValueStreamDetails(group.group_id, val)
-      : [];
+    const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
 
     // Build dimension columns (no stream columns — chart handles that)
     const relatedDimensions: {
-      label: string;
+      label: I18nText;
       level: string;
       color: string;
       values: string[];
@@ -2062,7 +1677,7 @@ const insightData = computed(() => {
     }[] = [];
     if (card && secondaryDim.value) {
       relatedDimensions.push({
-        label: secondaryDim.value.display,
+        label: raw(secondaryDim.value.display),
         level: "secondary",
         color: "teal",
         values: card.childValues,
@@ -2075,7 +1690,7 @@ const insightData = computed(() => {
           for (const tv of tvs) allTertiary.add(tv);
         }
         relatedDimensions.push({
-          label: tertiaryDim.value.display,
+          label: raw(tertiaryDim.value.display),
           level: "tertiary",
           color: "purple",
           values: [...allTertiary].sort(),
@@ -2101,12 +1716,8 @@ const insightData = computed(() => {
       coverage,
       count,
       total,
-      childLabel: secondaryDim.value
-        ? pluralize(secondaryDim.value.display)
-        : "",
-      childCountLabel: tertiaryDim.value
-        ? pluralize(tertiaryDim.value.display).toLowerCase()
-        : "",
+      childLabel: secondaryDim.value ? pluralize(secondaryDim.value.display) : "",
+      childCountLabel: tertiaryDim.value ? pluralize(tertiaryDim.value.display).toLowerCase() : "",
       children,
       maxChildCount: Math.max(...children.map((c) => c.count), 1),
       relatedDimensions,
@@ -2143,9 +1754,7 @@ const insightData = computed(() => {
         childCountLabel: tertiaryDim.value
           ? pluralize(tertiaryDim.value.display).toLowerCase()
           : "",
-        parentCountLabel: primaryDim.value
-          ? pluralize(primaryDim.value.display).toLowerCase()
-          : "",
+        parentCountLabel: primaryDim.value ? pluralize(primaryDim.value.display).toLowerCase() : "",
         children,
         maxChildCount: Math.max(...children.map((c) => c.count), 1),
         isCardLevel: true,
@@ -2161,11 +1770,9 @@ const insightData = computed(() => {
     }
     const tertiaryVals = getSecondaryTertiaryValues(val);
 
-    const streamDetails = group
-      ? getValueStreamDetails(group.group_id, val)
-      : [];
+    const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
     const relatedDimensions: {
-      label: string;
+      label: I18nText;
       level: string;
       color: string;
       values: string[];
@@ -2173,7 +1780,7 @@ const insightData = computed(() => {
     }[] = [];
     if (primaryDim.value && parents.length > 0) {
       relatedDimensions.push({
-        label: primaryDim.value.display,
+        label: raw(primaryDim.value.display),
         level: "primary",
         color: "blue",
         values: parents.sort(),
@@ -2182,7 +1789,7 @@ const insightData = computed(() => {
     }
     if (tertiaryDim.value && tertiaryVals.length > 0) {
       relatedDimensions.push({
-        label: tertiaryDim.value.display,
+        label: raw(tertiaryDim.value.display),
         level: "tertiary",
         color: "purple",
         values: tertiaryVals,
@@ -2202,9 +1809,7 @@ const insightData = computed(() => {
       childCountLabel: "",
       children: parents.map((p) => ({ name: p, count: 0 })),
       maxChildCount: 1,
-      tertiaryLabel: tertiaryDim.value
-        ? pluralize(tertiaryDim.value.display)
-        : "",
+      tertiaryLabel: tertiaryDim.value ? pluralize(tertiaryDim.value.display) : "",
       tertiaryValues: tertiaryVals,
       relatedDimensions,
       isCardLevel: false,
@@ -2246,18 +1851,16 @@ const insightData = computed(() => {
 
   const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
   const relatedDimensions: {
-    label: string;
+    label: I18nText;
     level: string;
     color: string;
     values: string[];
     groupId?: string;
   }[] = [];
   if (primaryDim.value && locations.length > 0) {
-    const uniquePrimaries = [
-      ...new Set(locations.map((l) => l.primary)),
-    ].sort();
+    const uniquePrimaries = [...new Set(locations.map((l) => l.primary))].sort();
     relatedDimensions.push({
-      label: primaryDim.value.display,
+      label: raw(primaryDim.value.display),
       level: "primary",
       color: "blue",
       values: uniquePrimaries,
@@ -2265,11 +1868,9 @@ const insightData = computed(() => {
     });
   }
   if (secondaryDim.value && locations.length > 0) {
-    const uniqueSecondaries = [
-      ...new Set(locations.map((l) => l.secondary)),
-    ].sort();
+    const uniqueSecondaries = [...new Set(locations.map((l) => l.secondary))].sort();
     relatedDimensions.push({
-      label: secondaryDim.value.display,
+      label: raw(secondaryDim.value.display),
       level: "secondary",
       color: "teal",
       values: uniqueSecondaries,
@@ -2297,7 +1898,7 @@ const insightData = computed(() => {
 
 /** Related-dimension column shown in the insight dialog. */
 interface RelatedDimension {
-  label: string;
+  label: I18nText;
   level: string;
   color: string;
   values: string[];
@@ -2312,15 +1913,6 @@ const insightRelatedDimensions = computed<RelatedDimension[]>(() => {
 });
 
 /** Chart data for insight dialog — stream contribution donut */
-/** Dynamic panel width based on number of related dimension columns */
-const insightPanelWidth = computed(() => {
-  const dims = (insightData.value as any)?.relatedDimensions;
-  const colCount = dims?.length ?? 0;
-  if (colCount <= 2) return "480px";
-  if (colCount === 3) return "640px";
-  return "800px"; // 4+
-});
-
 const insightPanelWidthPct = computed(() => {
   const dims = (insightData.value as any)?.relatedDimensions;
   const colCount = dims?.length ?? 0;
@@ -2363,7 +1955,7 @@ const insightChartData = computed(() => {
           fontSize: 12,
         },
         backgroundColor: isDarkTheme.value ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-        extraCssText: "max-height: 240px; overflow-y: auto;",
+        extraCssText: "max-height: 15rem; overflow-y: auto;",
         formatter: function (params: any) {
           const names: string[] = params.data?.streamNames ?? [];
           const header = `${params.marker} ${params.name} : <b>${params.value} streams (${params.percent}%)</b>`;
@@ -2371,15 +1963,13 @@ const insightChartData = computed(() => {
           const list = names
             .map(
               (n) =>
-                `<div style="padding:1px 0;padding-left:14px;font-size: var(--text-2xs);">${n}</div>`,
+                `<div style="padding:0.0625rem 0;padding-left:0.875rem;font-size: var(--text-2xs);">${n}</div>`,
             )
             .join("");
-          return header + '<div style="margin-top:4px;">' + list + "</div>";
+          return header + '<div style="margin-top:0.25rem;">' + list + "</div>";
         },
       },
-      color: streamDetails.map(
-        (sd) => STREAM_TYPE_COLORS[sd.streamType] ?? "#9ca3af",
-      ),
+      color: streamDetails.map((sd) => STREAM_TYPE_COLORS[sd.streamType] ?? "#9ca3af"),
       series: [
         {
           type: "pie",
@@ -2429,9 +2019,7 @@ const insightChartData = computed(() => {
 });
 
 /** Unique field names actually found in data (from service_field_sources) with their stream types */
-const detectedServiceFields = computed<
-  { name: string; streamTypes: string[] }[]
->(() => {
+const detectedServiceFields = computed<{ name: string; streamTypes: string[] }[]>(() => {
   if (serviceFieldSources.value.length > 0) {
     return serviceFieldSources.value
       .map((s) => ({ name: s.field_name, streamTypes: s.stream_types }))
@@ -2462,19 +2050,8 @@ const unseenServiceFields = computed<string[]>(() => {
   return allServiceFieldNames.value.filter((f) => !detectedNames.has(f));
 });
 
-/** Summary text for collapsed banner: first 2 field names + "+N more" */
-const serviceFieldSummary = computed(() => {
-  const fields = detectedServiceFields.value;
-  const shown = fields.slice(0, 2).map((f) => f.name);
-  const remaining =
-    fields.length - shown.length + unseenServiceFields.value.length;
-  return { shown, remaining };
-});
-
 /** Whether service name field is detected in any stream */
-const serviceNameDetected = computed(
-  () => detectedServiceFields.value.length > 0,
-);
+const serviceNameDetected = computed(() => detectedServiceFields.value.length > 0);
 
 /** Currently selected field analytics mapping */
 const selectedFieldAnalytics = computed(() => {
@@ -2494,10 +2071,7 @@ function getPopupColumnValues(colIndex: number): string[] {
     // Filter by primary value if selected
     if (popupPrimaryValue.value) {
       const analytics = dimensionAnalytics.value[primaryDim.value.group_id];
-      return (
-        analytics?.value_children?.[popupPrimaryValue.value]?.[col.group_id] ??
-        []
-      );
+      return analytics?.value_children?.[popupPrimaryValue.value]?.[col.group_id] ?? [];
     }
     // No primary selected — union all secondary values
     const analytics = dimensionAnalytics.value[primaryDim.value.group_id];
@@ -2545,54 +2119,6 @@ const totalServices = computed(() => {
     }
   }
   return max;
-});
-
-/**
- * Detect environment and suggest fields based on available data, driven by the
- * active environment tab.
- */
-const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
-  if (!activeEnvironment.value) return null;
-
-  const env = activeEnvironment.value;
-  let envType = "General";
-  let description = "General fields detected in your telemetry data.";
-  let evidenceGroups: string[] = [];
-
-  if (env === "kubernetes" || env === "k8s") {
-    envType = "Kubernetes";
-    description = "Kubernetes fields detected in your telemetry data.";
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("k8s-"))
-      .map((g) => g.group_id);
-  } else if (env === "aws") {
-    const isEcs = activeEnvGroups.value.some((g) =>
-      g.group_id.startsWith("aws-ecs-"),
-    );
-    envType = isEcs ? "AWS ECS" : "AWS";
-    description = `${envType} fields detected in your telemetry data.`;
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("aws-"))
-      .map((g) => g.group_id);
-  } else if (env === "gcp") {
-    envType = "GCP";
-    description = "GCP fields detected in your telemetry data.";
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("gcp-"))
-      .map((g) => g.group_id);
-  } else if (env === "azure") {
-    envType = "Azure";
-    description = "Azure fields detected in your telemetry data.";
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("azure-"))
-      .map((g) => g.group_id);
-  }
-
-  return {
-    environment_type: envType,
-    description: description,
-    evidence_groups: evidenceGroups.slice(0, 3),
-  };
 });
 
 /**
@@ -2716,25 +2242,8 @@ const rankedDims = computed<FoundGroup[]>(() => {
 });
 
 const primaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[0]);
-const secondaryDim = computed<FoundGroup | undefined>(
-  () => rankedDims.value[1],
-);
+const secondaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[1]);
 const tertiaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[2]);
-
-/**
- * Hierarchy label, e.g. "K8S CLUSTER → K8S NAMESPACE → K8S DEPLOYMENT"
- */
-const hierarchyLabel = computed<string | null>(() => {
-  const p = primaryDim.value;
-  const s = secondaryDim.value;
-  const t = tertiaryDim.value;
-  if (!p) return null;
-  const pLabel = p.display.toUpperCase();
-  if (!s) return pLabel;
-  const sLabel = s.display.toUpperCase();
-  if (!t) return `${pLabel} → ${sLabel}`;
-  return `${pLabel} → ${sLabel} → ${t.display.toUpperCase()}`;
-});
 
 /**
  * One entry per unique value of the primary dim.
@@ -2742,10 +2251,7 @@ const hierarchyLabel = computed<string | null>(() => {
  * Falls back to using available_groups cardinality_class/unique_values if analytics is empty.
  */
 const primaryDimCards = computed<
-  Record<
-    string,
-    { childValues: string[]; tertiaryValues: Record<string, string[]> }
-  >
+  Record<string, { childValues: string[]; tertiaryValues: Record<string, string[]> }>
 >(() => {
   const primary = primaryDim.value;
   if (!primary) return {};
@@ -2760,10 +2266,7 @@ const primaryDimCards = computed<
 
   // Find primary values to show as cards
   let primaryValues: string[] = [];
-  if (
-    analytics?.value_children &&
-    Object.keys(analytics.value_children).length > 0
-  ) {
+  if (analytics?.value_children && Object.keys(analytics.value_children).length > 0) {
     primaryValues = Object.keys(analytics.value_children);
   } else {
     primaryValues = getGroupValues(primary);
@@ -2778,26 +2281,20 @@ const primaryDimCards = computed<
   // Sort cards by per-value coverage descending (most common value first)
   if (analytics?.value_counts) {
     const counts = analytics.value_counts;
-    primaryValues = [...primaryValues].sort(
-      (a, b) => (counts[b] ?? 0) - (counts[a] ?? 0),
-    );
+    primaryValues = [...primaryValues].sort((a, b) => (counts[b] ?? 0) - (counts[a] ?? 0));
   }
 
   // Cap at 20 cards to prevent UI lag
   for (const val of primaryValues.slice(0, 20)) {
     const childMap = analytics?.value_children?.[val];
-    const childValues = secondary
-      ? (childMap?.[secondary.group_id] ?? []).slice().sort()
-      : [];
+    const childValues = secondary ? (childMap?.[secondary.group_id] ?? []).slice().sort() : [];
 
     const tertiaryValues: Record<string, string[]> = {};
     if (tertiary && secondary) {
       for (const sVal of childValues) {
         const sAnalytics = dimensionAnalytics.value[secondary.group_id];
         if (sAnalytics?.value_children?.[sVal]) {
-          tertiaryValues[sVal] = (
-            sAnalytics.value_children[sVal][tertiary.group_id] ?? []
-          )
+          tertiaryValues[sVal] = (sAnalytics.value_children[sVal][tertiary.group_id] ?? [])
             .slice()
             .sort();
         }
@@ -2811,20 +2308,20 @@ const primaryDimCards = computed<
 
 /** Default tracked alias options shown when analytics data is not yet loaded */
 const DEFAULT_TRACKED_OPTIONS = [
-  { label: "K8s Cluster", value: "k8s-cluster" },
-  { label: "K8s Namespace", value: "k8s-namespace" },
-  { label: "K8s Deployment", value: "k8s-deployment" },
-  { label: "K8s StatefulSet", value: "k8s-statefulset" },
-  { label: "K8s DaemonSet", value: "k8s-daemonset" },
-  { label: "K8s Pod Name", value: "k8s-pod-name" },
-  { label: "AWS ECS Cluster", value: "aws-ecs-cluster" },
-  { label: "AWS ECS Task", value: "aws-ecs-task" },
-  { label: "Cloud Account", value: "cloud-account" },
-  { label: "Region", value: "region" },
-  { label: "Environment", value: "environment" },
-  { label: "Host", value: "host" },
-  { label: "Service Namespace", value: "service-namespace" },
-  { label: "Service Version", value: "service-version" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sCluster"), value: "k8s-cluster" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sNamespace"), value: "k8s-namespace" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sDeployment"), value: "k8s-deployment" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sStatefulSet"), value: "k8s-statefulset" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sDaemonSet"), value: "k8s-daemonset" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sPodName"), value: "k8s-pod-name" },
+  { label: t("settings.serviceIdentitySetup.trackedAwsEcsCluster"), value: "aws-ecs-cluster" },
+  { label: t("settings.serviceIdentitySetup.trackedAwsEcsTask"), value: "aws-ecs-task" },
+  { label: t("settings.serviceIdentitySetup.trackedCloudAccount"), value: "cloud-account" },
+  { label: t("search.region"), value: "region" },
+  { label: t("rum.environment"), value: "environment" },
+  { label: t("traces.dbSpanDetails.host"), value: "host" },
+  { label: t("settings.serviceIdentitySetup.trackedServiceNamespace"), value: "service-namespace" },
+  { label: t("settings.serviceIdentitySetup.trackedServiceVersion"), value: "service-version" },
 ];
 
 /**
@@ -2838,7 +2335,7 @@ const trackedAliasOptions = computed(() => {
     return groups
       .filter((g: FoundGroup) => g.group_id !== "service")
       .map((g: FoundGroup) => ({
-        label: g.display,
+        label: raw(g.display),
         value: g.group_id,
       }));
   }
@@ -2858,13 +2355,12 @@ const resolvedTrackedAliases = computed(() => {
       let label = labelMap.get(id);
       if (!label) {
         // Fallback: convert ID to readable label (e.g., "k8s-cluster" → "K8s Cluster")
-        label = id
-          .split("-")
-          .map(
-            (part) =>
-              part.charAt(0).toUpperCase() + part.slice(1).toLowerCase(),
-          )
-          .join(" ");
+        label = raw(
+          id
+            .split("-")
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+            .join(" "),
+        );
         console.warn(
           `[ServiceIdentitySetup] No label found for tracked alias "${id}", using fallback: "${label}"`,
         );
@@ -2876,9 +2372,7 @@ const resolvedTrackedAliases = computed(() => {
 
 /** Options for the tracked alias add-picker — excludes already-selected IDs */
 const trackedAliasAddOptions = computed(() =>
-  trackedAliasOptions.value.filter(
-    (o) => !trackedAliasIds.value.includes(o.value),
-  ),
+  trackedAliasOptions.value.filter((o) => !trackedAliasIds.value.includes(o.value)),
 );
 
 function onAddTrackedAlias(value: unknown) {
@@ -2899,9 +2393,7 @@ function getGroupByValue(value: string): FoundGroup | undefined {
   // If no exact match, try case-insensitive fallback
   if (!group) {
     const lowerValue = value.toLowerCase();
-    group = availableGroups.value.find(
-      (g) => g.group_id.toLowerCase() === lowerValue,
-    );
+    group = availableGroups.value.find((g) => g.group_id.toLowerCase() === lowerValue);
   }
 
   // Fall back to semanticGroups prop for display name when not in analytics data
@@ -2967,36 +2459,6 @@ function deduplicateAndSortGroups(groups: FoundGroup[]): FoundGroup[] {
   });
 }
 
-/**
- * Returns select options for the disambiguation row at `rowIndex`.
- * Excludes: the name_field, and any already-selected disambiguation groups
- * (except the one at the current row, which must remain selectable).
- */
-function getDisambiguationOptions(rowIndex: number) {
-  const alreadyUsed = new Set<string>([
-    nameField,
-    ...distinguishBy.value.filter((_, i) => i !== rowIndex),
-  ]);
-  return availableGroups.value
-    .filter((g) => !alreadyUsed.has(g.group_id))
-    .map((g) => ({
-      label: g.display,
-      value: g.group_id,
-      streamTypes: g.stream_types,
-      recommended: g.recommended,
-    }));
-}
-
-/** Returns a color token for a stream type chip */
-function streamTypeColor(streamType: string): string {
-  const map: Record<string, string> = {
-    logs: "blue",
-    traces: "orange",
-    metrics: "green",
-  };
-  return map[streamType] ?? "grey-7";
-}
-
 /** Simple pluralization helper for display labels */
 function pluralize(val: string): string {
   if (!val) return "";
@@ -3020,16 +2482,6 @@ function cardinalityColor(cardClass: string): BadgeVariant {
     VeryHigh: "error",
   };
   return map[cardClass] ?? "default";
-}
-
-/** Get the best available cardinality class for a group */
-function getEffectiveCardinalityClass(group?: FoundGroup): string {
-  if (!group) return "Unknown";
-  return (
-    dimensionAnalytics.value[group.group_id]?.cardinality_class ||
-    group.cardinality_class ||
-    "Unknown"
-  );
 }
 
 /** Get which stream types a specific value was found in for a dimension group */
@@ -3081,22 +2533,12 @@ function getGroupValues(group: FoundGroup): string[] {
   return Array.from(all).sort();
 }
 
-/** Return coverage % for a group relative to total services, or null if unknown */
-function getGroupCoverage(group: FoundGroup): number | null {
-  const dim = dimensionAnalytics.value[group.group_id];
-  if (!dim || !totalServices.value) return null;
-  return Math.round((dim.service_count / totalServices.value) * 100);
-}
-
 /**
  * Per-value coverage: what fraction of THIS dimension's services carry this specific value.
  * e.g., getValueCoverage(k8s-cluster, "staging") → 70 means 70% of K8s services are in staging.
  * This is the "within-group" breakdown, not global coverage.
  */
-function getValueCoverage(
-  group: FoundGroup | undefined,
-  value: string,
-): number | null {
+function getValueCoverage(group: FoundGroup | undefined, value: string): number | null {
   if (!group) return null;
   const dim = dimensionAnalytics.value[group.group_id];
   if (!dim?.value_counts || !dim.service_count) return null;
@@ -3119,9 +2561,7 @@ function getSecondaryTertiaryValues(secondaryVal: string): string[] {
 }
 
 /** For a tertiary dim value, find all cluster→namespace locations where it runs */
-function getTertiaryLocations(
-  tertiaryVal: string,
-): { primary: string; secondary: string }[] {
+function getTertiaryLocations(tertiaryVal: string): { primary: string; secondary: string }[] {
   const cards = primaryDimCards.value;
   const locations: { primary: string; secondary: string }[] = [];
   for (const [pVal, card] of Object.entries(cards)) {
@@ -3138,9 +2578,7 @@ function getTertiaryLocations(
 
 /** Generate a unique group ID for a manually-added group */
 function generateGroupId(): string {
-  const existing = Object.keys(setDistinguishBy.value).filter((k) =>
-    k.startsWith("custom-"),
-  );
+  const existing = Object.keys(setDistinguishBy.value).filter((k) => k.startsWith("custom-"));
   const next = existing.length + 1;
   return `custom-${next}`;
 }
@@ -3161,9 +2599,7 @@ function getFieldCardinalityTooltip(fieldId: string): string | null {
   const count = dim?.cardinality ?? group?.unique_values;
   const cardClass = dim?.cardinality_class ?? group?.cardinality_class;
   if (count == null) return null;
-  const formatted = cardClass
-    ? cardClass.replace(/([a-z])([A-Z])/g, "$1 $2")
-    : "";
+  const formatted = cardClass ? cardClass.replace(/([a-z])([A-Z])/g, "$1 $2") : "";
   const classLabel = formatted
     ? t("settings.serviceIdentitySetup.cardinalityClassLabel", {
         cardinality: formatted,
@@ -3180,18 +2616,13 @@ function getFieldCardinalityTooltip(fieldId: string): string | null {
  * We track this so we can show an inline hint only on first setup.
  */
 const isAutoSuggested = computed(() => {
-  return (
-    !currentIdentityConfig.value?.sets?.length &&
-    allConfiguredEnvs.value.length > 0
-  );
+  return !currentIdentityConfig.value?.sets?.length && allConfiguredEnvs.value.length > 0;
 });
 
 /** Options for the inline "add field" select for a specific env */
-function getAddFieldOptionsForEnv(envKey: string) {
+function getAddFieldOptionsForEnv(_envKey: string) {
   // Exclude fields already added in the current env AND all other envs
-  const allUsedFields = Object.values(setDistinguishBy.value)
-    .flat()
-    .filter(Boolean);
+  const allUsedFields = Object.values(setDistinguishBy.value).flat().filter(Boolean);
   const used = new Set([nameField, ...allUsedFields]);
   return availableGroups.value
     .filter((g) => !used.has(g.group_id))
@@ -3199,7 +2630,7 @@ function getAddFieldOptionsForEnv(envKey: string) {
       const dim = dimensionAnalytics.value[g.group_id];
       const cardClass = dim?.cardinality_class ?? g.cardinality_class ?? null;
       return {
-        label: g.display,
+        label: raw(g.display),
         value: g.group_id,
         streamTypes: g.stream_types,
         subLabel: g.stream_types?.join(", ") || undefined,
@@ -3240,93 +2671,6 @@ function dismissSuggestion() {
   suggestionDismissed.value = true;
 }
 
-function updateDistinguishByField(idx: number, val: string) {
-  const current = [...distinguishBy.value];
-  current[idx] = val;
-  distinguishBy.value = current;
-}
-
-function addDisambiguationField() {
-  if (distinguishBy.value.length < 5) {
-    const current = [...distinguishBy.value, ""];
-    distinguishBy.value = current;
-  }
-}
-
-function removeDisambiguationField(idx: number) {
-  const current = [...distinguishBy.value];
-  current.splice(idx, 1);
-  distinguishBy.value = current;
-}
-
-function openFieldDetails(
-  field: FoundGroup,
-  streamType: string = "",
-  value: string = "",
-) {
-  selectedField.value = field;
-  selectedStreamType.value = streamType;
-  activeStreamId.value = "";
-  activeStreamType.value = streamType;
-  preselectedValue.value = value;
-  popupPrimaryValue.value = "";
-  popupColumnSelections.value = [];
-
-  // Determine clicked field's position in the hierarchy and pre-select accordingly
-  if (value && primaryDim.value) {
-    const fieldIdx = rankedDims.value.findIndex(
-      (d) => d.group_id === field.group_id,
-    );
-    if (fieldIdx === 0) {
-      // Clicked on primary dim (e.g. cluster) — set as primary value
-      popupPrimaryValue.value = value;
-    } else if (fieldIdx > 0) {
-      // Clicked on secondary/tertiary — pre-select in the matching column (fieldIdx - 1)
-      const selections: (string | null)[] = new Array(
-        rankedDims.value.length - 1,
-      ).fill(null);
-      selections[fieldIdx - 1] = value;
-      popupColumnSelections.value = selections;
-    }
-  }
-
-  // Auto-select a stream — prefer one that contains the preselected value
-  if (selectedFieldAnalytics.value?.sample_values) {
-    const sampleValues = selectedFieldAnalytics.value.sample_values;
-    const types = Object.keys(sampleValues);
-    const typeToUse =
-      streamType && types.includes(streamType) ? streamType : types[0];
-
-    if (typeToUse) {
-      activeStreamType.value = typeToUse;
-      const streamEntries = Object.entries(sampleValues[typeToUse] ?? {});
-
-      // If a specific value was clicked, prefer the stream that contains it
-      const matchingStream = value
-        ? streamEntries.find(([, vals]) => vals.includes(value))
-        : null;
-
-      const streamName = matchingStream
-        ? matchingStream[0]
-        : (streamEntries[0]?.[0] ?? "");
-
-      activeStreamId.value = streamName;
-    }
-  }
-
-  detailsDialogVisible.value = true;
-
-  // Scroll the highlighted value into view after the dialog renders
-  if (value) {
-    nextTick(() => {
-      const el = valuesScrollContainer.value?.querySelector(
-        `[data-val="${CSS.escape(value)}"]`,
-      );
-      el?.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
-  }
-}
-
 /** True when current setDistinguishBy or trackedAliasIds differ from last saved config */
 const isDirty = computed(() => {
   const saved = currentIdentityConfig.value;
@@ -3347,10 +2691,7 @@ const isDirty = computed(() => {
   }
   const currentSets = setDistinguishBy.value;
 
-  const allIds = new Set([
-    ...Object.keys(savedSets),
-    ...Object.keys(currentSets),
-  ]);
+  const allIds = new Set([...Object.keys(savedSets), ...Object.keys(currentSets)]);
   for (const id of allIds) {
     const savedFields = savedSets[id] ?? [];
     const currentFields = (currentSets[id] ?? []).filter(Boolean);
@@ -3367,9 +2708,7 @@ async function loadData() {
   loading.value = true;
   try {
     // 1. Load Analytics (which now includes available_groups)
-    const analyticsRes = await serviceStreamsService.getDimensionAnalytics(
-      props.orgIdentifier,
-    );
+    const analyticsRes = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
     const summary: DimensionAnalyticsSummary = analyticsRes.data;
 
     // Apply frontend deduplication and consistent sorting as safety net
@@ -3389,9 +2728,7 @@ async function loadData() {
     }
 
     // 2. Load Current Config
-    const configRes = await serviceStreamsService.getIdentityConfig(
-      props.orgIdentifier,
-    );
+    const configRes = await serviceStreamsService.getIdentityConfig(props.orgIdentifier);
     currentIdentityConfig.value = configRes.data;
 
     // Populate per-set distinguish_by and labels from the loaded config
@@ -3407,18 +2744,14 @@ async function loadData() {
     }
 
     // Populate tracked alias IDs from loaded config
-    trackedAliasIds.value =
-      currentIdentityConfig.value?.tracked_alias_ids ?? [];
+    trackedAliasIds.value = currentIdentityConfig.value?.tracked_alias_ids ?? [];
 
     // Populate service_optional flag from loaded config (defaults to false)
-    serviceOptional.value =
-      currentIdentityConfig.value?.service_optional ?? false;
+    serviceOptional.value = currentIdentityConfig.value?.service_optional ?? false;
 
     // 3. Initial suggestion for active env if no config exists for it
     // Guard: skip if activeEnvironment is the placeholder "all" key (set before real config loads)
-    const realSetIds = new Set(
-      (currentIdentityConfig.value?.sets ?? []).map((s) => s.id),
-    );
+    const realSetIds = new Set((currentIdentityConfig.value?.sets ?? []).map((s) => s.id));
     if (
       activeEnvironment.value &&
       activeEnvironment.value !== "all" &&
@@ -3426,9 +2759,7 @@ async function loadData() {
       !setDistinguishBy.value[activeEnvironment.value]?.length &&
       suggestedConfig.value?.distinguish_by?.length
     ) {
-      setDistinguishBy.value[activeEnvironment.value] = [
-        ...suggestedConfig.value.distinguish_by,
-      ];
+      setDistinguishBy.value[activeEnvironment.value] = [...suggestedConfig.value.distinguish_by];
     }
   } catch (err: any) {
     console.error("Failed to load workload detection data:", err);
@@ -3441,12 +2772,17 @@ async function loadData() {
   }
 }
 
-async function loadAnalytics() {
+/**
+ * Re-fetch only the analytics-derived group list (the source of the
+ * Detection Rules field dropdown). Deliberately does NOT reload the identity
+ * config, so any unsaved distinguish_by/tracked-alias edits are preserved.
+ */
+async function refreshAvailableGroups() {
   try {
-    const res = await serviceStreamsService.getDimensionAnalytics(
-      props.orgIdentifier,
-    );
+    const res = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
     const summary: DimensionAnalyticsSummary = res.data;
+    availableGroups.value = deduplicateAndSortGroups(summary.available_groups ?? []);
+    serviceFieldSources.value = summary.service_field_sources ?? [];
     if (summary.dimensions) {
       dimensionAnalytics.value = summary.dimensions.reduce(
         (acc, dim) => {
@@ -3457,9 +2793,21 @@ async function loadAnalytics() {
       );
     }
   } catch (err) {
-    console.error("Failed to load dimension analytics:", err);
+    console.error("Failed to refresh available groups:", err);
   }
 }
+
+// The parent tabs are v-show (this component never unmounts), so a semantic
+// group created/renamed/deleted in Field Mappings must re-trigger the fetch —
+// otherwise the Detection Rules dropdown stays a mount-time snapshot until a
+// full page reload. The parent assigns a new array on every save, so a
+// reference watch is sufficient.
+watch(
+  () => props.semanticGroups,
+  () => {
+    refreshAvailableGroups();
+  },
+);
 
 async function saveConfig() {
   saving.value = true;
@@ -3468,31 +2816,17 @@ async function saveConfig() {
     // Preserve API-provided labels from loaded config, fall back to ID itself for new sets.
     // Filter out invalid IDs like "all" that can cause duplication issues.
     const sets: IdentitySet[] = Object.entries(setDistinguishBy.value)
-      .filter(
-        ([id, fields]) =>
-          id !== "all" && id !== "" && fields.filter(Boolean).length > 0,
-      )
+      .filter(([id, fields]) => id !== "all" && id !== "" && fields.filter(Boolean).length > 0)
       .map(([id, fields]) => ({
         id,
-        label: setLabels.value[id] ?? id,
+        label: raw(setLabels.value[id] ?? id),
         distinguish_by: fields.filter(Boolean),
       }));
 
     if (sets.length === 0) {
       toast({
         variant: "warning",
-        message: t(
-          "settings.correlation.identityConfigNoSets",
-          "Configure at least one identity set before saving.",
-        ),
-      });
-      return;
-    }
-
-    if (trackedAliasIds.value.length === 0) {
-      toast({
-        variant: "warning",
-        message: t("settings.serviceIdentitySetup.selectAtLeastOneTrackedAlias"),
+        message: t("settings.correlation.identityConfigNoSets"),
       });
       return;
     }
@@ -3513,10 +2847,7 @@ async function saveConfig() {
       service_optional: serviceOptional.value,
     };
 
-    await serviceStreamsService.saveIdentityConfig(
-      props.orgIdentifier,
-      payload,
-    );
+    await serviceStreamsService.saveIdentityConfig(props.orgIdentifier, payload);
 
     // Invalidate the shared identity-config cache so other parts of the app
     // (logs/traces correlation) pick up the new config immediately instead of

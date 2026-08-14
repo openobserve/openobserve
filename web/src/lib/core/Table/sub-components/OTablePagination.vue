@@ -1,13 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useSlots, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const slots = useSlots();
 
 const props = withDefaults(
@@ -15,6 +15,8 @@ const props = withDefaults(
     currentPage: number;
     totalPages: number;
     totalCount: number;
+    /** False when totalCount is only a lower bound. */
+    totalCountExact?: boolean;
     pageSize: number;
     pageSizeOptions: number[];
     showingFrom: number;
@@ -22,13 +24,14 @@ const props = withDefaults(
     isFirstPage: boolean;
     isLastPage: boolean;
     position?: "top" | "bottom";
-    title?: string;
+    title?: I18nText;
     /** When true, replace count + range text with skeleton bars */
     loading?: boolean;
   }>(),
   {
     position: "bottom",
-    title: "",
+    title: raw(""),
+    totalCountExact: true,
   },
 );
 
@@ -45,15 +48,23 @@ const pageSizeModel = computed({
   set: (val: number) => emit("update:pageSize", val),
 });
 
-const pageSizeSelectOptions = computed(() =>
-  props.pageSizeOptions.map((n) => ({ label: String(n), value: n }))
-);
+const pageSizeSelectOptions = computed(() => {
+  const opts = [...props.pageSizeOptions];
+  // Surface a caller-configured page size that isn't one of the presets, so the
+  // select shows it instead of rendering blank.
+  if (props.pageSize != null && props.pageSize > 0 && !opts.includes(props.pageSize)) {
+    const idx = opts.findIndex((o) => o > (props.pageSize as number));
+    if (idx === -1) opts.push(props.pageSize);
+    else opts.splice(idx, 0, props.pageSize);
+  }
+  return opts.map((n) => ({ label: raw(String(n)), value: n }));
+});
 </script>
 
 <template>
   <div
     :data-test="`o2-table-pagination-${position}`"
-    class="flex items-center flex-wrap justify-between gap-x-3 gap-y-1 py-1 px-3 border-t border-border-default min-h-10"
+    class="border-border-default flex min-h-10 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-3 py-1"
   >
     <!-- Left: bulk actions slot or row count.
          The footer-title typography lives on this wrapper so BOTH the default
@@ -66,13 +77,13 @@ const pageSizeSelectOptions = computed(() =>
       <!-- Loading: always skeleton, regardless of slot/count -->
       <span
         v-if="loading"
-        class="o2-pag-skel inline-block h-3 w-24 rounded-default [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
+        class="o2-pag-skel rounded-default inline-block h-3 w-24 [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
         aria-hidden="true"
         data-test="o2-table-pagination-count-skel"
       />
       <slot v-else-if="slots.actions" name="actions" />
       <span v-else>
-        {{ totalCount.toLocaleString() }} {{ title }}
+        {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }} {{ title }}
       </span>
     </div>
 
@@ -80,7 +91,7 @@ const pageSizeSelectOptions = computed(() =>
     <div class="flex items-center gap-3">
       <span
         v-if="loading"
-        class="o2-pag-skel inline-block h-3 w-36 rounded-default [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
+        class="o2-pag-skel rounded-default inline-block h-3 w-36 [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
         aria-hidden="true"
         data-test="o2-table-pagination-info-skel"
       />
@@ -89,10 +100,11 @@ const pageSizeSelectOptions = computed(() =>
         class="text-primary text-xs whitespace-nowrap"
         data-test="o2-table-pagination-info"
       >
-        {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }} {{ totalCount.toLocaleString() }}
+        {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }}
+        {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }}
       </span>
-      <div class="w-px h-4 bg-border-default shrink-0" v-if="pageSizeOptions.length > 0" />
-      <div v-if="pageSizeOptions.length > 0" class="flex items-center gap-1.5 text-primary text-xs">
+      <div class="bg-border-default h-4 w-px shrink-0" v-if="pageSizeOptions.length > 0" />
+      <div v-if="pageSizeOptions.length > 0" class="text-primary flex items-center gap-1.5 text-xs">
         <span class="whitespace-nowrap">{{ t("search.recordsPerPage") }}</span>
         <OSelect
           v-model="pageSizeModel"
@@ -132,6 +144,7 @@ const pageSizeSelectOptions = computed(() =>
           <OIcon name="chevron-right" size="sm" />
         </OButton>
         <OButton
+          v-if="totalCountExact"
           variant="outline"
           size="icon"
           :disabled="isLastPage"
@@ -155,6 +168,8 @@ const pageSizeSelectOptions = computed(() =>
    `[animation:…]` utility it has to override. `.o2-pag-skel` is this
    component's own element, so scoping is safe. */
 @media (prefers-reduced-motion: reduce) {
-  .o2-pag-skel { animation: none; }
+  .o2-pag-skel {
+    animation: none;
+  }
 }
 </style>

@@ -298,9 +298,7 @@ describe("AddAiToolset", () => {
       form.setFieldValue("kind", "cli");
       form.setFieldValue("name", "valid");
       form.setFieldValue("cli.command", "kubectl");
-      form.setFieldValue("cli.env", [
-        { key: "GH_TOKEN", value: "secret", visible: false },
-      ]);
+      form.setFieldValue("cli.env", [{ key: "GH_TOKEN", value: "secret", visible: false }]);
       form.setFieldValue("cli.credFiles", [{ key: "KUBECONFIG", value: "" }]);
       await flushPromises();
       // The Monaco editor bridges its value into the form.
@@ -360,10 +358,7 @@ describe("AddAiToolset", () => {
 
       // RENDERED inputs must shift, not just form.state.values.
       expect(renderedKeys("mcp.headers")).toEqual(["AAA", "CCC"]);
-      expect(getForm().state.values.mcp.headers.map((h: any) => h.key)).toEqual([
-        "AAA",
-        "CCC",
-      ]);
+      expect(getForm().state.values.mcp.headers.map((h: any) => h.key)).toEqual(["AAA", "CCC"]);
     });
 
     it("keeps cli.env inputs in sync after deleting a NON-last row", async () => {
@@ -397,11 +392,7 @@ describe("AddAiToolset", () => {
       ]);
       await flushPromises();
       await wrapper.vm.$nextTick();
-      expect(renderedKeys("cli.credFiles")).toEqual([
-        "C_AAA",
-        "C_BBB",
-        "C_CCC",
-      ]);
+      expect(renderedKeys("cli.credFiles")).toEqual(["C_AAA", "C_BBB", "C_CCC"]);
 
       wrapper.vm.removeCredFile(1); // delete the MIDDLE (non-last) row
       await flushPromises();

@@ -30,6 +30,7 @@ const {
   mockServiceUpdate,
   mockServiceGet,
   mockRouterPush,
+  mockToast,
 } = vi.hoisted(() => ({
   mockServiceGetLocations: vi.fn().mockResolvedValue({
     data: { locations: [] },
@@ -38,6 +39,7 @@ const {
   mockServiceUpdate: vi.fn().mockResolvedValue({}),
   mockServiceGet: vi.fn().mockResolvedValue({ data: {} }),
   mockRouterPush: vi.fn(),
+  mockToast: vi.fn(),
 }));
 
 vi.mock("vue-i18n", () => ({
@@ -76,7 +78,7 @@ vi.mock("@/utils/commons", () => ({
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: vi.fn(() => vi.fn()),
+  toast: mockToast,
 }));
 
 vi.mock("@/utils/synthetics/buildPayload", () => ({
@@ -90,17 +92,21 @@ import CreateProtocolCheck from "./CreateProtocolCheck.vue";
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
   OPageHeader: {
-    template: '<div data-test="synthetics-header"><slot /></div>',
+    template: '<div data-test="synthetics-header"><slot name="title" /><slot /></div>',
     props: ["title", "subtitle", "back"],
   },
+  // Mirrors the real OButton slot contract (OButton.vue): only `icon-left`,
+  // default and `icon-right` are rendered. Any other slot name (e.g. `suffix`)
+  // is silently dropped — which is exactly the bug this stub must surface.
   OButton: {
     template:
-      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot name="prefix" /><slot name="suffix" /><slot /></button>',
+      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot name="icon-left" /><slot /><slot name="icon-right" /></button>',
     props: ["variant", "size", "disabled", "loading", "class", "iconLeft"],
     inheritAttrs: true,
   },
+  // Renders an identifiable marker per icon name so slot placement is assertable.
   OIcon: {
-    template: '<span />',
+    template: '<span :data-test="`icon-${name}`" />',
     props: ["name", "size", "class"],
   },
   ODialog: {
@@ -110,16 +116,8 @@ const baseStubs = {
     inheritAttrs: true,
   },
   CheckConfigure: {
-    template:
-      '<div data-test="synthetics-check-configure"><slot name="type-config" /></div>',
-    props: [
-      "check",
-      "checkType",
-      "locations",
-      "destinations",
-      "folders",
-      "class",
-    ],
+    template: '<div data-test="synthetics-check-configure"><slot name="type-config" /></div>',
+    props: ["check", "checkType", "locations", "destinations", "folders", "class"],
   },
   CreateBrowserTestSkeleton: {
     template: '<div data-test="synthetics-loading-skeleton" />',
@@ -140,6 +138,9 @@ const baseStubs = {
   CheckSshConfig: {
     template: '<div data-test="synthetics-ssh-config" />',
     props: ["check"],
+  },
+  BetaBadge: {
+    template: '<span data-test="beta-badge">BETA</span>',
   },
 };
 
@@ -173,27 +174,60 @@ describe("CreateProtocolCheck", () => {
     wrapper?.unmount();
   });
 
+  describe("locations fetch failure", () => {
+    it("should stay silent when the endpoint 403s (community build)", async () => {
+      mockServiceGetLocations.mockRejectedValue({ response: { status: 403 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("should toast on a real fetch failure", async () => {
+      mockServiceGetLocations.mockRejectedValue({ response: { status: 500 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: "synthetics.locations.fetchFailed",
+        }),
+      );
+    });
+  });
+
   describe("initial render", () => {
     it("should render the protocol check form with check type HTTP", async () => {
       wrapper = mountPage("http");
       await flushPromises();
 
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-check-configure"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-check-configure"]').exists()).toBe(true);
     });
 
     it("should render the cancel and save buttons in the footer", async () => {
       wrapper = mountPage("http");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-create-cancel-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-create-save-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-save-btn"]').exists()).toBe(true);
+    });
+
+    // The footer actions are deliberately text-only — no leading or trailing
+    // icons. The stub renders OButton's real slots, so a stray icon would show.
+    it("should render the footer save button without an icon", async () => {
+      wrapper = mountPage("http");
+      await flushPromises();
+
+      const saveBtn = wrapper.find('[data-test="synthetics-create-save-btn"]');
+      expect(saveBtn.exists()).toBe(true);
+      expect(saveBtn.find('[data-test^="icon-"]').exists()).toBe(false);
+    });
+
+    it("should render the Beta badge in the page title", async () => {
+      wrapper = mountPage("http");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
   });
 
@@ -202,36 +236,28 @@ describe("CreateProtocolCheck", () => {
       wrapper = mountPage("http");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-http-config"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-http-config"]').exists()).toBe(true);
     });
 
     it("should render TCP config when checkType is tcp", async () => {
       wrapper = mountPage("tcp");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-tcp-config"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-tcp-config"]').exists()).toBe(true);
     });
 
     it("should render TLS config when checkType is tls", async () => {
       wrapper = mountPage("tls");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-tls-config"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-tls-config"]').exists()).toBe(true);
     });
 
     it("should render SSH config when checkType is ssh", async () => {
       wrapper = mountPage("ssh");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-ssh-config"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-ssh-config"]').exists()).toBe(true);
     });
   });
 

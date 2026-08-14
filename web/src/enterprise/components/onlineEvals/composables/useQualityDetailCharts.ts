@@ -2,6 +2,8 @@
 // One query per chart family. Each query is scoped to a single
 // score_config_id and the active time window.
 
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+
 import { ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
@@ -26,7 +28,7 @@ export interface TrendPoint {
 export interface DistributionBucket {
   rangeStart: number;
   rangeEnd: number;
-  label: string;
+  label: I18nText;
   count: number;
   healthy: boolean;
 }
@@ -41,7 +43,7 @@ export interface BooleanTrendSeries {
   /** Stable id derived from the group-by key (e.g. scorer_id, source_type, or "default"). */
   id: string;
   /** Display label shown in the legend / tooltip. */
-  label: string;
+  label: I18nText;
   points: BooleanTrendPoint[];
 }
 
@@ -79,18 +81,12 @@ interface RawBooleanSplitRow {
   healthy?: number | string;
 }
 
-function valueOf<T = any>(
-  row: any,
-  camel: string,
-  snake: string,
-): T | undefined {
+function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
 
-function numericRangeOf(
-  config: ScoreConfig,
-): { min: number; max: number } | null {
+function numericRangeOf(config: ScoreConfig): { min: number; max: number } | null {
   const r = valueOf<any>(config, "numericRange", "numeric_range");
   if (!r) return null;
   const min = toNumber(r.min);
@@ -114,6 +110,7 @@ export function useQualityDetailCharts(
   dateWindow: Ref<DateWindow>,
   agentFilter: Ref<AgentFilterSelection | null | undefined>,
   qualityScope: Ref<QualityScope>,
+  t: TranslateFn,
 ) {
   const { executeQuery } = useLLMStreamQuery();
   const isLoading = ref(false);
@@ -174,7 +171,7 @@ export function useQualityDetailCharts(
       return {
         rangeStart: start,
         rangeEnd: end,
-        label: `${start.toFixed(decimals)}–${end.toFixed(decimals)}`,
+        label: raw(`${start.toFixed(decimals)}–${end.toFixed(decimals)}`),
         count: c,
         healthy,
       };
@@ -223,18 +220,8 @@ export function useQualityDetailCharts(
         ].join("\n");
 
         const [trendRows, valueRows] = await Promise.all([
-          runQuery<RawNumericTrendRow>(
-            trendSql,
-            "numeric.trend",
-            startUs,
-            endUs,
-          ),
-          runQuery<{ v?: number | string }>(
-            valuesSql,
-            "numeric.values",
-            startUs,
-            endUs,
-          ),
+          runQuery<RawNumericTrendRow>(trendSql, "numeric.trend", startUs, endUs),
+          runQuery<{ v?: number | string }>(valuesSql, "numeric.values", startUs, endUs),
         ]);
 
         if (generation !== refreshGeneration) return;
@@ -249,14 +236,8 @@ export function useQualityDetailCharts(
 
         const range = numericRangeOf(cfg);
         if (range) {
-          const values = valueRows
-            .map((r) => toNumber(r.v))
-            .filter((v): v is number => v != null);
-          numericDistribution.value = buildDistribution(
-            values,
-            range,
-            healthyThresholdValue(cfg),
-          );
+          const values = valueRows.map((r) => toNumber(r.v)).filter((v): v is number => v != null);
+          numericDistribution.value = buildDistribution(values, range, healthyThresholdValue(cfg));
         } else {
           numericDistribution.value = [];
         }
@@ -277,18 +258,12 @@ export function useQualityDetailCharts(
           "GROUP BY bucket, series_key",
           "ORDER BY bucket",
         ].join("\n");
-        const rows = await runQuery<RawBooleanSplitRow>(
-          trendSql,
-          "boolean.trend",
-          startUs,
-          endUs,
-        );
+        const rows = await runQuery<RawBooleanSplitRow>(trendSql, "boolean.trend", startUs, endUs);
         if (generation !== refreshGeneration) return;
 
         const groupedByKey = new Map<string, BooleanTrendPoint[]>();
         for (const r of rows) {
-          const key =
-            r.series_key != null ? String(r.series_key) : "__default__";
+          const key = r.series_key != null ? String(r.series_key) : "__default__";
           const total = toNumber(r.total) ?? 0;
           const healthy = toNumber(r.healthy) ?? 0;
           const point: BooleanTrendPoint = {
@@ -301,23 +276,22 @@ export function useQualityDetailCharts(
           groupedByKey.get(key)!.push(point);
         }
 
-        const series: BooleanTrendSeries[] = Array.from(
-          groupedByKey.entries(),
-        ).map(([key, points]) => ({
-          id: key,
-          label:
-            key === "__default__"
-              ? expected == null
-                ? "True rate"
-                : "Healthy rate"
-              : key,
-          points: points.sort((a, b) => a.t - b.t),
-        }));
+        const series: BooleanTrendSeries[] = Array.from(groupedByKey.entries()).map(
+          ([key, points]) => ({
+            id: key,
+            label:
+              key === "__default__"
+                ? expected == null
+                  ? t("onlineEvals.quality.detail.legendTrueRate")
+                  : t("onlineEvals.quality.detail.legendHealthyRate")
+                : raw(key),
+            points: points.sort((a, b) => a.t - b.t),
+          }),
+        );
         // Sort by total volume descending so the dominant series renders first.
         series.sort(
           (a, b) =>
-            b.points.reduce((s, p) => s + p.total, 0) -
-            a.points.reduce((s, p) => s + p.total, 0),
+            b.points.reduce((s, p) => s + p.total, 0) - a.points.reduce((s, p) => s + p.total, 0),
         );
 
         booleanTrendSeries.value = series;

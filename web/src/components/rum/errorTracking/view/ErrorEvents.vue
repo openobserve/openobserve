@@ -20,41 +20,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("rum.events") }}
     </h4>
 
-    <div
-      v-if="!timelineEvents.length"
-      data-test="error-events-empty"
-    >
+    <div v-if="!timelineEvents.length" data-test="error-events-empty">
       <NoData />
     </div>
 
-    <ol
-      v-else
-      class="event-timeline list-none m-0 p-0"
-      data-test="error-events-timeline"
-    >
+    <ol v-else class="event-timeline m-0 list-none p-0" data-test="error-events-timeline">
       <li
         v-for="(event, index) in timelineEvents"
         :key="index"
-        class="event-timeline__item relative flex items-start gap-2 pl-5 pb-3"
+        class="event-timeline__item relative flex items-start gap-2 pb-3 pl-5"
         :class="{ 'event-timeline__item--error': isErrorEvent(event) }"
         :data-test="`error-events-timeline-item-${index}`"
       >
         <span
           class="event-timeline__dot"
           :class="
-            isErrorEvent(event)
-              ? 'event-timeline__dot--error'
-              : 'event-timeline__dot--default'
+            isErrorEvent(event) ? 'event-timeline__dot--error' : 'event-timeline__dot--default'
           "
           aria-hidden="true"
         />
-        <ErrorTypeIcons :column="event" class="shrink-0 mt-0.5" />
-        <div class="flex-1 min-w-0">
-          <div class="flex items-baseline gap-1.5 flex-wrap">
-            <span
-              class="font-medium"
-              :data-test="`error-events-timeline-category-${index}`"
-            >{{ getErrorCategory(event) }}</span>
+        <ErrorTypeIcons :column="event" class="mt-0.5 shrink-0" />
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-baseline gap-1.5">
+            <span class="font-medium" :data-test="`error-events-timeline-category-${index}`">{{
+              getErrorCategory(event)
+            }}</span>
             <OTag
               v-if="isErrorEvent(event)"
               :label="t('rum.error')"
@@ -67,10 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="shrink-0 text-right">
           <span
-            class="tabular-nums text-text-secondary"
+            class="text-text-secondary tabular-nums"
             :data-test="`error-events-timeline-offset-${index}`"
             :title="getFormattedDate(event._timestamp / 1000)"
-          >{{ offsetLabel(event) }}</span>
+            >{{ offsetLabel(event) }}</span
+          >
         </div>
       </li>
     </ol>
@@ -85,7 +76,7 @@ import { formatDate } from "@/utils/date";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import ErrorTypeIcons from "./ErrorTypeIcons.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const props = defineProps({
   error: {
@@ -94,7 +85,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const timelineEvents = computed<any[]>(() => props.error.events || []);
 
@@ -126,20 +117,21 @@ const getFormattedDate = (timestamp: number) =>
   formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): the timeline rail is a ::before pseudo-element on
    .event-timeline (and the dots are absolutely positioned against it), so there
    is no element for a utility class to land on. */
 .event-timeline {
   position: relative;
 
-  // Vertical rail connecting the dots.
+  /* Vertical rail connecting the dots. */
   &::before {
     content: "";
     position: absolute;
     left: 0.4375rem;
     top: 0.25rem;
     bottom: 0.25rem;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel timeline rail must not scale with text or it smears at fractional zoom */
     width: 1px;
     background: var(--color-card-glass-border);
   }
@@ -152,24 +144,21 @@ const getFormattedDate = (timestamp: number) =>
   width: 0.5625rem;
   height: 0.5625rem;
   border-radius: var(--radius-full);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel timeline dot border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-card-glass-border);
+}
 
-  &--default {
-    background: var(--color-card-glass-bg, var(--color-card-glass-border));
-  }
+.event-timeline__dot--default {
+  background: var(--color-card-glass-bg, var(--color-card-glass-border));
+}
 
-  &--error {
-    background: var(--color-severity-error-color);
-    border-color: var(--color-severity-error-color);
-  }
+.event-timeline__dot--error {
+  background: var(--color-severity-error-color);
+  border-color: var(--color-severity-error-color);
 }
 
 .event-timeline__item--error {
-  background: color-mix(
-    in srgb,
-    var(--color-severity-error-color) 6%,
-    transparent
-  );
+  background: color-mix(in srgb, var(--color-severity-error-color) 6%, transparent);
   border-radius: 0.375rem;
 }
 </style>

@@ -16,55 +16,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <DataSourceSidebarLayout
-    v-model="ingestiontabs"
-    :splitter-width="200"
-  >
+  <DataSourceSidebarLayout v-model="ingestiontabs" :splitter-width="200">
     <template #tabs>
-            <ORouteTab
-              name="openTelemetry"
-              :to="{
-                name: 'tracesOTLP',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-              label="OpenTelemetry"
-            />
-            <ORouteTab
-              name="ingestTracesFromOtel"
-              :to="{
-                name: 'ingestTracesFromOtel',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-              label="OTEL Collector"
-            />
+      <ORouteTab
+        name="openTelemetry"
+        :to="{
+          name: 'tracesOTLP',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+        :label="t('ingestion.openTelemetryTabLabel')"
+      />
+      <ORouteTab
+        name="ingestTracesFromOtel"
+        :to="{
+          name: 'ingestTracesFromOtel',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+        :label="t('ingestion.otelCollectorTabLabel')"
+      />
     </template>
 
-      <div class="w-full h-full">
-        <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
-          <router-view
-            title="Metrics"
-            :currOrgIdentifier="currOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-            @copy-to-clipboard-fn="copyToClipboardFn"
-          >
-          </router-view>
-        </div>
+    <div class="h-full w-full">
+      <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
+        <router-view
+          :title="t('ingestion.metricsLabel')"
+          :currOrgIdentifier="currOrgIdentifier"
+          :currUserEmail="currentUserEmail"
+          @copy-to-clipboard-fn="copyToClipboardFn"
+        >
+        </router-view>
       </div>
+    </div>
   </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
-import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onMounted, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -76,7 +73,9 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 export default defineComponent({
   name: "IngestTraces",
   components: {
-    ORouteTab, DataSourceSidebarLayout,},
+    ORouteTab,
+    DataSourceSidebarLayout,
+  },
   data() {
     return {};
   },
@@ -87,7 +86,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const rowData: any = ref({});
@@ -96,7 +95,9 @@ export default defineComponent({
       tracesOTLP: "openTelemetry",
       ingestTracesFromOtel: "ingestTracesFromOtel",
     };
-    const ingestiontabs = ref(routeToTracesTab[router.currentRoute.value.name as string] ?? "openTelemetry");
+    const ingestiontabs = ref(
+      routeToTracesTab[router.currentRoute.value.name as string] ?? "openTelemetry",
+    );
 
     onMounted(() => {
       const ingestRoutes = ["tracesOTLP"];
@@ -133,9 +134,9 @@ export default defineComponent({
     });
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText, {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
+      copyToClipboard(content.innerText, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("ingestion.copyContentError"),
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
@@ -171,4 +172,3 @@ export default defineComponent({
   },
 });
 </script>
-

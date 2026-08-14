@@ -54,16 +54,15 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 
 // Stub SetupCardRenderer so we can inspect the props it receives without
 // rendering its (heavy) internals.
-vi.mock(
-  "@/components/ingestion/setupCard/SetupCardRenderer.vue",
-  () => ({
-    default: {
-      name: "SetupCardRenderer",
-      props: ["content", "subs"],
-      template: '<div data-test="rum-web-setup-card" />',
-    },
-  }),
-);
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs"],
+    // Renders the hero-under-title slot like the real component does — the
+    // platform switch lives there, so the tests below need it in the DOM.
+    template: '<div data-test="rum-web-setup-card"><slot name="hero-under-title" /></div>',
+  },
+}));
 
 import FrontendRumConfig from "./FrontendRumConfig.vue";
 import { getIngestionURL, maskText } from "@/utils/zincutils";
@@ -75,16 +74,14 @@ const HTTP_ENDPOINT = "http://ingest.example.com";
 const ORG_ID = "my-org";
 const RUM_TOKEN = "rum-secret-token-xyz";
 
-function makeStore(overrides: {
-  rumToken?: string;
-  org?: string;
-  apiEndpoint?: string;
-} = {}) {
-  const {
-    rumToken = RUM_TOKEN,
-    org = ORG_ID,
-    apiEndpoint = HTTPS_ENDPOINT,
-  } = overrides;
+function makeStore(
+  overrides: {
+    rumToken?: string;
+    org?: string;
+    apiEndpoint?: string;
+  } = {},
+) {
+  const { rumToken = RUM_TOKEN, org = ORG_ID, apiEndpoint = HTTPS_ENDPOINT } = overrides;
 
   return createStore({
     state: {
@@ -111,8 +108,15 @@ const i18n = createI18n({
   messages: {
     en: {
       ingestion: {
-        generateRUMTokenMessage:
-          "Generate RUM Token to enable RUM for your organization.",
+        generateRUMTokenMessage: "Generate RUM Token to enable RUM for your organization.",
+        rumPlatform: "Platform",
+        rumPlatformBrowser: "Browser",
+        rumPlatformReactNative: "React Native",
+        rumPlatformAndroid: "Android",
+        rumPlatformIOS: "iOS",
+      },
+      common: {
+        beta: "Beta",
       },
     },
   },
@@ -147,15 +151,11 @@ describe("FrontendRumConfig", () => {
     });
 
     it("renders SetupCardRenderer when rumToken is non-empty", () => {
-      expect(
-        wrapper.find('[data-test="rum-web-setup-card"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-web-setup-card"]').exists()).toBe(true);
     });
 
     it("does NOT render the no-token message when token is present", () => {
-      expect(
-        wrapper.find('[data-test="rum-web-no-token-message"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-web-no-token-message"]').exists()).toBe(false);
     });
 
     it("passes content with 3 steps to SetupCardRenderer", () => {
@@ -196,9 +196,7 @@ describe("FrontendRumConfig", () => {
 
     it("passes the rum token into content init variant raw code", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain(RUM_TOKEN);
     });
@@ -206,9 +204,7 @@ describe("FrontendRumConfig", () => {
     it("content's masked code does NOT equal the raw when maskText produces a different string", () => {
       // With the real maskText (identity), raw === masked; but the structure must exist
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       // Both raw and masked must be strings
       expect(typeof npmVariant.code.raw).toBe("string");
@@ -251,18 +247,14 @@ describe("FrontendRumConfig", () => {
 
       const msg = wrapper.find('[data-test="rum-web-no-token-message"]');
       expect(msg.exists()).toBe(true);
-      expect(msg.text()).toContain(
-        "Generate RUM Token to enable RUM for your organization.",
-      );
+      expect(msg.text()).toContain("Generate RUM Token to enable RUM for your organization.");
     });
 
     it("does NOT render SetupCardRenderer when rumToken is empty string", () => {
       vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
       ({ wrapper } = mountComponent({ rumToken: "" }));
 
-      expect(
-        wrapper.find('[data-test="rum-web-setup-card"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-web-setup-card"]').exists()).toBe(false);
     });
 
     it("renders the no-token message when organizationData has no rumToken property", () => {
@@ -280,12 +272,8 @@ describe("FrontendRumConfig", () => {
         global: { plugins: [store, i18n] },
       });
 
-      expect(
-        wrapper.find('[data-test="rum-web-no-token-message"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="rum-web-setup-card"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-web-no-token-message"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-web-setup-card"]').exists()).toBe(false);
     });
   });
 
@@ -297,9 +285,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent({ apiEndpoint: "https://api.example.com" }));
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("insecureHTTP: false");
     });
@@ -309,9 +295,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent({ apiEndpoint: "http://api.example.com" }));
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("insecureHTTP: true");
     });
@@ -321,9 +305,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent({ apiEndpoint: "" }));
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("insecureHTTP: true");
     });
@@ -337,9 +319,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent());
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("site: 'ingest.openobserve.ai'");
     });
@@ -349,9 +329,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent({ apiEndpoint: "http://ingest.openobserve.ai" }));
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("site: 'ingest.openobserve.ai'");
     });
@@ -365,9 +343,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent({ org: "acme-corp" }));
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("organizationIdentifier: 'acme-corp'");
     });
@@ -388,9 +364,7 @@ describe("FrontendRumConfig", () => {
       });
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("organizationIdentifier: ''");
     });
@@ -431,9 +405,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent());
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code).toHaveProperty("masked");
     });
@@ -443,9 +415,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent());
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const cdnVariant = initStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code).toHaveProperty("masked");
     });
@@ -463,9 +433,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent());
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       // masked should use the maskText return value
       expect(npmVariant.code.masked).toContain("****masked****");
@@ -484,9 +452,7 @@ describe("FrontendRumConfig", () => {
 
     it("CDN install code contains preconnect link for browsersdk.openobserve.ai", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code.raw).toContain(
         'rel="preconnect" href="https://browsersdk.openobserve.ai"',
@@ -495,9 +461,7 @@ describe("FrontendRumConfig", () => {
 
     it("CDN install code contains dns-prefetch for browsersdk.openobserve.ai", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code.raw).toContain(
         'rel="dns-prefetch" href="https://browsersdk.openobserve.ai"',
@@ -506,29 +470,21 @@ describe("FrontendRumConfig", () => {
 
     it("CDN install code contains preconnect link for the ingestion endpoint", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
-      expect(cdnVariant.code.raw).toContain(
-        `href="${HTTPS_ENDPOINT}"`,
-      );
+      expect(cdnVariant.code.raw).toContain(`href="${HTTPS_ENDPOINT}"`);
     });
 
     it("CDN install code contains OO_RUM async loader global", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code.raw).toContain("OO_RUM");
     });
 
     it("CDN install code contains OO_LOGS async loader global", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code.raw).toContain("OO_LOGS");
     });
@@ -544,13 +500,169 @@ describe("FrontendRumConfig", () => {
 
     it("NPM install code is the exact install command", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const npmVariant = installStep.variants.find((v: any) => v.id === "npm");
-      expect(npmVariant.code.raw).toBe(
-        "npm i @openobserve/browser-rum @openobserve/browser-logs",
-      );
+      expect(npmVariant.code.raw).toBe("npm i @openobserve/browser-rum @openobserve/browser-logs");
+    });
+  });
+
+  // ── platform switcher ───────────────────────────────────────────────────
+
+  describe("platform switcher", () => {
+    beforeEach(() => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent());
+    });
+
+    it("renders all four platform options with their labels when rumToken is present", () => {
+      const browserTab = wrapper.find('[data-test="rum-setup-platform-browser"]');
+      const reactNativeTab = wrapper.find('[data-test="rum-setup-platform-react-native"]');
+      const androidTab = wrapper.find('[data-test="rum-setup-platform-android"]');
+      const iosTab = wrapper.find('[data-test="rum-setup-platform-ios"]');
+
+      expect(browserTab.exists()).toBe(true);
+      expect(browserTab.text()).toBe("Browser");
+      expect(reactNativeTab.exists()).toBe(true);
+      expect(reactNativeTab.text()).toContain("React Native");
+      expect(androidTab.exists()).toBe(true);
+      expect(androidTab.text()).toContain("Android");
+      expect(iosTab.exists()).toBe(true);
+      expect(iosTab.text()).toContain("iOS");
+    });
+
+    it("tags only the mobile platforms as beta", () => {
+      const betaOf = (id: string) =>
+        wrapper.find(`[data-test="rum-setup-platform-${id}"]`).find('[data-test="beta-badge"]');
+
+      expect(betaOf("browser").exists()).toBe(false);
+      expect(betaOf("react-native").text()).toBe("Beta");
+      expect(betaOf("android").text()).toBe("Beta");
+      expect(betaOf("ios").text()).toBe("Beta");
+    });
+
+    it("does NOT render the platform switcher when rumToken is empty", () => {
+      wrapper.unmount();
+      ({ wrapper } = mountComponent({ rumToken: "" }));
+
+      expect(wrapper.find('[data-test="rum-setup-platform-group"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-web-no-token-message"]').exists()).toBe(true);
+    });
+
+    it("defaults to the browser card with 3 steps and the browser provider name", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const content = card.props("content");
+
+      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.steps).toHaveLength(3);
+    });
+
+    it("swaps to the React Native card when React Native is selected", async () => {
+      const reactNativeTab = wrapper.find('[data-test="rum-setup-platform-react-native"]');
+
+      await reactNativeTab.trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const content = card.props("content");
+      // Title deliberately stays "Real User Monitoring" on both platforms.
+      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.steps.map((s: any) => s.id)).toEqual([
+        "install",
+        "init",
+        "session-replay",
+        "navigation",
+        "verify",
+      ]);
+    });
+
+    it("sets the React Native card's detect filter to source = 'react-native'", async () => {
+      const reactNativeTab = wrapper.find('[data-test="rum-setup-platform-react-native"]');
+
+      await reactNativeTab.trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      expect(card.props("content").detect.filter).toBe("source = 'react-native'");
+    });
+
+    it("restores the browser card when switching back to Browser", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-react-native"]').trigger("click");
+
+      await wrapper.find('[data-test="rum-setup-platform-browser"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const content = card.props("content");
+      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.steps.map((s: any) => s.id)).toEqual(["install", "init", "verify"]);
+    });
+
+    it("swaps to the Android card with source = 'android' detection when Android is selected", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-android"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const content = card.props("content");
+      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.provider.runtime).toBe("Android");
+      expect(content.steps.map((s: any) => s.id)).toEqual([
+        "install",
+        "init",
+        "session-replay",
+        "verify",
+      ]);
+      expect(content.detect.filter).toBe("source = 'android'");
+    });
+
+    it("swaps to the iOS card with source = 'ios' detection when iOS is selected", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-ios"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const content = card.props("content");
+      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.provider.runtime).toBe("iOS");
+      expect(content.steps.map((s: any) => s.id)).toEqual([
+        "install",
+        "init",
+        "session-replay",
+        "verify",
+      ]);
+      expect(content.detect.filter).toBe("source = 'ios'");
+    });
+
+    it("points the Android RUM install at the o2-sdk-android coordinates", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-android"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const install = card.props("content").steps.find((s: any) => s.id === "install");
+      const kotlin = install.variants.find((v: any) => v.id === "kotlin");
+      expect(kotlin.code.raw).toContain("ai.openobserve:o2-sdk-android-rum");
+    });
+
+    it("gives each Android feature its own full intake URL", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-android"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const init = card.props("content").steps.find((s: any) => s.id === "init");
+      expect(init.code.raw).toContain(`${HTTPS_ENDPOINT}/rum/v1/${ORG_ID}/rum`);
+      expect(init.code.raw).toContain(`${HTTPS_ENDPOINT}/rum/v1/${ORG_ID}/logs`);
+    });
+
+    it("points the iOS install at the openobserve-sdk-ios Swift package", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-ios"]').trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const install = card.props("content").steps.find((s: any) => s.id === "install");
+      const spm = install.variants.find((v: any) => v.id === "spm");
+      expect(spm.code.raw).toContain("github.com/openobserve/openobserve-sdk-ios.git");
+    });
+
+    it("carries the raw RUM token into the Android and iOS init code", async () => {
+      await wrapper.find('[data-test="rum-setup-platform-android"]').trigger("click");
+      let card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      let init = card.props("content").steps.find((s: any) => s.id === "init");
+      expect(init.code.raw).toContain(RUM_TOKEN);
+
+      await wrapper.find('[data-test="rum-setup-platform-ios"]').trigger("click");
+      card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      init = card.props("content").steps.find((s: any) => s.id === "init");
+      expect(init.code.raw).toContain(RUM_TOKEN);
     });
   });
 });

@@ -131,14 +131,13 @@ describe("AlertSettingsHelpDrawer", () => {
     expect(chips.some((c) => c.text() === "{alert_name}")).toBe(true);
   });
 
-  it("does NOT advertise {alert_agg_value} (server never substitutes it)", async () => {
-    // Regression: this is a phantom variable; offering it would send literal
-    // '{alert_agg_value}' to the destination.
+  it("advertises {alert_agg_value} and {alert_description} (both are substituted by the server)", async () => {
+    // alert_agg_value is now a real substituted variable (see src/core/src/alerts/alert.rs),
+    // so the drawer must advertise it alongside alert_description.
     w = mountDrawer({ topic: "variables" });
     await w.find('[data-test="help-builtin-toggle"]').trigger("click");
     const chips = w.findAll('[data-test="help-builtin-var"]');
-    expect(chips.some((c) => c.text() === "{alert_agg_value}")).toBe(false);
-    // and it should advertise the real {alert_description}
+    expect(chips.some((c) => c.text() === "{alert_agg_value}")).toBe(true);
     expect(chips.some((c) => c.text() === "{alert_description}")).toBe(true);
   });
 
@@ -146,12 +145,8 @@ describe("AlertSettingsHelpDrawer", () => {
     w = mountDrawer({ topic: "variables" });
     const why = w.find('[data-test="help-why"]');
     expect(why.exists()).toBe(true);
-    expect(why.text()).toContain(
-      (en as any).alerts.alertSettings.helpWhyWithoutLabel,
-    );
-    expect(why.text()).toContain(
-      (en as any).alerts.alertSettings.helpWhyWithLabel,
-    );
+    expect(why.text()).toContain((en as any).alerts.alertSettings.helpWhyWithoutLabel);
+    expect(why.text()).toContain((en as any).alerts.alertSettings.helpWhyWithLabel);
     // the "with a variable" side shows a real {placeholder}, not empty i18n
     expect(why.text()).toContain("{severity}");
     expect(why.text()).toContain("{team}");
@@ -166,9 +161,7 @@ describe("AlertSettingsHelpDrawer", () => {
     expect(ex.text()).toContain("{severity}");
     expect(ex.text()).toContain("{team}");
     // and shows what actually gets sent (input -> result), with vars filled in
-    expect(ex.text()).toContain(
-      (en as any).alerts.alertSettings.helpExampleResultLabel,
-    );
+    expect(ex.text()).toContain((en as any).alerts.alertSettings.helpExampleResultLabel);
     expect(ex.text()).toContain("Owned by payments");
   });
 
@@ -176,18 +169,14 @@ describe("AlertSettingsHelpDrawer", () => {
     w = mountDrawer({ topic: "template" });
     const note = w.find('[data-test="help-template-when"]');
     expect(note.exists()).toBe(true);
-    expect(note.text()).toContain(
-      (en as any).alerts.alertSettings.helpTemplateWhenHeading,
-    );
+    expect(note.text()).toContain((en as any).alerts.alertSettings.helpTemplateWhenHeading);
   });
 
   it("teaches WHY a row template + a compose example on the rowTemplate panel", () => {
     w = mountDrawer({ topic: "rowTemplate" });
     const why = w.find('[data-test="help-row-why"]');
     expect(why.exists()).toBe(true);
-    expect(why.text()).toContain(
-      (en as any).alerts.alertSettings.helpRowTemplateWhyHeading,
-    );
+    expect(why.text()).toContain((en as any).alerts.alertSettings.helpRowTemplateWhyHeading);
 
     const ex = w.find('[data-test="help-row-example"]');
     expect(ex.exists()).toBe(true);
@@ -211,9 +200,7 @@ describe("AlertSettingsHelpDrawer", () => {
       contextAttributes: [{ id: "1", key: "", value: "" }],
     });
     const section = w.find('[data-test="help-your-variables"]');
-    expect(section.text()).toContain(
-      (en as any).alerts.alertSettings.helpYourVariablesEmpty,
-    );
+    expect(section.text()).toContain((en as any).alerts.alertSettings.helpYourVariablesEmpty);
     expect(section.text()).not.toContain("{}");
   });
 
@@ -253,9 +240,7 @@ describe("AlertSettingsHelpDrawer", () => {
     // guards against referencing a key that doesn't exist in en.json.
     const applyBtn = w.find('[data-test="help-apply-template-btn"]');
     expect(applyBtn.exists()).toBe(true);
-    expect(applyBtn.text()).toBe(
-      (en as any).alerts.alertSettings.helpApplyToAlert,
-    );
+    expect(applyBtn.text()).toBe((en as any).alerts.alertSettings.helpApplyToAlert);
     expect(applyBtn.text()).not.toContain("alertSettings.help");
 
     await (w.vm as any).applyTemplate();
@@ -273,9 +258,7 @@ describe("AlertSettingsHelpDrawer", () => {
     });
     const legend = w.find('[data-test="help-legend"]');
     expect(legend.exists()).toBe(true);
-    expect(legend.text()).toContain(
-      (en as any).alerts.alertSettings.helpLegendTitle,
-    );
+    expect(legend.text()).toContain((en as any).alerts.alertSettings.helpLegendTitle);
     // concrete, self-explanatory swatches — not the old abstract "Aa"
     expect(legend.text()).toContain("High CPU");
     expect(legend.text()).toContain("{rows}");
@@ -286,9 +269,7 @@ describe("AlertSettingsHelpDrawer", () => {
     w = mountDrawer({ topic: "rowTemplate", rowTemplateType: "Json" });
     const row = w.find('[data-test="help-row-template-type"]');
     expect(row.exists()).toBe(true);
-    expect(row.text()).toContain(
-      (en as any).alerts.alertSettings.helpRowTemplateTypeCurrent,
-    );
+    expect(row.text()).toContain((en as any).alerts.alertSettings.helpRowTemplateTypeCurrent);
     expect(row.text()).toContain("Json");
   });
 
@@ -327,9 +308,7 @@ describe("AlertSettingsHelpDrawer", () => {
     for (const topic of ["template", "variables", "rowTemplate"] as const) {
       w = mountDrawer({ topic, currentTemplate: "", rowTemplate: "" });
       await w.vm.$nextTick();
-      const emptyPre = w
-        .findAll("pre.preview-box")
-        .filter((p) => p.text().trim() === "");
+      const emptyPre = w.findAll("pre.preview-box").filter((p) => p.text().trim() === "");
       expect(emptyPre.length).toBe(0);
       w.unmount();
     }

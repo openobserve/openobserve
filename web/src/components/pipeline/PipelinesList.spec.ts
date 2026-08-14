@@ -14,15 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount, flushPromises } from "@vue/test-utils";
-import {
-  describe,
-  expect,
-  it,
-  beforeEach,
-  afterEach,
-  vi,
-  type MockedFunction,
-} from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi, type MockedFunction } from "vitest";
 import PipelinesList from "@/components/pipeline/PipelinesList.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
@@ -239,12 +231,8 @@ describe("PipelinesList", () => {
     (pipelineService.getPipelines as MockedFunction<any>).mockResolvedValue({
       data: { list: mockPipelines },
     });
-    (pipelineService.createPipeline as MockedFunction<any>).mockResolvedValue(
-      {}
-    );
-    (pipelineService.deletePipeline as MockedFunction<any>).mockResolvedValue(
-      {}
-    );
+    (pipelineService.createPipeline as MockedFunction<any>).mockResolvedValue({});
+    (pipelineService.deletePipeline as MockedFunction<any>).mockResolvedValue({});
     (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue({});
 
     wrapper = createWrapper();
@@ -268,9 +256,7 @@ describe("PipelinesList", () => {
     });
 
     it("has correct component name", () => {
-      expect(
-        wrapper.vm.$options.__name || wrapper.vm.$options.name
-      ).toBe("PipelinesList");
+      expect(wrapper.vm.$options.__name || wrapper.vm.$options.name).toBe("PipelinesList");
     });
 
     it("initializes filterQuery as empty string", () => {
@@ -350,9 +336,7 @@ describe("PipelinesList", () => {
       wrapper.vm.openDeleteDialog(mockRealtimePipeline);
 
       expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
-      expect(wrapper.vm.confirmDialogMeta.data).toStrictEqual(
-        mockRealtimePipeline
-      );
+      expect(wrapper.vm.confirmDialogMeta.data).toStrictEqual(mockRealtimePipeline);
     });
 
     it("resetConfirmDialog hides dialog and clears state", () => {
@@ -395,25 +379,16 @@ describe("PipelinesList", () => {
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Pipeline Toggle State", () => {
     it("togglePipeline calls togglePipelineState directly for enabled pipeline", () => {
-      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue(
-        {}
-      );
+      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue({});
       const row = { pipeline_id: "test", enabled: true, type: "realtime" };
 
       wrapper.vm.togglePipeline(row);
 
-      expect(pipelineService.toggleState).toHaveBeenCalledWith(
-        "test-org",
-        "test",
-        false,
-        true
-      );
+      expect(pipelineService.toggleState).toHaveBeenCalledWith("test-org", "test", false, true);
     });
 
     it("togglePipeline calls togglePipelineState directly for realtime pipeline regardless of enabled state", () => {
-      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue(
-        {}
-      );
+      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue({});
       const row = { pipeline_id: "rt1", enabled: false, type: "realtime" };
 
       wrapper.vm.togglePipeline(row);
@@ -431,28 +406,19 @@ describe("PipelinesList", () => {
     });
 
     it("togglePipelineState calls pipelineService.toggleState with correct args", async () => {
-      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue(
-        {}
-      );
+      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue({});
       const row = { pipeline_id: "test", enabled: true };
 
       await wrapper.vm.togglePipelineState(row, true);
 
-      expect(pipelineService.toggleState).toHaveBeenCalledWith(
-        "test-org",
-        "test",
-        false,
-        true
-      );
+      expect(pipelineService.toggleState).toHaveBeenCalledWith("test-org", "test", false, true);
     });
 
     it("togglePipelineState handles non-403 errors with notification", async () => {
       const error = {
         response: { status: 400, data: { message: "Toggle Error" } },
       };
-      (pipelineService.toggleState as MockedFunction<any>).mockRejectedValue(
-        error
-      );
+      (pipelineService.toggleState as MockedFunction<any>).mockRejectedValue(error);
       const row = { pipeline_id: "test", enabled: true };
 
       await wrapper.vm.togglePipelineState(row, true);
@@ -462,9 +428,7 @@ describe("PipelinesList", () => {
 
     it("togglePipelineState silently ignores 403 errors", async () => {
       const error = { response: { status: 403 } };
-      (pipelineService.toggleState as MockedFunction<any>).mockRejectedValue(
-        error
-      );
+      (pipelineService.toggleState as MockedFunction<any>).mockRejectedValue(error);
       const row = { pipeline_id: "test", enabled: true };
 
       await wrapper.vm.togglePipelineState(row, true);
@@ -476,9 +440,7 @@ describe("PipelinesList", () => {
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Resume Pipeline Dialog", () => {
     it("handleResumePipeline calls toggleState and closes dialog", () => {
-      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue(
-        {}
-      );
+      (pipelineService.toggleState as MockedFunction<any>).mockResolvedValue({});
       wrapper.vm.resumePipelineDialogMeta.data = mockScheduledPipeline;
       wrapper.vm.shouldStartfromNow = false;
 
@@ -489,7 +451,7 @@ describe("PipelinesList", () => {
         "test-org",
         mockScheduledPipeline.pipeline_id,
         true,
-        false
+        false,
       );
     });
 
@@ -545,9 +507,7 @@ describe("PipelinesList", () => {
       const error = {
         response: { status: 400, data: { message: "Error" } },
       };
-      (pipelineService.createPipeline as MockedFunction<any>).mockRejectedValue(
-        error
-      );
+      (pipelineService.createPipeline as MockedFunction<any>).mockRejectedValue(error);
 
       await wrapper.vm.savePipeline({ name: "New Pipeline" });
 
@@ -582,9 +542,7 @@ describe("PipelinesList", () => {
       const error = {
         response: { status: 400, data: { message: "Delete Error" } },
       };
-      (pipelineService.deletePipeline as MockedFunction<any>).mockRejectedValue(
-        error
-      );
+      (pipelineService.deletePipeline as MockedFunction<any>).mockRejectedValue(error);
       wrapper.vm.confirmDialogMeta.data = mockRealtimePipeline;
 
       await wrapper.vm.deletePipeline();
@@ -607,10 +565,7 @@ describe("PipelinesList", () => {
 
     it("exportBulkPipelines downloads all selected pipelines and clears selection", () => {
       // Populate filteredPipelines so the computed selectedPipelines can resolve them
-      wrapper.vm.filteredPipelines = [
-        mockRealtimePipeline,
-        mockScheduledPipeline,
-      ];
+      wrapper.vm.filteredPipelines = [mockRealtimePipeline, mockScheduledPipeline];
       // Set selection by IDs (the read-only computed derives values from this)
       wrapper.vm.selectedPipelineIds = [
         mockRealtimePipeline.pipeline_id,
@@ -726,11 +681,9 @@ describe("PipelinesList", () => {
     });
 
     it("handles getPipelines API error by logging to console.error", async () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       (pipelineService.getPipelines as MockedFunction<any>).mockRejectedValue(
-        new Error("API Error")
+        new Error("API Error"),
       );
 
       await wrapper.vm.getPipelines();
@@ -779,18 +732,14 @@ describe("PipelinesList", () => {
 
       await wrapper.vm.updateActiveTab();
 
-      expect(
-        wrapper.vm.columns.some((c: any) => c.id === "actions")
-      ).toBe(true);
+      expect(wrapper.vm.columns.some((c: any) => c.id === "actions")).toBe(true);
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Bulk Operations", () => {
     it("bulkTogglePipelines calls togglePipelineState for each selected pipeline (pause)", async () => {
-      (pipelineService.bulkToggleState as MockedFunction<any>).mockResolvedValue(
-        {}
-      );
+      (pipelineService.bulkToggleState as MockedFunction<any>).mockResolvedValue({});
       // Populate filteredPipelines so selectedPipelines computed can resolve them
       wrapper.vm.filteredPipelines = [
         { ...mockRealtimePipeline, enabled: true },
@@ -836,9 +785,7 @@ describe("PipelinesList", () => {
       wrapper.vm.openBackfillDialog(pipeline);
 
       expect(wrapper.vm.backfillDialog.show).toBe(true);
-      expect(wrapper.vm.backfillDialog.pipelineId).toBe(
-        mockScheduledPipeline.pipeline_id
-      );
+      expect(wrapper.vm.backfillDialog.pipelineId).toBe(mockScheduledPipeline.pipeline_id);
     });
   });
 

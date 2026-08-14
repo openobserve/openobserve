@@ -34,9 +34,7 @@ describe("OFormDate", () => {
       },
       global: { components: { OFormDate } },
     });
-    expect((wrapper.find("input").element as HTMLInputElement).value).toBe(
-      "2025-05-11",
-    );
+    expect((wrapper.find("input").element as HTMLInputElement).value).toBe("2025-05-11");
   });
 
   it("shows schema error after submit when empty", async () => {

@@ -29,7 +29,7 @@ use axum::{
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    DISTINCT_FIELDS, TIMESTAMP_COL_NAME, get_config,
+    DISTINCT_FIELDS, O2_INGEST_TS_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert::Alert,
         gen_ai::GenAiAgentMappingConfig,
@@ -41,6 +41,7 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt, time::now_micros, util::DISTINCT_STREAM_PREFIX},
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
+use ingestion_common::IngestUser;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::trace::v1::{
@@ -49,6 +50,7 @@ use opentelemetry_proto::tonic::{
     trace::v1::{Status, status::StatusCode},
 };
 use prost::Message;
+use schema::{check_for_schema, stream_schema_exists};
 use serde_json::Map;
 
 pub mod agent_signals;
@@ -57,10 +59,10 @@ pub mod otel;
 pub mod service_graph;
 pub mod session;
 
+#[cfg(feature = "cloud")]
+use ::stream::get_stream;
 use config::utils::schema::format_stream_name;
 
-#[cfg(feature = "cloud")]
-use crate::stream::get_stream;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::{
@@ -72,12 +74,8 @@ use crate::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, grpc::get_val,
         write_file,
     },
-    ingestion_types::IngestUser,
     logs::O2IngestJsonData,
-    metadata::{
-        MetadataItem, MetadataType, distinct_values::DvItem, trace_list_index::TraceListItem, write,
-    },
-    schema::{check_for_schema, stream_schema_exists},
+    metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
     traces::otel::{OtelIngestionProcessor, is_llm_trace},
 };
 
@@ -109,7 +107,6 @@ const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
 const ATTR_STATUS_CODE: &str = "status_code";
 const ATTR_STATUS_MESSAGE: &str = "status_message";
-const O2_INGEST_TS_COL_NAME: &str = "_o2_ingest_ts";
 
 // Gen-AI semantic-convention column names produced by the OTEL processor after
 // dot→underscore flattening. Must stay in sync with GEN_AI_SCHEMA_FIELDS in
@@ -141,6 +138,16 @@ type AgentObservationBuffer = std::collections::BTreeMap<
 
 #[cfg(not(feature = "enterprise"))]
 type AgentObservationBuffer = Option<std::convert::Infallible>;
+
+/// Canonical agent-identity fields the registry wrote onto the span, captured
+/// before UDS refactoring so they can be re-inserted if the stream's UDS field
+/// list does not (yet) include them (see [`restore_canonical_agent_fields`]).
+struct CanonicalAgentFields {
+    agent_name: Option<String>,
+    agent_id: Option<String>,
+    env: Option<String>,
+    version: Option<String>,
+}
 
 fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
     for &field in GEN_AI_INT64_FIELDS.iter() {
@@ -179,7 +186,7 @@ fn collect_gen_ai_agent_observation(
     record_val: &mut Map<String, json::Value>,
     mapping_config: &GenAiAgentMappingConfig,
     observations: &mut AgentObservationBuffer,
-) -> Option<(Option<String>, Option<String>)> {
+) -> Option<CanonicalAgentFields> {
     #[cfg(feature = "enterprise")]
     {
         let observation =
@@ -191,7 +198,12 @@ fn collect_gen_ai_agent_observation(
                 record_val,
                 mapping_config,
             )?;
-        let canonical_fields = (observation.agent_name.clone(), observation.agent_id.clone());
+        let canonical_fields = CanonicalAgentFields {
+            agent_name: observation.agent_name.clone(),
+            agent_id: observation.agent_id.clone(),
+            env: observation.env.clone(),
+            version: observation.version.clone(),
+        };
         let agent_key = observation.agent_key.clone();
         let identity_source = observation.identity_source.clone();
         let buffer_size_before = observations.len();
@@ -224,17 +236,23 @@ fn collect_gen_ai_agent_observation(
 
 fn restore_canonical_agent_fields(
     record_val: &mut Map<String, json::Value>,
-    canonical_fields: Option<(Option<String>, Option<String>)>,
+    canonical_fields: Option<CanonicalAgentFields>,
 ) {
-    let Some((agent_name, agent_id)) = canonical_fields else {
+    let Some(fields) = canonical_fields else {
         return;
     };
 
-    if let Some(agent_name) = agent_name {
+    if let Some(agent_name) = fields.agent_name {
         record_val.insert("gen_ai_agent_name".to_string(), json::json!(agent_name));
     }
-    if let Some(agent_id) = agent_id {
+    if let Some(agent_id) = fields.agent_id {
         record_val.insert("gen_ai_agent_id".to_string(), json::json!(agent_id));
+    }
+    if let Some(env) = fields.env {
+        record_val.insert("gen_ai_agent_env".to_string(), json::json!(env));
+    }
+    if let Some(version) = fields.version {
+        record_val.insert("gen_ai_agent_version".to_string(), json::json!(version));
     }
 }
 
@@ -1459,15 +1477,9 @@ async fn write_traces(
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
-    let mut trace_index_values = Vec::with_capacity(json_data.len());
 
     // Start write data
     for (timestamp, record_val) in json_data {
-        // get service_name
-        let service_name = record_val
-            .get("service_name")
-            .map(json::get_string_value)
-            .unwrap_or_default();
         // get distinct_value item
         if stream_settings.enable_distinct_fields {
             let mut map = Map::new();
@@ -1489,20 +1501,6 @@ async fn write_traces(
                 }));
             }
         }
-
-        // build trace metadata
-        let trace_id = record_val
-            .get("trace_id")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-        trace_index_values.push(MetadataItem::TraceListIndexer(TraceListItem {
-            _timestamp: timestamp,
-            stream_name: stream_name.to_string(),
-            service_name: service_name.to_string(),
-            trace_id,
-        }));
 
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts
@@ -1583,14 +1581,6 @@ async fn write_traces(
         && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
     {
         log::error!("Error while writing distinct values: {e}");
-    }
-
-    // send trace metadata
-    if cfg.common.traces_list_index_enabled
-        && !trace_index_values.is_empty()
-        && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
-    {
-        log::error!("Error while writing trace_index values: {e}");
     }
 
     // only one trigger per request
@@ -1692,6 +1682,38 @@ mod tests {
                 .get("_o2_ingest_ts")
                 .and_then(|value| value.as_i64())
                 .is_some_and(|value| value > 1)
+        );
+    }
+
+    #[test]
+    fn test_restore_canonical_agent_fields_restores_env_and_version() {
+        // Simulates a UDS stream whose field list dropped the canonical agent
+        // columns during refactor_map: every canonical field must be restored,
+        // env/version included, so version-scoped queries can filter on them.
+        let mut record = json!({"_timestamp": 1_i64}).as_object().unwrap().clone();
+
+        super::restore_canonical_agent_fields(
+            &mut record,
+            Some(super::CanonicalAgentFields {
+                agent_name: Some("o2_ai_agent".to_string()),
+                agent_id: None,
+                env: Some("production".to_string()),
+                version: Some("0.1.0".to_string()),
+            }),
+        );
+
+        assert_eq!(
+            record.get("gen_ai_agent_name").and_then(|v| v.as_str()),
+            Some("o2_ai_agent")
+        );
+        assert!(!record.contains_key("gen_ai_agent_id"));
+        assert_eq!(
+            record.get("gen_ai_agent_env").and_then(|v| v.as_str()),
+            Some("production")
+        );
+        assert_eq!(
+            record.get("gen_ai_agent_version").and_then(|v| v.as_str()),
+            Some("0.1.0")
         );
     }
 

@@ -236,8 +236,8 @@ pub async fn set_limit(org_id: &str, usage_limit: u64) -> Result<(), anyhow::Err
     }
     set_cached_limit(org_id, usage_limit);
 
-    if !LOCAL_NODE.is_single_node() {
-        if let Err(err) = publish_ha_msg(&TrialQuotaHaMsg {
+    if !LOCAL_NODE.is_single_node()
+        && let Err(err) = publish_ha_msg(&TrialQuotaHaMsg {
             org_id: org_id.to_string(),
             cost: 0,
             usage_limit: Some(usage_limit),
@@ -245,11 +245,10 @@ pub async fn set_limit(org_id: &str, usage_limit: u64) -> Result<(), anyhow::Err
             timestamp: config::utils::time::now_micros(),
         })
         .await
-        {
-            log::warn!(
-                "[TRIAL_QUOTA] Failed to broadcast limit update for org={org_id}; periodic reconciliation will apply it: {err}"
-            );
-        }
+    {
+        log::warn!(
+            "[TRIAL_QUOTA] Failed to broadcast limit update for org={org_id}; periodic reconciliation will apply it: {err}"
+        );
     }
     Ok(())
 }

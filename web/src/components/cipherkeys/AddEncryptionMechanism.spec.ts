@@ -33,9 +33,7 @@ const addCipherKeySchema = makeAddCipherKeySchema((k: string) => i18n.global.t(k
 // shared schema — that exercises the actual inject + validation wiring.
 
 const validBase = (): AddCipherKeyForm => {
-  const v = JSON.parse(
-    JSON.stringify(addCipherKeyDefaults()),
-  ) as AddCipherKeyForm;
+  const v = JSON.parse(JSON.stringify(addCipherKeyDefaults())) as AddCipherKeyForm;
   v.name = "valid-key";
   v.key.store.type = "local";
   v.key.store.local = "secret";
@@ -75,23 +73,17 @@ describe("AddEncryptionMechanism.vue", () => {
   });
 
   it("renders the provider type select", () => {
-    expect(
-      wrapper.find('[data-test="add-cipher-key-auth-method-input"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-cipher-key-auth-method-input"]').exists()).toBe(true);
   });
 
   it("shows the algorithm select when the mechanism type is simple", () => {
-    expect(
-      wrapper.find('[data-test="add-cipher-algorithm-input"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-cipher-algorithm-input"]').exists()).toBe(true);
   });
 
   it("hides the algorithm select for a non-simple mechanism", async () => {
     form().setFieldValue("key.mechanism.type", "tink_keyset");
     await nextTick();
-    expect(
-      wrapper.find('[data-test="add-cipher-algorithm-input"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="add-cipher-algorithm-input"]').exists()).toBe(false);
   });
 
   it("flags a missing algorithm on submit when the mechanism is simple", async () => {
@@ -103,8 +95,7 @@ describe("AddEncryptionMechanism.vue", () => {
     await form().handleSubmit();
     expect(form().state.isValid).toBe(false);
     expect(
-      (form().getFieldMeta("key.mechanism.simple_algorithm")?.errors ?? [])
-        .length,
+      (form().getFieldMeta("key.mechanism.simple_algorithm")?.errors ?? []).length,
     ).toBeGreaterThan(0);
   });
 

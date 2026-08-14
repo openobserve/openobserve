@@ -21,9 +21,60 @@ use std::{
 use infra::{
     coordinator::get_coordinator,
     db::Event,
-    table::workflows::{Workflow, WorkflowRunErrors},
+    table::workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors},
 };
+use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
+
+#[derive(Serialize, Deserialize)]
+pub enum AssociationDeleteEvent {
+    Workflow {
+        org_id: String,
+        workflow_id: String,
+    },
+    Entity {
+        org_id: String,
+        entity_id: String,
+    },
+    Trigger {
+        org_id: String,
+        trigger: String,
+    },
+    Specific {
+        org_id: String,
+        entity_id: String,
+        workflow_id: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
+pub enum WorkflowTriggerType {
+    #[default]
+    AlertFired,
+    IncidentEvent,
+    Webhook,
+}
+
+impl From<&str> for WorkflowTriggerType {
+    fn from(value: &str) -> Self {
+        match value {
+            "AlertFired" => Self::AlertFired,
+            "IncidentEvent" => Self::IncidentEvent,
+            "Webhook" => Self::Webhook,
+            _ => Self::AlertFired,
+        }
+    }
+}
+
+impl std::fmt::Display for WorkflowTriggerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AlertFired => write!(f, "AlertFired"),
+            Self::IncidentEvent => write!(f, "IncidentEvent"),
+            Self::Webhook => write!(f, "Webhook"),
+        }
+    }
+}
 
 pub const WORKFLOWS_PREFIX: &str = "/workflows/";
 
@@ -167,6 +218,128 @@ pub async fn delete_errors_older_than(limit_time: i64) -> Result<usize, anyhow::
 pub async fn delete_runs_older_than(limit_time: i64) -> Result<usize, anyhow::Error> {
     let entries = infra::table::workflows::delete_all_runs_older_than(limit_time).await?;
     Ok(entries.len())
+}
+
+pub async fn get_workflow_associations(
+    org_id: &str,
+    workflow_id: &str,
+) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
+    infra::table::workflows::get_all_associations_for_workflow(org_id, workflow_id).await
+}
+
+pub async fn associate_workflow(
+    org_id: &str,
+    workflow_id: &str,
+    entity_id: &str,
+    entity_type: String,
+    trigger_type: String,
+) -> Result<(), anyhow::Error> {
+    let assoc = WorkflowAssociation {
+        id: 0,
+        org_id: org_id.to_string(),
+        entity_id: entity_id.to_string(),
+        entity_type,
+        workflow_id: workflow_id.to_string(),
+        trigger_type,
+        created_at: chrono::Utc::now().timestamp_micros(),
+    };
+    infra::table::workflows::add_workflow_association(assoc.clone()).await?;
+    #[cfg(feature = "enterprise")]
+    {
+        let config = o2_enterprise::enterprise::common::config::get_config();
+        if config.super_cluster.enabled {
+            match o2_enterprise::enterprise::super_cluster::queue::send_workflow_association(
+                serde_json::to_string(&assoc)?,
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully sent workflow association notification to super cluster queue for org: {} type {} entity_id: {} workflow_id: {}",
+                        assoc.org_id,
+                        assoc.trigger_type,
+                        assoc.entity_id,
+                        assoc.workflow_id
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "error in sending workflow association notification to super cluster queue for org: {} type {} entity_id: {} workflow_id: {} : {e}",
+                        assoc.org_id,
+                        assoc.trigger_type,
+                        assoc.entity_id,
+                        assoc.workflow_id
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn delete_workflow_association(
+    event: AssociationDeleteEvent,
+) -> Result<(), anyhow::Error> {
+    let org: &str;
+    let mut entity = "";
+    let mut trigger_type = "";
+    let mut workflow = "";
+    match &event {
+        AssociationDeleteEvent::Entity { org_id, entity_id } => {
+            org = org_id;
+            entity = entity_id;
+            infra::table::workflows::delete_association_by_entity(org_id, entity_id).await?;
+        }
+        AssociationDeleteEvent::Workflow {
+            org_id,
+            workflow_id,
+        } => {
+            org = org_id;
+            workflow = workflow_id;
+            infra::table::workflows::delete_association_by_workflow(org_id, workflow_id).await?;
+        }
+        AssociationDeleteEvent::Trigger { org_id, trigger } => {
+            org = org_id;
+            trigger_type = trigger;
+            infra::table::workflows::delete_association_by_trigger(org_id, trigger).await?;
+        }
+        AssociationDeleteEvent::Specific {
+            org_id,
+            entity_id,
+            workflow_id,
+        } => {
+            org = org_id;
+            entity = entity_id;
+            workflow = workflow_id;
+            infra::table::workflows::delete_workflow_association(org_id, workflow_id, entity_id)
+                .await?;
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        let config = o2_enterprise::enterprise::common::config::get_config();
+        if config.super_cluster.enabled {
+            let payload = serde_json::to_string(&event).unwrap();
+            match o2_enterprise::enterprise::super_cluster::queue::delete_workflow_association(
+                payload,
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully sent workflow association delete notification to super cluster queue for org: {org} trigger_type {trigger_type} entity_id: {entity} workflow_id: {workflow}",
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "error in sending workflow association delete notification to super cluster queue for org: {org} trigger_type {trigger_type} entity_id: {entity} workflow_id: {workflow} : {e}",
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

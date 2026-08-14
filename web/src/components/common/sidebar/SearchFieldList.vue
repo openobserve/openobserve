@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="flex flex-col w-full index-menu default-index-menu h-full!">
+  <div class="index-menu default-index-menu flex h-full! w-full flex-col">
     <div class="index-table h-full! w-full">
       <OFieldList
         ref="fieldListRef"
@@ -21,11 +21,11 @@
         <!-- Group header (only rendered for grouped/label rows) -->
         <template #group-header="{ row, groupName }">
           <div
-            class="field-group-header h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 -ml-page-edge px-page-edge flex justify-between items-center font-semibold text-xs leading-7 cursor-pointer bg-surface-subtle text-field-list-group-text"
+            class="field-group-header -ml-page-edge px-page-edge bg-surface-subtle text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs leading-7 font-semibold"
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
-            <div class="flex-1 min-w-0 truncate">
+            <div class="min-w-0 flex-1 truncate">
               {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
             </div>
             <OButton
@@ -45,9 +45,11 @@
         <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
           <OFieldRow>
-            <span class="field-type-container relative w-[0.55rem] h-4 mr-[0.3rem] ml-[0.2rem] shrink-0 flex items-center justify-center">
+            <span
+              class="field-type-container relative mr-[0.3rem] ml-[0.2rem] flex h-4 w-[0.55rem] shrink-0 items-center justify-center"
+            >
               <OIcon
-                class="field-expand-icon absolute inline-flex items-center justify-center shrink-0 w-4 text-text-muted"
+                class="field-expand-icon text-text-muted absolute inline-flex w-4 shrink-0 items-center justify-center"
                 :name="expandedRows[row.name] ? 'expand-more' : 'chevron-right'"
                 size="sm"
               />
@@ -78,7 +80,7 @@
 
         <!-- Expansion: FieldValuesPanel -->
         <template #expansion="{ row }">
-          <div class="pl-2 pr-1 py-1">
+          <div class="py-1 pr-1 pl-2">
             <FieldValuesPanel
               :field-name="row.name"
               :field-values="fieldValues[row.name]"
@@ -98,58 +100,55 @@
 
         <!-- Loading skeleton -->
         <template #loading>
-          <div
-            data-test="search-fieldlist-loading-skeleton"
-            class="w-full flex flex-col"
-          >
+          <div data-test="search-fieldlist-loading-skeleton" class="flex w-full flex-col">
             <!-- Group 1 header -->
-            <div class="h-7 flex items-center justify-between px-2">
-              <OSkeleton type="rect" class="h-3 w-24 rounded-default" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
+            <div class="flex h-7 items-center justify-between px-2">
+              <OSkeleton type="rect" class="rounded-default h-3 w-24" />
+              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
             </div>
             <!-- Group 1 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <!-- Group 2 header -->
-            <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-16 rounded-default" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
+            <div class="mt-2 flex h-7 items-center justify-between px-2">
+              <OSkeleton type="rect" class="rounded-default h-3 w-16" />
+              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
             </div>
             <!-- Group 2 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
-            <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-32 rounded-default" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
+            <div class="mt-2 flex h-7 items-center justify-between px-2">
+              <OSkeleton type="rect" class="rounded-default h-3 w-32" />
+              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
             </div>
             <!-- Group 3 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
           </div>
@@ -157,32 +156,27 @@
 
         <!-- After list: pagination -->
         <template #after-list="bottomProps">
-          <div v-if="bottomProps.totalPages > 1" class="flex items-center gap-1 ml-auto">
+          <div v-if="bottomProps.totalPages > 1" class="ml-auto flex items-center gap-1">
             <OTooltip
               side="left"
               align="center"
               max-width="18.75rem"
-              :content="`Total Fields: ${bottomProps.totalRows}`"
+              :content="t('common.totalFields', { count: bottomProps.totalRows })"
             />
             <OButton
               variant="ghost-primary"
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
               @click="bottomProps.firstPage"
-              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-default! overflow-visible!"
+              class="rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5"
             >
               <OIcon name="fast-rewind" size="sm" />
             </OButton>
-            <template
-              v-for="page in visiblePagesForTotal(bottomProps)"
-              :key="page"
-            >
+            <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
               <OButton
-                :variant="
-                  bottomProps.currentPage === page ? 'primary' : 'ghost'
-                "
+                :variant="bottomProps.currentPage === page ? 'primary' : 'ghost'"
                 size="icon-panel"
-                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-text-body! rounded-default! overflow-visible!"
+                class="text-text-body! rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5 text-xs! leading-none font-medium"
                 @click="setPage(page)"
                 >{{ page }}</OButton
               >
@@ -192,7 +186,7 @@
               size="icon-panel"
               :disabled="bottomProps.isLastPage"
               @click="bottomProps.lastPage"
-              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-default! overflow-visible!"
+              class="rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5"
             >
               <OIcon name="fast-forward" size="sm" />
             </OButton>
@@ -205,7 +199,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useFieldGrouping from "@/composables/useFieldGrouping";
@@ -255,6 +249,14 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  // Page-level WHERE fragment (e.g. `type='error'`) always ANDed into the
+  // field-values SQL so the counts match the rows the page itself queries.
+  // Deliberately separate from `query`: it is not user-editable, so it must
+  // not feed the include/exclude checkbox round-trip below.
+  baseFilter: {
+    type: String,
+    default: "",
+  },
   showCount: {
     type: Boolean,
     default: false,
@@ -276,20 +278,16 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const expandedRows: Ref<Record<string, boolean>> = ref({});
 const expandedIds = ref<string[]>([]);
 const currentPage = ref(1);
 const fieldListRef = ref<InstanceType<typeof OFieldList> | null>(null);
 
-const defaultValuesCount = computed(
-  () => store.state.zoConfig?.query_values_default_num || 10,
-);
+const defaultValuesCount = computed(() => store.state.zoConfig?.query_values_default_num || 10);
 
-const showFtsFieldValues = computed(
-  () => store.state.zoConfig?.showFtsFieldValues ?? false,
-);
+const showFtsFieldValues = computed(() => store.state.zoConfig?.showFtsFieldValues ?? false);
 
 // ─── Derive currently-filtered values from the active query ──────────
 // Mirrors logs IndexList.vue's activeIncludeFilterValues/activeExcludeFilterValues
@@ -307,9 +305,10 @@ const extractColName = (col: any): string | null => {
   return null;
 };
 
-function walkFilters(
-  query: string,
-): { include: Record<string, string[]>; exclude: Record<string, string[]> } {
+function walkFilters(query: string): {
+  include: Record<string, string[]>;
+  exclude: Record<string, string[]>;
+} {
   const include: Record<string, string[]> = {};
   const exclude: Record<string, string[]> = {};
   if (!query?.trim()) return { include, exclude };
@@ -318,11 +317,7 @@ function walkFilters(
     const parsed = fnParsedSQL(`select * from stream where ${query}`);
     if (!parsed?.where) return { include, exclude };
 
-    const push = (
-      target: Record<string, string[]>,
-      field: string,
-      value: string,
-    ) => {
+    const push = (target: Record<string, string[]>, field: string, value: string) => {
       if (!target[field]) target[field] = [];
       if (!target[field].includes(value)) target[field].push(value);
     };
@@ -390,9 +385,7 @@ onMounted(() => {
   }
 });
 
-const groupingActive = computed(
-  () => props.enableGrouping && semanticIndex.value !== null,
-);
+const groupingActive = computed(() => props.enableGrouping && semanticIndex.value !== null);
 
 // Map raw schema fields → FieldObj, bucket them, and annotate label rows so
 // OFieldList renders group headers (isGroup) vs field rows.
@@ -472,16 +465,50 @@ const {
 
 const currentSizePerField: Ref<Record<string, number>> = ref({});
 const currentKeyword: Ref<Record<string, string>> = ref({});
-const fieldValuesTimeRange: Ref<
-  Record<string, { start_time: number; end_time: number }>
-> = ref({});
+const fieldValuesTimeRange: Ref<Record<string, { start_time: number; end_time: number }>> = ref({});
 
 // ─── SQL helper ──────────────────────────────────────────────────────
 
 const buildSql = (streamName: string, whereClause?: string) =>
-  b64EncodeUnicode(
-    `SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`,
-  ) || "";
+  b64EncodeUnicode(`SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`) ||
+  "";
+
+// Base filter first, user query parenthesised after it — the editor value may
+// contain a top-level OR, which would otherwise swallow the base filter.
+const valuesWhereClause = computed(() => {
+  const base = props.baseFilter.trim();
+  const userQuery = props.query.trim();
+  if (base && userQuery) return `${base} AND (${userQuery})`;
+  return base || userQuery;
+});
+
+// Single entry point for every value request (expand, search, load-more,
+// base-filter refresh) so all four stay on the same SQL and time range.
+// `streamOverride` carries the row's own stream when the caller already has the
+// row in hand — expansion can be driven with a row that is not in `fields`.
+function requestFieldValues(
+  fieldName: string,
+  size: number,
+  keyword?: string,
+  streamOverride?: string,
+) {
+  const row: any = (props.fields as any[]).find((f: any) => f.name === fieldName);
+  const resolvedStream = streamOverride || row?.stream_name || props.streamName;
+  const pinnedTime = fieldValuesTimeRange.value[fieldName];
+  fetchFieldValues({
+    fields: [fieldName],
+    size,
+    no_count: false,
+    start_time: pinnedTime?.start_time ?? (props.timeStamp as any).startTime,
+    end_time: pinnedTime?.end_time ?? (props.timeStamp as any).endTime,
+    stream_name: resolvedStream,
+    stream_type: props.streamType,
+    sql: buildSql(resolvedStream, valuesWhereClause.value || undefined),
+    keyword: keyword || undefined,
+    timeout: 30000,
+    use_cache: (globalThis as any).use_cache ?? true,
+  });
+}
 
 // ─── Expansion handling ──────────────────────────────────────────────
 
@@ -536,25 +563,13 @@ function openFilterCreator({ name, ftsKey, stream_name }: any) {
   };
   resetFieldValues(name, true);
 
-  const resolvedStream = stream_name || props.streamName;
   fieldValuesCurrentSize.value[name] = defaultValuesCount.value;
   expandedRows.value[name] = true;
   if (!expandedIds.value.includes(name)) {
     expandedIds.value = [...expandedIds.value, name];
   }
 
-  fetchFieldValues({
-    fields: [name],
-    size: defaultValuesCount.value,
-    no_count: false,
-    start_time: (props.timeStamp as any).startTime,
-    end_time: (props.timeStamp as any).endTime,
-    stream_name: resolvedStream,
-    stream_type: props.streamType,
-    sql: buildSql(resolvedStream, (props as any).query || undefined),
-    timeout: 30000,
-    use_cache: (globalThis as any).use_cache ?? true,
-  });
+  requestFieldValues(name, defaultValuesCount.value, undefined, stream_name);
 }
 
 function closeField(fieldName: string) {
@@ -591,10 +606,6 @@ function setPage(page: number) {
 // ─── FieldValuesPanel event handlers ─────────────────────────────────
 
 const handleSearchFieldValues = (fieldName: string, term: string) => {
-  const row: any = (props.fields as any[]).find(
-    (f: any) => f.name === fieldName,
-  );
-  const resolvedStream = row?.stream_name || props.streamName;
   currentKeyword.value[fieldName] = term;
   currentSizePerField.value[fieldName] = defaultValuesCount.value;
   fieldValuesCurrentSize.value[fieldName] = defaultValuesCount.value;
@@ -602,51 +613,37 @@ const handleSearchFieldValues = (fieldName: string, term: string) => {
   cancelFieldStream(fieldName);
   resetFieldValues(fieldName, true);
 
-  const pinnedTime = fieldValuesTimeRange.value[fieldName];
-  fetchFieldValues({
-    fields: [fieldName],
-    size: defaultValuesCount.value,
-    no_count: false,
-    start_time: pinnedTime?.start_time ?? (props.timeStamp as any).startTime,
-    end_time: pinnedTime?.end_time ?? (props.timeStamp as any).endTime,
-    stream_name: resolvedStream,
-    stream_type: props.streamType,
-    sql: buildSql(resolvedStream, (props as any).query || undefined),
-    keyword: term || undefined,
-    timeout: 30000,
-    use_cache: (globalThis as any).use_cache ?? true,
-  });
+  requestFieldValues(fieldName, defaultValuesCount.value, term);
 };
 
 const handleLoadMoreValues = (fieldName: string) => {
-  const row: any = (props.fields as any[]).find(
-    (f: any) => f.name === fieldName,
-  );
-  const resolvedStream = row?.stream_name || props.streamName;
   const newSize =
-    (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) +
-    defaultValuesCount.value;
+    (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) + defaultValuesCount.value;
   currentSizePerField.value[fieldName] = newSize;
   fieldValuesCurrentSize.value[fieldName] = newSize;
-  fieldValuesFinalizedValues.value[fieldName] = [
-    ...(fieldValues.value[fieldName]?.values || []),
-  ];
+  fieldValuesFinalizedValues.value[fieldName] = [...(fieldValues.value[fieldName]?.values || [])];
 
-  const pinnedTime = fieldValuesTimeRange.value[fieldName];
-  fetchFieldValues({
-    fields: [fieldName],
-    size: newSize,
-    no_count: false,
-    start_time: pinnedTime?.start_time ?? (props.timeStamp as any).startTime,
-    end_time: pinnedTime?.end_time ?? (props.timeStamp as any).endTime,
-    stream_name: resolvedStream,
-    stream_type: props.streamType,
-    sql: buildSql(resolvedStream, (props as any).query || undefined),
-    keyword: currentKeyword.value[fieldName] || undefined,
-    timeout: 30000,
-    use_cache: (globalThis as any).use_cache ?? true,
-  });
+  requestFieldValues(fieldName, newSize, currentKeyword.value[fieldName]);
 };
+
+// The base filter is page-owned (e.g. the service chip on error tracking), so a
+// change to it silently invalidates every open value list. Refetch them in
+// place, keeping each field's current size and search keyword.
+watch(
+  () => props.baseFilter,
+  () => {
+    for (const fieldName of expandedIds.value) {
+      cancelFieldStream(fieldName);
+      delete fieldValuesFinalizedValues.value[fieldName];
+      resetFieldValues(fieldName, true);
+      requestFieldValues(
+        fieldName,
+        currentSizePerField.value[fieldName] ?? defaultValuesCount.value,
+        currentKeyword.value[fieldName],
+      );
+    }
+  },
+);
 
 const isNullValue = (v: string) =>
   v === null || v === undefined || v === "" || v.toLowerCase() === "null";
@@ -660,24 +657,14 @@ const buildExpression = (fieldName: string, v: string, action: string) =>
       ? `${fieldName}='${v}'`
       : `${fieldName}!='${v}'`;
 
-const handleAddSearchTerm = (
-  fieldName: string,
-  value: string,
-  action: string,
-) => {
+const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
   addSearchTerm(buildExpression(fieldName, value, action));
 };
 
-const handleAddMultipleSearchTerms = (
-  fieldName: string,
-  values: string[],
-  action: string,
-) => {
+const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
   const joinOp = action === "include" ? " or " : " and ";
   const expressions = values.map((v) => buildExpression(fieldName, v, action));
-  addSearchTerm(
-    expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0],
-  );
+  addSearchTerm(expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0]);
 };
 
 const handleRemoveFieldFilter = (fieldName: string) => {
@@ -689,31 +676,30 @@ const addSearchTerm = (term: string) => {
 };
 
 const copyContentValue = (value: string) => {
-  copyToClipboard(value, { successMessage: "Value copied to clipboard" });
+  copyToClipboard(value, t, { successMessage: t("common.valueCopiedToClipboard") });
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(lib-override:o2-field-list): reaches into OFieldList/FieldValuesPanel internals
    via :deep() — those elements are owned by the child component, so no utility on this
    template can reach them. */
 
-// Expanded field values should read as inline content, not a selected card —
-// drop the bordered/rounded panel treatment so no border or background lingers
-// once the row is expanded and the pointer moves away.
+/* Expanded field values should read as inline content, not a selected card —
+   drop the bordered/rounded panel treatment so no border or background lingers
+   once the row is expanded and the pointer moves away. */
 :deep(.o-field-list__expansion) {
   border: none;
   border-radius: 0;
   margin-bottom: 0;
 }
 
-// Tighten the gap between expanded field values. FieldValuesPanel stacks
-// padding on both the <li> and its inner <label> (py-1 on each), which
-// reads as too much vertical space in the dense RUM sidebar. Drop the <li>
-// padding here (RUM-scoped) and keep the label padding as the click target.
+/* Tighten the gap between expanded field values. FieldValuesPanel stacks
+   padding on both the <li> and its inner <label> (py-1 on each), which
+   reads as too much vertical space in the dense RUM sidebar. Drop the <li>
+   padding here (RUM-scoped) and keep the label padding as the click target. */
 :deep(.o-field-list__expansion [data-test="field-values-panel-values-list"] > li) {
   padding-top: 0;
   padding-bottom: 0;
 }
-
 </style>

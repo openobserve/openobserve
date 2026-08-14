@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw, type I18nText, type I18nKey } from "@/types/i18n";
+
 import type { FieldAlias, StreamInfo } from "@/services/service_streams";
 
 /**
@@ -51,8 +53,14 @@ export type SubjectButtonSpec = {
   poolSemanticIds?: string[];
   /** Stable identifier for the button (used as a Vue key). */
   id: string;
-  /** Display label rendered on the chip, e.g. "Pod". */
-  label: string;
+  /**
+   * Names that must read the same in every language — K8s kinds (`Pod`) and cloud
+   * product names (`ECS Task`). Ordinary nouns (`Host`) use `labelKey`, which wins
+   * if both are set.
+   */
+  label?: I18nText;
+  /** i18n KEY for the chip label, translated at render time. */
+  labelKey?: I18nKey;
   /** When true, this button's matching streams are pre-selected on load. */
   defaultActive?: boolean;
 };
@@ -77,29 +85,39 @@ export const SUBJECT_BUTTONS_BY_SET: Record<string, SubjectButtonSpec[]> = {
   // matched_set_id is `normalize_category_to_id(group)` on the backend, so for
   // semantic groups whose `group` field is "Kubernetes" the id is "kubernetes".
   kubernetes: [
-    { id: "pod",  semanticIds: ["k8s-pod-name"],  label: "Pod", defaultActive: true },
+    { id: "pod", semanticIds: ["k8s-pod-name"], label: raw("Pod"), defaultActive: true },
     {
       id: "node",
       semanticIds: ["k8s-node-name"],
       // Also pool pod-level metrics — they run on this node.
       poolSemanticIds: ["k8s-node-name", "k8s-pod-name"],
-      label: "Node",
+      label: raw("Node"),
     },
   ],
   aws: [
-    { id: "ecs-task", semanticIds: ["aws-ecs-task"], label: "ECS Task", defaultActive: true },
-    { id: "function", semanticIds: ["faas-name"],    label: "Function" },
-    { id: "host",     semanticIds: ["host"],         label: "Host" },
+    { id: "ecs-task", semanticIds: ["aws-ecs-task"], label: raw("ECS Task"), defaultActive: true },
+    { id: "function", semanticIds: ["faas-name"], labelKey: "metrics.subjects.function" },
+    { id: "host", semanticIds: ["host"], labelKey: "metrics.subjects.host" },
   ],
   gcp: [
-    { id: "instance",  semanticIds: ["gcp-instance"],  label: "Instance", defaultActive: true },
-    { id: "cloud-run", semanticIds: ["gcp-cloud-run"], label: "Cloud Run" },
-    { id: "function",  semanticIds: ["faas-name"],     label: "Function" },
+    {
+      id: "instance",
+      semanticIds: ["gcp-instance"],
+      labelKey: "metrics.subjects.instance",
+      defaultActive: true,
+    },
+    { id: "cloud-run", semanticIds: ["gcp-cloud-run"], label: raw("Cloud Run") },
+    { id: "function", semanticIds: ["faas-name"], labelKey: "metrics.subjects.function" },
   ],
   azure: [
-    { id: "resource-group", semanticIds: ["azure-resource-group"], label: "Resource Group", defaultActive: true },
-    { id: "role",           semanticIds: ["azure-cloud-role"],     label: "Role" },
-    { id: "function",       semanticIds: ["faas-name"],            label: "Function" },
+    {
+      id: "resource-group",
+      semanticIds: ["azure-resource-group"],
+      labelKey: "metrics.subjects.resourceGroup",
+      defaultActive: true,
+    },
+    { id: "role", semanticIds: ["azure-cloud-role"], labelKey: "metrics.subjects.role" },
+    { id: "function", semanticIds: ["faas-name"], labelKey: "metrics.subjects.function" },
   ],
 };
 
@@ -151,10 +169,7 @@ const MIN_TOKEN_LENGTH = 3;
 export function extractMetricTokens(fields: string[]): string[] {
   const tokens = new Set<string>();
   for (const raw of fields) {
-    const stripped = raw
-      .replace(STRIP_PREFIXES, "")
-      .replace(STRIP_SUFFIXES, "")
-      .toLowerCase();
+    const stripped = raw.replace(STRIP_PREFIXES, "").replace(STRIP_SUFFIXES, "").toLowerCase();
     if (stripped.length >= MIN_TOKEN_LENGTH) tokens.add(stripped);
   }
   return [...tokens];
@@ -166,16 +181,10 @@ export function extractMetricTokens(fields: string[]): string[] {
  */
 export function tokenToPatterns(token: string): RegExp[] {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return [
-    new RegExp(`^${escaped}[_.]`, "i"),
-    new RegExp(`\\b${escaped}\\b`, "i"),
-  ];
+  return [new RegExp(`^${escaped}[_.]`, "i"), new RegExp(`\\b${escaped}\\b`, "i")];
 }
 
-function patternsForSemanticGroups(
-  semanticIds: string[],
-  semanticGroups: FieldAlias[],
-): RegExp[] {
+function patternsForSemanticGroups(semanticIds: string[], semanticGroups: FieldAlias[]): RegExp[] {
   const tokens = new Set<string>();
   for (const semanticId of semanticIds) {
     const group = semanticGroups.find((g) => g.id === semanticId);
@@ -206,10 +215,7 @@ export function buildSubjectButtons(
   if (!specs?.length) return [];
   return specs
     .map((spec) => {
-      const patterns = patternsForSemanticGroups(
-        spec.semanticIds,
-        semanticGroups,
-      );
+      const patterns = patternsForSemanticGroups(spec.semanticIds, semanticGroups);
       const poolPatterns = spec.poolSemanticIds
         ? patternsForSemanticGroups(spec.poolSemanticIds, semanticGroups)
         : patterns;
@@ -259,10 +265,7 @@ export function buildWorkloadChipEntries(
       const group = semanticGroups.find((g) => g.id === semanticId);
       if (!group) continue;
       const hit = group.fields.find(
-        (f) =>
-          sourceRow[f] !== undefined &&
-          sourceRow[f] !== null &&
-          String(sourceRow[f]) !== "",
+        (f) => sourceRow[f] !== undefined && sourceRow[f] !== null && String(sourceRow[f]) !== "",
       );
       if (hit) {
         out[semanticId] = {
@@ -295,10 +298,7 @@ export function buildWorkloadChipDimensions(
 /**
  * Test whether a stream name matches any of the patterns.
  */
-export function streamMatchesPatterns(
-  streamName: string,
-  patterns: RegExp[],
-): boolean {
+export function streamMatchesPatterns(streamName: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(streamName));
 }
 
@@ -333,9 +333,7 @@ export function getSubjectSelectionState(
     (acc, s) => acc + (selectedNames.has(s.stream_name) ? 1 : 0),
     0,
   );
-  if (selectedCount === 0)
-    return { state: "none", relevantCount: relevant.length };
-  if (selectedCount === relevant.length)
-    return { state: "all", relevantCount: relevant.length };
+  if (selectedCount === 0) return { state: "none", relevantCount: relevant.length };
+  if (selectedCount === relevant.length) return { state: "all", relevantCount: relevant.length };
   return { state: "partial", relevantCount: relevant.length };
 }

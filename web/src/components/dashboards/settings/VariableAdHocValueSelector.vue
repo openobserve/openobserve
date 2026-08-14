@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-wrap items-center">
     <div
-      class="flex flex-nowrap items-center mb-2 mr-4 gap-x-1"
+      class="mr-4 mb-2 flex flex-nowrap items-center gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -13,12 +13,14 @@
         @update:model-value="updateModelValueOfSelect(index, $event)"
         class="flex-1"
       />
-      <OSelect class="w-auto"
+      <OSelect
+        class="w-auto"
         v-model="adhocVariables[index].operator"
         :options="operatorOptions"
         data-test="dashboard-variable-adhoc-operator-selector"
       />
-      <OInput class="w-31.25"
+      <OInput
+        class="w-31.25"
         v-model="adhocVariables[index].value"
         :placeholder="t('dashboard.variableAdHocValueSelector.enterValue')"
         :debounce="1000"
@@ -39,7 +41,7 @@
     <OButton
       variant="ghost"
       size="sm"
-      class="ml-1 mb-2 hideOnPrintMode"
+      class="hideOnPrintMode mb-2 ml-1"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"
     >
@@ -50,10 +52,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, toRef, watch, type Ref, toRefs } from "vue";
+import { defineComponent, toRef, watch, type Ref, toRefs } from "vue";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -75,10 +77,10 @@ export default defineComponent({
 
   setup(props: any, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const operatorOptions = [
-      { label: "=", value: "=" },
-      { label: "!=", value: "!=" },
+      { label: raw("="), value: "=" },
+      { label: raw("!="), value: "!=" },
     ];
     const options = toRef(props.variableItem, "options");
     const { modelValue: adhocVariables } = toRefs(props) as {
@@ -115,13 +117,11 @@ export default defineComponent({
     };
 
     const emitValue = () => {
-      emit(
-        "update:modelValue",
-        JSON.parse(JSON.stringify(adhocVariables.value)),
-      );
+      emit("update:modelValue", JSON.parse(JSON.stringify(adhocVariables.value)));
     };
 
     return {
+      raw,
       fieldsFilterFn,
       fieldsFilteredOptions,
       addFields,
@@ -136,4 +136,3 @@ export default defineComponent({
   },
 });
 </script>
-

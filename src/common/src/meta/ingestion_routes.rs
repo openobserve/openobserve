@@ -75,7 +75,7 @@ struct IngestionRoute {
 use Seg::{Lit, Param};
 
 /// The authoritative ingestion-route table. Mirrors the "ES compatibility" and
-/// ingestion blocks of `src/api/src/handler/http/router/mod.rs`. Kept in sync by
+/// ingestion blocks of `src/api/http/src/handler/http/router/mod.rs`. Kept in sync by
 /// hand — every ingestion/ES-compat route registered there has exactly one row
 /// here. Data-read routes (e.g. `.../traces/latest`, `.../_values`) are
 /// deliberately absent, which is the whole point: an ingestion token classified

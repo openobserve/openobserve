@@ -24,22 +24,13 @@ const destination = {
     return http().post(url, data);
   },
   update: ({ org_identifier, destination_name, data, module }: any) => {
-    let url = `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-      destination_name
-    )}`;
+    let url = `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(destination_name)}`;
     if (module) {
       url += `?module=${module}`;
     }
     return http().put(url, data);
   },
-  list: ({
-    org_identifier,
-    page_num,
-    page_size,
-    desc,
-    sort_by,
-    module,
-  }: any) => {
+  list: ({ org_identifier, page_num, page_size, desc, sort_by, module }: any) => {
     // Construct the base URL with required parameters
     let url = `/api/${org_identifier}/alerts/destinations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}`;
     // Append module if it is defined
@@ -50,16 +41,12 @@ const destination = {
   },
   get_by_name: ({ org_identifier, destination_name }: any) => {
     return http().get(
-      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-        destination_name
-      )}`
+      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(destination_name)}`,
     );
   },
   delete: ({ org_identifier, destination_name }: any) => {
     return http().delete(
-      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-        destination_name
-      )}`
+      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(destination_name)}`,
     );
   },
   bulkDelete: (org_identifier: string, data: any) => {
@@ -67,6 +54,17 @@ const destination = {
   },
   test: ({ org_identifier, data }: any) => {
     return http().post(`/api/${org_identifier}/alerts/destinations/test`, data);
+  },
+  // Renders a content-template spec/saved template and DISPATCHES it to the
+  // named destination's real channel, marked `[TEST] `. See Task 15 — unlike
+  // `test()` above (which only exercises raw URL/webhook connectivity), this
+  // reaches the destination's actual endpoint and requires destination write
+  // permission.
+  testSend: ({ org_identifier, destination_name, data }: any) => {
+    return http().post(
+      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(destination_name)}/test_send`,
+      data,
+    );
   },
 };
 

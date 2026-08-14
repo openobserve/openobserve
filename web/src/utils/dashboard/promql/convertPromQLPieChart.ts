@@ -72,9 +72,7 @@ export class PieConverter implements PromQLChartConverter {
     // Now apply colors and build data with unit formatting
     seriesDataCollection.forEach((seriesData) => {
       // Extract numeric values for color calculation
-      const numericValues = seriesData.rawValues.map(([, val]) =>
-        parseFloat(val),
-      );
+      const numericValues = seriesData.rawValues.map(([, val]) => parseFloat(val));
 
       const color = getSeriesColor(
         config.color || null,
@@ -134,12 +132,7 @@ export class PieConverter implements PromQLChartConverter {
                 .replace(
                   "{c}",
                   formatUnitValue(
-                    getUnitValue(
-                      params.value,
-                      config?.unit,
-                      config?.unit_custom,
-                      config?.decimals,
-                    ),
+                    getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
                   ),
                 )
                 .replace("{d}", params.percent.toFixed(1));

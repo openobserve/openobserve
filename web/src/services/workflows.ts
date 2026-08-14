@@ -23,13 +23,7 @@ const workflows = {
   },
 
   // Save a new workflow.
-  createWorkflow: ({
-    org_identifier,
-    data,
-  }: {
-    org_identifier: string;
-    data: object;
-  }) => {
+  createWorkflow: ({ org_identifier, data }: { org_identifier: string; data: object }) => {
     const url = `/api/${org_identifier}/workflows`;
     return http().post(url, data);
   },
@@ -49,13 +43,7 @@ const workflows = {
   },
 
   // Delete a workflow by id.
-  deleteWorkflow: ({
-    org_identifier,
-    id,
-  }: {
-    org_identifier: string;
-    id: string;
-  }) => {
+  deleteWorkflow: ({ org_identifier, id }: { org_identifier: string; id: string }) => {
     const url = `/api/${org_identifier}/workflows/${id}`;
     return http().delete(url);
   },
@@ -74,21 +62,23 @@ const workflows = {
     return http().put(url);
   },
 
-  // Dry-run the workflow against a sample payload. `from_node` re-runs from a
-  // specific node.
+  // Dry-run a workflow against a sample payload WITHOUT persisting it — the full
+  // in-memory `workflow` graph is sent in the body, so testing works whether the
+  // workflow is saved or not. `from_node` re-runs from a specific node. The
+  // backend generates a throwaway id/org for the run, so no workflow id is sent.
   testWorkflow: ({
     org_identifier,
-    id,
+    workflow,
     inputs,
     from_node,
   }: {
     org_identifier: string;
-    id: string;
+    workflow: any;
     inputs: any[];
     from_node?: string;
   }) => {
-    const url = `/api/${org_identifier}/workflows/${id}/test`;
-    return http().post(url, { inputs, from_node });
+    const url = `/api/${org_identifier}/workflows/test`;
+    return http().post(url, { workflow, inputs, from_node });
   },
 
   // Run history for a workflow. `start_time`/`end_time` are Unix microseconds;
@@ -115,7 +105,7 @@ const workflows = {
   },
 
   // Detail of a single run — errors (per errored node) plus the run's input
-  // data (`complete` = full workflow input, `node_map` = per-node input the
+  // data (`complete` = full workflow input, `error_node_map` = per-node input the
   // node processed/errored on). Powers the read-only run inspection in the
   // editor (click a run in history -> error nodes show Input/Output).
   getWorkflowRun: ({

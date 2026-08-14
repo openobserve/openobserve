@@ -15,30 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="flex items-center"
-    data-test="dashboard-table-pagination-controls"
-  >
+  <div class="flex items-center" data-test="dashboard-table-pagination-controls">
     <!-- Records per page dropdown: only when pagination is enabled -->
-    <div
-      v-if="showPagination"
-      class="flex flex-row items-center gap-2"
-    >
+    <div v-if="showPagination" class="flex flex-row items-center gap-2">
       <span class="text-xs" data-test="dashboard-table-rows-per-page-label"
         >{{ t("dashboard.rowsPerPage") }}
       </span>
       <OSelect
         :model-value="pagination.rowsPerPage"
-        @update:model-value="(val: SelectModelValue) => $emit('update:rowsPerPage', val)"
+        @update:model-value="(val: SelectModelValue) => $emit('update:rowsPerPage', Number(val))"
         :options="formattedPaginationOptions"
         size="sm"
+        :searchable="false"
         class="w-fit!"
         data-test="dashboard-table-rows-per-page-select"
       />
     </div>
 
     <!-- Count display -->
-    <span class="text-xs px-2" data-test="dashboard-table-row-count">
+    <span class="px-2 text-xs" data-test="dashboard-table-row-count">
       {{ countDisplay }}
     </span>
 
@@ -90,9 +85,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only as a param type in a template inline handler, which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 export default defineComponent({
   name: "TablePaginationControls",
@@ -129,15 +125,9 @@ export default defineComponent({
       default: true,
     },
   },
-  emits: [
-    "update:rowsPerPage",
-    "firstPage",
-    "prevPage",
-    "nextPage",
-    "lastPage",
-  ],
+  emits: ["update:rowsPerPage", "firstPage", "prevPage", "nextPage", "lastPage"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const countDisplay = computed(() => {
       const { showPagination, pagination, totalRows } = props;
       if (totalRows === 0) return "0 of 0";
@@ -150,14 +140,24 @@ export default defineComponent({
       return `${start}-${end} of ${totalRows}`;
     });
 
-    const formattedPaginationOptions = computed(() =>
-      props.paginationOptions.map((opt) => ({
-        label: opt === 0 ? "All" : String(opt),
+    const formattedPaginationOptions = computed(() => {
+      const opts = [...props.paginationOptions];
+      // Include a custom "Records per page" that isn't one of the presets, so the
+      // dropdown reflects it instead of rendering blank.
+      const current = props.pagination?.rowsPerPage;
+      if (current != null && current > 0 && !opts.includes(current)) {
+        const idx = opts.findIndex((o) => o !== 0 && o > current);
+        if (idx === -1) opts.push(current);
+        else opts.splice(idx, 0, current);
+      }
+      return opts.map((opt) => ({
+        label: opt === 0 ? t("common.all") : raw(String(opt)),
         value: opt,
-      })),
-    );
+      }));
+    });
 
     return {
+      raw,
       countDisplay,
       formattedPaginationOptions,
       t,
@@ -165,4 +165,3 @@ export default defineComponent({
   },
 });
 </script>
-

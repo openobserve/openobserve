@@ -38,9 +38,7 @@ const createWrapper = (props: Record<string, any> = {}) =>
 
 /** Clicks "+ Filter", which drops straight into the label step. */
 const openPicker = async (wrapper: VueWrapper<any>) => {
-  await wrapper
-    .find('[data-test="metrics-explorer-label-add"]')
-    .trigger("click");
+  await wrapper.find('[data-test="metrics-explorer-label-add"]').trigger("click");
   await flushPromises();
 };
 
@@ -75,12 +73,8 @@ describe("LabelFilterBar", () => {
         ],
       });
 
-      expect(
-        wrapper.find('[data-test="metrics-explorer-label-chip-job"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-label-chip-code"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-label-chip-job"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-label-chip-code"]').exists()).toBe(true);
     });
 
     it("renders the chip as `label = value`", () => {
@@ -88,9 +82,7 @@ describe("LabelFilterBar", () => {
         filters: [{ label: "job", value: "api", operator: "=" }],
       });
 
-      const chip = wrapper.find(
-        '[data-test="metrics-explorer-label-chip-job"]',
-      );
+      const chip = wrapper.find('[data-test="metrics-explorer-label-chip-job"]');
       expect(chip.text().replace(/\s+/g, " ")).toContain("job = api");
     });
 
@@ -99,9 +91,7 @@ describe("LabelFilterBar", () => {
         filters: [{ label: "job", value: "api" } as LabelFilter],
       });
 
-      const chip = wrapper.find(
-        '[data-test="metrics-explorer-label-chip-job"]',
-      );
+      const chip = wrapper.find('[data-test="metrics-explorer-label-chip-job"]');
       expect(chip.text().replace(/\s+/g, " ")).toContain("job = api");
     });
 
@@ -111,9 +101,7 @@ describe("LabelFilterBar", () => {
       const filter = { label: "job", value: "api", operator: "=" };
       wrapper = createWrapper({ filters: [filter] });
 
-      await wrapper
-        .find('[data-test="metrics-explorer-label-chip-remove-job"]')
-        .trigger("click");
+      await wrapper.find('[data-test="metrics-explorer-label-chip-remove-job"]').trigger("click");
 
       expect(wrapper.emitted("remove")).toBeTruthy();
       expect(wrapper.emitted("remove")![0]).toEqual([filter]);
@@ -144,29 +132,23 @@ describe("LabelFilterBar", () => {
 
     it("renders no chips when there are no filters", () => {
       wrapper = createWrapper({ filters: [] });
-      expect(
-        wrapper.findAll('[data-test^="metrics-explorer-label-chip-"]'),
-      ).toHaveLength(0);
+      expect(wrapper.findAll('[data-test^="metrics-explorer-label-chip-"]')).toHaveLength(0);
     });
   });
 
   describe("schema loading indicator", () => {
     it("shows the indicator while membership is resolving", () => {
       wrapper = createWrapper({ schemaLoading: true });
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-schema-loading"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-label-schema-loading"]').exists()).toBe(
+        true,
+      );
     });
 
     it("hides the indicator when membership is resolved", () => {
       wrapper = createWrapper({ schemaLoading: false });
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-schema-loading"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-label-schema-loading"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -191,23 +173,15 @@ describe("LabelFilterBar", () => {
 
     it("goes straight to the label step — no intermediate panel", async () => {
       wrapper = createWrapper();
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-picker-label"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists()).toBe(
+        false,
+      );
 
       await openPicker(wrapper);
 
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-picker-label"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists()).toBe(true);
       // The + Filter button is replaced by the step, not stacked under a popup.
-      expect(
-        wrapper.find('[data-test="metrics-explorer-label-add"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-label-add"]').exists()).toBe(false);
     });
 
     it("auto-advances from label to value", async () => {
@@ -218,25 +192,17 @@ describe("LabelFilterBar", () => {
       await wrapper.vm.onLabelPicked("job");
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-picker-value"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-label-picker-value"]').exists()).toBe(true);
     });
 
     it("returns to the + Filter button after a filter is added", async () => {
       wrapper = createWrapper();
       await pickFilter(wrapper, "job", "api");
 
-      expect(
-        wrapper.find('[data-test="metrics-explorer-label-add"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-picker-value"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-label-add"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-label-picker-value"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -262,9 +228,7 @@ describe("LabelFilterBar", () => {
       await flushPromises();
 
       expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-picker-no-suggestions"]')
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-label-picker-no-suggestions"]').exists(),
       ).toBe(false);
     });
 
@@ -276,9 +240,7 @@ describe("LabelFilterBar", () => {
       await flushPromises();
 
       expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-picker-no-suggestions"]')
-          .text(),
+        wrapper.find('[data-test="metrics-explorer-label-picker-no-suggestions"]').text(),
       ).toContain("No suggestions");
     });
 
@@ -292,9 +254,7 @@ describe("LabelFilterBar", () => {
       await flushPromises();
 
       expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-picker-no-suggestions"]')
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-label-picker-no-suggestions"]').exists(),
       ).toBe(true);
     });
   });
@@ -304,9 +264,7 @@ describe("LabelFilterBar", () => {
       wrapper = createWrapper();
       await pickFilter(wrapper, "job", "api");
 
-      expect(wrapper.emitted("add")![0]).toEqual([
-        { label: "job", value: "api", operator: "=" },
-      ]);
+      expect(wrapper.emitted("add")![0]).toEqual([{ label: "job", value: "api", operator: "=" }]);
     });
 
     it.each(["!=", "=~", "!~"])("carries the %s matcher", async (operator) => {
@@ -315,9 +273,7 @@ describe("LabelFilterBar", () => {
       wrapper = createWrapper();
       await pickFilter(wrapper, "pod", "web-.*", operator);
 
-      expect(wrapper.emitted("add")![0]).toEqual([
-        { label: "pod", value: "web-.*", operator },
-      ]);
+      expect(wrapper.emitted("add")![0]).toEqual([{ label: "pod", value: "web-.*", operator }]);
     });
 
     it("resets the operator to = for the next filter", async () => {
@@ -325,9 +281,7 @@ describe("LabelFilterBar", () => {
       await pickFilter(wrapper, "pod", "web-.*", "=~");
       await pickFilter(wrapper, "job", "api");
 
-      expect(wrapper.emitted("add")![1]).toEqual([
-        { label: "job", value: "api", operator: "=" },
-      ]);
+      expect(wrapper.emitted("add")![1]).toEqual([{ label: "job", value: "api", operator: "=" }]);
     });
   });
 
@@ -337,11 +291,9 @@ describe("LabelFilterBar", () => {
       await pickFilter(wrapper, "job", "api");
 
       expect(wrapper.emitted("add")).toBeTruthy();
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-picker-apply"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-label-picker-apply"]').exists()).toBe(
+        false,
+      );
     });
 
     // The hard requirement: suggestions are best-effort, the filter is not.
@@ -413,21 +365,13 @@ describe("LabelFilterBar", () => {
       await flushPromises();
 
       expect(wrapper.emitted("add")).toBeFalsy();
-      expect(wrapper.find('[role="alert"]').text()).toContain(
-        "Invalid label name",
-      );
+      expect(wrapper.find('[role="alert"]').text()).toContain("Invalid label name");
       // We stay on the label step so the user can correct it — an invalid label
       // must never advance to the value step.
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-picker-label"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-label-picker-value"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-label-picker-value"]').exists()).toBe(
+        false,
+      );
     });
 
     const valid = ["job", "_private", "job_name", "Job2", "__name"];
@@ -437,9 +381,7 @@ describe("LabelFilterBar", () => {
 
       await pickFilter(wrapper, name, "api");
 
-      expect(wrapper.emitted("add")![0]).toEqual([
-        { label: name, value: "api", operator: "=" },
-      ]);
+      expect(wrapper.emitted("add")![0]).toEqual([{ label: name, value: "api", operator: "=" }]);
     });
   });
 
@@ -449,8 +391,7 @@ describe("LabelFilterBar", () => {
    * "either of these", and that reading is always wrong, so the row says it.
    */
   describe("the AND between chips is stated, not inferred", () => {
-    const ands = (w: VueWrapper<any>) =>
-      w.findAll('[data-test="metrics-explorer-label-and"]');
+    const ands = (w: VueWrapper<any>) => w.findAll('[data-test="metrics-explorer-label-and"]');
 
     it("says nothing for a single chip — there is no conjunction yet", () => {
       wrapper = createWrapper({
@@ -493,8 +434,7 @@ describe("LabelFilterBar", () => {
    * here guards the structure, not just the hint.
    */
   describe("the empty filter row types a hint", () => {
-    const hint = (w: VueWrapper<any>) =>
-      w.find('[data-test="metrics-explorer-label-hint"]');
+    const hint = (w: VueWrapper<any>) => w.find('[data-test="metrics-explorer-label-hint"]');
 
     it("shows on an idle, unfiltered row", () => {
       wrapper = createWrapper({ filters: [] });
@@ -530,9 +470,7 @@ describe("LabelFilterBar", () => {
 
     it("gets out of the way while the picker is open", async () => {
       wrapper = createWrapper({ filters: [] });
-      await wrapper
-        .find('[data-test="metrics-explorer-label-add"]')
-        .trigger("click");
+      await wrapper.find('[data-test="metrics-explorer-label-add"]').trigger("click");
       await flushPromises();
 
       expect(hint(wrapper).exists()).toBe(false);
@@ -542,17 +480,11 @@ describe("LabelFilterBar", () => {
       wrapper = createWrapper({ filters: [] });
       // Both visible at once is the signature of a broken chain — it is exactly
       // what happened when this hint was first placed inside it.
-      await wrapper
-        .find('[data-test="metrics-explorer-label-add"]')
-        .trigger("click");
+      await wrapper.find('[data-test="metrics-explorer-label-add"]').trigger("click");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="metrics-explorer-label-add"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-label-add"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists()).toBe(true);
     });
   });
 });

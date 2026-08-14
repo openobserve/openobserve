@@ -20,7 +20,7 @@ import { createRouter, createWebHistory } from "vue-router";
 
 /**
  * Shared test fixtures for cipher key components to avoid repetitive setup
- * This consolidates common patterns found across AddCipherKey, AddAkeylessType, 
+ * This consolidates common patterns found across AddCipherKey, AddAkeylessType,
  * AddOpenobserveType, and AddEncryptionMechanism test files
  */
 
@@ -143,7 +143,7 @@ export const createMockStore = () =>
     },
   });
 
-// Common mock router factory  
+// Common mock router factory
 export const createMockRouter = () =>
   createRouter({
     history: createWebHistory(),
@@ -194,7 +194,16 @@ export const createComponentStubs = () => ({
         />
       </div>
     `,
-    props: ["modelValue", "label", "rules", "readonly", "disable", "error", "errorMessage", "tabindex"],
+    props: [
+      "modelValue",
+      "label",
+      "rules",
+      "readonly",
+      "disable",
+      "error",
+      "errorMessage",
+      "tabindex",
+    ],
     emits: ["update:modelValue"],
   },
   OTextarea: {
@@ -222,7 +231,17 @@ export const createComponentStubs = () => ({
         </select>
       </div>
     `,
-    props: ["modelValue", "options", "label", "rules", "error", "errorMessage", "labelKey", "valueKey", "tabindex"],
+    props: [
+      "modelValue",
+      "options",
+      "label",
+      "rules",
+      "error",
+      "errorMessage",
+      "labelKey",
+      "valueKey",
+      "tabindex",
+    ],
     emits: ["update:modelValue"],
   },
   OButton: {
@@ -293,7 +312,7 @@ export const mockZincUtils = {
 export const createCipherKeyMountConfig = (
   component: any,
   props: any,
-  customStubs: Record<string, any> = {}
+  customStubs: Record<string, any> = {},
 ) => {
   const store = createMockStore();
   const router = createMockRouter();
@@ -304,11 +323,7 @@ export const createCipherKeyMountConfig = (
     component,
     props,
     global: {
-      plugins: [
-        store,
-        router,
-        i18n,
-      ],
+      plugins: [store, router, i18n],
       stubs,
     },
     store,
@@ -332,9 +347,9 @@ export const setupCipherKeyMocks = () => {
       name: "test-cipher",
       key: {
         store: { type: "local", local: "" },
-        mechanism: { type: "simple", simple_algorithm: "aes-256-siv" }
-      }
-    }
+        mechanism: { type: "simple", simple_algorithm: "aes-256-siv" },
+      },
+    },
   });
 };
 

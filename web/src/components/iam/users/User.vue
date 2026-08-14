@@ -17,33 +17,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OPageLayout
-      :title="t('iam.basicUsers')"
-      :subtitle="t('user.subtitle')"
-      icon="person" bleed>
-      <template #actions>
-        <member-invitation
-          v-if="config.isCloud == 'true'"
-          :key="currentUserRole"
-          v-model:currentrole="currentUserRole"
-          @invite-sent="handleInviteSent"
-        />
-        <OButton
-          v-else
-          variant="primary"
-          size="sm"
-          @click="addRoutePush({})"
-          data-test="add-basic-user"
-        >
-          {{ t('user.add') }}
-        </OButton>
-      </template>
-    <div class="w-full flex-1 min-h-0 overflow-hidden">
+  <OPageLayout :title="t('iam.basicUsers')" :subtitle="t('user.subtitle')" icon="person" bleed>
+    <template #actions>
+      <MemberInvitation
+        v-if="config.isCloud == 'true'"
+        :key="currentUserRole"
+        v-model:currentrole="currentUserRole"
+        @invite-sent="handleInviteSent"
+      />
+      <OButton
+        v-else
+        variant="primary"
+        size="sm"
+        @click="addRoutePush({})"
+        data-test="add-basic-user"
+      >
+        {{ t("user.add") }}
+      </OButton>
+    </template>
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           :key="tableKey"
           :frame="false"
-          :data="rows"
+          :data="displayedRows"
           :columns="columns"
           row-key="email"
           :loading="loading"
@@ -65,8 +62,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-users-list"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
+          <!-- Access screens have no health state, so the strip counts ROLE
+               MEMBERSHIP and doubles as the role facet: the org's biggest roles
+               first, the tail folded into one tile, Total last and never
+               highlighted. Deliberately no green/amber/red — a role is a category,
+               not a severity. -->
+          <template #subheader>
+            <div
+              class="px-page-edge border-table-row-divider border-b py-1.5"
+              data-test="user-list-summary"
+            >
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :selected-key="roleFilter"
+                @select="onStatSelect"
+              />
+            </div>
+          </template>
+
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
+            <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('user.search')"
@@ -84,17 +101,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="user-list-refresh-btn"
               @click="refreshUsers"
             >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamUsersRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="iamUsersRefresh"
+              />
             </OButton>
           </template>
           <template #empty>
             <OEmptyState
               size="hero"
               preset="no-users"
-              :filtered="!!filterQuery"
+              :filtered="!!(filterQuery || roleFilter)"
               @action="
                 (id) =>
-                  id === 'clear-filters' ? (filterQuery = '') : addRoutePush({})
+                  id === 'clear-filters'
+                    ? ((filterQuery = ''), (roleFilter = null))
+                    : addRoutePush({})
               "
             />
           </template>
@@ -105,16 +128,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-body">—</span>
           </template>
 
-          <!-- Roles badges — typed userRole tags for built-in roles, custom
-               roles keep their original casing via an untyped tag. -->
+          <!-- Roles badges — built-in roles carry the privilege colour from the
+               userRole group; a custom role is a category, not a privilege level, so
+               it gets one stable neutral chip rather than an untyped tag whose
+               colour would be derived from the role's spelling. The invited chip
+               rides along here too: pending users are otherwise indistinguishable
+               on this path. -->
           <template #cell-roles="{ row }">
             <div class="flex flex-wrap items-center gap-1">
               <OTag
-                v-for="(roleName, idx) in (row.roles || [])"
+                v-for="(roleName, idx) in row.roles || []"
                 :key="`${roleName}-${idx}`"
                 :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
+                :variant="isBuiltinRole(roleName) ? undefined : 'default-soft'"
                 :value="roleName"
               />
+              <OTag v-if="row.status === 'pending'" type="userStatus" value="invited" />
             </div>
           </template>
 
@@ -126,11 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="userRole"
                 :value="String(row.role || '').replace(/\s*\(Invited\)\s*$/i, '')"
               />
-              <OTag
-                v-if="row.status === 'pending'"
-                type="userStatus"
-                value="invited"
-              />
+              <OTag v-if="row.status === 'pending'" type="userStatus" value="invited" />
             </span>
           </template>
 
@@ -170,7 +195,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #bottom>
-            <span class="text-xs font-normal">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || t('iam.user.organizationMembers')) : t('iam.basicUsers') }}</span>
+            <span class="text-xs font-normal"
+              >{{ rows.length }}
+              {{
+                isEnterpriseOrCloud
+                  ? t("iam.organizationMembers") || t("iam.user.organizationMembers")
+                  : t("iam.basicUsers")
+              }}</span
+            >
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
@@ -180,21 +212,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              {{ t('iam.user.delete') }}
+              {{ t("iam.user.delete") }}
             </OButton>
           </template>
         </OTable>
-        </div>
+      </div>
     </div>
 
-    <update-user-role
+    <UpdateUserRole
       v-if="config.isCloud == 'false'"
       v-model:open="showUpdateUserDialog"
       v-model="selectedUser"
       @updated="updateMember"
     />
 
-    <add-user
+    <AddUser
       v-model:open="showAddUserDialog"
       v-model="selectedUser"
       :isUpdated="isUpdated"
@@ -205,7 +237,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated="addMember"
     />
 
-    <ODialog data-test="user-delete-dialog"
+    <ODialog
+      data-test="user-delete-dialog"
       v-model:open="confirmDelete"
       size="sm"
       :title="t('user.confirmDeleteHead')"
@@ -214,10 +247,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmDelete = false"
       @click:primary="deleteUser"
     >
-      <p>{{ t('user.confirmDeleteMsg') }}</p>
+      <p>{{ t("user.confirmDeleteMsg") }}</p>
     </ODialog>
 
-    <ODialog data-test="user-revoke-dialog"
+    <ODialog
+      data-test="user-revoke-dialog"
       v-model:open="confirmRevoke"
       size="xs"
       :title="t('user.revokeInvitationTitle')"
@@ -226,10 +260,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmRevoke = false"
       @click:primary="revokeInvite"
     >
-      <p>{{ t('user.revokeInvitationMsg', { email: revokeInviteEmail }) }}</p>
+      <p>{{ t("user.revokeInvitationMsg", { email: revokeInviteEmail }) }}</p>
     </ODialog>
 
-    <ODialog data-test="user-bulk-delete-dialog"
+    <ODialog
+      data-test="user-bulk-delete-dialog"
       v-model:open="confirmBulkDelete"
       size="sm"
       :title="t('user.deleteUsersTitle')"
@@ -238,24 +273,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmBulkDelete = false"
       @click:primary="bulkDeleteUsers"
     >
-      <p>{{ t('user.deleteUsersMsg', { count: selectedUsers.length }) }}</p>
+      <p>{{ t("user.deleteUsersMsg", { count: selectedUsers.length }) }}</p>
     </ODialog>
   </OPageLayout>
 </template>
 
 <script lang="ts">
-
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import config from "@/aws-exports";
 import usersService from "@/services/users";
 import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
@@ -263,11 +300,7 @@ import AddUser from "@/components/iam/users/AddUser.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
-import {
-  getImageURL,
-  verifyOrganizationStatus,
-  maskText,
-} from "@/utils/zincutils";
+import { getImageURL, verifyOrganizationStatus, maskText } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -292,20 +325,17 @@ export default defineComponent({
     OButton,
     OTooltip,
     OTag,
+    OStatStrip,
     OIcon,
     ODialog,
     OEmptyState,
     OSearchInput,
   },
-  emits: [
-    "updated:fields",
-    "deleted:fields",
-    "updated:dates",
-  ],
+  emits: ["updated:fields", "deleted:fields", "updated:dates"],
   setup() {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -347,12 +377,12 @@ export default defineComponent({
       await getCustomRoles();
 
       // if (config.isCloud == "true") {
-        // columns.value.push({
-        //   name: "status",
-        //   field: "status",
-        //   label: t("user.status"),
-        //   align: "left",
-        // });
+      // columns.value.push({
+      //   name: "status",
+      //   field: "status",
+      //   label: t("user.status"),
+      //   align: "left",
+      // });
       // }
 
       // if (
@@ -377,15 +407,12 @@ export default defineComponent({
       // leave the user on the list view, not pop a dialog on load.
       const query = router.currentRoute.value.query;
       if (query.action === "update" && query.email) {
-        const match = usersState.users.find(
-          (m: any) => m.email === query.email,
-        );
+        const match = usersState.users.find((m: any) => m.email === query.email);
         if (match) addUser({ row: match }, true);
       }
     });
 
-    const isEnterpriseOrCloud =
-      config.isEnterprise === "true" || config.isCloud === "true";
+    const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
     const columns = computed<OTableColumnDef[]>(() => {
       const cols: OTableColumnDef[] = [
@@ -473,10 +500,191 @@ export default defineComponent({
       "editor",
       "serviceaccount",
     ]);
-    const isBuiltinRole = (r: string) =>
-      BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
+    const isBuiltinRole = (r: string) => BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
+
+    // ── Role tiles — the page's primary signal ──────────────────────────────
+    // A user can hold SEVERAL roles (built-in + custom), so the strip counts role
+    // MEMBERSHIP, not buckets: one Admin+custom user is counted under both tiles.
+    // Tiles therefore do not sum to the user total — each is "how many users hold
+    // this role", and its bar is that share of all users, which stays meaningful
+    // under overlap. Roles come from the data, so custom roles appear as first-class
+    // tiles without being enumerated anywhere.
+    const PRIVILEGE_RANK: Record<string, number> = {
+      root: 5,
+      admin: 4,
+      editor: 3,
+      member: 3,
+      user: 2,
+      viewer: 2,
+      serviceaccount: 1,
+    };
+    // Roles are unbounded (an org can define dozens), and a strip is a fixed row of
+    // tiles — past this many the strip stops being scannable, so the tail collapses
+    // into one "Other roles" tile that still filters. Five leaves room for that
+    // tile plus Invited and Total without the strip wrapping on a laptop.
+    const MAX_ROLE_TILES = 5;
+
+    const userRoles = (row: any): string[] => {
+      const roles = Array.isArray(row?.roles) && row.roles.length ? row.roles : [row?.role];
+      const seen = new Set<string>();
+      // Dedupe per user: a role listed twice must not count twice.
+      return roles
+        .filter(Boolean)
+        .map((r: any) =>
+          String(r)
+            .replace(/\s*\(Invited\)\s*$/i, "")
+            .trim(),
+        )
+        .filter((r: string) => {
+          const key = r.toLowerCase();
+          if (!r || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    };
+    const hasRole = (row: any, roleKey: string): boolean =>
+      userRoles(row).some((r) => r.toLowerCase() === roleKey);
+    const isInvited = (row: any): boolean => row?.status === "pending";
+
+    // role key -> { label (original casing), count of users holding it }
+    const roleTally = computed(() => {
+      const tally = new Map<string, { label: string; count: number }>();
+      for (const row of rows.value || []) {
+        for (const role of userRoles(row)) {
+          const key = role.toLowerCase();
+          const entry = tally.get(key);
+          if (entry) entry.count += 1;
+          else tally.set(key, { label: role, count: 1 });
+        }
+      }
+      return tally;
+    });
+
+    // BIGGEST roles first, so the tiles are the org's actual top roles rather than
+    // whichever ones happen to outrank the others: a two-user built-in must not
+    // take a slot from a role half the org holds. Privilege breaks ties (Admin
+    // before Viewer at equal size), then the name for stability.
+    const rankedRoles = computed(() => {
+      return Array.from(roleTally.value.entries())
+        .map(([key, entry]) => ({ key, ...entry, rank: PRIVILEGE_RANK[key] ?? 0 }))
+        .sort((a, b) => b.count - a.count || b.rank - a.rank || a.key.localeCompare(b.key));
+    });
+    const visibleRoles = computed(() => rankedRoles.value.slice(0, MAX_ROLE_TILES));
+    const overflowRoles = computed(() => rankedRoles.value.slice(MAX_ROLE_TILES));
+    // Unique users holding ANY overflow role — summing the tail would double-count
+    // anyone holding two of them.
+    const overflowUserCount = computed(() => {
+      const keys = new Set(overflowRoles.value.map((r) => r.key));
+      if (!keys.size) return 0;
+      return (rows.value || []).filter((row: any) =>
+        userRoles(row).some((r) => keys.has(r.toLowerCase())),
+      ).length;
+    });
+
+    // Built-in roles keep the privilege ramp; every custom role reads teal so it is
+    // visibly "not a built-in" without each one inventing its own colour.
+    const roleTone = (key: string): StatItem["tone"] => {
+      if (key === "root" || key === "admin") return "orange";
+      if (key === "editor" || key === "member") return "blue";
+      if (key === "user" || key === "viewer") return "neutral";
+      if (key === "serviceaccount") return "purple";
+      return "teal";
+    };
+    const roleIcon = (key: string): IconName => {
+      if (key === "root" || key === "admin") return "admin-panel-settings";
+      if (key === "editor" || key === "member") return "edit";
+      if (key === "user" || key === "viewer") return "visibility";
+      if (key === "serviceaccount") return "key";
+      return "manage-accounts";
+    };
+
+    // ── Role facet + summary strip ──────────────────────────────────────────
+    // Counts run over the full row set (not the facet-filtered one) so the tiles
+    // keep their totals while a facet is active.
+    const OVERFLOW_KEY = "__other_roles__";
+    const INVITED_KEY = "__invited__";
+    const roleFilter = ref<string | null>(null);
+
+    const displayedRows = computed(() => {
+      const all = rows.value || [];
+      const f = roleFilter.value;
+      if (!f) return all;
+      if (f === INVITED_KEY) return all.filter((row: any) => isInvited(row));
+      if (f === OVERFLOW_KEY) {
+        const keys = new Set(overflowRoles.value.map((r) => r.key));
+        return all.filter((row: any) => userRoles(row).some((r) => keys.has(r.toLowerCase())));
+      }
+      return all.filter((row: any) => hasRole(row, f));
+    });
+
+    const onStatSelect = (key: string) => {
+      if (key === "total") {
+        roleFilter.value = null;
+        return;
+      }
+      roleFilter.value = roleFilter.value === key ? null : key;
+    };
+
+    const invitedCount = computed(
+      () => (rows.value || []).filter((row: any) => isInvited(row)).length,
+    );
+
+    const summaryStats = computed<StatItem[]>(() => {
+      const total = (rows.value || []).length;
+      const hasData = total > 0;
+      const v = (n: number): string | number => (hasData ? n : "—");
+      const share = hasData ? total : undefined;
+
+      const tiles: StatItem[] = visibleRoles.value.map((role) => ({
+        key: role.key,
+        // The label is the role name itself — data, not a translatable string.
+        label: raw(role.label),
+        value: v(role.count),
+        icon: roleIcon(role.key),
+        tone: roleTone(role.key),
+        max: share,
+        dataTest: `user-summary-role-${role.key}`,
+      }));
+
+      if (overflowRoles.value.length) {
+        tiles.push({
+          key: OVERFLOW_KEY,
+          label: t("iam.summaryOtherRoles", { count: overflowRoles.value.length }),
+          value: v(overflowUserCount.value),
+          icon: "more-horiz",
+          tone: "teal",
+          max: share,
+          dataTest: "user-summary-other-roles",
+        });
+      }
+
+      // Invited is a lifecycle state, not a privilege, so it sits after the roles.
+      if (invitedCount.value > 0) {
+        tiles.push({
+          key: INVITED_KEY,
+          label: t("iam.summaryInvited"),
+          value: v(invitedCount.value),
+          icon: "person-add",
+          tone: "purple",
+          max: share,
+          dataTest: "user-summary-invited",
+        });
+      }
+
+      tiles.push({
+        key: "total",
+        label: t("iam.summaryTotalUsers"),
+        value: v(total),
+        icon: "group-work",
+        tone: "primary",
+        // Clickable (it clears the facet) but never shows the ring.
+        dataTest: "user-summary-total",
+      });
+      return tiles;
+    });
+
     const userEmail: any = ref("");
-    const options = ref<{ label: string; value: string }[]>([]);
+    const options = ref<{ label: I18nText; value: string }[]>([]);
     const customRoles = ref<string[]>([]);
     const selectedRole = ref();
     const currentUserRole = ref("");
@@ -497,17 +705,13 @@ export default defineComponent({
     const getCustomRoles = async (options: { silent?: boolean } = {}) => {
       if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
       try {
-        const res = await getCustomRolesApi(
-          store.state.selectedOrganization.identifier,
-        );
+        const res = await getCustomRolesApi(store.state.selectedOrganization.identifier);
         customRoles.value = Array.isArray(res.data) ? res.data : [];
       } catch (err: any) {
         if (!options.silent && err?.response?.status !== 403) {
           toast({
             variant: "error",
-            message:
-              err?.response?.data?.message ||
-              t('iam.user.failedToLoadCustomRoles'),
+            message: err?.response?.data?.message || t("iam.user.failedToLoadCustomRoles"),
           });
         }
       }
@@ -516,15 +720,15 @@ export default defineComponent({
     const getInvitedMembers = () => {
       const dismiss = toast({
         variant: "loading",
-        message: t('iam.user.pleaseWaitLoadingUsers'),
-              timeout: 0,
-});
+        message: t("iam.user.pleaseWaitLoadingUsers"),
+        timeout: 0,
+      });
 
       return new Promise((resolve, reject) => {
         usersService
           .invitedUsers(store.state.selectedOrganization.identifier)
           .then((res) => {
-            if(res.status == 200) {
+            if (res.status == 200) {
               dismiss();
               resolve(res.data);
             } else {
@@ -537,15 +741,15 @@ export default defineComponent({
             reject([]);
           });
       });
-    }
+    };
 
     const loading = ref(false);
     const getOrgMembers = () => {
       const dismiss = toast({
         variant: "loading",
-        message: t('iam.user.pleaseWaitLoadingUsers'),
-              timeout: 0,
-});
+        message: t("iam.user.pleaseWaitLoadingUsers"),
+        timeout: 0,
+      });
 
       loading.value = true;
       return new Promise((resolve, reject) => {
@@ -566,7 +770,10 @@ export default defineComponent({
                 isCurrentUserInternal.value = !data.is_external;
               }
 
-              if (data.email?.toLowerCase() == router.currentRoute.value.query.email?.toString().toLowerCase()) {
+              if (
+                data.email?.toLowerCase() ==
+                router.currentRoute.value.query.email?.toString().toLowerCase()
+              ) {
                 addUser({ row: data }, true);
               }
 
@@ -578,17 +785,12 @@ export default defineComponent({
                 data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
               }
               if (Array.isArray(data?.custom_roles)) {
-                data.custom_roles.forEach(
-                  (r: any) => r && rolesSet.add(String(r)),
-                );
+                data.custom_roles.forEach((r: any) => r && rolesSet.add(String(r)));
               }
               if (Array.isArray(data?.assigned_roles)) {
-                data.assigned_roles.forEach(
-                  (r: any) => r && rolesSet.add(String(r)),
-                );
+                data.assigned_roles.forEach((r: any) => r && rolesSet.add(String(r)));
               }
               const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
-
 
               return {
                 email: maskText(data.email),
@@ -606,13 +808,12 @@ export default defineComponent({
                     ? toCamelCase(data.role) + " (Invited)"
                     : toCamelCase(data.role),
                 roles: rolesArr,
-                auth_type: data?.auth_type
-                  ? data.auth_type
-                  : data?.is_external
-                    ? "SSO"
-                    : "Native",
+                auth_type: data?.auth_type ? data.auth_type : data?.is_external ? "SSO" : "Native",
                 is_external: !!data?.is_external,
-                enableEdit: store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
+                enableEdit:
+                  store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()
+                    ? true
+                    : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
                 status: data?.status,
@@ -645,16 +846,11 @@ export default defineComponent({
                   const roleMap: Record<string, any> = resp?.data || {};
                   usersState.users.forEach((u: any) => {
                     if (u.status === "pending") return;
-                    const fetched: string[] = Array.isArray(
-                      roleMap[u.rawEmail],
-                    )
+                    const fetched: string[] = Array.isArray(roleMap[u.rawEmail])
                       ? roleMap[u.rawEmail].filter(Boolean).map(String)
                       : [];
                     if (fetched.length) {
-                      const merged = new Set<string>([
-                        ...(u.roles || []),
-                        ...fetched,
-                      ]);
+                      const merged = new Set<string>([...(u.roles || []), ...fetched]);
                       u.roles = Array.from(merged);
                     }
                   });
@@ -672,7 +868,9 @@ export default defineComponent({
             dismiss();
             toast({
               variant: "error",
-              message: t('iam.user.failedToLoadUsers', { error: err?.response?.data?.message || err?.message || t('iam.user.unknownError') }),
+              message: t("iam.user.failedToLoadUsers", {
+                error: err?.response?.data?.message || err?.message || t("iam.user.unknownError"),
+              }),
               timeout: 5000,
             });
             reject(false);
@@ -739,9 +937,7 @@ export default defineComponent({
       }
       // Cloud: cannot edit self (same as delete behavior)
       if (config.isCloud == "true") {
-        return (
-          store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
-        );
+        return store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase();
       }
       // Allow editing for all other users
       return true;
@@ -765,32 +961,27 @@ export default defineComponent({
     };
 
     const shouldAllowDelete = (user: any) => {
-
       if (isEnterprise.value) {
-      //for cloud
-      //should allow delete for all users when it is root and also when the row user is not root
-      //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
-        if(config.isCloud == 'true'){
+        //for cloud
+        //should allow delete for all users when it is root and also when the row user is not root
+        //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
+        if (config.isCloud == "true") {
           return (
             user.role?.toLowerCase() !== "root" &&
-            (currentUserRole.value == "root" ||
-              currentUserRole.value == "admin") &&
-              store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
-
+            (currentUserRole.value == "root" || currentUserRole.value == "admin") &&
+            store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
           );
         }
         return (
           isCurrentUserInternal.value &&
           !user.isExternal &&
           user.role?.toLowerCase() !== "root" &&
-          (currentUserRole.value == "root" ||
-            currentUserRole.value == "admin") &&
+          (currentUserRole.value == "root" || currentUserRole.value == "admin") &&
           !user.isLoggedinUser
         );
       } else {
         return (
-          (currentUserRole.value == "admin" ||
-            currentUserRole.value == "root") &&
+          (currentUserRole.value == "admin" || currentUserRole.value == "root") &&
           !user.isLoggedinUser &&
           user.role?.toLowerCase() !== "root"
         );
@@ -806,8 +997,7 @@ export default defineComponent({
 
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
-      selectedUser.value.organization =
-        store.state.selectedOrganization.identifier;
+      selectedUser.value.organization = store.state.selectedOrganization.identifier;
 
       if (props.row != undefined) {
         // The row already stores the canonical role VALUE, so AddUser's role
@@ -907,7 +1097,7 @@ export default defineComponent({
           await getOrgMembers();
         } catch (error) {
           toast({
-            message: t('iam.user.failedToRefreshUserList'),
+            message: t("iam.user.failedToRefreshUserList"),
             variant: "error",
           });
         }
@@ -939,7 +1129,7 @@ export default defineComponent({
         updateUserActions();
         if (operationType == "created") {
           toast({
-            message: t('iam.user.userAddedSuccess'),
+            message: t("iam.user.userAddedSuccess"),
             variant: "success",
           });
           // if (
@@ -968,7 +1158,7 @@ export default defineComponent({
           // }
         } else {
           toast({
-            message: t('iam.user.userUpdatedSuccess'),
+            message: t("iam.user.userUpdatedSuccess"),
             variant: "success",
           });
           // usersState.users.forEach((member: any, key: number) => {
@@ -1001,7 +1191,7 @@ export default defineComponent({
         .then(async (res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: t('iam.user.userDeletedSuccess'),
+              message: t("iam.user.userDeletedSuccess"),
               variant: "success",
             });
             await getOrgMembers();
@@ -1011,7 +1201,7 @@ export default defineComponent({
         .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
-              message: t('iam.user.errorDeletingUser'),
+              message: t("iam.user.errorDeletingUser"),
               variant: "error",
             });
           }
@@ -1028,7 +1218,7 @@ export default defineComponent({
       confirmRevoke.value = false;
       const dismiss = toast({
         variant: "loading",
-        message: t('iam.user.pleaseWait'),
+        message: t("iam.user.pleaseWait"),
         timeout: 0,
       });
 
@@ -1037,7 +1227,7 @@ export default defineComponent({
         .then(async () => {
           dismiss();
           toast({
-            message: t('iam.user.invitationRevokedSuccess'),
+            message: t("iam.user.invitationRevokedSuccess"),
             variant: "success",
           });
           await getOrgMembers();
@@ -1053,7 +1243,7 @@ export default defineComponent({
         .catch((err: any) => {
           dismiss();
           toast({
-            message: err?.response?.data?.message || t('iam.user.errorRevokingInvitation'),
+            message: err?.response?.data?.message || t("iam.user.errorRevokingInvitation"),
             variant: "error",
           });
         });
@@ -1073,25 +1263,27 @@ export default defineComponent({
       const userEmails = selectedUsers.value.map((user: any) => user.email);
 
       try {
-        const res = await usersService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          { ids: userEmails }
-        );
+        const res = await usersService.bulkDelete(store.state.selectedOrganization.identifier, {
+          ids: userEmails,
+        });
         const { successful, unsuccessful } = res.data;
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
-            message: t('iam.user.deletedUsersSuccess', { count: successful.length }),
+            message: t("iam.user.deletedUsersSuccess", { count: successful.length }),
             variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
-            message: t('iam.user.deletedUsersPartial', { count: successful.length, failed: unsuccessful.length }),
+            message: t("iam.user.deletedUsersPartial", {
+              count: successful.length,
+              failed: unsuccessful.length,
+            }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: t('iam.user.failedToDeleteUsers', { count: unsuccessful.length }),
+            message: t("iam.user.failedToDeleteUsers", { count: unsuccessful.length }),
             variant: "error",
           });
         }
@@ -1103,7 +1295,8 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
-            message: err.response?.data?.message || err?.message || t('iam.user.errorDeletingUsers'),
+            message:
+              err.response?.data?.message || err?.message || t("iam.user.errorDeletingUsers"),
             variant: "error",
           });
         }
@@ -1115,7 +1308,7 @@ export default defineComponent({
     const updateUserRole = (row: any) => {
       const dismiss = toast({
         variant: "loading",
-        message: t('iam.user.pleaseWait'),
+        message: t("iam.user.pleaseWait"),
         timeout: 0,
       });
 
@@ -1131,7 +1324,7 @@ export default defineComponent({
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
-            const message = t('iam.user.errorUpdatingOrgMember');
+            const message = t("iam.user.errorUpdatingOrgMember");
             toast({
               variant: "error",
               message: message,
@@ -1140,7 +1333,7 @@ export default defineComponent({
           } else {
             toast({
               variant: "success",
-              message: t('iam.user.orgMemberUpdatedSuccess'),
+              message: t("iam.user.orgMemberUpdatedSuccess"),
             });
           }
           dismiss();
@@ -1159,15 +1352,11 @@ export default defineComponent({
       });
     };
 
-    const selectedUserIds = computed(() =>
-      selectedUsers.value.map((u: any) => u.email),
-    );
+    const selectedUserIds = computed(() => selectedUsers.value.map((u: any) => u.email));
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
       const usersMap = new Map(
-        usersState.users
-          .filter((u: any) => u.enableDelete)
-          .map((u: any) => [u.email, u]),
+        usersState.users.filter((u: any) => u.enableDelete).map((u: any) => [u.email, u]),
       );
       selectedUsers.value = ids.map((id) => usersMap.get(id)).filter(Boolean);
     };
@@ -1176,21 +1365,23 @@ export default defineComponent({
     watch(selectedUsers, (newSelectedUsers) => {
       const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
-
         selectedUsers.value = onlyEnabledSelected;
       }
     });
-
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
         id: "iamUsersAdd",
-        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+        handler: () => {
+          if (!isInputFocused()) addRoutePush({});
+        },
       },
       {
         id: "iamUsersRefresh",
-        handler: () => { if (!isInputFocused()) refreshUsers(); },
+        handler: () => {
+          if (!isInputFocused()) refreshUsers();
+        },
       },
       {
         id: "iamUsersFocusSearch",
@@ -1261,20 +1452,13 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteUsers,
       rows,
+      displayedRows,
+      roleFilter,
+      onStatSelect,
+      summaryStats,
       tableKey,
       // showAddUserBtn,
     };
   },
 });
 </script>
-
-<style scoped>
-/* keep(lib-override): compact role chip styling (child OTag DOM) */
-:deep(.o2-role-chip) {
-  padding: 0.125rem 0.5rem;
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  border-radius: 0.375rem;
-  line-height: 1.4;
-}
-</style>

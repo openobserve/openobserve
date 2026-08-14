@@ -16,11 +16,12 @@
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { TranslateFn, I18nText } from "@/types/i18n";
 
 export interface FavoriteDashboard {
   dashboardId: string;
   folderId: string;
-  label: string;
+  label: I18nText;
 }
 
 // Reserved pseudo-folder id for the folder-rail "Favorites" entry. Real folder
@@ -46,9 +47,7 @@ export function useFavoriteDashboards() {
     try {
       const res = await settings.getSetting(org, SETTING_KEY, userId);
       const val = res?.data?.setting_value;
-      favorites.value = Array.isArray(val)
-        ? val.filter((f: any) => f && f.dashboardId)
-        : [];
+      favorites.value = Array.isArray(val) ? val.filter((f: any) => f && f.dashboardId) : [];
     } catch {
       // Missing setting / 404 → no favorites yet for this user.
       favorites.value = [];
@@ -61,6 +60,7 @@ export function useFavoriteDashboards() {
     org: string,
     userId: string,
     d: FavoriteDashboard,
+    t: TranslateFn,
   ) => {
     if (!org || !userId) return; // never hit the API with an undefined segment
     const prev = favorites.value;
@@ -68,21 +68,15 @@ export function useFavoriteDashboards() {
       ? prev.filter((f) => f.dashboardId !== d.dashboardId)
       : [...prev, d]; // optimistic
     try {
-      await settings.setUserSetting(
-        org,
-        userId,
-        SETTING_KEY,
-        favorites.value,
-        SETTING_CATEGORY,
-      );
+      await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
     } catch (e: any) {
       favorites.value = prev; // revert
       toast({
         variant: "error",
         message:
           e?.response?.status === 403
-            ? "You don't have permission to change favorites"
-            : "Couldn't update favorite dashboards",
+            ? t("toastMessages.composables.noPermissionToChangeFavorites")
+            : t("toastMessages.composables.couldNotUpdateFavoriteDashboards"),
       });
     }
   };
@@ -90,11 +84,7 @@ export function useFavoriteDashboards() {
   // Drop favorites pointing at dashboards that no longer exist (deleted from
   // their folder). Without this the Favorites view keeps rendering a ghost row
   // from the stored label, and acting on it hits the API with a dead id.
-  const removeFavorites = async (
-    org: string,
-    userId: string,
-    dashboardIds: string[],
-  ) => {
+  const removeFavorites = async (org: string, userId: string, dashboardIds: string[]) => {
     if (!org || !userId || !dashboardIds.length) return;
     const ids = new Set(dashboardIds);
     const prev = favorites.value;
@@ -102,13 +92,7 @@ export function useFavoriteDashboards() {
     if (next.length === prev.length) return; // none of them were favorited
     favorites.value = next;
     try {
-      await settings.setUserSetting(
-        org,
-        userId,
-        SETTING_KEY,
-        favorites.value,
-        SETTING_CATEGORY,
-      );
+      await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
     } catch {
       // Best-effort cleanup that trails a successful delete — leave the local
       // list pruned so the row disappears now, and let the next load() reconcile

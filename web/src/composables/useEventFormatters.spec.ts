@@ -47,10 +47,7 @@ describe("useEventFormatters", () => {
 
     it("calls formatDate with Math.floor of the timestamp", () => {
       formatters.formatTimestamp(1704067200500.9);
-      expect(formatDate).toHaveBeenCalledWith(
-        1704067200500,
-        "MMM DD, YYYY HH:mm:ss.SSS Z"
-      );
+      expect(formatDate).toHaveBeenCalledWith(1704067200500, "MMM DD, YYYY HH:mm:ss.SSS Z");
     });
 
     it("returns the formatted string from formatDate", () => {
@@ -190,32 +187,30 @@ describe("useEventFormatters", () => {
   describe("getEventTypeClass", () => {
     it("returns error CSS classes for type 'error'", () => {
       expect(formatters.getEventTypeClass("error")).toBe(
-        "bg-error-100 text-error-700 border border-solid border-error-300"
+        "bg-error-100 text-error-700 border border-solid border-error-300",
       );
     });
 
     it("returns action CSS classes for type 'action'", () => {
       expect(formatters.getEventTypeClass("action")).toBe(
-        "bg-blue-100 text-blue-700 border border-solid border-blue-300"
+        "bg-blue-100 text-blue-700 border border-solid border-blue-300",
       );
     });
 
     it("returns view CSS classes for type 'view'", () => {
       expect(formatters.getEventTypeClass("view")).toBe(
-        "bg-success-100 text-success-700 border border-solid border-success-400"
+        "bg-success-100 text-success-700 border border-solid border-success-400",
       );
     });
 
     it("returns resource CSS classes for type 'resource'", () => {
       expect(formatters.getEventTypeClass("resource")).toBe(
-        "bg-purple-100 text-purple-700 border border-solid border-purple-400"
+        "bg-purple-100 text-purple-700 border border-solid border-purple-400",
       );
     });
 
     it("returns default classes for an unknown type", () => {
-      expect(formatters.getEventTypeClass("unknown")).toBe(
-        "bg-grey-100 text-grey-700"
-      );
+      expect(formatters.getEventTypeClass("unknown")).toBe("bg-grey-100 text-grey-700");
     });
 
     it("returns default classes for an empty string type", () => {

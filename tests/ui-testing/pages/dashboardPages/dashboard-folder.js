@@ -119,6 +119,14 @@ export default class DashboardFolder {
     // Click delete icon and confirm via class-member locators.
     await this.deleteFolderIcon.click();
     await this.confirmDeleteFolderBtn.click();
+    // Wait for the confirm dialog to actually close before returning, same
+    // as createFolder — otherwise callers (afterEach cleanup in particular)
+    // can race ahead while the delete is still in flight, leaving the
+    // folder undeleted with no error surfaced.
+    await this.page
+      .locator('[data-test="o-dialog-overlay"]')
+      .waitFor({ state: "detached", timeout: 10000 })
+      .catch(() => {});
   }
 
   // Edit folder name

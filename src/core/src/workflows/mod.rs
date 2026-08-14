@@ -17,45 +17,34 @@ use std::collections::HashMap;
 
 use config::meta::{
     pipeline::components::NodeData,
-    self_reporting::usage::{TriggerData, TriggerDataStatus, TriggerDataType},
+    self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
 };
 use db::{
     self,
     authz::{remove_ownership, set_ownership},
+    workflows::{AssociationDeleteEvent, WorkflowTriggerType},
 };
-use infra::table::workflows::{self, Workflow, WorkflowError, WorkflowRunData, WorkflowRunErrors};
+use infra::table::workflows::{
+    self, Workflow, WorkflowAssociation, WorkflowError, WorkflowRunData, WorkflowRunErrors,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use usage_reporting::publish_triggers_usage;
 
 use crate::{
-    common::{infra::config::ALERTS, meta::authz::Authz, utils::get_nats_lock},
+    common::{meta::authz::Authz, utils::get_nats_lock},
     pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
-    self_reporting::publish_triggers_usage,
 };
 
 pub mod runtime;
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub enum WorkflowTriggerType {
-    #[default]
-    AlertFired,
-}
-
-impl From<&str> for WorkflowTriggerType {
-    fn from(value: &str) -> Self {
-        match value {
-            "AlertFired" => Self::AlertFired,
-            _ => Self::AlertFired,
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct InputMap {
-    complete: Vec<Value>,
-    node_map: HashMap<String, Vec<Value>>,
+    // even though a bad naming convention, node_map is
+    error_node_map: HashMap<String, Vec<Value>>,
+    #[serde(default)]
+    input_map: HashMap<String, Vec<Value>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -65,7 +54,7 @@ pub struct WorkflowTrigger {
     pub trigger_type: WorkflowTriggerType,
     pub org_id: String,
     pub workflow_id: String,
-    pub metadata: HashMap<String, String>,
+    pub metadata: HashMap<String, Value>,
     pub run_id: String,
     pub origin_cluster: String,
 }
@@ -263,6 +252,10 @@ pub async fn get_error_input_data(errors: &WorkflowRunErrors) -> Result<String, 
 
 async fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
     for node in &workflow.nodes {
+        if !node.position.is_valid() {
+            return Err(anyhow::anyhow!("node {} position is not valid", node.id));
+        }
+
         if !node.data.is_workflow_node() {
             return Err(anyhow::anyhow!(
                 "node {} is not a workflow compatible node",
@@ -351,6 +344,13 @@ pub async fn get_workflow_by_id(org_id: &str, id: &str) -> Result<Option<Workflo
     Ok(ret)
 }
 
+pub async fn get_workflow_associations(
+    org_id: &str,
+    id: &str,
+) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
+    db::workflows::get_workflow_associations(org_id, id).await
+}
+
 fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>) -> bool {
     match permitted {
         Some(permitted) => {
@@ -362,18 +362,20 @@ fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>
 }
 
 pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    // TODO YJDoc2: later sometime, figure out a better scheme dot this check,
-    // as we support more and more places to add workflow, this might become infeasible
-    // to check for all cases
-    let cacher = ALERTS.read().await;
-    for (stream_key, (_, alert)) in cacher.iter() {
-        if stream_key.starts_with(&format!("{org_id}/"))
-            && alert.workflows.contains(&id.to_string())
-        {
-            return Err(anyhow::anyhow!("workflow is used by alert {}", alert.name));
-        }
+    let associations = db::workflows::get_workflow_associations(org_id, id).await?;
+    if associations
+        .iter()
+        .any(|a| a.trigger_type != WorkflowTriggerType::IncidentEvent.to_string())
+    {
+        return Err(anyhow::anyhow!(
+            "workflow is still associated with entities, must remove the connection first",
+        ));
     }
-
+    let associations = AssociationDeleteEvent::Workflow {
+        org_id: org_id.to_string(),
+        workflow_id: id.to_string(),
+    };
+    db::workflows::delete_workflow_association(associations).await?;
     db::workflows::delete_workflow_record(id).await?;
     remove_ownership(org_id, "workflows", Authz::new(id)).await;
     db::workflows::notify_workflow_delete(id).await?;
@@ -382,19 +384,58 @@ pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error
 
 pub async fn test_workflow(
     org_id: &str,
-    id: &str,
+    workflow: Workflow,
     inputs: Vec<serde_json::Value>,
     from_node: Option<String>,
 ) -> Result<WorkflowResult, anyhow::Error> {
-    let workflow = get_workflow_by_id(org_id, id)
-        .await?
-        .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+    validate_workflow(&workflow).await?;
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
-
     let res = executable
         .process_workflow(org_id, inputs, from_node)
         .await?;
     Ok(res)
+}
+
+pub async fn trigger_workflow(
+    org_id: &str,
+    id: &str,
+    inputs: Vec<serde_json::Value>,
+    user_id: &str,
+) -> Result<String, anyhow::Error> {
+    if db::workflows::get_workflow(org_id, id).await?.is_none() {
+        return Err(anyhow::anyhow!("workflow with id {id} not found"));
+    }
+
+    let metadata = [("event_type", "manual"), ("user_id", user_id)]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v.into()))
+        .collect();
+
+    let trace_id = format!("webhook-{}", config::ider::generate_trace_id());
+    log::info!(
+        "received webhook trigger for workflow {org_id}/{id} from user {user_id}, assigning trace id {trace_id}"
+    );
+
+    if let Err(e) = send_workflow_trigger(
+        &trace_id,
+        org_id,
+        "Webhook".to_string(),
+        WorkflowTriggerType::Webhook,
+        id,
+        metadata,
+        &inputs,
+    )
+    .await
+    {
+        log::error!(
+            "error in sending webhook trigger for workflow {org_id}/{id} from user {user_id}, trace id {trace_id} error : {e}"
+        );
+        return Err(e);
+    }
+    log::info!(
+        "successfully triggered workflow {org_id}/{id} from user {user_id}, with trace id {trace_id}"
+    );
+    Ok(trace_id)
 }
 
 async fn execute_workflow(
@@ -414,7 +455,6 @@ async fn execute_workflow(
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
 
     let now = chrono::Utc::now().timestamp_micros();
-    let input_copy = inputs.clone();
     let res = executable.process_workflow(org_id, inputs, None).await?;
 
     let mut errored_input_map = HashMap::new();
@@ -459,33 +499,41 @@ async fn execute_workflow(
         }
     }
 
-    if !workflow_errors.is_empty() {
-        let ip_map = InputMap {
-            complete: input_copy,
-            node_map: errored_input_map,
-        };
+    let ip_map = InputMap {
+        error_node_map: errored_input_map,
+        input_map: res.inputs,
+    };
 
-        let errors = WorkflowRunErrors {
-            org_id: org_id.to_string(),
-            cluster: config::get_cluster_name(),
-            id: 0, // will be set directly in db
-            workflow_id: id.to_string(),
-            run_id: run_id.to_string(),
-            ran_at: now,
-            data: workflow_errors,
-            input_data: Some(serde_json::to_string(&ip_map).unwrap()),
-        };
-        // workflow has already run, so not much point in returning error because
-        // we couldn't save the errors to db, log and ignore
-        if let Err(e) = db::workflows::save_workflow_errors(errors).await {
-            log::error!(
-                "[Workflows] : error saving workflow run errors for run id {run_id} for workflow {org_id}/{id} in db : {e}"
-            );
-        }
-        return Ok(WorkflowExecutionStatus::Errored);
+    // if this is not empty, then some node errored
+    let errored = !workflow_errors.is_empty();
+
+    // we hijack the workflow run errors to store both the error as well as execution history map
+    // as both have essentially the same structure and no point in duplicating tables and adding
+    // migration true error v/s just run can be distinguished by workflow_errors is empty or
+    // not.
+    let errors = WorkflowRunErrors {
+        org_id: org_id.to_string(),
+        cluster: config::get_cluster_name(),
+        id: 0, // will be set directly in db
+        workflow_id: id.to_string(),
+        run_id: run_id.to_string(),
+        ran_at: now,
+        data: workflow_errors,
+        input_data: Some(serde_json::to_string(&ip_map).unwrap()),
+    };
+    // workflow has already run, so not much point in returning error because
+    // we couldn't save the errors to db, log and ignore
+    if let Err(e) = db::workflows::save_workflow_errors(errors).await {
+        log::error!(
+            "[Workflows] : error saving workflow run errors for run id {run_id} for workflow {org_id}/{id} in db : {e}"
+        );
     }
 
-    Ok(WorkflowExecutionStatus::Success)
+    if errored {
+        Ok(WorkflowExecutionStatus::Errored)
+    } else {
+        Ok(WorkflowExecutionStatus::Success)
+    }
 }
 
 pub async fn get_workflow_errors(
@@ -506,6 +554,21 @@ pub async fn retry_run(
     let workflow = workflows::get_by_org_wid(org_id, wid)
         .await?
         .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+
+    let mut start_id = None;
+    for node in &workflow.nodes {
+        if matches!(node.data, NodeData::WorkflowTrigger) {
+            start_id = Some(node.id.clone());
+            break;
+        }
+    }
+    let Some(start_id) = start_id else {
+        log::error!(
+            "missing workflow trigger node in workflow {org_id}/{wid} for retry run {run_id}"
+        );
+        return Err(anyhow::anyhow!("workflow trigger node missing in workflow"));
+    };
+
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
 
     let errors = match workflows::list_errors_for_workflow_run(org_id, wid, run_id).await {
@@ -538,12 +601,11 @@ pub async fn retry_run(
         anyhow::anyhow!("error deserializing inputs : {e}")
     })?;
 
-    let inputs = match from_node.as_ref() {
-        Some(node) => ip_map.node_map.remove(node).ok_or(anyhow::anyhow!(
-            "node id {node} does not have any associated input data in the stored inputs"
-        ))?,
-        None => ip_map.complete,
-    };
+    let node_id = from_node.as_ref().unwrap_or(&start_id);
+
+    let inputs = ip_map.input_map.remove(node_id).ok_or(anyhow::anyhow!(
+        "node id {node_id} does not have any associated input data in the stored inputs"
+    ))?;
 
     let res = executable
         .process_workflow(org_id, inputs, from_node)
@@ -557,7 +619,7 @@ pub async fn send_workflow_trigger(
     source_id: String,
     trigger_type: WorkflowTriggerType,
     workflow_id: &str,
-    metadata: HashMap<String, String>,
+    metadata: HashMap<String, Value>,
     data: &[Value],
 ) -> Result<(), anyhow::Error> {
     let o2_cfg = get_o2_config();
@@ -709,7 +771,7 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         ),
         is_realtime: false,
         is_silenced: false,
-        status: TriggerDataStatus::Completed,
+        status: RunOutcome::Succeeded,
         start_time,
         end_time,
         error,

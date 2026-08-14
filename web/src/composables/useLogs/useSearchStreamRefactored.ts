@@ -33,14 +33,15 @@ import useSearchConnection from "@/composables/useLogs/useSearchConnection";
 import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHandler";
 import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
+import { raw, type TranslateFn } from "@/types/i18n";
 
-export const useSearchStreamRefactored = () => {
+export const useSearchStreamRefactored = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
   const { addTraceId } = logsUtils();
 
   // Initialize all the split composables
   const queryBuilder = useSearchQuery();
-  const connectionManager = useSearchConnection();
+  const connectionManager = useSearchConnection(t);
   const responseProcessor = useSearchResponseHandler();
   const histogramHandler = useSearchHistogramManager();
   const paginationManager = useSearchPagination();
@@ -70,7 +71,7 @@ export const useSearchStreamRefactored = () => {
     } catch (error: any) {
       console.error("Search operation failed:", error);
       searchObj.loading = false;
-      showErrorNotification("Error occurred during the search operation.");
+      showErrorNotification(t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"));
     }
   };
 
@@ -80,11 +81,7 @@ export const useSearchStreamRefactored = () => {
    */
   const handleSearchComplete = (payload: any) => {
     // Process histogram if needed
-    if (
-      payload.type === "search" &&
-      !payload.isPagination &&
-      searchObj.meta.refreshInterval == 0
-    ) {
+    if (payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
       histogramHandler.processHistogramRequest(
         payload.queryReq,
         connectionManager.buildWebSocketPayload,
@@ -123,7 +120,8 @@ export const useSearchStreamRefactored = () => {
             breakdownField: null,
             breakdownSeries: null,
             chartParams: {
-              title: "",
+              title: raw(""),
+              titleParts: null,
               unparsed_x_data: [],
               timezone: "",
             },

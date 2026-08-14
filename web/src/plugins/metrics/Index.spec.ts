@@ -86,8 +86,7 @@ vi.mock("../../composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
     resetDashboardPanelData: mockResetDashboardPanelData,
-    resetDashboardPanelDataAndAddTimeField:
-      mockResetDashboardPanelDataAndAddTimeField,
+    resetDashboardPanelDataAndAddTimeField: mockResetDashboardPanelDataAndAddTimeField,
     resetAggregationFunction: mockResetAggregationFunction,
     validatePanel: mockValidatePanel,
     removeXYFilters: mockRemoveXYFilters,
@@ -148,13 +147,11 @@ const createWrapper = (props: Record<string, any> = {}) => {
         ShareButton: true,
         // Heavy async / complex children
         PanelEditor: {
-          template:
-            "<div class='panel-editor' data-test='panel-editor'><slot /></div>",
+          template: "<div class='panel-editor' data-test='panel-editor'><slot /></div>",
           methods: { runQuery: vi.fn() },
         },
         DateTimePickerDashboard: {
-          template:
-            "<div class='date-time-picker' data-test='metrics-date-picker'></div>",
+          template: "<div class='date-time-picker' data-test='metrics-date-picker'></div>",
           methods: {
             refresh: vi.fn(),
             getConsumableDateTime: vi.fn(() => ({
@@ -171,8 +168,7 @@ const createWrapper = (props: Record<string, any> = {}) => {
           template: "<div class='metric-legends'></div>",
         },
         AddToDashboard: {
-          template:
-            "<div v-if='open' class='add-to-dashboard' @click='$emit(\"save\")'></div>",
+          template: "<div v-if='open' class='add-to-dashboard' @click='$emit(\"save\")'></div>",
           props: ["open", "dashboardPanelData"],
           emits: ["save", "update:open"],
         },
@@ -200,12 +196,7 @@ const createWrapper = (props: Record<string, any> = {}) => {
             "secondaryButtonLoading",
             "neutralButtonLoading",
           ],
-          emits: [
-            "update:open",
-            "click:primary",
-            "click:secondary",
-            "click:neutral",
-          ],
+          emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
         },
         ODrawer: {
           template:
@@ -231,12 +222,7 @@ const createWrapper = (props: Record<string, any> = {}) => {
             "secondaryButtonLoading",
             "neutralButtonLoading",
           ],
-          emits: [
-            "update:open",
-            "click:primary",
-            "click:secondary",
-            "click:neutral",
-          ],
+          emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
         },
         AutoRefreshInterval: {
           template:
@@ -320,9 +306,7 @@ describe("Metrics Index — component initialization", () => {
   it("sets stream_type to 'metrics' on mounted", async () => {
     createWrapper();
     await flushPromises();
-    expect(mockDashboardPanelData.data.queries[0].fields.stream_type).toBe(
-      "metrics",
-    );
+    expect(mockDashboardPanelData.data.queries[0].fields.stream_type).toBe("metrics");
   });
 
   it("sets chart type to 'line' on mounted", async () => {
@@ -394,17 +378,13 @@ describe("Metrics Index — template structure", () => {
   it("renders date-time picker with data-test attribute", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    expect(wrapper.find('[data-test="metrics-date-picker"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="metrics-date-picker"]').exists()).toBe(true);
   });
 
   it("renders auto-refresh interval with data-test attribute", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    expect(wrapper.find('[data-test="metrics-auto-refresh"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="metrics-auto-refresh"]').exists()).toBe(true);
   });
 
   it("does not render AddToDashboard dialog when showAddToDashboardDialog is false", async () => {
@@ -684,8 +664,7 @@ describe("Metrics Index — onDataZoom method", () => {
     });
 
     const callArgs = mockSetCustomDate.mock.calls[0][1];
-    const diffMinutes =
-      (callArgs.end.getTime() - callArgs.start.getTime()) / 60000;
+    const diffMinutes = (callArgs.end.getTime() - callArgs.start.getTime()) / 60000;
     expect(diffMinutes).toBe(1);
   });
 
@@ -842,9 +821,7 @@ describe("Metrics Index — updateDateTime method", () => {
 
     wrapper.vm.updateDateTime(wrapper.vm.selectedDate);
 
-    expect(mockDashboardPanelData.meta.dateTime.start_time).toBeInstanceOf(
-      Date,
-    );
+    expect(mockDashboardPanelData.meta.dateTime.start_time).toBeInstanceOf(Date);
     expect(mockDashboardPanelData.meta.dateTime.end_time).toBeInstanceOf(Date);
   });
 });

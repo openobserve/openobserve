@@ -23,7 +23,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-
 // ── Stub for migrated ODrawer ───────────────────────────────────────────────
 // Mirrors the real ODrawer contract: v-model:open, width, show-close props
 // plus update:open / close events. The default slot renders the drawer body
@@ -82,7 +81,9 @@ describe("SearchResult Component", () => {
           DetailTable: true,
           ChartRenderer: true,
           SanitizedHtmlRenderer: true,
-          TenstackTable: true,
+          OTable: true,
+          CellActions: true,
+          O2AIContextAddBtn: true,
           PatternDetailsDialog: true,
           TracesAnalysisDashboard: true,
           ODrawer: oDrawerStub,
@@ -171,9 +172,7 @@ describe("SearchResult Component", () => {
       await wrapper.vm.onTimeBoxed(timeboxData);
 
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
-      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe(
-        "2023-01-01T00:00:00Z",
-      );
+      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe("2023-01-01T00:00:00Z");
     });
   });
 
@@ -322,9 +321,7 @@ describe("SearchResult Component", () => {
   describe("Watch Handlers", () => {
     it("should handle findFTSFields changes", async () => {
       const extractFTSFieldsSpy = vi.spyOn(wrapper.vm, "extractFTSFields");
-      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
-        { name: "field1" },
-      ];
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "field1" }];
       await wrapper.vm.$nextTick();
       expect(extractFTSFieldsSpy).toHaveBeenCalled();
     });
@@ -372,9 +369,7 @@ describe("SearchResult Component", () => {
       await wrapper.vm.$nextTick();
 
       // User's choice preserved; no FTS default injected.
-      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([
-        "kubernetes_pod_id",
-      ]);
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["kubernetes_pod_id"]);
       expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(false);
     });
 
@@ -400,9 +395,7 @@ describe("SearchResult Component", () => {
       await wrapper.vm.$nextTick();
 
       // "message" is filled, "log" is empty → best-fill picks "message".
-      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([
-        "message",
-      ]);
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
       expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
     });
 
@@ -426,9 +419,7 @@ describe("SearchResult Component", () => {
 
       // No selection → the best-filled FTS field ("message") becomes the default,
       // and is marked as a system pick so it is never persisted.
-      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([
-        "message",
-      ]);
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["message"]);
       expect(wrapper.vm.searchObj.meta.isFtsDefaultColumn).toBe(true);
     });
 
@@ -438,9 +429,7 @@ describe("SearchResult Component", () => {
       // query's result columns.
       wrapper.vm.searchObj.data.stream.selectedFields = [];
       wrapper.vm.searchObj.meta.isFtsDefaultColumn = false;
-      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
-        { name: "message", ftsKey: true },
-      ];
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "message", ftsKey: true }];
       wrapper.vm.searchObj.data.queryResults = {
         hits: [{ message: "hello" }],
       };
@@ -509,12 +498,14 @@ describe("SearchResult Component", () => {
       wrapper.vm.searchObj.data.resultGrid.colSizes = {};
       wrapper.vm.searchObj.data.stream.selectedStream = ["new-stream"];
 
+      // handleColumnSizesUpdate converts column-id-keyed sizes into the CSS-var
+      // persistence format so saved views load correctly.
       const newSizes = { col1: 100 };
       await wrapper.vm.handleColumnSizesUpdate(newSizes);
 
-      expect(
-        wrapper.vm.searchObj.data.resultGrid.colSizes["new-stream"],
-      ).toEqual([newSizes]);
+      expect(wrapper.vm.searchObj.data.resultGrid.colSizes["new-stream"]).toEqual([
+        { "--col-col1-size": 100, "--header-col1-size": 100 },
+      ]);
     });
 
     it("should handle empty column order update", async () => {
@@ -524,9 +515,7 @@ describe("SearchResult Component", () => {
 
       await wrapper.vm.handleColumnOrderUpdate(newOrder, columns);
 
-      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([
-        "field1",
-      ]);
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["field1"]);
     });
   });
 
@@ -679,9 +668,7 @@ describe("SearchResult Component", () => {
 
       await wrapper.vm.onTimeBoxed(timeboxData);
 
-      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe(
-        "2023-01-01T00:00:00Z",
-      );
+      expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe("2023-01-01T00:00:00Z");
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
     });
   });
@@ -840,9 +827,7 @@ describe("SearchResult Component", () => {
   describe("Detail Tab — ODrawer migration", () => {
     it("does not render the Detail ODrawer by default (showDetailTab=false)", () => {
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
-      expect(
-        wrapper.find('[data-test="logs-search-result-detail-dialog"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="logs-search-result-detail-dialog"]').exists()).toBe(false);
     });
 
     it("renders the Detail ODrawer once showDetailTab flips true", async () => {

@@ -19,13 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        the chosen section renders its own page (header + table) to the right. -->
   <OPageLayout bleed :sidebar-width="230" data-test="iam-page">
     <template #sidebar>
-      <SectionRail
-        :groups="sectionGroups"
-        :active-key="activeSection"
-        :title="t('menu.iam')"
-      />
+      <SectionRail :groups="sectionGroups" :active-key="activeSection" :title="t('menu.iam')" />
     </template>
-    <section class="h-full min-w-0 min-h-0 overflow-y-auto">
+    <section class="h-full min-h-0 min-w-0 overflow-y-auto">
       <RouterView />
     </section>
   </OPageLayout>
@@ -34,19 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import {
-  type SectionHubGroup,
-  type SectionHubItem,
-} from "@/components/common/SectionHub.vue";
+import { type SectionHubGroup } from "@/components/common/SectionHub.vue";
 import { computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { useRouter, useRoute, RouterView } from "vue-router";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const route = useRoute();
 const { isMetaOrg } = useIsMetaOrg();
@@ -60,6 +53,7 @@ const routeToIamTab: Record<string, string> = {
   users: "users",
   serviceAccounts: "serviceAccounts",
   ingestionTokens: "ingestionTokens",
+  syntheticsTokens: "syntheticsTokens",
   mcpServer: "mcpServer",
   groups: "groups",
   editGroup: "groups",
@@ -71,18 +65,14 @@ const routeToIamTab: Record<string, string> = {
 };
 const activeSection = computed(() => routeToIamTab[route.name as string] ?? "");
 
-
 const sectionGroups = computed<SectionHubGroup[]>(() => {
   const isEnt = config.isEnterprise == "true" || config.isCloud == "true";
   const isCloud = config.isCloud == "true";
   const meta = isMetaOrg.value;
   const rbac = !!store.state.zoConfig.rbac_enabled;
   const svc = store.state.zoConfig.service_account_enabled ?? true;
-  // MCP is an AI feature (its endpoint requires O2_AI_ENABLED). Available on
-  // both enterprise and cloud builds, gated on the ai_enabled runtime flag.
-  const aiEnabled = isEnt && !!store.state.zoConfig.ai_enabled;
 
-  const groups: { label: string; items: SectionHubItem[] }[] = [
+  const groups: SectionHubGroup[] = [
     {
       label: t("iam.sectionAccess"),
       items: [
@@ -112,12 +102,23 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           dataTest: "iam-ingestion-tokens-tab",
         },
         {
+          key: "syntheticsTokens",
+          label: t("iam.syntheticsTokens"),
+          description: t("iam.syntheticsTokensDesc"),
+          icon: "key",
+          to: { name: "syntheticsTokens", query: orgQuery.value },
+          visible: isEnt && store.state.zoConfig?.synthetics_enabled !== false,
+          dataTest: "iam-synthetics-tokens-tab",
+        },
+        {
           key: "mcpServer",
           label: t("iam.mcpServerLabel"),
           description: t("iam.mcpServerDesc"),
           icon: "mcp",
           to: { name: "mcpServer", query: orgQuery.value },
-          visible: aiEnabled,
+          // No `visible` gate: the MCP endpoint is served by every edition, so
+          // the card shows on OSS too. See the route comment in
+          // useEnterpriseRoutes.ts.
           dataTest: "iam-mcp-server-tab",
         },
         {
@@ -180,7 +181,6 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   return groups;
 });
 
-
 // The rail is always shown, so the IAM root has no standalone landing — send it
 // to the first section (Users, always available). Also: non-meta users can't use
 // the quota section — bounce them to Users too.
@@ -190,13 +190,9 @@ watch(
     if (name === "iam") {
       // .catch: in unit tests the mounted router may not register child routes;
       // a rejected navigation must not surface as an unhandled error.
-      Promise.resolve(
-        router.replace({ name: "users", query: orgQuery.value }),
-      ).catch(() => {});
+      Promise.resolve(router.replace({ name: "users", query: orgQuery.value })).catch(() => {});
     } else if (name === "quota" && !isMetaOrg.value) {
-      Promise.resolve(
-        router.push({ name: "users", query: orgQuery.value }),
-      ).catch(() => {});
+      Promise.resolve(router.push({ name: "users", query: orgQuery.value })).catch(() => {});
     }
   },
   { immediate: true },

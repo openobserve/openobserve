@@ -46,29 +46,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #extra>
-      <div class="flex items-center justify-center gap-2 flex-wrap">
-        <span class="text-sm font-semibold text-text-secondary mr-1">
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <span class="text-text-secondary mr-1 text-sm font-semibold">
           {{ t("traces.noData.or") }}
         </span>
         <EmptyStateIngestionChip
           data-test="traces-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
         >
-          <img :src="getImageURL('images/common/kubernetes.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+          <img
+            :src="getImageURL('images/common/kubernetes.svg')"
+            class="h-3.5 w-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("traces.noData.kubernetes") }}
         </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
-          data-test="traces-no-data-python-btn"
-          @click="go('python')"
-        >
-          <img :src="getImageURL('images/ingestion/python.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+        <EmptyStateIngestionChip data-test="traces-no-data-python-btn" @click="go('python')">
+          <img
+            :src="getImageURL('images/ingestion/python.svg')"
+            class="h-3.5 w-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("traces.noData.python") }}
         </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
-          data-test="traces-no-data-nodejs-btn"
-          @click="go('nodejs')"
-        >
-          <img :src="getImageURL('images/ingestion/nodejs.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+        <EmptyStateIngestionChip data-test="traces-no-data-nodejs-btn" @click="go('nodejs')">
+          <img
+            :src="getImageURL('images/ingestion/nodejs.svg')"
+            class="h-3.5 w-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("traces.noData.nodejs") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
@@ -77,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
         >
-          <img :src="aiIconSrc" class="w-3.5 h-3.5 shrink-0" alt="" />
+          <img :src="aiIconSrc" class="h-3.5 w-3.5 shrink-0" alt="" />
           {{ t("traces.noData.askAi") }}
         </EmptyStateIngestionChip>
       </div>
@@ -87,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -99,7 +105,7 @@ import { getImageURL } from "@/utils/zincutils";
 defineProps<{ aiEnabled: boolean }>();
 const emit = defineEmits<{ "ask-ai": [] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 const { aiIconSrc } = useAiIcon();

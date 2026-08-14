@@ -27,9 +27,11 @@
 //! Because nodes carry their own x/y, dot and label move together (unlike
 //! label-only shifting, which detaches the text from its node).
 
+import type { I18nText } from "@/types/i18n";
+
 export interface LayoutNode {
   id: string;
-  label?: string;
+  label?: I18nText;
 }
 export interface LayoutEdge {
   from: string | null;
@@ -69,9 +71,7 @@ export function computeTreeLayout(
   // otherwise the entry node looks parented, roots comes back empty, BFS never
   // runs, and every node collapses to depth 0 (a flat, mis-wired tree). This is
   // exactly what made an agent's model hang off the wrong parent.
-  const hasIncoming = new Set(
-    graph.edges.filter((e) => e.from != null).map((e) => e.to),
-  );
+  const hasIncoming = new Set(graph.edges.filter((e) => e.from != null).map((e) => e.to));
   const placed = new Set<string>();
   for (const e of graph.edges) {
     if (e.from == null) continue;
@@ -115,10 +115,7 @@ export function computeTreeLayout(
   for (let d = 0; d <= maxDepth; d++) {
     columnX.set(d, x);
     const ids = byDepth.get(d) ?? [];
-    const widest = Math.max(
-      0,
-      ...ids.map((id) => labelWidth(nodeById.get(id)!)),
-    );
+    const widest = Math.max(0, ...ids.map((id) => labelWidth(nodeById.get(id)!)));
     x += Math.max(MIN_COLUMN_GAP, widest + COLUMN_PADDING);
   }
 

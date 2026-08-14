@@ -23,21 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="variableItem?.options || []"
       labelKey="label"
       valueKey="value"
-      class="textbox flex flex-col no-case o2-custom-select-dashboard min-w-37.5 max-w-160"
+      class="textbox no-case o2-custom-select-dashboard flex max-w-160 min-w-37.5 flex-col"
       :loading="variableItem.isLoading"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
       :select-all="variableItem.multiSelect"
       @update:model-value="emit('update:modelValue', $event)"
     >
-      <template #empty>{{ t('dashboard.variableCustomValueSelector.noDataFound') }}</template>
+      <template #empty>{{ t("dashboard.variableCustomValueSelector.noDataFound") }}</template>
     </OSelect>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
@@ -46,7 +46,7 @@ export default defineComponent({
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const selectedValue = ref(props.variableItem?.value);
 
     watch(

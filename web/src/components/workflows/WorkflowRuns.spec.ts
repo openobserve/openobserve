@@ -75,7 +75,7 @@ const OButtonStub = {
   name: "OButton",
   props: ["variant"],
   emits: ["click"],
-  template: `<button class="o-btn" @click="$emit('click')"><slot /></button>`,
+  template: `<button class="o-btn" v-bind="$attrs" @click="$emit('click')"><slot /></button>`,
 };
 const RunsPanelStub = {
   name: "WorkflowRunsPanel",
@@ -93,6 +93,7 @@ const globalCfg = {
     WorkflowRunsPanel: RunsPanelStub,
     WorkflowCanvas: stub("WorkflowCanvas"),
     WorkflowStepResultDrawer: stub("WorkflowStepResultDrawer"),
+    WorkflowTestDialog: stub("WorkflowTestDialog"),
   },
 };
 
@@ -190,13 +191,29 @@ describe("WorkflowRuns", () => {
     expect(panel(wrapper).props("selectedRunId")).toBe("");
   });
 
-  it("Edit Workflow navigates to the editor (edit stays separate from inspect)", async () => {
+  it("Edit Workflow navigates to the editor (build stays separate from inspect)", async () => {
     const wrapper = await mountRuns();
-    await wrapper.find(".o-btn").trigger("click");
+    await wrapper.find('[data-test="workflow-runs-edit"]').trigger("click");
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
       query: { id: "wf-1", name: "my flow", org_identifier: "default" },
     });
+  });
+
+  it("Test opens the dry-run dialog here and deselects the historical run", async () => {
+    const wrapper = await mountRuns();
+    // Select a run first, so we can prove Test deselects it.
+    panel(wrapper).vm.$emit("select-run", "run-5");
+    await flushPromises();
+    expect(panel(wrapper).props("selectedRunId")).toBe("run-5");
+
+    workflowObj.testRun.show = false;
+    await wrapper.find('[data-test="workflow-runs-test"]').trigger("click");
+
+    expect(workflowObj.testRun.show).toBe(true);
+    expect(panel(wrapper).props("selectedRunId")).toBe("");
+    // Test never navigates away — it stays on the runs page.
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
   it("back returns to the workflows list", async () => {

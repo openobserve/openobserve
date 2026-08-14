@@ -24,7 +24,7 @@ const dashboards = {
     name: string,
     organization: string,
     folderId: string,
-    title: string
+    title: string,
   ) => {
     const params: any = {
       page_num,
@@ -43,16 +43,13 @@ const dashboards = {
     return http().get(`/api/${organization}/dashboards`, { params });
   },
   create: (organization: string, data: any, folderId?: string) => {
-    return http().post(
-      `/api/${organization}/dashboards?folder=${folderId ?? "default"}`,
-      data,
-      { headers: { "Content-Type": "application/json; charset=UTF-8" } }
-    );
+    return http().post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, {
+      headers: { "Content-Type": "application/json; charset=UTF-8" },
+    });
   },
   delete: (organization: string, dashboardID: string, folderId?: string) => {
     return http().delete(
-      `/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"
-      }`
+      `/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`,
     );
   },
   bulkDelete: (organization: string, data: any, folder?: string) => {
@@ -63,20 +60,15 @@ const dashboards = {
     return http().delete(url, { data });
   },
   get_Dashboard: (org_identifier: string, dashboardID: string, folderId?: string) => {
-    return http().get(`/api/${org_identifier}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`);
+    return http().get(
+      `/api/${org_identifier}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`,
+    );
   },
-  save: (
-    organization: string,
-    dashboardID: string,
-    data: any,
-    folderId?: string,
-    hash?: any
-  ) => {
+  save: (organization: string, dashboardID: string, data: any, folderId?: string, hash?: any) => {
     return http().put(
-      `/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"
-      }&hash=${hash}`,
+      `/api/${organization}/dashboards/${dashboardID}?folder=${folderId ?? "default"}&hash=${hash}`,
       data,
-      { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+      { headers: { "Content-Type": "application/json; charset=UTF-8" } },
     );
   },
   list_Folders: (organization: string) => {
@@ -95,14 +87,19 @@ const dashboards = {
   delete_Folder: (organization: string, folderId: any) => {
     return http().delete(`/api/v2/${organization}/folders/dashboards/${folderId}`);
   },
-  move_Dashboard: (organization: string, dashboardIds: string[], from: string, dstFolderId: string) => {
+  move_Dashboard: (
+    organization: string,
+    dashboardIds: string[],
+    from: string,
+    dstFolderId: string,
+  ) => {
     return http().patch(
       `/api/${organization}/dashboards/move?folder=${from}`,
       {
-        "dashboard_ids": dashboardIds,
-        "dst_folder_id": dstFolderId
+        dashboard_ids: dashboardIds,
+        dst_folder_id: dstFolderId,
       },
-      { headers: { "Content-Type": "application/json; charset=UTF-8" } }
+      { headers: { "Content-Type": "application/json; charset=UTF-8" } },
     );
   },
 };

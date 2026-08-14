@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  calculateWidthText,
-  calculateDynamicNameGap,
-} from "../../chartDimensionUtils";
+import { calculateWidthText, calculateDynamicNameGap } from "../../chartDimensionUtils";
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { getTrellisGrid } from "../../calculateGridForSubPlot";
 import { deepCopy } from "@/utils/zincutils";
@@ -80,10 +77,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
    * @param yAxisNameGap
    * @param gridData
    */
-  const updateYAxisOption = (
-    yAxisNameGap: number,
-    gridData: null | any = null,
-  ) => {
+  const updateYAxisOption = (yAxisNameGap: number, gridData: null | any = null) => {
     const maxYValue = getUnitValue(
       Math.max(
         ...yAxisKeys
@@ -106,8 +100,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
     // addMaxValue is a boolean that verifies if maxYValue.value is a valid numeric string.
     // It ensures that the max property of the yAxis is only updated with valid numeric values.
     const addMaxValue =
-      maxYValue.value ===
-      parseInt(num) + (decimals === undefined ? "" : `.${decimals}`);
+      maxYValue.value === parseInt(num) + (decimals === undefined ? "" : `.${decimals}`);
 
     options.yAxis.forEach((it: any, index: number) => {
       if (addMaxValue) {
@@ -151,10 +144,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
    * @param yAxisNameGap
    * @param gridData
    */
-  const updateXAxisOption = (
-    yAxisNameGap: number,
-    gridData: null | any = null,
-  ) => {
+  const updateXAxisOption = (yAxisNameGap: number, gridData: null | any = null) => {
     // Update xAxis label properties for each chart xAxis based on the grid position
     options.xAxis.forEach((it: any, index: number) => {
       let showAxisLabel = false;
@@ -199,10 +189,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
       }
 
       // Validate panel dimensions
-      if (
-        chartPanelRef.value.offsetWidth <= 0 ||
-        chartPanelRef.value.offsetHeight <= 0
-      ) {
+      if (chartPanelRef.value.offsetWidth <= 0 || chartPanelRef.value.offsetHeight <= 0) {
         throw new Error("Invalid panel dimensions");
       }
 
@@ -237,9 +224,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
       const gridData = getTrellisGrid(
         chartPanelRef.value.offsetWidth,
         chartPanelRef.value.offsetHeight,
-        group_by_y_axis
-          ? options.series.length / yAxisKeys.length
-          : options.series.length,
+        group_by_y_axis ? options.series.length / yAxisKeys.length : options.series.length,
         yAxisNameGap,
         customCols,
         panelSchema.config?.axis_width,
@@ -315,9 +300,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
         // Add title for each chart
         if (existingSeriesIndex === -1) {
           options.title.push({
-            text: group_by_y_axis
-              ? series.originalSeriesName || series.name
-              : series.name,
+            text: group_by_y_axis ? series.originalSeriesName || series.name : series.name,
             textStyle: {
               fontSize: 12,
               width:

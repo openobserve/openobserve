@@ -16,7 +16,10 @@
 /**
  * Shared tooltip overflow CSS style for chart tooltips
  */
+import type { I18nText } from "@/types/i18n";
+
 export const TOOLTIP_SCROLL_STYLE =
+  // eslint-disable-next-line local/no-hardcoded-px -- ECharts serialises this into its own container — no CSS cascade resolves rem
   "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;";
 
 /**
@@ -105,15 +108,7 @@ export interface ConversionContext {
  * Aggregation function type for single-value charts
  */
 export type AggregationFunction =
-  | "last"
-  | "first"
-  | "min"
-  | "max"
-  | "avg"
-  | "sum"
-  | "count"
-  | "range"
-  | "diff";
+  "last" | "first" | "min" | "max" | "avg" | "sum" | "count" | "range" | "diff";
 
 /**
  * Configuration options for table charts
@@ -121,19 +116,11 @@ export type AggregationFunction =
 export interface TableColumnConfig {
   name: string;
   field: string;
-  label: string;
+  label: I18nText;
   align: "left" | "center" | "right";
   sortable: boolean;
   format?: (val: any) => string;
-  type?:
-    | "string"
-    | "number"
-    | "timestamp"
-    | "duration"
-    | "bytes"
-    | "boolean"
-    | "link"
-    | "json";
+  type?: "string" | "number" | "timestamp" | "duration" | "bytes" | "boolean" | "link" | "json";
 }
 
 /**

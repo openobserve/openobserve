@@ -35,23 +35,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="isUpdate && localValue != ''"
         @click="showSecretEdit = false"
       >
-        {{ t('common.cancel') }}
+        {{ t("common.cancel") }}
       </OButton>
     </div>
     <!-- Read-only display branch (edit mode, secret present, not editing): pure
          UI outside the form (R1) — not an editable field. -->
     <div v-else>
-      <label class="flex mb-3">
-        <b>{{ t('cipherKey.secret') }}</b>
+      <label class="mb-3 flex">
+        <b>{{ t("cipherKey.secret") }}</b>
       </label>
-      <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ localValue }}</pre>
+      <pre class="border-input-border mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
+        localValue
+      }}</pre>
       <OButton
         data-test="add-cipher-key-openobserve-secret-input-update"
         variant="primary"
         size="sm-action"
         @click="showSecretEdit = true"
       >
-        {{ t('common.update') }}
+        {{ t("common.update") }}
       </OButton>
     </div>
   </div>
@@ -59,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, inject, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -76,7 +78,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Local toggle for "edit the stored secret" (pure UI). The secret value
     // itself is form-owned — read it reactively from the parent OForm.

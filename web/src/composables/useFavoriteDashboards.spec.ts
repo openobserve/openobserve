@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import i18nInstance from "@/locales";
+
+const t = (i18nInstance.global as any).t;
 
 vi.mock("@/services/settings", () => ({
   default: {
@@ -86,7 +89,7 @@ describe("useFavoriteDashboards", () => {
     (settings.setUserSetting as any).mockResolvedValue({});
     const { toggleFavorite, favorites } = useFavoriteDashboards();
     favorites.value = [D1];
-    const p = toggleFavorite("org1", "me@example.com", D2);
+    const p = toggleFavorite("org1", "me@example.com", D2, t);
     expect(favorites.value).toEqual([D1, D2]); // optimistic — before resolve
     await p;
     expect(settings.setUserSetting).toHaveBeenCalledWith(
@@ -102,7 +105,7 @@ describe("useFavoriteDashboards", () => {
     (settings.setUserSetting as any).mockResolvedValue({});
     const { toggleFavorite, favorites } = useFavoriteDashboards();
     favorites.value = [D1, D2];
-    await toggleFavorite("org1", "me@example.com", D1);
+    await toggleFavorite("org1", "me@example.com", D1, t);
     expect(favorites.value).toEqual([D2]);
     expect(settings.setUserSetting).toHaveBeenCalledWith(
       "org1",
@@ -119,11 +122,9 @@ describe("useFavoriteDashboards", () => {
     });
     const { toggleFavorite, favorites } = useFavoriteDashboards();
     favorites.value = [D1];
-    await toggleFavorite("org1", "me@example.com", D2);
+    await toggleFavorite("org1", "me@example.com", D2, t);
     expect(favorites.value).toEqual([D1]); // reverted
-    expect(toast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error" }),
-    );
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
 
   it("toggleFavorite shows a permission message on 403", async () => {
@@ -131,7 +132,7 @@ describe("useFavoriteDashboards", () => {
       response: { status: 403 },
     });
     const { toggleFavorite, favorites } = useFavoriteDashboards();
-    await toggleFavorite("org1", "me@example.com", D1);
+    await toggleFavorite("org1", "me@example.com", D1, t);
     expect(favorites.value).toEqual([]);
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -143,8 +144,8 @@ describe("useFavoriteDashboards", () => {
 
   it("toggleFavorite no-ops (no API call, no flash) without org or user", async () => {
     const { toggleFavorite, favorites } = useFavoriteDashboards();
-    await toggleFavorite("", "me@example.com", D1);
-    await toggleFavorite("org1", "", D1);
+    await toggleFavorite("", "me@example.com", D1, t);
+    await toggleFavorite("org1", "", D1, t);
     expect(settings.setUserSetting).not.toHaveBeenCalled();
     expect(favorites.value).toEqual([]);
   });

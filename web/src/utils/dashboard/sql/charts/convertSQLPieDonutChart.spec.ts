@@ -29,7 +29,12 @@ vi.mock("@/utils/dashboard/legendConfiguration", () => ({
   getChartDimensions: vi.fn(() => ({ chartWidth: 800, chartHeight: 400 })),
   applyPieDonutChartAlignment: vi.fn(),
   applyPieDonutCenterAdjustment: vi.fn(),
-  calculatePieChartContainer: vi.fn(() => ({ left: "15%", right: "15%", top: "15%", bottom: "15%" })),
+  calculatePieChartContainer: vi.fn(() => ({
+    left: "15%",
+    right: "15%",
+    top: "15%",
+    bottom: "15%",
+  })),
 }));
 
 function makeMockContext(overrides: Partial<any> = {}): any {

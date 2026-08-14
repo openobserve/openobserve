@@ -143,9 +143,7 @@ describe("panelEditor types and utilities", () => {
     });
 
     it("should return DASHBOARD_PRESET as default for unknown page type", () => {
-      expect(getPresetByPageType("unknown" as PanelEditorPageType)).toBe(
-        DASHBOARD_PRESET,
-      );
+      expect(getPresetByPageType("unknown" as PanelEditorPageType)).toBe(DASHBOARD_PRESET);
     });
   });
 
@@ -386,12 +384,8 @@ describe("panelEditor types and utilities", () => {
         );
 
         regularChartTypes.forEach((type) => {
-          const inSelectStar = SELECT_STAR_ALLOWED_CHART_TYPES.includes(
-            type as any,
-          );
-          const inAggregation = AGGREGATION_REQUIRED_CHART_TYPES.includes(
-            type as any,
-          );
+          const inSelectStar = SELECT_STAR_ALLOWED_CHART_TYPES.includes(type as any);
+          const inAggregation = AGGREGATION_REQUIRED_CHART_TYPES.includes(type as any);
           expect(inSelectStar || inAggregation).toBe(true);
         });
       });
@@ -425,12 +419,7 @@ describe("panelEditor types and utilities", () => {
     });
 
     it("PanelEditorPageType should accept valid page types", () => {
-      const validTypes: PanelEditorPageType[] = [
-        "dashboard",
-        "metrics",
-        "logs",
-        "build",
-      ];
+      const validTypes: PanelEditorPageType[] = ["dashboard", "metrics", "logs", "build"];
 
       validTypes.forEach((type) => {
         const config = getPresetByPageType(type);

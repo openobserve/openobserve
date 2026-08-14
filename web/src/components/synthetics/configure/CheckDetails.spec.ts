@@ -1,6 +1,19 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import CheckDetails from "./CheckDetails.vue";
@@ -72,7 +85,7 @@ const OSwitchStub = {
 
 const OButtonStub = {
   emits: ["click"],
-  template: '<button @click="$emit(\'click\')"><slot /></button>',
+  template: "<button @click=\"$emit('click')\"><slot /></button>",
 };
 
 const OIconStub = {
@@ -162,12 +175,10 @@ describe("CheckDetails", () => {
     });
 
     it("should render tag input and add button", () => {
-      expect(
-        wrapper.find('[data-test="synthetics-check-details-tag-input"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-check-details-add-tag-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-check-details-tag-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-check-details-add-tag-btn"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -176,7 +187,7 @@ describe("CheckDetails", () => {
       wrapper = mountCheckDetails();
     });
 
-    it('should emit update:check with updated name when name input changes', async () => {
+    it("should emit update:check with updated name when name input changes", async () => {
       const nameInput = wrapper.find<HTMLInputElement>(
         '[data-test="synthetics-check-details-name-input"] input',
       );
@@ -211,24 +222,23 @@ describe("CheckDetails", () => {
       expect(options[1].text()).toBe("Non-Critical Monitors");
     });
 
-    it("should render default option when no folders are provided", () => {
+    // A fabricated "Default" option used to stand in for a missing list, which
+    // made a failed folder fetch indistinguishable from an org that only has the
+    // default folder — while the select rendered the unresolvable id verbatim.
+    it("should render no options when no folders are provided", () => {
       wrapper = mountCheckDetails({ folders: undefined });
       const select = wrapper.find<HTMLSelectElement>(
         '[data-test="synthetics-check-details-folder-select"] select',
       );
-      const options = select.findAll("option");
-      expect(options).toHaveLength(1);
-      expect(options[0].text()).toBe("Default");
+      expect(select.findAll("option")).toHaveLength(0);
     });
 
-    it("should render default option when folders array is empty", () => {
+    it("should render no options when folders array is empty", () => {
       wrapper = mountCheckDetails({ folders: [] });
       const select = wrapper.find<HTMLSelectElement>(
         '[data-test="synthetics-check-details-folder-select"] select',
       );
-      const options = select.findAll("option");
-      expect(options).toHaveLength(1);
-      expect(options[0].text()).toBe("Default");
+      expect(select.findAll("option")).toHaveLength(0);
     });
 
     it("should emit update:check with updated folder when a folder is selected", async () => {
@@ -308,9 +318,7 @@ describe("CheckDetails", () => {
       const tagInput = wrapper.find<HTMLInputElement>(
         '[data-test="synthetics-check-details-tag-input"] input',
       );
-      const addBtn = wrapper.find(
-        '[data-test="synthetics-check-details-add-tag-btn"]',
-      );
+      const addBtn = wrapper.find('[data-test="synthetics-check-details-add-tag-btn"]');
 
       await tagInput.setValue("new-tag");
       await addBtn.trigger("click");
@@ -331,9 +339,7 @@ describe("CheckDetails", () => {
       const tagInput = wrapper.find<HTMLInputElement>(
         '[data-test="synthetics-check-details-tag-input"] input',
       );
-      const addBtn = wrapper.find(
-        '[data-test="synthetics-check-details-add-tag-btn"]',
-      );
+      const addBtn = wrapper.find('[data-test="synthetics-check-details-add-tag-btn"]');
 
       // Record emit count before attempting duplicate add
       const emitCountBefore = (wrapper.emitted("update:check") ?? []).length;
@@ -354,9 +360,7 @@ describe("CheckDetails", () => {
 
     it("should remove a tag when the remove button is clicked", async () => {
       // The mock data has tags: ["production", "critical"]
-      const removeBtn = wrapper.find(
-        '[data-test="synthetics-check-details-remove-tag-0-btn"]',
-      );
+      const removeBtn = wrapper.find('[data-test="synthetics-check-details-remove-tag-0-btn"]');
       expect(removeBtn.exists()).toBe(true);
 
       await removeBtn.trigger("click");
@@ -386,9 +390,7 @@ describe("CheckDetails", () => {
     });
 
     it("should not add empty tag when input is empty", async () => {
-      const addBtn = wrapper.find(
-        '[data-test="synthetics-check-details-add-tag-btn"]',
-      );
+      const addBtn = wrapper.find('[data-test="synthetics-check-details-add-tag-btn"]');
 
       // Ensure tag input is empty (it should be initially)
       await addBtn.trigger("click");
@@ -411,9 +413,7 @@ describe("CheckDetails", () => {
         validationErrors: { name: "Name is required" },
       });
 
-      const nameWrapper = wrapper.find(
-        '[data-test="synthetics-check-details-name-input"]',
-      );
+      const nameWrapper = wrapper.find('[data-test="synthetics-check-details-name-input"]');
       expect(nameWrapper.exists()).toBe(true);
       expect(nameWrapper.find(".o-input-error").exists()).toBe(true);
       expect(nameWrapper.find(".o-input-error").text()).toBe("Name is required");
@@ -424,9 +424,7 @@ describe("CheckDetails", () => {
         validationErrors: { url: "URL is required" },
       });
 
-      const urlWrapper = wrapper.find(
-        '[data-test="synthetics-check-details-url-input"]',
-      );
+      const urlWrapper = wrapper.find('[data-test="synthetics-check-details-url-input"]');
       expect(urlWrapper.exists()).toBe(true);
       expect(urlWrapper.find(".o-input-error").exists()).toBe(true);
       expect(urlWrapper.find(".o-input-error").text()).toBe("URL is required");
@@ -435,18 +433,14 @@ describe("CheckDetails", () => {
     it("should not show error when validationErrors is undefined", () => {
       wrapper = mountCheckDetails({ validationErrors: undefined });
 
-      const nameWrapper = wrapper.find(
-        '[data-test="synthetics-check-details-name-input"]',
-      );
+      const nameWrapper = wrapper.find('[data-test="synthetics-check-details-name-input"]');
       expect(nameWrapper.find(".o-input-error").exists()).toBe(false);
     });
 
     it("should not show error when validationErrors is an empty object", () => {
       wrapper = mountCheckDetails({ validationErrors: {} });
 
-      const nameWrapper = wrapper.find(
-        '[data-test="synthetics-check-details-name-input"]',
-      );
+      const nameWrapper = wrapper.find('[data-test="synthetics-check-details-name-input"]');
       expect(nameWrapper.find(".o-input-error").exists()).toBe(false);
     });
   });
@@ -455,22 +449,16 @@ describe("CheckDetails", () => {
     it("should use default target label when targetLabel is not provided", () => {
       wrapper = mountCheckDetails();
 
-      const urlWrapper = wrapper.find(
-        '[data-test="synthetics-check-details-url-input"]',
-      );
+      const urlWrapper = wrapper.find('[data-test="synthetics-check-details-url-input"]');
       expect(urlWrapper.text()).toContain("Starting URL");
     });
 
     it("should use custom target label when targetLabel is provided", () => {
       wrapper = mountCheckDetails({ targetLabel: "Target Host" });
 
-      const urlWrapper = wrapper.find(
-        '[data-test="synthetics-check-details-url-input"]',
-      );
+      const urlWrapper = wrapper.find('[data-test="synthetics-check-details-url-input"]');
       expect(urlWrapper.text()).toContain("Target Host");
-      expect(urlWrapper.text()).not.toContain(
-        "Starting URL",
-      );
+      expect(urlWrapper.text()).not.toContain("Starting URL");
     });
 
     it("should use default target placeholder when targetPlaceholder is not provided", () => {
@@ -479,9 +467,7 @@ describe("CheckDetails", () => {
       const urlInput = wrapper.find<HTMLInputElement>(
         '[data-test="synthetics-check-details-url-input"] input',
       );
-      expect(urlInput.element.placeholder).toBe(
-        "https://example.com",
-      );
+      expect(urlInput.element.placeholder).toBe("https://example.com");
     });
 
     it("should use custom target placeholder when targetPlaceholder is provided", () => {
@@ -515,15 +501,17 @@ describe("CheckDetails", () => {
         ...mockMonitorHttp,
         folder: undefined,
       };
-      wrapper = mountCheckDetails({ check: checkWithoutFolder });
+      wrapper = mountCheckDetails({
+        check: checkWithoutFolder,
+        folders: [{ folderId: "default", name: "Default" }],
+      });
 
       const select = wrapper.find<HTMLSelectElement>(
         '[data-test="synthetics-check-details-folder-select"] select',
       );
-      // When folder is undefined, folder computed returns ''
-      // The select should show the default option with value "default"
-      const defaultOption = select.find('option[value="default"]');
-      expect(defaultOption.exists()).toBe(true);
+      // When folder is undefined, folder computed returns '' — the option list
+      // is still the loaded one, with nothing selected.
+      expect(select.find('option[value="default"]').exists()).toBe(true);
     });
 
     it("should handle empty tags array", () => {
@@ -543,9 +531,7 @@ describe("CheckDetails", () => {
       const tagInput = wrapper.find<HTMLInputElement>(
         '[data-test="synthetics-check-details-tag-input"] input',
       );
-      const addBtn = wrapper.find(
-        '[data-test="synthetics-check-details-add-tag-btn"]',
-      );
+      const addBtn = wrapper.find('[data-test="synthetics-check-details-add-tag-btn"]');
 
       await tagInput.setValue("cleaned-tag");
       await addBtn.trigger("click");

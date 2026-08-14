@@ -253,7 +253,9 @@ describe("ImportSyntheticsLocations", () => {
 
     it("respects enabled: false when provided", async () => {
       wrapper = makeWrapper();
-      const json = JSON.stringify([{ provider: "aws", region: "us-east-1", label: "Test", enabled: false }]);
+      const json = JSON.stringify([
+        { provider: "aws", region: "us-east-1", label: "Test", enabled: false },
+      ]);
       await parseViaScheduleParse(wrapper, json);
 
       const locations = wrapper.vm.parsedLocations as any[];
@@ -262,7 +264,9 @@ describe("ImportSyntheticsLocations", () => {
 
     it("generates id from provider and region", async () => {
       wrapper = makeWrapper();
-      const json = JSON.stringify([{ provider: "azure", region: "west-us", label: "Azure West US" }]);
+      const json = JSON.stringify([
+        { provider: "azure", region: "west-us", label: "Azure West US" },
+      ]);
       await parseViaScheduleParse(wrapper, json);
 
       const locations = wrapper.vm.parsedLocations as any[];
@@ -282,7 +286,14 @@ describe("ImportSyntheticsLocations", () => {
     it("shows dash for missing label in preview", async () => {
       wrapper = makeWrapper();
       (wrapper.vm as any).parsedLocations = [
-        { id: "aws-us-east-1", provider: "aws", region: "us-east-1", label: "", kind: "public", enabled: true },
+        {
+          id: "aws-us-east-1",
+          provider: "aws",
+          region: "us-east-1",
+          label: "",
+          kind: "public",
+          enabled: true,
+        },
       ];
       await nextTick();
 
@@ -380,20 +391,23 @@ describe("ImportSyntheticsLocations", () => {
       wrapper = makeWrapper();
 
       // First, trigger an error
-      await parseViaScheduleParse(wrapper, JSON.stringify([{ provider: "aws", region: "us-east-1" }]));
+      await parseViaScheduleParse(
+        wrapper,
+        JSON.stringify([{ provider: "aws", region: "us-east-1" }]),
+      );
       expect((wrapper.vm.validationErrors as string[]).length).toBeGreaterThan(0);
 
       // Then, provide valid JSON
       await parseViaScheduleParse(wrapper, validJsonArray);
-      expect((wrapper.vm.validationErrors as string[])).toHaveLength(0);
+      expect(wrapper.vm.validationErrors as string[]).toHaveLength(0);
     });
 
     it("treats empty input as valid (no parse, no errors)", async () => {
       wrapper = makeWrapper();
       await parseViaScheduleParse(wrapper, "   ");
 
-      expect((wrapper.vm.validationErrors as string[])).toHaveLength(0);
-      expect((wrapper.vm.parsedLocations as any[])).toHaveLength(0);
+      expect(wrapper.vm.validationErrors as string[]).toHaveLength(0);
+      expect(wrapper.vm.parsedLocations as any[]).toHaveLength(0);
     });
   });
 
@@ -440,12 +454,12 @@ describe("ImportSyntheticsLocations", () => {
       // Wait for the setTimeout in StubFileReader
       await new Promise((r) => setTimeout(r, 0));
 
-      expect((wrapper.vm.jsonString as string)).toBe(mockFileContent);
+      expect(wrapper.vm.jsonString as string).toBe(mockFileContent);
     });
 
     it("does nothing when no file is selected", async () => {
       wrapper = makeWrapper();
-      const initialJson = (wrapper.vm.jsonString as string);
+      const initialJson = wrapper.vm.jsonString as string;
 
       const event = {
         target: { files: [], value: "" },
@@ -454,7 +468,7 @@ describe("ImportSyntheticsLocations", () => {
       (wrapper.vm as any).handleFileChange(event);
       await nextTick();
 
-      expect((wrapper.vm.jsonString as string)).toBe(initialJson);
+      expect(wrapper.vm.jsonString as string).toBe(initialJson);
     });
   });
 
@@ -502,12 +516,15 @@ describe("ImportSyntheticsLocations", () => {
       await (wrapper.vm as any).handleImport();
       await flushPromises();
 
-      expect(mockCreateLocation).toHaveBeenCalledWith("test-org", expect.objectContaining({
-        locations: expect.arrayContaining([
-          expect.objectContaining({ id: "aws-us-east-1" }),
-          expect.objectContaining({ id: "gcp-us-central1" }),
-        ]),
-      }));
+      expect(mockCreateLocation).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({
+          locations: expect.arrayContaining([
+            expect.objectContaining({ id: "aws-us-east-1" }),
+            expect.objectContaining({ id: "gcp-us-central1" }),
+          ]),
+        }),
+      );
     });
 
     it("sets isImporting to true while the API call is pending", async () => {
@@ -524,7 +541,7 @@ describe("ImportSyntheticsLocations", () => {
       const importPromise = (wrapper.vm as any).handleImport();
       await nextTick();
 
-      expect((wrapper.vm.isImporting as boolean)).toBe(true);
+      expect(wrapper.vm.isImporting as boolean).toBe(true);
 
       // Resolve and clean up
       resolvePromise!({ data: { results: [] } });
@@ -539,7 +556,7 @@ describe("ImportSyntheticsLocations", () => {
 
       await (wrapper.vm as any).handleImport();
 
-      expect((wrapper.vm.isImporting as boolean)).toBe(false);
+      expect(wrapper.vm.isImporting as boolean).toBe(false);
     });
   });
 
@@ -552,9 +569,7 @@ describe("ImportSyntheticsLocations", () => {
 
       mockCreateLocation.mockResolvedValue({
         data: {
-          results: [
-            { id: "aws-us-east-1", label: "AWS US East", ok: true },
-          ],
+          results: [{ id: "aws-us-east-1", label: "AWS US East", ok: true }],
         },
       });
 
@@ -664,9 +679,7 @@ describe("ImportSyntheticsLocations", () => {
 
       await (wrapper.vm as any).handleImport();
 
-      const successCalls = mockToastFn.mock.calls.filter(
-        (c: any[]) => c[0]?.variant === "success",
-      );
+      const successCalls = mockToastFn.mock.calls.filter((c: any[]) => c[0]?.variant === "success");
       expect(successCalls).toHaveLength(0);
     });
 
@@ -694,9 +707,7 @@ describe("ImportSyntheticsLocations", () => {
 
       await (wrapper.vm as any).handleImport();
 
-      const errorCalls = mockToastFn.mock.calls.filter(
-        (c: any[]) => c[0]?.variant === "error",
-      );
+      const errorCalls = mockToastFn.mock.calls.filter((c: any[]) => c[0]?.variant === "error");
       expect(errorCalls.length).toBeGreaterThan(0);
       expect(errorCalls[0][0].message).toContain("Failed to import");
     });
@@ -749,14 +760,14 @@ describe("ImportSyntheticsLocations", () => {
       await textarea.trigger("input");
 
       // parse not called yet
-      expect((wrapper.vm.parsedLocations as any[])).toHaveLength(0);
+      expect(wrapper.vm.parsedLocations as any[]).toHaveLength(0);
 
       // Advance past debounce
       vi.advanceTimersByTime(300);
       await nextTick();
 
       // Now should have parsed
-      expect((wrapper.vm.parsedLocations as any[])).toHaveLength(1);
+      expect(wrapper.vm.parsedLocations as any[]).toHaveLength(1);
     });
 
     it("debounces multiple rapid inputs into a single parse call", async () => {
@@ -776,14 +787,14 @@ describe("ImportSyntheticsLocations", () => {
       await textarea.trigger("input");
 
       // Only 100ms since last input — not yet parsed
-      expect((wrapper.vm.parsedLocations as any[])).toHaveLength(0);
+      expect(wrapper.vm.parsedLocations as any[]).toHaveLength(0);
 
       // Advance past debounce period (300ms from last input)
       vi.advanceTimersByTime(300);
       await nextTick();
 
       // Should now have parsed the latest value (2 items)
-      expect((wrapper.vm.parsedLocations as any[])).toHaveLength(2);
+      expect(wrapper.vm.parsedLocations as any[]).toHaveLength(2);
     });
   });
 
@@ -802,10 +813,10 @@ describe("ImportSyntheticsLocations", () => {
       // Trigger a new parse
       await parseViaScheduleParse(wrapper, validJsonArray);
 
-      expect((wrapper.vm.parsedLocations as any[])).toHaveLength(1);
+      expect(wrapper.vm.parsedLocations as any[]).toHaveLength(1);
       expect((wrapper.vm.parsedLocations as any[])[0].id).not.toBe("old");
-      expect((wrapper.vm.validationErrors as string[])).toHaveLength(0);
-      expect((wrapper.vm.importResults as any[])).toHaveLength(0);
+      expect(wrapper.vm.validationErrors as string[]).toHaveLength(0);
+      expect(wrapper.vm.importResults as any[]).toHaveLength(0);
 
       vi.useRealTimers();
     });
@@ -827,7 +838,7 @@ describe("ImportSyntheticsLocations", () => {
 
       await (wrapper.vm as any).handleImport();
 
-      expect((wrapper.vm.importResults as any[])).toHaveLength(0);
+      expect(wrapper.vm.importResults as any[]).toHaveLength(0);
     });
 
     it("handles response without data.results gracefully", async () => {
@@ -838,7 +849,7 @@ describe("ImportSyntheticsLocations", () => {
 
       await (wrapper.vm as any).handleImport();
 
-      expect((wrapper.vm.importResults as any[])).toHaveLength(0);
+      expect(wrapper.vm.importResults as any[]).toHaveLength(0);
     });
   });
 });

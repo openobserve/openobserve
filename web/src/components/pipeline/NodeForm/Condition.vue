@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :width="45"
     :show-close="false"
     data-test="add-condition-drawer"
-    primary-button-label="Save"
-    secondary-button-label="Cancel"
+    :primary-button-label="t('common.save')"
+    :secondary-button-label="t('common.cancel')"
     secondary-button-variant="outline"
     :neutral-button-label="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutral-button-variant="outline-destructive"
@@ -36,13 +36,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <button
         type="button"
-        aria-label="Close drawer"
+        :aria-label="t('pipeline.closeDrawer')"
         data-test="o-drawer-close-btn"
         @mousedown.prevent
         @click="openCancelDialog"
-        class="shrink-0 flex items-center justify-center h-7 w-7 rounded-default text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring cursor-pointer"
+        class="rounded-default text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg focus-visible:ring-dialog-focus-ring flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
@@ -50,85 +61,111 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-condition-section"
-      class="stream-routing-section w-full min-h-full bg-surface-base"
+      class="stream-routing-section bg-surface-base min-h-full w-full"
     >
-
-
-    <div class="w-full rounded-default stream-routing-container">
-      <div>
-        <div
-          class="showLabelOnTop font-bold text-h7"
-          data-test="add-condition-query-input-title"
-        >
-          <div></div>
-          <!-- SHARED body: the same ConditionBuilder the workflow Condition node
+      <div class="rounded-default stream-routing-container w-full">
+        <div>
+          <div class="showLabelOnTop text-h7 font-bold" data-test="add-condition-query-input-title">
+            <div></div>
+            <!-- SHARED body: the same ConditionBuilder the workflow Condition node
                renders. It owns the FilterGroup, the V0/V1→V2 conversion, the zod
                schema and the inline error. Pipelines only supply the stream
                fields and these guidelines. -->
-          <ConditionBuilder
-            ref="builder"
-            :fields="filteredColumns"
-            :initial-conditions="initialConditions"
-            module="pipelines"
-            :allow-custom-columns="true"
-            normalize-operators
-          >
-            <template #guidelines>
-          <div
-            class="note-container bg-banner-warning-bg border border-banner-warning-border text-banner-warning-text w-full rounded-default p-3 my-3 flex flex-col gap-2"
-            data-test="add-condition-note-container"
-          >
-            <div
-              class="text-sm text-banner-warning-text"
-              data-test="add-condition-note-heading"
+            <ConditionBuilder
+              ref="builder"
+              :fields="filteredColumns"
+              :initial-conditions="initialConditions"
+              module="pipelines"
+              :allow-custom-columns="true"
+              normalize-operators
             >
-              Condition value Guidelines:
-            </div>
-            <div
-              class="flex flex-col gap-1 text-sm text-banner-warning-text"
-              data-test="add-condition-note-info"
-            >
-              <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
-                <span>
-                  To check for an empty value, use
-                  <span class="highlight font-bold text-text-link">""</span>. Example:
-                  <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">app_name != ""</span>
-                </span>
-              </div>
-              <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
-                <span>
-                  To check for an Null value, use
-                  <span class="highlight font-bold text-text-link">null</span>. Example:
-                  <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">app_name != null</span>
-                </span>
-              </div>
-              <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
-                <span>
-                  To add a custom column, type column name and press
-                  <span class="highlight font-bold text-text-link">Enter</span>.
-                </span>
-              </div>
-              <div class="flex items-start gap-2">
-                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-status-error-text" />
-                <span>If conditions are not met, the record will be dropped.</span>
-              </div>
-              <div class="flex items-start gap-2">
-                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-status-error-text" />
-                <span>If the record does not have the specified field, it will be dropped.</span>
-              </div>
-            </div>
+              <template #guidelines>
+                <div
+                  class="note-container bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default my-3 flex w-full flex-col gap-2 border p-3"
+                  data-test="add-condition-note-container"
+                >
+                  <div
+                    class="text-banner-warning-text text-sm"
+                    data-test="add-condition-note-heading"
+                  >
+                    {{ t("pipeline.conditionValueGuidelines") }}
+                  </div>
+                  <div
+                    class="text-banner-warning-text flex flex-col gap-1 text-sm"
+                    data-test="add-condition-note-info"
+                  >
+                    <div class="flex items-start gap-2">
+                      <OIcon
+                        name="info"
+                        size="sm"
+                        class="text-status-warning-text mt-0.5 shrink-0"
+                      />
+                      <span>
+                        {{ t("pipeline.emptyValueGuideline") }}
+                        <span class="highlight text-text-link font-bold">{{ raw('""') }}</span
+                        >{{ t("pipeline.exampleColon") }}
+                        <span
+                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
+                          >{{ raw('app_name != ""') }}</span
+                        >
+                      </span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                      <OIcon
+                        name="info"
+                        size="sm"
+                        class="text-status-warning-text mt-0.5 shrink-0"
+                      />
+                      <span>
+                        {{ t("pipeline.nullValueGuideline") }}
+                        <span class="highlight text-text-link font-bold">{{ raw("null") }}</span
+                        >{{ t("pipeline.exampleColon") }}
+                        <span
+                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
+                          >{{ raw("app_name != null") }}</span
+                        >
+                      </span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                      <OIcon
+                        name="info"
+                        size="sm"
+                        class="text-status-warning-text mt-0.5 shrink-0"
+                      />
+                      <span>
+                        {{ t("pipeline.customColumnGuideline") }}
+                        <span class="highlight text-text-link font-bold">{{
+                          t("pipeline.enterKey")
+                        }}</span
+                        >.
+                      </span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                      <OIcon
+                        name="warning"
+                        size="sm"
+                        class="text-status-error-text mt-0.5 shrink-0"
+                      />
+                      <span>{{ t("pipeline.conditionsNotMetWarning") }}</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                      <OIcon
+                        name="warning"
+                        size="sm"
+                        class="text-status-error-text mt-0.5 shrink-0"
+                      />
+                      <span>{{ t("pipeline.missingFieldWarning") }}</span>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </ConditionBuilder>
           </div>
-            </template>
-          </ConditionBuilder>
         </div>
       </div>
     </div>
-  </div>
   </ODrawer>
-  <confirm-dialog
+  <ConfirmDialog
     v-model="dialog.show"
     :title="dialog.title"
     :message="dialog.message"
@@ -137,20 +174,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import {
-  computed,
-  onMounted,
-  ref,
-  type Ref,
-  onBeforeMount,
-  watch,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, onMounted, ref, type Ref, onBeforeMount, watch } from "vue";
+import { useI18nTyped, raw } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
-import {
-  getUUID,
-} from "@/utils/zincutils";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useStreams from "@/composables/useStreams";
@@ -158,38 +185,22 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-// V1 interfaces (legacy support)
-interface FilterCondition {
-  column: string;
-  operator: string;
-  value: any;
-  ignore_case: boolean;
-  id: string;
-}
-
-interface ConditionGroup {
-  // V2 properties
-  filterType?: "group";
-  logicalOperator?: "AND" | "OR";
-  conditions?: (FilterCondition | ConditionGroup)[];
-  // V1 properties (legacy)
-  groupId?: string;
-  label?: "and" | "or";
-  items?: (FilterCondition | ConditionGroup)[];
-}
-
-const { t } = useI18n();
-
+const { t } = useI18nTyped();
 
 const store = useStore();
 
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const internalOpen = ref(!!props.open);
-watch(() => props.open, (v) => { internalOpen.value = !!v; });
+watch(
+  () => props.open,
+  (v) => {
+    internalOpen.value = !!v;
+  },
+);
 
 function handleDrawerClose(v: boolean) {
   if (!v) {
@@ -204,7 +215,7 @@ const filteredColumns: any = ref([]);
 
 const originalStreamFields: Ref<any[]> = ref([]);
 
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
 
 const selected = ref(null);
 watch(selected, (newValue: any) => {
@@ -219,48 +230,10 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const getDefaultStreamRoute: any = () => {
-  if (pipelineObj.isEditNode) {
-    return pipelineObj.currentSelectedNodeData.data;
-  }
-  return {
-    name: "",
-    destination: {
-      org_id: "",
-      stream_name: "",
-      stream_type: "logs",
-    },
-    is_real_time: true,
-    query_condition: {
-      sql: "",
-      type: "sql",
-      aggregation: null,
-    },
-    trigger_condition: {
-      period: 15,
-      frequency_type: "minutes",
-      cron: "",
-      frequency: 15,
-      timezone: "UTC",
-    },
-    context_attributes: [
-      {
-        key: "",
-        value: "",
-        id: getUUID(),
-      },
-    ],
-    description: "",
-    enabled: true,
-  };
-};
-
 // The SHARED ConditionBuilder owns V0/V1 -> V2 conversion and the lowercase
 // operator normalization; pipelines just hand it the saved rule.
 const initialConditions = computed(() =>
-  pipelineObj.isEditNode
-    ? (pipelineObj.currentSelectedNodeData?.data?.conditions ?? null)
-    : null,
+  pipelineObj.isEditNode ? (pipelineObj.currentSelectedNodeData?.data?.conditions ?? null) : null,
 );
 
 onBeforeMount(async () => {
@@ -298,9 +271,7 @@ const builder = ref<any>(null);
 // Snapshot of the rule as first rendered, for the "discard changes?" prompt.
 const originalConditionGroup = ref<any>(null);
 onMounted(() => {
-  originalConditionGroup.value = JSON.parse(
-    JSON.stringify(builder.value?.conditionGroup ?? null),
-  );
+  originalConditionGroup.value = JSON.parse(JSON.stringify(builder.value?.conditionGroup ?? null));
 });
 
 const updateStreamFields = async (streamName: any, streamType: any) => {
@@ -330,8 +301,7 @@ const updateStreamFields = async (streamName: any, streamType: any) => {
 
     // Get special system field names from config
     // These are OpenObserve internal fields that should always be available
-    const timestampColumn =
-      store.state.zoConfig?.timestamp_column || "_timestamp";
+    const timestampColumn = store.state.zoConfig?.timestamp_column || "_timestamp";
     const allFieldsName = store.state.zoConfig?.all_fields_name;
 
     // Filter the columns to include:
@@ -360,49 +330,39 @@ const getFields = async () => {
     const allNodes = pipelineObj.currentSelectedPipeline?.nodes || [];
 
     const inputStreamNode: any = allNodes.find(
-      (node: any) =>
-        node.io_type === "input" && node.data.node_type === "stream",
+      (node: any) => node.io_type === "input" && node.data.node_type === "stream",
     );
 
     const inputQueryNode: any = allNodes.find(
-      (node: any) =>
-        node.io_type === "input" && node.data.node_type === "query",
+      (node: any) => node.io_type === "input" && node.data.node_type === "query",
     );
 
     const anyStreamNode: any = allNodes.find(
-      (node: any) =>
-        node.data?.node_type === "stream" && node.data?.stream_name,
+      (node: any) => node.data?.node_type === "stream" && node.data?.stream_name,
     );
 
     if (inputStreamNode) {
       await updateStreamFields(
-        inputStreamNode.data?.stream_name.value ||
-          inputStreamNode.data?.stream_name,
+        inputStreamNode.data?.stream_name.value || inputStreamNode.data?.stream_name,
         inputStreamNode.data?.stream_type,
       );
     } else if (inputQueryNode) {
       const filteredQuery: any = inputQueryNode?.data?.query_condition.sql
         .split("\n")
-        .filter(
-          (line: string) => line.length > 0 && !line.trim().startsWith("--"),
-        )
+        .filter((line: string) => line.length > 0 && !line.trim().startsWith("--"))
         .join("\n");
       if (filteredQuery) {
         const parsedSql = parser.astify(filteredQuery);
         if (parsedSql && parsedSql.from) {
           const streamNames = parsedSql.from.map((item: any) => item.table);
           for (const streamName of streamNames) {
-            await updateStreamFields(
-              streamName,
-              inputQueryNode?.data?.stream_type,
-            );
+            await updateStreamFields(streamName, inputQueryNode?.data?.stream_type);
           }
         }
       }
     } else if (anyStreamNode) {
       await updateStreamFields(
-        anyStreamNode.data?.stream_name.value ||
-          anyStreamNode.data?.stream_name,
+        anyStreamNode.data?.stream_name.value || anyStreamNode.data?.stream_name,
         anyStreamNode.data?.stream_type,
       );
     } else {
@@ -412,7 +372,6 @@ const getFields = async () => {
     console.error("Error fetching fields:", e);
   }
 };
-
 
 const closeDialog = () => {
   // The builder holds its own deep clone of the rule, so the saved node data was
@@ -469,10 +428,7 @@ const saveCondition = async () => {
     }
 
     // Fix userClickedNode if it's an object instead of string ID
-    if (
-      pipelineObj.userClickedNode &&
-      typeof pipelineObj.userClickedNode === "object"
-    ) {
+    if (pipelineObj.userClickedNode && typeof pipelineObj.userClickedNode === "object") {
       if (pipelineObj.userClickedNode.id) {
         pipelineObj.userClickedNode = pipelineObj.userClickedNode.id;
       } else {
@@ -482,15 +438,15 @@ const saveCondition = async () => {
 
     addNode(conditionData);
     // Snapshot the newly saved state for the discard-changes comparison.
-    originalConditionGroup.value = JSON.parse(
-      JSON.stringify(payload.conditions),
-    );
+    originalConditionGroup.value = JSON.parse(JSON.stringify(payload.conditions));
     emit("cancel:hideform");
   } catch (error) {
     console.error("Error saving condition:", error);
     toast({
       variant: "error",
-      message: "Error saving condition: " + (error as Error).message,
+      message: t("toastMessages.NodeForm.errorSavingCondition", {
+        error: (error as Error).message,
+      }),
       timeout: 5000,
     });
     emit("cancel:hideform");
@@ -525,7 +481,6 @@ const deleteRoute = () => {
 
   emit("cancel:hideform");
 };
-
 </script>
 
 <style scoped>

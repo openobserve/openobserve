@@ -29,7 +29,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
-        self_reporting::usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
+        self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
     utils::{flatten, json::*, schema::format_partition_key},
@@ -42,18 +42,18 @@ use infra::{
     errors::{Error, Result},
     schema::STREAM_RECORD_ID_GENERATOR,
 };
+use ingestion_common::IngestionRequest;
 use proto::cluster_rpc::IngestionType;
+use usage_reporting::publish_triggers_usage;
 use vrl::compiler::runtime::Runtime;
 
 use super::{
     db::alerts::alert,
-    pipeline::{batch_execution::ExecutablePipeline, store as pipeline},
-    self_reporting::publish_triggers_usage,
+    pipeline::{batch_execution::ExecutablePipeline, db as pipeline},
 };
 use crate::{
     alerts::alert::AlertExt,
     common::{infra::config::STREAM_ALERTS, meta::stream::SchemaRecords},
-    ingestion_types::IngestionRequest,
 };
 
 pub mod grpc;
@@ -85,7 +85,7 @@ pub async fn get_stream_partition_keys(
     let stream_settings = infra::schema::get_settings(org_id, stream_name, *stream_type)
         .await
         .unwrap_or_default();
-    stream_settings.partition_keys
+    stream_settings.partition_keys.clone()
 }
 
 #[inline(always)]
@@ -150,7 +150,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             next_run_at: now,
             is_realtime: true,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Firing,
             start_time: now,
             end_time: 0,
             retries: 0,
@@ -173,18 +173,18 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.name
         );
         match alert
-            .send_notification(&trace_id, val, now, None, now)
+            .send_notification(&trace_id, val, now, None, now, None, None, None, &[])
             .await
         {
             Err(e) => {
                 log::error!("Failed to send notification: {e}");
-                trigger_data_stream.status = TriggerDataStatus::Failed;
+                trigger_data_stream.status = RunOutcome::NotifyFailed;
                 trigger_data_stream.error =
                     Some(format!("error sending notification for alert: {e}"));
             }
-            Ok((success_msg, error_msg)) => {
-                let success_msg = success_msg.trim().to_owned();
-                let error_msg = error_msg.trim().to_owned();
+            Ok(outcome) => {
+                let success_msg = outcome.success_message.trim().to_owned();
+                let error_msg = outcome.error_message.trim().to_owned();
                 if !error_msg.is_empty() {
                     trigger_data_stream.error = Some(error_msg);
                 }
@@ -478,7 +478,8 @@ pub async fn get_uds_and_original_data_streams(
         );
 
         if !stream_settings.defined_schema_fields.is_empty() {
-            let mut fields = HashSet::<_>::from_iter(stream_settings.defined_schema_fields);
+            let mut fields =
+                HashSet::<_>::from_iter(stream_settings.defined_schema_fields.iter().cloned());
             if !fields.contains(TIMESTAMP_COL_NAME) {
                 fields.insert(TIMESTAMP_COL_NAME.to_string());
             }
@@ -550,7 +551,7 @@ pub fn refactor_map(
 
 #[cfg(test)]
 mod tests {
-    use infra::schema::{STREAM_SETTINGS, unwrap_stream_settings};
+    use infra::schema::unwrap_stream_settings;
     use transform::compile_vrl_function;
 
     use super::*;
@@ -620,10 +621,11 @@ mod tests {
         );
         let schema = arrow_schema::Schema::empty().with_metadata(meta);
         let settings = unwrap_stream_settings(&schema).unwrap();
-        let mut w = STREAM_SETTINGS.write().await;
-        w.insert("default/logs/olympics".to_string(), settings);
-        infra::schema::set_stream_settings_atomic(w.clone());
-        drop(w);
+        infra::schema::put_stream_settings(
+            "default/logs/olympics".to_string(),
+            std::sync::Arc::new(settings),
+        )
+        .await;
         let keys = get_stream_partition_keys("default", &StreamType::Logs, "olympics").await;
         assert_eq!(
             keys,

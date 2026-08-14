@@ -67,11 +67,7 @@ export function useJobMatchedTargets(
       return;
     }
 
-    const sql = buildJobMatchedTargetsSql(
-      stream.value,
-      whereClause.value,
-      targetScope.value,
-    );
+    const sql = buildJobMatchedTargetsSql(stream.value, whereClause.value, targetScope.value);
     const endUs = Date.now() * 1000;
     const startUs = (Date.now() - WINDOW_MS) * 1000;
     isLoading.value = true;

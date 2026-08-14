@@ -20,7 +20,6 @@ import FlameGraphView from "@/components/traces/FlameGraphView.vue";
 
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
-
 // Stub ChartRenderer globally so defineAsyncComponent resolves synchronously
 const ChartRendererStub = {
   name: "ChartRenderer",
@@ -767,9 +766,7 @@ describe("FlameGraphView", () => {
       await wrapper.vm.$nextTick();
 
       const { data } = wrapper.vm.flameGraphDataAndDepth;
-      const selectedItem = data.find(
-        (d: any) => d.spanData.span_id === "span-1",
-      );
+      const selectedItem = data.find((d: any) => d.spanData.span_id === "span-1");
       expect(selectedItem.itemStyle.borderColor).toBe("#2563EB");
       expect(selectedItem.itemStyle.borderWidth).toBe(3);
     });
@@ -1107,8 +1104,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const { formatDuration } =
-        await import("@/composables/traces/useTraceProcessing");
+      const { formatDuration } = await import("@/composables/traces/useTraceProcessing");
 
       getFormatter(wrapper)({
         data: {

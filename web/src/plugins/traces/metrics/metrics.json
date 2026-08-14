@@ -69,12 +69,12 @@
             "color": {
               "mode": "palette-classic-by-series",
               "colorBySeries": [
-                  { "value": "p50 (Median)", "color": "#4caf50" },
-                  { "value": "p70", "color": "#cddc39" },
-                  { "value": "p95", "color": "#ff9800" },
-                  { "value": "p99", "color": "#f44336" }
-                ]            
-              },
+                { "value": "p50 (Median)", "color": "#4caf50" },
+                { "value": "p70", "color": "#cddc39" },
+                { "value": "p95", "color": "#ff9800" },
+                { "value": "p99", "color": "#f44336" }
+              ]
+            },
             "trellis": {
               "layout": null,
               "num_of_columns": 1,
@@ -112,7 +112,7 @@
                     "havingConditions": [],
                     "treatAsNonTimestamp": true
                   },
-                                    {
+                  {
                     "label": "p75",
                     "alias": "p75",
                     "column": "p75",
@@ -226,9 +226,7 @@
             "table_dynamic_columns": false,
             "color": {
               "mode": "fixed",
-              "fixedColor": [
-                "#79abfc"
-              ],
+              "fixedColor": ["#79abfc"],
               "seriesBy": "last",
               "colorBySeries": []
             },
@@ -357,9 +355,7 @@
             "table_dynamic_columns": false,
             "color": {
               "mode": "fixed",
-              "fixedColor": [
-                "#fc7b7b"
-              ],
+              "fixedColor": ["#fc7b7b"],
               "seriesBy": "last",
               "colorBySeries": []
             },
@@ -412,9 +408,7 @@
                   "conditions": [
                     {
                       "type": "condition",
-                      "values": [
-                        "ERROR"
-                      ],
+                      "values": ["ERROR"],
                       "column": "span_status",
                       "operator": "=",
                       "value": "ERROR",

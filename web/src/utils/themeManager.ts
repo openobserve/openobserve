@@ -59,10 +59,7 @@ const parseSemantic = (raw: string | null): SemanticColors | undefined => {
  * propagates to direct localStorage readers too. The transient live preview is
  * never persisted.
  */
-export const applyThemeForMode = (
-  mode: ThemeMode,
-  store: ThemeStoreLike,
-): ResolvedTheme => {
+export const applyThemeForMode = (mode: ThemeMode, store: ThemeStoreLike): ResolvedTheme => {
   const keys = THEME_STORAGE_KEYS[mode];
 
   const resolved = resolveThemeForMode({
@@ -73,12 +70,7 @@ export const applyThemeForMode = (
     customSemanticColors: parseSemantic(localStorage.getItem(keys.semantic)),
   });
 
-  applyThemeColors(
-    resolved.themeColor,
-    mode,
-    resolved.isDefault,
-    resolved.semanticColors,
-  );
+  applyThemeColors(resolved.themeColor, mode, resolved.isDefault, resolved.semanticColors);
 
   // Refresh the render-cache for any persisted source so direct localStorage
   // readers (charts) stay in sync. Never persist the transient live preview.
@@ -96,6 +88,7 @@ export const applyThemeForMode = (
 
 /** Resolve and apply the theme for the store's current mode. */
 export const applyCurrentTheme = (store: ThemeStoreLike): ResolvedTheme => {
+  // eslint-disable-next-line no-restricted-syntax -- themeManager is theme infrastructure alongside useTheme.ts/chartTheme.ts: it resolves store.state.theme into the applied mode, so it must read the raw value rather than consume useTheme().
   const mode: ThemeMode = store.state.theme === "dark" ? "dark" : "light";
   return applyThemeForMode(mode, store);
 };
@@ -111,8 +104,7 @@ export const bootstrapTheme = (): void => {
   // resolve below reads the correct `appliedXThemeName` keys.
   migrateLegacyThemeStorage();
 
-  const mode: ThemeMode =
-    localStorage.getItem("theme") === "dark" ? "dark" : "light";
+  const mode: ThemeMode = localStorage.getItem("theme") === "dark" ? "dark" : "light";
 
   // No store yet → no live preview at boot.
   applyThemeForMode(mode, { state: { theme: mode, tempThemeColors: {} } });

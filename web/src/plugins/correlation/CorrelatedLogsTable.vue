@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="correlated-logs-table flex flex-col h-full w-full relative overflow-hidden"
+    class="correlated-logs-table relative flex h-full w-full flex-col overflow-hidden"
     data-test="correlated-logs-table"
   >
     <!-- Header with Inline Filters -->
     <div
       v-if="!props.hideDimensionFilters"
-      class="correlation-controls p-0 max-md:p-2 border-b border-solid border-card-glass-border bg-card-glass-bg"
+      class="correlation-controls border-card-glass-border bg-card-glass-bg border-b border-solid p-0 max-md:p-2"
     >
       <!-- Dimension Filters Bar with Pending/Apply Pattern -->
       <template v-if="!isLoading || hasResults">
@@ -35,9 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :has-pending-changes="hasPendingChanges"
               :show-apply-button="true"
               :filter-label="t('correlation.logs.filtersLabel')"
-              :unstable-dimension-tooltip="
-                t('correlation.logs.unstableDimension')
-              "
+              :unstable-dimension-tooltip="t('correlation.logs.unstableDimension')"
               @update:dimension="handleDimensionUpdate"
               @apply="handleApplyFilters"
             />
@@ -47,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon"
-            :class="{ 'text-white! bg-theme-accent!': wrapTableCells }"
+            :class="{ 'bg-theme-accent! text-white!': wrapTableCells }"
             data-test="correlated-logs-table-wrap-content-btn"
             @click="wrapTableCells = !wrapTableCells"
           >
@@ -57,31 +55,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Column Visibility Dropdown -->
           <div class="pr-4">
-            <ODropdown
-              side="bottom"
-              align="end"
-              data-test="column-visibility-dropdown"
-            >
+            <ODropdown side="bottom" align="end" data-test="column-visibility-dropdown">
               <template #trigger>
-                <OButton
-                  variant="outline"
-                  size="sm"
-                  :disabled="!hasResults"
-                >
+                <OButton variant="outline" size="sm" :disabled="!hasResults">
                   <template v-if="true">
-                    <OIcon name="view-column"
-size="sm"
-class="mr-1" />
-                    {{ t('search.showHideColumns') }}
+                    <OIcon name="view-column" size="sm" class="mr-1" />
+                    {{ t("search.showHideColumns") }}
                   </template>
                 </OButton>
               </template>
-              <div class="column-visibility-list min-w-62.5 max-h-100 overflow-y-auto">
+              <div class="column-visibility-list max-h-100 min-w-62.5 overflow-y-auto">
                 <!-- Select All / Deselect All -->
                 <ODropdownItem
-                  class="border-b border-solid border-card-glass-border"
+                  class="border-card-glass-border border-b border-solid"
                   data-test="select-all-columns"
-                  @select="(e) => { e.preventDefault(); toggleSelectAll(); }"
+                  @select="
+                    (e) => {
+                      e.preventDefault();
+                      toggleSelectAll();
+                    }
+                  "
                 >
                   <template #icon-left>
                     <span @click.stop>
@@ -93,7 +86,7 @@ class="mr-1" />
                     </span>
                   </template>
                   <span class="font-semibold">
-                    {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
+                    {{ areAllColumnsSelected ? t("common.deselectAll") : t("common.selectAll") }}
                   </span>
                 </ODropdownItem>
 
@@ -106,9 +99,17 @@ class="mr-1" />
                   @dragstart="handleDragStart($event, index)"
                   @dragover.prevent
                   @drop="handleDrop($event, index)"
-                  :class="['group cursor-grab transition-colors duration-200 hover:bg-interactive-hover-bg', { 'opacity-50 cursor-grabbing!': draggedIndex === index }]"
+                  :class="[
+                    'group hover:bg-interactive-hover-bg cursor-grab transition-colors duration-200',
+                    { 'cursor-grabbing! opacity-50': draggedIndex === index },
+                  ]"
                   :data-test="`column-item-${field}`"
-                  @select="(e) => { e.preventDefault(); toggleColumnVisibility(field); }"
+                  @select="
+                    (e) => {
+                      e.preventDefault();
+                      toggleColumnVisibility(field);
+                    }
+                  "
                 >
                   <template #icon-left>
                     <span @click.stop>
@@ -135,10 +136,10 @@ class="mr-1" />
       </template>
 
       <!-- Show skeleton while loading -->
-      <div v-else class="flex items-center gap-3 flex-wrap p-3 max-md:flex-col max-md:items-start">
-        <OSkeleton class="w-50 h-8" />
-        <OSkeleton class="w-50 h-8" />
-        <OSkeleton class="w-50 h-8" />
+      <div v-else class="flex flex-wrap items-center gap-3 p-3 max-md:flex-col max-md:items-start">
+        <OSkeleton class="h-8 w-50" />
+        <OSkeleton class="h-8 w-50" />
+        <OSkeleton class="h-8 w-50" />
       </div>
 
       <!-- Results Summary Row -->
@@ -173,7 +174,7 @@ class="mr-1" />
           variant="ghost"
           size="icon"
           class="h-5!"
-          :class="{ 'text-white! bg-theme-accent! hover:opacity-80': wrapTableCells }"
+          :class="{ 'bg-theme-accent! text-white! hover:opacity-80': wrapTableCells }"
           data-test="correlated-logs-table-wrap-content-btn"
           @click="wrapTableCells = !wrapTableCells"
         >
@@ -184,53 +185,93 @@ class="mr-1" />
     </CorrelationEventHeader>
 
     <!-- Main Content Area -->
-    <div class="flex-1 overflow-hidden relative">
+    <div class="relative flex-1 overflow-hidden">
       <!-- Logs Table or Skeleton -->
-      <div class="flex flex-col h-full">
-        <div class="flex-1 w-full overflow-auto logs-table-container">
+      <div class="flex h-full flex-col">
+        <div class="logs-table-container w-full flex-1 overflow-auto">
           <!-- Actual Table (when data is loaded) -->
-          <TenstackTable
+          <OTable
             v-if="hasResults"
             :key="`page-${currentPage}`"
-            :rows="pagedResults"
+            :data="pagedResults"
             :columns="tableColumns"
             :wrap="wrapTableCells"
             :loading="isLoading"
-            :err-msg="''"
-            :function-error-msg="''"
-            :expanded-rows="expandedRows"
-            :highlight-timestamp="-1"
-            :default-columns="showingDefaultColumns"
-            :jsonpreview-stream-name="jsonPreviewStreamName"
-            :highlight-query="highlightQuery"
-            :selected-stream-fts-keys="ftsFields"
-            :selected-stream-fields="selectedFields"
-            :hide-search-term-actions="hideSearchTermActions"
-            :hide-view-related-button="hideViewRelatedButton"
+            :row-key="correlatedRowKey"
+            :default-columns="false"
+            :show-global-filter="false"
+            pagination="none"
+            :enable-column-reorder="true"
+            :enable-column-resize="true"
+            :get-row-status-color="getCorrelatedRowStatusColor"
+            expansion="multiple"
+            :expanded-ids="correlatedExpandedIds"
             class="overflow-y-auto!"
-            @click:dataRow="handleRowClick"
-            @copy="handleCopy"
-            @sendToAiChat="handleSendToAiChat"
-            @addSearchTerm="handleAddSearchTerm"
-            @addFieldToTable="handleAddFieldToTable"
-            @closeColumn="handleCloseColumn"
-            @update:columnOrder="handleColumnOrderChange"
-            @expandRow="handleExpandRow"
-            @view-trace="handleViewTrace"
-            @show-correlation="handleNestedCorrelation"
             data-test="logs-tenstack-table"
-          />
+            @row-click="handleRowClick"
+            @close-column="handleCloseColumn"
+            @column-order-change="handleColumnOrderChange"
+            @update:expandedIds="onCorrelatedExpandedIdsChange"
+          >
+            <template
+              v-for="col in tableColumns"
+              :key="col.id"
+              #[`cell-${col.id}`]="{ row, value }"
+            >
+              <span
+                v-if="correlatedCellHtml(col.id, row)"
+                class="log-cell-html"
+                v-html="correlatedCellHtml(col.id, row)"
+              />
+              <span v-else>{{ value }}</span>
+            </template>
+
+            <template #cell-hover-actions="{ row, column, active }">
+              <O2AIContextAddBtn
+                v-if="active && column.id === correlatedTimestampCol"
+                class="size-6!"
+                :imageHeight="'14'"
+                :imageWidth="'14'"
+                @send-to-ai-chat="handleSendToAiChat(JSON.stringify(row))"
+              />
+              <CellActions
+                v-else-if="active && column.meta?.closable && row[column.id] != null"
+                :column="column"
+                :row="row"
+                :selected-stream-fields="selectedFields"
+                :hide-search-term-actions="hideSearchTermActions"
+                @copy="handleCopy"
+                @add-search-term="handleAddSearchTerm"
+                @send-to-ai-chat="handleSendToAiChat"
+              />
+            </template>
+
+            <template #expansion="{ row }">
+              <JsonPreview
+                :value="row"
+                mode="expanded"
+                :stream-name="jsonPreviewStreamName"
+                :highlight-query="highlightQuery"
+                :hide-search-term-actions="hideSearchTermActions"
+                :hide-view-related="hideViewRelatedButton"
+                @copy="handleCopy"
+                @add-field-to-table="handleAddFieldToTable"
+                @add-search-term="handleAddSearchTerm"
+                @view-trace="handleViewTrace(row)"
+                @show-correlation="handleNestedCorrelation"
+                @send-to-ai-chat="handleSendToAiChat"
+              />
+            </template>
+          </OTable>
 
           <!-- Table Skeleton (initial load) -->
           <div
             v-else-if="isLoading && !hasError"
-            class="h-full flex flex-col items-center justify-center"
+            class="flex h-full flex-col items-center justify-center"
             data-test="table-skeleton"
           >
             <!-- Loading indicator -->
-            <div
-              class="flex items-center justify-center gap-3 max-md:flex-col"
-            >
+            <div class="flex items-center justify-center gap-3 max-md:flex-col">
               <OSpinner size="sm" />
               <span class="text-sm opacity-70">
                 {{ t("correlation.logs.loading") }}
@@ -241,12 +282,10 @@ class="mr-1" />
           <!-- Error State -->
           <div
             v-else-if="hasError"
-            class="flex flex-col items-center justify-center h-full py-20"
+            class="flex h-full flex-col items-center justify-center py-20"
             data-test="error-state"
           >
-            <p
-              class="text-base opacity-70 max-w-md text-center"
-            >
+            <p class="max-w-md text-center text-base opacity-70">
               {{ error || t("correlation.logs.errorDetails") }}
             </p>
           </div>
@@ -254,13 +293,13 @@ class="mr-1" />
           <!-- Empty State -->
           <div
             v-else-if="isEmpty"
-            class="flex flex-col items-center justify-center h-full py-20"
+            class="flex h-full flex-col items-center justify-center py-20"
             data-test="empty-state"
           >
-            <p class="text-base font-medium mb-2 opacity-90">
+            <p class="mb-2 text-base font-medium opacity-90">
               {{ t("correlation.logs.noData") }}
             </p>
-            <p class="text-sm opacity-70 mb-4">
+            <p class="mb-4 text-sm opacity-70">
               {{ t("correlation.logs.noDataDetails") }}
             </p>
           </div>
@@ -269,11 +308,14 @@ class="mr-1" />
         <!-- Pagination bar -->
         <div
           v-if="hasResults && totalPages > 1"
-          class="flex items-center justify-between px-4 py-2 border-t border-solid border-card-glass-border bg-card-glass-bg text-xs shrink-0"
+          class="border-card-glass-border bg-card-glass-bg flex shrink-0 items-center justify-between border-t border-solid px-4 py-2 text-xs"
           data-test="correlated-logs-pagination"
         >
           <span class="opacity-60">
-            {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
+            {{ (currentPage - 1) * displayPageSize + 1 }}–{{
+              Math.min(currentPage * displayPageSize, searchResults.length)
+            }}
+            {{ t("search.of") }} {{ searchResults.length }}
           </span>
           <OPagination
             :model-value="currentPage"
@@ -295,7 +337,7 @@ import {
   resolveSetId,
   type SubjectButtonSpec,
 } from "@/composables/useMetricSubjectButtons";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -307,12 +349,17 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
-import TenstackTable from "@/plugins/logs/TenstackTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import JsonPreview from "@/plugins/logs/JsonPreview.vue";
+import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
-import type { ColumnDef } from "@tanstack/vue-table";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -328,15 +375,11 @@ const props = defineProps<CorrelatedLogsProps>();
 // Emits
 const emit = defineEmits<{
   sendToAiChat: [value: any];
-  addSearchTerm: [
-    field: string | number,
-    fieldValue: string | number | boolean,
-    action: string,
-  ];
+  addSearchTerm: [field: string | number, fieldValue: string | number | boolean, action: string];
 }>();
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { searchObj } = searchState();
@@ -369,7 +412,7 @@ const jsonPreviewStreamName = computed(() => {
   if (props.sourceStream) {
     return props.sourceStream;
   }
-  return '';
+  return "";
 });
 
 const TIMESTAMP_COL_WIDTH = 225;
@@ -422,24 +465,20 @@ const loadColumnState = () => {
 // Save column state to localStorage
 const saveColumnState = () => {
   try {
-    localStorage.setItem(
-      STORAGE_KEY_COLUMNS,
-      JSON.stringify(Array.from(visibleColumns.value))
-    );
+    localStorage.setItem(STORAGE_KEY_COLUMNS, JSON.stringify(Array.from(visibleColumns.value)));
     localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(columnOrder.value));
   } catch (error) {
     console.warn("[CorrelatedLogsTable] Failed to save column state:", error);
   }
 };
 
-
 // Load state and key fields config on component mount
 onMounted(async () => {
   loadColumnState();
   try {
     const keyFieldsConfig = await loadKeyFields();
-   let _defaultLogFields = keyFieldsConfig?.["logs"]?.fields ?? [];
-   defaultLogFields.value = _defaultLogFields;
+    let _defaultLogFields = keyFieldsConfig?.["logs"]?.fields ?? [];
+    defaultLogFields.value = _defaultLogFields;
   } catch {
     defaultLogFields.value = [];
   }
@@ -473,7 +512,7 @@ watch(
       saveColumnState();
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 watch(
@@ -483,7 +522,7 @@ watch(
       saveColumnState();
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Pending dimensions - for the apply button pattern
@@ -504,17 +543,11 @@ const matchedDimensions = computed(() => props.matchedDimensions);
 const additionalDimensions = computed(() => props.additionalDimensions || {});
 const availableDimensions = computed(() => props.availableDimensions || {});
 const ftsFields = computed(() => props.ftsFields || []);
-const hideViewRelatedButton = computed(
-  () => props.hideViewRelatedButton ?? false,
-);
-const hideSearchTermActions = computed(
-  () => props.hideSearchTermActions ?? false,
-);
+const hideViewRelatedButton = computed(() => props.hideViewRelatedButton ?? false);
+const hideSearchTermActions = computed(() => props.hideSearchTermActions ?? false);
 
 // Track which dimensions are unstable (for UI styling)
-const unstableDimensionKeys = computed(
-  () => new Set(Object.keys(additionalDimensions.value)),
-);
+const unstableDimensionKeys = computed(() => new Set(Object.keys(additionalDimensions.value)));
 
 // Track if there are pending changes that haven't been applied
 const hasPendingChanges = computed(() => {
@@ -569,15 +602,14 @@ const highlightQuery = computed(() => {
 const getFilterOptions = (
   key: string,
   currentValue: string,
-): Array<{ label: string; value: string }> => {
+): Array<{ label: I18nText; value: string }> => {
   const uniqueValues = new Set<string>();
 
   // Always include wildcard option
   uniqueValues.add(SELECT_ALL_VALUE);
 
   // Get the original value from matched or additional dimensions
-  const originalValue =
-    matchedDimensions.value[key] || additionalDimensions.value[key];
+  const originalValue = matchedDimensions.value[key] || additionalDimensions.value[key];
 
   // Always include original value if it exists and is not SELECT_ALL_VALUE
   if (originalValue && originalValue !== SELECT_ALL_VALUE) {
@@ -586,11 +618,7 @@ const getFilterOptions = (
 
   // Include current value if it's different from original and SELECT_ALL_VALUE
   // This preserves previously selected values in the dropdown
-  if (
-    currentValue &&
-    currentValue !== SELECT_ALL_VALUE &&
-    currentValue !== originalValue
-  ) {
+  if (currentValue && currentValue !== SELECT_ALL_VALUE && currentValue !== originalValue) {
     uniqueValues.add(currentValue);
   }
 
@@ -608,7 +636,7 @@ const getFilterOptions = (
 
   // Convert to { label, value } format for the select with map-options
   return Array.from(uniqueValues).map((val) => ({
-    label: val === SELECT_ALL_VALUE ? "All Values" : val,
+    label: val === SELECT_ALL_VALUE ? t("correlation.logs.allValues") : raw(val),
     value: val,
   }));
 };
@@ -664,9 +692,7 @@ const orderedFields = computed(() => {
 
 // Check if all columns (except timestamp) are selected
 const areAllColumnsSelected = computed(() => {
-  const selectableFields = availableFields.value.filter(
-    (field) => field !== "_timestamp"
-  );
+  const selectableFields = availableFields.value.filter((field) => field !== "_timestamp");
   if (selectableFields.length === 0) return false;
 
   return selectableFields.every((field) => visibleColumns.value.has(field));
@@ -674,9 +700,7 @@ const areAllColumnsSelected = computed(() => {
 
 // Check if some columns are selected (for indeterminate state)
 const areSomeColumnsSelected = computed(() => {
-  const selectableFields = availableFields.value.filter(
-    (field) => field !== "_timestamp"
-  );
+  const selectableFields = availableFields.value.filter((field) => field !== "_timestamp");
   if (selectableFields.length === 0) return false;
 
   return selectableFields.some((field) => visibleColumns.value.has(field));
@@ -689,7 +713,9 @@ const initializeVisibleColumns = (fields: string[]) => {
   if (fields.length === 0) return;
 
   const defaults = new Set<string>();
-  const timestampField = fields.find((f) => f === (store.state.zoConfig.timestamp_column || "_timestamp"));
+  const timestampField = fields.find(
+    (f) => f === (store.state.zoConfig.timestamp_column || "_timestamp"),
+  );
   if (timestampField) defaults.add(timestampField);
 
   for (const keyField of defaultLogFields.value) {
@@ -704,9 +730,9 @@ watch(
   availableFields,
   (fields) => {
     if (fields.length === 0) return;
-    
+
     // Check for <=1 since _timestamp is also stored in localStorage as a default column
-    if(visibleColumns.value.size <= 1) initializeVisibleColumns(fields);
+    if (visibleColumns.value.size <= 1) initializeVisibleColumns(fields);
 
     // Initialize column order if not set
     if (columnOrder.value.length === 0) {
@@ -732,9 +758,7 @@ watch(defaultLogFields, (keyFields) => {
 
 // Filter out hidden columns, respecting custom order
 const visibleFields = computed(() => {
-  return orderedFields.value.filter((field) =>
-    visibleColumns.value.has(field),
-  );
+  return orderedFields.value.filter((field) => visibleColumns.value.has(field));
 });
 
 // Compute per-column max cap based on container width and number of visible columns.
@@ -751,10 +775,7 @@ const DEFAULT_LONG_TEXT_FIELDS: string[] = [];
 
 // Measures a field's content width and returns the capped size plus whether the
 // raw measurement exceeded maxCap (used to build the dynamic long-text list).
-const getColumnWidth = (
-  field: string,
-  maxCap: number,
-): { width: number; exceededCap: boolean } => {
+const getColumnWidth = (field: string, maxCap: number): { width: number; exceededCap: boolean } => {
   if (field === "_timestamp" || field === "source") {
     return { width: 150, exceededCap: false };
   }
@@ -765,12 +786,16 @@ const getColumnWidth = (
 
   try {
     // Font of table header — must match what actually renders, or the measured
-    // width is wrong and cells truncate/overflow.
-    canvasContext.font = canvasFont("14px", "sans", "bold");
+    // width is wrong and cells truncate/overflow. Rem, not px: this text is
+    // painted by the DOM, so it scales with the root font-size and the
+    // measurement has to scale with it. The px exemptions on the dashboard's
+    // canvas measurements are the opposite case — those measure text ECharts
+    // paints at a fixed numeric fontSize.
+    canvasContext.font = canvasFont("0.875rem", "sans", "bold");
     let max = canvasContext.measureText(field).width + 16;
 
     // Font of the table content
-    canvasContext.font = canvasFont("12px", "mono");
+    canvasContext.font = canvasFont("0.75rem", "mono");
 
     const hits = searchResults.value || [];
     for (let i = 0; i < Math.min(5, hits.length); i++) {
@@ -824,13 +849,12 @@ const getColumnWidthHelper = (field: string): number => {
 };
 
 // Generate table columns dynamically from visible fields in custom order
-const tableColumns = computed<ColumnDef<any>[]>(() => {
+const tableColumns = computed<OTableColumnDef<any>[]>(() => {
   // Use the computed visibleFields
   const fields = visibleFields.value;
 
   // Check if only timestamp is visible - if so, add source column
-  const hasOnlyTimestamp =
-    fields.length === 1 && fields[0] === "_timestamp";
+  const hasOnlyTimestamp = fields.length === 1 && fields[0] === "_timestamp";
 
   const columns = fields.map((field) => {
     // Special handling for timestamp column
@@ -840,7 +864,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
         id: field,
         accessorKey: field,
         label: t("search.timestamp") + ` (${store.state.timezone})`,
-        header: t("search.timestamp") + ` (${store.state.timezone})`,
+        header: raw(`${t("search.timestamp")} (${store.state.timezone})`),
         align: "left",
         sortable: true,
         enableResizing: false,
@@ -873,7 +897,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
       name: field,
       id: field,
       accessorKey: field,
-      header: field,
+      header: raw(field),
       align: "left",
       sortable: true,
       enableResizing: true,
@@ -918,7 +942,10 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
     lastCol &&
     longTextFields.value.includes(lastCol.name as string)
   ) {
-    lastCol.size = Math.min(columnMaxCap.value, Math.max(150, (lastCol.size ?? 150) + (containerWidth.value - totalWidth)));
+    lastCol.size = Math.min(
+      columnMaxCap.value,
+      Math.max(150, (lastCol.size ?? 150) + (containerWidth.value - totalWidth)),
+    );
   }
 
   // Always leave 12px clearance on the last resizable column so the resize
@@ -932,21 +959,13 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
 });
 
 // Determine if we're showing default columns (only timestamp + source)
-const showingDefaultColumns = computed(() => {
-  return visibleFields.value.length === 1 && visibleFields.value[0] === "_timestamp";
-});
-
 /**
  * Format timestamp (microsecond precision) to human-readable format
  */
 const formatTimestamp = (timestamp: number): string => {
   // Convert microseconds to milliseconds
   const ms = Math.floor(timestamp / 1000);
-  return timestampToTimezoneDate(
-    ms,
-    store.state.timezone || "UTC",
-    "yyyy-MM-dd HH:mm:ss.SSS",
-  );
+  return timestampToTimezoneDate(ms, store.state.timezone || "UTC", "yyyy-MM-dd HH:mm:ss.SSS");
 };
 
 // Compute selected fields from the columns
@@ -965,13 +984,7 @@ watch(
  * Event Handlers
  */
 // Handle dimension update from DimensionFiltersBar - updates pending state only
-const handleDimensionUpdate = ({
-  key,
-  value,
-}: {
-  key: string;
-  value: string;
-}) => {
+const handleDimensionUpdate = ({ key, value }: { key: string; value: string }) => {
   pendingFilters.value[key] = value;
 };
 
@@ -981,13 +994,12 @@ const handleApplyFilters = () => {
   updateFilters(pendingFilters.value);
 };
 
-const handleRowClick = () => {
-};
+const handleRowClick = () => {};
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData, {
-    successMessage: "Content Copied Successfully!",
+  copyToClipboard(copyData, t, {
+    successMessage: t("common.contentCopiedSuccessfully"),
     timeout: 1000,
   });
 };
@@ -1005,7 +1017,6 @@ const handleAddSearchTerm = (
 };
 
 const handleAddFieldToTable = (field: string) => {
-
   // Add the field to visible columns if it's not already visible
   if (!visibleColumns.value.has(field)) {
     visibleColumns.value.add(field);
@@ -1015,14 +1026,14 @@ const handleAddFieldToTable = (field: string) => {
     // Show success notification
     toast({
       variant: "success",
-      message: `Column "${field}" added to table`,
+      message: t("toastMessages.correlation.columnAddedToTable", { name: field }),
       timeout: 1500,
     });
   } else {
     // Field is already visible, show info notification
     toast({
       variant: "info",
-      message: `Column "${field}" is already visible`,
+      message: t("toastMessages.correlation.columnIsAlreadyVisible", { name: field }),
       timeout: 1500,
     });
   }
@@ -1134,7 +1145,94 @@ const handleExpandRow = (row: any) => {
   }
 };
 
+// ── Logs rendering ──
+// Same FTS pipeline as the logs grid: chunked colorized HTML rendered per cell.
+const { processedResults: correlatedProcessed, processHitsInChunks: correlatedProcessChunks } =
+  useLogsHighlighter();
+
+const correlatedTimestampCol = computed(
+  () => store.state.zoConfig.timestamp_column || "_timestamp",
+);
+
+// Guarded: `pagedResults` is undefined while the composable initialises.
+const pagedRows = (): any[] => ((pagedResults as any)?.value as any[]) || [];
+
+// Row → index within the current page; the highlight cache is keyed off it.
+const correlatedHitIndexMap = computed(() => {
+  const m = new Map<any, number>();
+  pagedRows().forEach((h: any, i: number) => m.set(h, i));
+  return m;
+});
+const correlatedCellHtml = (columnId: string, row: any): string | null => {
+  const idx = correlatedHitIndexMap.value.get(row);
+  if (idx == null || idx < 0) return null;
+  return (correlatedProcessed.value as any)[`${columnId}_${idx}`] ?? null;
+};
+const reprocessCorrelatedHighlight = (clearCache: boolean) => {
+  correlatedProcessChunks(
+    pagedRows(),
+    (tableColumns.value as any[]) || [],
+    clearCache,
+    highlightQuery.value || "",
+    100,
+    ftsFields.value || [],
+  );
+};
+watch(
+  () => tableColumns.value,
+  () => reprocessCorrelatedHighlight(true),
+);
+watch(
+  () => (pagedResults as any)?.value,
+  () => reprocessCorrelatedHighlight(false),
+);
+
+const getCorrelatedRowStatusColor = (row: any): string | undefined =>
+  extractStatusFromLog(row)?.color;
+
+// Row identity is the row's position in the current page, NOT its `_timestamp`:
+// a timestamp repeats across rows ingested in the same batch, and keying on it
+// expanded every row sharing the value off a single click. `expandedRows` holds
+// row objects, so translate them through the same page-index map.
+const correlatedRowKey = (row: any): string => String(correlatedHitIndexMap.value.get(row) ?? -1);
+const correlatedExpandedIds = computed<string[]>(() =>
+  (expandedRows.value || [])
+    .map((r: any) => correlatedHitIndexMap.value.get(r))
+    .filter((i: number | undefined): i is number => i != null)
+    .map(String),
+);
+const onCorrelatedExpandedIdsChange = (newIds: string[]) => {
+  const prev = new Set(correlatedExpandedIds.value);
+  const next = new Set(newIds);
+  let toggled: string | null = null;
+  for (const k of next)
+    if (!prev.has(k)) {
+      toggled = k;
+      break;
+    }
+  if (toggled == null)
+    for (const k of prev)
+      if (!next.has(k)) {
+        toggled = k;
+        break;
+      }
+  if (toggled == null) return;
+  const row = pagedRows()[Number(toggled)];
+  if (row) handleExpandRow(row);
+};
+
 const handleViewTrace = (log: any) => {
+  // Guard: a caller that loses the record used to crash here on
+  // `log[timestamp_column]` (issue #13708). Tell the user instead of leaving a
+  // button that silently does nothing.
+  if (!log) {
+    toast({
+      variant: "warning",
+      message: t("search.viewTraceUnavailable"),
+    });
+    return;
+  }
+
   // 15 mins +- from the log timestamp
   const from = log[store.state.zoConfig.timestamp_column] - 900000000;
   const to = log[store.state.zoConfig.timestamp_column] + 900000000;
@@ -1148,19 +1246,12 @@ const handleViewTrace = (log: any) => {
       to,
       refresh,
       org_identifier: store.state.selectedOrganization.identifier,
-      trace_id:
-        log[
-          store.state.organizationData.organizationSettings
-            .trace_id_field_name
-        ],
+      trace_id: log[store.state.organizationData.organizationSettings.trace_id_field_name],
       reload: "true",
     },
   };
 
-  query["span_id"] =
-    log[
-      store.state.organizationData.organizationSettings.span_id_field_name
-    ];
+  query["span_id"] = log[store.state.organizationData.organizationSettings.span_id_field_name];
 
   router.push(query);
 };
@@ -1183,18 +1274,43 @@ onBeforeUnmount(() => {
 // Watch for prop changes
 watch(
   () => props.timeRange,
-  () => {
-  },
+  () => {},
   { deep: true },
 );
 
 // ── Chip row ───────────────────────────────────────────────────────────────
 
 const LABEL_ACRONYMS = new Set([
-  "aws", "ecs", "gcp", "iam", "vpc", "rds", "s3", "ec2",
-  "id", "url", "uri", "ip", "dns", "ssl", "tls", "tcp", "udp",
-  "api", "cpu", "gpu", "ram", "ssd", "hdd", "io",
-  "k8s", "faas", "otel", "sql", "http", "https",
+  "aws",
+  "ecs",
+  "gcp",
+  "iam",
+  "vpc",
+  "rds",
+  "s3",
+  "ec2",
+  "id",
+  "url",
+  "uri",
+  "ip",
+  "dns",
+  "ssl",
+  "tls",
+  "tcp",
+  "udp",
+  "api",
+  "cpu",
+  "gpu",
+  "ram",
+  "ssd",
+  "hdd",
+  "io",
+  "k8s",
+  "faas",
+  "otel",
+  "sql",
+  "http",
+  "https",
 ]);
 const titleCaseWord = (w: string) => {
   if (!w) return w;
@@ -1204,8 +1320,7 @@ const titleCaseWord = (w: string) => {
 };
 const titleCase = (s: string) => s.split(/\s+/).map(titleCaseWord).join(" ");
 
-const dimensionDisplayLabel = (key: string): string =>
-  titleCase(key.replace(/[-_.]/g, " "));
+const dimensionDisplayLabel = (key: string): string => titleCase(key.replace(/[-_.]/g, " "));
 
 const toChipString = (v: unknown): string | null => {
   if (v == null) return null;
@@ -1215,9 +1330,10 @@ const toChipString = (v: unknown): string | null => {
 };
 
 const chipDimensionSource = computed<Record<string, string>>(() => {
-  const src = props.chipDimensions && Object.keys(props.chipDimensions).length > 0
-    ? props.chipDimensions
-    : { ...(props.matchedDimensions ?? {}), ...(props.additionalDimensions ?? {}) };
+  const src =
+    props.chipDimensions && Object.keys(props.chipDimensions).length > 0
+      ? props.chipDimensions
+      : { ...(props.matchedDimensions ?? {}), ...(props.additionalDimensions ?? {}) };
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(src)) {
     const s = toChipString(v);
@@ -1232,20 +1348,24 @@ const subjectSemanticIds = computed<Set<string>>(() => {
   if (!props.matchedSetId) return new Set();
   const canonical = resolveSetId(props.matchedSetId);
   const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
-  return specs?.length ? new Set(specs.flatMap((s: SubjectButtonSpec) => s.semanticIds)) : new Set();
+  return specs?.length
+    ? new Set(specs.flatMap((s: SubjectButtonSpec) => s.semanticIds))
+    : new Set();
 });
 
 const unifiedChips = computed<DimensionChip[]>(() =>
   Object.keys(chipDimensionSource.value)
     .filter((key) => !subjectSemanticIds.value.has(key))
-    .map((key) => ({
-      key,
-      label: dimensionDisplayLabel(key),
-      value: chipDimensionSource.value[key],
-      kind: "context" as DimensionChip["kind"],
-    } as DimensionChip)),
+    .map(
+      (key) =>
+        ({
+          key,
+          label: raw(dimensionDisplayLabel(key)),
+          value: chipDimensionSource.value[key],
+          kind: "context" as DimensionChip["kind"],
+        }) as DimensionChip,
+    ),
 );
-
 </script>
 
 <style scoped>

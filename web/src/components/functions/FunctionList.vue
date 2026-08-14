@@ -17,10 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
-    data-test="function-list-page"
-    class="flex flex-col h-full min-h-0"
-  >
+  <div data-test="function-list-page" class="flex h-full min-h-0 flex-col">
     <OPageLayout
       v-if="!showAddJSTransformDialog"
       :title="t('function.header')"
@@ -29,20 +26,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       tabs-below
       bleed
     >
-        <template #header-tabs>
-          <PipelineSectionTabs />
-        </template>
-        <template #actions>
-          <OButton
-            variant="primary"
-            size="sm"
-            data-test="function-list-add-function-btn"
-            @click="showAddUpdateFn({})"
-          >
-            {{ t(`function.add`) }}
-          </OButton>
-        </template>
-      <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <template #header-tabs>
+        <PipelineSectionTabs />
+      </template>
+      <template #actions>
+        <OButton
+          variant="primary"
+          size="sm"
+          data-test="function-list-add-function-btn"
+          @click="showAddUpdateFn({})"
+        >
+          {{ t(`function.add`) }}
+        </OButton>
+      </template>
+      <div class="min-h-0 w-full flex-1 overflow-hidden">
         <div class="h-full">
           <OTable
             :frame="false"
@@ -59,115 +56,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             :default-columns="false"
             width="100%"
-            class="w-full h-full"
+            class="h-full w-full"
           >
-              <template #toolbar>
-                <div class="flex items-center gap-2 w-full">
-                  <OSearchInput
-                    data-test="functions-list-search-input"
-                    v-model="filterQuery"
-                    class="flex-1"
-                    :placeholder="t('function.search')"
-                  />
-                </div>
-              </template>
-              <template #toolbar-trailing>
-                <OButton
-                  variant="outline"
-                  size="icon-sm"
-                  icon-left="refresh"
-                  :loading="loading"
-                  data-test="functions-list-refresh-btn"
-                  @click="getJSTransforms"
-                >
-                  <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="functionsRefresh" />
-                </OButton>
-              </template>
-              <template #empty>
-                <OEmptyState
-                  size="hero"
-                  preset="no-functions"
-                  :filtered="!!filterQuery"
-                  @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : showAddUpdateFn({}))"
+            <template #toolbar>
+              <div class="flex w-full items-center gap-2">
+                <OSearchInput
+                  data-test="functions-list-search-input"
+                  v-model="filterQuery"
+                  class="flex-1"
+                  :placeholder="t('function.search')"
                 />
-              </template>
+              </div>
+            </template>
+            <template #toolbar-trailing>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                icon-left="refresh"
+                :loading="loading"
+                data-test="functions-list-refresh-btn"
+                @click="getJSTransforms"
+              >
+                <OTooltip
+                  side="bottom"
+                  :content="t('common.refresh')"
+                  shortcut-id="functionsRefresh"
+                />
+              </OButton>
+            </template>
+            <template #empty>
+              <OEmptyState
+                size="hero"
+                preset="no-functions"
+                :filtered="!!filterQuery"
+                @action="
+                  (id) => (id === 'clear-filters' ? (filterQuery = '') : showAddUpdateFn({}))
+                "
+              />
+            </template>
 
-              <template #cell-name="{ row, value }">
-                <span class="text-text-body" :data-test="`function-list-name-cell-${row?.name ?? value}`">{{ value }}</span>
-              </template>
+            <template #cell-name="{ row, value }">
+              <span
+                class="text-text-body"
+                :data-test="`function-list-name-cell-${row?.name ?? value}`"
+                >{{ value }}</span
+              >
+            </template>
 
-              <!-- Language of the transform. Its own column (sortable + hideable)
+            <!-- Language of the transform. Its own column (sortable + hideable)
                    rather than a glyph on the name, so JS vs VRL reads at a glance. -->
-              <template #cell-transType="{ row }">
-                <OBadge
-                  size="xs"
-                  :variant="row?.transType === '1' ? 'amber-soft' : 'blue-soft'"
-                  :data-test="`function-list-type-badge-${
-                    row?.transType === '1' ? 'js' : 'vrl'
-                  }`"
+            <template #cell-transType="{ row }">
+              <OBadge
+                size="xs"
+                :variant="row?.transType === '1' ? 'amber-soft' : 'blue-soft'"
+                :data-test="`function-list-type-badge-${row?.transType === '1' ? 'js' : 'vrl'}`"
+              >
+                {{ row?.transType === "1" ? t("function.javascript") : t("function.vrl") }}
+              </OBadge>
+            </template>
+
+            <template #cell-actions="{ row }">
+              <div class="actions-container flex items-center">
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('function.updateTitle')"
+                  data-test="function-list-edit-function-btn"
+                  data-row-action="edit"
+                  @click="showAddUpdateFn({ row })"
+                  icon-left="edit"
+                />
+                <OButton
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  :title="t('function.delete')"
+                  data-test="function-list-delete-function-btn"
+                  data-row-action="delete"
+                  @click="showDeleteDialogFn({ row })"
+                  icon-left="delete"
+                />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="account-tree"
+                  :title="t('function.associatedPipelines')"
+                  data-row-action="view"
+                  @click="getAssociatedPipelines({ row })"
+                />
+              </div>
+            </template>
+
+            <template #bottom>
+              <div class="flex w-full items-center justify-between py-2">
+                <div class="mr-4 flex items-center text-xs font-normal">
+                  {{ resultTotal }} {{ t("function.header") }}
+                </div>
+                <OButton
+                  v-if="selectedFunctions.length > 0"
+                  data-test="function-list-delete-functions-btn"
+                  variant="outline-destructive"
+                  size="sm"
+                  :loading="bulkDeleteLoading"
+                  @click="openBulkDeleteDialog"
+                  icon-left="delete"
                 >
-                  {{
-                    row?.transType === "1"
-                      ? t("function.javascript")
-                      : t("function.vrl")
-                  }}
-                </OBadge>
-              </template>
-
-              <template #cell-actions="{ row }">
-                <div class="flex items-center actions-container">
-                  <OButton
-                    variant="ghost"
-                    size="icon-sm"
-                    :title="t('function.updateTitle')"
-                    data-test="function-list-edit-function-btn"
-                    data-row-action="edit"
-                    @click="showAddUpdateFn({ row })"
-                    icon-left="edit"
-                  />
-                  <OButton
-                    variant="ghost-destructive"
-                    size="icon-sm"
-                    :title="t('function.delete')"
-                    data-test="function-list-delete-function-btn"
-                    data-row-action="delete"
-                    @click="showDeleteDialogFn({ row })"
-                    icon-left="delete"
-                  />
-                  <OButton
-                    variant="ghost"
-                    size="icon-sm"
-                    icon-left="account-tree"
-                    :title="'Associated Pipelines'"
-                    data-row-action="view"
-                    @click="getAssociatedPipelines({ row })"
-                  />
-                </div>
-              </template>
-
-              <template #bottom>
-                <div class="flex items-center justify-between w-full py-2">
-                  <div class="flex items-center text-xs font-normal mr-4">
-                    {{ resultTotal }} {{ t('function.header') }}
-                  </div>
-                  <OButton
-                    v-if="selectedFunctions.length > 0"
-                    data-test="function-list-delete-functions-btn"
-                    variant="outline-destructive"
-                    size="sm"
-                    :loading="bulkDeleteLoading"
-                    @click="openBulkDeleteDialog"
-                    icon-left="delete"
-                  >
-                    Delete
-                  </OButton>
-                </div>
-              </template>
-            </OTable>
-          </div>
+                  {{ t("common.delete") }}
+                </OButton>
+              </div>
+            </template>
+          </OTable>
         </div>
+      </div>
     </OPageLayout>
-    <div v-else class="flex-1 min-h-0">
+    <div v-else class="min-h-0 flex-1">
       <AddFunction
         v-model="formData"
         :isUpdated="isUpdated"
@@ -178,34 +179,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <ConfirmDialog
-      title="Delete Transform"
-      message="Are you sure you want to delete transform?"
+      :title="t('function.deleteTransformDialogTitle')"
+      :message="t('function.deleteTransformConfirmMessage')"
       @update:ok="deleteFn"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
 
     <ConfirmDialog
-      title="Delete Functions"
-      :message="`Are you sure you want to delete ${selectedFunctions.length} function(s)?`"
+      :title="t('function.deleteFunctionsDialogTitle')"
+      :message="t('functions.confirmDeleteFunctions', { count: selectedFunctions.length })"
       @update:ok="bulkDeleteFunctions"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
 
-    <ODialog data-test="function-list-force-delete-dialog" v-model:open="confirmForceDelete" persistent size="md"
-      :title="`Pipelines Associated with ${selectedDelete?.name}`"
+    <ODialog
+      data-test="function-list-force-delete-dialog"
+      v-model:open="confirmForceDelete"
+      persistent
+      size="md"
+      :title="t('common.pipelinesAssociatedWith', { name: selectedDelete?.name })"
     >
-      <div
-        v-if="transformedPipelineList.length > 0"
-        class="max-h-50 overflow-y-auto"
-      >
-        <ul class="scrollable-list flex flex-col list-none p-0 m-0">
+      <div v-if="transformedPipelineList.length > 0" class="max-h-50 overflow-y-auto">
+        <ul class="scrollable-list m-0 flex list-none flex-col p-0">
           <li
             v-for="(pipeline, index) in transformedPipelineList"
             :key="pipeline.value"
             @click="onPipelineSelect(pipeline)"
-            class="flex items-center px-3 py-2 cursor-pointer hover:bg-muted/50"
+            class="hover:bg-muted/50 flex cursor-pointer items-center px-3 py-2"
             :data-test="`function-list-pipeline-item-${pipeline.value}`"
           >
             <span class="text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>
@@ -213,8 +215,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ul>
       </div>
       <div v-else>
-        <div class="text-xl font-semibold text-center">
-          No pipelines associated with this function
+        <div class="text-center text-xl font-semibold">
+          {{ t("function.noPipelinesAssociated") }}
         </div>
       </div>
     </ODialog>
@@ -222,17 +224,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-
-import {
-  defineAsyncComponent,
-  defineComponent,
-  ref,
-  computed,
-  watch,
-} from "vue";
+import { defineAsyncComponent, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -268,16 +263,16 @@ export default defineComponent({
     ODialog,
     OSearchInput,
     OTooltip,
-    },
+  },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
-    "sendToAiChat"
+    "sendToAiChat",
   ],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
@@ -337,19 +332,12 @@ export default defineComponent({
       // return ;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading functions...",
-              timeout: 0,
-});
+        message: t("toastMessages.functions.pleaseWaitWhileLoadingFunctions"),
+        timeout: 0,
+      });
 
       jsTransformService
-        .list(
-          1,
-          100000,
-          "name",
-          false,
-          "",
-          store.state.selectedOrganization.identifier,
-        )
+        .list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier)
         .then((res) => {
           resultTotal.value = res.data.list.length;
           if (router.currentRoute.value.query.action == "add") {
@@ -386,7 +374,7 @@ export default defineComponent({
           if (err?.response?.status && err?.response?.status != 403) {
             toast({
               variant: "error",
-              message: "Error while pulling function.",
+              message: t("toastMessages.functions.errorWhilePullingFunction"),
             });
           }
         })
@@ -440,7 +428,7 @@ export default defineComponent({
         });
         track("Button Click", {
           button: "Add Function",
-          page: "Functions"
+          page: "Functions",
         });
       } else {
         isUpdated.value = true;
@@ -455,7 +443,7 @@ export default defineComponent({
         });
         track("Button Click", {
           button: "Update Function",
-          page: "Functions"
+          page: "Functions",
         });
       }
       addTransform();
@@ -491,10 +479,7 @@ export default defineComponent({
 
     const deleteFn = () => {
       jsTransformService
-        .delete(
-          store.state.selectedOrganization.identifier,
-          selectedDelete.value.name,
-        )
+        .delete(store.state.selectedOrganization.identifier, selectedDelete.value.name)
         .then((res: any) => {
           if (res.data.code == 200) {
             toast({
@@ -513,11 +498,10 @@ export default defineComponent({
           if (err.response.data.code == 409) {
             toast({
               variant: "error",
-              message:
-                "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
+              message: t("toastMessages.functions.functionDeletionAssociatedPipelines"),
               timeout: 10000,
               action: {
-                label: "View",
+                label: t("toastMessages.functions.view"),
                 handler: () => {
                   forceRemoveFunction(err.response.data["message"]);
                 },
@@ -528,9 +512,9 @@ export default defineComponent({
           if (err.response.status != 403) {
             toast({
               variant: "error",
-              message:
-                JSON.stringify(err.response.data["message"]) ||
-                "Function deletion failed.",
+              message: raw(
+                JSON.stringify(err.response.data["message"]) || "Function deletion failed.",
+              ),
             });
           }
         });
@@ -553,10 +537,7 @@ export default defineComponent({
     const getAssociatedPipelines = (props: any) => {
       selectedDelete.value = props.row;
       jsTransformService
-        .getAssociatedPipelines(
-          store.state.selectedOrganization.identifier,
-          props.row.name,
-        )
+        .getAssociatedPipelines(store.state.selectedOrganization.identifier, props.row.name)
         .then((res: any) => {
           pipelineList.value = res.data.list;
           confirmForceDelete.value = true;
@@ -598,16 +579,19 @@ export default defineComponent({
     };
 
     const visibleRows = computed(() => {
-      if (!filterQuery.value) return jsTransforms.value || []
-      return filterData(jsTransforms.value || [], filterQuery.value)
+      if (!filterQuery.value) return jsTransforms.value || [];
+      return filterData(jsTransforms.value || [], filterQuery.value);
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
-
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
@@ -617,7 +601,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting functions...",
+        message: t("toastMessages.functions.deletingFunctions"),
         timeout: 0,
       });
 
@@ -625,7 +609,7 @@ export default defineComponent({
         if (selectedFunctions.value.length === 0) {
           toast({
             variant: "error",
-            message: "No functions selected for deletion",
+            message: t("toastMessages.functions.noFunctionsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -638,7 +622,7 @@ export default defineComponent({
 
         const response = await jsTransformService.bulkDelete(
           store.state.selectedOrganization.identifier,
-          payload
+          payload,
         );
 
         dismiss();
@@ -653,27 +637,34 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} function(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.functions.functionsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} function(s)`,
+              message: t("toastMessages.functions.failedToDeleteFunctions", { count: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} function(s) deleted successfully`,
+              message: t("toastMessages.functions.functionsDeletedSuccessfully", {
+                count: successCount,
+              }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedFunctions.value.length} function(s) deleted successfully`,
+            message: t("toastMessages.functions.functionsDeletedSuccessfully", {
+              count: selectedFunctions.value.length,
+            }),
           });
         }
 
@@ -685,7 +676,10 @@ export default defineComponent({
         console.error("Error deleting functions:", error);
 
         // Show error message from response if available
-        const errorMessage = error.response?.data?.message || error?.message || "Error deleting functions. Please try again.";
+        const errorMessage =
+          error.response?.data?.message ||
+          error?.message ||
+          "Error deleting functions. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",
@@ -699,17 +693,19 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
-
-
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
         id: "functionsAdd",
-        handler: () => { if (!isInputFocused()) showAddUpdateFn({}); },
+        handler: () => {
+          if (!isInputFocused()) showAddUpdateFn({});
+        },
       },
       {
         id: "functionsRefresh",
-        handler: () => { if (!isInputFocused()) getJSTransforms(); },
+        handler: () => {
+          if (!isInputFocused()) getJSTransforms();
+        },
       },
       {
         id: "functionsFocusSearch",

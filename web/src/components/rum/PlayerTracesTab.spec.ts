@@ -53,8 +53,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 // The mock must expose a default export that is a function returning the object.
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
-    fetchQueryDataWithHttpStream: (...args: any[]) =>
-      mockFetchQueryDataWithHttpStream(...args),
+    fetchQueryDataWithHttpStream: (...args: any[]) => mockFetchQueryDataWithHttpStream(...args),
   }),
 }));
 
@@ -65,7 +64,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 // Fix 4: component reads SQL-aliased fields (_view_url, _view_loading_type, _date).
 function createRumHit(overrides: Record<string, any> = {}) {
   return {
-    _oo_trace_id: "trace-abc123def456",
+    _trace_id: "trace-abc123def456",
     _view_url: "https://example.com/products",
     _view_loading_type: "initial_load",
     _view_id: "view-1",
@@ -101,10 +100,7 @@ function createTraceMetadata(overrides: Record<string, any> = {}) {
  * the fetchTraceMetadata Promise (setTimeout creates a macrotask that
  * flushPromises() does not drain).
  */
-function setupSuccessfulMocks(
-  rumHits?: any[],
-  traceMetadataHits?: any[],
-) {
+function setupSuccessfulMocks(rumHits?: any[], traceMetadataHits?: any[]) {
   mockSearch.mockReset();
   mockFetchQueryDataWithHttpStream.mockReset();
 
@@ -118,12 +114,10 @@ function setupSuccessfulMocks(
     return Promise.resolve({ data: { hits: [] } });
   });
 
-  mockFetchQueryDataWithHttpStream.mockImplementation(
-    (_queryReq: any, handlers: any) => {
-      handlers.data(null, { content: { results: { hits: metadata } } });
-      handlers.complete();
-    },
-  );
+  mockFetchQueryDataWithHttpStream.mockImplementation((_queryReq: any, handlers: any) => {
+    handlers.data(null, { content: { results: { hits: metadata } } });
+    handlers.complete();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +146,7 @@ const globalStubs = {
   OSpinner: { template: '<div data-test="spinner" />' },
   OIcon: {
     name: "OIcon",
-    template: '<span :data-test="\'icon-\' + name" />',
+    template: "<span :data-test=\"'icon-' + name\" />",
     props: ["name", "size"],
   },
   // Fix 6: use v-bind="$attrs" so the parent's data-test attribute passes through.
@@ -194,34 +188,24 @@ const globalStubs = {
       "initialTimelineExpanded",
     ],
   },
-  // Fix 7: stub TenstackTable so we can trigger row clicks and inspect
-  // scoped-slot content (route, duration) without mounting the real component.
-  TenstackTable: {
-    name: "TenstackTable",
-    props: [
-      "rows",
-      "columns",
-      "rowHeight",
-      "enableRowExpand",
-      "enableTextHighlight",
-      "enableStatusBar",
-      "defaultColumns",
-      "enableColumnReorder",
-      "enableAiContextButton",
-      "rowClass",
-    ],
-    emits: ["click:dataRow"],
+  // Stub OTable so row clicks and scoped-slot content (route, duration) can be
+  // exercised without mounting the real component.
+  OTable: {
+    name: "OTable",
+    props: ["data", "columns", "rowHeight", "defaultColumns", "enableColumnReorder", "rowClass"],
+    emits: ["row-click"],
     template: `
-      <div data-test="rum-player-traces-tab-table">
+      <div>
         <div
-          v-for="(row, i) in rows"
+          v-for="(row, i) in data"
           :key="i"
           :data-test="'table-row-' + i"
-          @click="$emit('click:dataRow', row)"
+          @click="$emit('row-click', row)"
         >
-          <slot name="cell-route"    :item="row" :cell="{ column: { getSize: () => 100 } }" />
-          <slot name="cell-duration" :item="row" :cell="{ column: { getSize: () => 100 } }" />
-          <slot name="cell-status"   :item="row" :cell="{ column: { getSize: () => 100 } }" />
+          <slot name="cell-timestamp" :row="row" :value="null" :column="{}" />
+          <slot name="cell-route"     :row="row" :value="null" :column="{}" />
+          <slot name="cell-duration"  :row="row" :value="null" :column="{}" />
+          <slot name="cell-status"    :row="row" :value="null" :column="{}" />
         </div>
       </div>
     `,
@@ -263,6 +247,19 @@ function mountComponent(options: MountOptions = {}) {
 // Must import after mocks
 import PlayerTracesTab from "@/components/rum/PlayerTracesTab.vue";
 
+// The composable now asks the stream schema which trace-id namespaces exist (`_o2_` vs
+// `_oo_`) before building SQL, so getStream must be mocked or every call hangs.
+// Reports the legacy spelling, matching data ingested before the namespace migration.
+const mockGetStream = vi.fn().mockResolvedValue({
+  schema: [{ name: "_oo_trace_id" }, { name: "_oo_span_id" }],
+});
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStream: mockGetStream,
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -293,9 +290,7 @@ describe("PlayerTracesTab", () => {
     });
 
     it("should render trace table when data is loaded", () => {
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
     });
 
     it("should display the route path in the table row", () => {
@@ -303,9 +298,7 @@ describe("PlayerTracesTab", () => {
     });
 
     it("should display trace count badge in filter bar", () => {
-      const badge = wrapper.find(
-        '[data-test="rum-player-traces-tab-count-badge"]',
-      );
+      const badge = wrapper.find('[data-test="rum-player-traces-tab-count-badge"]');
       expect(badge.exists()).toBe(true);
       expect(badge.text()).toContain("1");
     });
@@ -323,9 +316,7 @@ describe("PlayerTracesTab", () => {
       wrapper = mountComponent();
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-loading"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-loading"]').exists()).toBe(true);
     });
 
     it("should not show the trace table while loading", async () => {
@@ -335,9 +326,7 @@ describe("PlayerTracesTab", () => {
       wrapper = mountComponent();
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-table"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(false);
     });
   });
 
@@ -353,9 +342,7 @@ describe("PlayerTracesTab", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists()).toBe(true);
     });
 
     it("should display 'No correlated traces found' message", async () => {
@@ -381,9 +368,7 @@ describe("PlayerTracesTab", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-error"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-error"]').exists()).toBe(true);
     });
 
     it("should display the error message text", async () => {
@@ -403,9 +388,7 @@ describe("PlayerTracesTab", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-retry-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-retry-btn"]').exists()).toBe(true);
     });
 
     it("should retry fetch when retry button is clicked", async () => {
@@ -418,9 +401,7 @@ describe("PlayerTracesTab", () => {
       mockSearch.mockReset();
       mockSearch.mockResolvedValue({ data: { hits: [] } });
 
-      const retryBtn = wrapper.find(
-        '[data-test="rum-player-traces-tab-retry-btn"]',
-      );
+      const retryBtn = wrapper.find('[data-test="rum-player-traces-tab-retry-btn"]');
       await retryBtn.trigger("click");
       await flushPromises();
 
@@ -448,24 +429,18 @@ describe("PlayerTracesTab", () => {
       await wrapper.find('[data-test="table-row-0"]').trigger("click");
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-back-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-back-btn"]').exists()).toBe(true);
     });
 
     it("should return to list view when back button is clicked", async () => {
       await wrapper.find('[data-test="table-row-0"]').trigger("click");
       await nextTick();
 
-      await wrapper
-        .find('[data-test="rum-player-traces-tab-back-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="rum-player-traces-tab-back-btn"]').trigger("click");
       await nextTick();
 
       expect(wrapper.find('[data-test="trace-details"]').exists()).toBe(false);
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
     });
 
     it("should show the selected trace route in detail header", async () => {
@@ -519,8 +494,8 @@ describe("PlayerTracesTab", () => {
       const traceId = "same-trace";
       setupSuccessfulMocks(
         [
-          createRumHit({ _oo_trace_id: traceId }),
-          createRumHit({ _oo_trace_id: traceId, _view_id: "view-2" }),
+          createRumHit({ _trace_id: traceId }),
+          createRumHit({ _trace_id: traceId, _view_id: "view-2" }),
         ],
         [createTraceMetadata({ trace_id: traceId })],
       );
@@ -539,10 +514,7 @@ describe("PlayerTracesTab", () => {
       // filteredViews ends up empty — component renders the empty state.
       mockSearch.mockResolvedValue({
         data: {
-          hits: [
-            createRumHit({ _oo_trace_id: null }),
-            createRumHit({ _oo_trace_id: "valid-trace" }),
-          ],
+          hits: [createRumHit({ _trace_id: null }), createRumHit({ _trace_id: "valid-trace" })],
         },
       });
 
@@ -558,11 +530,11 @@ describe("PlayerTracesTab", () => {
       setupSuccessfulMocks(
         [
           createRumHit({
-            _oo_trace_id: "trace-1",
+            _trace_id: "trace-1",
             _view_url: "https://example.com/page1",
           }),
           createRumHit({
-            _oo_trace_id: "trace-2",
+            _trace_id: "trace-2",
             _view_url: "https://example.com/page2",
           }),
         ],
@@ -650,19 +622,15 @@ describe("PlayerTracesTab", () => {
         return Promise.resolve({ data: { hits: [] } });
       });
       // Metadata returns no hits → filteredViews is empty → empty state shown.
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_queryReq: any, handlers: any) => {
-          handlers.data(null, { content: { results: { hits: [] } } });
-          handlers.complete();
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_queryReq: any, handlers: any) => {
+        handlers.data(null, { content: { results: { hits: [] } } });
+        handlers.complete();
+      });
 
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists()).toBe(true);
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -676,18 +644,14 @@ describe("PlayerTracesTab", () => {
         return Promise.resolve({ data: { hits: [] } });
       });
       // On error the component falls back to unfiltered views (no metadata enrichment).
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_queryReq: any, handlers: any) => {
-          handlers.error(null, new Error("Metadata fetch failed"));
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_queryReq: any, handlers: any) => {
+        handlers.error(null, new Error("Metadata fetch failed"));
+      });
 
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("/products");
     });
   });
@@ -698,9 +662,9 @@ describe("PlayerTracesTab", () => {
 
   describe("formatting utilities", () => {
     it("should extract pathname from a full URL", () => {
-      expect(
-        (wrapper.vm as any).shortRoute("https://example.com/products?page=1"),
-      ).toBe("/products?page=1");
+      expect((wrapper.vm as any).shortRoute("https://example.com/products?page=1")).toBe(
+        "/products?page=1",
+      );
     });
 
     it("should return the original string for an invalid URL", () => {
@@ -718,9 +682,7 @@ describe("PlayerTracesTab", () => {
       await wrapper.find('[data-test="table-row-0"]').trigger("click");
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-seek-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-seek-btn"]').exists()).toBe(true);
     });
 
     it("should not show seek button when startTime prop is 0", async () => {
@@ -732,9 +694,7 @@ describe("PlayerTracesTab", () => {
       await wrapper.find('[data-test="table-row-0"]').trigger("click");
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-seek-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-seek-btn"]').exists()).toBe(false);
     });
 
     it("should emit event-emitted with trace-seek when seek button is clicked", async () => {
@@ -758,10 +718,7 @@ describe("PlayerTracesTab", () => {
       wrapper.unmount();
 
       // startTime: 1000 ms, trace start_time: 2_000_000_000 ns → 2000 ms → offset = 1000 ms (> 0)
-      setupSuccessfulMocks(
-        [createRumHit()],
-        [createTraceMetadata({ start_time: 2_000_000_000 })],
-      );
+      setupSuccessfulMocks([createRumHit()], [createTraceMetadata({ start_time: 2_000_000_000 })]);
       wrapper = mountComponent({ props: { startTime: 1000 } });
       await flushPromises();
 
@@ -770,9 +727,7 @@ describe("PlayerTracesTab", () => {
 
       const emitted = wrapper.emitted("event-emitted");
       expect(emitted).toBeTruthy();
-      const rowClickEvents = (emitted as any[]).filter(
-        (args) => args[0] === "trace-row-click",
-      );
+      const rowClickEvents = (emitted as any[]).filter((args) => args[0] === "trace-row-click");
       expect(rowClickEvents.length).toBe(1);
       expect(rowClickEvents[0][1]).toEqual({ relativeTime: 1000 });
     });
@@ -783,9 +738,7 @@ describe("PlayerTracesTab", () => {
       await nextTick();
 
       const emitted = wrapper.emitted("event-emitted") ?? [];
-      const rowClickEvents = (emitted as any[]).filter(
-        (args) => args[0] === "trace-row-click",
-      );
+      const rowClickEvents = (emitted as any[]).filter((args) => args[0] === "trace-row-click");
       expect(rowClickEvents.length).toBe(0);
     });
   });
@@ -815,10 +768,7 @@ describe("PlayerTracesTab", () => {
     it("should use singular 'span' when spanCount is 1", async () => {
       wrapper.unmount();
 
-      setupSuccessfulMocks(
-        [createRumHit()],
-        [createTraceMetadata({ spans: [1, 0] })],
-      );
+      setupSuccessfulMocks([createRumHit()], [createTraceMetadata({ spans: [1, 0] })]);
       wrapper = mountComponent();
       await flushPromises();
 
@@ -851,9 +801,7 @@ describe("PlayerTracesTab", () => {
       await wrapper.find('[data-test="table-row-0"]').trigger("click");
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-open-full-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-open-full-btn"]').exists()).toBe(true);
     });
 
     it("should not show error count chip when trace has no errors", async () => {
@@ -892,9 +840,9 @@ describe("PlayerTracesTab", () => {
 
     it("should not show error count badge when no traces have errors", () => {
       // Default metadata has spans: [5, 0] → totalErrorCount = 0
-      expect(
-        wrapper.find('[data-test="rum-player-traces-tab-error-count-badge"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-player-traces-tab-error-count-badge"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -945,15 +893,13 @@ describe("PlayerTracesTab", () => {
     });
 
     it("should assign empty class for traceRowClass when errorCount is 0", () => {
-      expect(
-        (wrapper.vm as any).traceRowClass({ metadata: { errorCount: 0 } }),
-      ).toBe("");
+      expect((wrapper.vm as any).traceRowClass({ metadata: { errorCount: 0 } })).toBe("");
     });
 
     it("should assign error class for traceRowClass when errorCount > 0", () => {
-      expect(
-        (wrapper.vm as any).traceRowClass({ metadata: { errorCount: 2 } }),
-      ).toBe("trace-row--error");
+      expect((wrapper.vm as any).traceRowClass({ metadata: { errorCount: 2 } })).toBe(
+        "trace-row--error",
+      );
     });
   });
 
@@ -1007,9 +953,7 @@ describe("PlayerTracesTab", () => {
       await wrapper.find('[data-test="table-row-0"]').trigger("click");
       await nextTick();
 
-      await wrapper
-        .find('[data-test="rum-player-traces-tab-back-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="rum-player-traces-tab-back-btn"]').trigger("click");
       await nextTick();
 
       expect((wrapper.vm as any).selectedTraceStartTime).toBe(0);
@@ -1047,6 +991,97 @@ describe("PlayerTracesTab", () => {
       await flushPromises();
 
       expect(mockSearch).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // SQL is schema-guarded so a mobile stream never 400s
+  //
+  // Mobile RUM streams lack the browser-shaped view columns: `view_loading_type`
+  // is browser-only, and `action_id` may be absent. Referencing a column the
+  // stream does not have fails the whole query with a 400. Every optional column
+  // must therefore be selected only when present, and the `action_id` filter
+  // applied only when that column exists.
+  // =========================================================================
+
+  describe("schema-guarded SQL", () => {
+    function lastRumSql(): string {
+      const call = mockSearch.mock.calls.find((c: any[]) => c[1] === "RUM");
+      return call?.[0]?.query?.query?.sql ?? "";
+    }
+
+    it("omits view_loading_type and the action_id filter on a mobile schema", async () => {
+      // Arrange: a mobile-shaped schema — trace_id present, but no view_loading_type
+      // and no action_id.
+      wrapper.unmount();
+      mockSearch.mockClear();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [
+          { name: "_o2_trace_id" },
+          { name: "session_id" },
+          { name: "view_url" },
+          { name: "view_id" },
+          { name: "type" },
+          { name: "date" },
+        ],
+      });
+
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert: query ran (no early return), references neither absent column.
+      const sql = lastRumSql();
+      expect(sql).not.toBe("");
+      expect(sql).not.toContain("max(view_loading_type)");
+      expect(sql).toContain("NULL as _view_loading_type");
+      expect(sql).not.toContain("action_id is not null");
+      expect(sql).toContain("_o2_trace_id");
+      expect(sql).toContain("max(view_url)");
+    });
+
+    it("keeps view_loading_type and the action_id filter on a full browser schema", async () => {
+      // Arrange: browser schema carries every column.
+      wrapper.unmount();
+      mockSearch.mockClear();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [
+          { name: "_oo_trace_id" },
+          { name: "session_id" },
+          { name: "view_url" },
+          { name: "view_id" },
+          { name: "view_loading_type" },
+          { name: "type" },
+          { name: "date" },
+          { name: "action_id" },
+        ],
+      });
+
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      const sql = lastRumSql();
+      expect(sql).toContain("max(view_loading_type) as _view_loading_type");
+      expect(sql).toContain("action_id is not null");
+    });
+
+    it("does not query at all when the stream has no trace_id column", async () => {
+      // Arrange: neither namespace present → nothing to correlate.
+      wrapper.unmount();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [{ name: "session_id" }, { name: "view_url" }],
+      });
+      mockSearch.mockClear();
+
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert: early return, no search issued, empty state shown.
+      expect(mockSearch).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists()).toBe(true);
     });
   });
 });

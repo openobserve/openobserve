@@ -19,12 +19,9 @@ import {
   calculateDynamicNameGap,
   calculateNiceTickValues,
   calculateRotatedLabelBottomSpace,
+  X_AXIS_TICK_LABEL_BAND,
 } from "../../chartDimensionUtils";
-import {
-  ColorModeWithoutMinMax,
-  getSQLMinMaxValue,
-  getGridLineStyle,
-} from "../../colorPalette";
+import { ColorModeWithoutMinMax, getSQLMinMaxValue, getGridLineStyle } from "../../colorPalette";
 import { getDataValue } from "../../aliasUtils";
 import {
   createBaseLegendConfig,
@@ -45,9 +42,7 @@ import { type SQLContext } from "./types";
  */
 export const largestLabel = (data: any) => {
   const largestlabel = data.reduce((largest: any, label: any) => {
-    return label?.toString().length > largest?.toString().length
-      ? label
-      : largest;
+    return label?.toString().length > largest?.toString().length ? label : largest;
   }, "");
 
   return largestlabel;
@@ -74,9 +69,7 @@ export function buildSQLContext(
 ): SQLContext | null {
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
-    panelSchema?.config?.show_gridlines !== undefined
-      ? panelSchema.config.show_gridlines
-      : true;
+    panelSchema?.config?.show_gridlines !== undefined ? panelSchema.config.show_gridlines : true;
   // Subtle dashed grid lines so they recede behind the data
   const gridLineStyle = getGridLineStyle(store.state.theme);
   const extras: any = {};
@@ -139,9 +132,13 @@ export function buildSQLContext(
           xAxis: markLine.type == "xAxis" ? markLine.value : null,
           yAxis: markLine.type == "yAxis" ? markLine.value : null,
           label: {
+            // The alert preview passes show_label:false — its lines are
+            // colour-coded, and a text label clips at the chart top.
+            show: markLine.show_label !== false,
             formatter: markLine.name ? "{b}:{c}" : "{c}",
             position: "insideEndTop",
           },
+          ...(markLine.color ? { lineStyle: { color: markLine.color } } : {}),
         };
       }) ?? []
     );
@@ -232,8 +229,7 @@ export function buildSQLContext(
 
   const legendConfig = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
-  const isHorizontalChart =
-    panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
+  const isHorizontalChart = panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
 
   const defaultGrid = {
     containLabel: true,
@@ -254,17 +250,11 @@ export function buildSQLContext(
     const configured = panelSchema?.config?.decimals ?? 2;
     const format = (v: number, decimals: number) =>
       formatUnitValue(
-        getUnitValue(
-          v,
-          panelSchema?.config?.unit,
-          panelSchema?.config?.unit_custom,
-          decimals,
-        ),
+        getUnitValue(v, panelSchema?.config?.unit, panelSchema?.config?.unit_custom, decimals),
       );
     try {
       const usesStackExtent =
-        (panelSchema?.type === "stacked" ||
-          panelSchema?.type === "area-stacked") &&
+        (panelSchema?.type === "stacked" || panelSchema?.type === "area-stacked") &&
         (breakDownKeys?.length ?? 0) > 0;
       // stacked extent = the largest per-bucket SUM (what ECharts stacks to),
       // not the sum of per-series maxima that peak in different buckets
@@ -278,7 +268,13 @@ export function buildSQLContext(
         }
         for (const k in sums) if (sums[k] > hi) hi = sums[k];
       }
-      const lo = Number.isFinite(min) ? Math.min(min, hi) : 0;
+      const cfgMin = panelSchema?.config?.y_axis_min;
+      const cfgMax = panelSchema?.config?.y_axis_max;
+      const hasCfgMin = cfgMin !== null && cfgMin !== undefined;
+      const hasCfgMax = cfgMax !== null && cfgMax !== undefined;
+      const dataMin = Number.isFinite(min) ? min : 0;
+      const lo = hasCfgMin ? Math.min(cfgMin, dataMin) : Math.min(0, dataMin);
+      hi = hasCfgMax ? Math.max(cfgMax, hi) : Math.max(0, hi);
 
       const ticks = calculateNiceTickValues(lo, hi);
       if (!ticks?.length) throw new Error("no ticks");
@@ -286,12 +282,7 @@ export function buildSQLContext(
       let decimals = configured;
       if (ticks.length > 1) {
         const toDisplay = (v: number) => {
-          const u = getUnitValue(
-            v,
-            panelSchema?.config?.unit,
-            panelSchema?.config?.unit_custom,
-            8,
-          );
+          const u = getUnitValue(v, panelSchema?.config?.unit, panelSchema?.config?.unit_custom, 8);
           return { n: parseFloat(u?.value), unit: u?.unit };
         };
         const a = toDisplay(ticks[ticks.length - 2]);
@@ -300,10 +291,7 @@ export function buildSQLContext(
         if (a?.unit === b?.unit) {
           const interval = Math.abs(b.n - a.n);
           if (Number.isFinite(interval) && interval > 0) {
-            decimals = Math.min(
-              Math.max(configured, Math.ceil(-Math.log10(interval))),
-              8,
-            );
+            decimals = Math.min(Math.max(configured, Math.ceil(-Math.log10(interval))), 8);
           }
         }
       }
@@ -311,8 +299,7 @@ export function buildSQLContext(
       // include one extra interval tick — if the extent estimate runs a
       // hair short, ECharts' real top tick is still measured
       const interval = ticks.length > 1 ? ticks[1] - ticks[0] : 0;
-      const candidates =
-        interval > 0 ? [...ticks, ticks[ticks.length - 1] + interval] : ticks;
+      const candidates = interval > 0 ? [...ticks, ticks[ticks.length - 1] + interval] : ticks;
       const widestLabelWidth = Math.max(
         ...candidates.map((v: number) => calculateWidthText(format(v, decimals))),
       );
@@ -320,15 +307,12 @@ export function buildSQLContext(
     } catch {
       return {
         decimals: configured,
-        widestLabelWidth: calculateWidthText(
-          format(Number.isFinite(max) ? max : 0, configured),
-        ),
+        widestLabelWidth: calculateWidthText(format(Number.isFinite(max) ? max : 0, configured)),
       };
     }
   };
   const { decimals: yAxisTickDecimals, widestLabelWidth: widestYAxisTickLabel } =
     getYAxisTickInfo();
-
 
   const getFinalAxisValue = (
     configValue: number | null | undefined,
@@ -338,24 +322,20 @@ export function buildSQLContext(
     if (configValue === null || configValue === undefined) {
       return undefined;
     }
-    return isMin
-      ? Math.min(configValue, dataValue)
-      : Math.max(configValue, dataValue);
+    return isMin ? Math.min(configValue, dataValue) : Math.max(configValue, dataValue);
   };
 
   // Drop the x-axis name on panels too short to fit labels + name + plot.
   const panelHeightPx = chartPanelRef?.value?.offsetHeight ?? 0;
   const xAxisNameFits = !panelHeightPx || panelHeightPx >= 150;
 
-  const hasXAxisName =
-    xAxisNameFits && panelSchema?.queries?.[0]?.fields?.x?.[0]?.label;
+  const hasXAxisName = xAxisNameFits && panelSchema?.queries?.[0]?.fields?.x?.[0]?.label;
 
   // Drop the y-axis name on panels too narrow for name inset (36) + labels +
   // right margin (20) + a usable plot (~84); below that ECharts squeezes the
   // labels over the name regardless of nameGap.
   const panelWidthPx = chartPanelRef?.value?.offsetWidth ?? 0;
-  const yAxisNameFits =
-    !panelWidthPx || panelWidthPx >= widestYAxisTickLabel + 140;
+  const yAxisNameFits = !panelWidthPx || panelWidthPx >= widestYAxisTickLabel + 140;
 
   const hasYAxisName =
     yAxisNameFits &&
@@ -373,22 +353,14 @@ export function buildSQLContext(
   // Skip rotation for time-based x-axis and horizontal chart types (h-bar, h-stacked)
   // For horizontal charts, labels should always be at 0 degrees (not rotated)
   let labelRotation =
-    hasTimestampField || isHorizontalChart
-      ? 0
-      : panelSchema.config?.axis_label_rotate || 0;
+    hasTimestampField || isHorizontalChart ? 0 : panelSchema.config?.axis_label_rotate || 0;
   let labelWidth =
-    hasTimestampField || isHorizontalChart
-      ? 0
-      : panelSchema.config?.axis_label_truncate_width || 0;
+    hasTimestampField || isHorizontalChart ? 0 : panelSchema.config?.axis_label_truncate_width || 0;
 
   // If truncate width is not set and not time-based/horizontal, calculate the actual max width from data
-  if (
-    !hasTimestampField &&
-    !isHorizontalChart &&
-    labelWidth === 0 &&
-    xAxisKeys.length > 0
-  ) {
+  if (!hasTimestampField && !isHorizontalChart && labelWidth === 0 && xAxisKeys.length > 0) {
     const longestLabelStr = largestLabel(getAxisDataFromKey(xAxisKeys[0]));
+    // eslint-disable-next-line local/no-hardcoded-px -- must match `labelFontSize` below, which ECharts paints axis labels at as a literal CSS px that never scales with the root; rem here would over-reserve nameGap
     labelWidth = calculateWidthText(longestLabelStr, "12px");
   } else if (!hasTimestampField && !isHorizontalChart && labelWidth === 0) {
     labelWidth = 120; // Fallback
@@ -407,13 +379,7 @@ export function buildSQLContext(
   const dynamicXAxisNameGap =
     hasTimestampField || isHorizontalChart
       ? 35
-      : calculateDynamicNameGap(
-          labelRotation,
-          labelWidth,
-          labelFontSize,
-          25,
-          labelMargin,
-        );
+      : calculateDynamicNameGap(labelRotation, labelWidth, labelFontSize, 25, labelMargin);
 
   // Additional bottom space is only needed for non-horizontal, non-time-based charts
   const additionalBottomSpace =
@@ -427,52 +393,68 @@ export function buildSQLContext(
           dynamicXAxisNameGap,
         );
 
+  const axisWidth = panelSchema.config?.axis_width;
+  const axisWidthSet = axisWidth !== null && axisWidth !== undefined;
+  const reserveYLabelLeft = !isHorizontalChart && !hasYAxisName && !axisWidthSet;
+
+  const horizontalCategoryLabelWidth = isHorizontalChart
+    ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(xAxisKeys?.[0]))), 120)
+    : 0;
+  const reserveHorizontalYName = isHorizontalChart && !!hasXAxisName && !axisWidthSet;
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
-      containLabel: panelSchema.config?.axis_width == null ? true : false,
-      left: hasYAxisName ? (panelSchema.config?.axis_width ?? 30) : 5,
+      containLabel:
+        reserveYLabelLeft || reserveHorizontalYName ? false : axisWidthSet ? false : true,
+      left: reserveYLabelLeft
+        ? widestYAxisTickLabel + 12
+        : reserveHorizontalYName
+          ? horizontalCategoryLabelWidth + 26
+          : isHorizontalChart
+            ? (axisWidth ?? 15)
+            : hasYAxisName
+              ? (axisWidth ?? 30)
+              : 5,
       right: 20,
-      top: 8,
-      bottom: hasXAxisName
-        ? (() => {
-            // Reserve enough vertical space below the plot for the tick labels, the
-            // axis name (`nameGap` 35) and — when a horizontal legend is shown — the
-            // legend row beneath it. Measured ideal is roughly `nameGap + 20` for the
-            // containLabel case (labels are reserved inside the grid box, so only the
-            // name needs to clear the bottom-anchored legend); the earlier values left
-            // the name overlapping the legend, and over-padding leaves a visible gap.
-            const baseBottom =
-              legendConfig.orient === "horizontal" &&
-              panelSchema.config?.show_legends
-                ? panelSchema.config?.axis_width == null
-                  ? 55
-                  : 75
-                : panelSchema.config?.axis_width == null
+      top: 12,
+      bottom:
+        (hasXAxisName
+          ? (() => {
+              // Reserve enough vertical space below the plot for the tick labels, the
+              // axis name (`nameGap` 35) and — when a horizontal legend is shown — the
+              // legend row beneath it. Measured ideal is roughly `nameGap + 20` for the
+              // containLabel case (labels are reserved inside the grid box, so only the
+              // name needs to clear the bottom-anchored legend); the earlier values left
+              // the name overlapping the legend, and over-padding leaves a visible gap.
+              const baseBottom =
+                legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+                  ? panelSchema.config?.axis_width == null
+                    ? 55
+                    : 75
+                  : panelSchema.config?.axis_width == null
+                    ? 30
+                    : 50;
+              // When an x-axis name is present, `nameGap` already reserves space
+              // between rotated labels and the axis name. Adding `additionalBottomSpace`
+              // here causes double-counting and extra blank space beneath the axis
+              // name. Only return the base bottom in this case.
+              return baseBottom;
+            })()
+          : (() => {
+              // A bottom legend needs its row reserved even without an
+              // x-axis name, or it draws over the plot and tick labels.
+              const baseBottom =
+                legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
                   ? 30
-                  : 50;
-            // When an x-axis name is present, `nameGap` already reserves space
-            // between rotated labels and the axis name. Adding `additionalBottomSpace`
-            // here causes double-counting and extra blank space beneath the axis
-            // name. Only return the base bottom in this case.
-            return baseBottom;
-          })()
-        : (() => {
-            // A bottom legend needs its row reserved even without an
-            // x-axis name, or it draws over the plot and tick labels.
-            const baseBottom =
-              legendConfig.orient === "horizontal" &&
-              panelSchema.config?.show_legends
-                ? 30
-                : legendConfig.orient === "vertical" &&
-                    panelSchema.config?.show_legends
-                  ? 0
-                  : breakDownKeys.length > 0
-                    ? 25
-                    : 0;
-            return baseBottom + additionalBottomSpace;
-          })(),
+                  : legendConfig.orient === "vertical" && panelSchema.config?.show_legends
+                    ? 0
+                    : breakDownKeys.length > 0
+                      ? 25
+                      : 0;
+              return baseBottom + additionalBottomSpace;
+            })()) + (reserveYLabelLeft || reserveHorizontalYName ? X_AXIS_TICK_LABEL_BAND : 0),
     },
     tooltip: {
       trigger: "axis",
@@ -488,6 +470,7 @@ export function buildSQLContext(
       borderWidth: 1,
       padding: [8, 12],
       extraCssText:
+        // eslint-disable-next-line local/no-hardcoded-px -- ECharts serialises this into its own container — no CSS cascade resolves rem
         "max-height: 200px; overflow: auto; max-width: 400px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;",
       axisPointer: {
         type: "cross",
@@ -495,14 +478,11 @@ export function buildSQLContext(
           show: true,
           fontsize: 12,
           precision: panelSchema.config?.decimals,
-          backgroundColor: store.state.theme === "dark" ? "#333" : "",
+          backgroundColor: chartColor("--color-chart-crosshair-bg"),
           formatter: function (params: any) {
             try {
               let lineBreaks = "";
-              if (
-                panelSchema.type === "h-bar" ||
-                panelSchema.type === "h-stacked"
-              ) {
+              if (panelSchema.type === "h-bar" || panelSchema.type === "h-stacked") {
                 if (params?.axisDimension == "x")
                   return formatUnitValue(
                     getUnitValue(
@@ -514,15 +494,10 @@ export function buildSQLContext(
                   );
 
                 //we does not required any linebreaks for h-stacked because we only use one x axis
-                if (panelSchema.type === "h-stacked")
-                  return params?.value?.toString();
+                if (panelSchema.type === "h-stacked") return params?.value?.toString();
                 for (
                   let i = 0;
-                  i <
-                  xAxisKeys.length +
-                    breakDownKeys.length -
-                    params?.axisIndex -
-                    1;
+                  i < xAxisKeys.length + breakDownKeys.length - params?.axisIndex - 1;
                   i++
                 ) {
                   lineBreaks += " \n \n";
@@ -541,8 +516,7 @@ export function buildSQLContext(
                 );
               for (
                 let i = 0;
-                i <
-                xAxisKeys.length + breakDownKeys.length - params?.axisIndex - 1;
+                i < xAxisKeys.length + breakDownKeys.length - params?.axisIndex - 1;
                 i++
               ) {
                 lineBreaks += " \n \n";
@@ -575,8 +549,7 @@ export function buildSQLContext(
           if (hoveredSeriesState?.value?.hoveredSeriesName) {
             // get the current series index from name
             const currentSeriesIndex = name?.findIndex(
-              (it: any) =>
-                it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
+              (it: any) => it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
             );
 
             // if hovered series index is not -1 then take it to very first position
@@ -596,9 +569,7 @@ export function buildSQLContext(
             if (it.value != null) {
               // check if the series is the current series being hovered
               // if have than bold it
-              if (
-                it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-              )
+              if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
                   `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                     getUnitValue(
@@ -646,9 +617,7 @@ export function buildSQLContext(
       const xLabelPxWithGap = calculateWidthText(sampleXLabel) + 8;
       const showEveryKthLabel = Math.max(
         1,
-        Math.ceil(
-          xLabelPxWithGap / (xPlotWidthPx / Math.max(1, arr.length)),
-        ),
+        Math.ceil(xLabelPxWithGap / (xPlotWidthPx / Math.max(1, arr.length))),
       );
       const shownLabelIndexes = new Set(
         arr.filter((_: any, j: number) => j % showEveryKthLabel === 0),
@@ -656,11 +625,10 @@ export function buildSQLContext(
 
       // Use 0 for rotation and width if time-based field or horizontal chart
       const labelRotation =
-        hasTimestampField || isHorizontalChart
-          ? 0
-          : panelSchema.config?.axis_label_rotate || 0;
-      const labelWidth =
-        hasTimestampField || isHorizontalChart
+        hasTimestampField || isHorizontalChart ? 0 : panelSchema.config?.axis_label_rotate || 0;
+      const labelWidth = isHorizontalChart
+        ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(key))) + 2, 120)
+        : hasTimestampField
           ? 120
           : panelSchema.config?.axis_label_truncate_width || 120;
       const labelMargin = 10;
@@ -691,10 +659,7 @@ export function buildSQLContext(
                 : function (i: any) {
                     return shownLabelIndexes.has(i);
                   },
-          overflow:
-            index == xAxisKeys.length + breakDownKeys.length - 1
-              ? "none"
-              : "truncate",
+          overflow: index == xAxisKeys.length + breakDownKeys.length - 1 ? "none" : "truncate",
           // hide axis label if overlaps
           hideOverlap: true,
           width: labelWidth,
@@ -731,14 +696,7 @@ export function buildSQLContext(
       nameLocation: "middle",
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
-      // nameGap positions the name's centerline: clear the label column,
-      // its 8px margin and half the rotated name's own height.
-      nameGap:
-        (panelSchema?.type == "h-bar" || panelSchema?.type == "h-stacked"
-          ? calculateWidthText(
-              largestLabel(getAxisDataFromKey(yAxisKeys?.[0])),
-            )
-          : widestYAxisTickLabel) + 8,
+      nameGap: (isHorizontalChart ? horizontalCategoryLabelWidth : widestYAxisTickLabel) + 10,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
@@ -791,10 +749,7 @@ export function buildSQLContext(
         dataZoom: {
           yAxisIndex:
             panelSchema.config?.dataZoom &&
-            Object.prototype.hasOwnProperty.call(
-              panelSchema.config.dataZoom,
-              "yAxisIndex",
-            )
+            Object.prototype.hasOwnProperty.call(panelSchema.config.dataZoom, "yAxisIndex")
               ? panelSchema.config?.dataZoom.yAxisIndex
               : "none",
         },
@@ -827,11 +782,7 @@ export function buildSQLContext(
   // if color type is shades, continuous then required to calculate min and max for chart.
   let chartMin: any = Infinity;
   let chartMax: any = -Infinity;
-  if (
-    !Object.values(ColorModeWithoutMinMax).includes(
-      panelSchema.config?.color?.mode,
-    )
-  ) {
+  if (!Object.values(ColorModeWithoutMinMax).includes(panelSchema.config?.color?.mode)) {
     // if heatmap then get min and max from z axis sql data
     if (panelSchema.type == "heatmap") {
       // NOTE: Currently we do not support color options for heatmap
@@ -844,11 +795,7 @@ export function buildSQLContext(
   }
 
   // Build the lookup map once for O(1) series data access
-  const dataLookupMap = buildDataLookupMap(
-    missingValueData,
-    breakDownKeys,
-    xAxisKeys,
-  );
+  const dataLookupMap = buildDataLookupMap(missingValueData, breakDownKeys, xAxisKeys);
 
   // Build series helpers (they close over options, missingValueData, etc.)
   const seriesHelpers = createSeriesBuilders({

@@ -187,7 +187,26 @@ export class AlertManagement {
      */
     async deleteAlertByRow(alertName) {
         const kebabButton = this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).first();
-        await kebabButton.waitFor({ state: 'visible', timeout: 5000 });
+        // Under parallel load the just-created alert's row can be slow to render, or sit below the
+        // fold in a long/unrefreshed list, so a bare wait for its more-options kebab times out
+        // (alerts-ui-operations:71/131). First filter the current folder (client-side) to bring
+        // the row to the top.
+        if (!(await kebabButton.isVisible({ timeout: 3000 }).catch(() => false))) {
+            await this.searchAlert(alertName).catch(() => {});
+        }
+        try {
+            await kebabButton.waitFor({ state: 'visible', timeout: 20000 });
+        } catch (e) {
+            // The in-folder filter runs client-side over the already-fetched list, so if
+            // navigateToFolder resolved on a transient empty-state before the folder's alerts
+            // finished fetching (common under load), the row simply isn't there to filter. Fall
+            // back to an across-folders search, which issues a fresh SERVER-SIDE query and finds
+            // the alert regardless of which folder finished loading.
+            testLogger.warn('Alert kebab not visible after in-folder search; retrying via across-folders search', { alertName });
+            await this.searchAlertAcrossFolders(alertName).catch(() => {});
+            await kebabButton.waitFor({ state: 'visible', timeout: 20000 });
+        }
+        await kebabButton.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
         await kebabButton.click();
 
         // Target the Delete item by data-test (robust to label/shortcut-hint changes)
@@ -231,6 +250,33 @@ export class AlertManagement {
             testLogger.error('Neither table nor no data message found after search', { alertName, error: error.message });
             throw new Error(`Failed to search for alert "${alertName}": Neither table nor empty state appeared`);
         }
+    }
+
+    /**
+     * Search for an alert across ALL folders. The scope toggle switches the search input from a
+     * client-side folder filter (filterQuery) to a SERVER-SIDE query (searchQuery), so this finds
+     * the alert even when the active folder's list hasn't finished fetching under load. Uses the
+     * exact-case name (the backend match is case-insensitive) and is idempotent on the toggle.
+     * @param {string} alertName
+     */
+    async searchAlertAcrossFolders(alertName) {
+        const allScope = this.page.locator('[data-test="alert-list-search-across-folders-toggle"]');
+        const state = await allScope.getAttribute('data-state').catch(() => null);
+        if (state !== 'on' && state !== 'active') {
+            await allScope.click({ force: true }).catch(() => {});
+        }
+        await this.page.waitForTimeout(500);
+
+        const inputField = this.page.locator(this.locators.alertSearchInputField);
+        await inputField.waitFor({ state: 'attached', timeout: 10000 });
+        await inputField.fill('', { force: true });
+        await inputField.fill(alertName, { force: true });
+        await this.page.waitForTimeout(2000);
+
+        await Promise.race([
+            this.page.locator(this.locators.tableLocator).waitFor({ state: 'visible', timeout: 30000 }),
+            this.page.locator('[data-test="o2-empty-state"]').waitFor({ state: 'visible', timeout: 30000 })
+        ]).catch(() => {});
     }
 
     /**
@@ -392,9 +438,8 @@ export class AlertManagement {
             // The trigger endpoint evaluates the alert AND synchronously delivers the
             // notification, surfacing sink delivery errors as a 500. In that case the
             // trigger mechanics (menu action → PATCH → evaluation) worked; only the
-            // external webhook sink misbehaved (e.g. httpbin/webhook.site returning
-            // 503s). Delivery correctness is covered by the round-trip validation
-            // tests, not this UI feature test.
+            // notification sink returned an error on delivery. Delivery correctness is
+            // covered by the round-trip validation tests, not this UI feature test.
             if (status === 500 && /Error sending notification/i.test(body?.message || '')) {
                 testLogger.warn('Alert trigger reached delivery but sink rejected the notification — treating trigger as successful', { status, body });
                 return true;
@@ -420,10 +465,9 @@ export class AlertManagement {
             await errorNotification.waitFor({ state: 'visible', timeout: 3000 });
             const errorText = await errorNotification.textContent().catch(() => 'Unknown error');
             // "Error sending notification" means the trigger fired and reached delivery,
-            // but the external sink rejected it (e.g. httpbin/webhook.site 5xx). The
-            // trigger mechanism worked — only sink delivery failed, which this UI feature
-            // test does not assert. Treat it as success; a genuine trigger failure
-            // ("Failed to trigger") still returns false.
+            // but the notification sink rejected it. The trigger mechanism worked — only
+            // sink delivery failed, which this UI feature test does not assert. Treat it
+            // as success; a genuine trigger failure ("Failed to trigger") still returns false.
             if (/Error sending notification/i.test(errorText)) {
                 testLogger.warn('Trigger reached delivery but sink rejected it — treating trigger as successful', { errorText });
                 return true;
@@ -516,12 +560,11 @@ export class AlertManagement {
     }
 
     /**
-     * Open alert details dialog by clicking alert name in the list (PR #10470)
-     * The new AlertHistoryDrawer is rendered inside a dialog
+     * Open the routed alert detail page by clicking the alert name in the list
      * @param {string} alertName - Name of the alert
      */
     async openAlertDetailsDialog(alertName) {
-        testLogger.info('Opening alert details dialog', { alertName });
+        testLogger.info('Opening alert detail page', { alertName });
 
         // Try folder-specific search first
         await this.searchAlert(alertName);
@@ -546,14 +589,13 @@ export class AlertManagement {
 
         await alertRow.waitFor({ state: 'visible', timeout: 15000 });
 
-        // Click the alert name cell (2nd column) to open details dialog
-        const alertNameCell = alertRow.locator('td').nth(1);
-        await alertNameCell.click();
-        await this.page.waitForTimeout(1500);
-
-        // Wait for the new dialog to appear
-        await expect(this.page.locator('[data-test="alert-details-dialog"]')).toBeVisible({ timeout: 10000 });
-        testLogger.info('Alert details dialog opened', { alertName });
+        // Clicking anywhere on the row opens the Alerts 2.0 detail route. Click the
+        // exact name rather than a column index because selection/index columns are
+        // configurable and can shift the name cell.
+        await alertRow.getByText(alertName, { exact: true }).first().click();
+        await expect(this.page).toHaveURL(/\/alerts\/detail\/[^/?]+(?:\?|$)/, { timeout: 10000 });
+        await expect(this.page.locator('[data-test="alerts-alertdetail-title"]')).toBeVisible({ timeout: 10000 });
+        testLogger.info('Alert detail page opened', { alertName });
     }
 
     /**
@@ -618,7 +660,7 @@ export class AlertManagement {
         await logsPage.clickRefreshButton();
         await this.page.waitForTimeout(3000);
 
-        let logTableCell = this.page.locator('[data-test="log-table-column-0-source"]');
+        let logTableCell = this.page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-source"]');
         let logCount = await logTableCell.count();
 
         if (logCount === 0) {

@@ -80,9 +80,7 @@ describe("useOSRoutes", () => {
   });
 
   it("parentRoutes is always an empty array regardless of ingestion routes", () => {
-    vi.mocked(useIngestionRoutes).mockReturnValueOnce([
-      { path: "extra", name: "extra" },
-    ] as any);
+    vi.mocked(useIngestionRoutes).mockReturnValueOnce([{ path: "extra", name: "extra" }] as any);
     const { parentRoutes } = useOSRoutes();
     expect(parentRoutes).toEqual([]);
     expect(parentRoutes).toHaveLength(0);

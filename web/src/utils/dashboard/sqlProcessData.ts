@@ -51,10 +51,7 @@ export const processData = (
 
   // get the limit series from the config
   let limitSeries = top_results
-    ? (Math.min(
-        top_results,
-        store.state?.zoConfig?.max_dashboard_series ?? 100,
-      ) ?? 100)
+    ? (Math.min(top_results, store.state?.zoConfig?.max_dashboard_series ?? 100) ?? 100)
     : (store.state?.zoConfig?.max_dashboard_series ?? 100);
 
   // For multi y-axis charts, divide the limit by number of y-axes
@@ -78,11 +75,7 @@ export const processData = (
     let breakdownValue = getDataValue(item, breakdownKey);
 
     // Convert null, undefined, and empty string to a default empty string
-    if (
-      breakdownValue == null ||
-      breakdownValue === "" ||
-      breakdownValue === undefined
-    ) {
+    if (breakdownValue == null || breakdownValue === "" || breakdownValue === undefined) {
       breakdownValue = "";
     }
 
@@ -93,9 +86,7 @@ export const processData = (
   }, {});
 
   // Step 2: Sort and extract the top keys based on the configured number of top results
-  const allKeys = Object.entries(breakdown).sort(
-    ([, a]: any, [, b]: any) => b - a,
-  );
+  const allKeys = Object.entries(breakdown).sort(([, a]: any, [, b]: any) => b - a);
 
   // if top_results is enabled and the number of unique breakdown values is greater than the limit, add a warning message
   // if top_results is not enabled and the number of unique breakdown values is greater than the max_dashboard_series, add a warning message
@@ -103,8 +94,7 @@ export const processData = (
     (top_results &&
       top_results > (store.state?.zoConfig?.max_dashboard_series ?? 100) &&
       allKeys.length > top_results) ||
-    (!top_results &&
-      allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
+    (!top_results && allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
   ) {
     extras.limitNumberOfSeriesWarningMessage =
       "Limiting the displayed series to ensure optimal performance";
@@ -120,11 +110,7 @@ export const processData = (
     let breakdownValue = getDataValue(item, breakdownKey);
 
     // Ensure missing breakdown values are treated as empty strings
-    if (
-      breakdownValue == null ||
-      breakdownValue === "" ||
-      breakdownValue === undefined
-    ) {
+    if (breakdownValue == null || breakdownValue === "" || breakdownValue === undefined) {
       breakdownValue = "";
     }
 
@@ -132,8 +118,7 @@ export const processData = (
       resultArray.push({ ...item, [breakdownKey]: breakdownValue });
     } else if (top_results_others) {
       const xAxisValue = String(getDataValue(item, xAxisKey));
-      othersObj[xAxisValue] =
-        (othersObj[xAxisValue] || 0) + (+getDataValue(item, yAxisKey) || 0);
+      othersObj[xAxisValue] = (othersObj[xAxisValue] || 0) + (+getDataValue(item, yAxisKey) || 0);
     }
   });
 

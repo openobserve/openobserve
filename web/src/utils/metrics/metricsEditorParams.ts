@@ -43,9 +43,7 @@ export const METRICS_EDITOR_PARAM_KEYS = [
  * as a plain `/metrics` visit and land on the explorer instead of the chart the
  * sender meant to share.
  */
-export function hasMetricsEditorParams(
-  query: Record<string, any> | undefined | null,
-): boolean {
+export function hasMetricsEditorParams(query: Record<string, any> | undefined | null): boolean {
   if (!query) return false;
   return Object.keys(query).some((raw) => {
     const base = raw.split(".")[0];

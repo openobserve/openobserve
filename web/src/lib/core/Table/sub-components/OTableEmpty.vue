@@ -1,15 +1,15 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 withDefaults(
   defineProps<{
-    message?: string;
+    message?: I18nText;
     /**
      * Reserve a minimum height so the empty state has presence in
      * content-sized (non-fill-height) tables. Fill-height tables turn this
@@ -29,10 +29,7 @@ defineSlots<{
 <template>
   <div
     data-test="o2-table-empty"
-    :class="[
-      'flex flex-1 flex-col items-center justify-center',
-      floor ? 'min-h-75' : '',
-    ]"
+    :class="['flex flex-1 flex-col items-center justify-center', floor ? 'min-h-75' : '']"
   >
     <slot>
       <OEmptyState size="inline" :title="message ?? t('search.noData')" />

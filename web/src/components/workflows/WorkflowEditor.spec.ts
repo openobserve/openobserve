@@ -106,7 +106,7 @@ const createWorkflow = workflowService.createWorkflow as any;
 const updateWorkflow = workflowService.updateWorkflow as any;
 const getWorkflowRun = workflowService.getWorkflowRun as any;
 
-const { resetWorkflowData } = useWorkflowCanvas();
+const { resetWorkflowData } = useWorkflowCanvas(t);
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 
@@ -121,10 +121,15 @@ const globalStubs = {
   ConfirmDialog: ConfirmDialogStub,
   OPageHeader: {
     name: "OPageHeader",
-    props: ["title", "back"],
+    props: ["title", "subtitle", "back"],
+    // The name and mode/description now live in the #title and #subtitle slots
+    // (inline-edited), not in a `title` prop — render both so the OInlineEdit
+    // controls under test actually mount.
     template:
       '<div class="app-page-header" :data-title="title">' +
       '<button class="header-back" @click="back && back.onClick()" />' +
+      '<div class="header-title"><slot name="title" /></div>' +
+      '<div class="header-subtitle"><slot name="subtitle" /></div>' +
       '<slot name="title-trail" /><slot name="actions" /></div>',
   },
   OButton: {
@@ -172,10 +177,7 @@ const placeTrigger = (id = "t1") => {
   return id;
 };
 const dialogByTitle = (w: any, title: string) =>
-  w
-    .findAllComponents(ConfirmDialogStub)
-    .find((d: any) => d.props("title") === title)!;
-const saveTestDialog = (w: any) => dialogByTitle(w, t("workflow.test.saveToTestTitle"));
+  w.findAllComponents(ConfirmDialogStub).find((d: any) => d.props("title") === title)!;
 const deleteDialog = (w: any) => dialogByTitle(w, t("workflow.deleteNodeTitle"));
 const palette = (w: any) => w.findComponent({ name: "NodePalette" });
 
@@ -254,7 +256,7 @@ describe("WorkflowEditor", () => {
       expect(workflowObj.dialog.show).toBe(false);
     });
 
-    it("adds the picked trigger to the canvas and opens its panel", async () => {
+    it("adds the picked trigger to the canvas WITHOUT auto-opening its panel", async () => {
       wrapper = mountEditor();
       await flushPromises();
 
@@ -272,17 +274,16 @@ describe("WorkflowEditor", () => {
         .vm.$emit("pick", { key: "workflow_trigger", trigger_kind: "alert_fired" });
       await nextTick();
 
-      // Committed straight onto the canvas — the trigger panel is read-only and
-      // has no Save, so a staged node could never be committed.
+      // Committed straight onto the canvas.
       expect(wf().nodes).toHaveLength(1);
       expect(wf().nodes[0]).toMatchObject({
         type: "input",
         position: { x: 100, y: 40 },
         data: { node_type: "workflow_trigger", trigger_kind: "alert_fired", alert_ids: [] },
       });
-      // ...and its panel opens in EDIT mode, so closing it keeps the node.
-      expect(workflowObj.isEditNode).toBe(true);
-      expect(workflowObj.dialog.show).toBe(true);
+      // ...but its read-only detail panel does NOT auto-open — placing the trigger
+      // shouldn't interrupt the flow. The user clicks the node to open it.
+      expect(workflowObj.dialog.show).toBe(false);
       expect(workflowObj.stepPicker.show).toBe(false);
     });
 
@@ -321,7 +322,9 @@ describe("WorkflowEditor", () => {
       await flushPromises();
       workflowObj.nameError = true;
 
-      await wrapper.find('[data-test="workflow-editor-name"]').setValue("wf-a");
+      // The name is an inline-edited title: click to open the editor, then type.
+      await wrapper.find('[data-test="workflow-editor-name-trigger"]').trigger("click");
+      await wrapper.find('[data-test="workflow-editor-name-input"]').setValue("wf-a");
 
       expect(wf().name).toBe("wf-a");
       expect(workflowObj.nameError).toBe(false);
@@ -330,7 +333,8 @@ describe("WorkflowEditor", () => {
     it("binds the description input", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      await wrapper.find('[data-test="workflow-editor-description"]').setValue("d");
+      await wrapper.find('[data-test="workflow-editor-description-trigger"]').trigger("click");
+      await wrapper.find('[data-test="workflow-editor-description-input"]').setValue("d");
       expect(wf().description).toBe("d");
     });
   });
@@ -419,22 +423,24 @@ describe("WorkflowEditor", () => {
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(wrapper.find(".app-page-header").attributes("data-title")).toBe(
-        "my workflow",
-      );
-      expect(wrapper.find('[data-test="workflow-editor-name"]').exists()).toBe(false);
+      // Edit mode is readonly: the name shows as plain heading text (a -value
+      // span), with no click-to-edit trigger and no input.
+      expect(wrapper.find('[data-test="workflow-editor-name-value"]').text()).toBe("my workflow");
+      expect(wrapper.find('[data-test="workflow-editor-name-trigger"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-editor-name-input"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="workflow-editor-history"]').exists()).toBe(true);
     });
 
-    it("falls back to the module title when the saved workflow has no name", async () => {
+    it("shows the name placeholder when the saved workflow has no name", async () => {
       hydrateWorkflow(savedGraph({ name: "" }));
       mockRouter.currentRoute.value = { query: { id: "wf-1" } };
 
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(wrapper.find(".app-page-header").attributes("data-title")).toBe(
-        t("workflow.header"),
+      // A nameless workflow still renders a readonly title — the placeholder.
+      expect(wrapper.find('[data-test="workflow-editor-name-value"]').text()).toBe(
+        t("workflow.namePlaceholder"),
       );
     });
   });
@@ -488,10 +494,7 @@ describe("WorkflowEditor", () => {
       const event: any = { dataTransfer: { setData: vi.fn(), effectAllowed: "" } };
       palette(wrapper).props("onDragStart")(event, { subtype: "function" });
 
-      expect(event.dataTransfer.setData).toHaveBeenCalledWith(
-        "application/vueflow",
-        "function",
-      );
+      expect(event.dataTransfer.setData).toHaveBeenCalledWith("application/vueflow", "function");
       expect(workflowObj.draggedNodeType).toBe("function");
     });
   });
@@ -509,7 +512,14 @@ describe("WorkflowEditor", () => {
       wrapper = mountEditor();
       await flushPromises();
       const src = placeTrigger();
-      workflowObj.stepPicker = { show: true, source: src, handle: "out", mode: "next", position: null, anchor: null };
+      workflowObj.stepPicker = {
+        show: true,
+        source: src,
+        handle: "out",
+        mode: "next",
+        position: null,
+        anchor: null,
+      };
       await nextTick();
 
       const items = wrapper.findComponent({ name: "StepPickerDialog" }).props("items") as any[];
@@ -525,7 +535,14 @@ describe("WorkflowEditor", () => {
       wrapper = mountEditor();
       await flushPromises();
       const triggerId = placeTrigger();
-      workflowObj.stepPicker = { show: true, source: triggerId, handle: "out", mode: "next", position: null, anchor: null };
+      workflowObj.stepPicker = {
+        show: true,
+        source: triggerId,
+        handle: "out",
+        mode: "next",
+        position: null,
+        anchor: null,
+      };
       await nextTick();
 
       wrapper.findComponent({ name: "StepPickerDialog" }).vm.$emit("pick", { key: "function" });
@@ -542,13 +559,27 @@ describe("WorkflowEditor", () => {
     it("closes the picker on close", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      workflowObj.stepPicker = { show: true, source: "x", handle: "out", mode: "next", position: null, anchor: null };
+      workflowObj.stepPicker = {
+        show: true,
+        source: "x",
+        handle: "out",
+        mode: "next",
+        position: null,
+        anchor: null,
+      };
       await nextTick();
 
       wrapper.findComponent({ name: "StepPickerDialog" }).vm.$emit("close");
       await nextTick();
 
-      expect(workflowObj.stepPicker).toEqual({ show: false, source: "", handle: "out", mode: "next", position: null, anchor: null });
+      expect(workflowObj.stepPicker).toEqual({
+        show: false,
+        source: "",
+        handle: "out",
+        mode: "next",
+        position: null,
+        anchor: null,
+      });
     });
   });
 
@@ -620,7 +651,12 @@ describe("WorkflowEditor", () => {
       wf().name = "wf";
       wf().nodes = [
         ...wf().nodes,
-        { id: "orphan", type: "output", position: { x: 0, y: 0 }, data: { node_type: "destination" } },
+        {
+          id: "orphan",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination" },
+        },
       ];
 
       await clickSave(wrapper);
@@ -734,7 +770,11 @@ describe("WorkflowEditor", () => {
       expect(createWorkflow).toHaveBeenCalledTimes(1);
       const { org_identifier, data } = createWorkflow.mock.calls[0][0];
       expect(org_identifier).toBe("default");
-      expect(data).toMatchObject({
+      // Body is `{ workflow: {...}, trigger_type }` — the Workflow struct is
+      // nested under `workflow`; `trigger_type` (derived from the trigger kind)
+      // sits alongside it.
+      expect(data.trigger_type).toBe("AlertFired");
+      expect(data.workflow).toMatchObject({
         id: "",
         org_id: "",
         name: "my workflow", // trimmed
@@ -744,9 +784,9 @@ describe("WorkflowEditor", () => {
         updated_at: 0,
         created_by: "",
       });
-      expect(data.edges).toEqual([{ id: "e1", source: triggerId, target: "d1" }]);
+      expect(data.workflow.edges).toEqual([{ id: "e1", source: triggerId, target: "d1" }]);
 
-      const [trigger, destination] = data.nodes;
+      const [trigger, destination] = data.workflow.nodes;
       // trigger: io_type from the VueFlow type, kind carried in meta
       expect(trigger).toEqual({
         id: triggerId,
@@ -790,7 +830,7 @@ describe("WorkflowEditor", () => {
 
       await clickSave(wrapper);
 
-      const node = createWorkflow.mock.calls[0][0].data.nodes[0];
+      const node = createWorkflow.mock.calls[0][0].data.workflow.nodes[0];
       expect(node.io_type).toBe("default");
       expect(node.position).toEqual({ x: 0, y: 0 });
       expect(node.meta).toEqual({ trigger_kind: "alert_fired" });
@@ -806,7 +846,7 @@ describe("WorkflowEditor", () => {
 
       await clickSave(wrapper);
 
-      const bare = createWorkflow.mock.calls[0][0].data.nodes[1];
+      const bare = createWorkflow.mock.calls[0][0].data.workflow.nodes[1];
       expect(bare).toEqual({
         id: "bare",
         io_type: "default",
@@ -825,7 +865,7 @@ describe("WorkflowEditor", () => {
 
       await clickSave(wrapper);
 
-      expect(createWorkflow.mock.calls[0][0].data.enabled).toBe(true);
+      expect(createWorkflow.mock.calls[0][0].data.workflow.enabled).toBe(true);
     });
 
     it("captures the new id, flips to edit mode, toasts and emits saved", async () => {
@@ -860,6 +900,22 @@ describe("WorkflowEditor", () => {
         workflowName: "  my workflow  ",
       });
       expect(mockRouter.push).not.toHaveBeenCalled();
+    });
+
+    it("skips the link-alerts prompt for a non-alert trigger and navigates away", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      seedValidCreate();
+      // Swap the trigger kind to one that doesn't associate with alerts.
+      wf().nodes[0].data.trigger_kind = "incident_event";
+
+      await clickSave(wrapper);
+
+      expect(linkDialog(wrapper).exists()).toBe(false);
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "workflows",
+        query: { org_identifier: "default" },
+      });
     });
 
     it("returns to the list once the alerts are linked", async () => {
@@ -947,7 +1003,7 @@ describe("WorkflowEditor", () => {
       const call = updateWorkflow.mock.calls[0][0];
       expect(call.org_identifier).toBe("default");
       expect(call.id).toBe("wf-1");
-      expect(call.data).toMatchObject({
+      expect(call.data.workflow).toMatchObject({
         id: "wf-1",
         name: "my workflow",
         created_at: 111,
@@ -975,7 +1031,7 @@ describe("WorkflowEditor", () => {
 
       await clickSave(wrapper);
 
-      expect(updateWorkflow.mock.calls[0][0].data.enabled).toBe(false);
+      expect(updateWorkflow.mock.calls[0][0].data.workflow.enabled).toBe(false);
     });
 
     it("surfaces the API error message and stays on the page", async () => {
@@ -1070,18 +1126,28 @@ describe("WorkflowEditor", () => {
       await flushPromises();
     };
 
-    it("prompts to save first when the workflow has never been saved", async () => {
+    // Test now dry-runs the whole in-memory graph (sent in the request), so it
+    // opens the Test dialog directly whether the workflow is brand-new, has
+    // unsaved edits, or is a clean saved workflow — there is no save-first prompt.
+    // It still requires a runnable graph though: trigger + a connected step.
+    it("opens the Test dialog directly for a never-saved (but connected) graph", async () => {
+      // A create draft (no route id): mount runs startNewWorkflow(), then we build
+      // a valid graph on the canvas before testing.
       wrapper = mountEditor();
       await flushPromises();
+      hydrateWorkflow(savedGraph({ id: "", name: "" }));
+      await nextTick();
 
       await clickTest(wrapper);
 
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(true);
-      expect(workflowObj.testRun.show).toBe(false);
-      expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(false);
+      expect(workflowObj.testRun.show).toBe(true);
+      expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(true);
+      // No persistence happens just by opening Test.
+      expect(createWorkflow).not.toHaveBeenCalled();
+      expect(updateWorkflow).not.toHaveBeenCalled();
     });
 
-    it("prompts to save first when there are unsaved edits", async () => {
+    it("opens the Test dialog directly when there are unsaved edits", async () => {
       hydrateWorkflow(savedGraph());
       mockRouter.currentRoute.value = { query: { id: "wf-1" } };
       wrapper = mountEditor();
@@ -1090,8 +1156,8 @@ describe("WorkflowEditor", () => {
 
       await clickTest(wrapper);
 
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(true);
-      expect(workflowObj.testRun.show).toBe(false);
+      expect(workflowObj.testRun.show).toBe(true);
+      expect(updateWorkflow).not.toHaveBeenCalled();
     });
 
     it("opens the Test dialog directly for a clean saved workflow", async () => {
@@ -1104,61 +1170,55 @@ describe("WorkflowEditor", () => {
 
       expect(workflowObj.testRun.show).toBe(true);
       expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(true);
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
     });
 
-    it("saves then opens the Test dialog on Save & Test", async () => {
-      hydrateWorkflow(savedGraph());
-      mockRouter.currentRoute.value = { query: { id: "wf-1" } };
+    // A draft doesn't need a name to test, but it does need to be runnable: a
+    // trigger plus at least one connected step, no orphan nodes.
+    it("blocks Test with a warning when the graph has only a trigger (no step)", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      workflowObj.dirtyFlag = true;
+      placeTrigger();
+      await nextTick();
+
       await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:ok");
-      await flushPromises();
-
-      expect(updateWorkflow).toHaveBeenCalledTimes(1);
-      expect(workflowObj.testRun.show).toBe(true);
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
-    });
-
-    it("does not open the Test dialog when the Save & Test save fails", async () => {
-      hydrateWorkflow(savedGraph());
-      mockRouter.currentRoute.value = { query: { id: "wf-1" } };
-      updateWorkflow.mockRejectedValue(new Error("nope"));
-      wrapper = mountEditor();
-      await flushPromises();
-      workflowObj.dirtyFlag = true;
-      await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:ok");
-      await flushPromises();
 
       expect(workflowObj.testRun.show).toBe(false);
+      expect(wrapper.find('[data-test="WorkflowTestDialog"]').exists()).toBe(false);
+      expect(mockToast).toHaveBeenCalledWith({
+        message: t("workflow.addStepRequired"),
+        variant: "warning",
+      });
     });
 
-    it("dismisses the Save & Test prompt on cancel", async () => {
+    it("blocks Test with a warning when a node is left unconnected (orphan)", async () => {
+      // trigger + a destination that has NO incoming edge -> orphan.
       wrapper = mountEditor();
       await flushPromises();
-      await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:cancel");
+      hydrateWorkflow(savedGraph({ id: "", name: "", edges: [] }));
       await nextTick();
 
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
-      expect(createWorkflow).not.toHaveBeenCalled();
+      await clickTest(wrapper);
+
+      expect(workflowObj.testRun.show).toBe(false);
+      expect(mockToast).toHaveBeenCalledWith({
+        message: t("workflow.connectAllNodes"),
+        variant: "warning",
+      });
     });
 
-    it("dismisses the Save & Test prompt when the dialog closes itself (v-model)", async () => {
+    it("does not require a name to test a connected draft", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      await clickTest(wrapper);
-
-      saveTestDialog(wrapper).vm.$emit("update:modelValue", false);
+      hydrateWorkflow(savedGraph({ id: "", name: "" }));
       await nextTick();
 
-      expect(saveTestDialog(wrapper).props("modelValue")).toBe(false);
+      await clickTest(wrapper);
+
+      expect(workflowObj.testRun.show).toBe(true);
+      // no name warning was raised
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: t("workflow.nameRequired") }),
+      );
     });
 
     it("renders the per-step result drawer when a node's badge opens it", async () => {
@@ -1222,13 +1282,9 @@ describe("WorkflowEditor", () => {
         store.state.theme = theme;
         wrapper = mountEditor();
         await flushPromises();
-        expect(
-          wrapper.find("#workflow-workspace .bg-surface-subtle").exists(),
-        ).toBe(true);
+        expect(wrapper.find("#workflow-workspace .bg-surface-subtle").exists()).toBe(true);
         // No theme-conditional class survives.
-        expect(
-          wrapper.find("#workflow-workspace .bg-gray-100").exists(),
-        ).toBe(false);
+        expect(wrapper.find("#workflow-workspace .bg-gray-100").exists()).toBe(false);
         wrapper.unmount();
       }
       store.state.theme = "dark";

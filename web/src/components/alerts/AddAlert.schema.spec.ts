@@ -94,10 +94,45 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
   });
 
   it("blocks an empty stream_type and stream_name", () => {
-    const m = issuesByPath(
-      validScheduled({ stream_type: "", stream_name: "" }),
-    );
+    const m = issuesByPath(validScheduled({ stream_type: "", stream_name: "" }));
     expect(m["stream_type"]).toContain(STREAM_TYPE_REQUIRED_MESSAGE);
+    expect(m["stream_name"]).toContain(STREAM_NAME_REQUIRED_MESSAGE);
+  });
+
+  // ── Feature 5: SLO alerts have no stream (§6b.6) ──────────────────────────
+  //
+  // An SLO alert runs no query, so there is no stream to name. The backend
+  // skips its schema lookup for this family; requiring a stream here would
+  // make every SLO alert unsavable from the form.
+  // INVERTED, not deleted: SLO alerts are authored on the SLO page now, so
+  // this form's exemption is gone. Keeping the test in its inverted form is
+  // what stops the exemption being quietly reintroduced, which would re-open
+  // generic-form SLO authoring.
+  it("gives a slo query_condition no stream exemption", () => {
+    const m = issuesByPath(
+      validScheduled({
+        stream_name: "",
+        query_condition: {
+          type: "slo",
+          conditions: { groupId: "g", label: "and", items: [] },
+          sql: "",
+          promql: "",
+          slo_condition: {
+            slo_id: "slo1",
+            kind: "burn_rate",
+            operator: ">",
+            critical: 14.4,
+            long_window_secs: 3600,
+            short_window_secs: 300,
+          },
+        },
+      }),
+    );
+    expect(m["stream_name"]).toContain(STREAM_NAME_REQUIRED_MESSAGE);
+  });
+
+  it("still requires a stream for every other query type", () => {
+    const m = issuesByPath(validScheduled({ stream_name: "" }));
     expect(m["stream_name"]).toContain(STREAM_NAME_REQUIRED_MESSAGE);
   });
 
@@ -139,12 +174,8 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
     base.query_condition.type = "promql";
     base.query_condition.promql_condition = { operator: "", value: "" };
     const m = issuesByPath(base);
-    expect(
-      m["query_condition.promql_condition.operator"]?.length,
-    ).toBeGreaterThan(0);
-    expect(
-      m["query_condition.promql_condition.value"]?.length,
-    ).toBeGreaterThan(0);
+    expect(m["query_condition.promql_condition.operator"]?.length).toBeGreaterThan(0);
+    expect(m["query_condition.promql_condition.value"]?.length).toBeGreaterThan(0);
   });
 
   it("promql value is zero-safe (0 passes)", () => {
@@ -174,9 +205,7 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
       ],
     };
     const m = issuesByPath(base);
-    expect(
-      m["query_condition.conditions.conditions.0.column"]?.length,
-    ).toBeGreaterThan(0);
+    expect(m["query_condition.conditions.conditions.0.column"]?.length).toBeGreaterThan(0);
   });
 
   // ── Anomaly branch: near-pass-through — `name` ONLY ─────────────────────────

@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="dashboardPanelData.data.type == 'custom_chart'" class="pb-8">
-    <div class="max-w-75 mx-3">
-      <div class="mb-1.5 text-compact font-medium text-input-label-text">
+    <div class="mx-3 max-w-75">
+      <div class="text-compact text-input-label-text mb-1.5 font-medium">
         {{ t("dashboard.description") }}
       </div>
       <OTextarea
@@ -30,10 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-else class="pb-8">
     <!-- Search bar (sticky; h-11 matches the config section headers' sticky top) -->
     <div
-      class="sticky top-0 z-30 flex h-11 items-center gap-1 px-2 bg-card-glass-solid"
+      class="bg-card-glass-solid sticky top-0 z-30 flex h-11 items-center gap-1 px-2"
       data-test="dashboard-config-search-wrapper"
     >
-      <ConfigPanelSearch v-model="searchQuery" class="flex-1 min-w-0" />
+      <ConfigPanelSearch v-model="searchQuery" class="min-w-0 flex-1" />
       <OButton
         variant="ghost"
         size="icon"
@@ -46,9 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t('dashboard.expandAllSections')
         "
       >
-        <template #icon-left><OIcon
-            :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'"
-            size="sm"
+        <template #icon-left
+          ><OIcon :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'" size="sm"
         /></template>
         <OTooltip
           :content="
@@ -66,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="column items-center py-4 text-center"
       data-test="dashboard-config-no-results"
     >
-      <OIcon name="search-off" size="md" class="mb-1 text-icon-color" />
+      <OIcon name="search-off" size="md" class="text-icon-color mb-1" />
       <div class="text-text-muted text-xs">
         {{ t("dashboard.configPanelNoResultsFound", { query: searchQuery }) }}
       </div>
@@ -84,14 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionGeneral')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
-        <div
-          v-show="isConfigOptionVisible('general', 'description')"
-          class="max-w-75"
-        >
-          <div class="mb-1.5 text-compact font-medium text-input-label-text">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <div v-show="isConfigOptionVisible('general', 'description')" class="max-w-75">
+          <div class="text-compact text-input-label-text mb-1.5 font-medium">
             {{ t("dashboard.description") }}
           </div>
           <OTextarea
@@ -111,9 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-step-value"
         >
           <template #tooltip>
-            <OTooltip max-width="250px">
+            <OTooltip max-width="15.625rem">
               <template #content>
-                <b>Step - </b>
+                <b>{{ t("dashboard.stepPrefix") }}</b>
                 {{ t("dashboard.stepValueTooltip") }}
                 <br />
                 {{ t("dashboard.stepValueExample") }}
@@ -123,9 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OInput>
 
         <!-- Panel Default Time Configuration -->
-        <div
-          v-show="isConfigOptionVisible('general', 'panel-default-time')"
-        >
+        <div v-show="isConfigOptionVisible('general', 'panel-default-time')">
           <div class="flex items-center">
             <OSwitch
               v-model="useDefaultTime"
@@ -134,32 +128,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
               @change="onToggleDefaultTime"
             />
-            <OButton
-              variant="ghost"
-              size="icon"
-              class="mt-1"
-              @click.stop
-              icon-left="info-outline"
-            >
-              <OTooltip
-                :content="t('dashboard.useDefaultTimeTooltip')"
-                max-width="250px"
-              />
+            <OButton variant="ghost" size="icon" class="mt-1" @click.stop icon-left="info-outline">
+              <OTooltip :content="t('dashboard.useDefaultTimeTooltip')" max-width="15.625rem" />
             </OButton>
           </div>
 
           <div v-if="useDefaultTime" class="mt-2">
-            <div class="mb-1.5 text-compact font-medium text-input-label-text">
+            <div class="text-compact text-input-label-text mb-1.5 font-medium">
               {{ t("dashboard.defaultDuration") }}
             </div>
             <div
-              v-if="
-                showTimePicker ||
-                (panelTimeRange !== null && panelTimeRange !== undefined)
-              "
-              class="flex items-center flex-nowrap overflow-visible"
+              v-if="showTimePicker || (panelTimeRange !== null && panelTimeRange !== undefined)"
+              class="flex flex-nowrap items-center overflow-visible"
             >
-              <div class="panel-time-picker-btn flex-[1_1_0] min-w-0 overflow-visible">
+              <div class="panel-time-picker-btn min-w-0 flex-[1_1_0] overflow-visible">
                 <DateTimePickerDashboard
                   ref="panelTimePickerRef"
                   v-model="pickerValue"
@@ -167,12 +149,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :hide-relative-timezone="true"
                   menu-align="end"
                   data-test="dashboard-config-panel-time-picker"
-                  class="w-fit min-w-0 max-w-full overflow-hidden"
+                  class="w-fit max-w-full min-w-0 overflow-hidden"
                 />
-                <OTooltip :content="formattedPickerValue" max-width="320px" />
+                <OTooltip :content="raw(formattedPickerValue)" max-width="20rem" />
               </div>
               <OIcon
-                class="mr-1 ml-2 flex-shrink-0 cursor-pointer shrink-0"
+                class="mr-1 ml-2 flex-shrink-0 shrink-0 cursor-pointer"
                 size="sm"
                 name="close"
                 data-test="dashboard-config-cancel-panel-time"
@@ -185,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 @click="showTimePicker = true"
                 data-test="dashboard-config-set-panel-time"
-              >{{ t("common.set") }}</OButton
+                >{{ t("common.set") }}</OButton
               >
             </div>
           </div>
@@ -218,9 +200,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionPromqlTable')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <PromQLChartConfig
           :chart-type="dashboardPanelData.data.type"
           :is-config-option-visible="isConfigOptionVisible"
@@ -233,8 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="config"
       v-if="
         promqlMode &&
-        (dashboardPanelData.data.type === 'geomap' ||
-          dashboardPanelData.data.type === 'maps')
+        (dashboardPanelData.data.type === 'geomap' || dashboardPanelData.data.type === 'maps')
       "
       v-show="isSectionVisible('geographic')"
       :model-value="isExpanded('geographic')"
@@ -245,9 +226,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionGeographic')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <PromQLChartConfig :chart-type="dashboardPanelData.data.type" />
       </div>
     </OCollapsible>
@@ -264,9 +245,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLegend')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="o2-input flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <OSwitch
           v-if="shouldShowLegendsToggle(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'show-legends')"
@@ -284,9 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.legendsPositionLabel')"
           v-model="legendsPositionModel"
           data-test="dashboard-config-legend-position"
-          :data-test-selected-value="
-            String(dashboardPanelDataModel.data.config.legends_position)
-          "
+          :data-test-selected-value="String(dashboardPanelDataModel.data.config.legends_position)"
         >
           <OToggleGroupItem
             v-for="opt in legendsPositionOptions"
@@ -307,9 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.legendsType')"
           v-model="legendsTypeModel"
           data-test="dashboard-config-legends-scrollable"
-          :data-test-selected-value="
-            String(dashboardPanelDataModel.data.config.legends_type)
-          "
+          :data-test-selected-value="String(dashboardPanelDataModel.data.config.legends_type)"
         >
           <OToggleGroupItem
             v-for="opt in legendTypeOptions"
@@ -322,13 +299,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </OToggleGroup>
 
-        <div class="flex gap-2 flex-wrap"
-          v-show="isConfigOptionVisible('legend', 'legend-size')"
-        >
+        <div class="flex flex-wrap gap-2" v-show="isConfigOptionVisible('legend', 'legend-size')">
           <!-- Legend Width + unit selector -->
           <div
             v-if="shouldShowLegendWidth(dashboardPanelData)"
-            class="flex items-end justify-between gap-1.5 w-full min-w-0"
+            class="flex w-full min-w-0 items-end justify-between gap-1.5"
           >
             <OInput
               v-model.number="legendWidthValue"
@@ -336,18 +311,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :placeholder="t('dashboard.auto')"
               data-test="dashboard-config-legend-width"
-              class="flex-1 min-w-0"
+              class="min-w-0 flex-1"
             />
             <div
-              class="flex items-center gap-1 mt-2.25 shrink-0"
+              class="mt-2.25 flex shrink-0 items-center gap-1"
               v-if="shouldShowLegendWidthUnitContainer(dashboardPanelData)"
             >
               <OButton
                 @click="setUnit('px')"
                 variant="outline"
                 :active="
-                  dashboardPanelData?.data?.config.legend_width?.unit ===
-                    null ||
+                  dashboardPanelData?.data?.config.legend_width?.unit === null ||
                   dashboardPanelData?.data?.config?.legend_width?.unit === 'px'
                 "
                 size="sm"
@@ -362,9 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 @click="setUnit('%')"
                 variant="outline"
-                :active="
-                  dashboardPanelData?.data?.config?.legend_width?.unit === '%'
-                "
+                :active="dashboardPanelData?.data?.config?.legend_width?.unit === '%'"
                 size="sm"
                 :data-test="`dashboard-config-legend-width-unit-${
                   dashboardPanelData?.data?.config?.legend_width?.unit === '%'
@@ -380,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Legend Height + unit selector -->
           <div
             v-if="shouldShowLegendHeight(dashboardPanelData)"
-            class="flex items-end justify-between gap-1.5 w-full min-w-0"
+            class="flex w-full min-w-0 items-end justify-between gap-1.5"
           >
             <OInput
               v-model.number="legendHeightValue"
@@ -388,18 +360,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :placeholder="t('dashboard.auto')"
               data-test="dashboard-config-legend-height"
-              class="flex-1 min-w-0"
+              class="min-w-0 flex-1"
             />
             <div
-              class="flex items-center gap-1 mt-2.25 shrink-0"
+              class="mt-2.25 flex shrink-0 items-center gap-1"
               v-if="shouldShowLegendHeightUnitContainer(dashboardPanelData)"
             >
               <OButton
                 @click="setHeightUnit('px')"
                 variant="outline"
                 :active="
-                  dashboardPanelData?.data?.config.legend_height?.unit ===
-                    null ||
+                  dashboardPanelData?.data?.config.legend_height?.unit === null ||
                   dashboardPanelData?.data?.config?.legend_height?.unit === 'px'
                 "
                 size="sm"
@@ -414,9 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 @click="setHeightUnit('%')"
                 variant="outline"
-                :active="
-                  dashboardPanelData?.data?.config?.legend_height?.unit === '%'
-                "
+                :active="dashboardPanelData?.data?.config?.legend_height?.unit === '%'"
                 size="sm"
                 :data-test="`dashboard-config-legend-height-unit-${
                   dashboardPanelData?.data?.config?.legend_height?.unit === '%'
@@ -438,9 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.chartAlign')"
           v-model="chartAlignModel"
           data-test="dashboard-config-chart-align"
-          :data-test-selected-value="
-            String(dashboardPanelDataModel.data.config.chart_align)
-          "
+          :data-test-selected-value="String(dashboardPanelDataModel.data.config.chart_align)"
         >
           <OToggleGroupItem
             v-for="opt in chartAlignOptions"
@@ -473,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="`${t('dashboard.queryLabel')} ${Number(index) + 1}`"
+              :label="raw(`${t('dashboard.queryLabel')} ${Number(index) + 1}`)"
               :data-test="`dashboard-config-query-tab-${index}`"
             >
             </OTab>
@@ -489,9 +456,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('legend', 'promql-legend-label')"
           :label="t('common.legend')"
           v-model="
-            dashboardPanelDataModel.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].config.promql_legend
+            dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+              .promql_legend
           "
           :items="dashboardSelectfieldPromQlList"
           search-regex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
@@ -528,9 +494,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionData')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="o2-input flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <OSelect
           v-show="isConfigOptionVisible('data', 'unit')"
           v-model="dashboardPanelDataModel.data.config.unit"
@@ -573,7 +539,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               // Invalid value (out of range) → keep it and show error
             }
           "
-          :error="decimalsTouched && typeof dashboardPanelData.data.config.decimals === 'number' && (dashboardPanelData.data.config.decimals < 0 || dashboardPanelData.data.config.decimals > 100)"
+          :error="
+            decimalsTouched &&
+            typeof dashboardPanelData.data.config.decimals === 'number' &&
+            (dashboardPanelData.data.config.decimals < 0 ||
+              dashboardPanelData.data.config.decimals > 100)
+          "
           :error-message="t('dashboard.decimalsMustBeBetween')"
           :label="t('dashboard.decimals')"
           data-test="dashboard-config-decimals"
@@ -602,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="tab.tabName || (t('dashboard.queryLabel') + ' ' + (Number(index) + 1))"
+              :label="tab.tabName || t('dashboard.queryLabel') + ' ' + (Number(index) + 1)"
               :data-test="`dashboard-config-query-tab-${index}`"
             >
             </OTab>
@@ -619,45 +590,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           v-show="isConfigOptionVisible('data', 'query-label')"
         >
-          <div class="flex items-center gap-1 mb-1.5 text-compact font-medium text-input-label-text">
+          <div
+            class="text-compact text-input-label-text mb-1.5 flex items-center gap-1 font-medium"
+          >
             {{ t("dashboard.multiSqlQueryLabel") }}
             <OIcon name="info-outline" size="sm" />
             <OTooltip
               side="top"
               align="center"
-              max-width="250px"
+              max-width="15.625rem"
               :content="t('dashboard.multiSqlQueryLabelHint')"
             />
           </div>
           <OInput
+            :placeholder="raw('{field_name}')"
             v-model="
-              dashboardPanelDataModel.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].config.query_label
+              dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                .config.query_label
             "
             size="sm"
-            placeholder="{field_name}"
             class="w-full"
             :data-test="`dashboard-config-legend-${dashboardPanelData.layout.currentQueryIndex}`"
-            @focus="() => {
-              const q = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
-              if (!q.config.query_label) q.config.query_label = '{field_name}';
-            }"
+            @focus="
+              () => {
+                const q =
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+                if (!q.config.query_label) q.config.query_label = '{field_name}';
+              }
+            "
           />
         </div>
 
         <OInput
           v-if="
             !promqlMode &&
-            !dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].customQuery
+            !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+              .customQuery
           "
           v-show="isConfigOptionVisible('data', 'limit')"
           v-model.number="
-            dashboardPanelDataModel.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].config.limit
+            dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+              .limit
           "
           type="number"
           :min="0"
@@ -667,8 +640,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.layout.currentQueryIndex
               ].config.limit = typeof value === 'number' ? value : null)
           "
-          @blur="() => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit == null && (dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit = 0)"
-          placeholder="0"
+          @blur="
+            () =>
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+                .limit == null &&
+              (dashboardPanelDataModel.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].config.limit = 0)
+          "
+          :placeholder="t('dashboard.zeroPlaceholder')"
           :label="t('dashboard.queryLimit')"
           data-test="dashboard-config-limit"
         >
@@ -684,22 +664,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="number"
           :min="0"
           @update:model-value="
-            (value: any) =>
-              (dashboardPanelDataModel.data.config.top_results = value
-                ? value
-                : null)
+            (value: any) => (dashboardPanelDataModel.data.config.top_results = value ? value : null)
           "
           :placeholder="t('dashboard.placeholderAll')"
           :disabled="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.fields?.breakdown?.length == 0
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields
+              ?.breakdown?.length == 0
           "
           :label="t('dashboard.showTopNValues')"
           data-test="dashboard-config-top_results"
         >
           <template #tooltip>
-            <OTooltip max-width="250px">
+            <OTooltip max-width="15.625rem">
               <template #content>
                 <b>{{ t("dashboard.topNTooltipTitle") }}</b>
                 <br /><br />
@@ -716,17 +692,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.addOthersSeries')"
           data-test="dashboard-config-top_results_others"
           :disabled="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.breakdown?.length == 0
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.breakdown?.length == 0
           "
           size="lg"
         >
           <template #tooltip>
-            <OTooltip
-              :content="t('dashboard.addOthersSeriesTooltip')"
-              max-width="250px"
-            />
+            <OTooltip :content="t('dashboard.addOthersSeriesTooltip')" max-width="15.625rem" />
           </template>
         </OSwitch>
 
@@ -739,10 +711,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #tooltip>
-            <OTooltip
-              :content="t('dashboard.connectNullValuesTooltip')"
-              max-width="250px"
-            />
+            <OTooltip :content="t('dashboard.connectNullValuesTooltip')" max-width="15.625rem" />
           </template>
         </OSwitch>
 
@@ -750,7 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'no-value-replacement')"
           v-model="dashboardPanelDataModel.data.config.no_value_replacement"
-          placeholder="-"
+          :placeholder="raw('-')"
           :label="t('dashboard.noValueReplacement')"
           data-test="dashboard-config-no-value-replacement"
         >
@@ -773,9 +742,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionAxis')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <OInput
           v-if="shouldShowAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'axis-width')"
@@ -785,8 +754,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('dashboard.auto')"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelDataModel.data.config.axis_width =
-                value !== '' ? value : null)
+              (dashboardPanelDataModel.data.config.axis_width = value !== '' ? value : null)
           "
           data-test="dashboard-config-axis-width"
         />
@@ -806,15 +774,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('axis', 'y-axis')"
         >
           <OInput
-            class="flex-1 min-w-0"
+            class="min-w-0 flex-1"
             v-model.number="dashboardPanelDataModel.data.config.y_axis_min"
             type="number"
             :placeholder="t('dashboard.auto')"
             :label="t('common.yAxisMin')"
             @update:model-value="
               (value: any) =>
-                (dashboardPanelDataModel.data.config.y_axis_min =
-                  value !== '' ? value : null)
+                (dashboardPanelDataModel.data.config.y_axis_min = value !== '' ? value : null)
             "
             data-test="dashboard-config-y_axis_min"
           >
@@ -829,15 +796,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OInput>
           <OInput
-            class="flex-1 min-w-0"
+            class="min-w-0 flex-1"
             v-model.number="dashboardPanelDataModel.data.config.y_axis_max"
             type="number"
             :placeholder="t('dashboard.auto')"
             :label="t('common.yAxisMax')"
             @update:model-value="
               (value: any) =>
-                (dashboardPanelDataModel.data.config.y_axis_max =
-                  value !== '' ? value : null)
+                (dashboardPanelDataModel.data.config.y_axis_max = value !== '' ? value : null)
             "
             data-test="dashboard-config-y_axis_max"
           >
@@ -876,9 +842,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLabels')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <OSelect
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'label-position')"
@@ -896,7 +862,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model.number="dashboardPanelDataModel.data.config.label_option.rotate"
           :label="t('dashboard.labelRotate')"
           type="number"
-          placeholder="0"
+          :placeholder="t('dashboard.zeroPlaceholder')"
           @update:model-value="
             (value: any) =>
               (dashboardPanelDataModel.data.config.label_option.rotate =
@@ -905,7 +871,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @blur="
             () => {
               if (dashboardPanelData.data.config.label_option.rotate == null)
-                dashboardPanelDataModel.data.config.label_option.rotate = 0
+                dashboardPanelDataModel.data.config.label_option.rotate = 0;
             }
           "
           data-test="dashboard-config-label-rotate"
@@ -917,17 +883,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('labels', 'axis-label')"
         >
           <OInput
-            class="flex-1 min-w-0"
+            class="min-w-0 flex-1"
             v-model.number="dashboardPanelDataModel.data.config.axis_label_rotate"
             type="number"
-            placeholder="0"
+            :placeholder="t('dashboard.zeroPlaceholder')"
             :label="t('dashboard.axisLabelRotate')"
             @update:model-value="
               (value: any) =>
                 (dashboardPanelDataModel.data.config.axis_label_rotate =
                   typeof value === 'number' ? value : null)
             "
-            @blur="() => dashboardPanelData.data.config.axis_label_rotate == null && (dashboardPanelDataModel.data.config.axis_label_rotate = 0)"
+            @blur="
+              () =>
+                dashboardPanelData.data.config.axis_label_rotate == null &&
+                (dashboardPanelDataModel.data.config.axis_label_rotate = 0)
+            "
             data-test="dashboard-config-axis-label-rotate"
           >
             <template #tooltip>
@@ -944,12 +914,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OInput>
           <OInput
-            class="flex-1 min-w-0"
-            v-model.number="
-              dashboardPanelDataModel.data.config.axis_label_truncate_width
-            "
+            class="min-w-0 flex-1"
+            v-model.number="dashboardPanelDataModel.data.config.axis_label_truncate_width"
             type="number"
-            placeholder="0"
+            :placeholder="t('dashboard.zeroPlaceholder')"
             :label="t('dashboard.axisLabelTruncate')"
             @update:model-value="
               (value: any) =>
@@ -962,9 +930,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :side-offset="8">
                 <template #content>
                   <div>
-                    <span>{{
-                      t("dashboard.axisLabelTruncateTooltipText")
-                    }}</span>
+                    <span>{{ t("dashboard.axisLabelTruncateTooltipText") }}</span>
                     <br /><br />
                     <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
                     <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
@@ -989,9 +955,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLineStyle')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="o2-input flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <OSelect
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'symbol')"
@@ -1028,7 +994,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @blur="
             () => {
               if (dashboardPanelData.data.config.line_thickness == null)
-                dashboardPanelDataModel.data.config.line_thickness = 1.5
+                dashboardPanelDataModel.data.config.line_thickness = 1.5;
             }
           "
           :label="t('dashboard.lineThickness')"
@@ -1051,9 +1017,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionTable')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <OSwitch
           v-show="isConfigOptionVisible('table', 'wrap')"
           v-model="dashboardPanelDataModel.data.config.wrap_table_cells"
@@ -1101,9 +1067,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-if="dashboardPanelData.data.config.table_pagination"
           v-show="isConfigOptionVisible('table', 'rows-per-page')"
-          v-model.number="
-            dashboardPanelDataModel.data.config.table_pagination_rows_per_page
-          "
+          v-model.number="dashboardPanelDataModel.data.config.table_pagination_rows_per_page"
           type="number"
           :placeholder="t('dashboard.auto')"
           :min="1"
@@ -1111,10 +1075,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-rows-per-page"
         >
           <template #tooltip>
-            <OTooltip
-              :content="t('dashboard.rowsPerPageTooltip')"
-              max-width="250px"
-            />
+            <OTooltip :content="t('dashboard.rowsPerPageTooltip')" max-width="15.625rem" />
           </template>
         </OInput>
       </div>
@@ -1132,9 +1093,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionPivotTable')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <OSwitch
           v-if="!promqlMode && isPivotMode"
           v-show="isConfigOptionVisible('pivotTable', 'pivot-show-row-totals')"
@@ -1144,44 +1105,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #label>
             {{ t("dashboard.pivotShowRowTotals") }}
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click.stop
-              icon-left="info-outline"
-            >
-              <OTooltip
-                :content="t('dashboard.pivotShowRowTotalsTooltip')"
-                max-width="250px"
-              />
+            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
+              <OTooltip :content="t('dashboard.pivotShowRowTotalsTooltip')" max-width="15.625rem" />
             </OButton>
           </template>
         </OSwitch>
 
         <OSwitch
           v-if="
-            !promqlMode &&
-            isPivotMode &&
-            dashboardPanelData.data.config.table_pivot_show_row_totals
+            !promqlMode && isPivotMode && dashboardPanelData.data.config.table_pivot_show_row_totals
           "
-          v-show="
-            isConfigOptionVisible('pivotTable', 'pivot-sticky-col-totals')
-          "
+          v-show="isConfigOptionVisible('pivotTable', 'pivot-sticky-col-totals')"
           v-model="dashboardPanelDataModel.data.config.table_pivot_sticky_col_totals"
           data-test="dashboard-config-pivot-sticky-col-totals"
           size="lg"
         >
           <template #label>
             {{ t("dashboard.pivotStickyColTotals") }}
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click.stop
-              icon-left="info-outline"
-            >
+            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
               <OTooltip
                 :content="t('dashboard.pivotStickyColTotalsTooltip')"
-                max-width="250px"
+                max-width="15.625rem"
               />
             </OButton>
           </template>
@@ -1196,44 +1140,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #label>
             {{ t("dashboard.pivotShowColTotals") }}
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click.stop
-              icon-left="info-outline"
-            >
-              <OTooltip
-                :content="t('dashboard.pivotShowColTotalsTooltip')"
-                max-width="250px"
-              />
+            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
+              <OTooltip :content="t('dashboard.pivotShowColTotalsTooltip')" max-width="15.625rem" />
             </OButton>
           </template>
         </OSwitch>
 
         <OSwitch
           v-if="
-            !promqlMode &&
-            isPivotMode &&
-            dashboardPanelData.data.config.table_pivot_show_col_totals
+            !promqlMode && isPivotMode && dashboardPanelData.data.config.table_pivot_show_col_totals
           "
-          v-show="
-            isConfigOptionVisible('pivotTable', 'pivot-sticky-row-totals')
-          "
+          v-show="isConfigOptionVisible('pivotTable', 'pivot-sticky-row-totals')"
           v-model="dashboardPanelDataModel.data.config.table_pivot_sticky_row_totals"
           data-test="dashboard-config-pivot-sticky-row-totals"
           size="lg"
         >
           <template #label>
             {{ t("dashboard.pivotStickyRowTotals") }}
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click.stop
-              icon-left="info-outline"
-            >
+            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
               <OTooltip
                 :content="t('dashboard.pivotStickyRowTotalsTooltip')"
-                max-width="250px"
+                max-width="15.625rem"
               />
             </OButton>
           </template>
@@ -1244,7 +1171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Value Transformations -->
     <OCollapsible
       variant="config"
-      v-if="dashboardPanelData.data.type == 'table'"
+      v-if="dashboardPanelData.data.type == 'table' || dashboardPanelData.data.type == 'metric'"
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
       :icon="SECTION_ICONS.valueTransformations"
@@ -1253,19 +1180,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.valueTransformations = v;
         }
       "
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
       <template #trigger>
-        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
-          t("dashboard.configSectionValueTransformations")
-        }}</span>
+        <span
+          class="text-compact text-collapsible-label group-data-[state=open]:text-collapsible-icon-open font-medium"
+          >{{ t("dashboard.configSectionValueTransformations") }}</span
+        >
         <OIcon name="info-outline" size="sm" />
         <OTooltip
           :content="t('dashboard.configSectionValueTransformationsTooltip')"
-          max-width="250px"
+          max-width="15.625rem"
         />
       </template>
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <ValueMapping />
       </div>
     </OCollapsible>
@@ -1282,33 +1210,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.fieldOverrides = v;
         }
       "
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
       <template #trigger>
-        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
-          t("dashboard.configSectionFieldOverrides")
-        }}</span>
+        <span
+          class="text-compact text-collapsible-label group-data-[state=open]:text-collapsible-icon-open font-medium"
+          >{{ t("dashboard.configSectionFieldOverrides") }}</span
+        >
         <OIcon name="info-outline" size="sm" />
         <OTooltip
           :content="t('dashboard.configSectionFieldOverridesTooltip')"
-          max-width="250px"
+          max-width="15.625rem"
         />
       </template>
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
-        <OverrideConfig
-          :dashboardPanelData="dashboardPanelData"
-          :panelData="panelData"
-        />
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="$emit('open-field-overrides')"
+          data-test="dashboard-addpanel-config-override-config-add-btn"
+        >
+          {{ t("dashboard.addFieldOverride") }}
+        </OButton>
       </div>
     </OCollapsible>
 
     <!-- Section: Map -->
     <OCollapsible
       variant="config"
-      v-if="
-        dashboardPanelData.data.type == 'geomap' ||
-        dashboardPanelData.data.type == 'maps'
-      "
+      v-if="dashboardPanelData.data.type == 'geomap' || dashboardPanelData.data.type == 'maps'"
       v-show="isSectionVisible('map')"
       :model-value="isExpanded('map')"
       :icon="SECTION_ICONS.map"
@@ -1318,9 +1248,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionMap')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="o2-input flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="o2-input box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <div v-if="dashboardPanelData.data.type == 'maps'">
           <OSelect
             v-model="dashboardPanelDataModel.data.config.map_type.type"
@@ -1331,10 +1261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-map-type"
           >
             <template #tooltip>
-              <OTooltip
-                :content="t('dashboard.mapsMapTypeTooltip')"
-                max-width="250px"
-              />
+              <OTooltip :content="t('dashboard.mapsMapTypeTooltip')" max-width="15.625rem" />
             </template>
           </OSelect>
         </div>
@@ -1353,23 +1280,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>{{ t("dashboard.initialView") }}</span>
           <div class="flex gap-2">
             <OInput
-              class="flex-1 min-w-0"
+              class="min-w-0 flex-1"
               v-model.number="dashboardPanelDataModel.data.config.map_view.lat"
               :label="t('dashboard.latitudeLabel')"
               type="number"
-              @blur="
-                handleBlur(dashboardPanelData.data.config.map_view, 0, 'lat')
-              "
+              @blur="handleBlur(dashboardPanelData.data.config.map_view, 0, 'lat')"
               data-test="dashboard-config-latitude"
             />
             <OInput
-              class="flex-1 min-w-0"
+              class="min-w-0 flex-1"
               v-model.number="dashboardPanelDataModel.data.config.map_view.lng"
               :label="t('dashboard.longitudeLabel')"
               type="number"
-              @blur="
-                handleBlur(dashboardPanelData.data.config.map_view, 0, 'lng')
-              "
+              @blur="handleBlur(dashboardPanelData.data.config.map_view, 0, 'lng')"
               data-test="dashboard-config-longitude"
             />
           </div>
@@ -1377,9 +1300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model.number="dashboardPanelDataModel.data.config.map_view.zoom"
             :label="t('dashboard.zoomLabel')"
             type="number"
-            @blur="
-              handleBlur(dashboardPanelData.data.config.map_view, 1, 'zoom')
-            "
+            @blur="handleBlur(dashboardPanelData.data.config.map_view, 1, 'zoom')"
             data-test="dashboard-config-zoom"
           />
 
@@ -1394,36 +1315,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="flex gap-2">
             <OInput
-              class="flex-1 min-w-0"
-              v-if="
-                dashboardPanelData.data.config.map_symbol_style.size ===
-                'by Value'
-              "
+              class="min-w-0 flex-1"
+              v-if="dashboardPanelData.data.config.map_symbol_style.size === 'by Value'"
               v-model.number="
-                dashboardPanelDataModel.data.config.map_symbol_style.size_by_value
-                  .min
+                dashboardPanelDataModel.data.config.map_symbol_style.size_by_value.min
               "
               :label="t('dashboard.minimum')"
               type="number"
               :min="0"
               @blur="
-                handleBlur(
-                  dashboardPanelData.data.config.map_symbol_style.size_by_value,
-                  1,
-                  'min',
-                )
+                handleBlur(dashboardPanelData.data.config.map_symbol_style.size_by_value, 1, 'min')
               "
               data-test="dashboard-config-map-symbol-min"
             />
             <OInput
-              class="flex-1 min-w-0"
-              v-if="
-                dashboardPanelData.data.config.map_symbol_style.size ===
-                'by Value'
-              "
+              class="min-w-0 flex-1"
+              v-if="dashboardPanelData.data.config.map_symbol_style.size === 'by Value'"
               v-model.number="
-                dashboardPanelDataModel.data.config.map_symbol_style.size_by_value
-                  .max
+                dashboardPanelDataModel.data.config.map_symbol_style.size_by_value.max
               "
               :label="t('dashboard.maximum')"
               type="number"
@@ -1440,29 +1349,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <OInput
-            v-if="
-              dashboardPanelData.data.config.map_symbol_style.size === 'fixed'
-            "
-            v-model.number="
-              dashboardPanelDataModel.data.config.map_symbol_style.size_fixed
-            "
+            v-if="dashboardPanelData.data.config.map_symbol_style.size === 'fixed'"
+            v-model.number="dashboardPanelDataModel.data.config.map_symbol_style.size_fixed"
             :label="t('dashboard.fixedValue')"
             type="number"
-            @blur="
-              handleBlur(
-                dashboardPanelData.data.config.map_symbol_style,
-                2,
-                'size_fixed',
-              )
-            "
+            @blur="handleBlur(dashboardPanelData.data.config.map_symbol_style, 2, 'size_fixed')"
             data-test="dashboard-config-map-symbol-fixed"
           />
 
           <OSelect
             v-model="
-              dashboardPanelDataModel.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].config.layer_type
+              dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                .config.layer_type
             "
             :options="layerTypeOptions"
             :label="t('dashboard.layerType')"
@@ -1474,17 +1372,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             v-if="!isWeightFieldPresent"
             v-model.number="
-              dashboardPanelDataModel.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].config.weight_fixed
+              dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                .config.weight_fixed
             "
             :label="t('common.weight')"
             type="number"
             @blur="
               handleBlur(
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].config,
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config,
                 1,
                 'weight_fixed',
               )
@@ -1508,15 +1403,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionGauge')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-min')"
           v-model.number="
-            dashboardPanelDataModel.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].config.min
+            dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+              .min
           "
           type="number"
           :label="t('dashboard.gaugeMinValue')"
@@ -1528,8 +1422,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @blur="
             () => {
-              if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.min == null)
-                dashboardPanelDataModel.data.queries[dashboardPanelDataModel.layout.currentQueryIndex].config.min = 0
+              if (
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+                  .min == null
+              )
+                dashboardPanelDataModel.data.queries[
+                  dashboardPanelDataModel.layout.currentQueryIndex
+                ].config.min = 0;
             }
           "
           data-test="dashboard-config-gauge-min"
@@ -1537,13 +1436,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-max')"
           v-model.number="
-            dashboardPanelDataModel.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].config.max
+            dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+              .max
           "
           type="number"
           :label="t('dashboard.gaugeMaxValue')"
-          placeholder="100"
+          :placeholder="t('dashboard.hundredPlaceholder')"
           @update:model-value="
             (value: any) =>
               (dashboardPanelDataModel.data.queries[
@@ -1552,8 +1450,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @blur="
             () => {
-              if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.max == null)
-                dashboardPanelDataModel.data.queries[dashboardPanelDataModel.layout.currentQueryIndex].config.max = 100
+              if (
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+                  .max == null
+              )
+                dashboardPanelDataModel.data.queries[
+                  dashboardPanelDataModel.layout.currentQueryIndex
+                ].config.max = 100;
             }
           "
           data-test="dashboard-config-gauge-max"
@@ -1574,9 +1477,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLayout')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <div v-show="isConfigOptionVisible('layout', 'trellis-layout')">
           <OSelect
             :label="t('dashboard.trellisLayout')"
@@ -1588,7 +1491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isBreakdownFieldEmpty || hasTimeShifts"
           >
             <template #tooltip>
-              <OTooltip max-width="250px">
+              <OTooltip max-width="15.625rem">
                 <template #content>
                   <b>{{
                     hasTimeShifts
@@ -1606,9 +1509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('layout', 'trellis-columns')"
         >
           <OInput
-            v-model.number="
-              dashboardPanelDataModel.data.config.trellis.num_of_columns
-            "
+            v-model.number="dashboardPanelDataModel.data.config.trellis.num_of_columns"
             type="number"
             :placeholder="t('dashboard.auto')"
             :label="t('dashboard.numOfColumns')"
@@ -1624,7 +1525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #tooltip>
-              <OTooltip max-width="250px">
+              <OTooltip max-width="15.625rem">
                 <template #content>
                   <b>{{
                     hasTimeShifts
@@ -1655,33 +1556,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip>
                 <template #content>
                   <div>
-                    <b>{{
-                      t("dashboard.groupMultiYAxisTrellisTooltipTitle")
-                    }}</b>
+                    <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipTitle") }}</b>
                     <br /><br />
-                    {{
-                      t("dashboard.groupMultiYAxisTrellisTooltipDescription")
-                    }}
+                    {{ t("dashboard.groupMultiYAxisTrellisTooltipDescription") }}
                     <br /><br />
-                    <b>{{
-                      t("dashboard.groupMultiYAxisTrellisTooltipEnabled")
-                    }}</b>
+                    <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipEnabled") }}</b>
                     <br /><br />
-                    <b>{{
-                      t("dashboard.groupMultiYAxisTrellisTooltipDisabled")
-                    }}</b>
+                    <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipDisabled") }}</b>
                     <br /><br />
-                    <i>{{
-                      t("dashboard.groupMultiYAxisTrellisTooltipExample")
-                    }}</i>
+                    <i>{{ t("dashboard.groupMultiYAxisTrellisTooltipExample") }}</i>
                     <br />
-                    {{
-                      t("dashboard.groupMultiYAxisTrellisTooltipEnabledResult")
-                    }}
+                    {{ t("dashboard.groupMultiYAxisTrellisTooltipEnabledResult") }}
                     <br />
-                    {{
-                      t("dashboard.groupMultiYAxisTrellisTooltipDisabledResult")
-                    }}
+                    {{ t("dashboard.groupMultiYAxisTrellisTooltipDisabledResult") }}
                   </div>
                 </template>
               </OTooltip>
@@ -1704,9 +1591,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionColors')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <ColorPaletteDropDown />
         <ColorBySeries :colorBySeriesData="panelData" />
       </div>
@@ -1724,23 +1611,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.drilldown = v;
         }
       "
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
       <template #trigger>
-        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
-          t("dashboard.drilldown")
-        }}</span>
-        <OIcon
-          name="info-outline"
-          size="sm"
-          data-test="dashboard-addpanel-config-drilldown-info"
-        />
-        <OTooltip
-          :content="t('dashboard.drilldownTooltip')"
-          max-width="250px"
-        />
+        <span
+          class="text-compact text-collapsible-label group-data-[state=open]:text-collapsible-icon-open font-medium"
+          >{{ t("dashboard.drilldown") }}</span
+        >
+        <OIcon name="info-outline" size="sm" data-test="dashboard-addpanel-config-drilldown-info" />
+        <OTooltip :content="t('dashboard.drilldownTooltip')" max-width="15.625rem" />
       </template>
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <Drilldown :variablesData="variablesData" />
       </div>
     </OCollapsible>
@@ -1748,13 +1629,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section: Comparison -->
     <OCollapsible
       variant="config"
-      v-if="
-        shouldShowTimeShift(
-          dashboardPanelData,
-          promqlMode,
-          dashboardPanelDataPageKey,
-        )
-      "
+      v-if="shouldShowTimeShift(dashboardPanelData, promqlMode, dashboardPanelDataPageKey)"
       v-show="isSectionVisible('comparison')"
       :model-value="isExpanded('comparison')"
       :icon="SECTION_ICONS.comparison"
@@ -1763,28 +1638,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.comparison = v;
         }
       "
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
       <template #trigger>
-        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
-          t("dashboard.comparisonAgainst")
-        }}</span>
+        <span
+          class="text-compact text-collapsible-label group-data-[state=open]:text-collapsible-icon-open font-medium"
+          >{{ t("dashboard.comparisonAgainst") }}</span
+        >
         <OIcon
           name="info-outline"
           size="sm"
           data-test="dashboard-addpanel-config-time-shift-info"
         />
-        <OTooltip
-          :content="t('dashboard.comparisonAgainstTooltip')"
-          max-width="250px"
-        />
+        <OTooltip :content="t('dashboard.comparisonAgainstTooltip')" max-width="15.625rem" />
       </template>
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
-        <CustomDateTimePicker
-          modelValue="0m"
-          :isFirstEntry="true"
-          :disable="true"
-        />
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <CustomDateTimePicker modelValue="0m" :isFirstEntry="true" :disable="true" />
         <div
           v-for="(picker, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -1792,11 +1661,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
         >
           <div class="flex items-center">
-            <CustomDateTimePicker
-              v-model="picker.offSet"
-              :picker="picker"
-              :isFirstEntry="false"
-            />
+            <CustomDateTimePicker v-model="picker.offSet" :picker="picker" :isFirstEntry="false" />
             <OIcon
               class="mr-1 ml-2 cursor-pointer"
               size="sm"
@@ -1812,7 +1677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             @click="addTimeShift"
             data-test="dashboard-addpanel-config-time-shift-add-btn"
-          >{{ t("dashboard.addButton") }}</OButton
+            >{{ t("dashboard.addButton") }}</OButton
           >
         </div>
       </div>
@@ -1830,23 +1695,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.markLines = v;
         }
       "
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
       <template #trigger>
-        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
-          t("dashboard.markLines")
-        }}</span>
-        <OIcon
-          name="info-outline"
-          size="sm"
-          data-test="dashboard-addpanel-config-markline-info"
-        />
-        <OTooltip
-          :content="t('dashboard.markLinesTooltip')"
-          max-width="250px"
-        />
+        <span
+          class="text-compact text-collapsible-label group-data-[state=open]:text-collapsible-icon-open font-medium"
+          >{{ t("dashboard.markLines") }}</span
+        >
+        <OIcon name="info-outline" size="sm" data-test="dashboard-addpanel-config-markline-info" />
+        <OTooltip :content="t('dashboard.markLinesTooltip')" max-width="15.625rem" />
       </template>
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <MarkLineConfig />
       </div>
     </OCollapsible>
@@ -1864,10 +1723,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionBackground')"
-      class="border-t border-solid border-card-glass-border"
+      class="border-card-glass-border border-t border-solid"
     >
-      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <BackGroundColorConfig />
+      </div>
+    </OCollapsible>
+
+    <!-- Section: Sparkline (metric only) -->
+    <OCollapsible
+      variant="config"
+      v-if="dashboardPanelData.data.type == 'metric'"
+      v-show="isSectionVisible('sparkline')"
+      :model-value="isExpanded('sparkline')"
+      :icon="SECTION_ICONS.sparkline"
+      @update:modelValue="
+        (v) => {
+          expandedSections.sparkline = v;
+        }
+      "
+      :label="t('dashboard.configSectionSparkline')"
+      class="border-card-glass-border border-t border-solid"
+    >
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <SparklineConfig />
       </div>
     </OCollapsible>
   </div>
@@ -1885,16 +1764,8 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
-import {
-  computed,
-  defineComponent,
-  inject,
-  nextTick,
-  onBeforeMount,
-  onMounted,
-  ref,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, inject, nextTick, onBeforeMount, onMounted, ref } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
@@ -1904,7 +1775,7 @@ import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
-import OverrideConfig from "./OverrideConfig.vue";
+import SparklineConfig from "./SparklineConfig.vue";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
 import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
@@ -1967,21 +1838,22 @@ export default defineComponent({
     DateTimePickerDashboard,
     ColorPaletteDropDown,
     BackGroundColorConfig,
-    OverrideConfig,
+    SparklineConfig,
     PromQLChartConfig,
     OButton,
     OTooltip,
     OIcon,
     OCollapsible,
   },
-  props: ["dashboardPanelData", "variablesData", "panelData"],
-  setup(props) {
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
+  props: ["variablesData", "panelData"],
+  emits: ["open-field-overrides"],
+  setup() {
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { t } = useI18nTyped();
+    const { dashboardPanelData, promqlMode, isPivotMode } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
     );
-    const { dashboardPanelData, promqlMode, isPivotMode } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
 
     // Alias for template v-model mutation sites; same reference, no behavior change.
     const dashboardPanelDataModel = computed(() => dashboardPanelData);
@@ -1993,9 +1865,7 @@ export default defineComponent({
     const TOGGLE_AUTO = "__auto__";
     const toggleModel = (key: string) =>
       computed({
-        get: () =>
-          (dashboardPanelData.data.config as Record<string, unknown>)[key] ??
-          TOGGLE_AUTO,
+        get: () => (dashboardPanelData.data.config as Record<string, unknown>)[key] ?? TOGGLE_AUTO,
         set: (v: unknown) => {
           (dashboardPanelData.data.config as Record<string, unknown>)[key] =
             v === TOGGLE_AUTO ? null : v;
@@ -2007,7 +1877,6 @@ export default defineComponent({
     const toggleItemValue = (value: unknown) =>
       value === null || value === undefined ? TOGGLE_AUTO : value;
 
-    const { t } = useI18n();
     const store = useStore();
 
     const basemapTypeOptions = [
@@ -2183,8 +2052,7 @@ export default defineComponent({
         }
 
         // Set the value
-        dashboardPanelData.data.config.legend_width.value =
-          value !== "" ? value : null;
+        dashboardPanelData.data.config.legend_width.value = value !== "" ? value : null;
       },
     });
 
@@ -2215,8 +2083,7 @@ export default defineComponent({
         }
 
         // Set the value
-        dashboardPanelData.data.config.legend_height.value =
-          value !== "" ? value : null;
+        dashboardPanelData.data.config.legend_height.value = value !== "" ? value : null;
       },
     });
 
@@ -2320,8 +2187,9 @@ export default defineComponent({
         value: "center",
       },
     ];
-    // Single source of truth — shared with the column-formatting dialog.
-    const unitOptions = getUnitOptions(t);
+    // Single source of truth — shared with the column-formatting dialog. Labels are
+    // already translated; raw() only re-brands the `string` the helper widens to.
+    const unitOptions = getUnitOptions(t).map((o) => ({ ...o, label: raw(o.label) }));
 
     const labelPositionOptions = [
       {
@@ -2429,9 +2297,7 @@ export default defineComponent({
 
     const isWeightFieldPresent = computed(() => {
       const layoutFields =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
       return !!layoutFields?.weight;
     });
 
@@ -2443,9 +2309,8 @@ export default defineComponent({
 
     const selectPromQlNameOption = (option: any) => {
       const inputValue =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.promql_legend;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+          .promql_legend;
 
       // Find the index of the last opening brace '{'
       const openingBraceIndex = inputValue.lastIndexOf("{");
@@ -2454,12 +2319,10 @@ export default defineComponent({
 
       const fieldName = (option as any)?.value ?? option;
       if (openingBraceIndex === -1) {
-        const newValue =
-          "{" + inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
+        const newValue = "{" + inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
         return newValue;
       } else {
-        const newValue =
-          inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
+        const newValue = inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
         return newValue;
       }
     };
@@ -2467,24 +2330,21 @@ export default defineComponent({
     const dashboardSelectfieldPromQlList = computed(() => {
       // Get fields from groupedFields based on current query's stream
       const currentQuery =
-        props.dashboardPanelData.data.queries[
-          props.dashboardPanelData.layout.currentQueryIndex
-        ];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
       const currentStream = currentQuery?.fields?.stream;
 
       if (!currentStream) return [];
 
       // Find the current stream in groupedFields
-      const streamFields =
-        props.dashboardPanelData.meta.streamFields.groupedFields.find(
-          (group: any) => group.name === currentStream,
-        );
+      const streamFields = dashboardPanelData.meta.streamFields.groupedFields.find(
+        (group: any) => group.name === currentStream,
+      );
 
       if (!streamFields?.schema) return [];
 
       return streamFields.schema.map((it: any) => {
         return {
-          label: it.name,
+          label: raw(it.name),
           value: it.name,
         };
       });
@@ -2511,9 +2371,8 @@ export default defineComponent({
 
       timeShifts.push(newTimeShift);
       if (
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.time_shift
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+          .time_shift
       ) {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -2559,28 +2418,22 @@ export default defineComponent({
     const isBreakdownFieldEmpty = computed(() => {
       const queries = dashboardPanelData.data.queries || [];
       return (
-        queries.length === 0 ||
-        queries.some((q: any) => (q?.fields?.breakdown?.length ?? 0) === 0)
+        queries.length === 0 || queries.some((q: any) => (q?.fields?.breakdown?.length ?? 0) === 0)
       );
     });
 
     const hasTimeShifts = computed(() => {
       return (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.time_shift?.length > 0
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config
+          .time_shift?.length > 0
       );
     });
 
     // Panel default time configuration (v4.0)
-    const useDefaultTime = ref(
-      !!dashboardPanelData.data.config?.panel_time_enabled,
-    );
+    const useDefaultTime = ref(!!dashboardPanelData.data.config?.panel_time_enabled);
 
     // Current panel time range (null = not set)
-    const panelTimeRange = ref(
-      dashboardPanelData.data.config?.panel_time_range ?? null,
-    );
+    const panelTimeRange = ref(dashboardPanelData.data.config?.panel_time_range ?? null);
 
     // Picker value - initialize from existing config or default
     const existingRange = dashboardPanelData.data.config?.panel_time_range;
@@ -2653,28 +2506,16 @@ export default defineComponent({
         if (active) {
           dashboardPanelData.data.config.table_transpose = false;
           dashboardPanelData.data.config.table_dynamic_columns = false;
-          if (
-            dashboardPanelData.data.config.table_pivot_show_row_totals ===
-            undefined
-          ) {
+          if (dashboardPanelData.data.config.table_pivot_show_row_totals === undefined) {
             dashboardPanelData.data.config.table_pivot_show_row_totals = false;
           }
-          if (
-            dashboardPanelData.data.config.table_pivot_show_col_totals ===
-            undefined
-          ) {
+          if (dashboardPanelData.data.config.table_pivot_show_col_totals === undefined) {
             dashboardPanelData.data.config.table_pivot_show_col_totals = false;
           }
-          if (
-            dashboardPanelData.data.config.table_pivot_sticky_row_totals ===
-            undefined
-          ) {
+          if (dashboardPanelData.data.config.table_pivot_sticky_row_totals === undefined) {
             dashboardPanelData.data.config.table_pivot_sticky_row_totals = false;
           }
-          if (
-            dashboardPanelData.data.config.table_pivot_sticky_col_totals ===
-            undefined
-          ) {
+          if (dashboardPanelData.data.config.table_pivot_sticky_col_totals === undefined) {
             dashboardPanelData.data.config.table_pivot_sticky_col_totals = false;
           }
         }
@@ -2754,6 +2595,7 @@ export default defineComponent({
     const decimalsTouched = ref(false);
 
     return {
+      raw,
       legendsPositionModel,
       legendsTypeModel,
       chartAlignModel,

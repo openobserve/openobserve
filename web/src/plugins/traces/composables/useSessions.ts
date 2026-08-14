@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { ref } from "vue";
 import { useStore } from "vuex";
 import sessionsService from "@/services/sessions";
@@ -76,7 +78,7 @@ export interface SessionTraceRow {
 /** Single message inside a turn (USER block / ASSISTANT block). */
 export interface TurnMessage {
   role: "user" | "assistant" | "system" | "tool";
-  content: string;
+  content: I18nText;
 }
 
 /** Full per-turn payload, lazy-loaded when a turn row is expanded. */
@@ -145,6 +147,7 @@ export interface SessionRow {
 // ---------------------------------------------------------------------------
 const sessions = ref<SessionRow[]>([]);
 const total = ref(0);
+const totalIsExact = ref(true);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const hasLoadedOnce = ref(false);
@@ -251,6 +254,7 @@ export function useSessions() {
         };
       });
       total.value = Number(body.total) || 0;
+      totalIsExact.value = body.total_is_exact ?? true;
       hasLoadedOnce.value = true;
       // Stamp when/which-org this page was fetched — used to keep the "last
       // refreshed" label accurate and to invalidate the cache on org switch.
@@ -306,9 +310,7 @@ export function useSessions() {
     // Sort chronologically so the conversation list reads in turn
     // order. The endpoint returns DESC by default to surface "most
     // recent" first; for a session we want oldest-first.
-    accumulated.sort(
-      (a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0),
-    );
+    accumulated.sort((a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0));
 
     // Map each trace summary to SessionTraceRow.
     //
@@ -371,9 +373,7 @@ export function useSessions() {
         model: modelsArr[0] ?? null,
         models: modelsArr,
         turnUserMessage: userMessageOf(r.gen_ai_input_messages),
-        serviceName: svcArr[0]?.service_name
-          ? String(svcArr[0].service_name)
-          : null,
+        serviceName: svcArr[0]?.service_name ? String(svcArr[0].service_name) : null,
       } as SessionTraceRow & { serviceName: string | null };
     });
 
@@ -421,8 +421,7 @@ export function useSessions() {
       userId: null,
       serviceName,
       firstSeenMicros: firstSeenNanos,
-      durationNanos:
-        lastSeenNanos > firstSeenNanos ? lastSeenNanos - firstSeenNanos : 0,
+      durationNanos: lastSeenNanos > firstSeenNanos ? lastSeenNanos - firstSeenNanos : 0,
       turns: traces.length,
       inputTokens: totalInputTokens,
       outputTokens: totalOutputTokens,
@@ -458,7 +457,16 @@ export function useSessions() {
     endTime: number,
   ): Promise<TurnDetail> {
     if (!streamName || !traceId || !startTime || !endTime) {
-      return { traceId, userMessage: null, assistantMessage: null, model: null, llmCalls: 0, toolCalls: 0, otherCalls: 0, otherOps: [] };
+      return {
+        traceId,
+        userMessage: null,
+        assistantMessage: null,
+        model: null,
+        llmCalls: 0,
+        toolCalls: 0,
+        otherCalls: 0,
+        otherOps: [],
+      };
     }
     const safeId = traceId.replace(/'/g, "''");
 
@@ -493,14 +501,15 @@ export function useSessions() {
       const op = String(row.gen_ai_operation_name || "").toLowerCase();
       if (LLM_OPS.has(op)) llmCalls += 1;
       else if (op === "execute_tool") toolCalls += 1;
-      else { otherCalls += 1; otherOpsSet.add(op); }
+      else {
+        otherCalls += 1;
+        otherOpsSet.add(op);
+      }
     }
     const otherOps = [...otherOpsSet].sort();
     // Lazy-import the message parser so this composable stays light
     // when only the list view is in use.
-    const { messagesFromInput, messagesFromOutput, getModel } = await import(
-      "../threadView.utils"
-    );
+    const { messagesFromInput, messagesFromOutput, getModel } = await import("../threadView.utils");
 
     let userMessage: TurnMessage | null = null;
     let assistantMessage: TurnMessage | null = null;
@@ -553,7 +562,16 @@ export function useSessions() {
       }
     }
 
-    return { traceId, userMessage, assistantMessage, model, llmCalls, toolCalls, otherCalls, otherOps };
+    return {
+      traceId,
+      userMessage,
+      assistantMessage,
+      model,
+      llmCalls,
+      toolCalls,
+      otherCalls,
+      otherOps,
+    };
   }
 
   /**
@@ -571,13 +589,11 @@ export function useSessions() {
     endTime: number,
   ): Promise<any[]> {
     if (!streamName || !traceIds.length || !startTime || !endTime) return [];
-    const inList = traceIds
-      .map((id) => `'${String(id).replace(/'/g, "''")}'`)
-      .join(",");
+    const inList = traceIds.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",");
     const sql = compactSql(`
       SELECT
         span_id, trace_id, operation_name, gen_ai_operation_name,
-        tool_name, gen_ai_tool_name, tool_args,
+        gen_ai_tool_name,
         duration, start_time, end_time,
         span_status, status_message,
         gen_ai_request_model, gen_ai_response_model,
@@ -604,6 +620,7 @@ export function useSessions() {
   return {
     sessions,
     total,
+    totalIsExact,
     loading,
     error,
     hasLoadedOnce,

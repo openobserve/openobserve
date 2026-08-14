@@ -4,6 +4,7 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import en from "@/locales/languages/en-US.json";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { EvalTargetScope, Scorer } from "@/services/online-evals.service";
 import JobInputMapping from "./JobInputMapping.vue";
 
@@ -36,10 +37,7 @@ const autoFilledScorer = {
   variables: ["input", "output"],
 } as Scorer;
 
-function mountMapping(
-  targetScope: EvalTargetScope,
-  scorers: Scorer[] = [scorer],
-) {
+function mountMapping(targetScope: EvalTargetScope, scorers: Scorer[] = [scorer]) {
   const i18n = createI18n({
     legacy: false,
     locale: "en",
@@ -60,6 +58,10 @@ function mountMapping(
           custom: "{{custom_field}}",
         },
       },
+      streamFields: [
+        { label: "gen_ai_output_messages", value: "gen_ai_output_messages", type: "Utf8" },
+        { label: "custom_attribute", value: "custom_attribute", type: "Utf8" },
+      ],
     },
     global: {
       plugins: [i18n],
@@ -78,89 +80,68 @@ describe("JobInputMapping", () => {
     mocks.copyToClipboard.mockClear();
   });
 
-  it("opens the system-provided variables table from Learn more", async () => {
+  it("opens the system-provided values table from the explicit help action", async () => {
     const wrapper = mountMapping("trace");
 
     expect(
       wrapper.find('[data-test="job-input-mapping-system-variables-learn-more"]').exists(),
     ).toBe(true);
-    expect(
-      wrapper
-        .find('[data-test="job-input-mapping-system-variables-table"]')
-        .exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="job-input-mapping-system-variables-table"]').exists()).toBe(
+      false,
+    );
 
-    const learnMore = wrapper.get(
+    const systemValuesHelp = wrapper.get(
       '[data-test="job-input-mapping-system-variables-learn-more"]',
     );
-    expect(learnMore.text()).toContain("Learn more");
-    await learnMore.trigger("click");
+    expect(systemValuesHelp.text()).toContain("About system-provided values");
+    await systemValuesHelp.trigger("click");
 
-    expect(
-      wrapper
-        .get('[data-test="job-input-mapping-system-variables-drawer"]')
-        .text(),
-    ).toContain("Trace Variables");
+    expect(wrapper.get('[data-test="job-input-mapping-system-variables-drawer"]').text()).toContain(
+      "Trace system values",
+    );
     const systemVariablesTable = wrapper.find(
       '[data-test="job-input-mapping-system-variables-table"]',
     );
     expect(systemVariablesTable.exists()).toBe(true);
-    expect(systemVariablesTable.text()).toContain("Prompt variable");
+    expect(systemVariablesTable.text()).toContain("Value");
     expect(systemVariablesTable.text()).toContain("Source");
     expect(systemVariablesTable.text()).toContain("Value supplied");
     expect(systemVariablesTable.text()).toContain("Span Selector required");
+    expect(wrapper.get('[data-test="job-input-mapping-system-variable-input"]').text()).toBe(
+      "input",
+    );
+    expect(wrapper.get('[data-test="job-input-mapping-system-variable-steps"]').text()).toBe(
+      "steps",
+    );
     for (const variable of ["input", "output", "statistics", "steps"]) {
-      // Auto-filled rows are identified by the row itself, not by badge copy:
-      // they render a source description and no mapping input.
-      const row = wrapper.find(
-        `[data-test="job-input-mapping-system-provided-scorer-1-${variable}"]`,
-      );
-      expect(row.exists()).toBe(true);
-      expect(row.text().length).toBeGreaterThan(0);
       expect(
-        wrapper
-          .find(`[data-test="job-input-mapping-input-scorer-1-${variable}"]`)
-          .exists(),
-      ).toBe(false);
-    }
-    // The Span Selector is bound once per scorer (card level), not inside the
-    // {{ spans }} row — the backend requires one for EVERY trace scorer.
-    expect(
-      wrapper
-        .find('[data-test="job-input-mapping-span-selector-scorer-1"]')
-        .exists(),
-    ).toBe(true);
-    expect(
-      wrapper
-        .find('[data-test="job-input-mapping-input-scorer-1-custom"]')
-        .exists(),
-    ).toBe(true);
-  });
-
-  it("only marks statistics and steps as system provided for session jobs", () => {
-    const wrapper = mountMapping("session");
-
-    for (const variable of ["statistics", "steps"]) {
-      // Auto-filled rows are identified by the row itself, not by badge copy:
-      // they render a source description and no mapping input.
-      const row = wrapper.find(
-        `[data-test="job-input-mapping-system-provided-scorer-1-${variable}"]`,
-      );
-      expect(row.exists()).toBe(true);
-      expect(row.text().length).toBeGreaterThan(0);
-      expect(
-        wrapper
-          .find(`[data-test="job-input-mapping-input-scorer-1-${variable}"]`)
-          .exists(),
-      ).toBe(false);
-    }
-    for (const variable of ["input", "output", "spans", "custom"]) {
-      expect(
-        wrapper
-          .find(`[data-test="job-input-mapping-input-scorer-1-${variable}"]`)
-          .exists(),
+        wrapper.find(`[data-test="job-input-mapping-select-scorer-1-${variable}"]`).exists(),
       ).toBe(true);
     }
+    expect(wrapper.find('[data-test="job-input-mapping-span-selector-scorer-1"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="job-input-mapping-select-scorer-1-custom"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("keeps every scorer variable editable for session jobs", () => {
+    const wrapper = mountMapping("session");
+
+    for (const variable of ["input", "output", "statistics", "spans", "steps", "custom"]) {
+      expect(
+        wrapper.find(`[data-test="job-input-mapping-select-scorer-1-${variable}"]`).exists(),
+      ).toBe(true);
+    }
+  });
+
+  it("vertically centers the variable label and mapping controls", () => {
+    const wrapper = mountMapping("trace");
+    const row = wrapper.get('[data-test="job-input-mapping-row-scorer-1-output"]');
+
+    expect(row.classes()).toContain("items-center");
+    expect(row.get("code").classes()).not.toContain("mt-0.5");
   });
 
   it("keeps all scorer variables editable for span jobs", () => {
@@ -170,47 +151,139 @@ describe("JobInputMapping", () => {
       wrapper.find('[data-test="job-input-mapping-system-variables-learn-more"]').exists(),
     ).toBe(false);
     expect(
-      wrapper
-        .find('[data-test="job-input-mapping-input-scorer-1-statistics"]')
-        .exists(),
+      wrapper.find('[data-test="job-input-mapping-select-scorer-1-statistics"]').exists(),
     ).toBe(true);
-    expect(
-      wrapper
-        .find('[data-test="job-input-mapping-input-scorer-1-steps"]')
-        .exists(),
-    ).toBe(true);
-    expect(
-      wrapper
-        .find('[data-test="job-input-mapping-input-scorer-1-spans"]')
-        .exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="job-input-mapping-select-scorer-1-steps"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="job-input-mapping-select-scorer-1-spans"]').exists()).toBe(
+      true,
+    );
   });
 
   it("copies the mapping expression from an editable variable", async () => {
     const wrapper = mountMapping("span");
 
-    await wrapper
-      .get('[data-test="job-input-mapping-copy-scorer-1-input"]')
-      .trigger("click");
+    await wrapper.get('[data-test="job-input-mapping-copy-scorer-1-input"]').trigger("click");
 
-    expect(mocks.copyToClipboard).toHaveBeenCalledWith("{{custom_input}}", {
+    expect(mocks.copyToClipboard).toHaveBeenCalledWith("{{custom_input}}", expect.any(Function), {
       successMessage: "Copied to clipboard",
+    });
+  });
+
+  it("combines system-provided values and span attributes in each mapping dropdown", () => {
+    const wrapper = mountMapping("trace");
+    const select = wrapper
+      .findAllComponents(OSelect)
+      .find(
+        (component) =>
+          component.attributes("data-test") === "job-input-mapping-select-scorer-1-output",
+      );
+
+    expect(select).toBeDefined();
+    expect(select?.props("searchable")).toBe(true);
+    const options = select?.props("options") ?? [];
+    expect(options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "System-provided values · For each trace this job evaluates",
+          header: true,
+        }),
+        expect.objectContaining({ label: "output", value: "{{output}}" }),
+        expect.objectContaining({ label: "steps", value: "{{steps}}" }),
+        expect.objectContaining({ label: "Span attributes", header: true }),
+        expect.objectContaining({
+          label: "gen_ai_output_messages",
+          value: "{{gen_ai_output_messages}}",
+        }),
+        expect.objectContaining({
+          label: "custom_attribute",
+          value: "{{custom_attribute}}",
+        }),
+      ]),
+    );
+    expect(
+      options
+        .filter((option: { header?: boolean }) => !option.header)
+        .every((option: { subLabel?: string }) => option.subLabel === undefined),
+    ).toBe(true);
+    expect(
+      options
+        .filter((option: { header?: boolean }) => !option.header)
+        .every(
+          (option: { label: string }) =>
+            !option.label.includes("{{") && !option.label.includes("}}"),
+        ),
+    ).toBe(true);
+  });
+
+  it("explains which target supplies the system-provided values", () => {
+    for (const [scope, groupLabel] of [
+      ["trace", "System-provided values · For each trace this job evaluates"],
+      ["session", "System-provided values · For each session this job evaluates"],
+    ] as const) {
+      const wrapper = mountMapping(scope);
+      const select = wrapper
+        .findAllComponents(OSelect)
+        .find(
+          (component) =>
+            component.attributes("data-test") === "job-input-mapping-select-scorer-1-output",
+        );
+
+      expect(select?.props("options")).toEqual(
+        expect.arrayContaining([expect.objectContaining({ label: groupLabel, header: true })]),
+      );
+    }
+  });
+
+  it("emits the selected mapping value", async () => {
+    const wrapper = mountMapping("trace", [autoFilledScorer]);
+    const select = wrapper
+      .findAllComponents(OSelect)
+      .find(
+        (component) =>
+          component.attributes("data-test") === "job-input-mapping-select-scorer-2-output",
+      );
+
+    expect(select).toBeDefined();
+    select?.vm.$emit("update:modelValue", "{{gen_ai_output_messages}}");
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted("update:inputMappings")?.at(-1)?.[0]).toEqual({
+      "scorer-1": {
+        input: "{{custom_input}}",
+        output: "{{custom_output}}",
+        statistics: "{{custom_statistics}}",
+        spans: "{{custom_spans}}",
+        steps: "{{custom_steps}}",
+        custom: "{{custom_field}}",
+      },
+      "scorer-2": {
+        output: "{{gen_ai_output_messages}}",
+      },
     });
   });
 
   it("hides the selector dropdown until a selector exists", async () => {
     const wrapper = mountMapping("trace");
 
-    expect(
-      wrapper.find('[data-test="span-selector-binding-scorer-1"]').exists(),
-    ).toBe(false);
-    const createButton = wrapper.get(
-      '[data-test="span-selector-create-scorer-1"]',
-    );
+    await wrapper.setProps({
+      inputMappings: {
+        "scorer-1": {
+          input: "{{custom_input}}",
+          output: "{{custom_output}}",
+          statistics: "{{custom_statistics}}",
+          spans: "{{spans}}",
+          steps: "{{custom_steps}}",
+          custom: "{{custom_field}}",
+        },
+      },
+    });
+
+    expect(wrapper.find('[data-test="span-selector-binding-scorer-1"]').exists()).toBe(false);
+    const createButton = wrapper.get('[data-test="span-selector-create-scorer-1"]');
     expect(createButton.text()).toContain("Create for scorer");
-    expect(createButton.attributes("title")).toBe(
-      "Create a Span Selector for this scorer",
-    );
+    expect(createButton.attributes("title")).toBe("Create a Span Selector for this scorer");
 
     await wrapper.setProps({
       spanSelectors: [
@@ -225,41 +298,89 @@ describe("JobInputMapping", () => {
       ],
     });
 
-    expect(
-      wrapper.find('[data-test="span-selector-binding-scorer-1"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="span-selector-binding-scorer-1"]').exists()).toBe(true);
   });
 
-  // Regression: the Span Selector control used to render only inside the
-  // {{ spans }} variable row, but the backend's validate_for_activation()
-  // demands a binding for EVERY trace scorer. A scorer without {{ spans }} was
-  // therefore blocked from activation with no control to satisfy it.
-  it("offers a Span Selector for a trace scorer that has no {{ spans }}", () => {
+  it("offers a Span Selector only after the spans system value is selected", async () => {
+    const wrapper = mountMapping("trace");
+
+    expect(wrapper.find('[data-test="job-input-mapping-span-selector-scorer-1"]').exists()).toBe(
+      false,
+    );
+
+    const spansSelect = wrapper
+      .findAllComponents(OSelect)
+      .find(
+        (component) =>
+          component.attributes("data-test") === "job-input-mapping-select-scorer-1-spans",
+      );
+    expect(spansSelect).toBeDefined();
+
+    spansSelect?.vm.$emit("update:modelValue", "{{spans}}");
+    await wrapper.vm.$nextTick();
+
+    const inputMappings = wrapper.emitted("update:inputMappings")?.at(-1)?.[0];
+    expect(inputMappings).toEqual(
+      expect.objectContaining({
+        "scorer-1": expect.objectContaining({ spans: "{{spans}}" }),
+      }),
+    );
+
+    await wrapper.setProps({
+      inputMappings: {
+        "scorer-1": {
+          input: "{{custom_input}}",
+          output: "{{custom_output}}",
+          statistics: "{{custom_statistics}}",
+          spans: "{{spans}}",
+          steps: "{{custom_steps}}",
+          custom: "{{custom_field}}",
+        },
+      },
+    });
+
+    expect(wrapper.find('[data-test="job-input-mapping-span-selector-scorer-1"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("offers no Span Selector for a trace scorer that has no {{ spans }}", () => {
     const wrapper = mountMapping("trace", [autoFilledScorer]);
 
-    // autoFilledScorer declares only input/output — no spans variable.
-    expect(
-      wrapper
-        .find('[data-test="job-input-mapping-system-provided-scorer-2-spans"]')
-        .exists(),
-    ).toBe(false);
-    // ...yet it must still be bindable, because activation requires it.
-    const row = wrapper.find(
-      '[data-test="job-input-mapping-span-selector-scorer-2"]',
+    expect(wrapper.find('[data-test="job-input-mapping-span-selector-scorer-2"]').exists()).toBe(
+      false,
     );
-    expect(row.exists()).toBe(true);
-    // And it must say what a selector is for — "required" alone reads arbitrary.
-    expect(row.text()).toContain("Pick the ones this scorer should look at");
+  });
+
+  it("offers a Span Selector when a custom variable maps to {{ spans }}", async () => {
+    const customScorer = {
+      ...autoFilledScorer,
+      variables: ["evidence"],
+      template: "Judge {{ evidence }}.",
+    } as Scorer;
+    const wrapper = mountMapping("trace", [customScorer]);
+
+    expect(wrapper.find('[data-test="job-input-mapping-span-selector-scorer-2"]').exists()).toBe(
+      false,
+    );
+
+    await wrapper.setProps({
+      inputMappings: {
+        "scorer-2": { evidence: "{{ spans }}" },
+      },
+    });
+
+    expect(wrapper.find('[data-test="job-input-mapping-span-selector-scorer-2"]').exists()).toBe(
+      true,
+    );
   });
 
   it("offers no Span Selector outside trace scope", () => {
     const wrapper = mountMapping("span");
 
-    expect(
-      wrapper
-        .find('[data-test="job-input-mapping-span-selector-scorer-1"]')
-        .exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="job-input-mapping-span-selector-scorer-1"]').exists()).toBe(
+      false,
+    );
   });
 
   // The section keeps ONE shape regardless of what the scorer declares — only
@@ -274,20 +395,14 @@ describe("JobInputMapping", () => {
       expect(needsWork.findAll("article")).toHaveLength(1);
     });
 
-    it("shows every declared variable as a row, auto-filled ones included", () => {
+    it("shows every declared variable as an editable mapping row", () => {
       const wrapper = mountMapping("trace", [autoFilledScorer]);
 
       for (const variable of ["input", "output"]) {
         expect(
-          wrapper
-            .find(
-              `[data-test="job-input-mapping-system-provided-scorer-2-${variable}"]`,
-            )
-            .exists(),
+          wrapper.find(`[data-test="job-input-mapping-select-scorer-2-${variable}"]`).exists(),
         ).toBe(true);
       }
-      // Auto rows explain their source instead of repeating a badge.
-      expect(wrapper.text()).toContain("Input from the trace's root span");
     });
 
     // Provenance is carried by the heading ("Prompt variables") rather than a
@@ -297,7 +412,7 @@ describe("JobInputMapping", () => {
 
       expect(wrapper.text()).toContain("Prompt variables");
       expect(wrapper.text()).toContain(
-        "Trace values fill in automatically. Map anything else to a span field.",
+        "Map each variable to a system-provided value or span attribute.",
       );
     });
 
@@ -308,16 +423,14 @@ describe("JobInputMapping", () => {
         .get('[data-test="job-input-mapping-system-variables-learn-more"]')
         .trigger("click");
 
-      expect(
-        wrapper
-          .find('[data-test="job-input-mapping-system-variables-table"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="job-input-mapping-system-variables-table"]').exists()).toBe(
+        true,
+      );
     });
   });
 
   // Regression: the description interpolates {scope}; calling t() without the
-  // param rendered "from the  itself" with a hole in the sentence.
+  // param leaves a hole in the explanation.
   it("interpolates the scope into the system-provided description", async () => {
     const wrapper = mountMapping("trace");
 
@@ -325,10 +438,8 @@ describe("JobInputMapping", () => {
       .get('[data-test="job-input-mapping-system-variables-learn-more"]')
       .trigger("click");
 
-    const drawer = wrapper.get(
-      '[data-test="job-input-mapping-system-variables-drawer"]',
-    );
-    expect(drawer.text()).toContain("from the trace itself");
-    expect(drawer.text()).not.toContain("from the  itself");
+    const drawer = wrapper.get('[data-test="job-input-mapping-system-variables-drawer"]');
+    expect(drawer.text()).toContain("separately for each trace this job evaluates");
+    expect(drawer.text()).not.toContain("for each  this job evaluates");
   });
 });

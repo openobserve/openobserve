@@ -1,6 +1,19 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import type { BrowserStep } from "@/types/synthetics";
@@ -17,7 +30,6 @@ const i18n = createI18n({
   },
 });
 
-const originalPlugins = [...config.global.plugins];
 beforeAll(() => {
   config.global.plugins.unshift([i18n as any]);
 });
@@ -51,7 +63,7 @@ const OSpinnerStub = {
 
 // OProgressBar stub
 const OProgressBarStub = {
-  props: ["value", "variant", "size"],
+  props: ["value", "start", "variant", "size"],
   template: '<div class="progress-bar-stub" />',
 };
 
@@ -70,10 +82,8 @@ function makeStep(overrides: Partial<BrowserStep> = {}): BrowserStep {
     action: "click",
     name: "Click Login Button",
     selector: "#login-btn",
-    selectorType: "CSS",
     value: "",
     timeout: 30000,
-    code: "",
     ...overrides,
   };
 }
@@ -139,7 +149,7 @@ describe("JourneySteps", () => {
       await flushPromises();
 
       // Verify action icons are rendered with correct names
-      const icons = wrapper.findAll('[data-icon-name]');
+      const icons = wrapper.findAll("[data-icon-name]");
       const iconNames = icons.map((i) => i.attributes("data-icon-name"));
       expect(iconNames).toContain("open-in-browser"); // navigate
       expect(iconNames).toContain("ads-click"); // click
@@ -190,7 +200,9 @@ describe("JourneySteps", () => {
       // Action buttons should not be rendered
       expect(wrapper.find('[data-test="synthetics-journey-step-insert-btn"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="synthetics-journey-step-delete-btn"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should show action buttons when readonly is false", async () => {
@@ -205,7 +217,9 @@ describe("JourneySteps", () => {
       // Action buttons should be rendered for each row
       expect(wrapper.find('[data-test="synthetics-journey-step-insert-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="synthetics-journey-step-delete-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should default to showing action buttons when readonly is not specified", async () => {
@@ -404,8 +418,84 @@ describe("JourneySteps", () => {
 
       // In results mode, action buttons should NOT be present
       expect(wrapper.find('[data-test="synthetics-journey-step-delete-btn"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-step-duplicate-btn"]').exists()).toBe(
+        false,
+      );
       expect(wrapper.find('[data-test="synthetics-journey-step-insert-btn"]').exists()).toBe(false);
+    });
+
+    // The timeline is a shared scale, so each bar is positioned by the step's
+    // offset into the run rather than anchored to the column's left edge.
+    it("draws each timeline bar as a segment at the step's offset", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          mode: "results",
+          totalDurationMs: 10000,
+          data: [
+            { id: 1, name: "a", offsetMs: 0, duration: 2000, status: "pass" },
+            { id: 2, name: "b", offsetMs: 2000, duration: 3000, status: "pass" },
+            { id: 3, name: "c", offsetMs: 5000, duration: 5000, status: "fail" },
+          ],
+        },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const bars = wrapper.findAllComponents(OProgressBarStub);
+      expect(bars.map((b) => [b.props("start"), b.props("value")])).toEqual([
+        [0, 0.2],
+        [0.2, 0.5],
+        [0.5, 1],
+      ]);
+      // The failed step keeps its own colour on the shared scale.
+      expect(bars[2].props("variant")).toBe("danger");
+    });
+
+    // Dividing by a zero-length run would paint every bar full width, which
+    // reads as "every step took the whole run".
+    it("survives a run with no recorded duration", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          mode: "results",
+          totalDurationMs: 0,
+          data: [{ id: 1, name: "a", offsetMs: 0, duration: 0, status: "pass" }],
+        },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      expect(wrapper.findComponent(OProgressBarStub).props("value")).toBe(0);
+    });
+
+    // Editor mode is a form; results mode is a table an engineer reads down.
+    it("shows column headers in results mode but not in editor mode", async () => {
+      const data = makeSteps(1);
+      wrapper = mount(JourneySteps, {
+        props: { data, mode: "results", totalDurationMs: 35800 },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("showHeader")).toBe(true);
+      // The window is what makes a bar's position mean anything. Read from the
+      // column definition, not the rendered text; setupTests installs the real
+      // en-US catalogue, so `t()` interpolates the window instead of echoing the key.
+      const cols = table.props("columns") as Array<{ id: string; header: string }>;
+      expect(cols.map((c) => c.id)).toEqual([
+        "step",
+        "screenshot",
+        "details",
+        "progress",
+        "duration",
+      ]);
+      expect(cols.find((c) => c.id === "progress")?.header).toContain("35.8s");
+
+      wrapper = mount(JourneySteps, {
+        props: { data, mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTable" }).props("showHeader")).toBe(false);
     });
   });
 
@@ -413,9 +503,7 @@ describe("JourneySteps", () => {
 
   describe("step name fallback", () => {
     it("should use action label as name when step name is empty", async () => {
-      const steps = [
-        makeStep({ id: "step-1", action: "navigate", name: "" }),
-      ];
+      const steps = [makeStep({ id: "step-1", action: "navigate", name: "" })];
       wrapper = mount(JourneySteps, {
         props: { data: steps, mode: "editor" },
         global: { stubs: STUBS },

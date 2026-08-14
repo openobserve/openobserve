@@ -22,6 +22,7 @@ use crate::{
     ReadRecordBatchEntry,
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
+    pack::PackWriter,
     partition::Partition,
 };
 
@@ -75,12 +76,20 @@ impl Stream {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
+        mut pack: Option<&mut PackWriter>,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
         let mut paths = Vec::new();
         for partition in self.partitions.values() {
             let (part_schema_size, partitions) = partition
-                .persist(id, idx, org_id, stream_type, stream_name)
+                .persist(
+                    id,
+                    idx,
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    pack.as_deref_mut(),
+                )
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);

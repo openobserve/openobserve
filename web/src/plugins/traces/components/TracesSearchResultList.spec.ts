@@ -31,7 +31,9 @@ const { mockQCopyToClipboard, cellActionsColumnRef } = vi.hoisted(() => ({
   mockQCopyToClipboard: vi.fn().mockResolvedValue(undefined),
   cellActionsColumnRef: {
     id: undefined as string | undefined,
-    columnDef: { meta: { disableCellAction: false } },
+    // #cell-hover-actions passes the OTableColumnDef directly, so `meta` lives
+    // at the top level.
+    meta: { disableCellAction: false },
   },
 }));
 vi.mock("@/utils/clipboard", () => ({
@@ -51,14 +53,7 @@ vi.mock("@/composables/useTraces", () => ({
     updatedLocalLogFilterField: vi.fn(),
   }),
   DEFAULT_TRACE_COLUMNS: {
-    traces: [
-      "service_name",
-      "operation_name",
-      "duration",
-      "spans",
-      "status",
-      "service_latency",
-    ],
+    traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
     spans: ["service_name", "operation_name", "duration", "span_status"],
   },
 }));
@@ -77,64 +72,57 @@ vi.mock("@/plugins/traces/composables/useTracesTableColumns", () => ({
 vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
   default: {
     name: "CellActions",
-    props: [
-      "column",
-      "row",
-      "selectedStreamFields",
-      "hideSearchTermActions",
-      "hideAi",
-    ],
+    props: ["column", "row", "selectedStreamFields", "hideSearchTermActions", "hideAi"],
     emits: ["copy", "add-search-term", "send-to-ai-chat"],
     template: `<div data-test="stub-cell-actions" />`,
   },
 }));
 
-// ─── TenstackTable stub — renders loading/empty/cell slots ──────────────────
-// Also renders cell-actions slot so CellActions can be exercised in tests.
+// ─── OTable stub — renders loading/empty/cell slots ─────────
+// Also renders the cell-hover-actions slot so CellActions can be exercised.
 // setup() exposes cellActionsColumnRef so each test can control column.id — the
 // component's @copy handler uses column.id + row[column.id] from the slot scope,
 // not the event args emitted by CellActions.
-vi.mock("@/components/TenstackTable.vue", () => ({
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
-    name: "TenstackTable",
+    name: "OTable",
     props: [
       "columns",
-      "rows",
+      "data",
       "rowClass",
       "loading",
       "sortBy",
       "sortOrder",
       "sortFieldMap",
+      "sorting",
       "rowHeight",
+      "virtualScroll",
+      "fillHeight",
+      "scrollEl",
+      "scrollMargin",
       "enableColumnReorder",
-      "enableRowExpand",
-      "enableTextHighlight",
-      "enableCellActions",
-      "enableStatusBar",
       "defaultColumns",
+      "showGlobalFilter",
       "selectedStreamFields",
+      "wrap",
     ],
-    emits: [
-      "click:data-row",
-      "sort-change",
-      "closeColumn",
-      "update:columnOrder",
-    ],
+    emits: ["row-click", "sort-change", "close-column", "column-order-change"],
     setup() {
       return { cellActionsColumn: cellActionsColumnRef };
     },
-    // Mirror the real skeleton behaviour used by TenstackTable.
-    // Also render cell slots for the first row so slot-split tests can assert on rendered output.
+    // Mirror the loading skeleton + cell slots so slot-split tests can assert on
+    // rendered output.
     template: `
       <div data-test="stub-traces-table">
         <div v-if="loading && (!$slots.loading)" data-test="tenstack-table-skeleton-body">Skeleton loading...</div>
-        <slot v-if="loading && (!rows || rows.length === 0) && $slots.loading" name="loading" />
+        <slot v-if="loading && (!data || data.length === 0) && $slots.loading" name="loading" />
         <slot v-else-if="!loading" name="empty" />
-        <template v-if="rows && rows.length">
-          <div data-test="stub-cell-span_status"><slot name="cell-span_status" :item="rows[0]" /></div>
-          <div data-test="stub-cell-status"><slot name="cell-status" :item="rows[0]" /></div>
+        <template v-if="data && data.length">
+          <div data-test="stub-cell-operation_name"><slot name="cell-operation_name" :row="data[0]" /></div>
+          <div data-test="stub-cell-span_status"><slot name="cell-span_status" :row="data[0]" /></div>
+          <div data-test="stub-cell-status"><slot name="cell-status" :row="data[0]" /></div>
           <div data-test="stub-cell-actions-wrapper">
-            <slot name="cell-actions" :row="rows[0]" :column="cellActionsColumn" :active="true" />
+            <slot name="cell-hover-actions" :row="data[0]" :column="cellActionsColumn" :active="true" />
           </div>
         </template>
       </div>
@@ -171,7 +159,6 @@ vi.mock("./SpanStatusCodeBadge.vue", () => ({
 
 import TracesSearchResultList from "./TracesSearchResultList.vue";
 
-
 const makeHit = (id: string, errors = 0) => ({
   trace_id: id,
   service_name: "frontend",
@@ -197,21 +184,72 @@ describe("TracesSearchResultList", () => {
     cellActionsColumnRef.id = undefined;
   });
 
-  const mount_ = (
-    props: { hits: any[]; loading: boolean } & Record<string, any>,
-  ) =>
+  const mount_ = (props: { hits: any[]; loading: boolean } & Record<string, any>) =>
     mount(TracesSearchResultList, {
       props: props as any,
       global: { plugins: [i18n, store] },
     });
 
+  // ─── Wrap toggle ──────────────────────────────────────────────────────────
+  //
+  // Long operation names are the reason this exists: a trace or span name is
+  // often the widest thing on the row, and clipping it hides the part that
+  // distinguishes one entry from the next. Same affordance the logs table has.
+  describe("wrap", () => {
+    const row = {
+      trace_id: "t1",
+      operation_name: "GET /api/v2/organizations/default/very/long/operation/name/that/overflows",
+      service_name: "svc",
+      duration: 1234,
+      spans: 3,
+      errors: 0,
+      start_time: 1,
+    };
+
+    // Columns come from the shared searchObj, not props — without them the
+    // table renders no cells and the assertions below would pass vacuously.
+    beforeEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [
+        { id: "operation_name" },
+        { id: "service_name" },
+        { id: "duration" },
+      ];
+      sharedSearchObj.data.stream.selectedFields = ["operation_name", "service_name", "duration"];
+    });
+
+    it("does not wrap by default", () => {
+      wrapper = mount_({ hits: [row], loading: false });
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("wrap")).toBeFalsy();
+    });
+
+    it("passes the wrap flag down to the table", () => {
+      wrapper = mount_({ hits: [row], loading: false, wrap: true });
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("wrap")).toBe(true);
+    });
+
+    // The operation-name cell clips with `truncate` of its own, which would
+    // survive the table-level wrap and keep the name cut off.
+    it("stops truncating the operation name when wrapping", () => {
+      wrapper = mount_({ hits: [row], loading: false, wrap: true });
+      const cell = wrapper.find('[data-test="trace-row-operation-name"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.classes()).not.toContain("truncate");
+    });
+
+    it("still truncates the operation name when not wrapping", () => {
+      wrapper = mount_({ hits: [row], loading: false, wrap: false });
+      const cell = wrapper.find('[data-test="trace-row-operation-name"]');
+      expect(cell.classes()).toContain("truncate");
+    });
+  });
+
   // ─── Loading state ────────────────────────────────────────────────────────
   describe("loading state", () => {
     it("shows skeleton while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(
-        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists()).toBe(true);
     });
 
     // The component uses v-show="hasResults || loading" on the table wrapper, so
@@ -219,9 +257,7 @@ describe("TracesSearchResultList", () => {
     // It is only absent from the DOM when noResults is true (searchPerformed && !loading && empty).
     it.skip("hides the table wrapper while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
     });
 
     it("hides the empty state while loading", () => {
@@ -239,16 +275,14 @@ describe("TracesSearchResultList", () => {
 
     it("does not show spinner in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(
-        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists()).toBe(
+        false,
+      );
     });
 
     it("does not show the table in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
     });
 
     it("does not show no-results message when searchPerformed is false", () => {
@@ -263,16 +297,14 @@ describe("TracesSearchResultList", () => {
 
     it("shows the table wrapper when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(true);
     });
 
     it("does not show spinner when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(
-        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists()).toBe(
+        false,
+      );
     });
 
     it("does not show the no-results message when hits exist", () => {
@@ -286,8 +318,8 @@ describe("TracesSearchResultList", () => {
     it("re-emits row-click from TracesTable", async () => {
       const hits = [makeHit("t1")];
       wrapper = mount_({ hits, loading: false });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
-      await table.vm.$emit("click:data-row", hits[0]);
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("row-click", hits[0]);
       expect(wrapper.emitted("row-click")).toBeTruthy();
       expect(wrapper.emitted("row-click")![0]).toEqual([hits[0]]);
     });
@@ -297,7 +329,7 @@ describe("TracesSearchResultList", () => {
     it.skip("re-emits load-more from TracesTable", async () => {
       const hits = [makeHit("t1")];
       wrapper = mount_({ hits, loading: false });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       await table.vm.$emit("load-more");
       expect(wrapper.emitted("load-more")).toBeTruthy();
     });
@@ -307,21 +339,21 @@ describe("TracesSearchResultList", () => {
   describe("row error class", () => {
     it("passes a rowClass function to TracesTable", () => {
       wrapper = mount_({ hits: [makeHit("t1")], loading: false });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(typeof rowClassFn).toBe("function");
     });
 
     it("returns 'oz-table__row--error' for rows with errors", () => {
       wrapper = mount_({ hits: [makeHit("t1", 2)], loading: false });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeHit("t1", 2))).toBe("oz-table__row--error");
     });
 
     it("returns empty string for rows without errors", () => {
       wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeHit("t1", 0))).toBe("");
     });
@@ -345,11 +377,9 @@ describe("TracesSearchResultList", () => {
         loading: false,
         searchMode: "spans",
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe(
-        "oz-table__row--error",
-      );
+      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe("oz-table__row--error");
     });
 
     it("returns empty string for non-error span_status in spans mode", () => {
@@ -358,7 +388,7 @@ describe("TracesSearchResultList", () => {
         loading: false,
         searchMode: "spans",
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeSpanHit("s1", "OK"))).toBe("");
     });
@@ -369,12 +399,10 @@ describe("TracesSearchResultList", () => {
         loading: false,
         searchMode: "traces",
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       // traces mode: errors > 0 triggers error class
-      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe(
-        "oz-table__row--error",
-      );
+      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
     });
   });
 
@@ -398,11 +426,7 @@ describe("TracesSearchResultList", () => {
         { id: "duration" },
         { id: "span_status" },
       ];
-      sharedSearchObj.data.stream.selectedFields = [
-        "service_name",
-        "duration",
-        "span_status",
-      ];
+      sharedSearchObj.data.stream.selectedFields = ["service_name", "duration", "span_status"];
     });
 
     afterEach(() => {
@@ -418,14 +442,11 @@ describe("TracesSearchResultList", () => {
         sortOrder: "asc",
         searchMode: "spans" as any,
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
-      await table.vm.$emit("closeColumn", { id: "span_status" });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("close-column", { id: "span_status" });
 
       expect(wrapper.emitted("sort-change")).toBeTruthy();
-      expect(wrapper.emitted("sort-change")![0]).toEqual([
-        "start_time",
-        "desc",
-      ]);
+      expect(wrapper.emitted("sort-change")![0]).toEqual(["start_time", "desc"]);
     });
 
     it("should NOT emit sort-change when the closed column is NOT the active sort column", async () => {
@@ -436,8 +457,8 @@ describe("TracesSearchResultList", () => {
         sortOrder: "desc",
         searchMode: "spans" as any,
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
-      await table.vm.$emit("closeColumn", { id: "span_status" });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("close-column", { id: "span_status" });
 
       expect(wrapper.emitted("sort-change")).toBeFalsy();
     });
@@ -450,17 +471,13 @@ describe("TracesSearchResultList", () => {
         sortOrder: "desc",
         searchMode: "spans" as any,
       });
-      const table = wrapper.findComponent({ name: "TenstackTable" });
-      await table.vm.$emit("closeColumn", { id: "span_status" });
+      const table = wrapper.findComponent({ name: "OTable" });
+      await table.vm.$emit("close-column", { id: "span_status" });
 
-      expect(sharedSearchObj.data.stream.selectedFields).not.toContain(
-        "span_status",
+      expect(sharedSearchObj.data.stream.selectedFields).not.toContain("span_status");
+      expect(sharedSearchObj.data.resultGrid.columns.some((c: any) => c.id === "span_status")).toBe(
+        false,
       );
-      expect(
-        sharedSearchObj.data.resultGrid.columns.some(
-          (c: any) => c.id === "span_status",
-        ),
-      ).toBe(false);
     });
   });
 
@@ -482,9 +499,7 @@ describe("TracesSearchResultList", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
       const cell = wrapper.find('[data-test="stub-cell-span_status"]');
       expect(cell.exists()).toBe(true);
-      expect(cell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(
-        true,
-      );
+      expect(cell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(true);
     });
 
     it("passes item.span_status to SpanStatusPill in #cell-span_status slot", () => {
@@ -500,33 +515,25 @@ describe("TracesSearchResultList", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
       const cell = wrapper.find('[data-test="stub-cell-status"]');
       expect(cell.exists()).toBe(true);
-      expect(cell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(
-        true,
-      );
+      expect(cell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(true);
     });
 
     it("does NOT render SpanStatusPill inside #cell-status slot", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
       const statusCell = wrapper.find('[data-test="stub-cell-status"]');
-      expect(
-        statusCell.findComponent({ name: "SpanStatusPill" }).exists(),
-      ).toBe(false);
+      expect(statusCell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(false);
     });
 
     it("does NOT render TraceStatusCell inside #cell-span_status slot", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
-      const spanStatusCell = wrapper.find(
-        '[data-test="stub-cell-span_status"]',
-      );
-      expect(
-        spanStatusCell.findComponent({ name: "TraceStatusCell" }).exists(),
-      ).toBe(false);
+      const spanStatusCell = wrapper.find('[data-test="stub-cell-span_status"]');
+      expect(spanStatusCell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(false);
     });
   });
 
   // ─── copyToClipboard — span_kind translation ──────────────────────────────
   // The component's @copy handler is an inline expression:
-  //   @copy="copyToClipboard(column.id, row[column.id])"
+  //   @copy="copyToClipboard(column.id, t, row[column.id])"
   // It uses column.id and row[column.id] from the slot scope — it does NOT
   // forward the args emitted by CellActions.  Each test therefore:
   //   1. Sets cellActionsColumnRef.id to the target field before mounting
@@ -543,7 +550,7 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       await cellActions.vm.$emit("copy");
-      expect(mockQCopyToClipboard).toHaveBeenCalledWith("Server");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("Server", expect.any(Function));
     });
 
     it("should copy the raw value when field is span_kind and value is not in the map", async () => {
@@ -556,7 +563,7 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       await cellActions.vm.$emit("copy");
-      expect(mockQCopyToClipboard).toHaveBeenCalledWith("99");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("99", expect.any(Function));
     });
 
     it("should copy the raw value without translation when field is not span_kind", async () => {
@@ -569,7 +576,7 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       await cellActions.vm.$emit("copy");
-      expect(mockQCopyToClipboard).toHaveBeenCalledWith("2");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("2", expect.any(Function));
     });
   });
 
@@ -585,15 +592,8 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       // value "2" maps to "Server"
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "span_kind",
-        "2",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toContain(
-        "span_kind = 'Server'",
-      );
+      await cellActions.vm.$emit("add-search-term", "span_kind", "2", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toContain("span_kind = 'Server'");
     });
 
     it("should include raw value in filter when field is span_kind and value is not in the map", async () => {
@@ -601,15 +601,8 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       // value "99" has no mapping — raw string used in filter
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "span_kind",
-        "99",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toContain(
-        "span_kind = '99'",
-      );
+      await cellActions.vm.$emit("add-search-term", "span_kind", "99", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toContain("span_kind = '99'");
     });
 
     it("should include raw value without translation when field is not span_kind", async () => {
@@ -617,90 +610,48 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       // non-span_kind field — no translation
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "service_name",
-        "my-svc",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toContain(
-        "service_name = 'my-svc'",
-      );
+      await cellActions.vm.$emit("add-search-term", "service_name", "my-svc", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toContain("service_name = 'my-svc'");
     });
 
     it("should use != operator for exclude action", async () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "span_kind",
-        "2",
-        "exclude",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toContain(
-        "span_kind != 'Server'",
-      );
+      await cellActions.vm.$emit("add-search-term", "span_kind", "2", "exclude");
+      expect(sharedSearchObj.data.stream.addToFilter).toContain("span_kind != 'Server'");
     });
 
     it("should use fieldValue directly for start_time without needing a row shadow field", async () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "start_time",
-        "1700000000123456789",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toBe(
-        "start_time = '1700000000123456789'",
-      );
+      await cellActions.vm.$emit("add-search-term", "start_time", "1700000000123456789", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("start_time = '1700000000123456789'");
     });
 
     it("should use fieldValue directly for end_time without needing a row shadow field", async () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "end_time",
-        "1700000000987654321",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toBe(
-        "end_time = '1700000000987654321'",
-      );
+      await cellActions.vm.$emit("add-search-term", "end_time", "1700000000987654321", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("end_time = '1700000000987654321'");
     });
 
     it("should set is null filter when fieldValue is null for start_time", async () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "start_time",
-        "null",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toBe(
-        "start_time is null",
-      );
+      await cellActions.vm.$emit("add-search-term", "start_time", "null", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("start_time is null");
     });
 
     it("should set is null filter when fieldValue is null for a generic field", async () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "service_name",
-        "null",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toBe(
-        "service_name is null",
-      );
+      await cellActions.vm.$emit("add-search-term", "service_name", "null", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("service_name is null");
     });
   });
 });

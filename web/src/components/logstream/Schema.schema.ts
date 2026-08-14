@@ -41,9 +41,7 @@ export const makeSchemaFieldsSchema = (t: (_key: string) => string) =>
               message: t("logStream.fieldRequired"),
             })
             .refine(
-              (v) =>
-                v.trim().length === 0 ||
-                streamFieldNameRegex.test(normalizeFieldName(v)),
+              (v) => v.trim().length === 0 || streamFieldNameRegex.test(normalizeFieldName(v)),
               { message: t("logStream.streamNameHelpText") },
             ),
           // data_type is visible + required in schema.vue's Add Field(s) card.

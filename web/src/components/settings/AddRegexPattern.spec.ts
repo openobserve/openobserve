@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-
 // MSW is set up globally in setupTests.ts - no need to mock services
 // Import the actual service to test real HTTP calls
 import regexPatternService from "@/services/regex_pattern";
@@ -86,9 +85,7 @@ const setupStoreForTest = () => {
 // Create a real router instance for proper injection
 const router = createRouter({
   history: createWebHistory(),
-  routes: [
-    { path: '/', name: 'settings', component: AddRegexPattern },
-  ],
+  routes: [{ path: "/", name: "settings", component: AddRegexPattern }],
 });
 
 // Mock Vue Router
@@ -183,7 +180,8 @@ const lightStubs = {
   },
   OForm: {
     name: "OForm",
-    template: "<form data-test='o-form' @submit.prevent='$emit(\"submit\", {})'><slot></slot></form>",
+    template:
+      "<form data-test='o-form' @submit.prevent='$emit(\"submit\", {})'><slot></slot></form>",
     props: ["schema", "defaultValues"],
     emits: ["submit"],
   },
@@ -197,7 +195,8 @@ const lightStubs = {
     emits: ["update:modelValue"],
   },
   FullViewContainer: {
-    template: "<div data-test-stub='full-view-container'><slot></slot><slot name='right'></slot></div>",
+    template:
+      "<div data-test-stub='full-view-container'><slot></slot><slot name='right'></slot></div>",
     props: ["name", "isExpanded", "label", "labelClass"],
     emits: ["update:isExpanded"],
   },
@@ -288,7 +287,10 @@ describe("AddRegexPattern", () => {
     });
 
     it("should render the component title for editing regex pattern", () => {
-      const wrapper = createWrapper({ isEdit: true, data: { name: "", pattern: "", description: "" } });
+      const wrapper = createWrapper({
+        isEdit: true,
+        data: { name: "", pattern: "", description: "" },
+      });
       const drawer = wrapper.find('[data-test="o-drawer-stub"]');
       expect(drawer.exists()).toBe(true);
       expect(drawer.attributes("data-title")).toBe("Edit Pattern");
@@ -304,7 +306,10 @@ describe("AddRegexPattern", () => {
     });
 
     it("should handle isEdit prop correctly for edit mode", () => {
-      const wrapper = createWrapper({ isEdit: true, data: { name: "", pattern: "", description: "" } });
+      const wrapper = createWrapper({
+        isEdit: true,
+        data: { name: "", pattern: "", description: "" },
+      });
       const nameInput = wrapper.find('[data-test="add-regex-pattern-name-input"]');
       expect(nameInput.attributes("disabled")).toBeDefined();
       wrapper.unmount();
@@ -330,7 +335,13 @@ describe("AddRegexPattern", () => {
 
     it("should default to blank form values in create mode", () => {
       const wrapper = createWrapper({ isEdit: false });
-      expect(wrapper.vm.addRegexPatternDefaults).toEqual({ name: "", pattern: "", description: "", testString: "", outputString: "" });
+      expect(wrapper.vm.addRegexPatternDefaults).toEqual({
+        name: "",
+        pattern: "",
+        description: "",
+        testString: "",
+        outputString: "",
+      });
     });
   });
 
@@ -371,9 +382,7 @@ describe("AddRegexPattern", () => {
       expect(createSpy).toHaveBeenCalledTimes(1);
       const [org, payload] = createSpy.mock.calls[0];
       expect(org).toBe("default");
-      expect(payload).toEqual(
-        expect.objectContaining({ name: "My Pattern", pattern: "\\d+" }),
-      );
+      expect(payload).toEqual(expect.objectContaining({ name: "My Pattern", pattern: "\\d+" }));
       wrapper.unmount();
     });
   });
@@ -421,7 +430,11 @@ describe("AddRegexPattern", () => {
       const wrapper = createWrapper();
 
       // @submit payload is the source of truth for name/pattern/description.
-      await wrapper.vm.saveRegexPattern({ name: "Test Pattern", pattern: "\\d+", description: "Test Description" });
+      await wrapper.vm.saveRegexPattern({
+        name: "Test Pattern",
+        pattern: "\\d+",
+        description: "Test Description",
+      });
       await flushPromises();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -446,7 +459,11 @@ describe("AddRegexPattern", () => {
       };
 
       const wrapper = createWrapper({ isEdit: true, data: testData });
-      await wrapper.vm.saveRegexPattern({ name: "Test Pattern", pattern: "\\d+", description: "Test Description" });
+      await wrapper.vm.saveRegexPattern({
+        name: "Test Pattern",
+        pattern: "\\d+",
+        description: "Test Description",
+      });
       await flushPromises();
 
       expect(updateSpy).toHaveBeenCalledWith(
@@ -460,11 +477,8 @@ describe("AddRegexPattern", () => {
       // Override the MSW handler to return an error for this test
       global.server.use(
         http.post("http://localhost:5080/api/:org/re_patterns", () => {
-          return HttpResponse.json(
-            { message: "Pattern already exists" },
-            { status: 400 }
-          );
-        })
+          return HttpResponse.json({ message: "Pattern already exists" }, { status: 400 });
+        }),
       );
 
       const wrapper = createWrapper();
@@ -487,8 +501,7 @@ describe("AddRegexPattern", () => {
         form: {
           useStore: () => () => "",
           setFieldValue: (name: string, val: string) => {
-            if (name === "outputString")
-              (wrapper.vm as any).outputStringValue = val;
+            if (name === "outputString") (wrapper.vm as any).outputStringValue = val;
           },
         },
       };
@@ -507,11 +520,8 @@ describe("AddRegexPattern", () => {
     it("should handle test error correctly", async () => {
       global.server.use(
         http.post("http://localhost:5080/api/:org/re_patterns/test", () => {
-          return HttpResponse.json(
-            { message: "Invalid pattern" },
-            { status: 400 }
-          );
-        })
+          return HttpResponse.json({ message: "Invalid pattern" }, { status: 400 });
+        }),
       );
 
       const wrapper = createWrapper();
@@ -544,11 +554,11 @@ describe("AddRegexPattern", () => {
       const wrapper = createWrapper();
       await nextTick();
 
-      expect(wrapper.vm.config.isEnterprise).toBe('true');
+      expect(wrapper.vm.config.isEnterprise).toBe("true");
       expect(wrapper.vm.store.state.zoConfig.ai_enabled).toBe(true);
 
       const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
-      const allBtns = wrapper.findAll('button[data-o2-btn]');
+      const allBtns = wrapper.findAll("button[data-o2-btn]");
 
       if (aiBtn.exists()) {
         expect(aiBtn.exists()).toBe(true);
@@ -617,7 +627,13 @@ describe("AddRegexPattern", () => {
     it("should handle undefined data prop", () => {
       const wrapper = createWrapper({ data: undefined });
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.addRegexPatternDefaults).toEqual({ name: "", pattern: "", description: "", testString: "", outputString: "" });
+      expect(wrapper.vm.addRegexPatternDefaults).toEqual({
+        name: "",
+        pattern: "",
+        description: "",
+        testString: "",
+        outputString: "",
+      });
     });
 
     it("should handle empty description in edit mode", () => {
@@ -634,11 +650,11 @@ describe("AddRegexPattern", () => {
       mockStore.state.organizationData.regexPatternPrompt = "Test prompt";
       mockStore.state.organizationData.regexPatternTestValue = "Test value";
 
-      await router.push({ path: '/', query: { from: 'logs' } });
+      await router.push({ path: "/", query: { from: "logs" } });
 
       const wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(wrapper.vm.inputContext).toBe("Test prompt");
       expect(wrapper.vm.testStringValue).toBe("Test value");

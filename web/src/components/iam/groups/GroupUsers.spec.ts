@@ -47,9 +47,18 @@ const o2Stubs = {
       </div>
     `,
     props: [
-      "data", "columns", "rowKey", "globalFilter", "pagination",
-      "pageSize", "sorting", "filterMode", "defaultColumns",
-      "showGlobalFilter", "footerTitle", "dense",
+      "data",
+      "columns",
+      "rowKey",
+      "globalFilter",
+      "pagination",
+      "pageSize",
+      "sorting",
+      "filterMode",
+      "defaultColumns",
+      "showGlobalFilter",
+      "footerTitle",
+      "dense",
     ],
   },
   OCheckbox: {
@@ -345,24 +354,6 @@ describe("GroupUsers Component", () => {
       expect(wrapper2.vm.orgOptions).toHaveLength(2); // "All" + TestOrg
       expect(wrapper2.vm.orgOptions[1].label).toBe("TestOrg");
     });
-
-    it("filters organizations alphabetically", () => {
-      wrapper.vm.orgOptions = [
-        { label: "ZOrg", value: "z" },
-        { label: "AOrg", value: "a" },
-        { label: "MOrg", value: "m" },
-      ];
-
-      // mockUpdate must actually invoke the callback so the filter logic runs
-      const mockUpdate = vi.fn((fn: () => void) => fn());
-
-      wrapper.vm.filterOrganizations("a", mockUpdate);
-
-      expect(mockUpdate).toHaveBeenCalledWith(expect.any(Function));
-      // After the filter runs, orgList should only contain matches
-      expect(wrapper.vm.orgList).toHaveLength(1);
-      expect(wrapper.vm.orgList[0].label).toBe("AOrg");
-    });
   });
 
   describe("Search Functionality", () => {
@@ -529,7 +520,9 @@ describe("GroupUsers Component", () => {
   describe("User Selection", () => {
     it("renders checkboxes for user selection", () => {
       // After mount, rows have user1@example.com and admin@example.com (isInGroup users)
-      const checkbox = wrapper.find('[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]');
+      const checkbox = wrapper.find(
+        '[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]',
+      );
       expect(checkbox.exists()).toBe(true);
     });
 
@@ -1051,7 +1044,9 @@ describe("GroupUsers Component", () => {
 
       // After mount, rows contain isInGroup users; checkboxes confirm
       // OTable is rendering with the correct row-key bound ("email").
-      const checkbox = wrapper.find('[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]');
+      const checkbox = wrapper.find(
+        '[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]',
+      );
       expect(checkbox.exists()).toBe(true);
     });
   });

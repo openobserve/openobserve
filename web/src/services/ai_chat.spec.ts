@@ -69,10 +69,9 @@ describe("ai_chat service", () => {
 
       await getAiChat(messages);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/default/ai/chat_stream",
-        { messages }
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/default/ai/chat_stream", {
+        messages,
+      });
     });
 
     it("should wrap messages in a { messages } object as the request body", async () => {
@@ -116,10 +115,9 @@ describe("ai_chat service", () => {
     it("should handle an empty messages array", async () => {
       await getAiChat([]);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/default/ai/chat_stream",
-        { messages: [] }
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/default/ai/chat_stream", {
+        messages: [],
+      });
     });
 
     it("should handle a single user message", async () => {
@@ -127,10 +125,9 @@ describe("ai_chat service", () => {
 
       await getAiChat(messages);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/default/ai/chat_stream",
-        { messages }
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/default/ai/chat_stream", {
+        messages,
+      });
     });
 
     it("should handle a multi-turn conversation", async () => {
@@ -144,26 +141,24 @@ describe("ai_chat service", () => {
 
       await getAiChat(messages);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/default/ai/chat_stream",
-        { messages }
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/default/ai/chat_stream", {
+        messages,
+      });
     });
 
     it("should handle messages with special characters", async () => {
       const messages = [
         {
           role: "user",
-          content: "Query: rate(http_requests_total{status=~\"5..\"}[5m]) & explain it",
+          content: 'Query: rate(http_requests_total{status=~"5.."}[5m]) & explain it',
         },
       ];
 
       await getAiChat(messages);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/default/ai/chat_stream",
-        { messages }
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/default/ai/chat_stream", {
+        messages,
+      });
     });
 
     it("should handle messages with nested objects", async () => {
@@ -178,10 +173,9 @@ describe("ai_chat service", () => {
 
       await getAiChat(messages);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/default/ai/chat_stream",
-        { messages }
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/default/ai/chat_stream", {
+        messages,
+      });
     });
 
     it("should generate a new trace context on every call", async () => {
@@ -206,7 +200,7 @@ describe("ai_chat service", () => {
       mockHttpInstance.post.mockRejectedValue(new Error("AI service unavailable"));
 
       await expect(getAiChat([{ role: "user", content: "Hello" }])).rejects.toThrow(
-        "AI service unavailable"
+        "AI service unavailable",
       );
     });
 
@@ -217,7 +211,7 @@ describe("ai_chat service", () => {
       mockHttpInstance.post.mockRejectedValue(unauthorizedError);
 
       await expect(getAiChat([{ role: "user", content: "Hello" }])).rejects.toEqual(
-        unauthorizedError
+        unauthorizedError,
       );
     });
 
@@ -227,9 +221,7 @@ describe("ai_chat service", () => {
       };
       mockHttpInstance.post.mockRejectedValue(serverError);
 
-      await expect(getAiChat([{ role: "user", content: "Hello" }])).rejects.toEqual(
-        serverError
-      );
+      await expect(getAiChat([{ role: "user", content: "Hello" }])).rejects.toEqual(serverError);
     });
 
     it("should not pass any query parameters in the URL", async () => {

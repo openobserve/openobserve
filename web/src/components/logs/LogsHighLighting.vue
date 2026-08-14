@@ -35,13 +35,15 @@ Usage Examples:
 - <LogsHighLighting :data="1234567890123" />  // Timestamp-like number
 -->
 <template>
-  <span class="logs-highlight-json font-mono text-xs wrap-break-word inline" v-html="colorizedJson"></span>
+  <span
+    class="logs-highlight-json inline font-mono text-xs wrap-break-word"
+    v-html="colorizedJson"
+  ></span>
 </template>
 
 <script setup lang="ts">
 // withDefaults is a compiler macro; importing it conflicts with the macro declaration
 import { computed } from "vue";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
@@ -63,8 +65,7 @@ const props = withDefaults(defineProps<Props>(), {
   simpleMode: false,
 });
 
-const store = useStore();
-  const { isDark } = useTheme();
+const { isDark } = useTheme();
 const { colorizeJson } = useLogsHighlighter();
 
 /**
@@ -82,4 +83,3 @@ const colorizedJson = computed((): string => {
   );
 });
 </script>
-

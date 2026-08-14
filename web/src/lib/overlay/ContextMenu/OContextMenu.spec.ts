@@ -62,9 +62,7 @@ describe("OContextMenu", () => {
   it("emits update:open(false) when Escape is pressed", async () => {
     const wrapper = mountMenu();
     await rightClick(wrapper);
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await nextTick();
     await nextTick();
     const events = wrapper.emitted("update:open") ?? [];

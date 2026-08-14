@@ -1,47 +1,38 @@
 <template>
   <div>
-    <OButton
-      variant="outline"
-      size="sm"
-      @click="openOverrideConfigPopup"
-      data-test="dashboard-addpanel-config-override-config-add-btn"
-    >
-      {{ t("dashboard.addFieldOverride") }}
-    </OButton>
-
     <OverrideConfigPopup
-        :open="showOverrideConfigPopup"
-        :columns="columns"
-        :override-config="{
-          overrideConfigs: dashboardPanelData.data.config.override_config || [],
-        }"
-        :preview-data="previewData"
-        :value-mapping="dashboardPanelData.data.config.mappings || []"
-        :panel-unit="dashboardPanelData.data.config.unit ?? ''"
-        :panel-unit-custom="dashboardPanelData.data.config.unit_custom ?? ''"
-        :panel-decimals="dashboardPanelData.data.config.decimals ?? 2"
-        @close="showOverrideConfigPopup = false"
-        @save="saveOverrideConfigConfig"
-      />
+      :open="showOverrideConfigPopup"
+      :columns="columns"
+      :override-config="{
+        overrideConfigs: dashboardPanelData.data.config.override_config || [],
+      }"
+      :preview-data="previewData"
+      :value-mapping="dashboardPanelData.data.config.mappings || []"
+      :panel-unit="dashboardPanelData.data.config.unit ?? ''"
+      :panel-unit-custom="dashboardPanelData.data.config.unit_custom ?? ''"
+      :panel-decimals="dashboardPanelData.data.config.decimals ?? 2"
+      :initial-field="pendingInitialField"
+      @close="showOverrideConfigPopup = false"
+      @save="saveOverrideConfigConfig"
+    />
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, inject, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 
 interface Column {
   alias: string;
-  label: string;
+  label: I18nText;
   format?: (val: unknown) => string;
 }
 
 export default defineComponent({
   name: "OverrideConfig",
-  components: { OverrideConfigPopup, OButton },
+  components: { OverrideConfigPopup },
   props: {
     panelData: {
       type: Object,
@@ -49,16 +40,17 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { t } = useI18n();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
+    const { t } = useI18nTyped();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData, promqlMode, fetchPromQLLabels } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
     );
-    const { dashboardPanelData, promqlMode, fetchPromQLLabels } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
 
     const showOverrideConfigPopup = ref(false);
     const columns: any = ref<Column[]>([]);
+    // Field to preselect when opened via the table-header format-icon shortcut.
+    const pendingInitialField = ref<string | undefined>(undefined);
 
     // Per-alias sample rows + column defs for the dialog's live preview.
     const previewData = computed(() => {
@@ -101,27 +93,20 @@ export default defineComponent({
             // In "single" (Timestamp) mode: timestamp + value columns
             columnNames.add("timestamp");
             columnNames.add("value");
-          } else if (
-            tableMode === "expanded_timeseries" ||
-            tableMode === "all"
-          ) {
+          } else if (tableMode === "expanded_timeseries" || tableMode === "all") {
             if (tableMode === "expanded_timeseries") {
               columnNames.add("timestamp");
             }
 
             // Collect label keys from available labels (from PromQL label discovery)
             if (dashboardPanelData.meta?.promql?.availableLabels) {
-              dashboardPanelData.meta.promql.availableLabels.forEach(
-                (label: string) => {
-                  columnNames.add(label);
-                },
-              );
+              dashboardPanelData.meta.promql.availableLabels.forEach((label: string) => {
+                columnNames.add(label);
+              });
             }
 
             // Add value column(s)
-            const aggregations = config.table_aggregations || [
-              config.aggregation || "last",
-            ];
+            const aggregations = config.table_aggregations || [config.aggregation || "last"];
             if (aggregations.length === 1) {
               columnNames.add("value");
             } else {
@@ -140,8 +125,7 @@ export default defineComponent({
           alias: columnName,
           label: columnName,
           // panelData path uses align; fallback uses name heuristic
-          isNumeric:
-            columnName === "value" || columnName.startsWith("value_"),
+          isNumeric: columnName === "value" || columnName.startsWith("value_"),
         }));
       } else {
         const seen = new Set<string>();
@@ -153,20 +137,16 @@ export default defineComponent({
           collected.push({ ...col, isNumeric });
         };
         const queries = dashboardPanelData.data.queries || [];
-        queries.forEach((q: any) =>
-          (q?.fields?.x || []).forEach((c: any) => addField(c, false)),
-        );
+        queries.forEach((q: any) => (q?.fields?.x || []).forEach((c: any) => addField(c, false)));
         queries.forEach((q: any) =>
           (q?.fields?.breakdown || []).forEach((c: any) => addField(c, false)),
         );
-        queries.forEach((q: any) =>
-          (q?.fields?.y || []).forEach((c: any) => addField(c, true)),
-        );
+        queries.forEach((q: any) => (q?.fields?.y || []).forEach((c: any) => addField(c, true)));
         columns.value = collected;
       }
     };
 
-    const openOverrideConfigPopup = async () => {
+    const openOverrideConfigPopup = async (field?: string) => {
       // For PromQL mode, fetch labels first to ensure we have the latest label data
       if (promqlMode.value) {
         const query = dashboardPanelData.data.queries[0];
@@ -177,6 +157,7 @@ export default defineComponent({
       }
 
       fetchColumns();
+      pendingInitialField.value = field;
       showOverrideConfigPopup.value = true;
     };
 
@@ -195,9 +176,9 @@ export default defineComponent({
     });
 
     return {
-      t,
       dashboardPanelData,
       showOverrideConfigPopup,
+      pendingInitialField,
       openOverrideConfigPopup,
       saveOverrideConfigConfig,
       columns,

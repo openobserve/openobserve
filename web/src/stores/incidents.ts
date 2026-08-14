@@ -73,25 +73,25 @@ export default {
   },
   actions: {
     setIncidents(context: any, incidents: any) {
-      context.commit('setIncidents', incidents);
+      context.commit("setIncidents", incidents);
     },
     setCachedData(context: any, data: any[]) {
-      context.commit('setCachedData', data);
+      context.commit("setCachedData", data);
     },
     setPageBeforeSearch(context: any, page: number) {
-      context.commit('setPageBeforeSearch', page);
+      context.commit("setPageBeforeSearch", page);
     },
     setIsInitialized(context: any, isInitialized: boolean) {
-      context.commit('setIsInitialized', isInitialized);
+      context.commit("setIsInitialized", isInitialized);
     },
     setShouldRefresh(context: any, shouldRefresh: boolean) {
-      context.commit('setShouldRefresh', shouldRefresh);
+      context.commit("setShouldRefresh", shouldRefresh);
     },
     setStatusFilter(context: any, statusFilter: string) {
-      context.commit('setStatusFilter', statusFilter);
+      context.commit("setStatusFilter", statusFilter);
     },
     resetIncidents(context: any) {
-      context.commit('resetIncidents');
+      context.commit("resetIncidents");
     },
   },
 };

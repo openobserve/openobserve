@@ -64,7 +64,7 @@ enum Role {
   QUERIER = 2;
   COMPACTOR = 3;
   ROUTER = 4;
-  ALERT_MANAGER = 5;
+  SCHEDULER = 5;
   FLATTEN_COMPACTOR = 6;
   SCRIPT_SERVER = 7;
 }

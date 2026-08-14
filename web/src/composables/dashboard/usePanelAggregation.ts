@@ -58,8 +58,7 @@ export const usePanelAggregation = ({
         });
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent =
-          getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
@@ -106,8 +105,7 @@ export const usePanelAggregation = ({
         });
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent =
-          getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         break;
       case "table":
         // Keep breakdown fields — they are used for pivot table mode
@@ -133,8 +131,7 @@ export const usePanelAggregation = ({
         });
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent =
-          getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
 
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -176,8 +173,7 @@ export const usePanelAggregation = ({
         });
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent =
-          getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
 
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -214,23 +210,16 @@ export const usePanelAggregation = ({
         });
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent =
-          getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
 
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
         break;
       case "geomap":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.x = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x = [];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y = [];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z = [];
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.name = null;
           query.fields.value_for_maps = null;
@@ -240,17 +229,15 @@ export const usePanelAggregation = ({
         ].fields.breakdown = [];
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent =
-          getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
 
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
         });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.limit = 0;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit =
+          0;
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
@@ -258,13 +245,11 @@ export const usePanelAggregation = ({
       case "html": {
         // Preserve current stream and stream_type before resetting
         const htmlCurrentStream =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream;
         const htmlCurrentStreamType =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream_type;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream_type;
 
         dashboardPanelData.data.queries = getDefaultQueries();
         // These chart types reset to a single default query, so the active
@@ -275,16 +260,14 @@ export const usePanelAggregation = ({
         dashboardPanelData.layout.currentQueryIndex = 0;
 
         // Restore the preserved stream and stream_type
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream = htmlCurrentStream;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream =
+          htmlCurrentStream;
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type = htmlCurrentStreamType;
 
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent =
-          getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         dashboardPanelData.data.queryType = "";
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -294,13 +277,11 @@ export const usePanelAggregation = ({
       case "markdown": {
         // Preserve current stream and stream_type before resetting
         const markdownCurrentStream =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream;
         const markdownCurrentStreamType =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream_type;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream_type;
 
         dashboardPanelData.data.queries = getDefaultQueries();
         // These chart types reset to a single default query, so the active
@@ -311,16 +292,14 @@ export const usePanelAggregation = ({
         dashboardPanelData.layout.currentQueryIndex = 0;
 
         // Restore the preserved stream and stream_type
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream = markdownCurrentStream;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream =
+          markdownCurrentStream;
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type = markdownCurrentStreamType;
 
         dashboardPanelData.data.htmlContent = "";
-        dashboardPanelData.data.customChartContent =
-          getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
 
         dashboardPanelData.data.queryType = "";
         dashboardPanelData.data.queries[
@@ -331,13 +310,11 @@ export const usePanelAggregation = ({
       case "custom_chart": {
         // Preserve current stream and stream_type before resetting
         const customChartCurrentStream =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream;
         const customChartCurrentStreamType =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream_type;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream_type;
 
         dashboardPanelData.data.queries = getDefaultQueries();
         // These chart types reset to a single default query, so the active
@@ -348,9 +325,8 @@ export const usePanelAggregation = ({
         dashboardPanelData.layout.currentQueryIndex = 0;
 
         // Restore the preserved stream and stream_type
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream = customChartCurrentStream;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream =
+          customChartCurrentStream;
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type = customChartCurrentStreamType;
@@ -358,9 +334,8 @@ export const usePanelAggregation = ({
         // Custom charts always use a hand-written (custom) query — the default
         // query from getDefaultQueries() is in builder mode, which would leave
         // the query editor read-only. Switch it to custom mode.
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery = true;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery =
+          true;
 
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
@@ -371,15 +346,9 @@ export const usePanelAggregation = ({
         break;
       }
       case "maps":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.x = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x = [];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y = [];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z = [];
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.breakdown = [];
@@ -393,29 +362,21 @@ export const usePanelAggregation = ({
         });
         break;
       case "sankey":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.x = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x = [];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y = [];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z = [];
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.breakdown = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter = {
-          filterType: "group",
-          logicalOperator: "AND",
-          conditions: [],
-        };
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter =
+          {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [],
+          };
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent =
-          getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.latitude = null;
           query.fields.longitude = null;
@@ -423,9 +384,8 @@ export const usePanelAggregation = ({
           query.fields.name = null;
           query.fields.value_for_maps = null;
         });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.limit = 0;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit =
+          0;
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];

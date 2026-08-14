@@ -48,10 +48,7 @@ const globalStubs = {
       // Inject selectedTabId exactly as the real component does (inject with a
       // ref("default") fallback), and record every settled value so tests can
       // assert the parent provides it and sets it to the first tab id.
-      const selectedTabId = inject<Ref<string | null>>(
-        "selectedTabId",
-        ref("default"),
-      );
+      const selectedTabId = inject<Ref<string | null>>("selectedTabId", ref("default"));
       watchEffect(() => {
         if (selectedTabId.value != null) injectedTabIds.push(selectedTabId.value);
       });
@@ -101,9 +98,7 @@ describe("PinnedDashboardTab", () => {
     title: "Payments Health",
     version: 5,
     variables: { list: [] },
-    tabs: [
-      { tabId: "gen-tab-1", name: "Default", panels: [{ id: "p1" }] },
-    ],
+    tabs: [{ tabId: "gen-tab-1", name: "Default", panels: [{ id: "p1" }] }],
     ...overrides,
   });
 
@@ -234,9 +229,7 @@ describe("PinnedDashboardTab", () => {
     wrapper = factory();
     await flushPromises();
 
-    const cto = wrapper
-      .findComponent({ name: "RenderDashboardCharts" })
-      .props("currentTimeObj");
+    const cto = wrapper.findComponent({ name: "RenderDashboardCharts" }).props("currentTimeObj");
     const spanUs = cto.__global.end_time.getTime() - cto.__global.start_time.getTime();
     // 15 minutes = 900 seconds. In µs that's 900_000_000. Allow slack for the
     // few ms of wall-clock drift during the async load.

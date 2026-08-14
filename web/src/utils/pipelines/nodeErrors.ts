@@ -48,9 +48,7 @@ type RawNodeError = string | [string, unknown?] | unknown;
  * and `error_count` (which the caller reports separately) still reflects the
  * true total.
  */
-export const normalizeNodeErrorMessages = (
-  errors: RawNodeError[] | null | undefined,
-): string[] => {
+export const normalizeNodeErrorMessages = (errors: RawNodeError[] | null | undefined): string[] => {
   if (!Array.isArray(errors)) return [];
   return errors
     .map((entry) => {
@@ -70,8 +68,7 @@ export const normalizeNodeErrorMessages = (
  */
 export const formatNodeErrorText = (
   nodeError: { errors?: RawNodeError[]; error_count?: number } | null | undefined,
-  moreLabel: (count: number) => string = (count) =>
-    `... and ${count} more errors`,
+  moreLabel: (count: number) => string = (count) => `... and ${count} more errors`,
 ): string | null => {
   const messages = normalizeNodeErrorMessages(nodeError?.errors);
   if (!messages.length) return null;

@@ -40,12 +40,9 @@ export default class DashboardMultiSQL {
     return this.page.locator(`[data-test="dashboard-panel-query-tab-name-${index}"]`);
   }
 
-  /** Locator for the rename input at given index.
-   * The OInput wrapper carries the `...-input-${index}` data-test; the actual
-   * <input> element is the inner `...-field` node (OInput convention), which is
-   * what fill()/press() must target. */
+  /** Locator for the rename input at given index. */
   queryTabNameInput(index) {
-    return this.page.locator(`[data-test="dashboard-panel-query-tab-name-input-${index}-field"]`);
+    return this.page.locator(`[data-test="dashboard-panel-query-tab-name-input-${index}"]`);
   }
 
   /** Locator for the remove (close) icon at given index */
@@ -97,6 +94,26 @@ export default class DashboardMultiSQL {
     return this.page.locator('[data-test="panel-x-alias-inconsistency-warning"]');
   }
 
+  /**
+   * Locator for the x-alias-inconsistency warning nested inside a given axis
+   * layout section (used to assert the warning is NOT rendered inside a layout).
+   * @param {string} layoutDataTest - data-test of the layout wrapper
+   */
+  xAliasWarningInLayout(layoutDataTest) {
+    return this.page.locator(
+      `[data-test="${layoutDataTest}"] [data-test="panel-x-alias-inconsistency-warning"]`,
+    );
+  }
+
+  /**
+   * Locator for the "SQL" mode subtitle label shown in the query editor header.
+   */
+  get sqlModeSubtitle() {
+    return this.page.locator(
+      '.text-subtitle2.text-weight-bold:has-text("SQL")',
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
@@ -135,7 +152,10 @@ export default class DashboardMultiSQL {
    * @param {number} index
    */
   async switchToQueryTab(index) {
-    await this.queryTab(index).click();
+    // Click the NAME, not the tab's centre: the centre can land on the rename /
+    // visibility icons, which deliberately swallow the click so they never
+    // activate the tab. The name always bubbles up and activates it.
+    await this.queryTabLabel(index).click();
     // Wait for the clicked tab to actually become active (its fields/editor are
     // rendered for that query) instead of a fixed sleep.
     await this.waitForActiveQueryTab(index, 10000);

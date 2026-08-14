@@ -53,11 +53,9 @@ use transform::{
     QUERY_FUNCTIONS, apply_vrl_fn, compile_vrl_function,
     js::{JSRuntimeConfig, apply_js_fn, compile_js_function},
 };
+use usage_reporting::publish_error;
 
-use crate::{
-    alerts::{ConditionExt, ConditionGroupExt},
-    self_reporting::publish_error,
-};
+use crate::alerts::{ConditionExt, ConditionGroupExt};
 
 // Global batch buffer for accumulating remote stream records
 #[cfg(feature = "enterprise")]
@@ -72,6 +70,7 @@ struct BatchBuffer {
 pub struct WorkflowResult {
     pub stream_details: HashMap<StreamParams, Vec<(usize, Value)>>,
     pub errors: HashMap<String, NodeErrors>,
+    pub inputs: HashMap<String, Vec<Value>>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -566,6 +565,7 @@ impl ExecutablePipeline {
                 child_senders,
                 result_sender: result_sender_cp,
                 error_sender: error_sender_cp,
+                inputs_sender: None, // not applicable for pipelines
             };
             let task = tokio::spawn(process_node(metadata, node, function_runtime, channels));
             node_tasks.push(task);
@@ -777,6 +777,9 @@ impl ExecutablePipeline {
         let (error_sender, mut error_receiver) =
             channel::<(String, String, String, Option<String>, Option<Value>)>(batch_size);
 
+        // inputs_channel
+        let (inputs_sender, mut inputs_receiver) = channel::<(String, Value)>(batch_size);
+
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
 
@@ -800,6 +803,7 @@ impl ExecutablePipeline {
                 .collect();
             let result_sender_cp = node.children.is_empty().then_some(result_sender.clone());
             let error_sender_cp = error_sender.clone();
+            let inputs_sender_cp = inputs_sender.clone();
             let function_runtime: Option<CompiledFunctionRuntime> =
                 self.function_map.get(node_id).cloned();
             let pipeline_name = pipeline_name.clone();
@@ -839,6 +843,7 @@ impl ExecutablePipeline {
                 child_senders,
                 result_sender: result_sender_cp,
                 error_sender: error_sender_cp,
+                inputs_sender: Some(inputs_sender_cp),
             };
             let task = tokio::spawn(process_node(metadata, node, function_runtime, channels));
             node_tasks.push(task);
@@ -886,6 +891,14 @@ impl ExecutablePipeline {
             }
         });
 
+        let inputs_task = tokio::spawn(async move {
+            let mut input_map = HashMap::new();
+            while let Some((node_id, val)) = inputs_receiver.recv().await {
+                input_map.entry(node_id).or_insert(vec![]).push(val);
+            }
+            input_map
+        });
+
         // Send records to the source node to begin processing
         let flattened = {
             let source_node = self.node_map.get(&self.source_node_id).unwrap();
@@ -917,6 +930,7 @@ impl ExecutablePipeline {
         drop(result_sender);
         drop(error_sender);
         drop(node_senders);
+        drop(inputs_sender);
         log::debug!(
             "[Workflow] {pipeline_name} [inv={inv_id}]: All records send into pipeline for processing"
         );
@@ -939,6 +953,13 @@ impl ExecutablePipeline {
                 "[Workflow] {pipeline_name} [inv={inv_id}]: error collecting job failed: {e}"
             );
             anyhow!("[Workflow] error collecting job failed: {}", e)
+        })?;
+
+        let inputs = inputs_task.await.map_err(|e| {
+            log::error!(
+                "[Workflow] {pipeline_name} [inv={inv_id}]: input collecting job failed: {e}"
+            );
+            anyhow!("[Workflow] input collecting job failed: {}", e)
         })?;
 
         let node_errors = errors
@@ -1007,6 +1028,7 @@ impl ExecutablePipeline {
         Ok(WorkflowResult {
             stream_details: results,
             errors: node_errors,
+            inputs,
         })
     }
 
@@ -1154,6 +1176,24 @@ struct ProcessChannels {
     child_senders: Vec<Sender<PipelineItem>>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
     error_sender: Sender<(String, String, String, Option<String>, Option<Value>)>,
+    inputs_sender: Option<Sender<(String, Value)>>,
+}
+
+impl ProcessChannels {
+    // TODO YJDoc2: eventually implement these fns for other channels as well, so we have
+    // a common place for error logging and handling, instead of repeating the same code
+    // in each of the node processing fns
+    async fn send_input(&mut self, metadata: &ProcessMetadata, id: &str, value: &Value) {
+        if let Some(ref mut channel) = self.inputs_sender
+            && let Err(e) = channel.send((id.to_string(), value.clone())).await
+        {
+            log::error!(
+                "[Pipeline] {} [inv={}] error sending input via input channel for node {id} : {e}",
+                metadata.pipeline_name,
+                metadata.inv_id
+            );
+        }
+    }
 }
 
 async fn process_node(
@@ -1181,6 +1221,7 @@ async fn process_node(
         NodeData::WorkflowTrigger => {
             let mut count: usize = 0;
             while let Some(item) = channels.receiver.recv().await {
+                channels.send_input(&metadata, &node.id, &item.record).await;
                 send_to_children(&mut channels.child_senders, item, "WorkflowTrigger").await;
                 count += 1;
             }
@@ -1346,8 +1387,8 @@ async fn process_llm_evaluation_node(
         return count;
     }
     if !o2_enterprise::enterprise::common::config::get_config()
-        .common
-        .online_evals_enabled
+        .llm_eval_config
+        .enabled
     {
         log::warn!(
             "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} skipped because online evals are disabled",
@@ -1399,7 +1440,7 @@ async fn process_llm_evaluation_node(
                         evaluator_span_id: None,
                         parent_span_id: None,
                         is_root: false,
-                        target_scope: ctx.target_scope.clone(),
+                        target_scope: ctx.target_scope,
                         target_id: ctx.target_id.clone(),
                         target_span_id: ctx.span_id.clone(),
                         target_trace_id: ctx.trace_id.clone(),
@@ -1711,16 +1752,22 @@ async fn process_function_node(
 ) -> usize {
     let mut count: usize = 0;
     let cfg = config::get_config();
-    let inv_id = metadata.inv_id;
+    let inv_id = metadata.inv_id.clone();
     log::debug!(
         "[Pipeline] {} [inv={inv_id}]: func node {} starts processing",
         metadata.pipeline_name,
         metadata.node_idx
     );
     let mut vrl_runtime_state = crate::ingestion::init_functions_runtime();
-    let stream_name = metadata.stream_name.unwrap_or("pipeline".to_string());
+    let stream_name = metadata
+        .stream_name
+        .clone()
+        .unwrap_or("pipeline".to_string());
     let mut result_array_records = Vec::new();
     while let Some(pipeline_item) = channels.receiver.recv().await {
+        channels
+            .send_input(&metadata, &node.id, &pipeline_item.record)
+            .await;
         let PipelineItem {
             idx,
             mut record,
@@ -2026,7 +2073,7 @@ async fn process_condition_node(
 ) -> usize {
     let mut count: usize = 0;
     let cfg = config::get_config();
-    let inv_id = metadata.inv_id;
+    let inv_id = metadata.inv_id.clone();
     log::debug!(
         "[Pipeline] {} [inv={inv_id}]: cond node {} starts processing",
         metadata.pipeline_name,
@@ -2034,6 +2081,9 @@ async fn process_condition_node(
     );
     let mut total_received: usize = 0;
     while let Some(pipeline_item) = channels.receiver.recv().await {
+        channels
+            .send_input(&metadata, &node.id, &pipeline_item.record)
+            .await;
         total_received += 1;
         let PipelineItem {
             idx,
@@ -2346,7 +2396,14 @@ async fn process_destination_node(
 
     let mut data = Vec::new();
     while let Some(pipeline_item) = channels.receiver.recv().await {
+        channels
+            .send_input(&metadata, &node.id, &pipeline_item.record)
+            .await;
         data.push(std::sync::Arc::new(pipeline_item.record));
+    }
+
+    if data.is_empty() {
+        return Ok(0);
     }
 
     let data_count = data.len();
@@ -2748,6 +2805,7 @@ mod tests {
                 child_senders: vec![child_tx],
                 result_sender: None,
                 error_sender: error_tx,
+                inputs_sender: None,
             },
         )
         .await;

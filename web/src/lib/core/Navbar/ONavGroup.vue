@@ -45,7 +45,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import config from "@/aws-exports";
@@ -55,7 +55,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
   groupKey: string;
-  title: string;
+  title: I18nText;
   icon: string;
   children: SubnavChild[];
   /** When set, the tile navigates here on click and the flyout is hover-only. */
@@ -64,7 +64,7 @@ const props = defineProps<{
 
 const store = useStore();
 const router: any = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const isLinkMode = computed(() => !!props.parentItem);
 
@@ -76,9 +76,7 @@ const isLinkMode = computed(() => !!props.parentItem);
 // `a { color: var(--color-text-link) }` rule (app.scss, unlayered) otherwise wins
 // over the layered Tailwind color utility, tinting the link text/icon primary.
 const { isDark } = useTheme();
-const flyoutTextClass = computed(() =>
-  isDark.value ? "text-dropdown-item-text!" : "text-black!",
-);
+const flyoutTextClass = computed(() => (isDark.value ? "text-dropdown-item-text!" : "text-black!"));
 const flyoutIconClass = flyoutTextClass;
 
 const wrapperRef = ref<HTMLElement | null>(null);
@@ -92,8 +90,7 @@ const flyoutStyle = ref<Record<string, string>>({});
 // flyout's gating matches the page's section nav 1:1 (see GATE_PREDICATES).
 const gateContext = computed<NavGateContext>(() => {
   const z = store.state.zoConfig ?? {};
-  const orgSettings =
-    store.state.organizationData?.organizationSettings ?? {};
+  const orgSettings = store.state.organizationData?.organizationSettings ?? {};
   return {
     isEnterprise: config.isEnterprise == "true",
     isCloud: config.isCloud == "true",
@@ -174,25 +171,53 @@ function childPath(name: string): string | null {
   }
 }
 
-function isChildActive(child: SubnavChild): boolean {
+// At most ONE child is active, resolved for the whole flyout rather than per
+// child. Deciding per child lit up ancestors too: any section whose path is a
+// prefix of another's matched both, which is right for a drill-down like
+// /alerts/detail/:id but wrong for a sibling that merely sits underneath.
+//
+// Exact route-name match wins outright; otherwise the DEEPEST path prefix wins,
+// so a nested route is attributed to its own section, not a shallower sibling.
+const activeChild = computed<SubnavChild | null>(() => {
   const route = router.currentRoute.value;
-  // Exact route-name match — precise for query-tab routes (AI evals).
-  if (route.name === child.name) {
-    return !child.tab || route.query.tab === child.tab;
-  }
-  // Otherwise the section is still "active" when the current route is nested
-  // under it — drill-down editors, the ingestion ("Data sources") tab routes
-  // (e.g. ingestLogs under /ingestion), pipeline editors, etc.
-  if (child.tab) return false; // query-tab children only match by exact name
-  const base = childPath(child.name);
-  if (!base || base === "/") return false;
-  return route.path === base || route.path.startsWith(`${base}/`);
-}
-const isGroupActive = computed(() => props.children.some(isChildActive));
 
-const orgIdentifier = computed(
-  () => store.state.selectedOrganization?.identifier,
-);
+  // A tab-alias match wins over everything: the child's own route is elsewhere,
+  // but the CURRENT route is showing its view via a query tab (e.g.
+  // /traces?tab=service-graph renders the Service Graph in-page). Checked
+  // before the exact-name pass so the aliased route's own child (Traces)
+  // doesn't claim the highlight.
+  const tabAlias = props.children.find(
+    (c) =>
+      c.activeOnTab && route.name === c.activeOnTab.name && route.query.tab === c.activeOnTab.tab,
+  );
+  if (tabAlias) return tabAlias;
+
+  const exact = props.children.find(
+    (c) => route.name === c.name && (!c.tab || route.query.tab === c.tab),
+  );
+  if (exact) return exact;
+
+  let best: SubnavChild | null = null;
+  let bestLen = 0;
+  for (const child of props.children) {
+    if (child.tab) continue; // query-tab children only match by exact name
+    const base = childPath(child.name);
+    if (!base || base === "/") continue;
+    if (route.path !== base && !route.path.startsWith(`${base}/`)) continue;
+    if (base.length > bestLen) {
+      best = child;
+      bestLen = base.length;
+    }
+  }
+  return best;
+});
+
+function isChildActive(child: SubnavChild): boolean {
+  return activeChild.value === child;
+}
+const isGroupActive = computed(() => activeChild.value !== null);
+
+const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 
 function childTo(child: SubnavChild) {
   const query: Record<string, string> = {};
@@ -274,9 +299,7 @@ function onTileKeydown(event: KeyboardEvent) {
     event.stopPropagation();
     if (!isOpen.value) open();
     nextTick(() => {
-      flyoutRef.value
-        ?.querySelector<HTMLElement>("a[data-test^='nav-group-item-']")
-        ?.focus();
+      flyoutRef.value?.querySelector<HTMLElement>("a[data-test^='nav-group-item-']")?.focus();
     });
   } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
     if (isOpen.value) close();
@@ -331,9 +354,7 @@ function onFlyoutKeydown(event: KeyboardEvent) {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
   event.preventDefault();
   const items = Array.from(
-    flyoutRef.value?.querySelectorAll<HTMLElement>(
-      "a[data-test^='nav-group-item-']",
-    ) ?? [],
+    flyoutRef.value?.querySelectorAll<HTMLElement>("a[data-test^='nav-group-item-']") ?? [],
   );
   if (items.length === 0) return;
   const idx = items.indexOf(document.activeElement as HTMLElement);
@@ -404,22 +425,19 @@ function onChildMouseenter(event: MouseEvent) {
         :data-test="`nav-group-flyout-${groupKey}`"
         role="menu"
         :aria-label="title"
-        class="nav-group-flyout min-w-52 p-1 rounded-default border border-dropdown-border bg-dropdown-bg shadow-md"
+        class="nav-group-flyout rounded-default border-dropdown-border bg-dropdown-bg min-w-52 border p-1 shadow-md"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"
         @keydown="onFlyoutKeydown"
       >
-        <div
-          class="px-3 pt-1.5 pb-1 text-2xs font-semibold"
-          :class="flyoutTextClass"
-        >
+        <div class="text-2xs px-3 pt-1.5 pb-1 font-semibold" :class="flyoutTextClass">
           {{ title }}
         </div>
         <template v-for="(row, rowIndex) in flyoutRows" :key="row.key">
           <div
             v-if="row.kind === 'header'"
-            class="px-3 pb-1 text-2xs font-medium text-tabs-inactive-text"
+            class="text-2xs text-tabs-inactive-text px-3 pb-1 font-medium"
             :class="rowIndex === 0 ? 'pt-2' : 'pt-4'"
           >
             {{ row.label }}
@@ -429,7 +447,7 @@ function onChildMouseenter(event: MouseEvent) {
             :data-test="`nav-group-item-${row.child.name}`"
             role="menuitem"
             :to="childTo(row.child)"
-            class="nav-group-item flex items-center gap-2.5 px-3 py-1.5 rounded-default text-sm [text-decoration:none]! cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary-500"
+            class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2"
             :class="[
               flyoutTextClass,
               isChildActive(row.child)

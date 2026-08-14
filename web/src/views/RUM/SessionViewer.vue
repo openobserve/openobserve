@@ -17,66 +17,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="qp-2"
-    :title="sessionDetails.id || t('rum.sessionReplay')"
-    :back="{ label: t('rum.sessionReplay'), onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
+    :title="sessionDetails.id ? raw(sessionDetails.id) : t('rum.sessionReplay')"
+    :back="{
+      label: t('rum.sessionReplay'),
+      onClick: () => router.back(),
+      dataTest: 'session-viewer-back-btn',
+    }"
     bleed
   >
-      <template #subtitle>
-        <div class="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0">
-          <div class="text-xs truncate flex items-center gap-1.5">
-            <OIcon name="language" size="sm" />
-            {{ sessionDetails.ip }}
-          </div>
-          <div class="text-xs truncate flex items-center gap-1.5">
-            <OIcon name="calendar-month" size="sm" />
-            {{ sessionDetails.date }}
-          </div>
-          <div class="text-xs truncate flex items-center gap-1.5">
-            <OIcon name="person" size="sm" />
-            {{ sessionDetails.user_email || "Unknown User" }}
-          </div>
-          <div class="text-xs truncate flex items-center gap-1.5">
-            <OIcon name="location-on" size="sm" />
-            {{ sessionDetails.city }}, {{ sessionDetails.country }}
-          </div>
-          <div class="text-xs truncate flex items-center gap-1.5">
-            <OIcon name="settings" size="sm" />
-            {{ sessionDetails.browser }}, {{ sessionDetails.os }}
-          </div>
-          <div
-            v-if="frustrationCount > 0"
-            class="text-xs truncate flex items-center"
-            :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
-            data-test="session-viewer-frustration-summary"
-          >
-            <OIcon
-              name="sentiment-very-dissatisfied"
-              size="sm"
-              class="pr-1 text-severity-warning-color"
-              data-test="frustration-summary-icon"
-            />
-            <span
-              class="font-semibold text-severity-warning-color"
-              data-test="frustration-summary-text"
-              >{{ frustrationCount }} Frustration{{
-                frustrationCount > 1 ? "s" : ""
-              }}</span
-            >
-          </div>
+    <template #subtitle>
+      <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <div class="flex items-center gap-1.5 truncate text-xs">
+          <OIcon name="language" size="sm" />
+          {{ sessionDetails.ip }}
         </div>
-      </template>
-    <div
-      class="w-full flex bg-card-glass-bg overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0"
-    >
+        <div class="flex items-center gap-1.5 truncate text-xs">
+          <OIcon name="calendar-month" size="sm" />
+          {{ sessionDetails.date }}
+        </div>
+        <div class="flex items-center gap-1.5 truncate text-xs">
+          <OIcon name="person" size="sm" />
+          {{ sessionDetails.user_email || t("common.unknownUser") }}
+        </div>
+        <div class="flex items-center gap-1.5 truncate text-xs">
+          <OIcon name="location-on" size="sm" />
+          {{ sessionDetails.city }}, {{ sessionDetails.country }}
+        </div>
+        <div class="flex items-center gap-1.5 truncate text-xs">
+          <OIcon name="settings" size="sm" />
+          {{ sessionDetails.browser }}, {{ sessionDetails.os }}
+        </div>
+        <div
+          v-if="frustrationCount > 0"
+          class="flex items-center truncate text-xs"
+          :title="
+            t('rum.frustrationSignalsDetected', { count: frustrationCount }, frustrationCount)
+          "
+          data-test="session-viewer-frustration-summary"
+        >
+          <OIcon
+            name="sentiment-very-dissatisfied"
+            size="sm"
+            class="text-severity-warning-color pr-1"
+            data-test="frustration-summary-icon"
+          />
+          <span
+            class="text-severity-warning-color font-semibold"
+            data-test="frustration-summary-text"
+            >{{ t("rum.frustration", { count: frustrationCount }, frustrationCount) }}</span
+          >
+        </div>
+      </div>
+    </template>
+    <div class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden">
       <OSplitter
         v-model="splitterSize"
         :limits="[200, 1400]"
         unit="px"
-        class="w-full h-full"
+        class="h-full w-full"
         separatorClass="bg-card-glass-border w-px! hover:bg-theme-accent"
       >
         <template #before>
+          <!-- Mobile SDKs record wireframes (not a DOM); play them with the wireframe
+               player. Browser sessions use the rrweb-based VideoPlayer. -->
+          <MobileSessionPlayer
+            v-if="isMobileReplay"
+            :segments="segments"
+            :events="segmentEvents"
+            :is-loading="segmentsLoading"
+            class="h-full"
+          />
           <VideoPlayer
+            v-else
             ref="videoPlayerRef"
             :events="segmentEvents"
             :segments="segments"
@@ -113,12 +125,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
+import MobileSessionPlayer from "@/components/rum/MobileSessionPlayer.vue";
+import { isMobileReplaySource } from "@/composables/rum/useMobileSessionReplay";
 import EventDetailDrawer from "@/components/rum/EventDetailDrawer.vue";
 import { cloneDeep } from "lodash-es";
 import { computed, onBeforeMount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
@@ -149,11 +163,23 @@ const sessionId = ref("1");
 const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);
 const segmentEvents = ref<any[]>([]);
+// Dedicated to the replay-segment fetch, initialised true so the mobile player shows a
+// loading state from first paint. The shared isLoading counter can't be used here: it
+// dips back to 0 in the gap between getSession() resolving and getSessionSegments()
+// starting, which is exactly the moment the mobile player mounts — that dip is what let
+// the "No session replay available" empty state flash before the segments arrived.
+const segmentsLoading = ref(true);
+
+// Mobile sessions carry wireframe records (source: react-native/ios/android) → the
+// wireframe player; browser sessions use the rrweb VideoPlayer.
+const isMobileReplay = computed(() =>
+  isMobileReplaySource(sessionState.data.selectedSession?.source),
+);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const splitterSize = ref(600);
@@ -196,8 +222,7 @@ const sessionDetails = ref({
 
 const frustrationCount = computed(() => {
   return segmentEvents.value.filter(
-    (event: any) =>
-      event.frustration_types && event.frustration_types.length > 0,
+    (event: any) => event.frustration_types && event.frustration_types.length > 0,
   ).length;
 });
 
@@ -238,12 +263,11 @@ watch(
     ) {
       // Clear any existing timer
       if (seekTimer !== null) {
-         
         clearTimeout(seekTimer);
       }
 
       // Use setTimeout to give video player time to fully initialize
-       
+
       seekTimer = setTimeout(() => {
         if (videoPlayerRef.value) {
           try {
@@ -268,7 +292,7 @@ const getSessionDetails = () => {
     browser: sessionState.data.selectedSession?.browser,
     os: sessionState.data.selectedSession?.os,
     ip: sessionState.data.selectedSession?.ip,
-    user_email: sessionState.data.selectedSession?.user_email || "Unknown User",
+    user_email: sessionState.data.selectedSession?.user_email || t("common.unknownUser"),
     city: sessionState.data.selectedSession?.city || "Unknown",
     country: sessionState.data.selectedSession?.country || "Unknown",
     id: sessionState.data.selectedSession?.session_id,
@@ -279,27 +303,19 @@ const getSession = () => {
   return new Promise((resolve) => {
     let geoFields = "";
 
-    if (
-      performanceState.data.streams["_sessionreplay"]["schema"][
-        "geo_info_country"
-      ]
-    ) {
+    if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_country"]) {
       geoFields += "min(geo_info_city) as city,";
     }
 
-    if (
-      performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_city"]
-    ) {
+    if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_city"]) {
       geoFields += "min(geo_info_country) as country,";
     }
 
     const req = {
       query: {
         sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where session_id='${getSessionId.value}' order by zo_sql_timestamp`,
-        start_time:
-          Number(router.currentRoute.value.query.start_time) - 86400000000,
-        end_time:
-          Number(router.currentRoute.value.query.end_time) + 86400000000,
+        start_time: Number(router.currentRoute.value.query.start_time) - 86400000000,
+        end_time: Number(router.currentRoute.value.query.end_time) + 86400000000,
         from: 0,
         size: 10,
       },
@@ -341,24 +357,27 @@ const getSession = () => {
 };
 
 const getSessionSegments = () => {
-  if (!sessionState.data.selectedSession) return;
+  if (!sessionState.data.selectedSession) {
+    // No session to fetch a replay for — resolve the loading state so the player can fall
+    // through to its empty message instead of spinning forever.
+    segmentsLoading.value = false;
+    return;
+  }
 
   const queryPayload: any = {
     from: 0,
     size: 1000,
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
-      startTime:
-        Number(sessionState.data.selectedSession?.start_time) * 1000 - 300000,
-      endTime:
-        Number(sessionState.data.selectedSession?.end_time) * 1000 + 300000000,
+      startTime: Number(sessionState.data.selectedSession?.start_time) * 1000 - 300000,
+      endTime: Number(sessionState.data.selectedSession?.end_time) * 1000 + 300000000,
     },
     sqlMode: false,
     currentPage: 0,
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_sessionreplay" where session_id='${sessionId.value}' order by start asc`;
   delete req.aggs;
   isLoading.value.push(true);
@@ -396,7 +415,12 @@ const getSessionSegments = () => {
     .catch((error) => {
       console.error("Failed to fetch session events:", error);
     })
-    .finally(() => isLoading.value.pop());
+    .finally(() => {
+      isLoading.value.pop();
+      // Segment fetch settled: the mobile player can now decide between the replay and the
+      // empty state without a premature "No session replay available" flash.
+      segmentsLoading.value = false;
+    });
 };
 
 const getSessionEvents = () => {
@@ -405,8 +429,7 @@ const getSessionEvents = () => {
     size: 150,
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
-      startTime:
-        Number(sessionState.data.selectedSession?.start_time) * 1000 - 1,
+      startTime: Number(sessionState.data.selectedSession?.start_time) * 1000 - 1,
       endTime: Number(sessionState.data.selectedSession?.end_time) * 1000 + 1,
     },
     sqlMode: false,
@@ -414,7 +437,7 @@ const getSessionEvents = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' and (type='error' or type='action' or type='view') order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);
@@ -430,10 +453,7 @@ const getSessionEvents = () => {
     .then((res) => {
       const events = ["action", "view", "error"];
 
-      if (
-        !sessionDetails.value.user_email ||
-        sessionDetails.value.user_email === "Unknown User"
-      )
+      if (!sessionDetails.value.user_email || sessionDetails.value.user_email === "Unknown User")
         sessionDetails.value.user_email = res.data.hits[0]?.usr_email;
 
       segmentEvents.value = res.data.hits.filter((hit: any) => {
@@ -464,8 +484,7 @@ const getSessionErrorLogs = () => {
     size: 150,
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
-      startTime:
-        Number(sessionState.data.selectedSession?.start_time) * 1000 - 1,
+      startTime: Number(sessionState.data.selectedSession?.start_time) * 1000 - 1,
       endTime: Number(sessionState.data.selectedSession?.end_time) * 1000 + 1,
     },
     sqlMode: false,
@@ -473,7 +492,7 @@ const getSessionErrorLogs = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_rumlog" where session_id='${sessionId.value}' and status='error' order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);
@@ -536,8 +555,7 @@ const handleErrorEvent = (event: any) => {
 
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
-  _event.name =
-    event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
+  _event.name = event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
 
   // Add frustration information if present
   if (event?.action_frustration_type) {
@@ -570,7 +588,13 @@ const handleViewEvent = (event: any) => {
   //     " error " +
   //     event.event.custom.error.stack;
   // }
-  _event.name = event?.view_loading_type + " : " + event?.view_url || "--";
+  // Browser view events carry `view_loading_type` (initial_load / route_change)
+  // and show as "type : url". Mobile SDK views have no loading_type, so fall back
+  // to the human view name (e.g. "ProductDetail") and only then the url — avoids
+  // the "undefined : <url>" label for mobile sessions.
+  _event.name = event?.view_loading_type
+    ? event.view_loading_type + " : " + event?.view_url
+    : event?.view_name || event?.view_url || "--";
   return _event;
 };
 
@@ -593,12 +617,8 @@ function formatTimeDifference(start_time: number, end_time: number) {
   const milliSeconds = Math.abs(start_time - end_time);
   // Calculate hours, minutes, and seconds
   let hours: string | number = Math.floor(milliSeconds / (1000 * 60 * 60));
-  let minutes: string | number = Math.floor(
-    (milliSeconds % (1000 * 60 * 60)) / (1000 * 60),
-  );
-  let seconds: string | number = Math.floor(
-    (milliSeconds % (1000 * 60)) / 1000,
-  );
+  let minutes: string | number = Math.floor((milliSeconds % (1000 * 60 * 60)) / (1000 * 60));
+  let seconds: string | number = Math.floor((milliSeconds % (1000 * 60)) / 1000);
 
   // Add leading zeros if needed
   hours = hours < 10 ? "0" + hours : hours;
@@ -628,10 +648,6 @@ const handleSidebarEvent = (event: string, payload: any) => {
   }
 
   // Always seek to the event time in the video player
-  videoPlayerRef.value.goto(
-    payload.relativeTime,
-    !!videoPlayerRef.value.playerState?.isPlaying,
-  );
+  videoPlayerRef.value.goto(payload.relativeTime, !!videoPlayerRef.value.playerState?.isPlaying);
 };
 </script>
-

@@ -36,8 +36,7 @@ export { safeHttpUrl } from "@/components/ingestion/setupCard/subs";
 const marked = new Marked({ gfm: true, breaks: false });
 
 export type CardSegment =
-  | { type: "html"; html: string }
-  | { type: "code"; code: string; lang: string };
+  { type: "html"; html: string } | { type: "code"; code: string; lang: string };
 
 function substitute(md: string, subs: CardSubstitutions): string {
   return md
@@ -46,10 +45,7 @@ function substitute(md: string, subs: CardSubstitutions): string {
     .replaceAll("{token}", subs.token);
 }
 
-export function renderCardSegments(
-  md: string,
-  subs: CardSubstitutions,
-): CardSegment[] {
+export function renderCardSegments(md: string, subs: CardSubstitutions): CardSegment[] {
   // Lex the RAW markdown. We substitute {url}/{org}/{token} ONLY inside code
   // blocks (the runnable commands), never in prose — so explanatory text like
   // the "Substitutions" list keeps the placeholder names, and the base64 token

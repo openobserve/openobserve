@@ -12,7 +12,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
@@ -26,7 +26,7 @@ export default defineComponent({
   },
   emits: ["update:modelValue"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const histogramIntervalOptions = [
       {
@@ -123,9 +123,7 @@ export default defineComponent({
       },
     ];
 
-    const histogramIntervalModel = ref<string | null>(
-      props.modelValue ?? null,
-    );
+    const histogramIntervalModel = ref<string | null>(props.modelValue ?? null);
 
     // on modelvalue change, update the model
     watch(
@@ -143,4 +141,3 @@ export default defineComponent({
   },
 });
 </script>
-

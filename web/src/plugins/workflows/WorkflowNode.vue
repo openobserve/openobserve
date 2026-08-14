@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Workflow canvas node — a thin wrapper over the shared FlowNodeCard. The card
   frame/handles/icon/label are shared with pipelines; this component adds the
-  workflow interactions: click-to-edit, hover-delete (trigger is fixed), and the
+  workflow interactions: click-to-edit, hover-delete (trigger deletable too), and the
   hover-`+` "add next step" affordance (Condition is a single-output filter, so
   one output — no true/false branch).
 -->
@@ -40,16 +40,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #body>
       <div v-if="isConfiguredFunction" class="flex gap-1">
         {{ data.name }} -
-        <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+        <strong>{{ data.after_flatten ? raw("[RAF]") : raw("[RBF]") }}</strong>
       </div>
       <div v-else class="whitespace-nowrap">{{ nodeLabel }}</div>
     </template>
 
-    <!-- hover actions (delete) — trigger is fixed -->
+    <!-- hover actions (delete) — the trigger is deletable too, so the user can
+         swap its kind (deleting it brings back the "Choose a Trigger" start node). -->
     <template #actions>
       <div
-        v-show="showButtons && meta?.category !== 'trigger'"
-        class="absolute -top-7.5 right-0 flex gap-1.5 z-10 pt-1.25 px-1.25 pb-2.5"
+        v-show="showButtons"
+        class="absolute -top-7.5 right-0 z-10 flex gap-1.5 px-1.25 pt-1.25 pb-2.5"
         :data-test="`workflow-node-${data?.node_type}-actions`"
         @mouseenter="handleActionsEnter"
         @mouseleave="handleActionsLeave"
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           size="icon"
-          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-surface-overlay/95! border! border-status-negative! text-status-negative!"
+          class="rounded-default! bg-surface-overlay/95! border-status-negative! text-status-negative! h-5! w-5! min-w-5! border! p-0!"
           :data-test="`workflow-node-${data?.node_type}-delete-btn`"
           @click.stop="requestDeleteNode(id)"
         >
@@ -80,22 +81,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            (red, hover for messages, click to open the step drawer). -->
       <div
         v-if="testStatus === 'ok'"
-        class="wf-test-badge wf-test-pop nodrag bg-status-positive text-white"
+        class="wf-test-badge wf-test-pop nodrag bg-status-positive cursor-pointer text-white transition-transform duration-150 hover:scale-110"
         :data-test="`workflow-node-${data?.node_type}-test-ok`"
         @pointerdown.stop
-        @click.stop
+        @click.stop="openResult"
       >
         <OIcon name="check" size="xs" />
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+          <template #content>
+            <div class="p-2 text-left text-xs">
+              {{ t("workflow.test.stepResult.viewHint") }}
+            </div>
+          </template>
+        </OTooltip>
       </div>
       <div
         v-else-if="testStatus === 'skipped'"
-        class="wf-test-badge wf-test-pop nodrag bg-badge-default-solid-bg text-badge-default-solid-text cursor-help"
+        class="wf-test-badge wf-test-pop nodrag bg-badge-default-solid-bg text-badge-default-solid-text cursor-pointer transition-transform duration-150 hover:scale-110"
         :data-test="`workflow-node-${data?.node_type}-test-skipped`"
         @pointerdown.stop
-        @click.stop
+        @click.stop="openResult"
       >
         <OIcon name="remove" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.notVerified") }}
@@ -105,21 +113,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="testStatus === 'error'"
-        class="wf-test-badge wf-test-pop nodrag bg-status-negative text-white cursor-pointer transition-transform duration-150 hover:scale-110"
+        class="wf-test-badge wf-test-pop nodrag bg-status-negative cursor-pointer text-white transition-transform duration-150 hover:scale-110"
         :data-test="`workflow-node-${data?.node_type}-test-error`"
         @pointerdown.stop
         @click.stop="openResult"
       >
         <OIcon name="error" size="xs" />
-        <span v-if="errorCount > 1" class="wf-test-count bg-white text-status-negative">{{ errorCount }}</span>
-        <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
+        <span v-if="errorCount > 1" class="wf-test-count text-status-negative bg-white">{{
+          errorCount
+        }}</span>
+        <OTooltip side="top" align="center" :side-offset="8" max-width="22.5rem">
           <template #content>
-            <div class="p-2 text-left flex flex-col gap-1">
-              <div
-                v-for="(m, i) in errorMessages"
-                :key="i"
-                class="text-xs leading-[1.35]"
-              >
+            <div class="flex flex-col gap-1 p-2 text-left">
+              <div v-for="(m, i) in errorMessages" :key="i" class="text-xs leading-[1.35]">
                 {{ m }}
               </div>
             </div>
@@ -127,13 +133,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTooltip>
       </div>
     </template>
-
   </FlowNodeCard>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -142,6 +147,7 @@ import useWorkflowCanvas, {
   nodeMeta,
   workflowObj,
   nodeConfigDetail,
+  triggerDef,
 } from "./useWorkflowCanvas";
 
 const props = defineProps<{
@@ -149,18 +155,23 @@ const props = defineProps<{
   data: any;
 }>();
 
-const { t } = useI18n();
-const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
+const { t } = useI18nTyped();
+const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas(t);
 
 // Test result badge state — read from the last Test run. Null (no run, or this
-// node wasn't part of a `from_node` run) → no badge. A node passes (✓) only when
-// it ran, has no error, AND no upstream node errored — otherwise it's "skipped"
-// (not verified), since the backend gives us errors only, not per-node success.
+// node wasn't part of a `from_node` run) → no badge. A node is a real ✓ only when
+// records ACTUALLY reached it (it's in the per-node `inputs` map) and it didn't
+// error. A node the run reached but that received 0 records — e.g. an upstream
+// condition filtered everything out — is "skipped" (grey), NOT a false pass.
 const testResult = computed<any>(() => workflowObj.testRun?.result);
 const testStatus = computed<"ok" | "error" | "skipped" | null>(() => {
   const r = testResult.value;
   if (!r || !r.ranNodeIds?.includes(props.id)) return null;
   if (r.errors?.[props.id]) return "error";
+  // Live Test run carries the per-node `inputs` map: ✓ only if this node got
+  // records; otherwise it ran but processed nothing → grey.
+  if (r.inputs) return r.inputs[props.id]?.length ? "ok" : "skipped";
+  // History run (no `inputs` map): fall back to the blocked-downstream logic.
   if (r.blockedNodeIds?.includes(props.id)) return "skipped";
   return "ok";
 });
@@ -192,7 +203,9 @@ const nodeLabel = computed(() => {
   const data = props.data;
   const type = data?.node_type;
   const fallback = meta.value ? t(meta.value.titleKey) : type;
-  if (type === "workflow_trigger") return fallback;
+  // The trigger card shows its KIND's title (Alert Trigger, Incident Trigger, …),
+  // resolved from the registry so new kinds label themselves.
+  if (type === "workflow_trigger") return t(triggerDef(data?.trigger_kind).nodeTitleKey);
   return nodeConfigDetail(data, 28) || fallback;
 });
 // Icon for this node type: the pipeline node image as an "img:<url>" string

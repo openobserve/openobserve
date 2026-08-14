@@ -58,41 +58,6 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
-// Mock vue-i18n
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: (key: string) => {
-      const translations: Record<string, string> = {
-        "dashboard.colorPalette": "Color palette",
-        "dashboard.colorSeriesBy": "Color series by:",
-        "dashboard.colorBySeries": "<b>By Series</b>",
-        "dashboard.colorDefaultPaletteBySeries": "Default Palette (By Series)",
-        "dashboard.colorDefaultPaletteBySeriesSubLabel":
-          "Series with the same name will use the same color",
-        "dashboard.colorPaletteClassic": "Palette-Classic",
-        "dashboard.colorPaletteClassicSubLabel":
-          "A random color will be used for each series, regardless of its name",
-        "dashboard.colorSingleColor": "Single Color",
-        "dashboard.colorSingleColorSubLabel":
-          "Set a specific color to all series",
-        "dashboard.colorShadesOfSpecificColor": "Shades Of Specific Color",
-        "dashboard.colorShadesOfSpecificColorSubLabel":
-          "Different shades of specific color",
-        "dashboard.colorByValue": "<b>By Value</b>",
-        "dashboard.colorGreenYellowRed": "Green-Yellow-Red (By Value)",
-        "dashboard.colorRedYellowGreen": "Red-Yellow-Green (By Value)",
-        "dashboard.colorTemperature": "Temperature (By Value)",
-        "dashboard.colorPositive": "Positive (By Value)",
-        "dashboard.colorNegative": "Negative (By Value)",
-        "dashboard.colorLightToDarkBlue": "Light To Dark Blue (By Value)",
-        "dashboard.colorPaletteClassicBySeries": "Palette-Classic (By Series)",
-      };
-      return translations[key] || key;
-    },
-  }),
-}));
-
-
 describe("ColorPaletteDropDown", () => {
   let wrapper: VueWrapper;
 
@@ -105,7 +70,7 @@ describe("ColorPaletteDropDown", () => {
           dashboardPanelDataPageKey: "dashboard",
         },
         stubs: {
-          "OSelect": {
+          OSelect: {
             template: `
               <div class="o-select"
                    data-test="color-palette-select"
@@ -113,16 +78,11 @@ describe("ColorPaletteDropDown", () => {
                 <slot name="option" v-for="opt in options" :key="opt.value" :opt="opt" />
               </div>
             `,
-            props: [
-              "modelValue",
-              "options",
-              "label",
-              "dropdownStyle",
-            ],
+            props: ["modelValue", "options", "label", "dropdownStyle"],
             emits: ["update:model-value"],
             inheritAttrs: false,
           },
-          "OToggleGroup": {
+          OToggleGroup: {
             template: `
               <div class="o-toggle-group"
                    :model-value="modelValue"
@@ -133,7 +93,7 @@ describe("ColorPaletteDropDown", () => {
             props: ["modelValue", "variant"],
             emits: ["update:modelValue"],
           },
-          "OToggleGroupItem": {
+          OToggleGroupItem: {
             template: `<button data-test="o-toggle-group-item" :value="value"><slot /></button>`,
             props: ["value", "size", "disabled"],
           },
@@ -173,9 +133,7 @@ describe("ColorPaletteDropDown", () => {
 
       // onBeforeMount should set default config
       expect(mockDashboardPanelData.data.config.color).toBeDefined();
-      expect(mockDashboardPanelData.data.config.color.mode).toBe(
-        "palette-classic-by-series",
-      );
+      expect(mockDashboardPanelData.data.config.color.mode).toBe("palette-classic-by-series");
       expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([]);
       expect(mockDashboardPanelData.data.config.color.seriesBy).toBe("last");
     });
@@ -190,9 +148,7 @@ describe("ColorPaletteDropDown", () => {
 
       // Should preserve existing config
       expect(mockDashboardPanelData.data.config.color.mode).toBe("fixed");
-      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([
-        "#custom",
-      ]);
+      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual(["#custom"]);
       expect(mockDashboardPanelData.data.config.color.seriesBy).toBe("max");
     });
 
@@ -204,9 +160,9 @@ describe("ColorPaletteDropDown", () => {
             dashboardPanelDataPageKey: "customKey",
           },
           stubs: {
-            "OSelect": { template: "<div class='o-select'></div>" },
-            "OToggleGroup": { template: "<div class='o-toggle-group'><slot /></div>" },
-            "OToggleGroupItem": { template: "<button><slot /></button>" },
+            OSelect: { template: "<div class='o-select'></div>" },
+            OToggleGroup: { template: "<div class='o-toggle-group'><slot /></div>" },
+            OToggleGroupItem: { template: "<button><slot /></button>" },
           },
         },
       });
@@ -238,30 +194,22 @@ describe("ColorPaletteDropDown", () => {
       expect(colorOptions.length).toBeGreaterThan(10);
 
       // Should have group headers
-      const bySeriesGroup = colorOptions.find(
-        (opt) => opt.label === "<b>By Series</b>",
-      );
+      const bySeriesGroup = colorOptions.find((opt) => opt.label === "By Series");
       expect(bySeriesGroup).toBeDefined();
       expect(bySeriesGroup.header).toBe(true);
 
-      const byValueGroup = colorOptions.find(
-        (opt) => opt.label === "<b>By Value</b>",
-      );
+      const byValueGroup = colorOptions.find((opt) => opt.label === "By Value");
       expect(byValueGroup).toBeDefined();
       expect(byValueGroup.header).toBe(true);
     });
 
     it("should include palette-classic-by-series option with theme-based colors", () => {
       const colorOptions = wrapper.vm.colorOptions;
-      const defaultOption = colorOptions.find(
-        (opt) => opt.value === "palette-classic-by-series",
-      );
+      const defaultOption = colorOptions.find((opt) => opt.value === "palette-classic-by-series");
 
       expect(defaultOption).toBeDefined();
       expect(defaultOption.label).toBe("Default Palette (By Series)");
-      expect(defaultOption.subLabel).toBe(
-        "Series with the same name will use the same color",
-      );
+      expect(defaultOption.subLabel).toBe("Series with the same name will use the same color");
       expect(defaultOption.colorPalette).toEqual(mockColorPalette);
     });
 
@@ -288,9 +236,7 @@ describe("ColorPaletteDropDown", () => {
 
     it("should have fixed palette colors for palette-classic option", () => {
       const colorOptions = wrapper.vm.colorOptions;
-      const classicOption = colorOptions.find(
-        (opt) => opt.value === "palette-classic",
-      );
+      const classicOption = colorOptions.find((opt) => opt.value === "palette-classic");
 
       expect(classicOption).toBeDefined();
       expect(Array.isArray(classicOption.colorPalette)).toBeTruthy();
@@ -305,9 +251,7 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should return correct label for default mode", () => {
-      expect(wrapper.vm.selectedOptionLabel).toBe(
-        "Default Palette (By Series)",
-      );
+      expect(wrapper.vm.selectedOptionLabel).toBe("Default Palette (By Series)");
     });
 
     it("should return correct label for palette-classic mode", async () => {
@@ -328,9 +272,7 @@ describe("ColorPaletteDropDown", () => {
       mockDashboardPanelData.data.config.color.mode = "unknown-mode";
       await nextTick();
 
-      expect(wrapper.vm.selectedOptionLabel).toBe(
-        "Palette-Classic (By Series)",
-      );
+      expect(wrapper.vm.selectedOptionLabel).toBe("Palette-Classic (By Series)");
     });
 
     it("should handle missing color config gracefully", async () => {
@@ -344,9 +286,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      expect(wrapper.vm.selectedOptionLabel).toBe(
-        "Default Palette (By Series)",
-      );
+      expect(wrapper.vm.selectedOptionLabel).toBe("Default Palette (By Series)");
 
       // Restore original color config
       mockDashboardPanelData.data.config.color = originalColor;
@@ -363,9 +303,7 @@ describe("ColorPaletteDropDown", () => {
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe("fixed");
-      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([
-        "#53ca53",
-      ]);
+      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual(["#53ca53"]);
       expect(mockDashboardPanelData.data.config.color.seriesBy).toBe("last");
     });
 
@@ -374,9 +312,7 @@ describe("ColorPaletteDropDown", () => {
       await nextTick();
 
       expect(mockDashboardPanelData.data.config.color.mode).toBe("shades");
-      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([
-        "#53ca53",
-      ]);
+      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual(["#53ca53"]);
       expect(mockDashboardPanelData.data.config.color.seriesBy).toBe("last");
     });
 
@@ -384,9 +320,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper.vm.onColorModeChange("palette-classic-by-series");
       await nextTick();
 
-      expect(mockDashboardPanelData.data.config.color.mode).toBe(
-        "palette-classic-by-series",
-      );
+      expect(mockDashboardPanelData.data.config.color.mode).toBe("palette-classic-by-series");
       expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([]);
     });
 
@@ -394,9 +328,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper.vm.onColorModeChange("palette-classic");
       await nextTick();
 
-      expect(mockDashboardPanelData.data.config.color.mode).toBe(
-        "palette-classic",
-      );
+      expect(mockDashboardPanelData.data.config.color.mode).toBe("palette-classic");
       expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([]);
     });
 
@@ -405,12 +337,8 @@ describe("ColorPaletteDropDown", () => {
       wrapper.vm.onColorModeChange("continuous-red-yellow-green");
       await nextTick();
 
-      expect(mockDashboardPanelData.data.config.color.mode).toBe(
-        "continuous-red-yellow-green",
-      );
-      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual(
-        customPalette,
-      );
+      expect(mockDashboardPanelData.data.config.color.mode).toBe("continuous-red-yellow-green");
+      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual(customPalette);
     });
   });
 
@@ -420,9 +348,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
 
       const colorOptions = wrapper.vm.colorOptions;
-      const defaultOption = colorOptions.find(
-        (opt) => opt.value === "palette-classic-by-series",
-      );
+      const defaultOption = colorOptions.find((opt) => opt.value === "palette-classic-by-series");
       expect(defaultOption.colorPalette).toEqual(mockColorPalette);
     });
 
@@ -431,9 +357,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
 
       const colorOptions = wrapper.vm.colorOptions;
-      const defaultOption = colorOptions.find(
-        (opt) => opt.value === "palette-classic-by-series",
-      );
+      const defaultOption = colorOptions.find((opt) => opt.value === "palette-classic-by-series");
       expect(defaultOption.colorPalette).toEqual(mockColorPalette);
     });
 
@@ -441,9 +365,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
       // Check that the component uses the store theme correctly through colorOptions
       const colorOptions = wrapper.vm.colorOptions;
-      const defaultOption = colorOptions.find(
-        (opt) => opt.value === "palette-classic-by-series",
-      );
+      const defaultOption = colorOptions.find((opt) => opt.value === "palette-classic-by-series");
       expect(defaultOption.colorPalette).toEqual(mockColorPalette);
     });
   });
@@ -493,7 +415,9 @@ describe("ColorPaletteDropDown", () => {
       mockDashboardPanelData.data.config.color.mode = "fixed";
       await nextTick();
 
-      const wrapper_element = wrapper.find('[data-test="dashboard-color-palette-color-input-wrapper"]');
+      const wrapper_element = wrapper.find(
+        '[data-test="dashboard-color-palette-color-input-wrapper"]',
+      );
       expect(wrapper_element.exists()).toBeTruthy();
       expect(wrapper_element.classes()).toContain("inline-flex");
       expect(wrapper_element.classes()).toContain("items-center");
@@ -505,8 +429,7 @@ describe("ColorPaletteDropDown", () => {
     });
 
     it("should show series by toggle for continuous modes", async () => {
-      mockDashboardPanelData.data.config.color.mode =
-        "continuous-green-yellow-red";
+      mockDashboardPanelData.data.config.color.mode = "continuous-green-yellow-red";
       await nextTick();
 
       const toggle = wrapper.find("[data-test='series-by-toggle']");
@@ -535,9 +458,7 @@ describe("ColorPaletteDropDown", () => {
 
     it("should render option template for regular options", () => {
       const colorOptions = wrapper.vm.colorOptions;
-      const regularOption = colorOptions.find(
-        (opt) => !opt.header && opt.value,
-      );
+      const regularOption = colorOptions.find((opt) => !opt.header && opt.value);
 
       expect(regularOption).toBeDefined();
       expect(regularOption.label).toBeDefined();
@@ -548,7 +469,7 @@ describe("ColorPaletteDropDown", () => {
       const groupOption = colorOptions.find((opt) => opt.header);
 
       expect(groupOption).toBeDefined();
-      expect(groupOption.label).toContain("<b>");
+      expect(groupOption.label).toBe("By Series");
     });
 
     it("should handle options with colorPalette arrays", () => {
@@ -653,9 +574,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      expect(wrapper.vm.selectedOptionLabel).toBe(
-        "Default Palette (By Series)",
-      );
+      expect(wrapper.vm.selectedOptionLabel).toBe("Default Palette (By Series)");
 
       // Restore original color config
       mockDashboardPanelData.data.config.color = originalColor;
@@ -664,14 +583,11 @@ describe("ColorPaletteDropDown", () => {
     it("should handle undefined mode in selectedOptionLabel", async () => {
       // Save original mode
       const originalMode = mockDashboardPanelData.data.config.color.mode;
-      mockDashboardPanelData.data.config.color.mode =
-        "palette-classic-by-series";
+      mockDashboardPanelData.data.config.color.mode = "palette-classic-by-series";
       wrapper = createWrapper();
       await nextTick();
 
-      expect(wrapper.vm.selectedOptionLabel).toBe(
-        "Default Palette (By Series)",
-      );
+      expect(wrapper.vm.selectedOptionLabel).toBe("Default Palette (By Series)");
 
       // Restore original mode
       mockDashboardPanelData.data.config.color.mode = originalMode;
@@ -691,9 +607,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper.vm.onColorModeChange("invalid-mode");
       await nextTick();
 
-      expect(mockDashboardPanelData.data.config.color.mode).toBe(
-        "invalid-mode",
-      );
+      expect(mockDashboardPanelData.data.config.color.mode).toBe("invalid-mode");
       expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([]);
     });
   });
@@ -734,9 +648,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
 
       let colorOptions = wrapper.vm.colorOptions;
-      let defaultOption = colorOptions.find(
-        (opt) => opt.value === "palette-classic-by-series",
-      );
+      let defaultOption = colorOptions.find((opt) => opt.value === "palette-classic-by-series");
       expect(defaultOption.colorPalette).toEqual(mockColorPalette);
 
       wrapper.unmount();
@@ -746,9 +658,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
 
       colorOptions = wrapper.vm.colorOptions;
-      defaultOption = colorOptions.find(
-        (opt) => opt.value === "palette-classic-by-series",
-      );
+      defaultOption = colorOptions.find((opt) => opt.value === "palette-classic-by-series");
       expect(defaultOption.colorPalette).toEqual(mockColorPalette);
     });
 
@@ -766,9 +676,7 @@ describe("ColorPaletteDropDown", () => {
       wrapper.vm.onColorModeChange("continuous-temperature");
       await nextTick();
 
-      expect(mockDashboardPanelData.data.config.color.mode).toBe(
-        "continuous-temperature",
-      );
+      expect(mockDashboardPanelData.data.config.color.mode).toBe("continuous-temperature");
       expect(wrapper.vm.selectedOptionLabel).toBe("Temperature (By Value)");
     });
 
@@ -776,16 +684,12 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
 
       // Start with default
-      expect(mockDashboardPanelData.data.config.color.mode).toBe(
-        "palette-classic-by-series",
-      );
+      expect(mockDashboardPanelData.data.config.color.mode).toBe("palette-classic-by-series");
 
       // Change to fixed
       wrapper.vm.onColorModeChange("fixed");
       await nextTick();
-      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([
-        "#53ca53",
-      ]);
+      expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual(["#53ca53"]);
 
       // Change to palette-classic (should clear fixedColor)
       wrapper.vm.onColorModeChange("palette-classic");
@@ -807,7 +711,9 @@ describe("ColorPaletteDropDown", () => {
       wrapper = createWrapper();
       await nextTick();
 
-      const colorWrapper = wrapper.find('[data-test="dashboard-color-palette-color-input-wrapper"]');
+      const colorWrapper = wrapper.find(
+        '[data-test="dashboard-color-palette-color-input-wrapper"]',
+      );
       expect(colorWrapper.exists()).toBeTruthy();
     });
   });

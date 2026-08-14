@@ -8,30 +8,30 @@
 // so all access must be runtime-guarded with `typeof chrome !== 'undefined'`.
 
 interface ChromeEvent<TListener extends (...args: never[]) => void> {
-  addListener(callback: TListener): void
-  removeListener(callback: TListener): void
+  addListener(callback: TListener): void;
+  removeListener(callback: TListener): void;
 }
 
 interface ChromePort {
-  name: string
-  postMessage(message: unknown): void
-  disconnect(): void
-  onMessage: ChromeEvent<(message: unknown) => void>
-  onDisconnect: ChromeEvent<(port: ChromePort) => void>
+  name: string;
+  postMessage(message: unknown): void;
+  disconnect(): void;
+  onMessage: ChromeEvent<(message: unknown) => void>;
+  onDisconnect: ChromeEvent<(port: ChromePort) => void>;
 }
 
 interface ChromeRuntime {
-  lastError?: { message?: string }
+  lastError?: { message?: string };
   sendMessage(
     extensionId: string,
     message: unknown,
     responseCallback?: (response: unknown) => void,
-  ): void
-  connect(extensionId: string, connectInfo?: { name?: string }): ChromePort
+  ): void;
+  connect(extensionId: string, connectInfo?: { name?: string }): ChromePort;
 }
 
 interface Chrome {
-  runtime?: ChromeRuntime
+  runtime?: ChromeRuntime;
 }
 
-declare const chrome: Chrome | undefined
+declare const chrome: Chrome | undefined;

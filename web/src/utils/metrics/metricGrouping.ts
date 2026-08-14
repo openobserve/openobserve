@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nKey } from "@/types/i18n";
+
 import type { Component } from "vue";
 import type { StreamInfo } from "@/services/service_streams";
 
@@ -38,7 +40,7 @@ export interface DefaultMetricConfig {
 
 export interface MetricGroupDefinition {
   id: string;
-  label: string;
+  labelKey: I18nKey;
   icon: string | {};
   defaultMetrics?: DefaultMetricConfig[];
   children?: MetricGroupDefinition[];
@@ -46,7 +48,7 @@ export interface MetricGroupDefinition {
 
 export interface MetricGroupConfig {
   id: string;
-  label: string;
+  labelKey: I18nKey;
   icon: string | Component;
   streams: StreamInfo[];
 }
@@ -209,7 +211,7 @@ export const MEMORY_PATTERNS: RegExp[] = [
  */
 export const STORAGE_PATTERNS: RegExp[] = [
   /\bdisk\b/i,
-  /_disk_/i,         // e.g. system_disk_io, system_disk_operations
+  /_disk_/i, // e.g. system_disk_io, system_disk_operations
   /\bfilesystem\b/i,
   /\b_fs\b/,
   /\bfs_/,
@@ -217,14 +219,14 @@ export const STORAGE_PATTERNS: RegExp[] = [
   /^node_disk/,
   /^container_fs/,
   /^node_filesystem/,
-  /^system_disk/,    // system_disk_io, system_disk_operations
+  /^system_disk/, // system_disk_io, system_disk_operations
   /^system_filesystem/, // system_filesystem_usage
   /^k8s_.*_storage/,
   /^k8s_.*_filesystem/,
   /inode/,
   /volume/i,
-  /\bdisk_io\b/i,    // explicit disk_io compound
-  /_disk_io/i,       // system_disk_io
+  /\bdisk_io\b/i, // explicit disk_io compound
+  /_disk_io/i, // system_disk_io
 ];
 
 /**
@@ -270,11 +272,11 @@ const METRIC_GROUP_PATTERNS: Record<string, RegExp[]> = {
  * Ordering matters — classifyMetric checks groups in this order (first match wins).
  */
 export const DEFAULT_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
-  { id: "compute", label: "Compute", icon: "insights" },
-  { id: "memory", label: "Memory", icon: "memory" },
-  { id: "network", label: "Network", icon: "lan" },
-  { id: "storage", label: "Storage", icon: "storage" },
-  { id: "others", label: "Others", icon: "category" },
+  { id: "compute", labelKey: "metrics.groups.compute", icon: "insights" },
+  { id: "memory", labelKey: "metrics.groups.memory", icon: "memory" },
+  { id: "network", labelKey: "metrics.groups.network", icon: "lan" },
+  { id: "storage", labelKey: "metrics.groups.storage", icon: "storage" },
+  { id: "others", labelKey: "metrics.groups.others", icon: "category" },
 ];
 
 /**
@@ -288,12 +290,12 @@ export const DEFAULT_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
 export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
   {
     id: "pods",
-    label: "Pods",
+    labelKey: "metrics.groups.pods",
     icon: "widgets",
     children: [
       {
         id: "compute",
-        label: "Compute",
+        labelKey: "metrics.groups.compute",
         icon: "insights",
         defaultMetrics: [
           { streamName: "k8s_pod_cpu_usage" },
@@ -303,7 +305,7 @@ export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
       },
       {
         id: "memory",
-        label: "Memory",
+        labelKey: "metrics.groups.memory",
         icon: "memory",
         defaultMetrics: [
           { streamName: "k8s_pod_memory_usage" },
@@ -313,48 +315,48 @@ export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
       },
       {
         id: "network",
-        label: "Network",
+        labelKey: "metrics.groups.network",
         icon: "lan",
         defaultMetrics: [{ streamName: "k8s_pod_network_io" }],
       },
       {
         id: "storage",
-        label: "Storage",
+        labelKey: "metrics.groups.storage",
         icon: "storage",
         defaultMetrics: [
           { streamName: "k8s_pod_filesystem_usage" },
           { streamName: "k8s_pod_filesystem_capacity" },
         ],
       },
-      { id: "others", label: "Others", icon: "category" },
+      { id: "others", labelKey: "metrics.groups.others", icon: "category" },
     ],
   },
   {
     id: "nodes",
-    label: "Nodes",
+    labelKey: "metrics.groups.nodes",
     icon: "dns",
     children: [
       {
         id: "compute",
-        label: "Compute",
+        labelKey: "metrics.groups.compute",
         icon: "insights",
         defaultMetrics: [{ streamName: "k8s_node_cpu_usage" }],
       },
       {
         id: "memory",
-        label: "Memory",
+        labelKey: "metrics.groups.memory",
         icon: "memory",
         defaultMetrics: [{ streamName: "k8s_node_memory_rss" }],
       },
       {
         id: "network",
-        label: "Network",
+        labelKey: "metrics.groups.network",
         icon: "lan",
         defaultMetrics: [{ streamName: "k8s_node_network_io" }],
       },
       {
         id: "storage",
-        label: "Storage",
+        labelKey: "metrics.groups.storage",
         icon: "storage",
         defaultMetrics: [
           { streamName: "system_disk_io" },
@@ -362,7 +364,7 @@ export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
           { streamName: "system_filesystem_usage" },
         ],
       },
-      { id: "others", label: "Others", icon: "category" },
+      { id: "others", labelKey: "metrics.groups.others", icon: "category" },
     ],
   },
 ];
@@ -392,9 +394,7 @@ export function getDefaultMetricSelections(
           (s) =>
             s.stream_name === metric.streamName &&
             (!metric.filters ||
-              Object.entries(metric.filters).every(
-                ([k, v]) => s.filters?.[k] === v,
-              )),
+              Object.entries(metric.filters).every(([k, v]) => s.filters?.[k] === v)),
         );
         if (match) results.push(match);
       }
@@ -414,10 +414,7 @@ export function getDefaultMetricSelections(
  * @param groupDefs  - Ordered group definitions (controls priority)
  * @returns The id of the matched group
  */
-export function classifyMetric(
-  metricName: string,
-  groupDefs: MetricGroupDefinition[],
-): string {
+export function classifyMetric(metricName: string, groupDefs: MetricGroupDefinition[]): string {
   const nameLower = metricName.toLowerCase();
 
   for (const group of groupDefs) {
@@ -466,7 +463,7 @@ export function groupMetricsByCategory(
 
   const groups: MetricGroupConfig[] = groupDefs.map((def) => ({
     id: def.id,
-    label: def.label,
+    labelKey: def.labelKey,
     icon: def.icon,
     streams: buckets[def.id] ?? [],
   }));

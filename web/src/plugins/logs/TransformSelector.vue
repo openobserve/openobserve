@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButtonGroup
-    class="p-0 float-left mr-1 transform-selector element-box-shadow border border-button-outline-border"
+    class="transform-selector element-box-shadow border-button-outline-border float-left mr-1 border p-0"
   >
     <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
     <div class="flex items-center">
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :disabled="!searchObj.data.transformType"
         />
-        <OTooltip :content="getTransformLabelTooltip" :side-offset="2" />
+        <OTooltip :content="raw(getTransformLabelTooltip)" :side-offset="2" />
       </div>
       <ODropdown v-model:open="functionModel" side="bottom" align="start">
         <template #trigger>
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OIcon v-else :name="transformIcon" size="sm" />
             <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
-            <OTooltip :content="transformsLabel" :side-offset="2" />
+            <OTooltip :content="raw(transformsLabel)" :side-offset="2" />
           </OButton>
         </template>
         <div data-test="logs-search-saved-function-list" class="py-0">
@@ -74,31 +74,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div v-if="filteredTransformOptions.length" class="max-h-72 overflow-y-auto">
-            <ul class="flex flex-col m-0 p-0 list-none">
+            <ul class="m-0 flex list-none flex-col p-0">
               <li
                 v-for="item in filteredTransformOptions"
                 :key="'transform-' + item?.name"
                 :data-test="`logs-search-saved-transform-item-${item?.name}`"
-                class="border-b saved-view-item flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
+                class="saved-view-item hover:bg-muted/50 flex cursor-pointer items-center gap-2 border-b px-3 py-2"
                 @click="selectTransform(item, true)"
               >
-                <span class="text-sm flex-1 min-w-0">{{ item.name }}</span>
+                <span class="min-w-0 flex-1 text-sm">{{ item.name }}</span>
               </li>
             </ul>
           </div>
           <div v-else>
             <div class="flex items-center gap-2 px-3 py-2">
-              <div class="flex flex-col flex-1 min-w-0">
-                <span
-                  v-if="searchObj.data.transformType === 'function'"
-                  class="text-sm"
-                  >{{ t("search.savedFunctionNotFound") }}</span
-                >
-                <span
-                  v-if="searchObj.data.transformType === 'action'"
-                  class="text-sm"
-                  >{{ t("search.actionsNotFound") }}</span
-                >
+              <div class="flex min-w-0 flex-1 flex-col">
+                <span v-if="searchObj.data.transformType === 'function'" class="text-sm">{{
+                  t("search.savedFunctionNotFound")
+                }}</span>
+                <span v-if="searchObj.data.transformType === 'action'" class="text-sm">{{
+                  t("search.actionsNotFound")
+                }}</span>
                 <span v-if="!searchObj.data.transformType" class="text-sm">{{
                   t("search.selectTransformType")
                 }}</span>
@@ -117,7 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OIcon name="save" size="sm" />
       <OTooltip
-        :content="searchObj.data.transformType === 'action' ? t('search.saveActionDisabled') : t('common.save')"
+        :content="
+          searchObj.data.transformType === 'action'
+            ? t('search.saveActionDisabled')
+            : t('common.save')
+        "
         :side-offset="6"
       />
     </OButton>
@@ -134,34 +134,34 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const props = withDefaults(defineProps<{
-  functionOptions: { name: string; function: string }[];
-  hideToggle?: boolean;
-}>(), {
-  hideToggle: false,
-});
+const props = withDefaults(
+  defineProps<{
+    functionOptions: { name: string; function: string }[];
+    hideToggle?: boolean;
+  }>(),
+  {
+    hideToggle: false,
+  },
+);
 
 const emit = defineEmits(["select:function", "save:function"]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { searchObj } = searchState();
 
 const { isActionsEnabled } = logsUtils();
 
-const store = useStore();
-  const { isDark } = useTheme();
+const { isDark } = useTheme();
 
 const functionModel = ref(false);
-
 
 const transformTypes = computed(() => {
   return [
@@ -191,35 +191,11 @@ const filteredActionOptions = computed(() => {
 const filteredTransformOptions = computed(() => {
   if (!searchObj.data.transformType) return [];
 
-  if (searchObj.data.transformType === "action")
-    return filteredActionOptions.value;
+  if (searchObj.data.transformType === "action") return filteredActionOptions.value;
 
-  if (searchObj.data.transformType === "function")
-    return filteredFunctionOptions.value;
+  if (searchObj.data.transformType === "function") return filteredFunctionOptions.value;
 
   return [];
-});
-
-const functionToggleIcon = computed(() => {
-  return (
-    "img:" +
-    getImageURL(
-      searchObj.meta.toggleFunction
-        ? "images/common/function_dark.svg"
-        : "images/common/function.svg",
-    )
-  );
-});
-
-const iconRight = computed(() => {
-  return (
-    "img:" +
-    getImageURL(
-      isDark.value
-        ? "images/common/function_dark.svg"
-        : "images/common/function.svg",
-    )
-  );
 });
 
 const transformsLabel = computed(() => {
@@ -240,25 +216,16 @@ const transformsLabel = computed(() => {
 });
 
 const transformIcon = computed(() => {
-  
   if (!isActionsEnabled.value)
     return (
       "img:" +
-      getImageURL(
-        isDark.value
-          ? "images/common/function_dark.svg"
-          : "images/common/function.svg",
-      )
+      getImageURL(isDark.value ? "images/common/function_dark.svg" : "images/common/function.svg")
     );
 
   if (searchObj.data.transformType === "function")
     return (
       "img:" +
-      getImageURL(
-        isDark.value
-          ? "images/common/function_dark.svg"
-          : "images/common/function.svg",
-      )
+      getImageURL(isDark.value ? "images/common/function_dark.svg" : "images/common/function.svg")
     );
 
   if (searchObj.data.transformType === "action") return "code";
@@ -266,11 +233,7 @@ const transformIcon = computed(() => {
   if (!searchObj.data.transformType)
     return (
       "img:" +
-      getImageURL(
-        isDark.value
-          ? "images/common/transform_dark.svg"
-          : "images/common/transform.svg",
-      )
+      getImageURL(isDark.value ? "images/common/transform_dark.svg" : "images/common/transform.svg")
     );
 
   return undefined;
@@ -345,4 +308,3 @@ const getTransformLabelTooltip = computed(() => {
   border-radius: 0.375rem;
 }
 </style>
-

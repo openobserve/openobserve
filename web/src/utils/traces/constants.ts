@@ -30,13 +30,9 @@ export const SPAN_KIND_MAP: Record<string, string> = {
  * Reverse of SPAN_KIND_MAP — maps lowercase display labels back to numeric keys.
  * Keys are stored lowercased so lookups can be done case-insensitively.
  */
-export const SPAN_KIND_LABEL_TO_KEY: Record<string, string> =
-  Object.fromEntries(
-    Object.entries(SPAN_KIND_MAP).map(([key, label]) => [
-      label.toLowerCase(),
-      key,
-    ]),
-  );
+export const SPAN_KIND_LABEL_TO_KEY: Record<string, string> = Object.fromEntries(
+  Object.entries(SPAN_KIND_MAP).map(([key, label]) => [label.toLowerCase(), key]),
+);
 
 /**
  * Replaces human-readable span_kind labels (e.g. `'Server'`, `'Client'`) in a
@@ -63,10 +59,7 @@ export const parseSpanKindWhereClause = (
       const ast = parser.astify(fullSql);
 
       const replaceSpanKindStringNode = (strNode: any) => {
-        if (
-          strNode?.type === "single_quote_string" ||
-          strNode?.type === "string"
-        ) {
+        if (strNode?.type === "single_quote_string" || strNode?.type === "string") {
           const label = String(strNode.value).trim().toLowerCase();
           const key = SPAN_KIND_LABEL_TO_KEY[label];
           if (key !== undefined) {
@@ -79,19 +72,12 @@ export const parseSpanKindWhereClause = (
         if (!node || node.type !== "binary_expr") return;
 
         const isSpanKind =
-          node.left?.column === "span_kind" ||
-          node.left?.column?.expr?.value === "span_kind";
+          node.left?.column === "span_kind" || node.left?.column?.expr?.value === "span_kind";
 
         if (isSpanKind) {
-          if (
-            node.right?.type === "single_quote_string" ||
-            node.right?.type === "string"
-          ) {
+          if (node.right?.type === "single_quote_string" || node.right?.type === "string") {
             replaceSpanKindStringNode(node.right);
-          } else if (
-            node.right?.type === "expr_list" &&
-            Array.isArray(node.right.value)
-          ) {
+          } else if (node.right?.type === "expr_list" && Array.isArray(node.right.value)) {
             node.right.value.forEach(replaceSpanKindStringNode);
           }
         }
@@ -112,23 +98,17 @@ export const parseSpanKindWhereClause = (
 
   // Regex fallback when no parser is available or parsing failed.
   return whereClause
-    .replace(
-      /\bspan_kind\s*(!?=)\s*'([^']*)'/gi,
-      (match, op: string, label: string) => {
-        const key = SPAN_KIND_LABEL_TO_KEY[label.toLowerCase()];
-        return key !== undefined ? `span_kind${op}'${key}'` : match;
-      },
-    )
-    .replace(
-      /\bspan_kind\s+IN\s*\(([^)]*)\)/gi,
-      (_match, items: string) => {
-        const converted = items.replace(/'([^']*)'/g, (_m, lbl: string) => {
-          const k = SPAN_KIND_LABEL_TO_KEY[lbl.toLowerCase()];
-          return k !== undefined ? `'${k}'` : `'${lbl}'`;
-        });
-        return `span_kind IN (${converted})`;
-      },
-    );
+    .replace(/\bspan_kind\s*(!?=)\s*'([^']*)'/gi, (match, op: string, label: string) => {
+      const key = SPAN_KIND_LABEL_TO_KEY[label.toLowerCase()];
+      return key !== undefined ? `span_kind${op}'${key}'` : match;
+    })
+    .replace(/\bspan_kind\s+IN\s*\(([^)]*)\)/gi, (_match, items: string) => {
+      const converted = items.replace(/'([^']*)'/g, (_m, lbl: string) => {
+        const k = SPAN_KIND_LABEL_TO_KEY[lbl.toLowerCase()];
+        return k !== undefined ? `'${k}'` : `'${lbl}'`;
+      });
+      return `span_kind IN (${converted})`;
+    });
 };
 
 /** OTEL span kind ID for UNSPECIFIED (0) */

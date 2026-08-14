@@ -2176,8 +2176,9 @@ async fn check_partition_exists(pool: &sqlx::Pool<Postgres>, partition_name: &st
 SELECT EXISTS (
     SELECT 1 FROM pg_class c
     JOIN pg_inherits i ON c.oid = i.inhrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE c.relname = $1
-      AND c.relnamespace = 'public'::regnamespace
+      AND n.nspname = current_schema()
 ) AS exists
     "#;
     let exists: bool = sqlx::query_scalar(sql)
@@ -2306,7 +2307,9 @@ async fn precreate_partitions(pool: &sqlx::Pool<Postgres>) -> Result<()> {
 /// Get the relkind of a table from pg_class. Returns None if table doesn't exist.
 /// 'r' = regular table, 'p' = partitioned table
 async fn get_table_relkind(pool: &sqlx::Pool<Postgres>, table: &str) -> Result<Option<String>> {
-    let sql = "SELECT relkind::text FROM pg_class WHERE relname = $1 AND relnamespace = 'public'::regnamespace";
+    let sql = "SELECT c.relkind::text FROM pg_class c \
+               JOIN pg_namespace n ON n.oid = c.relnamespace \
+               WHERE c.relname = $1 AND n.nspname = current_schema()";
     let ret: Option<String> = sqlx::query_scalar(sql)
         .bind(table)
         .fetch_optional(pool)
@@ -2698,7 +2701,9 @@ async fn apply_autovacuum_tuning(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     for table in &tables {
         // Check if autovacuum is already tuned
         let reloptions: Option<String> = sqlx::query_scalar(
-            "SELECT array_to_string(reloptions, ',') FROM pg_class WHERE relname = $1 AND relnamespace = 'public'::regnamespace",
+            "SELECT array_to_string(c.reloptions, ',') FROM pg_class c \
+             JOIN pg_namespace n ON n.oid = c.relnamespace \
+             WHERE c.relname = $1 AND n.nspname = current_schema()",
         )
         .bind(table)
         .fetch_optional(pool)
@@ -2727,6 +2732,7 @@ async fn apply_autovacuum_tuning(pool: &sqlx::Pool<Postgres>) -> Result<()> {
 }
 
 const FILE_COLUMN_TARGET_WIDTH: i32 = 1024;
+const ACCOUNT_COLUMN_TARGET_WIDTH: i32 = 128;
 
 /// Return the declared max length of a VARCHAR column, if the column exists.
 async fn get_varchar_column_width(
@@ -2736,7 +2742,7 @@ async fn get_varchar_column_width(
 ) -> Result<Option<i32>> {
     let width: Option<i32> = sqlx::query_scalar(
         "SELECT character_maximum_length FROM information_schema.columns \
-         WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2",
+         WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2",
     )
     .bind(table)
     .bind(column)
@@ -2744,6 +2750,33 @@ async fn get_varchar_column_width(
     .await?
     .flatten();
     Ok(width)
+}
+
+/// Widen a VARCHAR column to `target_width` if it is currently narrower.
+async fn widen_varchar_column(
+    pool: &sqlx::Pool<Postgres>,
+    table: &str,
+    column: &str,
+    target_width: i32,
+) -> Result<()> {
+    match get_varchar_column_width(pool, table, column).await? {
+        Some(width) if width >= target_width => {
+            log::info!(
+                "[POSTGRES] Skipping {column} column widen for {table}: already VARCHAR({width})"
+            );
+            return Ok(());
+        }
+        _ => {}
+    }
+
+    let sql =
+        format!("ALTER TABLE IF EXISTS {table} ALTER COLUMN {column} TYPE VARCHAR({target_width})");
+    if let Err(e) = sqlx::query(&sql).execute(pool).await {
+        log::warn!("[POSTGRES] Failed to widen {column} column for {table}: {e}");
+    } else {
+        log::info!("[POSTGRES] Widened {column} column for {table} to VARCHAR({target_width})");
+    }
+    Ok(())
 }
 
 /// Apply column width compatibility for VARCHAR(file).
@@ -2755,22 +2788,7 @@ async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
         "file_list_dump_stats",
     ];
     for table in &tables {
-        match get_varchar_column_width(pool, table, "file").await? {
-            Some(width) if width >= FILE_COLUMN_TARGET_WIDTH => {
-                log::info!(
-                    "[POSTGRES] Skipping file column widen for {table}: already VARCHAR({width})"
-                );
-                continue;
-            }
-            _ => {}
-        }
-
-        let sql = format!(
-            "ALTER TABLE IF EXISTS {table} ALTER COLUMN file TYPE VARCHAR({FILE_COLUMN_TARGET_WIDTH})"
-        );
-        if let Err(e) = sqlx::query(&sql).execute(pool).await {
-            log::warn!("[POSTGRES] Failed to widen file column for {table}: {e}");
-        }
+        widen_varchar_column(pool, table, "file", FILE_COLUMN_TARGET_WIDTH).await?;
     }
     Ok(())
 }
@@ -2906,7 +2924,7 @@ async fn create_future_partitions(conn: &mut PgConnection, table: &str) -> Resul
 /// is one past the current maximum.
 async fn align_identity_sequence(conn: &mut PgConnection, table: &str) -> Result<()> {
     sqlx::query(&format!(
-        "SELECT setval(pg_get_serial_sequence('public.{table}', 'id'), COALESCE((SELECT MAX(id) FROM public.{table}), 0) + 1, false)"
+        "SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE((SELECT MAX(id) FROM {table}), 0) + 1, false)"
     ))
     .execute(&mut *conn)
     .await?;
@@ -3045,15 +3063,9 @@ CREATE TABLE IF NOT EXISTS stream_stats
     }
 
     // after introducing org_storage, the account can have value of org_id:default,
-    // and we restrict org_id to 100 characters so here we change it to 256 from original 32
+    // and we restrict org_id to 100 characters so here we change it to 128 from original 32
     for table in &["file_list", "file_list_history", "file_list_deleted"] {
-        log::info!("[POSTGRES] updating account col to 128 for table {table}");
-        sqlx::query(&format!(
-            "ALTER TABLE {table} ALTER COLUMN account TYPE VARCHAR(128);"
-        ))
-        .execute(&pool)
-        .await?;
-        log::info!("[POSTGRES] successfully updated account col to 128 for table {table}");
+        widen_varchar_column(&pool, table, "account", ACCOUNT_COLUMN_TARGET_WIDTH).await?;
     }
 
     Ok(())
@@ -3360,8 +3372,9 @@ SELECT c.relname
 FROM pg_inherits i
 JOIN pg_class c ON c.oid = i.inhrelid
 JOIN pg_class p ON p.oid = i.inhparent
+JOIN pg_namespace n ON n.oid = p.relnamespace
 WHERE p.relname = $1
-  AND p.relnamespace = 'public'::regnamespace
+  AND n.nspname = current_schema()
   AND c.relname != $2
 ORDER BY c.relname
             "#,

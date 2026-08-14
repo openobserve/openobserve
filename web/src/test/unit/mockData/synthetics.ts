@@ -82,8 +82,19 @@ export const mockMonitorBrowser: BrowserCheck = {
   folder: "folder-1",
   tags: ["critical", "e2e"],
   journey: [
-    { id: "step-1", action: "navigate", value: "https://app.example.com/login", code: "await page.goto('...')" },
-    { id: "step-2", action: "type", selector: "#username", value: "testuser", code: "await page.fill('#username', '...')" },
+    {
+      id: "step-1",
+      action: "navigate",
+      value: "https://app.example.com/login",
+      code: "await page.goto('...')",
+    },
+    {
+      id: "step-2",
+      action: "type",
+      selector: "#username",
+      value: "testuser",
+      code: "await page.fill('#username', '...')",
+    },
   ],
   schedule: { type: "interval", intervalValue: 15, intervalUnit: "minutes" },
   locations: ["us-east-1", "eu-west-1", "ap-southeast-1"],
@@ -206,14 +217,19 @@ export const mockRunFailed = {
   failedStep: "step-2",
   recordedSteps: [
     { id: "step-1", action: "navigate", name: "Go to page", passed: true, durationMs: 1200 },
-    { id: "step-2", action: "click", name: "Click submit", passed: false, durationMs: 28140, error: "Timeout" },
+    {
+      id: "step-2",
+      action: "click",
+      name: "Click submit",
+      passed: false,
+      durationMs: 28140,
+      error: "Timeout",
+    },
   ],
   lastAttemptSteps: [
     { id: "step-1", action: "navigate", name: "Go to page", passed: true, durationMs: 1100 },
   ],
-  retryHistory: [
-    { attempt: 1, status: "failed", durationMs: 29340, error: "TimeoutError" },
-  ],
+  retryHistory: [{ attempt: 1, status: "failed", durationMs: 29340, error: "TimeoutError" }],
   network: null,
   webVitals: null,
   traceKey: "synthetics/org-1/mon-http-1/2026/03/run-002/trace.json",
@@ -232,7 +248,67 @@ export const mockRunDetail = {
 export const mockLocations: SyntheticsLocation[] = [
   { id: "us-east-1", label: "US East (N. Virginia)", region: "us-east-1", provider: "aws" },
   { id: "eu-west-1", label: "EU (Ireland)", region: "eu-west-1", provider: "aws" },
-  { id: "ap-southeast-1", label: "Asia Pacific (Singapore)", region: "ap-southeast-1", provider: "aws" },
+  {
+    id: "ap-southeast-1",
+    label: "Asia Pacific (Singapore)",
+    region: "ap-southeast-1",
+    provider: "aws",
+  },
+];
+
+export const mockPrivateLocations: SyntheticsLocation[] = [
+  {
+    id: "private-mumbai-1",
+    label: "mumbai-prod",
+    region: "mumbai-prod",
+    provider: "",
+    kind: "private",
+    status: "online",
+    agent_names: ["ag-mumbai-22"],
+    live_agents: 1,
+  },
+  {
+    id: "private-blr-1",
+    label: "bangalore-prod",
+    region: "bangalore-prod",
+    provider: "",
+    kind: "private",
+    status: "online",
+    agent_names: ["ag-blr-01", "ag-blr-02", "ag-blr-03"],
+    live_agents: 3,
+  },
+  {
+    id: "private-pending-1",
+    label: "delhi-pending",
+    region: "delhi-pending",
+    provider: "",
+    kind: "private",
+    status: "pending",
+    agent_names: [],
+    live_agents: 0,
+  },
+  {
+    id: "private-offline-1",
+    label: "chennai-offline",
+    region: "chennai-offline",
+    provider: "",
+    kind: "private",
+    status: "offline",
+    agent_names: [],
+    live_agents: 0,
+    last_seen_at: Date.now() * 1000 - 2 * 3600 * 1_000_000, // 2 hours ago
+  },
+  {
+    id: "private-down-1",
+    label: "kolkata-down",
+    region: "kolkata-down",
+    provider: "",
+    kind: "private",
+    status: "offline",
+    agent_names: [],
+    live_agents: 0,
+    last_seen_at: Date.now() * 1000 - 30 * 3600 * 1_000_000, // 30 hours ago
+  },
 ];
 
 // ── Capabilities / device fixtures ──────────────────────────────────────────

@@ -14,18 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import {
-  buildConditionPreview,
-  getTruncatedConditions,
-} from "@/utils/conditionPreview";
+import { buildConditionPreview, getTruncatedConditions } from "@/utils/conditionPreview";
 
 // V2 condition leaf helper
-const cond = (
-  column: string,
-  operator: string,
-  value: any,
-  logicalOperator?: string,
-) => ({
+const cond = (column: string, operator: string, value: any, logicalOperator?: string) => ({
   filterType: "condition",
   column,
   operator,
@@ -80,26 +72,16 @@ describe("buildConditionPreview", () => {
     });
 
     it("renders a single condition", () => {
-      expect(buildConditionPreview(group([cond("status", "=", "500")]))).toBe(
-        "status = '500'",
-      );
+      expect(buildConditionPreview(group([cond("status", "=", "500")]))).toBe("status = '500'");
     });
 
     it("joins two conditions with the second's logicalOperator, lowercased", () => {
-      const node = group([
-        cond("status", "=", "500"),
-        cond("host", "!=", "web-01", "AND"),
-      ]);
-      expect(buildConditionPreview(node)).toBe(
-        "status = '500' and host != 'web-01'",
-      );
+      const node = group([cond("status", "=", "500"), cond("host", "!=", "web-01", "AND")]);
+      expect(buildConditionPreview(node)).toBe("status = '500' and host != 'web-01'");
     });
 
     it("lowercases an OR logicalOperator", () => {
-      const node = group([
-        cond("a", "=", "1"),
-        cond("b", "=", "2", "OR"),
-      ]);
+      const node = group([cond("a", "=", "1"), cond("b", "=", "2", "OR")]);
       expect(buildConditionPreview(node)).toBe("a = '1' or b = '2'");
     });
 
@@ -118,9 +100,7 @@ describe("buildConditionPreview", () => {
         cond("a", "=", "1"),
         { ...group([cond("b", "=", "2"), cond("c", "=", "3", "OR")]), logicalOperator: "AND" },
       ]);
-      expect(buildConditionPreview(node)).toBe(
-        "a = '1' and (b = '2' or c = '3')",
-      );
+      expect(buildConditionPreview(node)).toBe("a = '1' and (b = '2' or c = '3')");
     });
 
     it("renders a deeply nested group", () => {
@@ -145,9 +125,7 @@ describe("buildConditionPreview", () => {
     });
 
     it("does not treat a group as V2 when `conditions` is not an array", () => {
-      expect(
-        buildConditionPreview({ filterType: "group", conditions: "nope" }),
-      ).toBe("");
+      expect(buildConditionPreview({ filterType: "group", conditions: "nope" })).toBe("");
     });
 
     it("does not treat a group as V2 when `conditions` is missing", () => {
@@ -156,30 +134,22 @@ describe("buildConditionPreview", () => {
 
     describe("defaults and value quoting inside a group", () => {
       it("falls back to `field` when the column is missing", () => {
-        const node = group([
-          { filterType: "condition", operator: "=", value: "1" } as any,
-        ]);
+        const node = group([{ filterType: "condition", operator: "=", value: "1" } as any]);
         expect(buildConditionPreview(node)).toBe("field = '1'");
       });
 
       it("falls back to `=` when the operator is missing", () => {
-        const node = group([
-          { filterType: "condition", column: "a", value: "1" } as any,
-        ]);
+        const node = group([{ filterType: "condition", column: "a", value: "1" } as any]);
         expect(buildConditionPreview(node)).toBe("a = '1'");
       });
 
       it("renders '' when the value is undefined", () => {
-        const node = group([
-          { filterType: "condition", column: "a", operator: "=" } as any,
-        ]);
+        const node = group([{ filterType: "condition", column: "a", operator: "=" } as any]);
         expect(buildConditionPreview(node)).toBe("a = ''");
       });
 
       it("renders '' when the value is null", () => {
-        expect(buildConditionPreview(group([cond("a", "=", null)]))).toBe(
-          "a = ''",
-        );
+        expect(buildConditionPreview(group([cond("a", "=", null)]))).toBe("a = ''");
       });
 
       it("renders '' when the value is an empty string", () => {
@@ -191,17 +161,13 @@ describe("buildConditionPreview", () => {
       });
 
       it("quotes a false boolean value", () => {
-        expect(buildConditionPreview(group([cond("a", "=", false)]))).toBe(
-          "a = 'false'",
-        );
+        expect(buildConditionPreview(group([cond("a", "=", false)]))).toBe("a = 'false'");
       });
 
       it("supports every comparison operator", () => {
         const operators = ["=", "!=", ">", "<", ">=", "<=", "contains", "Contains", "NotContains"];
         operators.forEach((op) => {
-          expect(buildConditionPreview(group([cond("a", op, "v")]))).toBe(
-            `a ${op} 'v'`,
-          );
+          expect(buildConditionPreview(group([cond("a", op, "v")]))).toBe(`a ${op} 'v'`);
         });
       });
 
@@ -367,9 +333,9 @@ describe("buildConditionPreview", () => {
 
   describe("single condition", () => {
     it("renders column operator 'value'", () => {
-      expect(
-        buildConditionPreview({ column: "status", operator: ">=", value: 500 }),
-      ).toBe("status >= '500'");
+      expect(buildConditionPreview({ column: "status", operator: ">=", value: 500 })).toBe(
+        "status >= '500'",
+      );
     });
 
     it("renders '' for a missing value", () => {
@@ -377,21 +343,15 @@ describe("buildConditionPreview", () => {
     });
 
     it("renders '' for a null value", () => {
-      expect(
-        buildConditionPreview({ column: "a", operator: "=", value: null }),
-      ).toBe("a = ''");
+      expect(buildConditionPreview({ column: "a", operator: "=", value: null })).toBe("a = ''");
     });
 
     it("renders '' for an empty-string value", () => {
-      expect(
-        buildConditionPreview({ column: "a", operator: "=", value: "" }),
-      ).toBe("a = ''");
+      expect(buildConditionPreview({ column: "a", operator: "=", value: "" })).toBe("a = ''");
     });
 
     it("quotes a 0 value rather than treating it as missing", () => {
-      expect(
-        buildConditionPreview({ column: "a", operator: "=", value: 0 }),
-      ).toBe("a = '0'");
+      expect(buildConditionPreview({ column: "a", operator: "=", value: 0 })).toBe("a = '0'");
     });
 
     it("returns an empty string when the operator is missing", () => {
@@ -442,9 +402,7 @@ describe("buildConditionPreview", () => {
     });
 
     it("quotes a 0 value", () => {
-      expect(buildConditionPreview([{ column: "a", operator: "=", value: 0 }])).toBe(
-        "a = '0'",
-      );
+      expect(buildConditionPreview([{ column: "a", operator: "=", value: 0 }])).toBe("a = '0'");
     });
 
     it("returns an empty string when nothing survives the filter", () => {
@@ -455,9 +413,7 @@ describe("buildConditionPreview", () => {
 
 describe("getTruncatedConditions", () => {
   it("returns the full preview when it is within the default max length of 20", () => {
-    expect(
-      getTruncatedConditions({ column: "a", operator: "=", value: "1" }),
-    ).toBe("a = '1'");
+    expect(getTruncatedConditions({ column: "a", operator: "=", value: "1" })).toBe("a = '1'");
   });
 
   it("truncates and appends an ellipsis past the default max length", () => {
@@ -483,9 +439,7 @@ describe("getTruncatedConditions", () => {
   it("truncates at one char past the max length (boundary)", () => {
     const node = { column: "abcdefghijklm", operator: "=", value: "xyz" };
     expect(buildConditionPreview(node)).toHaveLength(21);
-    expect(getTruncatedConditions(node)).toBe(
-      buildConditionPreview(node).substring(0, 20) + "...",
-    );
+    expect(getTruncatedConditions(node)).toBe(buildConditionPreview(node).substring(0, 20) + "...");
   });
 
   it("honours a custom maxLength", () => {
@@ -511,10 +465,7 @@ describe("getTruncatedConditions", () => {
   });
 
   it("truncates a long V2 group preview", () => {
-    const node = group([
-      cond("status_code", ">=", 500),
-      cond("host", "=", "web-01", "AND"),
-    ]);
+    const node = group([cond("status_code", ">=", 500), cond("host", "=", "web-01", "AND")]);
     const full = buildConditionPreview(node);
     expect(full.length).toBeGreaterThan(20);
     expect(getTruncatedConditions(node)).toBe(full.substring(0, 20) + "...");

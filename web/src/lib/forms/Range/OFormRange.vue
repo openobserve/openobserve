@@ -21,18 +21,12 @@ const props = defineProps<FormRangeProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormRange] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormRange] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div class="flex flex-col gap-1">
         <ORange
@@ -55,9 +49,7 @@ if (import.meta.env.DEV && !form) {
           :markers="props.markers"
           :marker-labels="props.markerLabels"
           :model-value="field.state.value"
-          :error="
-            field.state.meta.errors.length > 0
-          "
+          :error="field.state.meta.errors.length > 0"
           @update:model-value="
             (v: RangeValue) => {
               field.handleChange(v);
@@ -70,12 +62,7 @@ if (import.meta.env.DEV && !form) {
             <slot name="label" />
           </template>
         </ORange>
-        <div
-          v-if="
-            field.state.meta.errors.length > 0
-          "
-          class="text-xs text-slider-error-text"
-        >
+        <div v-if="field.state.meta.errors.length > 0" class="text-slider-error-text text-xs">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

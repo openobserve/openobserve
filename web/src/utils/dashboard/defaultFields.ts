@@ -64,10 +64,7 @@ export const DEFAULT_SQL_Y_FIELD_VALUE = () => ({
  * True if a stream exposes a "value" column. When `streamName` is given, only
  * that stream is checked (groupedFields also holds joined streams for SQL joins).
  */
-export const hasValueColumn = (
-  groupedFields: any[],
-  streamName?: string,
-): boolean => {
+export const hasValueColumn = (groupedFields: any[], streamName?: string): boolean => {
   const streams = streamName
     ? (groupedFields ?? []).filter((stream: any) => stream?.name === streamName)
     : (groupedFields ?? []);
@@ -82,8 +79,7 @@ export const buildDefaultSqlFields = (
   groupedFields: any[],
   streamName?: string,
 ): { x: any[]; y: any[] } => {
-  const useValueMeasure =
-    streamType === "metrics" && hasValueColumn(groupedFields, streamName);
+  const useValueMeasure = streamType === "metrics" && hasValueColumn(groupedFields, streamName);
 
   return {
     x: [DEFAULT_SQL_X_FIELD()],

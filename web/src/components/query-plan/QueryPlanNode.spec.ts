@@ -18,7 +18,6 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import QueryPlanNode from "./QueryPlanNode.vue";
 import type { OperatorNode } from "@/utils/queryPlanParser";
 
-
 function makeNode(overrides: Partial<OperatorNode> = {}): OperatorNode {
   return {
     name: "ProjectionExec",
@@ -31,10 +30,7 @@ function makeNode(overrides: Partial<OperatorNode> = {}): OperatorNode {
   };
 }
 
-function mountNode(
-  node: OperatorNode,
-  props: Record<string, unknown> = {},
-) {
+function mountNode(node: OperatorNode, props: Record<string, unknown> = {}) {
   return mount(QueryPlanNode, {
     props: {
       node,
@@ -61,19 +57,13 @@ describe("QueryPlanNode", () => {
 
     it("should render the operator name", () => {
       wrapper = mountNode(makeNode({ name: "SortExec" }));
-      expect(
-        wrapper.find('[data-test="query-plan-node-operator-name"]').text(),
-      ).toBe("SortExec");
+      expect(wrapper.find('[data-test="query-plan-node-operator-name"]').text()).toBe("SortExec");
     });
 
     it("should render inline details when colon present in fullText", () => {
-      wrapper = mountNode(
-        makeNode({ fullText: "FilterExec: expression=[x > 0]" }),
-      );
+      wrapper = mountNode(makeNode({ fullText: "FilterExec: expression=[x > 0]" }));
       expect(wrapper.find(".inline-details").exists()).toBe(true);
-      expect(wrapper.find(".inline-details").text()).toContain(
-        "expression=[x > 0]",
-      );
+      expect(wrapper.find(".inline-details").text()).toContain("expression=[x > 0]");
     });
 
     it("should not render inline details when no colon in fullText", () => {
@@ -85,16 +75,12 @@ describe("QueryPlanNode", () => {
   describe("tree connector", () => {
     it("should show └─ connector when isLast is true", () => {
       wrapper = mountNode(makeNode(), { isLast: true });
-      expect(
-        wrapper.find('[data-test="query-plan-node-tree-connector"]').text(),
-      ).toBe("└─");
+      expect(wrapper.find('[data-test="query-plan-node-tree-connector"]').text()).toBe("└─");
     });
 
     it("should show ├─ connector when isLast is false", () => {
       wrapper = mountNode(makeNode(), { isLast: false });
-      expect(
-        wrapper.find('[data-test="query-plan-node-tree-connector"]').text(),
-      ).toBe("├─");
+      expect(wrapper.find('[data-test="query-plan-node-tree-connector"]').text()).toBe("├─");
     });
   });
 
@@ -109,9 +95,7 @@ describe("QueryPlanNode", () => {
 
     it("should not render tree-indent when parentPrefix is empty", () => {
       wrapper = mountNode(makeNode(), { parentPrefix: "" });
-      expect(
-        wrapper.find('[data-test="query-plan-node-tree-indent"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="query-plan-node-tree-indent"]').exists()).toBe(false);
     });
   });
 
@@ -129,11 +113,7 @@ describe("QueryPlanNode", () => {
 
     it("should show spacer instead of expand icon for leaf nodes", () => {
       wrapper = mountNode(makeNode());
-      expect(
-        wrapper
-          .find('[data-test="query-plan-node-expand-icon-spacer"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="query-plan-node-expand-icon-spacer"]').exists()).toBe(true);
       expect(wrapper.find(".expand-icon").exists()).toBe(false);
     });
 
@@ -225,9 +205,7 @@ describe("QueryPlanNode", () => {
 
     it("should show separator between details and metrics when both present", () => {
       wrapper = mountNode(nodeWithMetrics, { isAnalyze: true });
-      expect(
-        wrapper.find('[data-test="query-plan-node-separator"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="query-plan-node-separator"]').exists()).toBe(true);
     });
 
     it("should not show metrics section when node has no metrics", () => {
@@ -237,8 +215,7 @@ describe("QueryPlanNode", () => {
 
     it("should strip metrics section from inline details in analyze mode", () => {
       const nodeWithMetricsInText = makeNode({
-        fullText:
-          "FilterExec: expression=[x > 0], metrics=[elapsed_compute=5ms, output_rows=100]",
+        fullText: "FilterExec: expression=[x > 0], metrics=[elapsed_compute=5ms, output_rows=100]",
         metrics: { elapsed_compute: "5ms", output_rows: 100 },
       });
       wrapper = mountNode(nodeWithMetricsInText, { isAnalyze: true });

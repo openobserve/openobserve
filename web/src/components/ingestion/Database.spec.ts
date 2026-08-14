@@ -4,17 +4,16 @@ import Database from "@/components/ingestion/Database.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mock-${path}`),
-  verifyOrganizationStatus: vi.fn()
+  verifyOrganizationStatus: vi.fn(),
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 // Mock router
@@ -22,10 +21,10 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "databases",
-      query: {}
-    }
+      query: {},
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
@@ -35,7 +34,7 @@ vi.mock("vue-router", () => ({
 
 const mountOptions = {
   props: {
-    currOrgIdentifier: "test-org"
+    currOrgIdentifier: "test-org",
   },
   global: {
     plugins: [i18n],
@@ -44,8 +43,8 @@ const mountOptions = {
     },
     stubs: {
       DataSourceSidebarLayout: true,
-      'router-view': true
-    }
+      "router-view": true,
+    },
   },
 };
 
@@ -149,7 +148,10 @@ describe("Database Component", () => {
       // Check to object structure
       expect(firstTab.to).toHaveProperty("name");
       expect(firstTab.to).toHaveProperty("query");
-      expect(firstTab.to.query).toHaveProperty("org_identifier", store.state.selectedOrganization.identifier);
+      expect(firstTab.to.query).toHaveProperty(
+        "org_identifier",
+        store.state.selectedOrganization.identifier,
+      );
     });
 
     it("should generate correct icons for each database", () => {
@@ -190,7 +192,7 @@ describe("Database Component", () => {
       const databaseTabs = wrapper.vm.databaseTabs;
       const sqlDatabases = ["sqlserver", "postgres", "mysql"];
 
-      sqlDatabases.forEach(dbName => {
+      sqlDatabases.forEach((dbName) => {
         const hasDb = databaseTabs.some((tab: any) => tab.name === dbName);
         expect(hasDb).toBe(true);
       });
@@ -200,7 +202,7 @@ describe("Database Component", () => {
       const databaseTabs = wrapper.vm.databaseTabs;
       const nosqlDatabases = ["mongodb", "redis", "cassandra", "aerospike", "dynamodb"];
 
-      nosqlDatabases.forEach(dbName => {
+      nosqlDatabases.forEach((dbName) => {
         const hasDb = databaseTabs.some((tab: any) => tab.name === dbName);
         expect(hasDb).toBe(true);
       });
@@ -210,7 +212,7 @@ describe("Database Component", () => {
       const databaseTabs = wrapper.vm.databaseTabs;
       const dataWarehouses = ["snowflake", "databricks"];
 
-      dataWarehouses.forEach(dbName => {
+      dataWarehouses.forEach((dbName) => {
         const hasDb = databaseTabs.some((tab: any) => tab.name === dbName);
         expect(hasDb).toBe(true);
       });
@@ -220,7 +222,7 @@ describe("Database Component", () => {
       const databaseTabs = wrapper.vm.databaseTabs;
       const coordinationServices = ["zookeeper"];
 
-      coordinationServices.forEach(dbName => {
+      coordinationServices.forEach((dbName) => {
         const hasDb = databaseTabs.some((tab: any) => tab.name === dbName);
         expect(hasDb).toBe(true);
       });
@@ -305,7 +307,9 @@ describe("Database Component", () => {
       expect(sqlServerTab.icon).toBe("img:mock-images/ingestion/sqlserver.png");
       expect(sqlServerTab.contentClass).toBe("tab_content");
       expect(sqlServerTab.to.name).toBe("sqlserver");
-      expect(sqlServerTab.to.query.org_identifier).toBe(store.state.selectedOrganization.identifier);
+      expect(sqlServerTab.to.query.org_identifier).toBe(
+        store.state.selectedOrganization.identifier,
+      );
     });
 
     it("should have correct configuration for PostgreSQL tab", () => {
@@ -454,7 +458,7 @@ describe("Database Component", () => {
         global: mountOptions.global,
       });
 
-      expect(testWrapper.props('currOrgIdentifier')).toBe("");
+      expect(testWrapper.props("currOrgIdentifier")).toBe("");
       expect(testWrapper.vm.databaseTabs).toBeDefined();
       testWrapper.unmount();
     });
@@ -510,13 +514,22 @@ describe("Database Component", () => {
   describe("Database Tabs Raw Data", () => {
     it("should contain all expected database types in databaseTabs", () => {
       const expectedDbs = [
-        "sqlserver", "postgres", "mongodb", "redis", "mysql",
-        "snowflake", "zookeeper", "cassandra", "aerospike", "dynamodb", "databricks"
+        "sqlserver",
+        "postgres",
+        "mongodb",
+        "redis",
+        "mysql",
+        "snowflake",
+        "zookeeper",
+        "cassandra",
+        "aerospike",
+        "dynamodb",
+        "databricks",
       ];
 
       const actualDbNames = wrapper.vm.databaseTabs.map((tab: any) => tab.name);
 
-      expectedDbs.forEach(dbName => {
+      expectedDbs.forEach((dbName) => {
         expect(actualDbNames).toContain(dbName);
       });
     });

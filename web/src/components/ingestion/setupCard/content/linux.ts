@@ -18,6 +18,8 @@
 // callout; it is now a variant toggle, with the EC2 IAM prerequisite riding on
 // the EC2 variant's note where it is actually relevant.
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import {
@@ -40,34 +42,32 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Linux",
-      tagline:
-        "Install the OpenObserve agent on any Linux host — system and journald logs plus CPU, memory, disk and network metrics.",
+      tagline: gt("ingestion.setupCard.taglineLinux"),
       logo: getImageURL("images/common/linux.svg"),
       tone: "#f5b53d",
       runtime: "Host",
       setupTime: "~1 min",
-      metaBadges: ["Logs", "Metrics"],
+      metaBadges: [gt("common.logs"), gt("common.metrics")],
     },
     steps: [
       {
         id: "install",
-        title: "Install the Agent",
-        description:
-          "Run this on the host as **root** (or with `sudo`). Pick **AWS EC2** to additionally pick up instance metadata and use the instance's Name tag as the host identifier.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.installAgentTitle",
+        descriptionKey: "ingestion.setupCard.installAgentLinuxDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variants: [
           {
             id: "generic",
-            label: "Generic Linux",
+            labelKey: "ingestion.setupCard.genericLinuxVariant",
             icon: icon.linux,
             code: agentCode(install(""), subs, "bash"),
             note: "Any Linux server or VM.",
           },
           {
             id: "ec2",
-            label: "AWS EC2",
+            label: raw("AWS EC2"),
             icon: icon.ec2,
             code: agentCode(install("/ec2"), subs, "bash"),
             note: EC2_IAM_NOTE,
@@ -76,19 +76,19 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "The agent starts on install. Give it a few seconds, then hit Test — host metrics arrive as `system_*` streams.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyLinuxAgentDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
         pills: [
-          "System Logs",
-          "journald",
-          "CPU",
-          "Memory",
-          "Disk",
-          "Network",
+          gt("ingestion.setupCard.pillSystemLogs"),
+          // Daemon name and a universal acronym — the same token in every locale.
+          raw("journald"),
+          raw("CPU"),
+          gt("ingestion.setupCard.pillMemory"),
+          gt("ingestion.setupCard.pillDisk"),
+          gt("common.network"),
         ],
       },
     ],
@@ -100,9 +100,7 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
       fixLang: "bash",
       fixSnippet: `sudo systemctl status openobserve-agent
 sudo journalctl -u openobserve-agent -n 50 --no-pager`,
-      troubleshooting: sharedAgentTroubleshooting(
-        "`sudo systemctl status openobserve-agent`",
-      ),
+      troubleshooting: sharedAgentTroubleshooting("`sudo systemctl status openobserve-agent`"),
       uninstall: agentUninstall("linux"),
     },
     docUrl: "https://github.com/openobserve/agents",

@@ -16,61 +16,71 @@
 -->
 <template>
   <div class="flex flex-col gap-2.5" data-test="agent-behavior-panel">
+    <!-- Summary strip: behaviour signals at a glance (loops, failures, agents). -->
+    <div class="shrink-0" data-test="agent-behavior-summary">
+      <OStatStrip :items="behaviorStats" :loading="tableLoading" />
+    </div>
     <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
          panels (LLMErrorTable) so the whole page reads as one surface. -->
     <div
-      class="bg-card-glass-bg llm-trend-panel rounded-default flex flex-col flex-1 min-h-0 overflow-hidden border border-border-default"
+      class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
       data-test="agent-behavior-loops-card"
     >
-      <div class="flex flex-col mb-2 px-4 pt-4">
-        <div class="text-sm font-semibold text-text-heading">
-          {{ t("aiObservability.behavior.loopsTitle") }}
-        </div>
-        <div class="text-2xs leading-normal mt-0.5 text-text-secondary">
-          {{ t("aiObservability.behavior.loopsHint") }}
-        </div>
-      </div>
+      <PanelSectionHeader
+        :title="t('aiObservability.behavior.loopsTitle')"
+        :hint="t('aiObservability.behavior.loopsHint')"
+        icon="restart-alt"
+        tone="warning"
+      />
       <OTable
         data-test="agent-behavior-loops-table"
         :data="loopRows"
         :columns="loopColumns"
+        :loading="tableLoading"
         :default-columns="false"
         :frame="false"
         :show-global-filter="false"
-        class="flex-1 min-h-0"
+        :row-class="loopRowClass"
+        :footer-title="t('aiObservability.behavior.footerLoops')"
+        class="min-h-0 flex-1"
         show-index
         pagination="client"
-        :empty-message="t('aiObservability.behavior.noLoops')"
+        :empty-message="loopsEmptyMessage"
         @row-click="(r: any) => openDetail('loop', r)"
       />
     </div>
 
     <!-- Failure taxonomy -->
     <div
-      class="bg-card-glass-bg llm-trend-panel rounded-default flex flex-col flex-1 min-h-0 overflow-hidden border border-border-default"
+      class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
       data-test="agent-behavior-failures-card"
     >
-      <div class="flex flex-col mb-2 px-4 pt-4">
-        <div class="text-sm font-semibold text-text-heading">
-          {{ t("aiObservability.behavior.failuresTitle") }}
-        </div>
-        <div class="text-2xs leading-normal mt-0.5 text-text-secondary">
-          {{ t("aiObservability.behavior.failuresHint") }}
-        </div>
-      </div>
+      <PanelSectionHeader
+        :title="t('aiObservability.behavior.failuresTitle')"
+        :hint="t('aiObservability.behavior.failuresHint')"
+        icon="error-outline"
+        tone="error"
+      />
       <OTable
         data-test="agent-behavior-failures-table"
         :data="failureRows"
         :columns="failureColumns"
+        :loading="tableLoading"
         :default-columns="false"
         :frame="false"
         :show-global-filter="false"
-        class="flex-1 min-h-0"
+        :row-class="failureRowClass"
+        :footer-title="t('aiObservability.behavior.footerFailures')"
+        class="min-h-0 flex-1"
         show-index
         pagination="client"
-        :empty-message="t('aiObservability.behavior.noFailures')"
+        :empty-message="failuresEmptyMessage"
         @row-click="(r: any) => openDetail('failure', r)"
-      />
+      >
+        <template #cell-failClass="{ row }">
+          <OTag variant="warning-soft" size="sm">{{ row.failClass }}</OTag>
+        </template>
+      </OTable>
     </div>
 
     <!-- Cost is intentionally NOT a table here — LLM Insights already owns the
@@ -84,20 +94,25 @@
       :source-stream="sourceStream"
       :start-time="startTime"
       :end-time="endTime"
+      :agent-env="agentEnv"
+      :agent-version="agentVersion"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
-import agentSignalsService, {
-  type AgentSignalRecord,
-} from "@/services/agent_signals";
+import PanelSectionHeader from "./PanelSectionHeader.vue";
+import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
+import { matchesAgentScope } from "./agentScope";
 
 const props = defineProps<{
   startTime?: number;
@@ -105,9 +120,13 @@ const props = defineProps<{
   sourceStream?: string;
   /** When set (Agent mode), show only this agent's signals; empty = all agents. */
   agentFilter?: string;
+  /** Selected agent's env/version (Agent mode) — surfaced in the detail drawer. */
+  agentEnv?: string | null;
+  agentVersion?: string | null;
+  scopeReady?: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const signals = ref<AgentSignalRecord[]>([]);
@@ -120,23 +139,33 @@ const detailOpen = ref(false);
 const detailRow = ref<any>(null);
 
 /** Open the details panel for a clicked Behavior row (maps the table row to a signal). */
-const openDetail = (
-  signalType: "loop" | "failure" | "cost",
-  row: Record<string, any>,
-) => {
+const openDetail = (signalType: "loop" | "failure" | "cost", row: Record<string, any>) => {
   detailRow.value = { signalType, ...row };
   detailOpen.value = true;
 };
 
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier as string,
-);
+// Highlight the row whose drawer is currently open, so the relationship
+// "this row → this drawer" is visible at a glance (rather than a drawer that
+// seems disconnected from the table).
+const isActiveRow = (type: "loop" | "failure", row: any): boolean => {
+  const d = detailRow.value;
+  if (!detailOpen.value || !d || d.signalType !== type) return false;
+  if ((d.agentRaw ?? null) !== (row.agentRaw ?? null)) return false;
+  return type === "loop" ? d.tool === row.tool : d.failClass === row.failClass;
+};
+const loopRowClass = (row: any) => (isActiveRow("loop", row) ? "bg-table-row-selected-bg" : "");
+const failureRowClass = (row: any) =>
+  isActiveRow("failure", row) ? "bg-table-row-selected-bg" : "";
+
+const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 
 /** Signals scoped to the selected agent (Agent mode) or all agents (Stream mode). */
 const scopedSignals = computed(() => {
   const a = props.agentFilter?.trim();
   if (!a) return signals.value;
-  return signals.value.filter((s) => (s.agent_name ?? "") === a);
+  return signals.value.filter((s) =>
+    matchesAgentScope(s, { name: a, env: props.agentEnv, version: props.agentVersion }),
+  );
 });
 
 /** Loop rows: rank (agent, tool) by calls-per-trace ratio. */
@@ -161,6 +190,22 @@ const loopRows = computed(() =>
     .sort((a, b) => b.ratio - a.ratio),
 );
 
+// Scope-aware empty text — when a single agent is selected, say so (and how to
+// widen) so an agent with no signals reads as "nothing for THIS agent", not
+// "the page is broken / where's my data".
+const loopsEmptyMessage = computed(() =>
+  props.agentFilter
+    ? t("aiObservability.behavior.noLoopsForAgent", { agent: props.agentFilter })
+    : t("aiObservability.behavior.noLoops"),
+);
+const failuresEmptyMessage = computed(() =>
+  props.agentFilter
+    ? t("aiObservability.behavior.noFailuresForAgent", {
+        agent: props.agentFilter,
+      })
+    : t("aiObservability.behavior.noFailures"),
+);
+
 /** Failure rows: per (agent, class) with count. */
 const failureRows = computed(() =>
   scopedSignals.value
@@ -173,6 +218,43 @@ const failureRows = computed(() =>
     }))
     .sort((a, b) => b.count - a.count),
 );
+
+// Summary strip — at-a-glance behaviour signals. Loops draw attention (warning),
+// failures are the exception (error), agents-affected is the scope (primary).
+const behaviorStats = computed<StatItem[]>(() => {
+  const loops = loopRows.value;
+  const failures = failureRows.value;
+  const agents = new Set([...loops, ...failures].map((r) => r.agentRaw).filter(Boolean));
+  const totalFailures = failures.reduce((sum, f) => sum + (f.count || 0), 0);
+  const has = loops.length + failures.length > 0;
+  const v = (n: number): string | number => (has ? n : "—");
+  return [
+    {
+      key: "loops",
+      label: t("aiObservability.behavior.summaryLoops"),
+      value: v(loops.length),
+      icon: "restart-alt",
+      tone: "warning",
+      dataTest: "agent-behavior-summary-loops",
+    },
+    {
+      key: "failures",
+      label: t("aiObservability.behavior.summaryFailures"),
+      value: v(totalFailures),
+      icon: "error-outline",
+      tone: "error",
+      dataTest: "agent-behavior-summary-failures",
+    },
+    {
+      key: "agents",
+      label: t("aiObservability.behavior.summaryAgents"),
+      value: v(agents.size),
+      icon: "smart-toy",
+      tone: "primary",
+      dataTest: "agent-behavior-summary-agents",
+    },
+  ];
+});
 
 const loopColumns = computed<OTableColumnDef[]>(() => [
   {
@@ -236,8 +318,10 @@ const failureColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
+const tableLoading = computed(() => loading.value || props.scopeReady === false);
+
 const fetchSignals = async () => {
-  if (!orgId.value) return;
+  if (!orgId.value || !props.sourceStream) return;
   loading.value = true;
   try {
     const res = await agentSignalsService.getAgentSignals(orgId.value, {
@@ -256,10 +340,7 @@ const fetchSignals = async () => {
 };
 
 onMounted(fetchSignals);
-watch(
-  () => [props.startTime, props.endTime, props.sourceStream, orgId.value],
-  fetchSignals,
-);
+watch(() => [props.startTime, props.endTime, props.sourceStream, orgId.value], fetchSignals);
 
 defineExpose({ refresh: fetchSignals, lastRunAt, loading });
 </script>

@@ -68,7 +68,7 @@ describe("useActions", () => {
         isEnterprise: "true",
         isCloud: "false",
       };
-      
+
       // Reset store to enable actions
       mockStore.state.zoConfig.actions_enabled = true;
 
@@ -82,7 +82,7 @@ describe("useActions", () => {
         isEnterprise: "false",
         isCloud: "true",
       };
-      
+
       // Reset store to enable actions
       mockStore.state.zoConfig.actions_enabled = true;
 
@@ -115,7 +115,7 @@ describe("useActions", () => {
 
     it("should handle service call errors", async () => {
       const errorMessage = "Service error";
-      
+
       // Reset and enable actions for this test
       mockStore.state.zoConfig.actions_enabled = true;
       vi.doMock("@/aws-exports", () => ({
@@ -124,14 +124,13 @@ describe("useActions", () => {
           isCloud: "false",
         },
       }));
-      
+
       vi.mocked(actionService.list).mockRejectedValueOnce(new Error(errorMessage));
 
       const { getAllActions } = useActions();
 
       await expect(getAllActions()).rejects.toThrow(errorMessage);
     });
-
   });
 
   describe("composable structure", () => {

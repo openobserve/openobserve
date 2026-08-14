@@ -18,16 +18,16 @@ import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useT
 const VRL_PROMPTS = [
   'Write a VRL function. e.g. .status = "active"',
   'Write a VRL function. e.g. if .level == "error" { .alert = true }',
-  'Write a VRL function. e.g. del(.sensitive_field)',
-  'Write a VRL function. e.g. .count = int!(.count) + 1',
-  'Write a VRL function. e.g. .message = downcase!(string!(.message))',
+  "Write a VRL function. e.g. del(.sensitive_field)",
+  "Write a VRL function. e.g. .count = int!(.count) + 1",
+  "Write a VRL function. e.g. .message = downcase!(string!(.message))",
 ];
 
 const JS_PROMPTS = [
   'Write a JS function. e.g. row.status = "active";',
   'Write a JS function. e.g. if (row.level === "error") row.alert = true;',
-  'Write a JS function. e.g. delete row.sensitive_field;',
-  'Write a JS function. e.g. row.count = parseInt(row.count) + 1;',
+  "Write a JS function. e.g. delete row.sensitive_field;",
+  "Write a JS function. e.g. row.count = parseInt(row.count) + 1;",
 ];
 
 /** Typewriter placeholder for VRL function editors. */

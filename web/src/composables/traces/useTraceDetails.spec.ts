@@ -136,9 +136,7 @@ describe("useTraceDetails", () => {
   describe("hasSpanError with exception events", () => {
     it("should be true when span has exception events", () => {
       const span = computed(() => ({
-        events: JSON.stringify([
-          { name: "exception", "exception.type": "TypeError" },
-        ]),
+        events: JSON.stringify([{ name: "exception", "exception.type": "TypeError" }]),
       }));
       const result = useTraceDetails(span);
       expect(result.hasSpanError.value).toBe(true);
@@ -332,9 +330,7 @@ describe("useTraceDetails", () => {
         grpc_error_message: "Insufficient permissions",
       }));
       const result = useTraceDetails(span);
-      expect(result.spanGrpcErrorMessage.value).toBe(
-        "Insufficient permissions",
-      );
+      expect(result.spanGrpcErrorMessage.value).toBe("Insufficient permissions");
     });
 
     it("should return null when grpc_error_message is absent", () => {
@@ -530,7 +526,11 @@ describe("useTraceDetails", () => {
     it("should return exception.type from first exception event", () => {
       const span = computed(() => ({
         events: JSON.stringify([
-          { name: "exception", "exception.type": "TypeError", "exception.message": "x is not a function" },
+          {
+            name: "exception",
+            "exception.type": "TypeError",
+            "exception.message": "x is not a function",
+          },
         ]),
       }));
       const result = useTraceDetails(span);
@@ -539,9 +539,7 @@ describe("useTraceDetails", () => {
 
     it("should return Exception when exception event has no exception.type", () => {
       const span = computed(() => ({
-        events: JSON.stringify([
-          { name: "exception", "exception.message": "something broke" },
-        ]),
+        events: JSON.stringify([{ name: "exception", "exception.message": "something broke" }]),
       }));
       const result = useTraceDetails(span);
       expect(result.errorBannerTitle.value).toBe("Exception");
@@ -571,9 +569,7 @@ describe("useTraceDetails", () => {
 
     it("should prefer exception.type over all other error fields", () => {
       const span = computed(() => ({
-        events: JSON.stringify([
-          { name: "exception", "exception.type": "TypeError" },
-        ]),
+        events: JSON.stringify([{ name: "exception", "exception.type": "TypeError" }]),
         error_type: "InternalError",
         grpc_error_name: "PermissionDenied",
       }));
@@ -673,7 +669,11 @@ describe("useTraceDetails", () => {
     it("should return exception.message from first exception event", () => {
       const span = computed(() => ({
         events: JSON.stringify([
-          { name: "exception", "exception.type": "TypeError", "exception.message": "x is not a function" },
+          {
+            name: "exception",
+            "exception.type": "TypeError",
+            "exception.message": "x is not a function",
+          },
         ]),
       }));
       const result = useTraceDetails(span);
@@ -682,9 +682,7 @@ describe("useTraceDetails", () => {
 
     it("should return empty string when exception event has no message", () => {
       const span = computed(() => ({
-        events: JSON.stringify([
-          { name: "exception", "exception.type": "TypeError" },
-        ]),
+        events: JSON.stringify([{ name: "exception", "exception.type": "TypeError" }]),
       }));
       const result = useTraceDetails(span);
       expect(result.errorBannerMessage.value).toBe("");
@@ -714,9 +712,7 @@ describe("useTraceDetails", () => {
 
     it("should prefer exception.message over status_message and grpc_error_message", () => {
       const span = computed(() => ({
-        events: JSON.stringify([
-          { name: "exception", "exception.message": "exception text" },
-        ]),
+        events: JSON.stringify([{ name: "exception", "exception.message": "exception text" }]),
         status_message: "status text",
         grpc_error_message: "grpc text",
       }));

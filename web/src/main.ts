@@ -29,13 +29,11 @@ import configService from "./services/config";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
-import {
-  contextRegistry,
-  createDefaultContextProvider,
-} from "./composables/contextProviders";
+import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
 import { buildVersionChecker } from "./utils/buildVersionChecker";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
+import { raw } from "@/types/i18n";
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -139,8 +137,7 @@ const getConfig = async () => {
 
             // Check if error matches any ignored pattern
             const shouldIgnore = ignoredErrorPatterns.some(
-              (pattern) =>
-                pattern.test(errorMessage) || pattern.test(errorStack),
+              (pattern) => pattern.test(errorMessage) || pattern.test(errorStack),
             );
 
             if (shouldIgnore) {
@@ -171,9 +168,7 @@ const getConfig = async () => {
           const ignoredLogPatterns = [/ResizeObserver loop/i];
 
           // Check if log matches any ignored pattern
-          const shouldIgnore = ignoredLogPatterns.some((pattern) =>
-            pattern.test(logMessage),
-          );
+          const shouldIgnore = ignoredLogPatterns.some((pattern) => pattern.test(logMessage));
 
           if (shouldIgnore) {
             return false; // Don't send this log
@@ -208,10 +203,10 @@ function showNewVersionNotification() {
   staleNotificationShown = true;
   toast({
     variant: "error",
-    message: i18n.global.t("common.chunkLoadErrorMsg"),
+    message: raw(i18n.global.t("common.chunkLoadErrorMsg")),
     timeout: 0, // Don't auto-dismiss
     action: {
-      label: i18n.global.t("common.refresh"),
+      label: raw(i18n.global.t("common.refresh")),
       handler: () => {
         window.location.reload();
       },

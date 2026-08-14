@@ -5,6 +5,8 @@
 //
 // For inline/simple code chips (no highlighting), use OCode instead.
 
+import type { I18nText } from "@/types/i18n";
+
 export type CodeBlockChrome = "terminal" | "editor";
 
 export interface CodeBlockProps {
@@ -29,10 +31,23 @@ export interface CodeBlockProps {
   /** Show the copy button. Default: true. */
   copyable?: boolean;
   /** Toast shown on a successful copy. */
-  copyMessage?: string;
+  copyMessage?: I18nText;
   /** Tooltips for the reveal/hide toggle (when `codeMasked` is set). */
-  revealTooltip?: string;
-  hideTooltip?: string;
+  revealTooltip?: I18nText;
+  hideTooltip?: I18nText;
+  /**
+   * Wrap long lines instead of scrolling horizontally. Use when the code is
+   * meant to be READ in place (a query shown for confirmation) rather than
+   * scanned — a horizontal scrollbar hides the end of the statement, which is
+   * usually the part that matters.
+   */
+  wrap?: boolean;
+  /**
+   * Cap the visible height at roughly this many lines and scroll vertically past
+   * it. Keeps a long query from pushing the rest of a dialog off-screen while
+   * still showing enough to read at a glance.
+   */
+  maxLines?: number;
   /**
    * data-test prefix for the toolbar buttons, e.g. "ai-code" yields
    * "ai-code-copy-btn" / "ai-code-reveal-btn". Default: "code-block".

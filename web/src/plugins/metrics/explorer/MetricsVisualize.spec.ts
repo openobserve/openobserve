@@ -116,9 +116,7 @@ describe("MetricsVisualize", () => {
     expect(panelData.current.data.type).toBe("line");
     expect(panelData.current.data.queryType).toBe("promql");
     expect(panelData.current.data.queries[0].customQuery).toBe(false);
-    expect(panelData.current.data.queries[0].fields.stream_type).toBe(
-      "metrics",
-    );
+    expect(panelData.current.data.queries[0].fields.stream_type).toBe("metrics");
     expect(panelData.current.layout.showQueryBar).toBe(true);
   });
 
@@ -129,9 +127,7 @@ describe("MetricsVisualize", () => {
     const wrapper = mountVisualize();
     await flushPromises();
 
-    const allowed = wrapper
-      .findComponent({ name: "PanelEditor" })
-      .props("allowedChartTypes");
+    const allowed = wrapper.findComponent({ name: "PanelEditor" }).props("allowedChartTypes");
     expect(allowed).toBeUndefined();
   });
 
@@ -143,9 +139,7 @@ describe("MetricsVisualize", () => {
     await wrapper.find('[data-test="stub-add"]').trigger("click");
     expect(validatePanel).toHaveBeenCalled();
     // The dialog is shown (open prop true) and no error toast fired.
-    expect(
-      wrapper.findComponent({ name: "AddToDashboard" }).props("open"),
-    ).toBe(true);
+    expect(wrapper.findComponent({ name: "AddToDashboard" }).props("open")).toBe(true);
     expect(showErrorNotification).not.toHaveBeenCalled();
   });
 
@@ -158,9 +152,7 @@ describe("MetricsVisualize", () => {
 
     await wrapper.find('[data-test="stub-add"]').trigger("click");
     expect(showErrorNotification).toHaveBeenCalledWith("Add a query first");
-    expect(
-      wrapper.findComponent({ name: "AddToDashboard" }).props("open"),
-    ).toBe(false);
+    expect(wrapper.findComponent({ name: "AddToDashboard" }).props("open")).toBe(false);
   });
 
   /**

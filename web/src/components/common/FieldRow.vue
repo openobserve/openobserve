@@ -28,12 +28,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showQuickMode && field.name !== timestampColumn"
       :name="field.isInterestingField ? 'info-filled' : 'info-outline'"
       variant="ghost-neutral"
-      class="gap-0! mr-1"
+      class="mr-1 gap-0!"
       size="icon"
       :title="
         field.isInterestingField
-          ? 'Remove from interesting fields'
-          : 'Add to interesting fields'
+          ? t('logStream.removeFromInterestingFields')
+          : t('logStream.addToInterestingFields')
       "
       @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
     >
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost-neutral"
         size="icon"
         class="gap-0!"
-        title="Add field to table"
+        :title="t('search.addFieldToTable')"
         @click.stop="$emit('toggle-field', field)"
       >
         <OIcon name="visibility" size="sm" />
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost-neutral"
         class="gap-0!"
         size="icon"
-        title="Remove field from table"
+        :title="t('search.removeFieldFromTable')"
         @click.stop="$emit('toggle-field', field)"
       >
         <OIcon name="visibility-off" size="sm" />
@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :title="
           field.isInterestingField
-            ? 'Remove from interesting fields'
-            : 'Add to interesting fields'
+            ? t('logStream.removeFromInterestingFields')
+            : t('logStream.addToInterestingFields')
         "
         @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
       >
@@ -100,6 +100,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 interface Props {
   field: any;
@@ -116,14 +117,13 @@ const props = withDefaults(defineProps<Props>(), {
   showFtsFieldValues: false,
 });
 
+const { t } = useI18nTyped();
+
 defineEmits<{
   "add-to-filter": [value: string];
   "toggle-field": [field: any];
   "toggle-interesting": [field: any, isInteresting: boolean];
 }>();
 
-const isFieldSelected = computed(() =>
-  props.selectedFields.includes(props.field.name),
-);
+const isFieldSelected = computed(() => props.selectedFields.includes(props.field.name));
 </script>
-

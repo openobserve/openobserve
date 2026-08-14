@@ -43,6 +43,43 @@ pub async fn audit(message: auditor::AuditMessage) {
     auditor::audit(META_ORG_ID, message, publish_audit).await;
 }
 
+#[allow(clippy::too_many_arguments)]
+pub async fn report_http(
+    user_id: String,
+    org_id: String,
+    trace_id: String,
+    code: u16,
+    error_message: Option<String>,
+    http_method: String,
+    http_path: String,
+    http_query_params: String,
+    req_body: String,
+) {
+    use o2_enterprise::enterprise::common::{
+        auditor::{AuditMessage, Protocol, ResponseMeta},
+        config::get_config,
+    };
+
+    if get_config().common.audit_enabled {
+        audit(AuditMessage {
+            user_email: user_id,
+            org_id,
+            _timestamp: chrono::Utc::now().timestamp(),
+            protocol: Protocol::Http,
+            response_meta: ResponseMeta {
+                http_method,
+                http_path,
+                http_query_params,
+                http_body: req_body,
+                http_response_code: code,
+                error_msg: error_message,
+                trace_id: Some(trace_id),
+            },
+        })
+        .await;
+    }
+}
+
 pub async fn flush() {
     auditor::flush_audit(META_ORG_ID, publish_audit).await;
 }

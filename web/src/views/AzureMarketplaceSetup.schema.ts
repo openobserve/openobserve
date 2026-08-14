@@ -16,9 +16,7 @@ export const makeAzureCreateOrgSchema = (t: (_key: string) => string) =>
   z.object({
     newOrgName: z.string().min(1, t("validation.organizationNameRequired")),
   });
-export type AzureCreateOrgForm = z.infer<
-  ReturnType<typeof makeAzureCreateOrgSchema>
->;
+export type AzureCreateOrgForm = z.infer<ReturnType<typeof makeAzureCreateOrgSchema>>;
 export const azureCreateOrgDefaults = (): AzureCreateOrgForm => ({
   newOrgName: "",
 });
@@ -28,9 +26,7 @@ export const makeAzureLinkOrgSchema = (t: (_key: string) => string) =>
   z.object({
     selectedOrg: z.string().min(1, t("validation.selectOrganization")),
   });
-export type AzureLinkOrgForm = z.infer<
-  ReturnType<typeof makeAzureLinkOrgSchema>
->;
+export type AzureLinkOrgForm = z.infer<ReturnType<typeof makeAzureLinkOrgSchema>>;
 export const azureLinkOrgDefaults = (): AzureLinkOrgForm => ({
   selectedOrg: "",
 });

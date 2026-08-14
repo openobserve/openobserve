@@ -154,34 +154,24 @@ describe("TracesNoEventsState", () => {
     });
 
     it("should NOT render any expand range card (feature removed)", () => {
-      expect(
-        wrapper.find('[data-test="traces-no-events-expand-range-card"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="traces-no-events-expand-range-card"]').exists()).toBe(false);
     });
 
     it("should NOT render any remove filter card (removed from traces)", () => {
-      expect(
-        wrapper
-          .find('[data-test="traces-no-events-remove-filter-card"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="traces-no-events-remove-filter-card"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should NOT render the expand range card when a filter is applied", async () => {
       mockSearchObj.data.editorValue = "service_name = 'frontend'";
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="traces-no-events-expand-range-card"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="traces-no-events-expand-range-card"]').exists()).toBe(false);
       // and definitely no remove-filter card either
-      expect(
-        wrapper
-          .find('[data-test="traces-no-events-remove-filter-card"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="traces-no-events-remove-filter-card"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -192,9 +182,7 @@ describe("TracesNoEventsState", () => {
     it("should NOT render the Ask AI button when aiEnabled is false", () => {
       const localWrapper = mountComponentWithStore({ aiEnabled: false });
 
-      expect(
-        localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists(),
-      ).toBe(false);
+      expect(localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists()).toBe(false);
 
       localWrapper.unmount();
     });
@@ -204,9 +192,7 @@ describe("TracesNoEventsState", () => {
       // windowHasStreamData true and jumpTarget null, so the button shows.
       const localWrapper = mountComponentWithStore({ aiEnabled: true });
 
-      expect(
-        localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists(),
-      ).toBe(true);
+      expect(localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists()).toBe(true);
 
       localWrapper.unmount();
     });
@@ -214,9 +200,7 @@ describe("TracesNoEventsState", () => {
     it("should emit ask-ai with no payload when the Ask AI button is clicked", async () => {
       const localWrapper = mountComponentWithStore({ aiEnabled: true });
 
-      await localWrapper
-        .find('[data-test="traces-no-events-ask-ai-btn"]')
-        .trigger("click");
+      await localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').trigger("click");
 
       expect(localWrapper.emitted("ask-ai")).toBeTruthy();
       expect(localWrapper.emitted("ask-ai")![0]).toEqual([]);
@@ -240,12 +224,10 @@ describe("TracesNoEventsState", () => {
       const localWrapper = mountComponentWithStore({ aiEnabled: true });
       await flushPromises();
 
-      expect(
-        localWrapper.find('[data-test="traces-no-events-jump-to-data-card"]').exists(),
-      ).toBe(true);
-      expect(
-        localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists(),
-      ).toBe(false);
+      expect(localWrapper.find('[data-test="traces-no-events-jump-to-data-card"]').exists()).toBe(
+        true,
+      );
+      expect(localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists()).toBe(false);
 
       localWrapper.unmount();
     });
@@ -266,9 +248,7 @@ describe("TracesNoEventsState", () => {
       });
       await flushPromises();
 
-      const card = localWrapper.find(
-        '[data-test="traces-no-events-jump-to-data-card"]',
-      );
+      const card = localWrapper.find('[data-test="traces-no-events-jump-to-data-card"]');
       expect(card.exists()).toBe(true);
 
       localWrapper.unmount();
@@ -284,9 +264,7 @@ describe("TracesNoEventsState", () => {
       });
       await flushPromises();
 
-      await localWrapper
-        .find('[data-test="traces-no-events-jump-to-data-card"]')
-        .trigger("click");
+      await localWrapper.find('[data-test="traces-no-events-jump-to-data-card"]').trigger("click");
 
       expect(localWrapper.emitted("jump-to-stream-data")![0]).toEqual([
         max - FIFTEEN_MINS_US,
@@ -307,11 +285,9 @@ describe("TracesNoEventsState", () => {
       });
       await flushPromises();
 
-      expect(
-        localWrapper
-          .find('[data-test="traces-no-events-jump-to-data-card"]')
-          .exists(),
-      ).toBe(true);
+      expect(localWrapper.find('[data-test="traces-no-events-jump-to-data-card"]').exists()).toBe(
+        true,
+      );
 
       localWrapper.unmount();
     });
@@ -325,17 +301,13 @@ describe("TracesNoEventsState", () => {
       });
       await flushPromises();
 
-      expect(
-        localWrapper
-          .find('[data-test="traces-no-events-jump-to-data-card"]')
-          .exists(),
-      ).toBe(false);
+      expect(localWrapper.find('[data-test="traces-no-events-jump-to-data-card"]').exists()).toBe(
+        false,
+      );
       // Expand-range card was removed from the component — it should not be present.
-      expect(
-        localWrapper
-          .find('[data-test="traces-no-events-expand-range-card"]')
-          .exists(),
-      ).toBe(false);
+      expect(localWrapper.find('[data-test="traces-no-events-expand-range-card"]').exists()).toBe(
+        false,
+      );
 
       localWrapper.unmount();
     });

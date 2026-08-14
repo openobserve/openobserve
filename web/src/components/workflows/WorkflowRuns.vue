@@ -27,14 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     └──────────────────────────────┴──────────────────────┘
 
   Selecting a run loads it onto the canvas (read-only) and updates ?run_id, so a
-  specific run is shareable. "Edit Workflow" is the deliberate switch to the
-  editor — the two surfaces never blur together, and nothing resizes mid-flow.
+  specific run is shareable. "Edit Workflow" is the deliberate switch to the build
+  canvas. Test lives here too — it's a read-only dry-run (never edits the graph),
+  so there's no reason to force a trip to the editor just to run one; a test simply
+  swaps the canvas from the selected historical run to the fresh test result.
 -->
 <template>
-  <div
-    data-test="workflow-runs-page"
-    class="flex flex-col h-full min-h-0"
-  >
+  <div data-test="workflow-runs-page" class="flex h-full min-h-0 flex-col">
     <OPageHeader
       :title="workflowName || t('workflow.runs.title')"
       :back="{
@@ -42,40 +41,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         onClick: goBack,
         dataTest: 'workflow-runs-back',
       }"
-      class="px-4 border-b border-border-default"
+      class="border-border-default border-b px-4"
     >
       <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
            after the title+subtitle column, stranding it far from the title). -->
       <template #title>
-        <span class="inline-flex items-center gap-2 min-w-0">
-          <span class="truncate">{{
-            workflowName || t("workflow.runs.title")
-          }}</span>
+        <span class="inline-flex min-w-0 items-center gap-2">
+          <span class="truncate">{{ workflowName || t("workflow.runs.title") }}</span>
           <BetaBadge />
         </span>
       </template>
       <template #actions>
-        <OButton
-          variant="outline"
-          data-test="workflow-runs-edit"
-          @click="onEditWorkflow"
-        >
+        <!-- Test is a read-only dry-run (it never edits the workflow), so it's
+             offered here too — no need to switch to the editor just to test. -->
+        <OButton variant="outline" data-test="workflow-runs-test" @click="onTest">
+          {{ t("workflow.test.button") }}
+        </OButton>
+        <OButton variant="outline" data-test="workflow-runs-edit" @click="onEditWorkflow">
           {{ t("workflow.runs.edit") }}
         </OButton>
       </template>
     </OPageHeader>
 
-    <div class="flex-1 flex min-h-0 pt-3 px-2 gap-2">
+    <div class="flex min-h-0 flex-1 gap-2 px-2 pt-3">
       <!-- Read-only canvas (per-node run status overlay). -->
-      <div
-        class="flex-1 relative min-w-0 rounded-surface overflow-hidden mb-3 bg-surface-subtle"
-      >
+      <div class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden">
         <WorkflowCanvas />
       </div>
 
       <!-- Persistent runs list (master-detail). -->
       <div
-        class="w-[27.5rem] max-w-[46%] shrink-0 mb-3 rounded-surface overflow-hidden border border-border-default bg-surface-base flex flex-col min-h-0"
+        class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[27.5rem] max-w-[46%] shrink-0 flex-col overflow-hidden border"
       >
         <WorkflowRunsPanel
           :org-id="orgId"
@@ -87,15 +83,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Per-step Input/Output result drawer — opened by clicking an error node's
-         badge. Read-only (no Replay on a historical run). -->
+    <!-- Test input popup — a fresh dry-run of the current graph, launched from the
+         header. Results paint on the read-only canvas (switching it out of the
+         selected historical run). -->
+    <WorkflowTestDialog v-if="workflowObj.testRun.show" />
+
+    <!-- Per-step Input/Output result drawer — opened by clicking a node's badge.
+         Read-only for a historical run; editable + replayable for a live test. -->
     <WorkflowStepResultDrawer v-if="workflowObj.testRun.resultDrawer.show" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -106,6 +107,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowStepResultDrawer from "./WorkflowStepResultDrawer.vue";
+import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import WorkflowRunsPanel from "./WorkflowRunsPanel.vue";
 import useWorkflowCanvas, {
   workflowObj,
@@ -114,21 +116,16 @@ import useWorkflowCanvas, {
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
-const { resetWorkflowData } = useWorkflowCanvas();
+const { t } = useI18nTyped();
 
-const { t } = useI18n();
+const { resetWorkflowData } = useWorkflowCanvas(t);
+
 const router = useRouter();
 const store = useStore();
 
-const orgId = computed(
-  () => store.state.selectedOrganization.identifier as string,
-);
-const workflowId = computed(
-  () => (router.currentRoute.value.query.id as string) || "",
-);
-const workflowName = computed(
-  () => workflowObj.currentSelectedWorkflow?.name || "",
-);
+const orgId = computed(() => store.state.selectedOrganization.identifier as string);
+const workflowId = computed(() => (router.currentRoute.value.query.id as string) || "");
+const workflowName = computed(() => workflowObj.currentSelectedWorkflow?.name || "");
 const selectedRunId = ref<string>("");
 
 // Steps this run executed that no longer exist in the workflow (deleted/edited
@@ -141,6 +138,26 @@ const ghostNodeCount = computed(
 const goBack = () => {
   router.push({ name: "workflows", query: { org_identifier: orgId.value } });
 };
+
+// Dry-run the current graph without leaving to the editor. Deselect the historical
+// run first — the canvas is about to show the LIVE test result instead, and a
+// lingering row highlight would misrepresent what's on the canvas. Clicking a run
+// in the list again reloads history, toggling back.
+const onTest = () => {
+  selectedRunId.value = "";
+  workflowObj.testRun.show = true;
+};
+
+// A live test result (from the header Test button, or a step drawer's "Use as Test
+// Input" which drops the user into a fresh test) replaces the historical run on the
+// canvas. Deselect the run so the list stops highlighting a row that no longer
+// matches what's shown. A history load keeps `mode: "history"`, so it's left alone.
+watch(
+  () => workflowObj.testRun.result,
+  (result: any) => {
+    if (result && result.mode !== "history") selectedRunId.value = "";
+  },
+);
 
 // Deliberate switch to the editor — the only bridge between inspect and build.
 const onEditWorkflow = () => {
@@ -181,7 +198,7 @@ const onSelectRun = async (runId: string) => {
   });
   if (!r.ok) {
     toast({
-      message: r.error || t("workflow.history.loadRunError"),
+      message: raw(r.error || t("workflow.history.loadRunError")),
       variant: "error",
     });
     return;

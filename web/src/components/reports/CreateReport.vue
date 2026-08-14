@@ -25,23 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <div data-test="add-report-section" class="w-full flex flex-col flex-1 min-h-0 create-report-page">
-      <div
-        class="flex bg-card-glass-bg flex-1 min-h-0 overflow-auto"
-      >
-        <div
-          ref="addAlertFormRef"
-          class="px-4 my-3"
-          style="width: 1024px"
-        >
-          <OForm
-            :id="formId"
-            :form="form"
-            class="create-report-form"
-          >
-            <div
-              class="flex items-start gap-4 px-2 pt-3"
-            >
+    <div
+      data-test="add-report-section"
+      class="create-report-page flex min-h-0 w-full flex-1 flex-col"
+    >
+      <div class="bg-card-glass-bg flex min-h-0 flex-1 overflow-auto">
+        <div ref="addAlertFormRef" class="my-3 px-4" style="width: 64rem">
+          <OForm :id="formId" :form="form" class="create-report-form">
+            <div class="flex items-start gap-4 px-2 pt-3">
               <div data-test="add-report-name-input" class="o2-input">
                 <OFormInput
                   data-test="add-report-name-input"
@@ -52,24 +43,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="showLabelOnTop"
                   :readonly="isEditingReport"
                   :disabled="isEditingReport"
-                  help-text="Characters like :, ?, /, #, and spaces are not allowed."
+                  :help-text="t('reports.validation.resourceNameInvalid')"
                   tabindex="0"
                   style="width: 20.625rem"
                 />
               </div>
 
-              <div
-                data-test="add-report-folder-select"
-                class="o2-input"
-                style="width: 15.625rem"
-              >
+              <div data-test="add-report-folder-select" class="o2-input" style="width: 15.625rem">
                 <SelectFolderDropdown
                   :activeFolderId="selectedReportFolderId"
                   type="reports"
                   :disableDropdown="isEditingReport"
-                  @folder-selected="
-                    (f: any) => (selectedReportFolderId = f.value)
-                  "
+                  @folder-selected="(f: any) => (selectedReportFolderId = f.value)"
                 />
               </div>
             </div>
@@ -85,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="input-border"
                 class="showLabelOnTop"
                 tabindex="0"
-                style="width: 600px"
+                style="width: 37.5rem"
               />
             </div>
 
@@ -96,32 +81,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 :label="t('reports.cachedReport')"
               />
-              <OIcon
-                name="info-outline"
-                class="cursor-pointer ml-2"
-                size="sm"
-              >
-                <OTooltip
-                  side="right"
-                  align="center"
-                >
-                  <template #content>Note: Cached reports are stored for quick access to
-                  dashboards; sharing is disabled for these reports.</template>
+              <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
+                <OTooltip side="right" align="center">
+                  <template #content>{{ t("reports.cachedReportHint") }}</template>
                 </OTooltip>
               </OIcon>
             </div>
 
-            <OStepper
-              v-model="step"
-              orientation="vertical"
-              animated
-              navigable
-              class="mt-3"
-            >
+            <OStepper v-model="step" orientation="vertical" animated navigable class="mt-3">
               <OStep
                 data-test="add-report-select-dashboard-step"
                 :name="1"
-                title="Select Dashboard"
+                :title="t('reports.selectDashboardStep')"
                 icon="edit"
                 :done="step > 1"
               >
@@ -131,14 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      KEY must be the index (stable): a value-derived key
                      (folder + dashboard) would remount the row on folder/dashboard
                      change, wiping each field's TanStack error meta. -->
-                <template
-                  v-for="(dashboard, index) in dashboardRows"
-                  :key="index"
-                >
-                  <div
-                    :data-test="`add-report-dashboard-${index}`"
-                    class="my-2 px-2 flex flex-col"
-                  >
+                <template v-for="(dashboard, index) in dashboardRows" :key="index">
+                  <div :data-test="`add-report-dashboard-${index}`" class="my-2 flex flex-col px-2">
                     <!-- items-start (not items-center): keeps all selects
                          top-aligned when a validation error appears under one and
                          grows its cell taller. -->
@@ -155,10 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('reports.dashboardFolder')"
                           required
                           :loading="isFetchingFolders"
-                          @update:model-value="
-                            (v: any) => onFolderSelection(v, index)
-                          "
-                          style="min-width: 250px !important; width: 100% !important;"
+                          @update:model-value="(v: any) => onFolderSelection(v, index)"
+                          style="min-width: 15.625rem !important; width: 100% !important"
                         />
                       </div>
                       <div
@@ -173,10 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('reports.dashboard')"
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
-                          @update:model-value="
-                            (v: any) => onDashboardSelection(v, index)
-                          "
-                          style="min-width: 250px !important; width: 100% !important;"
+                          @update:model-value="(v: any) => onDashboardSelection(v, index)"
+                          style="min-width: 15.625rem !important; width: 100% !important"
                         />
                       </div>
                       <div
@@ -191,68 +152,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('reports.dashboardTab')"
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
-                          style="min-width: 250px !important; width: 100% !important;"
+                          style="min-width: 15.625rem !important; width: 100% !important"
                         />
                       </div>
                     </div>
 
-                    <div
-                      data-test="add-report-timerange-select"
-                      class="w-full mt-2"
-                    >
+                    <div data-test="add-report-timerange-select" class="mt-2 w-full">
                       <OFormDateTimeRange
                         :name="`dashboards[${index}].timerange`"
-                        label="Time Range"
+                        :label="t('reports.timeRange')"
                         required
-                        description="Generates report with the data from specified time range"
+                        :description="t('reports.timeRangeDescription')"
                         auto-apply
                         data-test="add-report-timerange-dropdown"
                         menu-align="start"
                       />
                     </div>
 
-                    <div
-                      data-test="add-report-variable-select"
-                      class="w-full mt-3 o2-input"
-                    >
+                    <div data-test="add-report-variable-select" class="o2-input mt-3 w-full">
                       <VariablesInput name-prefix="variables" />
                     </div>
 
                     <!-- Report Format -->
-                    <div
-                      class="w-full mt-3"
-                      data-test="add-report-format-section"
-                    >
+                    <div class="mt-3 w-full" data-test="add-report-format-section">
                       <div
                         style="font-size: var(--text-sm)"
-                        class="font-bold text-text-secondary mb-2"
+                        class="text-text-secondary mb-2 font-bold"
                       >
                         {{ t("reports.reportFormat") }}
                       </div>
                       <div class="flex gap-3">
                         <!-- Report Type -->
-                        <div
-                          class="col-auto o2-input"
-                          data-test="add-report-type-select"
-                        >
+                        <div class="o2-input col-auto" data-test="add-report-type-select">
                           <OFormSelect
                             :name="`dashboards[${index}].report_type`"
                             :options="[
-                              { label: 'PDF (default)', value: 'pdf' },
-                              { label: 'PNG (Image)', value: 'png' },
-                              { label: 'CSV (Data)', value: 'csv' },
+                              { label: raw('PDF (default)'), value: 'pdf' },
+                              { label: raw('PNG (Image)'), value: 'png' },
+                              { label: raw('CSV (Data)'), value: 'csv' },
                             ]"
                             :label="t('reports.reportType')"
                             color="input-border"
                             class="showLabelOnTop"
-                            style="min-width: 180px"
+                            style="min-width: 11.25rem"
                           />
                         </div>
 
                         <!-- Email Attachment Type -->
                         <div
                           v-if="dashboard.report_type !== 'csv'"
-                          class="col-auto o2-input"
+                          class="o2-input col-auto"
                           data-test="add-report-attachment-type-select"
                         >
                           <OFormSelect
@@ -260,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="attachmentTypeOptions(dashboard.report_type)"
                             :label="t('reports.attachmentType')"
                             class="showLabelOnTop"
-                            style="min-width: 200px"
+                            style="min-width: 12.5rem"
                           />
                         </div>
                       </div>
@@ -274,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OBanner
                           variant="warning"
                           icon="info"
-                          content="PNG captures only the first visible page of the dashboard. Use PDF if the dashboard spans multiple pages."
+                          :content="t('reports.pngPageLimitNote')"
                         />
                       </div>
 
@@ -285,28 +234,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="add-report-custom-dimensions-section"
                       >
                         <div
-                          class="flex items-center cursor-pointer"
+                          class="flex cursor-pointer items-center"
                           style="font-size: var(--text-sm); color: inherit"
                           @click="showCustomDimensions = !showCustomDimensions"
                         >
                           <OIcon
-                            :name="
-                              showCustomDimensions
-                                ? 'expand-less'
-                                : 'expand-more'
-                            "
+                            :name="showCustomDimensions ? 'expand-less' : 'expand-more'"
                             size="sm"
                             class="mr-1"
                           />
-                          <span class="font-bold text-text-secondary">{{
+                          <span class="text-text-secondary font-bold">{{
                             t("reports.customDimensions")
                           }}</span>
                         </div>
-                        <div
-                          v-if="showCustomDimensions"
-                          class="flex gap-3 pt-2"
-                        >
-                          <div class="col-auto o2-input">
+                        <div v-if="showCustomDimensions" class="flex gap-3 pt-2">
+                          <div class="o2-input col-auto">
                             <OFormInput
                               :name="`dashboards[${index}].attachmentWidth`"
                               type="number"
@@ -314,12 +256,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :label="t('reports.dimensionWidth')"
                               color="input-border"
                               class="showLabelOnTop"
-                              style="min-width: 120px"
-                              placeholder="e.g. 1440"
+                              style="min-width: 7.5rem"
+                              :placeholder="t('reports.widthPlaceholder')"
                               data-test="add-report-dimension-width"
                             />
                           </div>
-                          <div class="col-auto o2-input">
+                          <div class="o2-input col-auto">
                             <OFormInput
                               :name="`dashboards[${index}].attachmentHeight`"
                               type="number"
@@ -327,14 +269,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :label="t('reports.dimensionHeight')"
                               color="input-border"
                               class="showLabelOnTop"
-                              style="min-width: 120px"
-                              placeholder="e.g. 900"
+                              style="min-width: 7.5rem"
+                              :placeholder="t('reports.heightPlaceholder')"
                               data-test="add-report-dimension-height"
                             />
                           </div>
                           <div class="col-auto flex items-end">
-                            <div class="text-xs text-text-muted pb-1">
-                              Leave blank to use server defaults
+                            <div class="text-text-muted pb-1 text-xs">
+                              {{ t("reports.dimensionsDefaultHint") }}
                             </div>
                           </div>
                         </div>
@@ -342,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </template>
-                <div class="flex gap-2 mt-4">
+                <div class="mt-4 flex gap-2">
                   <OButton
                     data-test="add-report-step1-continue-btn"
                     variant="primary"
@@ -359,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                   >
-                    Continue
+                    {{ t("reports.continue") }}
                   </OButton>
                 </div>
               </OStep>
@@ -367,17 +309,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OStep
                 data-test="add-report-select-schedule-step"
                 :name="2"
-                title="Schedule"
+                :title="t('reports.scheduleStep')"
                 icon="schedule"
                 :done="step > 2"
                 class="mt-3"
               >
                 <div class="my-2 px-2">
-                  <div
-                    style="font-size: var(--text-sm)"
-                    class="font-bold text-text-secondary mb-2"
-                  >
-                    Frequency
+                  <div style="font-size: var(--text-sm)" class="text-text-secondary mb-2 font-bold">
+                    {{ t("reports.frequency") }}
                   </div>
                   <OFormToggleGroup
                     name="frequencyType"
@@ -397,23 +336,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-if="frequencyType === 'cron'">
                     <!-- items-start: keep the Timezone select aligned with the
                          Cron input when the cron error text wraps below it. -->
-                    <div class="flex items-start justify-start mt-3">
+                    <div class="mt-3 flex items-start justify-start">
                       <div
                         data-test="add-report-schedule-custom-interval-input"
                         class="o2-input mr-2 pt-0"
-                        style="width: 320px"
+                        style="width: 20rem"
                       >
-                        <div class="mb-1 font-bold text-text-secondary">
+                        <div class="text-text-secondary mb-1 font-bold">
                           {{ t("reports.cronExpression") + " *" }}
-                          <OIcon
-                            name="info"
-                            size="sm"
-                            class="ml-1 cursor-pointer text-text-muted"
-                          >
+                          <OIcon name="info" size="sm" class="text-text-muted ml-1 cursor-pointer">
                             <OTooltip side="right" align="center">
                               <template #content>
                                 <span style="font-size: var(--text-sm); white-space: pre-line">
-                                  {{ t('reports.cronFormatTooltip') }}
+                                  {{ t("reports.cronFormatTooltip") }}
                                 </span>
                               </template>
                             </OTooltip>
@@ -436,15 +371,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('logStream.timezone')"
                           required
                           class="timezone-select showLabelOnTop"
-                          style="width: 300px"
+                          style="width: 18.75rem"
                         />
                       </div>
                     </div>
                   </template>
                   <template v-else>
-                    <div
-                      class="mt-3 flex justify-start items-center"
-                    >
+                    <div class="mt-3 flex items-center justify-start">
                       <OFormToggleGroup name="selectedTimeTab">
                         <OToggleGroupItem
                           v-for="visual in timeTabs"
@@ -456,32 +389,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ visual.label }}
                         </OToggleGroupItem>
                       </OFormToggleGroup>
-                      <OIcon
-                        name="info-outline"
-                        class="cursor-pointer ml-2"
-                        size="sm"
-                      >
+                      <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
                         <OTooltip side="right" align="center">
-                          <template #content>"Schedule Now" will schedule the report using the
-                          current date, time, and timezone.<br />
-                          In "Schedule Later" you can customize the date, time,
-                          and timezone.</template>
+                          <template #content
+                            >{{ t("reports.scheduleNowHint") }}<br />
+                            {{ t("reports.scheduleLaterHint") }}</template
+                          >
                         </OTooltip>
                       </OIcon>
                     </div>
 
                     <div
                       v-if="frequencyType === 'custom'"
-                      class="flex items-start justify-start mt-3"
+                      class="mt-3 flex items-start justify-start"
                     >
                       <div
                         data-test="add-report-schedule-custom-interval-input"
                         class="o2-input mr-2 pt-0"
-                        style="width: 160px"
+                        style="width: 10rem"
                       >
                         <OFormInput
                           name="customInterval"
-                          label="Repeat every"
+                          :label="t('reports.repeatEvery')"
                           required
                           color="input-border"
                           class="showLabelOnTop w-full"
@@ -492,12 +421,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         data-test="add-report-schedule-custom-frequency-select"
                         class="o2-input pt-0"
-                        style="width: 160px"
+                        style="width: 10rem"
                       >
                         <OFormSelect
                           name="customPeriod"
                           :options="customFrequencyOptions"
-                          :label="'Frequency'"
+                          :label="t('reports.frequency')"
                           required
                           class="showLabelOnTop no-case"
                           style="width: 100% !important"
@@ -511,26 +440,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       data-test="add-report-schedule-send-later-section"
                       v-if="selectedTimeTab === 'scheduleLater'"
-                      class="flex items-start justify-start mt-3"
+                      class="mt-3 flex items-start justify-start"
                     >
-                      <div
-                        data-test="add-report-schedule-start-date-input"
-                        class="o2-input mr-2"
-                      >
+                      <div data-test="add-report-schedule-start-date-input" class="o2-input mr-2">
                         <OFormDate
                           name="date"
-                          :label="'Start Date'"
+                          :label="t('reports.startDate')"
                           required
                           data-test="add-report-schedule-start-date-field"
                         />
                       </div>
-                      <div
-                        data-test="add-report-schedule-start-time-input"
-                        class="o2-input mr-2"
-                      >
+                      <div data-test="add-report-schedule-start-time-input" class="o2-input mr-2">
                         <OFormTime
                           name="time"
-                          :label="'Start Time'"
+                          :label="t('common.startTime')"
                           required
                           data-test="add-report-schedule-start-time-field"
                         />
@@ -543,20 +466,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('logStream.timezone')"
                           required
                           class="timezone-select showLabelOnTop"
-                          style="width: 300px"
+                          style="width: 18.75rem"
                         />
                       </div>
                     </div>
                   </template>
                 </div>
-                <div class="flex gap-2 mt-4">
+                <div class="mt-4 flex gap-2">
                   <OButton
                     data-test="add-report-step2-back-btn"
                     variant="outline"
                     size="sm-action"
                     @click="step--"
                   >
-                    Back
+                    {{ t("common.back") }}
                   </OButton>
                   <OButton
                     data-test="add-report-step2-continue-btn"
@@ -569,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                   >
-                    Continue
+                    {{ t("reports.continue") }}
                   </OButton>
                 </div>
               </OStep>
@@ -578,23 +501,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!isCachedReportValue"
                 data-test="add-report-share-step"
                 :name="3"
-                title="Share"
+                :title="t('reports.shareStep')"
                 icon="mail"
                 :done="step > 3"
                 class="mt-3"
               >
                 <div class="my-2 px-2">
-                  <div
-                    data-test="add-report-share-title-input"
-                    class="report-name-input o2-input"
-                  >
+                  <div data-test="add-report-share-title-input" class="report-name-input o2-input">
                     <OFormInput
                       data-test="add-report-share-title-input"
                       name="title"
                       :label="t('reports.title')"
                       required
                       tabindex="0"
-                      style="width: 400px"
+                      style="width: 25rem"
                     />
                   </div>
 
@@ -613,8 +533,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div data-test="add-report-share-message-section" class="pt-3">
-                    <div style="font-size: var(--text-sm)" class="font-bold text-text-secondary">
-                      Message
+                    <div style="font-size: var(--text-sm)" class="text-text-secondary font-bold">
+                      {{ t("reports.messageLabel") }}
                     </div>
 
                     <div data-test="add-report-share-message-input">
@@ -634,27 +554,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('reports.imagePreview')"
                       data-test="add-report-image-preview-toggle"
                     />
-                    <OIcon
-                      name="info-outline"
-                      class="cursor-pointer ml-2"
-                      size="sm"
-                    >
-                      <OTooltip max-width="320px">
-                        <template #content>Captures a PNG screenshot of the dashboard and embeds it
-                        inline in the email body alongside the PDF attachment
-                        for a quick visual preview.</template>
+                    <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
+                      <OTooltip max-width="20rem">
+                        <template #content>{{ t("reports.imagePreviewHint") }}</template>
                       </OTooltip>
                     </OIcon>
                   </div>
                 </div>
-                <div class="flex gap-2 mt-4">
+                <div class="mt-4 flex gap-2">
                   <OButton
                     data-test="add-report-step3-back-btn"
                     variant="outline"
                     size="sm-action"
                     @click="step--"
                   >
-                    Back
+                    {{ t("common.back") }}
                   </OButton>
                 </div>
               </OStep>
@@ -664,8 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-end px-3 w-full py-3 bg-card-glass-bg sticky! bottom-0 border-t border-card-glass-border"
-      style="z-index: 2"
+      class="bg-card-glass-bg border-card-glass-border sticky! bottom-0 z-2 flex w-full justify-end border-t px-3 py-3"
     >
       <OButton
         data-test="add-report-cancel-btn"
@@ -700,7 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useLocalTimezone } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
@@ -739,7 +652,7 @@ import {
   type CreateReportForm,
 } from "./CreateReport.schema";
 
-const props = defineProps({
+defineProps({
   report: {
     type: Object,
     default: null,
@@ -799,7 +712,7 @@ const defaultReport = {
   report_type: "PDF",
 };
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 
@@ -839,50 +752,41 @@ const dialog = ref({
 
 const timeTabs = [
   {
-    label: "Schedule now",
+    label: t("reports.scheduleNow"),
     value: "scheduleNow",
   },
   {
-    label: "Schedule later",
+    label: t("reports.scheduleLater"),
     value: "scheduleLater",
   },
 ];
 
 const frequencyTabs = [
-  { label: "Cron Job", value: "cron" },
-  { label: "Once", value: "once" },
-  { label: "Hourly", value: "hours" },
-  { label: "Daily", value: "days" },
-  { label: "Weekly", value: "weeks" },
-  { label: "Monthly", value: "months" },
-  { label: "Custom", value: "custom" },
+  { label: t("reports.cron"), value: "cron" },
+  { label: t("reports.frequencyOnce"), value: "once" },
+  { label: t("reports.frequencyHourly"), value: "hours" },
+  { label: t("reports.frequencyDaily"), value: "days" },
+  { label: t("reports.frequencyWeekly"), value: "weeks" },
+  { label: t("reports.frequencyMonthly"), value: "months" },
+  { label: t("reports.frequencyCustom"), value: "custom" },
 ];
 
 // frequencyType, selectedTimeTab and the dashboards rows are form-owned; read
 // reactively via form.useStore so the template conditionals (v-if / v-for /
 // OStepper) update on every change, including async edit prefill.
-const frequencyType = form.useStore(
-  (s: any) => s.values?.frequencyType ?? "once",
-);
-const selectedTimeTab = form.useStore(
-  (s: any) => s.values?.selectedTimeTab ?? "scheduleNow",
-);
-const dashboardRows = form.useStore(
-  (s: any): any[] => s.values?.dashboards ?? [],
-);
+const frequencyType = form.useStore((s: any) => s.values?.frequencyType ?? "once");
+const selectedTimeTab = form.useStore((s: any) => s.values?.selectedTimeTab ?? "scheduleNow");
+const dashboardRows = form.useStore((s: any): any[] => s.values?.dashboards ?? []);
 
 // `variables` are now form-owned (VariablesInput renders in form mode,
 // name-prefix="variables"); read from the form value at save.
 
-const filteredTimezone: any = ref([]);
+const folderOptions: Ref<{ label: I18nText; value: string }[]> = ref([]);
 
-const folderOptions: Ref<{ label: string; value: string }[]> = ref([]);
+const dashboardOptions: Ref<{ label: I18nText; value: string; tabs: any[]; version: number }[]> =
+  ref([]);
 
-const dashboardOptions: Ref<
-  { label: string; value: string; tabs: any[]; version: number }[]
-> = ref([]);
-
-const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
+const dashboardTabOptions: Ref<{ label: I18nText; value: string }[]> = ref([]);
 
 const options: Ref<{ [key: string]: any[] }> = ref({});
 
@@ -901,15 +805,11 @@ const isFetchingDashboard = ref(false);
 // won't track).
 const isSaving = form.useStore((s: any) => !!s.isSubmitting);
 
-const isCachedReportValue = form.useStore(
-  (s: any) => !!s.values?.isCachedReport,
-);
+const isCachedReportValue = form.useStore((s: any) => !!s.values?.isCachedReport);
 
 // Build a full form value from the typed defaults, with overrides for the seeded
 // values (used to reset the form for query/edit prefill).
-const buildFormValues = (
-  overrides: Partial<CreateReportForm> = {},
-): CreateReportForm => ({
+const buildFormValues = (overrides: Partial<CreateReportForm> = {}): CreateReportForm => ({
   ...createReportDefaults(),
   ...overrides,
 });
@@ -962,8 +862,7 @@ onBeforeMount(async () => {
         if (err?.response?.status != 403) {
           toast({
             variant: "error",
-            message:
-              err?.response?.data?.message || "Error while fetching report!",
+            message: err?.response?.data?.message || "Error while fetching report!",
           });
         }
       })
@@ -988,14 +887,7 @@ const jumpToFirstErrorStep = () => {
   const top = new Set(res.error.issues.map((i) => String(i.path[0])));
   // dashboards[0].* errors all surface under the top-level "dashboards" path.
   const step1 = ["name", "dashboards"];
-  const step2 = [
-    "cron",
-    "timezone",
-    "customInterval",
-    "customPeriod",
-    "date",
-    "time",
-  ];
+  const step2 = ["cron", "timezone", "customInterval", "customPeriod", "date", "time"];
   const step3 = ["title", "emails"];
   if (step1.some((k) => top.has(k))) {
     step.value = 1;
@@ -1033,9 +925,7 @@ watch(submissionAttempts, (n, o) => {
 // put (clearing them made a later Continue wipe the errors Save had just surfaced
 // on other steps). We simply don't READ the out-of-step fields when deciding
 // whether to advance.
-const validateStepFields = async (
-  fields: ReportFieldName[],
-): Promise<boolean> => {
+const validateStepFields = async (fields: ReportFieldName[]): Promise<boolean> => {
   let valid = true;
   for (const name of fields) {
     await form.validateField(name, "submit");
@@ -1056,11 +946,7 @@ const goToStep = async (fields: ReportFieldName[], next: number) => {
 const issuePathToName = (path: readonly PropertyKey[]): string =>
   path.reduce<string>(
     (acc, seg) =>
-      typeof seg === "number"
-        ? `${acc}[${seg}]`
-        : acc
-          ? `${acc}.${String(seg)}`
-          : String(seg),
+      typeof seg === "number" ? `${acc}[${seg}]` : acc ? `${acc}.${String(seg)}` : String(seg),
     "",
   );
 
@@ -1079,9 +965,7 @@ watch(
     const invalidNames = new Set(
       res.success ? [] : res.error.issues.map((i) => issuePathToName(i.path)),
     );
-    for (const name of Object.keys(
-      form.state.fieldMeta ?? {},
-    ) as ReportFieldName[]) {
+    for (const name of Object.keys(form.state.fieldMeta ?? {}) as ReportFieldName[]) {
       const meta = form.getFieldMeta(name);
       if (!meta) continue;
       const hasError = (meta.errors?.length ?? 0) > 0;
@@ -1165,33 +1049,19 @@ const setDashboardOptions = (id: string) => {
   isFetchingDashboard.value = true;
   return new Promise((resolve, reject) => {
     dashboardService
-      .list(
-        0,
-        10000,
-        "name",
-        false,
-        "",
-        store.state.selectedOrganization.identifier,
-        id,
-        "",
-      )
+      .list(0, 10000, "name", false, "", store.state.selectedOrganization.identifier, id, "")
       .then((response: any) => {
         response.data.dashboards
           .map((dash: any) => Object.values(dash).filter((dash) => dash)[0])
           .forEach(
-            (dashboard: {
-              title: string;
-              dashboardId: string;
-              tabs: any[];
-              version: number;
-            }) => {
+            (dashboard: { title: string; dashboardId: string; tabs: any[]; version: number }) => {
               dashboardOptions.value.push({
-                label: dashboard.title,
+                label: raw(dashboard.title),
                 value: dashboard.dashboardId,
                 tabs: dashboard?.tabs?.map((tab) => ({
-                  label: tab.name,
+                  label: raw(tab.name),
                   value: tab.tabId,
-                })) || [{ label: "Default", value: "default" }],
+                })) || [{ label: t("reports.destinationDefault"), value: "default" }],
                 version: dashboard.version,
               });
               options.value["dashboards"] = [...dashboardOptions.value];
@@ -1200,7 +1070,7 @@ const setDashboardOptions = (id: string) => {
 
         resolve(true);
       })
-      .catch((err) => reject(true))
+      .catch((_err) => reject(true))
       .finally(() => (isFetchingDashboard.value = false));
   });
 };
@@ -1213,11 +1083,9 @@ const onDashboardSelection = (dashboardId: any, index = 0) => {
 };
 
 const setDashboardTabOptions = (dashboardId: any) => {
-  const defaultTabs = [{ label: "Default", value: "default" }];
+  const defaultTabs = [{ label: t("reports.destinationDefault"), value: "default" }];
 
-  const match = dashboardOptions.value.find(
-    (dashboard) => dashboard.value === dashboardId,
-  );
+  const match = dashboardOptions.value.find((dashboard) => dashboard.value === dashboardId);
   dashboardTabOptions.value = match?.tabs || defaultTabs;
 
   options.value["tabs"] = [...dashboardTabOptions.value];
@@ -1236,53 +1104,30 @@ const allDashboardsArePdf = computed(
 // Returns the available attachment type options for a given report type.
 // Inline is disabled for PDF since the report server does not support it.
 const attachmentTypeOptions = (rType: string | undefined) => [
-  { label: "Standard — downloadable attachment (default)", value: "standard" },
+  { label: t("reports.attachmentStandard"), value: "standard" },
   {
-    label: "Inline — embedded in email body",
+    label: t("reports.attachmentInline"),
     value: "inline",
     disable: rType === "pdf",
   },
 ];
 
-const customFrequencyOptions = [
-  { label: "days", value: "days" },
-  { label: "hours", value: "hours" },
-  { label: "weeks", value: "weeks" },
-  { label: "months", value: "months" },
-];
+const customFrequencyOptions = computed(() => [
+  { label: t("reports.frequencyUnits.days"), value: "days" },
+  { label: t("reports.frequencyUnits.hours"), value: "hours" },
+  { label: t("reports.frequencyUnits.weeks"), value: "weeks" },
+  { label: t("reports.frequencyUnits.months"), value: "months" },
+]);
 
-const currentTimezone =
-  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 const timezone = ref(currentTimezone);
-
-const timezoneFilterFn = (val: string, update: Function) => {
-  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
-};
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
 
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
 });
 
-const browserTime =
-  "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
 // Add the UTC option
 timezoneOptions.unshift("UTC");
@@ -1296,14 +1141,14 @@ const getDashboaordFolders = () => {
       .then((res) => {
         res.data.list.forEach((folder: { name: string; folderId: string }) => {
           folderOptions.value.push({
-            label: folder.name,
+            label: raw(folder.name),
             value: folder.folderId,
           });
           options.value["folders"] = [...folderOptions.value];
         });
         resolve(true);
       })
-      .catch((err) => reject(true))
+      .catch((_err) => reject(true))
       .finally(() => {
         isFetchingFolders.value = false;
       });
@@ -1352,10 +1197,7 @@ const saveReport = async (value: CreateReportForm) => {
   let scheduleTime = value.time;
   let scheduleTimezone = value.timezone;
 
-  if (
-    value.selectedTimeTab === "scheduleNow" ||
-    value.frequencyType === "cron"
-  ) {
+  if (value.selectedTimeTab === "scheduleNow" || value.frequencyType === "cron") {
     const now = new Date();
 
     const day = String(now.getDate()).padStart(2, "0");
@@ -1441,7 +1283,7 @@ const saveReport = async (value: CreateReportForm) => {
 
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait...",
+    message: t("toastMessages.reports.pleaseWait"),
     timeout: 0,
   });
 
@@ -1462,9 +1304,9 @@ const saveReport = async (value: CreateReportForm) => {
 
       toast({
         variant: "success",
-        message: `Report ${
-          isEditingReport.value ? "updated" : "saved"
-        } successfully.`,
+        message: isEditingReport.value
+          ? t("toastMessages.reports.reportUpdatedSuccessfully")
+          : t("toastMessages.reports.reportSavedSuccessfully"),
       });
       goToReports();
     })
@@ -1474,9 +1316,7 @@ const saveReport = async (value: CreateReportForm) => {
           variant: "error",
           message:
             error?.response?.data?.message ||
-            `Error while ${
-              isEditingReport.value ? "updating" : "saving"
-            } report.`,
+            `Error while ${isEditingReport.value ? "updating" : "saving"} report.`,
         });
       }
     })
@@ -1495,45 +1335,6 @@ const goToReports = () => {
   });
 };
 
-const onFilterOptions = (type: string, val: String, update: Function) => {
-  if (type === "folders") {
-    folderOptions.value = filterOptions(options.value[type] || [], val, update);
-  }
-
-  if (type === "dashboards") {
-    dashboardOptions.value = filterOptions(
-      options.value[type] || [],
-      val,
-      update,
-    );
-  }
-
-  if (type === "tabs") {
-    dashboardTabOptions.value = filterOptions(
-      dashboardTabOptions.value,
-      val,
-      update,
-    );
-  }
-};
-
-const filterOptions = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter((option: any) => {
-      return option.label.toLowerCase().indexOf(value) > -1;
-    });
-  });
-
-  return filteredOptions;
-};
-
 const setupEditingReport = async (report: any) => {
   // Keep the report skeleton (destinations / frequency / timezone / timestamps /
   // ...) as the save base; the dashboards row + form-owned scalars are seeded
@@ -1546,9 +1347,7 @@ const setupEditingReport = async (report: any) => {
   // on save. Using plain `new Date()` would interpret the timestamp in the
   // browser's local timezone, causing a compounding offset on every save when
   // the browser and report timezones differ.
-  const reportTimezone = report.timezone
-    .toLowerCase()
-    .startsWith("browser time")
+  const reportTimezone = report.timezone.toLowerCase().startsWith("browser time")
     ? Intl.DateTimeFormat().resolvedOptions().timeZone
     : report.timezone;
   const dateInReportTz = _DateTime.fromMillis(report.start / 1000, {
@@ -1599,37 +1398,32 @@ const setupEditingReport = async (report: any) => {
   // Resolve folder/dashboard/tab against the loaded options (drop + warn if the
   // saved selection has since been deleted).
   let folder = "";
-  if (
-    folderOptions.value.some((f) => f.value === report.dashboards[0].folder)
-  ) {
+  if (folderOptions.value.some((f) => f.value === report.dashboards[0].folder)) {
     folder = report.dashboards[0].folder;
   } else {
-    toast({ variant: "error", message: "Selected folder has been deleted!" });
+    toast({ variant: "error", message: t("toastMessages.reports.selectedFolderHasBeenDeleted") });
   }
 
   let dashboard = "";
-  if (
-    dashboardOptions.value.some(
-      (d) => d.value === report.dashboards[0].dashboard,
-    )
-  ) {
+  if (dashboardOptions.value.some((d) => d.value === report.dashboards[0].dashboard)) {
     dashboard = report.dashboards[0].dashboard;
   } else {
-    toast({ variant: "error", message: "Selected dashboard has been deleted!" });
+    toast({
+      variant: "error",
+      message: t("toastMessages.reports.selectedDashboardHasBeenDeleted"),
+    });
   }
 
   setDashboardTabOptions(dashboard);
 
   let tabs = "";
-  const tab = dashboardTabOptions.value.find(
-    (t) => t.value === report.dashboards[0].tabs[0],
-  );
+  const tab = dashboardTabOptions.value.find((t) => t.value === report.dashboards[0].tabs[0]);
   if (tab) {
     tabs = tab.value;
   } else {
     toast({
       variant: "error",
-      message: "Selected dashboard tab has been deleted!",
+      message: t("toastMessages.reports.selectedDashboardTabHasBeenDeleted"),
     });
   }
 
@@ -1638,13 +1432,10 @@ const setupEditingReport = async (report: any) => {
     dashboard,
     tabs,
     report_type: report.dashboards[0].report_type ?? "pdf",
-    email_attachment_type:
-      report.dashboards[0].email_attachment_type ?? "standard",
+    email_attachment_type: report.dashboards[0].email_attachment_type ?? "standard",
     attachmentWidth: dims?.width ?? undefined,
     attachmentHeight: dims?.height ?? undefined,
-    timerange:
-      report.dashboards[0].timerange ??
-      createReportDefaults().dashboards[0].timerange,
+    timerange: report.dashboards[0].timerange ?? createReportDefaults().dashboards[0].timerange,
   };
 
   // Seed every form-owned value from the resolved record (async-arrived data).

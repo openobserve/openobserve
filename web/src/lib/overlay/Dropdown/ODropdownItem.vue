@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import type {
-  DropdownItemProps,
-  DropdownItemEmits,
-  DropdownItemSlots,
-} from "./ODropdown.types";
+import type { DropdownItemProps, DropdownItemEmits, DropdownItemSlots } from "./ODropdown.types";
 import { DropdownMenuItem } from "reka-ui";
 import OIcon from "../../core/Icon/OIcon.vue";
 import OShortcut from "../../core/Shortcut/OShortcut.vue";
@@ -17,12 +13,8 @@ const emit = defineEmits<DropdownItemEmits>();
 
 defineSlots<DropdownItemSlots>();
 
-const variantClasses: Record<
-  NonNullable<DropdownItemProps["variant"]>,
-  string
-> = {
-  default:
-    "text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg",
+const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> = {
+  default: "text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg",
   destructive:
     "text-dropdown-item-destructive-text data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
 };
@@ -34,8 +26,8 @@ const variantClasses: Record<
     :text-value="textValue"
     :class="[
       'relative flex items-center gap-2',
-      'w-full px-3 py-1.5 rounded-default',
-      'cursor-pointer select-none outline-none',
+      'rounded-default w-full px-3 py-1.5',
+      'cursor-pointer outline-none select-none',
       'transition-colors duration-150',
       variantClasses[variant],
       'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',

@@ -80,9 +80,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const width = 200;
-const gradientId = computed(
-  () => `kpi-spark-${Math.random().toString(36).slice(2, 9)}`,
-);
+const gradientId = computed(() => `kpi-spark-${Math.random().toString(36).slice(2, 9)}`);
 
 const hasData = computed(() => props.data.length > 1);
 
@@ -128,9 +126,7 @@ const bars = computed(() => {
 const linePath = computed(() => {
   const pts = points.value;
   if (!pts.length) return "";
-  return pts
-    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`)
-    .join(" ");
+  return pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
 });
 
 const areaPath = computed(() => {

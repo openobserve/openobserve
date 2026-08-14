@@ -18,10 +18,13 @@ import {
   CARD_KIND,
   baseNameOf,
   buildSelector,
+  computePercentileWindow,
   computeRateWindow,
   computeStepSeconds,
+  computeWidenedRateWindows,
   formatPromDuration,
   getMetricDefaults,
+  MIN_PERCENTILE_SAMPLES,
   inferUnit,
   resolveCardKind,
   resolveVariant,
@@ -30,15 +33,14 @@ import {
 
 /** The rate window every truth-table expectation below is written against. */
 const W = "4m";
+/** The percentile window a gauge falls back to when no time context is given:
+ *  MIN_PERCENTILE_SAMPLES x the 15s default scrape. Deliberately NOT `W` — a
+ *  quantile needs far more samples than a rate. */
+const PW = "5m";
 
 /** Shorthand: the default (index 0) query for a metric, with no filters. */
-const defaultQuery = (
-  name: string,
-  type?: string,
-  ctx?: Record<string, any>,
-) =>
-  getMetricDefaults(name, type, undefined, { rateWindow: W, ...ctx })
-    .defaultQuery;
+const defaultQuery = (name: string, type?: string, ctx?: Record<string, any>) =>
+  getMetricDefaults(name, type, undefined, { rateWindow: W, ...ctx }).defaultQuery;
 
 const unitOf = (name: string, type?: string, ctx?: Record<string, any>) =>
   getMetricDefaults(name, type, undefined, { rateWindow: W, ...ctx }).unit;
@@ -47,17 +49,13 @@ const streamNames = (...names: string[]) => new Set(names);
 
 describe("buildSelector", () => {
   it("always emits the __name__ form, never a bare identifier", () => {
-    expect(buildSelector("http_requests_total")).toBe(
-      '{__name__="http_requests_total"}',
-    );
+    expect(buildSelector("http_requests_total")).toBe('{__name__="http_requests_total"}');
   });
 
   it("handles metric names that are not valid PromQL identifiers", () => {
     // OpenObserve stream-name normalization strips only [^a-zA-Z0-9_:], so a
     // name may begin with a digit. As a bare identifier this would not parse.
-    expect(buildSelector("5xx_errors_total")).toBe(
-      '{__name__="5xx_errors_total"}',
-    );
+    expect(buildSelector("5xx_errors_total")).toBe('{__name__="5xx_errors_total"}');
   });
 
   it("orders matchers deterministically so the cache key is stable", () => {
@@ -77,15 +75,11 @@ describe("buildSelector", () => {
     expect(buildSelector("m", [{ label: "path", value: 'a"b\\c' }])).toBe(
       '{__name__="m",path="a\\"b\\\\c"}',
     );
-    expect(buildSelector("m", [{ label: "l", value: "a\nb" }])).toBe(
-      '{__name__="m",l="a\\nb"}',
-    );
+    expect(buildSelector("m", [{ label: "l", value: "a\nb" }])).toBe('{__name__="m",l="a\\nb"}');
   });
 
   it("keeps an explicitly empty value", () => {
-    expect(buildSelector("m", [{ label: "l", value: "" }])).toBe(
-      '{__name__="m",l=""}',
-    );
+    expect(buildSelector("m", [{ label: "l", value: "" }])).toBe('{__name__="m",l=""}');
   });
 
   it("rejects invalid label names rather than silently dropping them", () => {
@@ -93,18 +87,16 @@ describe("buildSelector", () => {
     expect(() => buildSelector("m", [{ label: "bad-label", value: "x" }])).toThrow(
       /invalid label name/,
     );
-    expect(() => buildSelector("m", [{ label: "1abc", value: "x" }])).toThrow(
-      /invalid label name/,
-    );
+    expect(() => buildSelector("m", [{ label: "1abc", value: "x" }])).toThrow(/invalid label name/);
   });
 
   it("supports the non-equality matcher operators", () => {
-    expect(
-      buildSelector("m", [{ label: "job", value: "api.*", operator: "=~" }]),
-    ).toBe('{__name__="m",job=~"api.*"}');
-    expect(() =>
-      buildSelector("m", [{ label: "job", value: "x", operator: ">" }]),
-    ).toThrow(/invalid operator/);
+    expect(buildSelector("m", [{ label: "job", value: "api.*", operator: "=~" }])).toBe(
+      '{__name__="m",job=~"api.*"}',
+    );
+    expect(() => buildSelector("m", [{ label: "job", value: "x", operator: ">" }])).toThrow(
+      /invalid operator/,
+    );
   });
 });
 
@@ -144,6 +136,114 @@ describe("rate window (PRD 6.4)", () => {
   });
 });
 
+/**
+ * The retry ladder for a rate query whose standard window found nothing while
+ * the metric's samples sit right there in the range: the org's configured
+ * scrape interval overstated how often the data actually arrives, so the
+ * window gets widened geometrically before the card concedes "too few samples".
+ */
+describe("widened rate windows (sparse retry)", () => {
+  it("escalates 4x then 16x from the standard window", () => {
+    // The demo-app case: 15m range at a declared 15s scrape gives a [1m]
+    // standard window, but the app exports every 60s — [1m] rarely holds two
+    // samples. The first rung, [4m], is exactly the window a correctly
+    // configured 60s org would have computed; the second absorbs the
+    // range/2 cap.
+    expect(computeRateWindow(15 * 60, undefined, 15)).toBe("1m");
+    expect(computeWidenedRateWindows(15 * 60, undefined, 15)).toEqual(["4m", "7m30s"]);
+  });
+
+  it("widens multiplicatively even where the step dominates the scrape floor", () => {
+    // At long ranges the standard window is already step-sized, and adding a
+    // few scrape intervals to it would barely move it — a metric arriving at a
+    // 10m cadence under a 5m-ish window would still find nothing. Scaling the
+    // whole window is what actually reaches slower cadences.
+    const range = 24 * 3600; // step 288s, standard window 303s
+    expect(computeWidenedRateWindows(range, undefined, 15)).toEqual(["20m12s", "1h20m48s"]);
+  });
+
+  it("caps every rung at half the range, and dedupes rungs the cap flattens", () => {
+    // A window wider than half the view is one global average pretending to be
+    // a trend; and if two samples don't fit in half the range, no window was
+    // ever going to chart this as a rate.
+    const rungs = computeWidenedRateWindows(15 * 60, undefined, 60); // standard [4m], cap 7m30s
+    expect(rungs).toEqual(["7m30s"]);
+  });
+
+  it("returns nothing when the cap leaves no room to widen", () => {
+    // A 5m view at a 60s scrape already has a [4m] standard window — wider than
+    // the 2m30s cap. There is no honest wider window to offer; the card keeps
+    // its "too few samples" message.
+    expect(computeWidenedRateWindows(5 * 60, undefined, 60)).toEqual([]);
+  });
+});
+
+/**
+ * The rate window is sized for `rate()`, which needs two samples. Reusing it for
+ * `quantile_over_time` gave a 15m view a 1m window — FOUR samples at a 15s
+ * scrape — where p90 lands at index 0.9 x 3 = 2.7 and p99 at 2.97: both
+ * interpolate between the same top pair and draw as one line. Widening the
+ * window is what makes the percentiles actually separate.
+ */
+describe("percentile window", () => {
+  const toSeconds = (d: string) =>
+    [...d.matchAll(/(\d+)([dhms])/g)].reduce(
+      (acc, m) => acc + Number(m[1]) * { d: 86400, h: 3600, m: 60, s: 1 }[m[2] as "d"],
+      0,
+    );
+  const RANGES = { "15m": 900, "1h": 3600, "6h": 21600, "24h": 86400, "7d": 604800 };
+
+  it("is never narrower than the rate window", () => {
+    // The rate window already guarantees no gaps between evaluation points; a
+    // quantile can never want LESS data than a rate. Includes ranges so short
+    // that the range/4 cap would otherwise undercut it.
+    for (const range of [60, 300, ...Object.values(RANGES), 3600 * 300]) {
+      for (const scrape of [10, 15, 60]) {
+        expect(
+          toSeconds(computePercentileWindow(range, undefined, scrape)),
+          `range=${range} scrape=${scrape}`,
+        ).toBeGreaterThanOrEqual(toSeconds(computeRateWindow(range, undefined, scrape)));
+      }
+    }
+  });
+
+  it("gives a 15m view far more than the four samples the rate window did", () => {
+    const before = toSeconds(computeRateWindow(RANGES["15m"], 120, 15)) / 15;
+    const after = toSeconds(computePercentileWindow(RANGES["15m"], 120, 15)) / 15;
+    expect(before).toBe(4); // the bug
+    expect(after).toBeGreaterThanOrEqual(15);
+  });
+
+  it("reaches the sample target once the range allows it", () => {
+    for (const label of ["1h", "6h", "24h", "7d"] as const) {
+      const samples = toSeconds(computePercentileWindow(RANGES[label], 120, 15)) / 15;
+      expect(samples, label).toBeGreaterThanOrEqual(MIN_PERCENTILE_SAMPLES);
+    }
+  });
+
+  it("caps at a quarter of the view so the chart keeps its variation", () => {
+    // Without the cap a 15m view would ask for 5m — a third of the range — and
+    // every point would report nearly the same global quantile.
+    for (const range of Object.values(RANGES)) {
+      const w = toSeconds(computePercentileWindow(range, 120, 15));
+      const rate = toSeconds(computeRateWindow(range, 120, 15));
+      // The cap may only be overridden by the floor (the rate window itself).
+      expect(w <= range / 4 || w === rate, `range=${range}`).toBe(true);
+    }
+  });
+
+  it("scales with the scrape interval rather than assuming 15s", () => {
+    expect(computePercentileWindow(6 * 3600, 120, 15)).toBe("5m"); // 20 x 15s
+    expect(computePercentileWindow(6 * 3600, 120, 30)).toBe("10m"); // 20 x 30s
+  });
+
+  it("survives a zero/garbage range without emitting an invalid duration", () => {
+    for (const bad of [0, -1, NaN, undefined as any]) {
+      expect(computePercentileWindow(bad, 120, 15)).toMatch(/^\d+[dhms]/);
+    }
+  });
+});
+
 describe("type resolution (PRD 6.1)", () => {
   it("dispatches family suffixes on the name, not the coerced type", () => {
     // The backend coerces _bucket/_sum/_count sub-streams to `counter` when
@@ -154,18 +254,14 @@ describe("type resolution (PRD 6.1)", () => {
         streamNames: streamNames("foo_seconds_count"),
       }),
     ).toBe(CARD_KIND.MEAN_PAIR);
-    expect(resolveCardKind("foo_bucket", "counter")).toBe(
-      CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS,
-    );
+    expect(resolveCardKind("foo_bucket", "counter")).toBe(CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS);
   });
 
   it("compares the declared type case-insensitively", () => {
     // The backend serializes MetricType in PascalCase: "Counter", "GaugeHistogram".
     expect(resolveCardKind("foo", "Counter")).toBe(CARD_KIND.COUNTER_RATE);
     expect(resolveCardKind("foo", "Summary")).toBe(CARD_KIND.SUMMARY_QUANTILES);
-    expect(resolveCardKind("foo_bucket", "GaugeHistogram")).toBe(
-      CARD_KIND.OTHER,
-    );
+    expect(resolveCardKind("foo_bucket", "GaugeHistogram")).toBe(CARD_KIND.OTHER);
     expect(resolveCardKind("foo_bucket", "ExponentialHistogram")).toBe(
       CARD_KIND.EXP_HISTOGRAM_FALLBACK,
     );
@@ -194,12 +290,12 @@ describe("type resolution (PRD 6.1)", () => {
         familyType: "exponentialhistogram",
       }),
     ).toBe(CARD_KIND.EXP_HISTOGRAM_FALLBACK);
-    expect(
-      resolveCardKind("foo_bucket", "counter", { familyType: "gaugehistogram" }),
-    ).toBe(CARD_KIND.OTHER);
-    expect(
-      resolveCardKind("foo_bucket", "counter", { familyType: "histogram" }),
-    ).toBe(CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS);
+    expect(resolveCardKind("foo_bucket", "counter", { familyType: "gaugehistogram" })).toBe(
+      CARD_KIND.OTHER,
+    );
+    expect(resolveCardKind("foo_bucket", "counter", { familyType: "histogram" })).toBe(
+      CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS,
+    );
   });
 
   it("maps the remaining family suffixes", () => {
@@ -239,24 +335,18 @@ describe("PRD 6.2 truth table", () => {
   });
 
   it("foo_total -> sum(rate), count/sec", () => {
-    expect(defaultQuery("foo_total")).toBe(
-      'sum(rate({__name__="foo_total"}[4m]))',
-    );
+    expect(defaultQuery("foo_total")).toBe('sum(rate({__name__="foo_total"}[4m]))');
     expect(unitOf("foo_total")).toBe("count-per-sec");
   });
 
   it("foo_seconds_count -> sum(rate), count/sec (no lookback)", () => {
-    expect(defaultQuery("foo_seconds_count")).toBe(
-      'sum(rate({__name__="foo_seconds_count"}[4m]))',
-    );
+    expect(defaultQuery("foo_seconds_count")).toBe('sum(rate({__name__="foo_seconds_count"}[4m]))');
     // _count counts events, not seconds: it must NOT rate to s/s.
     expect(unitOf("foo_seconds_count")).toBe("count-per-sec");
   });
 
   it("foo_seconds_total -> sum(rate), unitless (s/s)", () => {
-    expect(defaultQuery("foo_seconds_total")).toBe(
-      'sum(rate({__name__="foo_seconds_total"}[4m]))',
-    );
+    expect(defaultQuery("foo_seconds_total")).toBe('sum(rate({__name__="foo_seconds_total"}[4m]))');
     expect(unitOf("foo_seconds_total")).toBe("none");
   });
 
@@ -288,9 +378,7 @@ describe("PRD 6.2 truth table", () => {
     const d = getMetricDefaults("foo_bucket", "histogram", undefined, {
       rateWindow: W,
     });
-    expect(d.defaultQuery).toBe(
-      'sum by (le) (rate({__name__="foo_bucket"}[4m]))',
-    );
+    expect(d.defaultQuery).toBe('sum by (le) (rate({__name__="foo_bucket"}[4m]))');
     expect(d.chartType).toBe("heatmap");
     expect(d.unit).toBe("short");
     expect(d.legendTemplate).toBe("{le}");
@@ -311,11 +399,7 @@ describe("PRD 6.2 truth table", () => {
       'histogram_quantile(0.9, sum by (le) (rate({__name__="foo_seconds_bucket"}[4m])))',
       'histogram_quantile(0.99, sum by (le) (rate({__name__="foo_seconds_bucket"}[4m])))',
     ]);
-    expect(pct.queries.map((q: any) => q.legendTemplate)).toEqual([
-      "p50",
-      "p90",
-      "p99",
-    ]);
+    expect(pct.queries.map((q: any) => q.legendTemplate)).toEqual(["p50", "p90", "p99"]);
   });
 });
 
@@ -353,18 +437,14 @@ describe("unit inference (PRD 7.1 / 7.2)", () => {
     expect(getMetricDefaults("foo_widgets", "gauge", "By").unit).toBe("bytes");
     expect(getMetricDefaults("foo_widgets", "gauge", "s").unit).toBe("seconds");
     // Rated: the declared observation unit goes through the rated mapping.
-    expect(getMetricDefaults("foo_widgets_total", "counter", "By").unit).toBe(
-      "bytes-per-sec",
-    );
+    expect(getMetricDefaults("foo_widgets_total", "counter", "By").unit).toBe("bytes-per-sec");
     // Unrecognized declared unit falls through to name inference.
     expect(getMetricDefaults("foo_bytes", "gauge", "zorkmids").unit).toBe("bytes");
   });
 
   it("never lets a _count member inherit the family observation unit", () => {
     // A family declaring `seconds` must still yield count/s on X_count.
-    expect(getMetricDefaults("foo_seconds_count", "counter", "s").unit).toBe(
-      "count-per-sec",
-    );
+    expect(getMetricDefaults("foo_seconds_count", "counter", "s").unit).toBe("count-per-sec");
   });
 
   it("always treats _created as seconds-since-epoch", () => {
@@ -416,9 +496,7 @@ describe("variants (PRD 6.3)", () => {
     // Queries also carry `builder` state for the Select handoff; that is the
     // subject of metricDefaults.builder.spec.ts, so pick out the two fields
     // this test is actually about.
-    expect(
-      minmax.queries.map((q: any) => [q.expr, q.legendTemplate]),
-    ).toEqual([
+    expect(minmax.queries.map((q: any) => [q.expr, q.legendTemplate])).toEqual([
       ['min({__name__="foo_bytes"})', "min"],
       ['max({__name__="foo_bytes"})', "max"],
     ]);
@@ -448,9 +526,7 @@ describe("variants (PRD 6.3)", () => {
     expect(d.defaultQuery).toBe("");
     expect(d.configurable).toBe(false);
     // Select still works: buckets are snapshots, so no rate().
-    expect(d.variants[0].queries[0].expr).toBe(
-      'sum by (le) ({__name__="foo_bucket"})',
-    );
+    expect(d.variants[0].queries[0].expr).toBe('sum by (le) ({__name__="foo_bucket"})');
   });
 
   it("gives _gsum / _gcount plain gauge treatment with no rate", () => {
@@ -470,7 +546,7 @@ describe("variants (PRD 6.3)", () => {
     expect(d.legendTemplate).toBe("{quantile}");
     // Averaging pre-computed quantiles is not statistically mergeable, so the
     // pXX vocabulary is deliberately withheld from this variant.
-    expect(d.variants[0].label).toBe("Avg of reported quantiles");
+    expect(d.variants[0].labelKey).toBe("metrics.explorer.variants.avgReportedQuantiles");
     expect(JSON.stringify(d.variants[0])).not.toMatch(/p50|p90|p99/);
     // The raw variant must distinguish targets, not just quantiles.
     expect(d.variants[1].queries[0].legendTemplate).toBe("{instance} {quantile}");
@@ -511,9 +587,7 @@ describe("variants (PRD 6.3)", () => {
     expect(bucketOf("a", "gauge")).toBe("gauge");
     expect(bucketOf("a_bucket", "histogram")).toBe("histogram");
     expect(bucketOf("a_bucket", "exponentialhistogram")).toBe("histogram");
-    expect(
-      bucketOf("a_sum", "", { streamNames: streamNames("a_count") }),
-    ).toBe("summary");
+    expect(bucketOf("a_sum", "", { streamNames: streamNames("a_count") })).toBe("summary");
     expect(bucketOf("a", "summary")).toBe("summary");
     expect(bucketOf("a_info", "info")).toBe("other");
     expect(bucketOf("a_created", "counter")).toBe("other");
@@ -547,9 +621,7 @@ describe("resolveVariant", () => {
     const r = resolveVariant(histogram(), "count-rate");
     expect(r?.chartType).toBe("line");
     expect(r?.unit).toBe("count-per-sec");
-    expect(r?.queries[0].expr).toBe(
-      'sum(rate({__name__="foo_seconds_count"}[4m]))',
-    );
+    expect(r?.queries[0].expr).toBe('sum(rate({__name__="foo_seconds_count"}[4m]))');
   });
 });
 
@@ -637,8 +709,7 @@ describe("extreme-value guard (all-NaN retry)", () => {
 });
 
 describe("percentile checkbox sets are honoured", () => {
-  const gauge = () =>
-    getMetricDefaults("queue_depth", "gauge", undefined, { rateWindow: W });
+  const gauge = () => getMetricDefaults("queue_depth", "gauge", undefined, { rateWindow: W });
 
   it("builds a query for EVERY percentile the dialog offers", () => {
     // The dialog renders a checkbox per `availablePercentiles`. Any offered
@@ -646,9 +717,7 @@ describe("percentile checkbox sets are honoured", () => {
     // nothing — the subset filter empties and falls back to all of them.
     const variant = gauge().variants.find((v: any) => v.id === "percentiles");
     const offered = variant.availablePercentiles;
-    const built = variant.queries.map((q: any) =>
-      Number(/^p(\d+)$/.exec(q.legendTemplate)![1]),
-    );
+    const built = variant.queries.map((q: any) => Number(/^p(\d+)$/.exec(q.legendTemplate)![1]));
     expect(built.sort((a, b) => a - b)).toEqual([...offered].sort((a, b) => a - b));
   });
 
@@ -656,7 +725,7 @@ describe("percentile checkbox sets are honoured", () => {
     const r = resolveVariant(gauge(), "percentiles", { percentiles: [75] });
     expect(r?.queries).toHaveLength(1);
     expect(r?.queries[0].legendTemplate).toBe("p75");
-    expect(r?.queries[0].expr).toBe('quantile(0.75, {__name__="queue_depth"})');
+    expect(r?.queries[0].expr).toBe(`quantile_over_time(0.75, {__name__="queue_depth"}[${PW}])`);
   });
 
   it("resolves a mixed subset exactly", () => {
@@ -666,11 +735,45 @@ describe("percentile checkbox sets are honoured", () => {
 
   it("defaults to p50/p90/p99 out of the five offered", () => {
     const r = resolveVariant(gauge(), "percentiles");
-    expect(r?.queries.map((q: any) => q.legendTemplate)).toEqual([
-      "p50",
-      "p90",
-      "p99",
-    ]);
+    expect(r?.queries.map((q: any) => q.legendTemplate)).toEqual(["p50", "p90", "p99"]);
+  });
+
+  /**
+   * `quantile(φ, v)` aggregates ACROSS the series present at each timestamp, so
+   * on a single-series gauge every percentile returns that one series' own value
+   * — three identical lines under three different legends. Percentiles for a
+   * gauge are a question about TIME.
+   */
+  it("asks for percentiles over time, not across series", () => {
+    const r = resolveVariant(gauge(), "percentiles", { percentiles: [50, 99] });
+    for (const q of r!.queries) {
+      expect(q.expr).toMatch(/^quantile_over_time\(/);
+      expect(q.expr).toContain(`[${PW}]`);
+    }
+    // Distinct ratios — the whole point is that the series no longer coincide.
+    expect(new Set(r!.queries.map((q: any) => q.expr)).size).toBe(2);
+  });
+
+  /**
+   * A range vector may only be taken over a SELECTOR. The NaN-guard retry path
+   * rewrites the selector into `(x and x > -Inf)`, and `(...)[5m]` does not
+   * parse — nor does the subquery form `(...)[5m:]`, which the engine rejects
+   * unless the inner expression is already a matrix. So the percentile queries
+   * must be built from the UNGUARDED selector even in guarded mode.
+   */
+  it("keeps a parseable range vector when the NaN guard is on", () => {
+    const guarded = getMetricDefaults("queue_depth", "gauge", undefined, {
+      rateWindow: W,
+      applyNanGuard: true,
+    });
+    const r = resolveVariant(guarded, "percentiles", { percentiles: [99] });
+
+    expect(r!.queries[0].expr).toBe(`quantile_over_time(0.99, {__name__="queue_depth"}[${PW}])`);
+    expect(r!.queries[0].expr).not.toContain("> -Inf");
+
+    // The guard still applies to the variants that can carry it.
+    const avg = resolveVariant(guarded, "avg");
+    expect(avg!.queries[0].expr).toContain("> -Inf");
   });
 });
 
@@ -689,9 +792,7 @@ describe("the card footer names the function actually in effect", () => {
     // Deriving it from the card kind left it reading "sum(rate)" forever, so
     // switching to avg(rate) looked like it had done nothing.
     expect(resolveVariant(counter(), "rate-avg")?.footerLabel).toBe("avg(rate)");
-    expect(resolveVariant(counter(), "increase")?.footerLabel).toBe(
-      "sum(increase)",
-    );
+    expect(resolveVariant(counter(), "increase")?.footerLabel).toBe("sum(increase)");
   });
 
   it("gives every variant of every card kind a footer label", () => {
@@ -736,13 +837,12 @@ describe("units the chart actually needs (found in review)", () => {
     // An OTLP `Cel` gauge, or a byte counter with no unit segment in its name.
     // Name inference alone cannot know either; the declared unit is the only
     // source, which is why dropping it silently degraded these to numbers/count.
-    expect(
-      getMetricDefaults("cpu_temperature", "gauge", "Cel", { rateWindow: W }).unit,
-    ).toBe("celsius");
+    expect(getMetricDefaults("cpu_temperature", "gauge", "Cel", { rateWindow: W }).unit).toBe(
+      "celsius",
+    );
 
     expect(
-      getMetricDefaults("network_ingress_total", "counter", "By", { rateWindow: W })
-        .unit,
+      getMetricDefaults("network_ingress_total", "counter", "By", { rateWindow: W }).unit,
     ).toBe("bytes-per-sec");
   });
 });

@@ -89,11 +89,8 @@
           data-test="span-selector-field-mode"
         />
 
-        <div
-          v-if="formValues.fieldMode === 'default'"
-          class="flex flex-col gap-1.5"
-        >
-          <span class="text-xs text-input-help-text leading-none">
+        <div v-if="formValues.fieldMode === 'default'" class="flex flex-col gap-1.5">
+          <span class="text-input-help-text text-xs leading-none">
             {{ t("onlineEvals.job.spanSelector.defaultSchemaHelp") }}
           </span>
           <!-- These are the actual field names that reach the scorer, so they
@@ -146,7 +143,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -167,10 +164,7 @@ import {
   normalizeJobFilterCondition,
 } from "../../utils/jobFilter";
 import JobFilterBuilder from "./JobFilterBuilder.vue";
-import {
-  makeSpanSelectorSchema,
-  type SpanSelectorForm,
-} from "./SpanSelectorBinding.schema";
+import { makeSpanSelectorSchema, type SpanSelectorForm } from "./SpanSelectorBinding.schema";
 
 const DEFAULT_FIELDS = [
   "name",
@@ -187,7 +181,7 @@ const props = defineProps<{
   scorerId: string;
   selectors: SpanSelector[];
   binding?: string;
-  streamFields: Array<{ label: string; value: string; type: string }>;
+  streamFields: Array<{ label: I18nText; value: string; type: string }>;
 }>();
 
 const emit = defineEmits<{
@@ -195,7 +189,7 @@ const emit = defineEmits<{
   (e: "update:binding", value: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const drawerOpen = ref(false);
 const formId = computed(
   () => `span-selector-form-${props.scorerId.replace(/[^a-zA-Z0-9_-]/g, "-")}`,
@@ -203,7 +197,7 @@ const formId = computed(
 
 const selectorOptions = computed(() =>
   props.selectors.map((selector) => ({
-    label: selector.name,
+    label: raw(selector.name),
     value: selector.id,
   })),
 );
@@ -223,8 +217,7 @@ const spanSelectorSchema = makeSpanSelectorSchema(t, {
   isDuplicateName: (name, id) =>
     props.selectors.some(
       (selector) =>
-        selector.id !== id &&
-        selector.name.trim().toLowerCase() === name.trim().toLowerCase(),
+        selector.id !== id && selector.name.trim().toLowerCase() === name.trim().toLowerCase(),
     ),
 });
 
@@ -241,9 +234,7 @@ const form = useOForm<SpanSelectorForm>({
   schema: spanSelectorSchema,
   onSubmit: saveSelector,
 });
-const formValues = form.useStore(
-  (state: any) => state.values as SpanSelectorForm,
-);
+const formValues = form.useStore((state: any) => state.values as SpanSelectorForm);
 
 // The filter tree is form-owned (JobFilterBuilder renders in form mode via
 // name-prefix="filterGroup"), so every condition's leaf inputs bind to a
@@ -310,9 +301,7 @@ function saveSelector(value: SpanSelectorForm) {
     fields: value.fieldMode === "custom" ? [...value.fields] : [],
     maximumSpans: Number(value.maximumSpans),
   };
-  const existingIndex = props.selectors.findIndex(
-    (item) => item.id === selector.id,
-  );
+  const existingIndex = props.selectors.findIndex((item) => item.id === selector.id);
   const selectors = [...props.selectors];
   if (existingIndex >= 0) selectors.splice(existingIndex, 1, selector);
   else selectors.push(selector);

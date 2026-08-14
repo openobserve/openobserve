@@ -43,13 +43,11 @@ describe("buildTestSample", () => {
 
   it("prefills every meta field the Alert Trigger schema declares, in schema order", () => {
     const [firing] = buildTestSample() as [Envelope];
-    const expectedKeys = TRIGGER_META_VARS.map((v) =>
-      v.ref.replace(/^meta\./, ""),
-    );
+    const expectedKeys = TRIGGER_META_VARS.map((v) => v.ref.replace(/^meta\./, ""));
     expect(Object.keys(firing.meta)).toEqual(expectedKeys);
   });
 
-  it("prefills the documented named defaults (all string values, matching the real payload)", () => {
+  it("prefills the documented named defaults (numeric fields as numbers, text as strings)", () => {
     const [firing] = buildTestSample() as [Envelope];
     expect(firing.meta).toEqual({
       org_id: "default",
@@ -57,36 +55,40 @@ describe("buildTestSample", () => {
       stream_name: "default",
       alert_name: "High Error Rate",
       alert_type: "scheduled",
-      alert_period: "10",
+      alert_period: 10,
       alert_operator: ">=",
-      alert_threshold: "100",
-      alert_count: "137",
-      alert_start_time: String(SAMPLE_TS),
-      alert_end_time: String(SAMPLE_TS + 600000000),
+      alert_threshold: 100,
+      alert_count: 137,
+      alert_start_time: SAMPLE_TS,
+      alert_end_time: SAMPLE_TS + 600000000,
     });
   });
 
   it("uses microsecond-epoch timestamps 10 minutes apart", () => {
     const [firing] = buildTestSample() as [Envelope];
-    expect(firing.meta.alert_start_time).toBe(String(SAMPLE_TS));
-    expect(
-      Number(firing.meta.alert_end_time) - Number(firing.meta.alert_start_time),
-    ).toBe(600000000);
+    expect(firing.meta.alert_start_time).toBe(SAMPLE_TS);
+    expect(Number(firing.meta.alert_end_time) - Number(firing.meta.alert_start_time)).toBe(
+      600000000,
+    );
   });
 
-  it("emits every meta field as a string (the real payload's meta is a string:string map)", () => {
+  it("types the numeric meta fields as numbers and text fields as strings", () => {
     const [firing] = buildTestSample() as [Envelope];
-    expect(typeof firing.meta.alert_period).toBe("string");
-    expect(typeof firing.meta.alert_threshold).toBe("string");
-    expect(typeof firing.meta.alert_count).toBe("string");
-    expect(typeof firing.meta.alert_start_time).toBe("string");
+    // numeric alert fields + timestamps -> numbers
+    expect(typeof firing.meta.alert_period).toBe("number");
+    expect(typeof firing.meta.alert_threshold).toBe("number");
+    expect(typeof firing.meta.alert_count).toBe("number");
+    expect(typeof firing.meta.alert_start_time).toBe("number");
+    expect(typeof firing.meta.alert_end_time).toBe("number");
+    // text fields stay strings
+    expect(typeof firing.meta.alert_name).toBe("string");
+    expect(typeof firing.meta.stream_type).toBe("string");
+    expect(typeof firing.meta.alert_operator).toBe("string");
   });
 
   it("uses a valid enum member for alert_type", () => {
     const [firing] = buildTestSample() as [Envelope];
-    const enumValues = TRIGGER_META_VARS.find(
-      (v) => v.ref === "meta.alert_type",
-    )?.enumValues;
+    const enumValues = TRIGGER_META_VARS.find((v) => v.ref === "meta.alert_type")?.enumValues;
     expect(enumValues).toContain(firing.meta.alert_type);
   });
 
@@ -110,17 +112,13 @@ describe("buildTestSample", () => {
     expect(a[0].data).not.toBe(b[0].data);
 
     a[0].meta.alert_name = "mutated";
-    expect((buildTestSample() as [Envelope])[0].meta.alert_name).toBe(
-      "High Error Rate",
-    );
+    expect((buildTestSample() as [Envelope])[0].meta.alert_name).toBe("High Error Rate");
   });
 });
 
 describe("buildTestSampleText", () => {
   it("is the pretty-printed JSON of buildTestSample()", () => {
-    expect(buildTestSampleText()).toBe(
-      JSON.stringify(buildTestSample(), null, 2),
-    );
+    expect(buildTestSampleText()).toBe(JSON.stringify(buildTestSample(), null, 2));
   });
 
   it("round-trips back to the sample object", () => {
@@ -152,17 +150,17 @@ describe("buildFlatTestSample", () => {
     });
   });
 
-  it("stringifies every meta value (the flattened meta block is string:string)", () => {
+  it("preserves each meta value's native type when flattening", () => {
     const [row] = buildFlatTestSample() as [Record<string, unknown>];
-    Object.keys(row)
-      .filter((k) => k.startsWith("meta_"))
-      .forEach((k) => {
-        expect(typeof row[k]).toBe("string");
-      });
-    expect(row.meta_alert_period).toBe("10");
-    expect(row.meta_alert_threshold).toBe("100");
-    expect(row.meta_alert_count).toBe("137");
-    expect(row.meta_alert_start_time).toBe(String(SAMPLE_TS));
+    // numeric alert fields + timestamps stay numbers
+    expect(row.meta_alert_period).toBe(10);
+    expect(row.meta_alert_threshold).toBe(100);
+    expect(row.meta_alert_count).toBe(137);
+    expect(row.meta_alert_start_time).toBe(SAMPLE_TS);
+    expect(typeof row.meta_alert_count).toBe("number");
+    // text fields stay strings
+    expect(row.meta_alert_name).toBe("High Error Rate");
+    expect(typeof row.meta_alert_name).toBe("string");
   });
 
   it("preserves the original row columns with their original types", () => {
@@ -273,15 +271,13 @@ describe("type-based fallbacks for unmapped meta fields", () => {
 
   it("still prefers the named default over the type default when the key is mapped", async () => {
     const { buildTestSample: build } = await loadWith([
-      { ref: "meta.alert_count", type: "string", descKey: "x" },
+      { ref: "meta.alert_count", type: "int", descKey: "x" },
     ]);
-    expect((build() as any)[0].meta).toEqual({ alert_count: "137" });
+    expect((build() as any)[0].meta).toEqual({ alert_count: 137 });
   });
 
   it("produces an empty meta block when the schema is empty", async () => {
-    const { buildTestSample: build, buildFlatTestSample: flat } = await loadWith(
-      [],
-    );
+    const { buildTestSample: build, buildFlatTestSample: flat } = await loadWith([]);
     expect((build() as any)[0].meta).toEqual({});
     expect(flat()).toEqual([
       {

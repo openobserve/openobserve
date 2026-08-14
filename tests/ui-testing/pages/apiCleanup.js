@@ -391,6 +391,42 @@ class APICleanup {
         }
     }
 
+    /**
+     * Delete a single report by its id (v2, folder-aware).
+     *
+     * Prefer this over deleteReport() whenever a report may live outside the
+     * default folder: the v1 `DELETE /api/{org}/reports/{name}` route resolves
+     * names within the default folder only and returns 404 for a report saved
+     * in a custom report folder, which then blocks deleting that folder.
+     *
+     * @param {string} reportId - The report id (`report_id` from fetchReports)
+     * @param {string} reportName - Optional, for logging only
+     * @returns {Promise<Object>} { code, message }
+     */
+    async deleteReportById(reportId, reportName = '') {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/reports/${reportId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const text = await response.text();
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete report by id', { reportId, reportName, status: response.status, body: text });
+                return { code: response.status, message: text };
+            }
+
+            return { code: 200, message: text };
+        } catch (error) {
+            testLogger.error('Failed to delete report by id', { reportId, reportName, error: error.message });
+            return { code: 500, message: error.message, error: error.message };
+        }
+    }
+
 
     /**
      * Fetch all pipelines

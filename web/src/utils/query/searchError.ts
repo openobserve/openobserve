@@ -36,6 +36,8 @@
  */
 
 /** The backend's internal error envelope, embedded in an otherwise plain string. */
+import { gt, raw, type I18nText } from "@/types/i18n";
+
 const ERROR_CODE_MARKER = "ErrorCode#";
 
 /** Long enough for any real message; short enough not to fill the screen. */
@@ -43,7 +45,7 @@ const MAX_MESSAGE_LENGTH = 300;
 
 export interface SearchError {
   /** A sentence fit to show a user. Never empty. */
-  message: string;
+  message: I18nText;
   /** The backend's error code, when it gave one (`20010`) or the HTTP status. */
   code?: number;
   /** The internal cause. Useful to an engineer, noise to everyone else. */
@@ -52,30 +54,27 @@ export interface SearchError {
   traceId?: string;
 }
 
-const str = (value: any): string =>
-  typeof value === "string" && value.trim() ? value.trim() : "";
+const str = (value: any): string => (typeof value === "string" && value.trim() ? value.trim() : "");
 
 const truncate = (message: string): string =>
-  message.length > MAX_MESSAGE_LENGTH
-    ? `${message.slice(0, MAX_MESSAGE_LENGTH)} …`
-    : message;
+  message.length > MAX_MESSAGE_LENGTH ? `${message.slice(0, MAX_MESSAGE_LENGTH)} …` : message;
 
 /**
  * Pulls the sentence out of an `ErrorCode# {...}` envelope, or `null` when the
  * string is not one (already a plain message, or malformed JSON — in which case
  * the raw string is still better than nothing).
  */
-function unwrapErrorCode(raw: string): Omit<SearchError, "traceId"> | null {
-  const marker = raw.indexOf(ERROR_CODE_MARKER);
+function unwrapErrorCode(text: string): Omit<SearchError, "traceId"> | null {
+  const marker = text.indexOf(ERROR_CODE_MARKER);
   if (marker === -1) return null;
 
-  const open = raw.indexOf("{", marker);
-  const close = raw.lastIndexOf("}");
+  const open = text.indexOf("{", marker);
+  const close = text.lastIndexOf("}");
   if (open === -1 || close <= open) return null;
 
   let parsed: any;
   try {
-    parsed = JSON.parse(raw.slice(open, close + 1));
+    parsed = JSON.parse(text.slice(open, close + 1));
   } catch {
     return null;
   }
@@ -84,7 +83,7 @@ function unwrapErrorCode(raw: string): Omit<SearchError, "traceId"> | null {
   if (!message) return null;
 
   return {
-    message,
+    message: raw(message),
     code: typeof parsed?.code === "number" ? parsed.code : undefined,
     detail: str(parsed?.inner) || undefined,
   };
@@ -99,7 +98,8 @@ function unwrapErrorCode(raw: string): Omit<SearchError, "traceId"> | null {
  */
 export function parseSearchError(
   error: any,
-  fallback = "Query failed",
+  // Evaluated per call, so gt() resolves the active locale.
+  fallback: I18nText = gt("search.queryFailed"),
 ): SearchError {
   // Already normalised upstream (the streaming path parses at the point of
   // failure, where the payload is still intact) — do not re-derive it.
@@ -108,7 +108,7 @@ export function parseSearchError(
   if (typeof error === "string") {
     const unwrapped = unwrapErrorCode(error);
     return {
-      message: truncate(unwrapped?.message || error || fallback),
+      message: raw(truncate(unwrapped?.message || error || fallback)),
       code: unwrapped?.code,
       detail: unwrapped?.detail,
     };
@@ -126,9 +126,8 @@ export function parseSearchError(
 
   // `error` first: on a PromQL failure that is the field carrying the envelope,
   // while `message` is often just the HTTP-level "Request failed with status…".
-  const raw =
-    str(body.error) || str(body.message) || bodyText || str(error?.message);
-  const unwrapped = unwrapErrorCode(raw);
+  const rawMessage = str(body.error) || str(body.message) || bodyText || str(error?.message);
+  const unwrapped = unwrapErrorCode(rawMessage);
 
   const httpStatus = error?.response?.status ?? error?.status;
   const code =
@@ -137,7 +136,7 @@ export function parseSearchError(
     (typeof httpStatus === "number" ? httpStatus : undefined);
 
   return {
-    message: truncate(unwrapped?.message || raw || fallback),
+    message: raw(truncate(unwrapped?.message || rawMessage || fallback)),
     code,
     detail: unwrapped?.detail ?? (str(body.error_detail) || undefined),
     traceId: str(body.trace_id) || str(error?.trace_id) || undefined,

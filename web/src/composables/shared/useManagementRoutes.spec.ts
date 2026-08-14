@@ -115,7 +115,7 @@ describe("useManagementRoutes", () => {
 
   describe("Base Children Routes", () => {
     let routes: any;
-    
+
     beforeEach(() => {
       routes = useManagementRoutes();
     });
@@ -127,21 +127,39 @@ describe("useManagementRoutes", () => {
     });
 
     it("should have organizationSettings route", () => {
-      const orgRoute = routes[0].children.find((child: any) => child.name === "organizationSettings");
+      const orgRoute = routes[0].children.find(
+        (child: any) => child.name === "organizationSettings",
+      );
       expect(orgRoute).toBeDefined();
       expect(orgRoute.path).toBe("organization");
     });
 
-    it("should have alertDestinations route", () => {
-      const alertDestRoute = routes[0].children.find((child: any) => child.name === "alertDestinations");
+    // Notification Destinations and Templates moved to /alert-* (Reliability).
+    // What is left here is a bare redirect, so old bookmarks still resolve.
+    it("should redirect alert_destinations to alertDestinations, preserving the query", () => {
+      const alertDestRoute = routes[0].children.find(
+        (child: any) => child.path === "alert_destinations",
+      );
       expect(alertDestRoute).toBeDefined();
-      expect(alertDestRoute.path).toBe("alert_destinations");
+      expect(alertDestRoute.name).toBeUndefined();
+      // `action=import` opens the import view — dropping the query would break
+      // every existing deep link into it.
+      expect(alertDestRoute.redirect({ query: { org_identifier: "o", action: "import" } })).toEqual(
+        {
+          name: "alertDestinations",
+          query: { org_identifier: "o", action: "import" },
+        },
+      );
     });
 
-    it("should have alertTemplates route", () => {
-      const templateRoute = routes[0].children.find((child: any) => child.name === "alertTemplates");
+    it("should redirect templates to alertTemplates, preserving the query", () => {
+      const templateRoute = routes[0].children.find((child: any) => child.path === "templates");
       expect(templateRoute).toBeDefined();
-      expect(templateRoute.path).toBe("templates");
+      expect(templateRoute.name).toBeUndefined();
+      expect(templateRoute.redirect({ query: { org_identifier: "o", action: "import" } })).toEqual({
+        name: "alertTemplates",
+        query: { org_identifier: "o", action: "import" },
+      });
     });
 
     it("should NOT have llmProviders route in OSS builds", () => {
@@ -150,7 +168,9 @@ describe("useManagementRoutes", () => {
     });
 
     it("should NOT have genAiAgentMapping route in OSS builds", () => {
-      const genAiRoute = routes[0].children.find((child: any) => child.name === "genAiAgentMapping");
+      const genAiRoute = routes[0].children.find(
+        (child: any) => child.name === "genAiAgentMapping",
+      );
       expect(genAiRoute).toBeUndefined();
     });
 
@@ -160,19 +180,14 @@ describe("useManagementRoutes", () => {
     });
 
     it("should have beforeEnter hook for organizationSettings route", () => {
-      const orgRoute = routes[0].children.find((child: any) => child.name === "organizationSettings");
+      const orgRoute = routes[0].children.find(
+        (child: any) => child.name === "organizationSettings",
+      );
       expect(typeof orgRoute.beforeEnter).toBe("function");
     });
 
-    it("should have beforeEnter hook for alertDestinations route", () => {
-      const alertDestRoute = routes[0].children.find((child: any) => child.name === "alertDestinations");
-      expect(typeof alertDestRoute.beforeEnter).toBe("function");
-    });
-
-    it("should have beforeEnter hook for alertTemplates route", () => {
-      const templateRoute = routes[0].children.find((child: any) => child.name === "alertTemplates");
-      expect(typeof templateRoute.beforeEnter).toBe("function");
-    });
+    // The two alerting redirects carry no guard by design: they resolve to
+    // /alerts/* routes, which run routeGuard themselves.
 
     it("should call routeGuard in general route beforeEnter", () => {
       const generalRoute = routes[0].children.find((child: any) => child.name === "general");
@@ -185,7 +200,9 @@ describe("useManagementRoutes", () => {
     });
 
     it("should call routeGuard in organizationSettings route beforeEnter", () => {
-      const orgRoute = routes[0].children.find((child: any) => child.name === "organizationSettings");
+      const orgRoute = routes[0].children.find(
+        (child: any) => child.name === "organizationSettings",
+      );
       const mockTo = { path: "/settings/organization" };
       const mockFrom = { path: "/settings" };
       const mockNext = vi.fn();
@@ -194,40 +211,46 @@ describe("useManagementRoutes", () => {
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
 
-    it("should call routeGuard in alertDestinations route beforeEnter", () => {
-      const alertDestRoute = routes[0].children.find((child: any) => child.name === "alertDestinations");
-      const mockTo = { path: "/settings/alert_destinations" };
-      const mockFrom = { path: "/settings" };
-      const mockNext = vi.fn();
-
-      alertDestRoute.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
-    });
-
-    it("should call routeGuard in alertTemplates route beforeEnter", () => {
-      const templateRoute = routes[0].children.find((child: any) => child.name === "alertTemplates");
-      const mockTo = { path: "/settings/templates" };
-      const mockFrom = { path: "/settings" };
-      const mockNext = vi.fn();
-
-      templateRoute.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
-    });
-
-    it("should have component defined for each base child route", () => {
-      routes[0].children.forEach((child: any) => {
-        expect(child.component).toBeDefined();
-      });
+    it("should have component defined for each non-redirect base child route", () => {
+      routes[0].children
+        .filter((child: any) => !child.redirect)
+        .forEach((child: any) => {
+          expect(child.component).toBeDefined();
+        });
     });
 
     it("should have correct path for each base child route", () => {
-      const expectedPaths = ["general", "organization", "alert_destinations", "model_pricing", "model_pricing/edit", "templates"];
-      const actualPaths = routes[0].children.slice(0, 6).map((child: any) => child.path);
+      // model_pricing / model_pricing/edit are no longer base children — they moved
+      // into the enterprise/cloud block (Model Pricing is enterprise/cloud-only).
+      const expectedPaths = [
+        "general",
+        "organization",
+        "alert_destinations",
+        "templates",
+        "alert_sources",
+      ];
+      const actualPaths = routes[0].children.slice(0, 5).map((child: any) => child.path);
       expect(actualPaths).toEqual(expectedPaths);
     });
 
-    it("should have unique names for each base child route", () => {
-      const names = routes[0].children.slice(0, 6).map((child: any) => child.name);
+    it("should NOT have modelPricing route in OSS builds", () => {
+      const modelPricingRoute = routes[0].children.find(
+        (child: any) => child.name === "modelPricing",
+      );
+      expect(modelPricingRoute).toBeUndefined();
+      const modelPricingEditor = routes[0].children.find(
+        (child: any) => child.name === "modelPricingEditor",
+      );
+      expect(modelPricingEditor).toBeUndefined();
+    });
+
+    it("should have unique names for each named base child route", () => {
+      // Redirect-only children are deliberately unnamed — their name belongs to
+      // the /alerts/* route they point at.
+      const names = routes[0].children
+        .slice(0, 5)
+        .filter((child: any) => !child.redirect)
+        .map((child: any) => child.name);
       const uniqueNames = [...new Set(names)];
       expect(names).toHaveLength(uniqueNames.length);
     });
@@ -246,7 +269,9 @@ describe("useManagementRoutes", () => {
 
     it("should have query_management route when enterprise", () => {
       const routes = useManagementRoutes();
-      const queryMgmtRoute = routes[0].children.find((child: any) => child.name === "query_management");
+      const queryMgmtRoute = routes[0].children.find(
+        (child: any) => child.name === "query_management",
+      );
       expect(queryMgmtRoute).toBeDefined();
       expect(queryMgmtRoute.path).toBe("query_management");
     });
@@ -258,9 +283,25 @@ describe("useManagementRoutes", () => {
       expect(cipherRoute.path).toBe("cipher_keys");
     });
 
+    it("should have modelPricing route (+ editor) when enterprise", () => {
+      const routes = useManagementRoutes();
+      const modelPricingRoute = routes[0].children.find(
+        (child: any) => child.name === "modelPricing",
+      );
+      expect(modelPricingRoute).toBeDefined();
+      expect(modelPricingRoute.path).toBe("model_pricing");
+      const modelPricingEditor = routes[0].children.find(
+        (child: any) => child.name === "modelPricingEditor",
+      );
+      expect(modelPricingEditor).toBeDefined();
+      expect(modelPricingEditor.path).toBe("model_pricing/edit");
+    });
+
     it("should have pipelineDestinations route when enterprise", () => {
       const routes = useManagementRoutes();
-      const pipelineRoute = routes[0].children.find((child: any) => child.name === "pipelineDestinations");
+      const pipelineRoute = routes[0].children.find(
+        (child: any) => child.name === "pipelineDestinations",
+      );
       expect(pipelineRoute).toBeDefined();
       expect(pipelineRoute.path).toBe("pipeline_destinations");
     });
@@ -274,7 +315,9 @@ describe("useManagementRoutes", () => {
 
     it("should have domainManagement route when enterprise", () => {
       const routes = useManagementRoutes();
-      const domainRoute = routes[0].children.find((child: any) => child.name === "domainManagement");
+      const domainRoute = routes[0].children.find(
+        (child: any) => child.name === "domainManagement",
+      );
       expect(domainRoute).toBeDefined();
       expect(domainRoute.path).toBe("domain_management");
     });
@@ -288,7 +331,9 @@ describe("useManagementRoutes", () => {
 
     it("should have correct meta properties for query_management route", () => {
       const routes = useManagementRoutes();
-      const queryMgmtRoute = routes[0].children.find((child: any) => child.name === "query_management");
+      const queryMgmtRoute = routes[0].children.find(
+        (child: any) => child.name === "query_management",
+      );
       expect(queryMgmtRoute.meta).toEqual({ keepAlive: true, title: "Query Management" });
     });
 
@@ -306,7 +351,9 @@ describe("useManagementRoutes", () => {
 
     it("should have correct meta properties for domainManagement route", () => {
       const routes = useManagementRoutes();
-      const domainRoute = routes[0].children.find((child: any) => child.name === "domainManagement");
+      const domainRoute = routes[0].children.find(
+        (child: any) => child.name === "domainManagement",
+      );
       expect(domainRoute.meta).toEqual({ keepAlive: true, title: "Domain Management" });
     });
 
@@ -318,13 +365,17 @@ describe("useManagementRoutes", () => {
 
     it("should have correct meta properties for pipelineDestinations route", () => {
       const routes = useManagementRoutes();
-      const pipelineRoute = routes[0].children.find((child: any) => child.name === "pipelineDestinations");
+      const pipelineRoute = routes[0].children.find(
+        (child: any) => child.name === "pipelineDestinations",
+      );
       expect(pipelineRoute.meta).toEqual({ title: "Pipeline Destinations" });
     });
 
     it("should have syntheticsLocations route when enterprise", () => {
       const routes = useManagementRoutes();
-      const synthRoute = routes[0].children.find((child: any) => child.name === "syntheticsLocations");
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
       expect(synthRoute).toBeDefined();
       expect(synthRoute.path).toBe("synthetics_locations");
       expect(synthRoute.meta).toEqual({ keepAlive: true, title: "Synthetics Locations" });
@@ -334,19 +385,25 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      const synthRoute = routes[0].children.find((child: any) => child.name === "syntheticsLocations");
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
       expect(synthRoute).toBeUndefined();
     });
 
     it("should have beforeEnter hook for syntheticsLocations route", () => {
       const routes = useManagementRoutes();
-      const synthRoute = routes[0].children.find((child: any) => child.name === "syntheticsLocations");
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
       expect(typeof synthRoute.beforeEnter).toBe("function");
     });
 
     it("should call routeGuard in syntheticsLocations beforeEnter hook", () => {
       const routes = useManagementRoutes();
-      const synthRoute = routes[0].children.find((child: any) => child.name === "syntheticsLocations");
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
       const mockTo = { path: "/settings/synthetics_locations" };
       const mockFrom = { path: "/settings" };
       const mockNext = vi.fn();
@@ -357,19 +414,26 @@ describe("useManagementRoutes", () => {
 
     it("should have component defined for syntheticsLocations route", () => {
       const routes = useManagementRoutes();
-      const synthRoute = routes[0].children.find((child: any) => child.name === "syntheticsLocations");
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
       expect(synthRoute.component).toBeDefined();
     });
 
     it("should have beforeEnter hooks for all enterprise routes", () => {
       const routes = useManagementRoutes();
       const enterpriseRoutes = [
-        "query_management", "cipherKeys", "pipelineDestinations",
-        "llmProviders", "nodes", "domainManagement", "regexPatterns",
-        "syntheticsLocations"
+        "query_management",
+        "cipherKeys",
+        "pipelineDestinations",
+        "llmProviders",
+        "nodes",
+        "domainManagement",
+        "regexPatterns",
+        "syntheticsLocations",
       ];
-      
-      enterpriseRoutes.forEach(routeName => {
+
+      enterpriseRoutes.forEach((routeName) => {
         const route = routes[0].children.find((child: any) => child.name === routeName);
         expect(typeof route.beforeEnter).toBe("function");
       });
@@ -377,7 +441,9 @@ describe("useManagementRoutes", () => {
 
     it("should call routeGuard in enterprise route beforeEnter hooks", () => {
       const routes = useManagementRoutes();
-      const queryMgmtRoute = routes[0].children.find((child: any) => child.name === "query_management");
+      const queryMgmtRoute = routes[0].children.find(
+        (child: any) => child.name === "query_management",
+      );
       const mockTo = { path: "/settings/query_management" };
       const mockFrom = { path: "/settings" };
       const mockNext = vi.fn();
@@ -389,20 +455,25 @@ describe("useManagementRoutes", () => {
     it("should have components defined for all enterprise routes", () => {
       const routes = useManagementRoutes();
       const enterpriseRoutes = [
-        "query_management", "cipherKeys", "pipelineDestinations",
-        "llmProviders", "nodes", "domainManagement", "regexPatterns",
-        "syntheticsLocations"
+        "query_management",
+        "cipherKeys",
+        "pipelineDestinations",
+        "llmProviders",
+        "nodes",
+        "domainManagement",
+        "regexPatterns",
+        "syntheticsLocations",
       ];
-      
-      enterpriseRoutes.forEach(routeName => {
+
+      enterpriseRoutes.forEach((routeName) => {
         const route = routes[0].children.find((child: any) => child.name === routeName);
         expect(route.component).toBeDefined();
       });
     });
 
-    it("should have exactly 19 children routes when enterprise is enabled", () => {
+    it("should have exactly 20 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(19); // 6 base + llmProviders + genAiAgentMapping + 11 enterprise
+      expect(routes[0].children).toHaveLength(20); // 5 base (incl. alert_sources redirect) + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise
     });
   });
 
@@ -419,26 +490,34 @@ describe("useManagementRoutes", () => {
 
     it("should have orgnizationManagement route when cloud", () => {
       const routes = useManagementRoutes();
-      const orgMgmtRoute = routes[0].children.find((child: any) => child.name === "orgnizationManagement");
+      const orgMgmtRoute = routes[0].children.find(
+        (child: any) => child.name === "orgnizationManagement",
+      );
       expect(orgMgmtRoute).toBeDefined();
       expect(orgMgmtRoute.path).toBe("organization_management");
     });
 
     it("should have correct meta properties for orgnizationManagement route", () => {
       const routes = useManagementRoutes();
-      const orgMgmtRoute = routes[0].children.find((child: any) => child.name === "orgnizationManagement");
+      const orgMgmtRoute = routes[0].children.find(
+        (child: any) => child.name === "orgnizationManagement",
+      );
       expect(orgMgmtRoute.meta).toEqual({ keepAlive: true, title: "Organization Management" });
     });
 
     it("should have beforeEnter hook for orgnizationManagement route", () => {
       const routes = useManagementRoutes();
-      const orgMgmtRoute = routes[0].children.find((child: any) => child.name === "orgnizationManagement");
+      const orgMgmtRoute = routes[0].children.find(
+        (child: any) => child.name === "orgnizationManagement",
+      );
       expect(typeof orgMgmtRoute.beforeEnter).toBe("function");
     });
 
     it("should call routeGuard in orgnizationManagement beforeEnter hook", () => {
       const routes = useManagementRoutes();
-      const orgMgmtRoute = routes[0].children.find((child: any) => child.name === "orgnizationManagement");
+      const orgMgmtRoute = routes[0].children.find(
+        (child: any) => child.name === "orgnizationManagement",
+      );
       const mockTo = { path: "/settings/organization_management" };
       const mockFrom = { path: "/settings" };
       const mockNext = vi.fn();
@@ -449,13 +528,15 @@ describe("useManagementRoutes", () => {
 
     it("should have component defined for orgnizationManagement route", () => {
       const routes = useManagementRoutes();
-      const orgMgmtRoute = routes[0].children.find((child: any) => child.name === "orgnizationManagement");
+      const orgMgmtRoute = routes[0].children.find(
+        (child: any) => child.name === "orgnizationManagement",
+      );
       expect(orgMgmtRoute.component).toBeDefined();
     });
 
-    it("should have exactly 9 children routes when cloud is enabled", () => {
+    it("should have exactly 10 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(9); // 6 base + llmProviders + genAiAgentMapping + 1 cloud
+      expect(routes[0].children).toHaveLength(10); // 5 base (incl. alert_sources redirect) + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 1 cloud
     });
   });
 
@@ -470,20 +551,25 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 20 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 21 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(20); // 6 base + llmProviders + genAiAgentMapping + 11 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
       const routes = useManagementRoutes();
       const enterpriseRoutes = [
-        "query_management", "cipherKeys", "pipelineDestinations",
-        "llmProviders", "nodes", "domainManagement", "regexPatterns",
-        "syntheticsLocations"
+        "query_management",
+        "cipherKeys",
+        "pipelineDestinations",
+        "llmProviders",
+        "nodes",
+        "domainManagement",
+        "regexPatterns",
+        "syntheticsLocations",
       ];
-      
-      enterpriseRoutes.forEach(routeName => {
+
+      enterpriseRoutes.forEach((routeName) => {
         const route = routes[0].children.find((child: any) => child.name === routeName);
         expect(route).toBeDefined();
       });
@@ -491,17 +577,23 @@ describe("useManagementRoutes", () => {
 
     it("should have cloud route when both are enabled", () => {
       const routes = useManagementRoutes();
-      const orgMgmtRoute = routes[0].children.find((child: any) => child.name === "orgnizationManagement");
+      const orgMgmtRoute = routes[0].children.find(
+        (child: any) => child.name === "orgnizationManagement",
+      );
       expect(orgMgmtRoute).toBeDefined();
     });
   });
 
   describe("Route Configuration Validation", () => {
-    it("should have unique route names across all children", () => {
+    it("should have unique route names across all named children", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";
       const routes = useManagementRoutes();
-      const names = routes[0].children.map((child: any) => child.name);
+      // Redirect-only children are unnamed by design (their name lives on the
+      // /alerts/* target), so they cannot participate in a uniqueness check.
+      const names = routes[0].children
+        .filter((child: any) => !child.redirect)
+        .map((child: any) => child.name);
       const uniqueNames = [...new Set(names)];
       expect(names).toHaveLength(uniqueNames.length);
     });
@@ -519,11 +611,15 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";
       const routes = useManagementRoutes();
-      routes[0].children.forEach((child: any) => {
-        expect(child.name).toBeDefined();
-        expect(child.name).not.toBe("");
-        expect(typeof child.name).toBe("string");
-      });
+      // Redirect-only children are unnamed on purpose; every other child must
+      // carry a real name.
+      routes[0].children
+        .filter((child: any) => !child.redirect)
+        .forEach((child: any) => {
+          expect(child.name).toBeDefined();
+          expect(child.name).not.toBe("");
+          expect(typeof child.name).toBe("string");
+        });
     });
 
     it("should not have empty or undefined route paths", () => {
@@ -537,14 +633,18 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have valid component imports for all routes", () => {
+    it("should have valid component imports for all non-redirect routes", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";
       const routes = useManagementRoutes();
-      routes[0].children.forEach((child: any) => {
-        expect(child.component).toBeDefined();
-        expect(typeof child.component === "function" || typeof child.component === "object").toBe(true);
-      });
+      routes[0].children
+        .filter((child: any) => !child.redirect)
+        .forEach((child: any) => {
+          expect(child.component).toBeDefined();
+          expect(typeof child.component === "function" || typeof child.component === "object").toBe(
+            true,
+          );
+        });
     });
   });
 
@@ -553,63 +653,63 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should return the same structure on multiple calls", () => {
@@ -617,13 +717,13 @@ describe("useManagementRoutes", () => {
       config.isCloud = "true";
       const routes1 = useManagementRoutes();
       const routes2 = useManagementRoutes();
-      
+
       // Compare the structure rather than object references
       expect(routes1.length).toBe(routes2.length);
       expect(routes1[0].path).toBe(routes2[0].path);
       expect(routes1[0].name).toBe(routes2[0].name);
       expect(routes1[0].children.length).toBe(routes2[0].children.length);
-      
+
       // Compare child routes structure
       routes1[0].children.forEach((child1: any, index: number) => {
         const child2 = routes2[0].children[index];
@@ -636,21 +736,21 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes1 = useManagementRoutes();
-      
+
       config.isEnterprise = "true";
       config.isCloud = "true";
       const routes2 = useManagementRoutes();
-      
+
       expect(routes1[0].children.length).toBeLessThan(routes2[0].children.length);
     });
 
     it("should maintain immutability of the returned routes array", () => {
       const routes = useManagementRoutes();
       const originalLength = routes[0].children.length;
-      
+
       // Attempt to modify the returned array
       routes[0].children.push({ name: "test", path: "test" });
-      
+
       // Get new routes and verify original structure is maintained
       const newRoutes = useManagementRoutes();
       expect(newRoutes[0].children.length).toBe(originalLength);

@@ -16,16 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="mt-4 rounded-default border border-border-default p-3"
+    class="rounded-default border-border-default mt-4 border p-3"
     data-test="error-session-replay-card"
   >
     <div class="flex items-center justify-between gap-2">
       <div class="min-w-0">
         <h4>{{ t("rum.sessionReplay") }}</h4>
-        <small data-test="error-session-replay-hint">{{
-          t("rum.replayAtFailureHint")
-        }}</small>
-        <div class="flex mt-1.5">
+        <small data-test="error-session-replay-hint">{{ t("rum.replayAtFailureHint") }}</small>
+        <div class="mt-1.5 flex">
           <template v-for="(value, tag) in getSessionTags" :key="tag">
             <ErrorTag :tag="{ key: tag, value }" />
           </template>
@@ -51,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import ErrorTag from "./ErrorTag.vue";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps({
   error: {

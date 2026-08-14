@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <date-time
+  <DateTime
     ref="dateTimePicker"
     :auto-apply="autoApplyDashboard"
     :default-type="modelValue.valueType"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @hide="onHide"
     @show="onShow"
   >
-  </date-time>
+  </DateTime>
 </template>
 
 <script lang="ts">

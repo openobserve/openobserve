@@ -25,8 +25,7 @@ export function useTableHighlight(props: {
   /** FTS keys for detecting FTS columns */
   ftsKeys?: string[];
 }) {
-  const { isFTSColumn, processTextWithHighlights, extractKeywords } =
-    useTextHighlighter();
+  const { isFTSColumn, processTextWithHighlights, extractKeywords } = useTextHighlighter();
 
   const hasHighlight = computed(() => !!props.highlightText);
 
@@ -39,17 +38,11 @@ export function useTableHighlight(props: {
    * In simple mode, all columns are highlighted.
    * In FTS mode, only FTS-matching columns are highlighted.
    */
-  function shouldHighlightColumn(
-    columnId: string,
-    cellValue?: any,
-  ): boolean {
+  function shouldHighlightColumn(columnId: string, cellValue?: any): boolean {
     if (!props.highlightText) return false;
 
     // If specific highlight fields are set, only highlight those
-    if (
-      props.highlightFields &&
-      props.highlightFields.length > 0
-    ) {
+    if (props.highlightFields && props.highlightFields.length > 0) {
       return props.highlightFields.includes(columnId);
     }
 
@@ -87,12 +80,7 @@ export function useTableHighlight(props: {
       // reads its `colors` argument only from `getSingleSemanticColor`, which no
       // production caller uses. It is threaded through purely for API compat —
       // do not reintroduce a literal colour map here.
-      return processTextWithHighlights(
-        cellValue,
-        props.highlightText,
-        colors,
-        false,
-      );
+      return processTextWithHighlights(cellValue, props.highlightText, colors, false);
     }
 
     // Simple keyword highlighting
@@ -105,43 +93,28 @@ export function useTableHighlight(props: {
   function getSimpleHighlightedHtml(text: any): string {
     if (!text || !keywords.value.length) return String(text ?? "");
     const str = String(text);
-    const escaped = keywords.value.map((k) =>
-      k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    );
+    const escaped = keywords.value.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
     const pattern = new RegExp(`(${escaped.join("|")})`, "gi");
-    const escapedText = str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-    return escapedText.replace(
-      pattern,
-      '<span class="log-highlighted">$1</span>',
-    );
+    const escapedText = str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return escapedText.replace(pattern, '<span class="log-highlighted">$1</span>');
   }
 
   /**
    * Splits text into segments, marking which match keywords.
    */
-  function getHighlightSegments(
-    text: string,
-  ): { text: string; match: boolean }[] {
+  function getHighlightSegments(text: string): { text: string; match: boolean }[] {
     if (!props.highlightText || !text) {
       return [{ text: text ?? "", match: false }];
     }
-    if (keywords.value.length === 0)
-      return [{ text, match: false }];
+    if (keywords.value.length === 0) return [{ text, match: false }];
 
-    const escaped = keywords.value.map((k) =>
-      k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    );
+    const escaped = keywords.value.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
     const pattern = new RegExp(`(${escaped.join("|")})`, "gi");
     const parts = text.split(pattern);
 
     return parts.map((part) => ({
       text: part,
-      match: keywords.value.some(
-        (kw) => kw.toLowerCase() === part.toLowerCase(),
-      ),
+      match: keywords.value.some((kw) => kw.toLowerCase() === part.toLowerCase()),
     }));
   }
 

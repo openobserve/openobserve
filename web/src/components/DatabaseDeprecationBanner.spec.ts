@@ -18,7 +18,6 @@ import { mount } from "@vue/test-utils";
 import DatabaseDeprecationBanner from "./DatabaseDeprecationBanner.vue";
 import { createStore } from "vuex";
 
-
 describe("DatabaseDeprecationBanner", () => {
   let store: any;
   const DISMISS_KEY = "mysql_deprecation_dismissed";
@@ -196,10 +195,7 @@ describe("DatabaseDeprecationBanner", () => {
     const recentDate = new Date();
     recentDate.setDate(recentDate.getDate() - 3); // 3 days ago
 
-    localStorage.setItem(
-      DISMISS_KEY,
-      JSON.stringify({ timestamp: recentDate.toISOString() })
-    );
+    localStorage.setItem(DISMISS_KEY, JSON.stringify({ timestamp: recentDate.toISOString() }));
 
     store = createStore({
       state: {
@@ -225,10 +221,7 @@ describe("DatabaseDeprecationBanner", () => {
     const oldDate = new Date();
     oldDate.setDate(oldDate.getDate() - 10); // 10 days ago
 
-    localStorage.setItem(
-      DISMISS_KEY,
-      JSON.stringify({ timestamp: oldDate.toISOString() })
-    );
+    localStorage.setItem(DISMISS_KEY, JSON.stringify({ timestamp: oldDate.toISOString() }));
 
     store = createStore({
       state: {

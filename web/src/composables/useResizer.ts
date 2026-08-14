@@ -39,7 +39,7 @@ function useResizer(options: UseResizerOptions) {
     document.removeEventListener("mouseup", stopResize);
     document.body.classList.remove("no-select");
     isResizing.value = false;
-    if(resizing?.cancel) resizing.cancel();
+    if (resizing?.cancel) resizing.cancel();
   };
 
   const stopResize = () => {
@@ -49,8 +49,7 @@ function useResizer(options: UseResizerOptions) {
   const resizing = throttle((event: MouseEvent) => {
     if (!isResizing.value) return;
 
-    const currentCoord =
-      direction === "horizontal" ? event.clientX : event.clientY;
+    const currentCoord = direction === "horizontal" ? event.clientX : event.clientY;
     const delta = currentCoord - initialCoord;
     let newValue = initialSize + (invert ? -delta : delta);
 
@@ -70,8 +69,7 @@ function useResizer(options: UseResizerOptions) {
 
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault();
-    initialCoord =
-      direction === "horizontal" ? event.clientX : event.clientY;
+    initialCoord = direction === "horizontal" ? event.clientX : event.clientY;
     initialSize = value.value;
     isResizing.value = true;
 

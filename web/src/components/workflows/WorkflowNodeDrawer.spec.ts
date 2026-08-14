@@ -52,8 +52,8 @@ const { triggerSubmit, conditionSubmit, functionSubmit, destinationSubmit, makeB
     }),
   }));
 
-vi.mock("@/plugins/workflows/nodes/WorkflowAlertTrigger.vue", () =>
-  makeBodyStub("WorkflowAlertTrigger", () => triggerSubmit()),
+vi.mock("@/plugins/workflows/nodes/WorkflowTrigger.vue", () =>
+  makeBodyStub("WorkflowTrigger", () => triggerSubmit()),
 );
 vi.mock("@/plugins/workflows/nodes/WorkflowCondition.vue", () =>
   makeBodyStub("WorkflowCondition", () => conditionSubmit()),
@@ -73,9 +73,7 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
-import useWorkflowCanvas, {
-  workflowObj,
-} from "@/plugins/workflows/useWorkflowCanvas";
+import useWorkflowCanvas, { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 
 const t = (k: string, v?: any) => i18n.global.t(k, v ?? {});
 
@@ -116,14 +114,10 @@ const mountDrawer = () =>
     },
   });
 
-const drawerProps = (wrapper: any) =>
-  wrapper.findComponent(ODrawerStub).props() as any;
+const drawerProps = (wrapper: any) => wrapper.findComponent(ODrawerStub).props() as any;
 
 // Stage a node for the drawer to edit / add, exactly as the canvas would.
-const stageNode = (
-  nodeType: string,
-  opts: { isEdit?: boolean; id?: string; data?: any } = {},
-) => {
+const stageNode = (nodeType: string, opts: { isEdit?: boolean; id?: string; data?: any } = {}) => {
   const id = opts.id ?? "n-staged";
   const node = {
     id,
@@ -147,7 +141,7 @@ const stageNode = (
 
 describe("WorkflowNodeDrawer", () => {
   let wrapper: any = null;
-  const { resetWorkflowData } = useWorkflowCanvas();
+  const { resetWorkflowData } = useWorkflowCanvas(t);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -165,15 +159,13 @@ describe("WorkflowNodeDrawer", () => {
       stageNode("condition");
       wrapper = mountDrawer();
       expect(drawerProps(wrapper).title).toBe(t("workflow.node.condition"));
-      expect(wrapper.find(".drawer-title").text()).toBe(
-        t("workflow.node.condition"),
-      );
+      expect(wrapper.find(".drawer-title").text()).toBe(t("workflow.node.condition"));
     });
 
     it("renders the trigger title", () => {
       stageNode("workflow_trigger");
       wrapper = mountDrawer();
-      expect(drawerProps(wrapper).title).toBe(t("workflow.node.alertTrigger"));
+      expect(drawerProps(wrapper).title).toBe(t("workflow.triggerKind.alertFired.node"));
     });
 
     it("falls back to the raw dialog name when the node type is unknown", () => {
@@ -185,7 +177,7 @@ describe("WorkflowNodeDrawer", () => {
 
   describe("body switching", () => {
     it.each([
-      ["workflow_trigger", "WorkflowAlertTrigger"],
+      ["workflow_trigger", "WorkflowTrigger"],
       ["condition", "WorkflowCondition"],
       ["function", "WorkflowFunction"],
       ["destination", "WorkflowDestination"],
@@ -296,9 +288,7 @@ describe("WorkflowNodeDrawer", () => {
     it("offers Delete only when editing an existing non-trigger node", () => {
       stageNode("condition", { isEdit: true });
       wrapper = mountDrawer();
-      expect(drawerProps(wrapper).neutralButtonLabel).toBe(
-        t("workflow.deleteNode"),
-      );
+      expect(drawerProps(wrapper).neutralButtonLabel).toBe(t("workflow.deleteNode"));
     });
 
     it("does not offer Delete while adding a new node", () => {
@@ -312,8 +302,7 @@ describe("WorkflowNodeDrawer", () => {
       wrapper = mountDrawer();
       expect(drawerProps(wrapper).primaryButtonLabel).toBe("Save");
 
-      wrapper.findComponent({ name: "WorkflowDestination" }).vm
-        .createNewDestination = true;
+      wrapper.findComponent({ name: "WorkflowDestination" }).vm.createNewDestination = true;
       await nextTick();
 
       const p = drawerProps(wrapper);
@@ -354,9 +343,7 @@ describe("WorkflowNodeDrawer", () => {
       await wrapper.find(".btn-primary").trigger("click");
       await flushPromises();
 
-      expect(workflowObj.currentSelectedWorkflow.nodes[0].data.destination_id).toBe(
-        "sink-a",
-      );
+      expect(workflowObj.currentSelectedWorkflow.nodes[0].data.destination_id).toBe("sink-a");
       expect(workflowObj.dialog.show).toBe(false);
     });
 
@@ -369,9 +356,7 @@ describe("WorkflowNodeDrawer", () => {
       await flushPromises();
 
       expect(workflowObj.dialog.show).toBe(true);
-      expect(
-        workflowObj.currentSelectedWorkflow.nodes[0].data.conditions,
-      ).toBeUndefined();
+      expect(workflowObj.currentSelectedWorkflow.nodes[0].data.conditions).toBeUndefined();
     });
 
     it("blocks the save when the body form returns undefined", async () => {
@@ -393,9 +378,7 @@ describe("WorkflowNodeDrawer", () => {
       await flushPromises();
 
       expect(workflowObj.dialog.show).toBe(false);
-      expect(workflowObj.currentSelectedWorkflow.nodes[0].data.node_type).toBe(
-        "mystery_node",
-      );
+      expect(workflowObj.currentSelectedWorkflow.nodes[0].data.node_type).toBe("mystery_node");
     });
   });
 

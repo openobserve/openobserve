@@ -1,11 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type {
-  TextareaProps,
-  TextareaEmits,
-  TextareaSlots,
-} from "./OTextarea.types";
+import type { TextareaProps, TextareaEmits, TextareaSlots } from "./OTextarea.types";
 import { computed, nextTick, onMounted, ref, useAttrs, useId, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -14,9 +10,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 // (Same pattern as ODialog / OInput.)
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
-const parentDataTest = computed(
-  () => $attrs["data-test"] as string | undefined,
-);
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
@@ -115,19 +109,17 @@ const wrapperClasses = computed(() => [
 <template>
   <div
     v-bind="wrapperAttrs"
-    :class="[
-      'flex flex-col gap-1',
-      fieldWidthClass,
-      fill && 'h-full min-h-0',
-    ]"
+    :class="['flex flex-col gap-1', fieldWidthClass, fill && 'h-full min-h-0']"
   >
     <!-- Label -->
     <label
       v-if="label || $slots.tooltip"
       :for="textareaId"
       :class="[
-        'o-input-label text-compact leading-tight flex items-center gap-1',
-        props.disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        'o-input-label text-compact flex items-center gap-1 leading-tight',
+        props.disabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -137,11 +129,12 @@ const wrapperClasses = computed(() => [
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <!-- Textarea wrapper -->
-    <div :class="[wrapperClasses, fill && 'flex-1 min-h-0']">
+    <div :class="[wrapperClasses, fill && 'min-h-0 flex-1']">
       <textarea
         :id="textareaId"
         ref="textareaRef"
@@ -158,19 +151,14 @@ const wrapperClasses = computed(() => [
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
-          'flex-1 min-w-0 bg-transparent outline-none',
+          'min-w-0 flex-1 bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
           'disabled:cursor-not-allowed',
-          'py-2 px-3 text-sm',
+          'px-3 py-2 text-sm',
           fill ? 'h-full min-h-0 resize-none' : 'min-h-20',
           !fill && (autogrow ? 'resize-none' : 'resize-y'),
         ]"
-        @input="
-          emit(
-            'update:modelValue',
-            ($event.target as HTMLTextAreaElement).value,
-          )
-        "
+        @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
         @blur="emit('blur', $event)"
         @focus="emit('focus', $event)"
         @keydown="emit('keydown', $event)"
@@ -185,15 +173,12 @@ const wrapperClasses = computed(() => [
       <span
         v-if="effectiveError && effectiveError.trim()"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-        class="text-xs text-input-error-text leading-none"
+        class="text-input-error-text text-xs leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-input-hint leading-none"
-      >
+      <span v-else-if="helpText" class="text-input-hint text-xs leading-none">
         {{ helpText }}
       </span>
       <span v-else class="flex-1" />
@@ -201,10 +186,8 @@ const wrapperClasses = computed(() => [
       <span
         v-if="maxlength"
         :class="[
-          'text-xs leading-none tabular-nums shrink-0',
-          charCount > maxlength
-            ? 'text-input-error-text'
-            : 'text-input-hint',
+          'shrink-0 text-xs leading-none tabular-nums',
+          charCount > maxlength ? 'text-input-error-text' : 'text-input-hint',
         ]"
       >
         {{ charCount }}/{{ maxlength }}

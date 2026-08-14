@@ -9,7 +9,6 @@ publish = false
 default = []
 cloud = []
 vectorscan = []
-vortex = []
 
 [lib]
 path = "lib.rs"

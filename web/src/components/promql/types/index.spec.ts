@@ -48,9 +48,7 @@ describe("normalizeStepId", () => {
 
   it("is idempotent — upgrading twice is upgrading once", () => {
     for (const [stored] of STORED_TO_CURRENT) {
-      expect(normalizeStepId(normalizeStepId(stored))).toBe(
-        normalizeStepId(stored),
-      );
+      expect(normalizeStepId(normalizeStepId(stored))).toBe(normalizeStepId(stored));
     }
   });
 
@@ -61,24 +59,20 @@ describe("normalizeStepId", () => {
     expect(normalizeStepId("")).toBe("");
   });
 
-  it.each([
-    "constructor",
-    "toString",
-    "valueOf",
-    "hasOwnProperty",
-    "__proto__",
-    "isPrototypeOf",
-  ])("returns a plain string for the inherited key %s", (key) => {
-    // The lookup table is a plain object, so it inherits from Object.prototype.
-    // Indexed naively, these keys return FUNCTIONS. Such an id can reach us from
-    // a hand-edited or imported dashboard, and a non-string here is not a
-    // cosmetic problem: it is written back into the panel and then dropped by
-    // JSON.stringify on save, losing the step's id for good.
-    const result = normalizeStepId(key);
+  it.each(["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__", "isPrototypeOf"])(
+    "returns a plain string for the inherited key %s",
+    (key) => {
+      // The lookup table is a plain object, so it inherits from Object.prototype.
+      // Indexed naively, these keys return FUNCTIONS. Such an id can reach us from
+      // a hand-edited or imported dashboard, and a non-string here is not a
+      // cosmetic problem: it is written back into the panel and then dropped by
+      // JSON.stringify on save, losing the step's id for good.
+      const result = normalizeStepId(key);
 
-    expect(typeof result).toBe("string");
-    expect(result).toBe(key);
-  });
+      expect(typeof result).toBe("string");
+      expect(result).toBe(key);
+    },
+  );
 
   it("never maps a current id back onto a stored one", () => {
     // Guards against someone inverting the table.
@@ -106,9 +100,7 @@ describe("normalizeSteps", () => {
   it("carries each step's params across untouched", () => {
     // The id is upgraded; nothing else about the step may change, or the panel
     // would come back rendering different numbers.
-    const [step] = normalizeSteps([
-      { id: "__divide_by", params: [1024], extra: "kept" } as any,
-    ]);
+    const [step] = normalizeSteps([{ id: "__divide_by", params: [1024], extra: "kept" } as any]);
 
     expect(step).toEqual({ id: "scalar_divide", params: [1024], extra: "kept" });
   });
@@ -155,8 +147,6 @@ describe("normalizeSteps", () => {
 
     expect(result).toBe(steps); // nothing changed => same array, panel not dirtied
     expect(typeof result[0].id).toBe("string");
-    expect(JSON.parse(JSON.stringify(result))).toEqual([
-      { id: "constructor", params: [1] },
-    ]);
+    expect(JSON.parse(JSON.stringify(result))).toEqual([{ id: "constructor", params: [1] }]);
   });
 });

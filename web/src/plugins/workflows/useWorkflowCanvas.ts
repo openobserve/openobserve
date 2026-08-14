@@ -37,7 +37,10 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
+import { DEFAULT_TRIGGER_KIND } from "./triggers";
 import workflowService from "@/services/workflows";
+import type { I18nKey } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
 
@@ -45,11 +48,11 @@ export interface WorkflowNodeMeta {
   /** Colour/behaviour family. */
   category: WorkflowNodeCategory;
   /** Small uppercase label above the title (i18n key). */
-  kindKey: string;
+  kindKey: I18nKey;
   /** Node title (i18n key). */
-  titleKey: string;
+  titleKey: I18nKey;
   /** Short description (i18n key), shown in the step picker. */
-  descKey: string;
+  descKey: I18nKey;
   /** OIcon registry name for the node's glyph (fallback when no `image`). */
   icon: IconName;
   /**
@@ -75,7 +78,7 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
   workflow_trigger: {
     category: "trigger",
     kindKey: "workflow.node.kindTrigger",
-    titleKey: "workflow.node.alertTrigger",
+    titleKey: "workflow.triggerKind.alertFired.node",
     descKey: "workflow.node.triggerBody",
     icon: "notifications-active",
     image: getImageURL("images/pipeline/input_stream.png"),
@@ -135,40 +138,17 @@ export const nodeConfigDetail = (data: any, maxLen = 28): string => {
   return "";
 };
 
-// Trigger kinds the user chooses from when creating a workflow. `key` maps to
-// the future backend WorkflowTriggerKind (B1). Only Alert Fired is enabled in
-// v1; the rest are shown as "coming soon" so the picker is clearly extensible.
-export interface WorkflowTriggerType {
-  key: string;
-  labelKey: string;
-  descKey: string;
-  icon: IconName;
-  enabled: boolean;
-}
-
-export const WORKFLOW_TRIGGER_TYPES: WorkflowTriggerType[] = [
-  {
-    key: "alert_fired",
-    labelKey: "workflow.triggerType.alertFired",
-    descKey: "workflow.triggerType.alertFiredDesc",
-    icon: "notifications-active",
-    enabled: true,
-  },
-  {
-    key: "schedule",
-    labelKey: "workflow.triggerType.schedule",
-    descKey: "workflow.triggerType.scheduleDesc",
-    icon: "schedule",
-    enabled: false,
-  },
-  {
-    key: "webhook",
-    labelKey: "workflow.triggerType.webhook",
-    descKey: "workflow.triggerType.webhookDesc",
-    icon: "webhook",
-    enabled: false,
-  },
-];
+// Trigger kinds live in the registry (./triggers) — the single place a kind is
+// described. Re-exported here so canvas consumers keep one import surface.
+export {
+  WORKFLOW_TRIGGERS,
+  DEFAULT_TRIGGER_KIND,
+  triggerDef,
+  triggerTypeForKind,
+  enabledTriggers,
+  buildTriggerSampleText,
+} from "./triggers";
+export type { WorkflowTriggerDef } from "./triggers";
 
 const defaultDialog = {
   show: false,
@@ -255,6 +235,19 @@ const workflowObj = reactive(Object.assign({}, defaultObject));
 
 export { workflowObj };
 
+// The kind of the current graph's trigger node — the single lookup other pieces
+// (payload reference, condition fields, function sample) use to stay in sync
+// with whatever trigger the workflow starts from. Returns undefined when there
+// is NO trigger node (e.g. it was deleted): callers then show nothing rather
+// than defaulting to a kind that isn't there. The kind lives in
+// `data.trigger_kind` (fresh) or `meta.trigger_kind` (rehydrated from the API).
+export const currentTriggerKind = (): string | undefined => {
+  const trigger = (workflowObj.currentSelectedWorkflow?.nodes || []).find(
+    (n: any) => n.data?.node_type === "workflow_trigger",
+  );
+  return trigger?.data?.trigger_kind || trigger?.meta?.trigger_kind;
+};
+
 // ── Shared graph helpers ─────────────────────────────────────────────────────
 // Workflows enforce one incoming edge per node (see onConnect), so the graph is
 // a TREE rooted at the trigger (or from_node) — a plain BFS from the root visits
@@ -288,16 +281,10 @@ export const buildChildrenMap = (edges: any[]): Map<string, string[]> => {
 // Example — for Trigger(t) → Function(f) → Destination(d):
 //   flowOrderedNodeIds(nodes, edges)         => ["t", "f", "d"]  // from trigger
 //   flowOrderedNodeIds(nodes, edges, "f")    => ["f", "d"]       // run-from "f"
-export const flowOrderedNodeIds = (
-  nodes: any[],
-  edges: any[],
-  startId?: string,
-): string[] => {
+export const flowOrderedNodeIds = (nodes: any[], edges: any[], startId?: string): string[] => {
   const children = buildChildrenMap(edges);
   const start =
-    startId ||
-    (nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger")
-      ?.id;
+    startId || (nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger")?.id;
   const order: string[] = [];
   const seen = new Set<string>();
   const queue = start ? [start] : [];
@@ -317,10 +304,7 @@ export const flowOrderedNodeIds = (
 // Example — for Trigger(t) → Function(f) → Destination(d):
 //   reachableFrom(edges, ["f"])   => Set { "f", "d" }   // "f" and downstream
 //   reachableFrom(edges, ["t"])   => Set { "t", "f", "d" }
-export const reachableFrom = (
-  edges: any[],
-  startIds: string[],
-): Set<string> => {
+export const reachableFrom = (edges: any[], startIds: string[]): Set<string> => {
   const children = buildChildrenMap(edges);
   const reached = new Set<string>(startIds);
   const queue = [...startIds];
@@ -340,19 +324,71 @@ export const reachableFrom = (
 // neutral "not verified" badge rather than a ✓.
 const downstreamOfErrorNodes = (errorIds: string[]): string[] => {
   if (!errorIds.length) return [];
-  const set = reachableFrom(
-    workflowObj.currentSelectedWorkflow.edges || [],
-    errorIds,
-  );
+  const set = reachableFrom(workflowObj.currentSelectedWorkflow.edges || [], errorIds);
   for (const id of errorIds) set.delete(id);
   return [...set];
 };
 
+// Serialize one in-memory VueFlow node down to the fields the backend `Node`
+// struct persists: id, io_type, position, data, and (when present) meta / style.
+// Everything else on the node is VueFlow runtime state (`type`, `dimensions`,
+// `handleBounds`, `computedPosition`, `selected`, `dragging`, …) and is dropped.
+//
+// `io_type` is derived from `node_type` (via `node.type`, the VueFlow render
+// template) — the backend `Node` struct requires it (matches the pipeline
+// payload); it isn't a source of truth.
+const serializeNode = (node: any) => {
+  const nodeType = node?.data?.node_type;
+  const data = { ...(node.data || {}) };
+  const meta: Record<string, string> = { ...(node.meta || {}) };
+
+  // Trigger: NodeData::WorkflowTrigger is a unit variant, so its kind can't live
+  // in `data`; carry it in `meta` (strings survive serialization).
+  if (nodeType === "workflow_trigger") {
+    meta.trigger_kind = data.trigger_kind || DEFAULT_TRIGGER_KIND;
+  }
+
+  const out: any = {
+    id: node.id,
+    io_type: node.type || "default",
+    position: {
+      x: node.position?.x ?? 0,
+      y: node.position?.y ?? 0,
+    },
+    data,
+  };
+  if (Object.keys(meta).length) out.meta = meta;
+  if (node.style) out.style = node.style;
+  return out;
+};
+
+// Build the backend `Workflow` object from the current in-memory graph. Shared by
+// the editor's create/update payload AND the Test run (which now sends the whole
+// graph so it can run WITHOUT saving). The `Workflow` struct has no serde
+// defaults, so every field must be present; org_id/id/created_by are
+// overridden/generated by the backend (the test endpoint assigns a throwaway id).
+export const serializeWorkflow = () => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  return {
+    id: wf.id || "",
+    org_id: "",
+    name: (wf.name || "").trim(),
+    description: wf.description || "",
+    enabled: wf.enabled ?? true,
+    created_at: wf.created_at || 0,
+    updated_at: wf.updated_at || 0,
+    created_by: "",
+    nodes: (wf.nodes || []).map(serializeNode),
+    edges: wf.edges || [],
+  };
+};
+
 // Run the workflow Test (from the Test dialog or a node's Replay button) and
 // store the result so each WorkflowNode paints its ✓ / ✗ / ⊘ badge. Shared so
-// both entry points behave identically. The backend returns errors only — the
-// step drawer (error nodes only) derives its input/output from `errors`, so
-// there's no per-node node_io to carry.
+// both entry points behave identically. The whole in-memory graph is sent, so a
+// workflow can be tested whether or not it's been saved. The backend returns
+// errors only — the step drawer (error nodes only) derives its input/output from
+// `errors`, so there's no per-node node_io to carry.
 export const executeTestRun = async (opts: {
   orgId: string;
   inputs: any[];
@@ -362,11 +398,15 @@ export const executeTestRun = async (opts: {
   try {
     const res = await workflowService.testWorkflow({
       org_identifier: opts.orgId,
-      id: wf.id,
+      workflow: serializeWorkflow(),
       inputs: opts.inputs,
       from_node: opts.fromNode || undefined,
     });
     const errors = res.data?.errors || {};
+    // Per-node INPUT map: node_id -> the records that node received. A node's
+    // OUTPUT is derived from this (see nodeTestOutputBranches): since the graph is
+    // a single-incoming tree, a child's input IS its parent's output on that edge.
+    const inputs = res.data?.inputs || {};
     // Which nodes ran: from a replay, `fromNode` + everything downstream;
     // otherwise everything reachable from the trigger. Nodes NOT reachable
     // (unwired / disconnected) never executed, so they must not paint a ✓.
@@ -374,11 +414,10 @@ export const executeTestRun = async (opts: {
       (n: any) => n.data?.node_type === "workflow_trigger",
     )?.id;
     const startId = opts.fromNode || triggerId;
-    const ranNodeIds = startId
-      ? [...reachableFrom(wf.edges || [], [startId])]
-      : [];
+    const ranNodeIds = startId ? [...reachableFrom(wf.edges || [], [startId])] : [];
     workflowObj.testRun.result = {
       errors,
+      inputs,
       ranNodeIds,
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
     };
@@ -390,14 +429,55 @@ export const executeTestRun = async (opts: {
   }
 };
 
+// A single downstream branch of a node's OUTPUT: the target it feeds and the
+// records that target received (== what this node emitted on that edge). `records`
+// is null when the target got nothing (filtered out / never reached).
+export interface NodeOutputBranch {
+  targetId: string;
+  nodeType: string;
+  detail: string;
+  records: any[] | null;
+}
+
+// The INPUT a node received on the last Test run — the raw records from the
+// backend `inputs` map (shape varies by node type; rendered as-is). Null when the
+// node isn't in the map (0 records reached it) or there's no run.
+export const nodeTestInput = (nodeId: string): any[] | null => {
+  const inputs = workflowObj.testRun.result?.inputs;
+  const v = inputs?.[nodeId];
+  return Array.isArray(v) ? v : null;
+};
+
+// A node's OUTPUT, per outgoing edge. The graph is a single-incoming tree, so
+// each child's input came ONLY from this node — child input == this node's output
+// on that branch. One entry per outgoing edge (so fan-out reads per-target); an
+// empty array means a terminal node (a destination/sink) with no derivable output.
+export const nodeTestOutputBranches = (nodeId: string): NodeOutputBranch[] => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  const byId = new Map<string, any>((wf.nodes || []).map((n: any) => [n.id, n]));
+  return (wf.edges || [])
+    .filter((e: any) => e.source === nodeId)
+    .map((e: any) => {
+      const target = byId.get(e.target);
+      return {
+        targetId: e.target,
+        nodeType: target?.data?.node_type || "",
+        detail: nodeConfigDetail(target?.data, 40),
+        records: nodeTestInput(e.target),
+      };
+    });
+};
+
 // Load a PAST run (from the Executions history) into the same testRun.result the
-// canvas already reads — so error nodes paint ✗ and open the step drawer, but
-// read-only (no editable input / Replay). The run detail carries:
-//   errors.data:      [{ node_id, error: string[] }]  — errored nodes + messages
-//   data.node_map:    { node_id: [{ meta, data }] }   — per-node input processed
-//   data.complete:    [{ meta, data }]                — full workflow input
-// The array-vs-map difference in errors.data is bridged here (each entry has its
-// node_id), so it lines up with node_map by key.
+// canvas already reads — read-only (no editable input / Replay). The run detail
+// now mirrors the Test response shape, so history shows per-node Input/Output for
+// EVERY node (not just error nodes):
+//   errors.data:     [{ node_id, error: string[] }]  — errored nodes + messages
+//   data.input_map:  { node_id: [records] }          — per-node INPUT (all nodes)
+//   data.error_node_map:   { node_id: [records] }          — legacy: errored node's input
+// input_map is the same per-node `inputs` map a Test run produces, so we store it
+// under the same key and the whole drawer (Input + derived Output + badges) works
+// identically to Test — just read-only. Falls back to error_node_map for older runs.
 export const loadWorkflowRun = async (opts: {
   orgId: string;
   workflowId: string;
@@ -414,42 +494,39 @@ export const loadWorkflowRun = async (opts: {
 
     // errors.data (array) -> map keyed by node_id, in the same
     // { error_count, errors: [[message], …] } shape the badges + drawer read.
-    const errList = Array.isArray(payload.errors?.data)
-      ? payload.errors.data
-      : [];
+    const errList = Array.isArray(payload.errors?.data) ? payload.errors.data : [];
     const errors: Record<string, any> = {};
     for (const e of errList) {
       // Drop null/empty messages so a message-less error entry doesn't render
       // the literal string "undefined"/"null" as an error line.
-      const msgs = (Array.isArray(e.error) ? e.error : [e.error]).filter(
-        Boolean,
-      );
+      const msgs = (Array.isArray(e.error) ? e.error : [e.error]).filter(Boolean);
       errors[e.node_id] = {
         error_count: msgs.length,
         errors: msgs.map((m: string) => [m]),
       };
     }
 
-    const nodeInputs = payload.data?.node_map || {};
+    // Per-node INPUT for the whole run (all nodes) — the same shape/semantics as a
+    // Test run's `inputs`, so the drawer derives Output the same way. Older runs
+    // only carried error_node_map (errored node's input) — fall back to that.
+    const inputs = payload.data?.input_map || payload.data?.error_node_map || {};
 
     // GHOST NODES — the run references a node the workflow no longer has (it was
     // edited/deleted after the run). Its badge has nowhere to render, so an error
     // would silently vanish and the run would look cleaner than it was. Surface
     // them so the Runs view can say the graph no longer matches this run.
     const currentNodeIds = new Set((wf.nodes || []).map((n: any) => n.id));
-    const ghostNodeIds = [
-      ...new Set([...Object.keys(errors), ...Object.keys(nodeInputs)]),
-    ].filter((id) => !currentNodeIds.has(id));
+    const ghostNodeIds = [...new Set([...Object.keys(errors), ...Object.keys(inputs)])].filter(
+      (id) => !currentNodeIds.has(id),
+    );
 
     workflowObj.testRun.result = {
       errors,
-      // Every node "ran": upstream shows ✓, errored ✗, downstream ⊘ — via the
-      // existing testStatus logic. Only ✗ nodes are clickable.
+      // Same per-node inputs map as a Test run — drives the ✓/grey/✗ badges and the
+      // drawer's Input + derived Output for every node.
+      inputs,
       ranNodeIds: (wf.nodes || []).map((n: any) => n.id),
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
-      // Per-node input the drawer shows (read-only) for an errored node.
-      nodeInputs,
-      fullInput: payload.data?.complete ?? null,
       mode: "history",
       runId: opts.runId,
       ghostNodeIds,
@@ -479,8 +556,7 @@ export const hydrateWorkflow = (wf: any) => {
     if (node.data?.node_type === "workflow_trigger" && node.meta) {
       node.data = {
         ...node.data,
-        trigger_kind:
-          node.meta.trigger_kind || node.data.trigger_kind || "alert_fired",
+        trigger_kind: node.meta.trigger_kind || node.data.trigger_kind || DEFAULT_TRIGGER_KIND,
       };
     }
     return node;
@@ -502,9 +578,8 @@ export const hydrateWorkflow = (wf: any) => {
   workflowObj.isEditWorkflow = true;
 };
 
-export default function useWorkflowCanvas() {
-  const { screenToFlowCoordinate, onNodesInitialized, updateNode } =
-    useVueFlow();
+export default function useWorkflowCanvas(t: TranslateFn) {
+  const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 
   // --- edge helpers ----------------------------------------------------------
   // Edge factory + cycle detection are shared with the pipeline canvas
@@ -526,9 +601,7 @@ export default function useWorkflowCanvas() {
     // real edit, so gate the dirty flag on that. Otherwise inspecting a run
     // (hover a node → click its error badge → Esc) would mark the workflow
     // unsaved and wrongly force a Save-before-Test on the next run.
-    const structural = changes.some(
-      (c: any) => c?.type === "add" || c?.type === "remove",
-    );
+    const structural = changes.some((c: any) => c?.type === "add" || c?.type === "remove");
     if (structural && workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
     if (structural) workflowObj.edgesChange = true;
   }
@@ -540,7 +613,7 @@ export default function useWorkflowCanvas() {
     // one incoming edge per node
     if (edges.some((e: any) => e.target === connection.target)) {
       toast({
-        message: "Only one incoming connection to a step is allowed",
+        message: t("toastMessages.workflows.onlyOneIncomingConnectionToA"),
         variant: "warning",
       });
       return;
@@ -548,7 +621,7 @@ export default function useWorkflowCanvas() {
 
     if (detectCycle(edges, connection)) {
       toast({
-        message: "This connection would create a loop",
+        message: t("toastMessages.workflows.thisConnectionWouldCreateALoop"),
         variant: "warning",
       });
       return;
@@ -573,18 +646,12 @@ export default function useWorkflowCanvas() {
   }
 
   // Ask before removing a node — opens the ConfirmDialog (rendered in
-  // WorkflowEditor) rather than deleting outright. The trigger anchors the
-  // workflow, so it's rejected here without a prompt.
+  // WorkflowEditor) rather than deleting outright. The trigger is deletable too:
+  // removing it brings back the "Choose a Trigger" start node so the user can
+  // pick a different kind. Any steps that followed it stay on the canvas (the
+  // user reconnects them to the new trigger), the same as deleting a source in
+  // the pipeline editor.
   function requestDeleteNode(nodeId: string) {
-    const wf = workflowObj.currentSelectedWorkflow;
-    const node = wf.nodes.find((n: any) => n.id === nodeId);
-    if (node?.data?.node_type === "workflow_trigger") {
-      toast({
-        message: "The trigger starts the workflow and can't be deleted",
-        variant: "warning",
-      });
-      return;
-    }
     workflowObj.deleteConfirm = { show: true, nodeId };
   }
   function cancelDeleteNode() {
@@ -593,19 +660,8 @@ export default function useWorkflowCanvas() {
 
   function deleteNode(nodeId: string) {
     const wf = workflowObj.currentSelectedWorkflow;
-    const node = wf.nodes.find((n: any) => n.id === nodeId);
-    // The trigger anchors the workflow and can't be removed.
-    if (node?.data?.node_type === "workflow_trigger") {
-      toast({
-        message: "The trigger starts the workflow and can't be deleted",
-        variant: "warning",
-      });
-      return;
-    }
     wf.nodes = wf.nodes.filter((n: any) => n.id !== nodeId);
-    wf.edges = wf.edges.filter(
-      (e: any) => e.source !== nodeId && e.target !== nodeId,
-    );
+    wf.edges = wf.edges.filter((e: any) => e.source !== nodeId && e.target !== nodeId);
     // The graph changed — prior Test badges are stale.
     workflowObj.testRun.result = null;
     if (workflowObj.currentSelectedNodeData?.id === nodeId) {
@@ -662,18 +718,15 @@ export default function useWorkflowCanvas() {
     const sources = new Set((wf.edges || []).map((e: any) => e.source));
     const leaves = nodes.filter((n: any) => !sources.has(n.id));
     const pool = leaves.length ? leaves : nodes;
-    return pool.reduce((a: any, b: any) =>
-      (b.position?.y ?? 0) > (a.position?.y ?? 0) ? b : a,
-    ).id;
+    return pool.reduce((a: any, b: any) => ((b.position?.y ?? 0) > (a.position?.y ?? 0) ? b : a))
+      .id;
   }
 
   // A terminal node (output io_type, e.g. Destination) can't have children — the
   // chain ends there. Used to block appending past it from the palette / drop.
   function isTerminal(nodeId?: string): boolean {
     if (!nodeId) return false;
-    const node = workflowObj.currentSelectedWorkflow.nodes.find(
-      (n: any) => n.id === nodeId,
-    );
+    const node = workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === nodeId);
     return nodeMeta(node?.data?.node_type)?.ioType === "output";
   }
 
@@ -689,7 +742,7 @@ export default function useWorkflowCanvas() {
   }
   function warnTriggerFirst() {
     toast({
-      message: "Choose a trigger node to start your workflow",
+      message: t("toastMessages.workflows.chooseATriggerNodeToStart"),
       variant: "warning",
     });
   }
@@ -705,7 +758,7 @@ export default function useWorkflowCanvas() {
     if (!src) return;
     if (isTerminal(src)) {
       toast({
-        message: "This branch already ends in a Destination.",
+        message: t("toastMessages.workflows.thisBranchAlreadyEndsInA"),
         variant: "warning",
       });
       return;
@@ -732,9 +785,7 @@ export default function useWorkflowCanvas() {
   // pipeline canvas. (Palette click still appends+wires via addNodeToEnd.)
   function onDrop(event: DragEvent) {
     const nodeType =
-      workflowObj.draggedNodeType ||
-      event.dataTransfer?.getData("application/vueflow") ||
-      "";
+      workflowObj.draggedNodeType || event.dataTransfer?.getData("application/vueflow") || "";
     workflowObj.draggedNodeType = "";
     const meta = nodeMeta(nodeType);
     if (!meta) return;
@@ -806,9 +857,8 @@ export default function useWorkflowCanvas() {
         },
       },
     ];
-    // Open the (read-only) trigger panel on the now-real node, so closing it
-    // dismisses a panel rather than discarding the node.
-    editNode(id);
+    // Don't auto-open the trigger's (read-only) detail panel — placing the trigger
+    // shouldn't interrupt the build flow. The user can click the node to open it.
   }
 
   const NODE_W = 240;
@@ -822,8 +872,7 @@ export default function useWorkflowCanvas() {
     const sourceHandle = handle === "out" ? undefined : handle;
     // Offset siblings on the same output so they don't overlap (fan-out).
     const siblings = wf.edges.filter(
-      (e: any) =>
-        e.source === sourceId && (e.sourceHandle || undefined) === sourceHandle,
+      (e: any) => e.source === sourceId && (e.sourceHandle || undefined) === sourceHandle,
     ).length;
     const position = {
       x: (src.position?.x ?? 0) + siblings * (NODE_W + 40),
@@ -861,11 +910,7 @@ export default function useWorkflowCanvas() {
       if (workflowObj.pendingEdge) {
         wf.edges = [
           ...wf.edges,
-          newEdge(
-            workflowObj.pendingEdge.source,
-            node.id,
-            workflowObj.pendingEdge.sourceHandle,
-          ),
+          newEdge(workflowObj.pendingEdge.source, node.id, workflowObj.pendingEdge.sourceHandle),
         ];
       }
     }
@@ -891,9 +936,7 @@ export default function useWorkflowCanvas() {
 
   // Open an existing node's config drawer.
   function editNode(nodeId: string) {
-    const node = workflowObj.currentSelectedWorkflow.nodes.find(
-      (n: any) => n.id === nodeId,
-    );
+    const node = workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === nodeId);
     if (!node) return;
     workflowObj.isEditNode = true;
     workflowObj.pendingEdge = null;
@@ -904,12 +947,8 @@ export default function useWorkflowCanvas() {
   }
 
   function resetWorkflowData() {
-    workflowObj.currentSelectedWorkflow = JSON.parse(
-      JSON.stringify(defaultWorkflow),
-    );
-    workflowObj.workflowWithoutChange = JSON.parse(
-      JSON.stringify(defaultWorkflow),
-    );
+    workflowObj.currentSelectedWorkflow = JSON.parse(JSON.stringify(defaultWorkflow));
+    workflowObj.workflowWithoutChange = JSON.parse(JSON.stringify(defaultWorkflow));
     workflowObj.currentSelectedNodeData = null;
     workflowObj.currentSelectedNodeID = "";
     workflowObj.dialog = { ...defaultDialog };

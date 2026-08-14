@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  latestScoreAttemptsFromSql,
-  latestScoresFromSql,
-} from "./latestScoreSql";
+import { latestScoreAttemptsFromSql, latestScoresFromSql } from "./latestScoreSql";
 
 describe("latestScoreSql", () => {
   it("selects one latest row per evaluation key with deterministic ordering", () => {
@@ -10,9 +7,7 @@ describe("latestScoreSql", () => {
 
     expect(sql).toContain('FROM "_llm_scores"');
     expect(sql).toContain("PARTITION BY _evaluation_key");
-    expect(sql).toContain(
-      "ORDER BY COALESCE(score_version, 0) DESC, _timestamp DESC",
-    );
+    expect(sql).toContain("ORDER BY COALESCE(score_version, 0) DESC, _timestamp DESC");
     expect(sql).toContain("WHERE _latest_score_rank = 1");
     expect(sql).toContain("AND (score_config_id IS NOT NULL)");
     expect(sql.indexOf("WHERE _latest_score_rank = 1")).toBeLessThan(

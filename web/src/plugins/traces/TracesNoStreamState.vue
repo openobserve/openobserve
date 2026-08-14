@@ -49,15 +49,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-if="recentStream" #extra>
-      <div class="flex items-center justify-center gap-2 flex-wrap">
-        <span class="text-sm font-semibold text-text-secondary mr-1">
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <span class="text-text-secondary mr-1 text-sm font-semibold">
           {{ t("traces.noStream.recent") }}
         </span>
         <EmptyStateIngestionChip
           icon="account-tree"
           :data-test="`traces-no-stream-recent-${recentStream}`"
           @click="emit('pick-stream', recentStream)"
-        ><span class="truncate max-w-40">{{ recentStream }}</span></EmptyStateIngestionChip>
+          ><span class="max-w-40 truncate">{{ recentStream }}</span></EmptyStateIngestionChip
+        >
       </div>
     </template>
   </OEmptyState>
@@ -65,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
@@ -80,7 +81,7 @@ const emit = defineEmits<{
   "pick-stream": [stream: string];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const recentStream = computed<string>(() => {
   if (!props.orgId) return "";
@@ -91,6 +92,10 @@ const recentStream = computed<string>(() => {
 const description = computed(() => t("traces.noStream.description"));
 
 const openGuide = () => {
-  window.open("https://openobserve.ai/docs/features/distributed-tracing/#overview", "_blank", "noopener,noreferrer");
+  window.open(
+    "https://openobserve.ai/docs/features/distributed-tracing/#overview",
+    "_blank",
+    "noopener,noreferrer",
+  );
 };
 </script>

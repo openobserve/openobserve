@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <component
     :is="href ? 'a' : 'button'"
-    class="es-ing-chip inline-flex items-center gap-1.25 py-1 px-3 text-compact font-medium rounded-full border border-border-default bg-surface-panel no-underline! text-text-secondary! cursor-pointer outline-none transition-[border-color,color,background-color] duration-150 hover:border-primary-400 hover:text-primary-600! hover:bg-[color-mix(in_srgb,var(--color-primary-500)_6%,transparent)] focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+    class="es-ing-chip text-compact border-border-default bg-surface-panel text-text-secondary! hover:border-accent hover:text-accent! inline-flex cursor-pointer items-center gap-1.25 rounded-full border px-3 py-1 font-medium no-underline! transition-[border-color,color,background-color] duration-150 outline-none hover:bg-[color-mix(in_srgb,var(--color-primary-500)_6%,transparent)] focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
     v-bind="href ? { href, target: '_blank', rel: 'noopener noreferrer' } : { type: 'button' }"
     @click="!href && emit('click')"
   >
@@ -49,7 +49,7 @@ const emit = defineEmits<{ click: [] }>();
    gradient swap plus a filter on the SLOTTED <img> (hence `:deep`), so it
    cannot be expressed as template utilities on the call sites. `!important`
    preserves the previous global rule's win over the chip's own
-   `bg-surface-panel` / `text-text-secondary!` / `hover:text-primary-600!`
+   `bg-surface-panel` / `text-text-secondary!` / `hover:text-accent!`
    utilities. Dark mode rides the `--color-gradient-ai-subtle` token flip. */
 .ai-hover-btn {
   background: var(--color-gradient-ai-subtle) !important;
@@ -61,15 +61,13 @@ const emit = defineEmits<{ click: [] }>();
 }
 
 .dark .ai-hover-btn {
-  box-shadow: 0 0.25rem 0.75rem 0
-    color-mix(in srgb, var(--color-ai-accent) 20%, transparent);
+  box-shadow: 0 0.25rem 0.75rem 0 color-mix(in srgb, var(--color-ai-accent) 20%, transparent);
   color: white !important;
 }
 
 .ai-hover-btn:hover {
   background: var(--color-gradient-ai) !important;
-  box-shadow: 0 0.25rem 0.75rem 0
-    color-mix(in srgb, var(--color-ai-accent) 35%, transparent);
+  box-shadow: 0 0.25rem 0.75rem 0 color-mix(in srgb, var(--color-ai-accent) 35%, transparent);
   color: white !important;
 }
 

@@ -15,7 +15,12 @@
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis, buildTooltip } from "./shared/axisBuilder";
+import {
+  buildCategoryXAxis,
+  buildCategoryYAxis,
+  buildValueAxis,
+  buildTooltip,
+} from "./shared/axisBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { calculateWidthText } from "../chartDimensionUtils";
@@ -26,12 +31,7 @@ import { calculateWidthText } from "../chartDimensionUtils";
 export class BarConverter implements PromQLChartConverter {
   supportedTypes = ["h-bar", "stacked", "h-stacked"];
 
-  convert(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-    extras: any,
-  ) {
+  convert(processedData: ProcessedPromQLData[], panelSchema: any, store: any, extras: any) {
     const chartType = panelSchema.type;
     const config = panelSchema.config || {};
     const isHorizontal = chartType.startsWith("h-");
@@ -55,7 +55,7 @@ export class BarConverter implements PromQLChartConverter {
       processedData.forEach((queryData) => {
         queryData.series.forEach((seriesData) => {
           const numericValues = seriesData.values.map(([, val]) => parseFloat(val));
-          numericValues.forEach(val => {
+          numericValues.forEach((val) => {
             if (val < chartMin) chartMin = val;
             if (val > chartMax) chartMax = val;
           });
@@ -72,9 +72,9 @@ export class BarConverter implements PromQLChartConverter {
             let timeString: string;
             if (formatted instanceof Date) {
               // Format as HH:MM:SS
-              const hours = String(formatted.getHours()).padStart(2, '0');
-              const minutes = String(formatted.getMinutes()).padStart(2, '0');
-              const seconds = String(formatted.getSeconds()).padStart(2, '0');
+              const hours = String(formatted.getHours()).padStart(2, "0");
+              const minutes = String(formatted.getMinutes()).padStart(2, "0");
+              const seconds = String(formatted.getSeconds()).padStart(2, "0");
               timeString = `${hours}:${minutes}:${seconds}`;
             } else {
               // ISO string - extract time portion
@@ -91,7 +91,7 @@ export class BarConverter implements PromQLChartConverter {
           const data = queryData.timestamps.map(([ts]) => {
             const dataValue = seriesData.data[ts];
             // Return '-' for missing values instead of 0 to show blank in stacked charts
-            return dataValue != null ? parseFloat(dataValue) : '-';
+            return dataValue != null ? parseFloat(dataValue) : "-";
           });
 
           // Get numeric values for color calculation
@@ -104,7 +104,7 @@ export class BarConverter implements PromQLChartConverter {
             chartMin,
             chartMax,
             store.state.theme,
-            config.color?.colorBySeries
+            config.color?.colorBySeries,
           );
 
           series.push({
@@ -121,12 +121,7 @@ export class BarConverter implements PromQLChartConverter {
               // Add unit formatting to labels
               formatter: (params: any) => {
                 return formatUnitValue(
-                  getUnitValue(
-                    params.value,
-                    config?.unit,
-                    config?.unit_custom,
-                    config?.decimals
-                  )
+                  getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
                 );
               },
             },
@@ -145,7 +140,11 @@ export class BarConverter implements PromQLChartConverter {
       const dataItems: Array<{ value: number; itemStyle?: { color: string } }> = [];
 
       // First pass: calculate min/max and collect data
-      const seriesDataCollection: Array<{ name: string; value: number; rawValues: Array<[number, string]> }> = [];
+      const seriesDataCollection: Array<{
+        name: string;
+        value: number;
+        rawValues: Array<[number, string]>;
+      }> = [];
 
       processedData.forEach((queryData) => {
         queryData.series.forEach((seriesData) => {
@@ -175,13 +174,11 @@ export class BarConverter implements PromQLChartConverter {
           chartMin,
           chartMax,
           store.state.theme,
-          config.color?.colorBySeries
+          config.color?.colorBySeries,
         );
 
         dataItems.push(
-          color
-            ? { value: seriesData.value, itemStyle: { color } }
-            : { value: seriesData.value }
+          color ? { value: seriesData.value, itemStyle: { color } } : { value: seriesData.value },
         );
       });
 
@@ -196,12 +193,7 @@ export class BarConverter implements PromQLChartConverter {
           // Add unit formatting to labels
           formatter: (params: any) => {
             return formatUnitValue(
-              getUnitValue(
-                params.value,
-                config?.unit,
-                config?.unit_custom,
-                config?.decimals
-              )
+              getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
             );
           },
         },
@@ -233,21 +225,22 @@ export class BarConverter implements PromQLChartConverter {
 
     // containLabel reserves the label area; fixed px insets avoid the waste
     // of percentage margins on wide panels and starvation on short ones.
-    const legendAtBottom =
-      config.show_legends && config.legends_position !== "right";
+    const legendAtBottom = config.show_legends && config.legends_position !== "right";
     // the last category label centers under the final tick and spills half
     // its width past the plot edge — reserve that much on the right
     const lastCategory = String(categories[categories.length - 1] ?? "");
+    /* eslint-disable local/no-hardcoded-px -- must match the fixed numeric fontSize ECharts paints category labels at; ECharts numeric sizes are literal CSS px and never scale with the root, so rem here would over-reserve the inset */
     const rightInset = isHorizontal
       ? "4%"
       : Math.max(20, Math.ceil(calculateWidthText(lastCategory, "12px") / 2) + 6);
+    /* eslint-enable local/no-hardcoded-px */
     return {
       series,
       ...axisConfig,
       grid: {
-        left: 8,
+        left: 16,
         right: rightInset,
-        top: 8,
+        top: 16,
         bottom: legendAtBottom ? 40 : 12,
         containLabel: true,
         ...(config.axis_width && { left: config.axis_width }),

@@ -36,20 +36,11 @@
  *  if a deployment names it differently. */
 export const USAGE_STREAM_NAME = "usage";
 
-export type UsageMetric =
-  | "Ingestion"
-  | "Search"
-  | "Pipeline"
-  | "RemotePipeline";
+export type UsageMetric = "Ingestion" | "Search" | "Pipeline" | "RemotePipeline";
 
 /** The byte-based billable events charted daily (all except Functions, and
  *  except Data Retention / AI Credits which use different units/streams). */
-export const CHART_METRICS: UsageMetric[] = [
-  "Ingestion",
-  "Search",
-  "Pipeline",
-  "RemotePipeline",
-];
+export const CHART_METRICS: UsageMetric[] = ["Ingestion", "Search", "Pipeline", "RemotePipeline"];
 
 /** Per-metric display colour (kept distinct so the lines read apart). */
 const METRIC_COLOR: Record<UsageMetric, string> = {
@@ -73,10 +64,7 @@ function sizeExpr(dataType: "gb" | "mb"): string {
  * down by `event` (Ingestion, Search, Pipeline, Remote Pipeline — everything
  * except Functions). Powers the single combined line chart.
  */
-export function buildUsageCombinedSql(opts: {
-  orgId: string;
-  dataType: "gb" | "mb";
-}): string {
+export function buildUsageCombinedSql(opts: { orgId: string; dataType: "gb" | "mb" }): string {
   const { orgId, dataType } = opts;
   const events = CHART_METRICS.map((e) => `'${e}'`).join(", ");
   return (
@@ -147,9 +135,7 @@ export function buildUsageCombinedLinePanelSchema(opts: {
         fields: {
           stream: USAGE_STREAM_NAME,
           stream_type: "logs",
-          x: [
-            { alias: "x_axis_1", column: "x_axis_1", color: null, label: "Time" },
-          ],
+          x: [{ alias: "x_axis_1", column: "x_axis_1", color: null, label: "Time" }],
           y: [
             {
               alias: "y_axis_1",

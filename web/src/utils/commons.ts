@@ -18,8 +18,8 @@
 import dashboardService from "../services/dashboards";
 import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
+import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
-
 
 let moment: any;
 let momentInitialized = false;
@@ -40,12 +40,8 @@ export const modifySQLQuery = async (
 ) => {
   await importMoment();
 
-  const startTime = moment(String(currentTimeObj.start_time)).format(
-    "YYYY-MM-DDThh:mm:ssZ",
-  );
-  const endTime = moment(String(currentTimeObj.end_time)).format(
-    "YYYY-MM-DDThh:mm:ssZ",
-  );
+  const startTime = moment(String(currentTimeObj.start_time)).format("YYYY-MM-DDThh:mm:ssZ");
+  const endTime = moment(String(currentTimeObj.end_time)).format("YYYY-MM-DDThh:mm:ssZ");
   const replaceString = `time_range(${timestampColumn},'${startTime}', '${endTime}')`;
   let modString: String = "";
 
@@ -89,10 +85,7 @@ export function getConsumableDateTime(dateObj: any) {
     //   searchObj.data.resultGrid.currentDateTime = endTimeStamp;
     // }
 
-    const startTimeStamp = subtractRelativeTime(
-      endTimeStamp,
-      JSON.parse(subtractObject),
-    );
+    const startTimeStamp = subtractRelativeTime(endTimeStamp, JSON.parse(subtractObject));
 
     return {
       start_time: startTimeStamp,
@@ -103,9 +96,7 @@ export function getConsumableDateTime(dateObj: any) {
     if (dateObj.absolute.date.from == "" && dateObj.absolute.startTime == "") {
       start = new Date();
     } else {
-      start = new Date(
-        dateObj.absolute.date.from + " " + dateObj.absolute.startTime,
-      );
+      start = new Date(dateObj.absolute.date.from + " " + dateObj.absolute.startTime);
     }
     if (dateObj.absolute.date.to == "" && dateObj.absolute.endTime == "") {
       end = new Date();
@@ -167,10 +158,7 @@ export const getAllDashboards = async (store: any, folderId: any) => {
 };
 export const getFoldersListByType = async (store: any, type: any) => {
   let folders = (
-    await commonService.list_Folders(
-      store.state.selectedOrganization.identifier,
-      type
-    )
+    await commonService.list_Folders(store.state.selectedOrganization.identifier, type)
   ).data.list;
 
   // get default folder and append it to top
@@ -186,10 +174,7 @@ export const getFoldersListByType = async (store: any, type: any) => {
   }
 
   store.dispatch("setFoldersByType", {
-    [type]: [
-      defaultFolder,
-      ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
-    ],
+    [type]: [defaultFolder, ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name))],
   });
 
   return store.state.organizationData.foldersByType[type];
@@ -229,7 +214,7 @@ export const addPanel = async (
   panelData: any,
   folderId: any,
   tabId: any,
-  variablesToUpdate?: { variableNames: string[], newPanelId: string },
+  variablesToUpdate?: { variableNames: string[]; newPanelId: string },
   newVariables?: any[],
 ) => {
   // get the object of panel data
@@ -328,11 +313,7 @@ export const addVariable = async (
   variableData: any,
   folderId: any,
 ) => {
-  const currentDashboard: any = await getDashboard(
-    store,
-    dashboardId,
-    folderId,
-  );
+  const currentDashboard: any = await getDashboard(store, dashboardId, folderId);
   if (!currentDashboard.variables) {
     currentDashboard.variables = {};
     currentDashboard.variables.showDynamicFilters = false;
@@ -400,9 +381,7 @@ export const deletePanel = async (
   const tab = getTabDataFromTabId(currentDashboard, tabId);
 
   //remove panel from current dashboard
-  const panelIndex = tab.panels.findIndex(
-    (panel: any) => panel.id == panelId,
-  );
+  const panelIndex = tab.panels.findIndex((panel: any) => panel.id == panelId);
   tab.panels.splice(panelIndex, 1);
   // currentDashboard.panels = currentDashboard.panels;
 
@@ -474,9 +453,7 @@ export const updatePanel = async (
   // find tab from tabId
   const tab = getTabDataFromTabId(currentDashboard, tabId);
 
-  const panelIndex = tab.panels.findIndex(
-    (panel: any) => panel.id == panelData.id,
-  );
+  const panelIndex = tab.panels.findIndex((panel: any) => panel.id == panelData.id);
   tab.panels[panelIndex] = panelData;
   return await updateDashboard(
     store,
@@ -533,12 +510,7 @@ export const updateDashboard = async (
     folderId,
   );
 
-  await retrieveAndStoreDashboardData(
-    store,
-    dashboardId,
-    folderId,
-    apiResponse,
-  );
+  await retrieveAndStoreDashboardData(store, dashboardId, folderId, apiResponse);
   await getAllDashboards(store, folderId);
 
   return res;
@@ -549,7 +521,7 @@ const ensureVariablesStructure = (dashboard: any): void => {
   if (!dashboard.variables) {
     dashboard.variables = {
       showDynamicFilters: false,
-      list: []
+      list: [],
     };
   } else {
     // Ensure showDynamicFilters has a default value
@@ -563,14 +535,9 @@ const ensureVariablesStructure = (dashboard: any): void => {
   }
 };
 
-export const getDashboard = async (
-  store: any,
-  dashboardId: any,
-  folderId: any,
-) => {
+export const getDashboard = async (store: any, dashboardId: any, folderId: any) => {
   // check if dashboard data is present in store
-  let dashboardJson =
-    store.state.organizationData.allDashboardData[dashboardId];
+  let dashboardJson = store.state.organizationData.allDashboardData[dashboardId];
 
   if (!dashboardJson && dashboardId) {
     const apiResponse = await dashboardService.get_Dashboard(
@@ -579,12 +546,7 @@ export const getDashboard = async (
       folderId,
     );
 
-    dashboardJson = await retrieveAndStoreDashboardData(
-      store,
-      dashboardId,
-      folderId,
-      apiResponse,
-    );
+    dashboardJson = await retrieveAndStoreDashboardData(store, dashboardId, folderId, apiResponse);
   }
 
   if (!dashboardJson) {
@@ -594,12 +556,18 @@ export const getDashboard = async (
   // Ensure variables structure always exists (fix for dashboards with no variables)
   ensureVariablesStructure(dashboardJson);
 
-  // Fix duplicate panel IDs and check if any were found
-  const hasDuplicates = fixDuplicatePanelIds(dashboardJson);
+  // Fix duplicate panel IDs and layout IDs (layout.i) and check if any were found
+  const hasDuplicateIds = dedupeDashboardIds(dashboardJson);
 
-  // If duplicates were found, save the dashboard and retrieve it with new IDs
-  if (hasDuplicates) {
-    // Save the dashboard with fixed IDs
+  // The reserved timestamp column is not allowed as a SQL output alias —
+  // normalize it to `ts`. Returns true when anything was rewritten, so we
+  // persist it (save + re-fetch) exactly like duplicate panel IDs.
+  const timestampColumn = store.state.zoConfig?.timestamp_column ?? "_timestamp";
+  const hasReservedAlias = normalizeReservedTimestampAlias(dashboardJson, timestampColumn);
+
+  // If any fix changed the dashboard, save it and retrieve the updated version
+  if (hasDuplicateIds || hasReservedAlias) {
+    // Save the dashboard with the applied fixes
     await updateDashboard(
       store,
       store.state.selectedOrganization.identifier,
@@ -615,12 +583,7 @@ export const getDashboard = async (
       folderId,
     );
 
-    dashboardJson = await retrieveAndStoreDashboardData(
-      store,
-      dashboardId,
-      folderId,
-      apiResponse,
-    );
+    dashboardJson = await retrieveAndStoreDashboardData(store, dashboardId, folderId, apiResponse);
 
     // Ensure variables structure exists after re-fetching too
     ensureVariablesStructure(dashboardJson);
@@ -664,17 +627,49 @@ const generateUniquePanelId = (existingIds: Set<string>): string => {
   return id;
 };
 
-export const deleteDashboardById = async (
-  store: any,
-  dashboardId: any,
-  folderId: any,
-) => {
+// Fix duplicate panel layout ids (layout.i). layout.i is a numeric grid-slot
+// id scoped to a tab, so dedupe per-tab and continue from the tab's max i.
+const fixDuplicateLayoutIds = (dashboardJson: any): boolean => {
+  let hasDuplicates = false;
+
+  for (const tab of dashboardJson?.tabs || []) {
+    if (!Array.isArray(tab?.panels)) continue;
+
+    const usedIds = new Set<number>();
+    let maxI = 0;
+    for (const panel of tab.panels) {
+      if (typeof panel?.layout?.i === "number") {
+        maxI = Math.max(maxI, panel.layout.i);
+      }
+    }
+
+    for (const panel of tab.panels) {
+      if (!panel?.layout) continue;
+
+      const currentId = panel.layout.i;
+      if (typeof currentId !== "number" || usedIds.has(currentId)) {
+        panel.layout.i = ++maxI;
+        hasDuplicates = true;
+      }
+
+      usedIds.add(panel.layout.i);
+    }
+  }
+
+  return hasDuplicates;
+};
+
+// Dedupe both panel ids and layout ids in place. Used on dashboard load and at
+// import time (post schema migration). Returns true if anything was changed.
+export const dedupeDashboardIds = (dashboardJson: any): boolean => {
+  const fixedPanelIds = fixDuplicatePanelIds(dashboardJson);
+  const fixedLayoutIds = fixDuplicateLayoutIds(dashboardJson);
+  return fixedPanelIds || fixedLayoutIds;
+};
+
+export const deleteDashboardById = async (store: any, dashboardId: any, folderId: any) => {
   // Delete the dashboard using the dashboardService
-  await dashboardService.delete(
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    folderId,
-  );
+  await dashboardService.delete(store.state.selectedOrganization.identifier, dashboardId, folderId);
 
   // Get list of all dashboard of all folders
   const allDashboardList = store.state.organizationData.allDashboardList;
@@ -721,10 +716,7 @@ export const deleteDashboardById = async (
  *
  * @param idsByFolder folder id → dashboard ids deleted from that folder
  */
-export const evictDashboardsFromCache = (
-  store: any,
-  idsByFolder: Map<string, string[]>,
-) => {
+export const evictDashboardsFromCache = (store: any, idsByFolder: Map<string, string[]>) => {
   const allDashboardList = store.state.organizationData?.allDashboardList ?? {};
   const next = { ...allDashboardList };
   let changed = false;
@@ -732,9 +724,7 @@ export const evictDashboardsFromCache = (
   idsByFolder.forEach((ids, folderId) => {
     const cached = next[folderId];
     if (!Array.isArray(cached)) return; // folder never fetched — nothing stale
-    const remaining = cached.filter(
-      (dashboard: any) => !ids.includes(dashboard.dashboardId),
-    );
+    const remaining = cached.filter((dashboard: any) => !ids.includes(dashboard.dashboardId));
     if (remaining.length !== cached.length) {
       next[folderId] = remaining;
       changed = true;
@@ -803,9 +793,7 @@ export const deleteTab = async (
     moveToTabData.panels.push(...deleteTabData.panels);
   }
   // delete the tab
-  currentDashboard.tabs = currentDashboard.tabs.filter(
-    (tab: any) => tab.tabId != deleteTabId,
-  );
+  currentDashboard.tabs = currentDashboard.tabs.filter((tab: any) => tab.tabId != deleteTabId);
 
   return await updateDashboard(
     store,
@@ -823,11 +811,7 @@ export const editTab = async (
   tabId: any,
   tabData: any,
 ) => {
-  const currentDashboardData = await getDashboard(
-    store,
-    dashboardId,
-    folderId,
-  );
+  const currentDashboardData = await getDashboard(store, dashboardId, folderId);
   const tab = getTabDataFromTabId(currentDashboardData, tabId);
 
   // only name will change
@@ -845,20 +829,11 @@ export const editTab = async (
   return tab;
 };
 
-export const addTab = async (
-  store: any,
-  dashboardId: any,
-  folderId: any,
-  newTabData: any,
-) => {
+export const addTab = async (store: any, dashboardId: any, folderId: any, newTabData: any) => {
   // generate tab id
   newTabData.tabId = getTabId();
 
-  const currentDashboardData = await getDashboard(
-    store,
-    dashboardId,
-    folderId,
-  );
+  const currentDashboardData = await getDashboard(store, dashboardId, folderId);
 
   currentDashboardData.tabs.push(newTabData);
 
@@ -892,9 +867,7 @@ export const movePanelToAnotherTab = async (
   const panelData = currentTabData.panels.find((it: any) => it.id == panelId);
 
   // delete panel in currentTab
-  currentTabData.panels = currentTabData.panels.filter(
-    (panel: any) => panel.id != panelId,
-  );
+  currentTabData.panels = currentTabData.panels.filter((panel: any) => panel.id != panelId);
 
   // Now, add panel to moveToTab
   if (!moveToTabData.panels) {
@@ -919,11 +892,8 @@ export const movePanelToAnotherTab = async (
 };
 
 export const getFoldersList = async (store: any) => {
-  let folders = (
-    await dashboardService.list_Folders(
-      store.state.selectedOrganization.identifier,
-    )
-  ).data.list;
+  let folders = (await dashboardService.list_Folders(store.state.selectedOrganization.identifier))
+    .data.list;
 
   // get default folder and append it to top
   let defaultFolder = folders.find((it: any) => it.folderId == "default");
@@ -946,10 +916,7 @@ export const getFoldersList = async (store: any) => {
 };
 
 export const deleteFolderById = async (store: any, folderId: any) => {
-  await dashboardService.delete_Folder(
-    store.state.selectedOrganization.identifier,
-    folderId,
-  );
+  await dashboardService.delete_Folder(store.state.selectedOrganization.identifier, folderId);
   await getFoldersList(store);
 };
 
@@ -960,11 +927,7 @@ const refreshFolderLists = (store: any, type: any) =>
   ]);
 
 export const deleteFolderByIdByType = async (store: any, folderId: any, type: any) => {
-  await commonService.delete_Folder(
-    store.state.selectedOrganization.identifier,
-    type,
-    folderId,
-  );
+  await commonService.delete_Folder(store.state.selectedOrganization.identifier, type, folderId);
   await refreshFolderLists(store, type);
 };
 
@@ -973,10 +936,7 @@ export const createFolder = async (store: any, data: any) => {
     store.state.selectedOrganization.identifier,
     data,
   );
-  await Promise.all([
-    getFoldersList(store),
-    getFoldersListByType(store, "dashboards"),
-  ]);
+  await Promise.all([getFoldersList(store), getFoldersListByType(store, "dashboards")]);
   return newFolder;
 };
 
@@ -991,15 +951,8 @@ export const createFolderByType = async (store: any, data: any, type: any) => {
 };
 
 export const updateFolder = async (store: any, folderId: any, data: any) => {
-  await dashboardService.edit_Folder(
-    store.state.selectedOrganization.identifier,
-    folderId,
-    data,
-  );
-  await Promise.all([
-    getFoldersList(store),
-    getFoldersListByType(store, "dashboards"),
-  ]);
+  await dashboardService.edit_Folder(store.state.selectedOrganization.identifier, folderId, data);
+  await Promise.all([getFoldersList(store), getFoldersListByType(store, "dashboards")]);
 };
 
 export const updateFolderByType = async (store: any, folderId: any, data: any, type: any) => {
@@ -1027,7 +980,7 @@ export const moveDashboardToAnotherFolder = async (
     store.state.selectedOrganization.identifier,
     dashboardIds,
     from,
-    to
+    to,
   );
 
   //update both folders dashboard
@@ -1039,24 +992,21 @@ export const moveModuleToAnotherFolder = async (
   store: any,
   data: any,
   type: any,
-  folder_id?: any
+  folder_id?: any,
 ) => {
   //move alerts
   await commonService.move_across_folders(
     store.state.selectedOrganization.identifier,
     type,
     data,
-    folder_id
-
+    folder_id,
   );
 };
 
 export const checkIfVariablesAreLoaded = (variablesData: any): boolean => {
   if (
     variablesData?.values?.length > 0 &&
-    variablesData?.values?.every(
-      (it: any) => !it.isLoading && !it.isVariableLoadingPending,
-    ) &&
+    variablesData?.values?.every((it: any) => !it.isLoading && !it.isVariableLoadingPending) &&
     !variablesData?.isVariablesLoading
   ) {
     return true;

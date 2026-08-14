@@ -14,7 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <ODialog data-test="add-group-dialog"
+  <ODialog
+    data-test="add-group-dialog"
     :open="open"
     size="sm"
     :title="t('iam.addGroup')"
@@ -51,13 +52,13 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddGroupSchema, type AddGroupForm } from "./AddGroup.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const props = defineProps({
   open: {
     type: Boolean,
@@ -95,21 +96,18 @@ const addGroupDefaults = computed((): AddGroupForm => ({
 const saveGroup = async (value: AddGroupForm) => {
   const name = value.name.trim();
   try {
-    const res = await createGroup(
-      name,
-      store.state.selectedOrganization.identifier,
-    );
+    const res = await createGroup(name, store.state.selectedOrganization.identifier);
     emits("added:group", { group_name: name, data: res.data });
     emits("update:open", false);
 
     toast({
-      message: t('iam.addGroupPage.createdSuccessfully', { name }),
+      message: t("iam.addGroupPage.createdSuccessfully", { name }),
       variant: "success",
     });
   } catch (err: any) {
     if (err.response?.status != 403) {
       toast({
-        message: t('iam.addGroupPage.errorCreating'),
+        message: t("iam.addGroupPage.errorCreating"),
         variant: "error",
       });
     }

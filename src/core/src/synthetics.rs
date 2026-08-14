@@ -23,9 +23,9 @@
 #[cfg(feature = "enterprise")]
 pub struct CheckNotification {
     pub org_id: String,
-    pub monitor_name: String,
-    pub monitor_id: String,
-    pub monitor_type: String,
+    pub check_name: String,
+    pub check_id: String,
+    pub check_type: String,
     pub target: String,
     pub destinations: Vec<String>,
     pub run_id: String,
@@ -35,6 +35,41 @@ pub struct CheckNotification {
     pub job_count: i64,
     pub error: Option<String>,
     pub checked_at: i64,
+    /// This message closes an incident rather than opening one.
+    ///
+    /// Mandatory once `cooldown_mins` exists: with a cooldown, silence no
+    /// longer means "recovered", it means "possibly still broken and inside
+    /// the window". A recovery message is the only thing that closes it.
+    pub recovery: bool,
+    /// How many runs in a row had failed when this fired. 0 on a recovery.
+    pub consecutive_failures: i32,
+    /// The run recovered by retrying. Informational, not an incident.
+    pub flaky: bool,
+    /// The target is reachable but degrading — a certificate inside its warning
+    /// window, or a failing SFTP probe on a host that authenticated.
+    ///
+    /// Kept distinct from `flaky` because they arrive as the same `warning`
+    /// status: a flaky run fixed itself and needs no action, a degrading one
+    /// will not fix itself and needs action before it becomes an outage.
+    /// Why the run was a warning, straight from the probe: `cert_expiring`,
+    /// `sftp_degraded`, `flaky`. `None` from a probe too old to report one, in
+    /// which case the message stays generic rather than guessing.
+    pub status_reason: Option<String>,
+    pub degraded: bool,
+    /// Locations that did not pass, worst first.
+    ///
+    /// Previously absent entirely, so a six-location check with one broken
+    /// region could only say "the check is failing" and the reader had to open
+    /// the UI to find out where.
+    pub failing_locations: Vec<String>,
+    /// Locations that passed, alphabetical.
+    ///
+    /// Carried because `failing_locations` is empty on a recovery **by
+    /// definition** — nothing is failing — which left the recovery message
+    /// unable to name anything and degrading to a bare count. With both sides
+    /// a partial recovery is expressible too: "2 of 3 recovered, the third is
+    /// still down".
+    pub passing_locations: Vec<String>,
 }
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
@@ -44,7 +79,13 @@ pub struct CheckNotification {
 /// HTTP webhooks, an HTML card for email, plain text for SNS.
 #[cfg(feature = "enterprise")]
 pub async fn notify_check_result(n: CheckNotification) {
-    if n.status == "passed" || n.status == "up" {
+    // A passing run is worth sending exactly once: when it ends an incident
+    // somebody was already told about. Otherwise it is a confirmation nobody
+    // asked for.
+    //
+    // A flaky run reports as `warning`, not `passed`, so it is not caught here —
+    // the decision to send it was already made upstream against `cooldown_mins`.
+    if !n.recovery && (n.status == "passed" || n.status == "up") {
         return;
     }
 
@@ -66,19 +107,42 @@ pub async fn notify_check_result(n: CheckNotification) {
                     DestinationType::Http(_) => build_slack_json(&n),
                 };
 
-                let subject = format!(
-                    "[OpenObserve Synthetics] {} {} is {}",
-                    status_emoji(&n.status),
-                    n.monitor_name,
-                    n.status.to_uppercase()
-                );
+                let subject = if n.recovery {
+                    format!("[OpenObserve Synthetics] ✅ {} has RECOVERED", n.check_name)
+                } else if n.degraded {
+                    // Not "is WARNING": the point of the message is that this needs
+                    // action before it becomes an outage. Named where we know the
+                    // condition, because the subject is the line that decides
+                    // whether anyone opens the alert — and "CERTIFICATE EXPIRING"
+                    // gets renewed where a generic "DEGRADED" gets skimmed.
+                    match n.status_reason.as_deref() {
+                        Some("cert_expiring") => format!(
+                            "[OpenObserve Synthetics] 🟡 {} — CERTIFICATE EXPIRING SOON",
+                            n.check_name
+                        ),
+                        Some("sftp_degraded") => format!(
+                            "[OpenObserve Synthetics] 🟡 {} — SFTP DEGRADED",
+                            n.check_name
+                        ),
+                        _ => format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.check_name),
+                    }
+                } else if n.flaky {
+                    format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.check_name)
+                } else {
+                    format!(
+                        "[OpenObserve Synthetics] {} {} is {}",
+                        status_emoji(&n),
+                        n.check_name,
+                        n.status.to_uppercase()
+                    )
+                };
                 if let Err(e) =
                     crate::alerts::alert::dispatch_notification(destination_type, &subject, msg)
                         .await
                 {
                     log::error!(
-                        "[synthetics] notify dest={dest_name} monitor={}: {e}",
-                        n.monitor_id
+                        "[synthetics] notify dest={dest_name} check={}: {e}",
+                        n.check_id
                     );
                 }
             }
@@ -90,9 +154,33 @@ pub async fn notify_check_result(n: CheckNotification) {
 }
 
 #[cfg(feature = "enterprise")]
-fn status_emoji(status: &str) -> &'static str {
-    match status {
-        "failed" | "down" => "🔴",
+/// Emoji for a notification, branching on the **same flags** as
+/// [`status_headline`] and in the same order.
+///
+/// This used to take `&str` and branch on `status` alone, which put a 🔴 on
+/// every recovery: `status_headline` reads the `recovery` bool, but on a
+/// recovery run `status` is `"passed"` — the run genuinely did pass — so the
+/// emoji fell through to the catch-all. The headline said "has recovered" next
+/// to an outage marker, and in a busy channel that reads as a second outage.
+///
+/// The old `"recovered" => "✅"` arm was unreachable: nothing sets `status` to
+/// that literal. `AlertDecision::Recovered` becomes the `recovery` bool at the
+/// ack and never round-trips into the status string.
+///
+/// Taking the whole notification is what keeps the two in step — a future
+/// branch added to the headline is a compile-visible omission here, rather than
+/// a silently wrong glyph.
+fn status_emoji(n: &CheckNotification) -> &'static str {
+    if n.recovery {
+        return "✅";
+    }
+    if n.degraded {
+        return "🟡";
+    }
+    if n.flaky {
+        return "🔁";
+    }
+    match n.status.as_str() {
         "warning" => "🟡",
         "error" => "⚠️",
         _ => "🔴",
@@ -102,17 +190,64 @@ fn status_emoji(status: &str) -> &'static str {
 /// What the status means, in operator language — differs per status.
 #[cfg(feature = "enterprise")]
 fn status_headline(n: &CheckNotification) -> String {
+    if n.recovery {
+        return format!("{} has recovered", n.check_name);
+    }
+    // `warning` covers two unrelated things, and they need opposite responses:
+    // a flaky run already fixed itself, a degrading target will not.
+    if n.degraded {
+        // Name the condition. "Degrading" is true but not actionable, and the
+        // reader's next step differs entirely: renew a certificate, or go and look
+        // at an SFTP subsystem. QA reported the generic case as the bug — an
+        // expiring certificate that read as "passed only after retries (flaky)".
+        return match n.status_reason.as_deref() {
+            Some("cert_expiring") => format!(
+                "{} — the TLS certificate is expiring soon, renew it before it lapses",
+                n.check_name
+            ),
+            Some("sftp_degraded") => format!(
+                "{} connects and authenticates, but its SFTP subsystem is failing",
+                n.check_name
+            ),
+            _ => format!(
+                "{} is reachable but degrading — this needs attention before it fails",
+                n.check_name
+            ),
+        };
+    }
+    if n.flaky {
+        return format!(
+            "{} passed only after retries (flaky) — it recovered on its own",
+            n.check_name
+        );
+    }
     match n.status.as_str() {
-        "warning" => format!("{} passed only after retries (flaky)", n.monitor_name),
+        "warning" => format!("{} passed only after retries (flaky)", n.check_name),
         "error" => format!(
             "{} could not be checked — probe infrastructure error",
-            n.monitor_name
+            n.check_name
         ),
-        _ => format!("{} is failing", n.monitor_name),
+        _ => format!("{} is failing", n.check_name),
     }
 }
 
-/// Deep link to the monitor's results page in the UI.
+/// `checked_at` (microseconds) as a readable UTC stamp, e.g.
+/// "2026-07-28 01:24:51 UTC".
+///
+/// Every destination gets this rather than a raw epoch. Slack's `<!date^…>`
+/// markup is still used where it applies, but only ever with this as its
+/// fallback text — the fallback is what an operator actually reads whenever the
+/// markup is not interpreted, which is exactly when a bare epoch is useless.
+#[cfg(feature = "enterprise")]
+fn checked_at_utc(checked_at_micros: i64) -> String {
+    chrono::DateTime::from_timestamp_micros(checked_at_micros)
+        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+        // Out-of-range only for a nonsense timestamp; showing the raw value
+        // beats dropping the field and leaving the reader with nothing.
+        .unwrap_or_else(|| checked_at_micros.to_string())
+}
+
+/// Deep link to the check's results page in the UI.
 #[cfg(feature = "enterprise")]
 fn run_url(n: &CheckNotification) -> String {
     let cfg = config::get_config();
@@ -120,7 +255,56 @@ fn run_url(n: &CheckNotification) -> String {
     let base_uri = &cfg.common.base_uri;
     format!(
         "{web_url}{base_uri}/web/synthetic/{}/results?org_identifier={}",
-        n.monitor_id, n.org_id
+        n.check_id, n.org_id
+    )
+}
+
+#[cfg(feature = "enterprise")]
+/// "2 of 6: mumbai, frankfurt" — or just the count when we could not attribute.
+///
+/// Answers "which region is broken", which the message previously could not: it
+/// carried only how many locations were checked, so a one-of-six failure and a
+/// six-of-six outage read identically.
+fn locations_line(n: &CheckNotification) -> String {
+    let total = if n.job_count > 0 { n.job_count } else { 1 };
+
+    // On a recovery the interesting set is what came back, not what is broken —
+    // and `failing_locations` is empty by definition, which is what used to make
+    // this degrade to a bare count and tell the reader nothing.
+    if n.recovery {
+        return match (
+            n.passing_locations.is_empty(),
+            n.failing_locations.is_empty(),
+        ) {
+            // Nothing to name at all — an older ack, or the query failed.
+            (true, _) => total.to_string(),
+            // Full recovery.
+            (false, true) => format!(
+                "{} of {} recovered: {}",
+                n.passing_locations.len(),
+                total,
+                n.passing_locations.join(", ")
+            ),
+            // Partial: some came back, some did not. Naming both is the whole
+            // point — "2 of 3 recovered" alone would read as an all-clear.
+            (false, false) => format!(
+                "{} of {} recovered: {} — still failing: {}",
+                n.passing_locations.len(),
+                total,
+                n.passing_locations.join(", "),
+                n.failing_locations.join(", ")
+            ),
+        };
+    }
+
+    if n.failing_locations.is_empty() {
+        return total.to_string();
+    }
+    format!(
+        "{} of {}: {}",
+        n.failing_locations.len(),
+        total,
+        n.failing_locations.join(", ")
     )
 }
 
@@ -130,22 +314,19 @@ fn run_url(n: &CheckNotification) -> String {
 fn build_slack_json(n: &CheckNotification) -> String {
     let checked_secs = n.checked_at / 1_000_000;
     let mut lines = vec![
-        format!("{} *{}*", status_emoji(&n.status), status_headline(n)),
+        format!("{} *{}*", status_emoji(n), status_headline(n)),
         String::new(),
-        format!("*Monitor:* {} ({})", n.monitor_name, n.monitor_type),
+        format!("*Check:* {} ({})", n.check_name, n.check_type),
         format!("*Target:* {}", n.target),
-        format!(
-            "*Locations checked:* {}",
-            if n.job_count > 0 { n.job_count } else { 1 }
-        ),
+        format!("*Locations:* {}", locations_line(n)),
     ];
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("*Error:* ```{e}```"));
     }
+    let checked_human = checked_at_utc(n.checked_at);
     lines.push(format!(
-        "*Time:* <!date^{checked_secs}^{{date_time_secs}}|{checked_secs}>"
+        "*Time:* <!date^{checked_secs}^{{date_time_secs}}|{checked_human}>"
     ));
-    lines.push(format!("<{}|View run details →>", run_url(n)));
 
     serde_json::json!({ "text": lines.join("\n") }).to_string()
 }
@@ -155,17 +336,15 @@ fn build_slack_json(n: &CheckNotification) -> String {
 fn build_plain_text(n: &CheckNotification) -> String {
     let mut lines = vec![
         status_headline(n),
-        format!("Monitor: {} ({})", n.monitor_name, n.monitor_type),
+        format!("Check: {} ({})", n.check_name, n.check_type),
         format!("Target: {}", n.target),
         format!("Status: {}", n.status),
-        format!(
-            "Locations checked: {}",
-            if n.job_count > 0 { n.job_count } else { 1 }
-        ),
+        format!("Locations: {}", locations_line(n)),
     ];
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("Error: {e}"));
     }
+    lines.push(format!("Time: {}", checked_at_utc(n.checked_at)));
     lines.push(format!("Run details: {}", run_url(n)));
     lines.join("\n")
 }
@@ -174,10 +353,14 @@ fn build_plain_text(n: &CheckNotification) -> String {
 #[cfg(feature = "enterprise")]
 fn build_email_html(n: &CheckNotification) -> String {
     // TODO: update with a better template for all the checks
-    let color = match n.status.as_str() {
-        "warning" => "#b58105",
-        "error" => "#b45309",
-        _ => "#c62828",
+    let color = if n.recovery {
+        "#2e7d32"
+    } else {
+        match n.status.as_str() {
+            "warning" => "#b58105",
+            "error" => "#b45309",
+            _ => "#c62828",
+        }
     };
     let error_row = match n.error.as_deref().filter(|e| !e.is_empty()) {
         Some(e) => format!(
@@ -191,27 +374,30 @@ fn build_email_html(n: &CheckNotification) -> String {
         r#"<div style="font-family:sans-serif;max-width:560px;">
   <h2 style="color:{color};margin-bottom:4px;">{emoji} {headline}</h2>
   <table style="border-collapse:collapse;background:#f7f7f7;border-radius:6px;width:100%;">
-    <tr><td style="padding:6px 12px;color:#666;width:140px;">Monitor</td>
+    <tr><td style="padding:6px 12px;color:#666;width:140px;">Check</td>
         <td style="padding:6px 12px;">{name} ({mtype})</td></tr>
     <tr><td style="padding:6px 12px;color:#666;">Target</td>
         <td style="padding:6px 12px;">{target}</td></tr>
     <tr><td style="padding:6px 12px;color:#666;">Status</td>
         <td style="padding:6px 12px;font-weight:bold;color:{color};">{status}</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Locations checked</td>
+    <tr><td style="padding:6px 12px;color:#666;">Locations</td>
         <td style="padding:6px 12px;">{jobs}</td></tr>
+    <tr><td style="padding:6px 12px;color:#666;">Time</td>
+        <td style="padding:6px 12px;">{checked_at}</td></tr>
     {error_row}
   </table>
   <p style="margin-top:12px;">
     <a href="{url}" style="background:{color};color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;">View run details</a>
   </p>
 </div>"#,
-        emoji = status_emoji(&n.status),
+        emoji = status_emoji(n),
         headline = html_escape(&status_headline(n)),
-        name = html_escape(&n.monitor_name),
-        mtype = html_escape(&n.monitor_type),
+        name = html_escape(&n.check_name),
+        mtype = html_escape(&n.check_type),
         target = html_escape(&n.target),
         status = n.status.to_uppercase(),
-        jobs = if n.job_count > 0 { n.job_count } else { 1 },
+        jobs = html_escape(&locations_line(n)),
+        checked_at = checked_at_utc(n.checked_at),
         url = run_url(n),
     )
 }
@@ -226,7 +412,7 @@ fn html_escape(s: &str) -> String {
 
 // ── Private-location staleness watcher ────────────────────────────────────────
 
-/// Ticks every 60s on alert_manager nodes. A private location whose registered
+/// Ticks every 60s on scheduler nodes. A private location whose registered
 /// agents have ALL gone stale (`O2_SYNTHETICS_AGENT_STALE_SECS`) while
 /// synthetics are assigned to it gets one "location down" notification, sent to
 /// the union of those synthetics' alert destinations. One-shot per down
@@ -234,9 +420,6 @@ fn html_escape(s: &str) -> String {
 /// Never-registered locations count as pending, not down.
 #[cfg(feature = "enterprise")]
 pub async fn location_staleness_watcher() {
-    use std::collections::HashSet;
-
-    let mut notified_down: HashSet<String> = HashSet::new();
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 
@@ -262,33 +445,46 @@ pub async fn location_staleness_watcher() {
                 .await
                 .unwrap_or_default();
             if !loc.enabled || agents.is_empty() {
-                notified_down.remove(&loc.id);
+                clear_down(&loc.id).await;
                 continue;
             }
             let any_live = agents.iter().any(|a| now - a.last_seen_at <= window_us);
             if any_live {
-                notified_down.remove(&loc.id);
-                continue;
-            }
-            if notified_down.contains(&loc.id) {
+                clear_down(&loc.id).await;
                 continue;
             }
 
             let conn = infra::db::ORM_CLIENT
                 .get_or_init(infra::db::connect_to_orm)
                 .await;
-            let checks = infra::table::synthetics_monitors::list_referencing_location(
-                conn, &org_id, &loc.id,
-            )
-            .await
-            .unwrap_or_default();
+            let checks =
+                infra::table::synthetics_checks::list_referencing_location(conn, &org_id, &loc.id)
+                    .await
+                    .unwrap_or_default();
             if checks.is_empty() {
                 // Nothing runs here — stay quiet, re-evaluate next tick.
                 continue;
             }
-            // Mark before dispatch so a location without destinations is still
-            // one-shot (no per-tick log spam / retry storm).
-            notified_down.insert(loc.id.clone());
+            // Claim before dispatch so a location without destinations is still
+            // one-shot (no per-tick log spam / retry storm), AND so that only one
+            // scheduler node speaks. This watcher runs on every scheduler node, so
+            // the suppression flag cannot live in this process's memory — N nodes
+            // would each believe they had not notified yet and send N pages for
+            // one outage. The CAS in `try_claim_down_notification` makes exactly
+            // one node the winner.
+            match infra::table::synthetics_locations::try_claim_down_notification(&loc.id, now)
+                .await
+            {
+                Ok(true) => {}
+                Ok(false) => continue, // another node is sending it
+                Err(e) => {
+                    log::error!(
+                        "[synthetics] staleness watcher: claim down notification for {}: {e}",
+                        loc.id
+                    );
+                    continue;
+                }
+            }
 
             let mut destinations: Vec<String> =
                 checks.iter().flat_map(|c| c.destinations.clone()).collect();
@@ -314,6 +510,192 @@ pub async fn location_staleness_watcher() {
             )
             .await;
         }
+    }
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checked_at_utc_formats_micros_as_readable_utc() {
+        // 1785201891 s → 2026-07-28 01:24:51 UTC
+        assert_eq!(
+            checked_at_utc(1_785_201_891_000_000),
+            "2026-07-28 01:24:51 UTC"
+        );
+    }
+
+    #[test]
+    fn checked_at_utc_keeps_second_precision() {
+        // Sub-second remainder is dropped, not rounded up.
+        assert_eq!(
+            checked_at_utc(1_785_201_891_999_999),
+            "2026-07-28 01:24:51 UTC"
+        );
+    }
+
+    #[test]
+    fn checked_at_utc_falls_back_to_the_raw_value_when_out_of_range() {
+        assert_eq!(checked_at_utc(i64::MAX), i64::MAX.to_string());
+    }
+
+    /// A firing notification for a 3-location check, two of them broken.
+    fn firing() -> CheckNotification {
+        CheckNotification {
+            org_id: "default".into(),
+            check_name: "EU1 Cloud Health Check".into(),
+            check_id: "abc123".into(),
+            check_type: "http".into(),
+            target: "https://example.com".into(),
+            destinations: vec![],
+            run_id: "run1".into(),
+            status: "failed".into(),
+            job_count: 3,
+            error: None,
+            checked_at: 1_785_000_000_000_000,
+            recovery: false,
+            consecutive_failures: 3,
+            flaky: false,
+            status_reason: None,
+            degraded: false,
+            failing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
+            passing_locations: vec!["aws-eu-central-1".into()],
+        }
+    }
+
+    /// The same check recovering: status is "passed", nothing is failing.
+    fn recovered() -> CheckNotification {
+        CheckNotification {
+            status: "passed".into(),
+            recovery: true,
+            consecutive_failures: 0,
+            failing_locations: vec![],
+            passing_locations: vec![
+                "aws-eu-central-1".into(),
+                "aws-us-east-1".into(),
+                "aws-us-west-1".into(),
+            ],
+            ..firing()
+        }
+    }
+
+    // ── 2324-a · the emoji must agree with the headline ────────────────────
+
+    #[test]
+    fn recovery_is_not_marked_as_an_outage() {
+        // The bug: status is "passed" on a recovery, so branching on the status
+        // string fell through to the 🔴 catch-all while the headline said
+        // "has recovered". In a busy channel that reads as a second outage.
+        let n = recovered();
+        assert_eq!(status_emoji(&n), "✅");
+        assert!(status_headline(&n).contains("has recovered"));
+    }
+
+    #[test]
+    fn emoji_and_headline_agree_on_every_branch() {
+        // The two are only correct together; this is the invariant the old
+        // signature could not express.
+        let cases: Vec<(CheckNotification, &str, &str)> = vec![
+            (recovered(), "✅", "has recovered"),
+            (
+                CheckNotification {
+                    degraded: true,
+                    status: "warning".into(),
+                    status_reason: Some("cert_expiring".into()),
+                    ..firing()
+                },
+                "🟡",
+                "certificate is expiring",
+            ),
+            (
+                CheckNotification {
+                    flaky: true,
+                    status: "warning".into(),
+                    ..firing()
+                },
+                "🔁",
+                "flaky",
+            ),
+            (firing(), "🔴", "is failing"),
+            (
+                CheckNotification {
+                    status: "error".into(),
+                    ..firing()
+                },
+                "⚠️",
+                "could not be checked",
+            ),
+        ];
+        for (n, emoji, headline_fragment) in cases {
+            assert_eq!(status_emoji(&n), emoji, "status={}", n.status);
+            assert!(
+                status_headline(&n).contains(headline_fragment),
+                "status={} headline={}",
+                n.status,
+                status_headline(&n)
+            );
+        }
+    }
+
+    #[test]
+    fn degraded_outranks_flaky_exactly_as_the_headline_does() {
+        // Both arrive as `warning`. The order matters: a degrading target needs
+        // action, a flaky one already fixed itself.
+        let n = CheckNotification {
+            degraded: true,
+            flaky: true,
+            status: "warning".into(),
+            ..firing()
+        };
+        assert_eq!(status_emoji(&n), "🟡");
+    }
+
+    // ── 2324-b · a recovery must be able to name its locations ─────────────
+
+    #[test]
+    fn full_recovery_names_the_locations_that_came_back() {
+        // The bug: failing_locations is empty by definition on a recovery, so
+        // this used to render the bare count "3".
+        let line = locations_line(&recovered());
+        assert!(line.contains("3 of 3 recovered"), "{line}");
+        assert!(line.contains("aws-us-east-1"), "{line}");
+    }
+
+    #[test]
+    fn partial_recovery_names_both_sides() {
+        // "2 of 3 recovered" alone would read as an all-clear.
+        let n = CheckNotification {
+            recovery: true,
+            status: "passed".into(),
+            passing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
+            failing_locations: vec!["aws-eu-central-1".into()],
+            ..firing()
+        };
+        let line = locations_line(&n);
+        assert!(line.contains("2 of 3 recovered"), "{line}");
+        assert!(line.contains("still failing: aws-eu-central-1"), "{line}");
+    }
+
+    #[test]
+    fn recovery_with_no_location_data_falls_back_to_the_count() {
+        // An older ack, or the query failed. Better a bare count than a lie.
+        let n = CheckNotification {
+            recovery: true,
+            passing_locations: vec![],
+            failing_locations: vec![],
+            ..recovered()
+        };
+        assert_eq!(locations_line(&n), "3");
+    }
+
+    #[test]
+    fn firing_still_names_only_what_is_broken() {
+        // The passing set exists now, but a firing message must not list it —
+        // the reader wants the outage, not the healthy regions.
+        let line = locations_line(&firing());
+        assert!(line.starts_with("2 of 3: "), "{line}");
+        assert!(!line.contains("aws-eu-central-1"), "{line}");
     }
 }
 
@@ -377,5 +759,16 @@ async fn notify_location_down(
                 log::error!("[synthetics] load dest={dest_name} org={org_id}: {e}");
             }
         }
+    }
+}
+
+/// Clears a location's down flag so a future outage notifies again.
+///
+/// Every scheduler node calls this on recovery; the underlying update is
+/// idempotent, so they cannot disagree.
+#[cfg(feature = "enterprise")]
+async fn clear_down(location_id: &str) {
+    if let Err(e) = infra::table::synthetics_locations::clear_down_notification(location_id).await {
+        log::error!("[synthetics] staleness watcher: clear down flag for {location_id}: {e}");
     }
 }

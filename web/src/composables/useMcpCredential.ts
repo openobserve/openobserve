@@ -22,7 +22,7 @@
 
 import { ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import service_accounts from "@/services/service_accounts";
 import { createRole, updateRole } from "@/services/iam";
 import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
@@ -42,7 +42,7 @@ export interface McpCredential {
 
 export function useMcpCredential() {
   const store = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
 
   const generating = ref(false);
   const error = ref("");
@@ -50,8 +50,7 @@ export function useMcpCredential() {
 
   /** rbac + service accounts must both be enabled for a read-only SA to exist. */
   const canGenerate = () =>
-    !!store.state.zoConfig?.rbac_enabled &&
-    (store.state.zoConfig?.service_account_enabled ?? true);
+    !!store.state.zoConfig?.rbac_enabled && (store.state.zoConfig?.service_account_enabled ?? true);
 
   const generate = async (): Promise<McpCredential | null> => {
     generating.value = true;
@@ -96,9 +95,7 @@ export function useMcpCredential() {
       return credential.value;
     } catch (err: any) {
       error.value =
-        err?.response?.data?.message ||
-        err?.message ||
-        t("ingestion.mcp.credential.error");
+        err?.response?.data?.message || err?.message || t("ingestion.mcp.credential.error");
       return null;
     } finally {
       generating.value = false;

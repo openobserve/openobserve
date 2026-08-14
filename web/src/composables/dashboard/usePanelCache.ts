@@ -39,11 +39,7 @@ const initDB = (): Promise<IDBDatabase> => {
 };
 
 // Helper function to generate cache key
-const generateCacheKey = (
-  folderId: string,
-  dashboardId: string,
-  panelId: string,
-): string => {
+const generateCacheKey = (folderId: string, dashboardId: string, panelId: string): string => {
   return `${folderId}:${dashboardId}:${panelId}`;
 };
 
@@ -74,9 +70,7 @@ window._o2_removeDashboardCache = async (): Promise<void> => {
 
 window._o2_getDashboardCache = async (): Promise<any> => {
   try {
-    const allRecords = await performTransaction("readonly", (store) =>
-      store.getAll(),
-    );
+    const allRecords = await performTransaction("readonly", (store) => store.getAll());
     const cache: any = {};
 
     allRecords.forEach((record: any) => {
@@ -103,17 +97,9 @@ window._o2_getDashboardCache = async (): Promise<any> => {
 /**
  * Use Panel Cache Data on a per dashboard basis in combination with folderid, dashboard id and panel id
  */
-export const usePanelCache = (
-  folderId: string,
-  dashboardId: string,
-  panelId: string,
-) => {
+export const usePanelCache = (folderId: string, dashboardId: string, panelId: string) => {
   if (!(folderId && dashboardId && panelId)) {
-    const savePanelCache = async (
-      _key: any,
-      _data: any,
-      _cacheTimeRange: any,
-    ): Promise<void> => {
+    const savePanelCache = async (_key: any, _data: any, _cacheTimeRange: any): Promise<void> => {
       // do nothing
     };
 
@@ -129,11 +115,7 @@ export const usePanelCache = (
 
   const cacheKey = generateCacheKey(folderId, dashboardId, panelId);
 
-  const savePanelCache = async (
-    key: any,
-    data: any,
-    cacheTimeRange: any,
-  ): Promise<void> => {
+  const savePanelCache = async (key: any, data: any, cacheTimeRange: any): Promise<void> => {
     try {
       const cacheData = {
         id: cacheKey,
@@ -154,9 +136,7 @@ export const usePanelCache = (
 
   const getPanelCache = async (): Promise<any> => {
     try {
-      const result = await performTransaction("readonly", (store) =>
-        store.get(cacheKey),
-      );
+      const result = await performTransaction("readonly", (store) => store.get(cacheKey));
 
       if (result) {
         return {

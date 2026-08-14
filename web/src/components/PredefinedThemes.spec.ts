@@ -18,11 +18,7 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import PredefinedThemes from "./PredefinedThemes.vue";
 import i18n from "@/locales";
 import { nextTick, ref } from "vue";
-import {
-  CUSTOM_THEME_NAME,
-  getDefaultTheme,
-  themeNameSlug,
-} from "@/constants/themes";
+import { CUSTOM_THEME_NAME, getDefaultTheme, themeNameSlug } from "@/constants/themes";
 
 // The default theme (O2 Signature) provides the fallback colors.
 const DEFAULT_THEME = getDefaultTheme();
@@ -50,9 +46,7 @@ vi.mock("@/composables/usePredefinedThemes", () => ({
 vi.mock("@/utils/theme", () => ({
   applyThemeColors: vi.fn(),
   // Pass-through: run the mode switch synchronously (no view transition in tests)
-  switchThemeMode: vi.fn((_mode: string, applyChanges: () => void) =>
-    applyChanges(),
-  ),
+  switchThemeMode: vi.fn((_mode: string, applyChanges: () => void) => applyChanges()),
   hexToRgba: vi.fn((hex: string, opacity: number) => {
     return `rgba(0, 0, 0, ${opacity / 10})`;
   }),
@@ -132,20 +126,13 @@ const createWrapper = (props = {}, options = {}) => {
           name: "ODialog",
           template:
             '<div data-test-stub="o-dialog" :data-title="title"><span data-test-stub="o-dialog-title">{{ title }}</span><slot name="header"></slot><slot></slot><slot name="footer"></slot><button data-test-stub="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primaryButtonLabel }}</button><button data-test-stub="o-dialog-neutral" @click="$emit(\'click:neutral\')">{{ neutralButtonLabel }}</button></div>',
-          props: [
-            "open",
-            "size",
-            "title",
-            "primaryButtonLabel",
-            "neutralButtonLabel",
-          ],
+          props: ["open", "size", "title", "primaryButtonLabel", "neutralButtonLabel"],
           emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
         },
         // OToggleGroup — replaces the old OTabs segmented control
         OToggleGroup: {
           name: "OToggleGroup",
-          template:
-            '<div data-test-stub="o-toggle-group"><slot></slot></div>',
+          template: '<div data-test-stub="o-toggle-group"><slot></slot></div>',
           props: ["modelValue", "type"],
           emits: ["update:modelValue"],
         },
@@ -239,20 +226,14 @@ describe("PredefinedThemes", () => {
       const wrapper = createWrapper();
 
       // New segmented control uses OToggleGroupItem with data-test attrs
-      expect(
-        wrapper.find('[data-test="predefined-themes-tab-light"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="predefined-themes-tab-dark"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="predefined-themes-tab-light"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="predefined-themes-tab-dark"]').exists()).toBe(true);
     });
 
     it("should render the OToggleGroup container", () => {
       const wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test-stub="o-toggle-group"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test-stub="o-toggle-group"]').exists()).toBe(true);
     });
 
     it("should initialize with light mode tab active", () => {
@@ -274,9 +255,7 @@ describe("PredefinedThemes", () => {
     it("includes O2 Crimson Ink as a predefined theme with semanticColors", () => {
       const wrapper = createWrapper();
       const { vm } = wrapper;
-      const o2Theme = (vm as any).predefinedThemes.find(
-        (t: any) => t.name === "O2 Crimson Ink",
-      );
+      const o2Theme = (vm as any).predefinedThemes.find((t: any) => t.name === "O2 Crimson Ink");
 
       expect(o2Theme).toBeDefined();
       expect(o2Theme.light.themeColor).toBe("#E11D48");
@@ -290,9 +269,7 @@ describe("PredefinedThemes", () => {
       const wrapper = createWrapper();
       const { vm } = wrapper;
       const { applyThemeColors } = await import("@/utils/theme");
-      const o2Theme = (vm as any).predefinedThemes.find(
-        (t: any) => t.name === "O2 Crimson Ink",
-      );
+      const o2Theme = (vm as any).predefinedThemes.find((t: any) => t.name === "O2 Crimson Ink");
 
       (vm as any).applyTheme(o2Theme, "light");
 
@@ -311,9 +288,7 @@ describe("PredefinedThemes", () => {
       const wrapper = createWrapper();
       const { vm } = wrapper;
       const { applyThemeColors } = await import("@/utils/theme");
-      const oceanTheme = (vm as any).predefinedThemes.find(
-        (t: any) => t.name === "O2 Pulse",
-      );
+      const oceanTheme = (vm as any).predefinedThemes.find((t: any) => t.name === "O2 Pulse");
 
       (vm as any).applyTheme(oceanTheme, "light");
 
@@ -344,9 +319,7 @@ describe("PredefinedThemes", () => {
 
       // Each predefined theme should have a row button in the active (light) mode
       const pulseSlug = themeNameSlug("O2 Pulse");
-      const pulseRow = wrapper.find(
-        `[data-test="predefined-themes-apply-btn-light-${pulseSlug}"]`,
-      );
+      const pulseRow = wrapper.find(`[data-test="predefined-themes-apply-btn-light-${pulseSlug}"]`);
 
       expect(pulseRow.exists()).toBe(true);
     });
@@ -355,9 +328,7 @@ describe("PredefinedThemes", () => {
       const wrapper = createWrapper();
 
       const slug = themeNameSlug("O2 Crimson Ink");
-      const row = wrapper.find(
-        `[data-test="predefined-themes-apply-btn-light-${slug}"]`,
-      );
+      const row = wrapper.find(`[data-test="predefined-themes-apply-btn-light-${slug}"]`);
 
       expect(row.exists()).toBe(true);
     });
@@ -365,11 +336,9 @@ describe("PredefinedThemes", () => {
     it("renders custom color row for active mode", () => {
       const wrapper = createWrapper();
 
-      expect(
-        wrapper
-          .find('[data-test="predefined-themes-card-light-custom-color"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="predefined-themes-card-light-custom-color"]').exists()).toBe(
+        true,
+      );
     });
 
     it("shows hint text 'Pick any brand hex' when custom theme is not applied", () => {
@@ -437,11 +406,9 @@ describe("PredefinedThemes", () => {
       await nextTick();
 
       const slug = themeNameSlug("O2 Pulse");
-      expect(
-        wrapper
-          .find(`[data-test="predefined-themes-apply-btn-dark-${slug}"]`)
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find(`[data-test="predefined-themes-apply-btn-dark-${slug}"]`).exists()).toBe(
+        true,
+      );
     });
 
     it("renders dark-mode custom-color row when activeTab switches to dark", async () => {
@@ -451,11 +418,9 @@ describe("PredefinedThemes", () => {
       vm.activeTab = "dark";
       await nextTick();
 
-      expect(
-        wrapper
-          .find('[data-test="predefined-themes-card-dark-custom-color"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="predefined-themes-card-dark-custom-color"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -467,9 +432,7 @@ describe("PredefinedThemes", () => {
       // Every predefined theme should have a clickable row
       for (const theme of vm.predefinedThemes) {
         const slug = themeNameSlug(theme.name);
-        const row = wrapper.find(
-          `[data-test="predefined-themes-apply-btn-light-${slug}"]`,
-        );
+        const row = wrapper.find(`[data-test="predefined-themes-apply-btn-light-${slug}"]`);
         expect(row.exists()).toBe(true);
       }
     });
@@ -482,42 +445,30 @@ describe("PredefinedThemes", () => {
       vm.applyTheme(theme, "light");
       await nextTick();
 
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        "appliedLightThemeName",
-        theme.name,
-      );
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith("appliedLightThemeName", theme.name);
     });
 
     it("clicking the O2 Pulse theme row calls localStorage.setItem with its name", async () => {
       const wrapper = createWrapper();
 
       const slug = themeNameSlug("O2 Pulse");
-      const row = wrapper.find(
-        `[data-test="predefined-themes-apply-btn-light-${slug}"]`,
-      );
+      const row = wrapper.find(`[data-test="predefined-themes-apply-btn-light-${slug}"]`);
       expect(row.exists()).toBe(true);
 
       await row.trigger("click");
       await nextTick();
 
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        "appliedLightThemeName",
-        "O2 Pulse",
-      );
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith("appliedLightThemeName", "O2 Pulse");
     });
 
     it("clicking a theme row calls applyThemeColors with the correct color", async () => {
       const wrapper = createWrapper();
       const { applyThemeColors } = await import("@/utils/theme");
       const vm = wrapper.vm as any;
-      const pulseTheme = vm.predefinedThemes.find(
-        (t: any) => t.name === "O2 Pulse",
-      );
+      const pulseTheme = vm.predefinedThemes.find((t: any) => t.name === "O2 Pulse");
 
       const slug = themeNameSlug("O2 Pulse");
-      const row = wrapper.find(
-        `[data-test="predefined-themes-apply-btn-light-${slug}"]`,
-      );
+      const row = wrapper.find(`[data-test="predefined-themes-apply-btn-light-${slug}"]`);
       await row.trigger("click");
       await nextTick();
 
@@ -538,9 +489,7 @@ describe("PredefinedThemes", () => {
       vm.appliedLightThemeName = "O2 Pulse";
       await nextTick();
 
-      const badge = wrapper.find(
-        `[data-test="predefined-themes-applied-badge-light-${slug}"]`,
-      );
+      const badge = wrapper.find(`[data-test="predefined-themes-applied-badge-light-${slug}"]`);
       expect(badge.exists()).toBe(true);
       expect(badge.text()).toContain("Applied");
     });
@@ -566,9 +515,7 @@ describe("PredefinedThemes", () => {
 
       vm.appliedLightThemeName = "O2 Signature";
 
-      const theme = vm.predefinedThemes.find(
-        (t: any) => t.name === "O2 Signature",
-      );
+      const theme = vm.predefinedThemes.find((t: any) => t.name === "O2 Signature");
       expect(vm.isThemeApplied(theme, "light")).toBe(true);
     });
 
@@ -578,9 +525,7 @@ describe("PredefinedThemes", () => {
 
       vm.appliedLightThemeName = "O2 Pulse";
 
-      const theme = vm.predefinedThemes.find(
-        (t: any) => t.name === "O2 Signature",
-      );
+      const theme = vm.predefinedThemes.find((t: any) => t.name === "O2 Signature");
       expect(vm.isThemeApplied(theme, "light")).toBe(false);
     });
   });
@@ -626,9 +571,7 @@ describe("PredefinedThemes", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      const row = wrapper.find(
-        '[data-test="predefined-themes-card-light-custom-color"]',
-      );
+      const row = wrapper.find('[data-test="predefined-themes-card-light-custom-color"]');
       expect(row.exists()).toBe(true);
 
       await row.trigger("click");
@@ -645,9 +588,7 @@ describe("PredefinedThemes", () => {
       vm.activeTab = "dark";
       await nextTick();
 
-      const row = wrapper.find(
-        '[data-test="predefined-themes-card-dark-custom-color"]',
-      );
+      const row = wrapper.find('[data-test="predefined-themes-card-dark-custom-color"]');
       expect(row.exists()).toBe(true);
 
       await row.trigger("click");
@@ -689,10 +630,7 @@ describe("PredefinedThemes", () => {
       vm.applyCustomTheme("light");
       await nextTick();
 
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        "customLightColor",
-        "#FF0000",
-      );
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith("customLightColor", "#FF0000");
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
         "appliedLightThemeName",
         CUSTOM_THEME_NAME,
@@ -837,9 +775,7 @@ describe("PredefinedThemes", () => {
     it("reset button is rendered in the drawer header-right slot", () => {
       const wrapper = createWrapper();
 
-      const resetBtn = wrapper.find(
-        '[data-test="predefined-themes-reset-btn"]',
-      );
+      const resetBtn = wrapper.find('[data-test="predefined-themes-reset-btn"]');
       expect(resetBtn.exists()).toBe(true);
     });
 
@@ -850,9 +786,7 @@ describe("PredefinedThemes", () => {
       (wrapper.vm as any).appliedLightThemeName = "O2 Pulse";
       await nextTick();
 
-      const resetBtn = wrapper.find(
-        '[data-test="predefined-themes-reset-btn"]',
-      );
+      const resetBtn = wrapper.find('[data-test="predefined-themes-reset-btn"]');
       expect(resetBtn.exists()).toBe(true);
 
       await resetBtn.trigger("click");
@@ -1012,19 +946,14 @@ describe("PredefinedThemes", () => {
       vm.applyTheme(theme, "dark");
       await nextTick();
 
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        "appliedDarkThemeName",
-        "O2 Pulse",
-      );
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith("appliedDarkThemeName", "O2 Pulse");
     });
 
     it("sets appliedDarkThemeName ref when applying a dark theme", async () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      const theme = vm.predefinedThemes.find(
-        (t: any) => t.name === "O2 Horizon",
-      );
+      const theme = vm.predefinedThemes.find((t: any) => t.name === "O2 Horizon");
       vm.applyTheme(theme, "dark");
       await nextTick();
 
@@ -1035,9 +964,7 @@ describe("PredefinedThemes", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      const theme = vm.predefinedThemes.find(
-        (t: any) => t.name === "O2 Beacon",
-      );
+      const theme = vm.predefinedThemes.find((t: any) => t.name === "O2 Beacon");
       vm.applyTheme(theme, "dark");
       await nextTick();
 
@@ -1048,9 +975,7 @@ describe("PredefinedThemes", () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 
-      const theme = vm.predefinedThemes.find(
-        (t: any) => t.name === "O2 Crimson Ink",
-      );
+      const theme = vm.predefinedThemes.find((t: any) => t.name === "O2 Crimson Ink");
       vm.applyTheme(theme, "dark");
       await nextTick();
 
@@ -1071,17 +996,13 @@ describe("PredefinedThemes", () => {
       vm.applyTheme(theme, "light");
       await nextTick();
 
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith(
-        "lightSemanticColors",
-      );
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith("lightSemanticColors");
     });
   });
 
   describe("Watch handlers — isOpen composable", () => {
     it("syncs dialogOpen when isOpen ref changes", async () => {
-      const { usePredefinedThemes } = await import(
-        "@/composables/usePredefinedThemes"
-      );
+      const { usePredefinedThemes } = await import("@/composables/usePredefinedThemes");
 
       // Start with isOpen=false so dialogOpen starts false, then flip to true
       const reactiveIsOpen = ref(false);
@@ -1110,9 +1031,7 @@ describe("PredefinedThemes", () => {
     });
 
     it("syncs activeTab from store theme when isOpen becomes true", async () => {
-      const { usePredefinedThemes } = await import(
-        "@/composables/usePredefinedThemes"
-      );
+      const { usePredefinedThemes } = await import("@/composables/usePredefinedThemes");
 
       mockStore.state.theme = "dark";
       const reactiveIsOpen = ref(false);
@@ -1137,9 +1056,7 @@ describe("PredefinedThemes", () => {
   describe("Watch handlers — reactive Vuex store", () => {
     // These tests use the real Vuex store so watchers on store.state actually fire.
     const createWrapperWithRealStore = async () => {
-      const { default: realStore } = await import(
-        "@/test/unit/helpers/store"
-      );
+      const { default: realStore } = await import("@/test/unit/helpers/store");
       return {
         store: realStore,
         wrapper: mount(PredefinedThemes, {
@@ -1169,28 +1086,29 @@ describe("PredefinedThemes", () => {
               OToggleGroupItem: {
                 name: "OToggleGroupItem",
                 template:
-                  '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', value)"><slot></slot></button>',
+                  "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click', value)\"><slot></slot></button>",
                 props: ["value", "iconLeft"],
                 emits: ["click"],
                 inheritAttrs: false,
               },
               OBadge: {
                 name: "OBadge",
-                template: '<span :data-test="$attrs[\'data-test\']"><slot></slot></span>',
+                template: "<span :data-test=\"$attrs['data-test']\"><slot></slot></span>",
                 props: ["variant", "size", "icon"],
                 inheritAttrs: false,
               },
               OButton: {
-                template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot></slot></button>',
+                template:
+                  "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\"><slot></slot></button>",
                 props: ["variant", "size"],
                 emits: ["click"],
                 inheritAttrs: false,
               },
-              OCardSection: { template: '<div><slot></slot></div>' },
-              OSeparator: { template: '<hr />' },
-              OIcon: { template: '<i></i>', props: ["name", "size"] },
+              OCardSection: { template: "<div><slot></slot></div>" },
+              OSeparator: { template: "<hr />" },
+              OIcon: { template: "<i></i>", props: ["name", "size"] },
               OColor: {
-                template: '<div></div>',
+                template: "<div></div>",
                 props: ["modelValue"],
                 emits: ["update:modelValue"],
               },

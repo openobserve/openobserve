@@ -15,7 +15,9 @@
 
 use config::{DEFAULT_ORG, cluster::LOCAL_NODE, spawn_pausable_job};
 use db;
-use openobserve_core::{alerts, self_reporting, users};
+#[cfg(feature = "cloud")]
+use openobserve_core::self_reporting;
+use openobserve_core::{alerts, users};
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
@@ -25,23 +27,10 @@ use {
 
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
-#[cfg(feature = "enterprise")]
-fn eval_scheduler_fetch_size(total: usize, max_rows: usize) -> anyhow::Result<i64> {
-    if total > max_rows {
-        return Err(anyhow::anyhow!(
-            "online eval scheduler interval has {total} rows, exceeding the safe limit of {max_rows}"
-        ));
-    }
-    let fetch_size = total
-        .checked_add(1)
-        .ok_or_else(|| anyhow::anyhow!("online eval scheduler result count exceeds search size"))?;
-    i64::try_from(fetch_size)
-        .map_err(|_| anyhow::anyhow!("online eval scheduler result count exceeds search size"))
-}
-
+mod alert_eval_ledger_reaper;
+mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
-mod alert_manager;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -51,6 +40,8 @@ pub(crate) mod files;
 mod flatten_compactor;
 #[cfg(feature = "enterprise")]
 mod incidents;
+#[cfg(feature = "enterprise")]
+mod llm_review_reconciliation;
 pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]
@@ -60,10 +51,29 @@ pub(crate) mod pipeline;
 mod pipeline_error_cleanup;
 mod promql;
 mod promql_self_consume;
+mod scheduler;
 #[cfg(feature = "enterprise")]
 mod service_graph;
 mod session_cleanup;
+mod slo_maintenance;
 mod stats;
+
+use enrichment_data::enrichment_table::geoip::wait_for_initialization;
+use openobserve_core::org_cleanup::StreamDataCleanup;
+
+struct CompactionStreamDataCleanup;
+
+#[async_trait::async_trait]
+impl StreamDataCleanup for CompactionStreamDataCleanup {
+    async fn delete_stream_data(
+        &self,
+        org_id: &str,
+        stream_type: config::meta::stream::StreamType,
+        stream_name: &str,
+    ) -> Result<(), anyhow::Error> {
+        compaction::retention::delete_all(org_id, stream_type, stream_name).await
+    }
+}
 
 #[cfg(feature = "enterprise")]
 async fn patch_sre_readonly_alerts_incidents() {
@@ -180,25 +190,21 @@ async fn enforce_usage_stream_retention() {
         META_ORG_ID,
         meta::{self_reporting::usage::USAGE_STREAM, stream::StreamType},
     };
-    if let Some(mut s) =
-        infra::schema::get_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs).await
+    if let Some(s) = infra::schema::get_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs).await
         && s.data_retention < 32
     {
+        // local editable copy; persisted via save_stream_settings below
+        let mut s = (*s).clone();
         s.data_retention = 32;
-        openobserve_core::stream::save_stream_settings(
-            META_ORG_ID,
-            USAGE_STREAM,
-            StreamType::Logs,
-            s,
-        )
-        .await
-        .unwrap(); //unwrap is intentional, we should panic if this fails
+        stream::save_stream_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs, s)
+            .await
+            .unwrap(); //unwrap is intentional, we should panic if this fails
     }
 }
 
 #[cfg(feature = "cloud")]
 async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
-    if !LOCAL_NODE.is_alert_manager() {
+    if !LOCAL_NODE.is_scheduler() {
         return Ok(None);
     }
     use infra::{cluster::get_node_by_uuid, dist_lock};
@@ -347,7 +353,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     if !cfg.common.mmdb_disable_download
-        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager())
+        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_scheduler())
     {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(mmdb_downloader::run());
@@ -357,7 +363,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // This ensures the stale job recovery task starts even if this ingester
     // never receives a URL enrichment event. Critical for distributed deployments.
     if LOCAL_NODE.is_ingester() {
-        openobserve_core::enrichment_table::init_url_processor();
+        enrichment_data::enrichment_table::init_url_processor();
     }
 
     db::user::cache().await.expect("user cache failed");
@@ -399,10 +405,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
     if audit::run_publish_job().is_none() {
-        log::error!("Failed to run audit publish");
+        log::info!("Audit is disabled, skipping audit publish job");
     };
     #[cfg(feature = "cloud")]
-    tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
+    {
+        tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
+        tokio::task::spawn(o2_enterprise::enterprise::cloud::org_invites::watch());
+    }
 
     #[cfg(feature = "enterprise")]
     {
@@ -477,7 +486,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
     }
 
-    tokio::task::spawn(self_reporting::run());
+    tokio::task::spawn(usage_reporting::run());
 
     // cache short_urls
     tokio::task::spawn(db::short_url::watch());
@@ -486,7 +495,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("short url cache failed");
 
     // initialize metadata watcher
-    tokio::task::spawn(openobserve_core::schema_watcher::watch());
+    let schema_watcher = schema::create_watcher()?;
+    tokio::task::spawn(schema_watcher);
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
@@ -496,6 +506,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
     tokio::task::spawn(db::alerts::alert::watch());
+    // Synthetics config caches (checks, locations, probe tokens, agents) live on
+    // every node, so every node must hear invalidations — including routers,
+    // which serve the probe auth path.
+    tokio::task::spawn(infra::coordinator::synthetics::watch());
     // org_settings_watch already started above for all nodes including routers
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
     // processing node (ingester or compactor) so their local cache stays in sync with
@@ -510,12 +524,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // pipeline not used on compactors
-    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(openobserve_core::pipeline::store::watch());
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_scheduler() {
+        tokio::task::spawn(openobserve_core::pipeline::db::watch());
     } else {
         // On nodes that do not run the heavy pipeline watch (e.g. routers), still maintain
         // PIPELINE_ID_TO_ORG so HTTP handlers can perform cross-org IDOR checks in O(1).
-        tokio::task::spawn(openobserve_core::pipeline::store::watch_id_to_org());
+        tokio::task::spawn(openobserve_core::pipeline::db::watch_id_to_org());
     }
 
     // Dashboard id->org cache: maintained on every node type so HTTP handlers (e.g.
@@ -526,8 +540,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
         tokio::task::spawn(db::session::watch());
     }
-    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(openobserve_core::enrichment_table::runtime::watch());
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_scheduler() {
+        tokio::task::spawn(enrichment_data::enrichment_table::runtime::watch());
     }
 
     tokio::task::yield_now().await;
@@ -557,7 +571,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if LOCAL_NODE.is_querier() {
             tokio::task::spawn(async {
                 if let Err(e) =
-                    openobserve_core::model_pricing::sync_built_in_from_github(false).await
+                    openobserve_builtins::model_pricing::sync_built_in_from_github(false).await
                 {
                     log::error!("[model_pricing] initial built-in sync failed: {e}");
                 }
@@ -569,7 +583,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 loop {
                     tokio::time::sleep(interval).await;
                     if let Err(e) =
-                        openobserve_core::model_pricing::sync_built_in_from_github(false).await
+                        openobserve_builtins::model_pricing::sync_built_in_from_github(false).await
                     {
                         log::error!("[model_pricing] periodic built-in sync failed: {e}");
                     }
@@ -582,6 +596,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     alerts::templates::ensure_system_templates()
         .await
         .expect("system templates initialization failed");
+
+    // Give every org without a default_alert_template pointer one, pointing
+    // at the just-seeded o2_default_content. Best-effort: the compiled-in
+    // fallback (design §4.4) covers any org this misses.
+    if let Err(e) = alerts::notifications::org_default::backfill_org_default_templates().await {
+        log::error!("[TEMPLATES] default_alert_template backfill failed: {e}");
+    }
 
     // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()
@@ -610,7 +631,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_scheduler() {
         db::session::cache()
             .await
             .expect("user session cache failed");
@@ -645,7 +666,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
     // Register enterprise callbacks before durable consumers and scheduler startup.
-    // HTTP/background work can land on querier, ingester, or alert_manager nodes,
+    // HTTP/background work can land on querier, ingester, or scheduler nodes,
     // so callbacks must be available everywhere before consumers start.
     #[cfg(feature = "enterprise")]
     {
@@ -683,6 +704,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
+        let llm_eval_config =
+            &o2_enterprise::enterprise::common::config::get_config().llm_eval_config;
+        infra::table::online_eval_jobs::init_completion_window_defaults(
+            llm_eval_config.trace_idle_timeout_secs,
+            llm_eval_config.trace_max_age_secs,
+            llm_eval_config.session_idle_timeout_secs,
+            llm_eval_config.session_max_age_secs,
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_evaluator_trace_exporter(
             |org_id, traces, node_idx| {
                 Box::pin(async move {
@@ -702,7 +732,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::register_search_executor(
-            |org_id, stream_type, sql, start_time, end_time| {
+            |org_id, stream_type, sql, start_time, end_time, truncate_over_limit| {
                 Box::pin(async move {
                     let count_req = config::meta::search::Request {
                         query: config::meta::search::Query {
@@ -726,7 +756,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             total: count_response.total,
                             is_partial: count_response.is_partial,
                             function_error: count_response.function_error,
-                            hits: Vec::new(),
+                            ..Default::default()
                         });
                     }
 
@@ -734,12 +764,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     if total == 0 {
                         return Ok(Default::default());
                     }
-                    let max_rows = o2_enterprise::enterprise::common::config::get_config()
-                        .llm_eval_config
-                        .max_buffer_size
-                        .saturating_mul(10)
-                        .max(10_001);
-                    let size = eval_scheduler_fetch_size(total, max_rows)?;
+                    let max_rows = o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::EVAL_DETECTION_MAX_ROWS;
+                    let over_limit = total > max_rows;
+                    if over_limit && !truncate_over_limit {
+                        // The scheduler splits the window in half rather than
+                        // fetching an oversized result set.
+                        return Ok(o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
+                            total,
+                            over_limit: true,
+                            ..Default::default()
+                        });
+                    }
+                    // total <= max_rows here; fetch one extra row so a count
+                    // that grew after the count query fails closed downstream.
+                    let size = (if over_limit { max_rows } else { total + 1 }) as i64;
                     let data_req = config::meta::search::Request {
                         query: config::meta::search::Query {
                             sql,
@@ -760,6 +798,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                                 total,
                                 is_partial: response.is_partial,
                                 function_error: response.function_error,
+                                over_limit,
                             }
                         })
                         .map_err(|e| anyhow::anyhow!(e))
@@ -889,9 +928,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
             |org_id, anomaly_id, anomaly_name, success, error_msg, start_us, end_us| {
                 Box::pin(async move {
                     use config::meta::self_reporting::usage::{
-                        TriggerData, TriggerDataStatus, TriggerDataType,
+                        RunOutcome, TriggerData, TriggerDataType,
                     };
-                    openobserve_core::self_reporting::publish_triggers_usage(TriggerData {
+                    usage_reporting::publish_triggers_usage(TriggerData {
                         _timestamp: start_us,
                         org: org_id,
                         module: TriggerDataType::AnomalyDetectionTraining,
@@ -900,9 +939,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         is_realtime: false,
                         is_silenced: false,
                         status: if success {
-                            TriggerDataStatus::Completed
+                            RunOutcome::Succeeded
                         } else {
-                            TriggerDataStatus::Failed
+                            RunOutcome::Error
                         },
                         start_time: start_us,
                         end_time: end_us,
@@ -917,10 +956,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
     }
 
-    // The scheduler and startup recovery only run on alert_manager nodes.
+    // The scheduler and startup recovery only run on scheduler nodes.
     // Skip entirely when anomaly detection is disabled — no training and no detection.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_alert_manager()
+    if LOCAL_NODE.is_scheduler()
         && !o2_enterprise::enterprise::common::config::get_config()
             .anomaly_detection
             .disabled
@@ -936,7 +975,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_alert_manager() {
+    if LOCAL_NODE.is_scheduler() {
         o2_enterprise::enterprise::synthetics::init().await;
         if get_o2_config().synthetics.enabled {
             tokio::task::spawn(crate::service::synthetics::location_staleness_watcher());
@@ -944,7 +983,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
     tokio::task::spawn(metrics::run());
     let _ = promql::run();
-    tokio::task::spawn(alert_manager::run());
+    tokio::task::spawn(scheduler::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(alert_grouping::process_expired_batches());
     tokio::task::spawn(infra::cache::file_downloader::run());
@@ -1041,6 +1080,23 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(pipeline::run());
     pipeline_error_cleanup::run();
     session_cleanup::run();
+    // Multi-alert group lifecycle (M-7): retires groups the evaluation path
+    // can never retire on its own, because a vanished group produces no
+    // observation to act on.
+    alert_group_reaper::run();
+    // Retention for the alert availability ledger (S-16). Not job-cluster
+    // gated: retention deletes do not replicate, so every region reaps its own
+    // copy or it grows without bound.
+    alert_eval_ledger_reaper::run();
+    // Reconciliation is what makes the rolling window actually roll: the
+    // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
+    // climbs past what its window can hold. Also releases expired budget
+    // residuals (S-14c).
+    slo_maintenance::run();
+    // `_llm_scores` is authoritative for Workbench reviews. Repair the narrow
+    // failure window where ingestion succeeded but QueueItem status did not.
+    #[cfg(feature = "enterprise")]
+    llm_review_reconciliation::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
@@ -1051,12 +1107,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // to fetch tasks and a per-task CAS guards execution; the promotion sweep uses
         // an atomic status CAS — so multiple compactors remain safe, just less
         // contended. (The org_status cache watch loop stays on every node — see below.)
-        tokio::task::spawn(openobserve_core::org_cleanup::run());
+        tokio::task::spawn(openobserve_core::org_cleanup::run(std::sync::Arc::new(
+            CompactionStreamDataCleanup,
+        )));
         tokio::task::spawn(openobserve_core::org_cleanup::run_promotion_scheduler());
     }
 
     // load metrics disk cache
-    tokio::task::spawn(openobserve_core::promql::search::init());
+    tokio::task::spawn(promql_service::search::init());
 
     // start pipeline data retention
     #[cfg(feature = "enterprise")]
@@ -1065,10 +1123,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::keys::cache::cache());
         tokio::task::spawn(db::keys::watch::watch());
         tokio::task::spawn(org_storage::run());
-        tokio::task::spawn(openobserve_core::org_storage_providers::watch::watch());
+        tokio::task::spawn(openobserve_org_storage::watch::watch());
         tokio::task::spawn(openobserve_core::workflows::runtime::clean());
         tokio::task::spawn(db::workflows::watch());
-        if LOCAL_NODE.is_alert_manager() {
+        if LOCAL_NODE.is_scheduler() {
             tokio::task::spawn(openobserve_core::workflows::runtime::watch_workflow_triggers());
         }
     }
@@ -1109,8 +1167,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("AWS Marketplace integration init failed");
 
-        // run these cloud jobs only in alert manager
-        if LOCAL_NODE.is_alert_manager() {
+        // run these cloud jobs only on scheduler nodes
+        if LOCAL_NODE.is_scheduler() {
             cloud::start();
         }
     }
@@ -1136,7 +1194,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::license::watch());
     }
 
-    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_scheduler() {
         return Ok(());
     }
 
@@ -1145,11 +1203,11 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("Failed to clean up old JSON format enrichment tables");
 
-    openobserve_core::enrichment_table::cache::cache_enrichment_tables()
+    enrichment_data::enrichment_table::cache::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards
-    openobserve_core::pipeline::store::cache()
+    openobserve_core::pipeline::db::cache(wait_for_initialization)
         .await
         .expect("Pipeline cache failed");
 
@@ -1159,20 +1217,4 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Dashboard id->org cache failed");
 
     Ok(())
-}
-
-#[cfg(all(test, feature = "enterprise"))]
-mod tests {
-    use super::eval_scheduler_fetch_size;
-
-    #[test]
-    fn eval_scheduler_fetches_one_row_past_the_count() {
-        assert_eq!(eval_scheduler_fetch_size(10_001, 100_000).unwrap(), 10_002);
-    }
-
-    #[test]
-    fn eval_scheduler_rejects_intervals_above_the_safe_limit() {
-        let error = eval_scheduler_fetch_size(100_001, 100_000).unwrap_err();
-        assert!(error.to_string().contains("exceeding the safe limit"));
-    }
 }

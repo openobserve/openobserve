@@ -52,9 +52,7 @@ describe("service_accounts service", () => {
 
       await service_accounts.list("test-org");
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/test-org/service_accounts"
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/test-org/service_accounts");
     });
 
     it("should handle different org identifiers", async () => {
@@ -63,18 +61,14 @@ describe("service_accounts service", () => {
       const orgs = ["org1", "prod-org", "staging_env"];
       for (const org of orgs) {
         await service_accounts.list(org);
-        expect(mockHttpInstance.get).toHaveBeenCalledWith(
-          `/api/${org}/service_accounts`
-        );
+        expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org}/service_accounts`);
       }
     });
 
     it("should propagate errors", async () => {
       mockHttpInstance.get.mockRejectedValue(new Error("Unauthorized"));
 
-      await expect(service_accounts.list("test-org")).rejects.toThrow(
-        "Unauthorized"
-      );
+      await expect(service_accounts.list("test-org")).rejects.toThrow("Unauthorized");
     });
   });
 
@@ -85,10 +79,7 @@ describe("service_accounts service", () => {
 
       await service_accounts.create(data, "test-org");
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/test-org/service_accounts",
-        data
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/test-org/service_accounts", data);
     });
 
     it("should handle complex data payloads", async () => {
@@ -102,20 +93,15 @@ describe("service_accounts service", () => {
 
       await service_accounts.create(data, "prod-org");
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/prod-org/service_accounts",
-        data
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/prod-org/service_accounts", data);
     });
 
     it("should propagate errors", async () => {
-      mockHttpInstance.post.mockRejectedValue(
-        new Error("Email already exists")
-      );
+      mockHttpInstance.post.mockRejectedValue(new Error("Email already exists"));
 
-      await expect(
-        service_accounts.create({ name: "dup" }, "test-org")
-      ).rejects.toThrow("Email already exists");
+      await expect(service_accounts.create({ name: "dup" }, "test-org")).rejects.toThrow(
+        "Email already exists",
+      );
     });
   });
 
@@ -128,7 +114,7 @@ describe("service_accounts service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/test-org/service_accounts/svc@example.com",
-        data
+        data,
       );
     });
 
@@ -144,7 +130,7 @@ describe("service_accounts service", () => {
         await service_accounts.update(update, "test-org", "sa@example.com");
         expect(mockHttpInstance.put).toHaveBeenCalledWith(
           "/api/test-org/service_accounts/sa@example.com",
-          update
+          update,
         );
       }
     });
@@ -152,9 +138,9 @@ describe("service_accounts service", () => {
     it("should propagate errors", async () => {
       mockHttpInstance.put.mockRejectedValue(new Error("Not found"));
 
-      await expect(
-        service_accounts.update({}, "test-org", "ghost@example.com")
-      ).rejects.toThrow("Not found");
+      await expect(service_accounts.update({}, "test-org", "ghost@example.com")).rejects.toThrow(
+        "Not found",
+      );
     });
   });
 
@@ -165,7 +151,7 @@ describe("service_accounts service", () => {
       await service_accounts.delete("test-org", "svc@example.com");
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        "/api/test-org/service_accounts/svc@example.com"
+        "/api/test-org/service_accounts/svc@example.com",
       );
     });
 
@@ -175,16 +161,16 @@ describe("service_accounts service", () => {
       await service_accounts.delete("prod-org", "bot@company.com");
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        "/api/prod-org/service_accounts/bot@company.com"
+        "/api/prod-org/service_accounts/bot@company.com",
       );
     });
 
     it("should propagate errors", async () => {
       mockHttpInstance.delete.mockRejectedValue(new Error("Forbidden"));
 
-      await expect(
-        service_accounts.delete("test-org", "locked@example.com")
-      ).rejects.toThrow("Forbidden");
+      await expect(service_accounts.delete("test-org", "locked@example.com")).rejects.toThrow(
+        "Forbidden",
+      );
     });
   });
 
@@ -197,10 +183,9 @@ describe("service_accounts service", () => {
 
       await service_accounts.bulkDelete("test-org", data);
 
-      expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        "/api/test-org/service_accounts/bulk",
-        { data }
-      );
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith("/api/test-org/service_accounts/bulk", {
+        data,
+      });
     });
 
     it("should handle empty data", async () => {
@@ -208,17 +193,16 @@ describe("service_accounts service", () => {
 
       await service_accounts.bulkDelete("test-org", { emails: [] });
 
-      expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        "/api/test-org/service_accounts/bulk",
-        { data: { emails: [] } }
-      );
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith("/api/test-org/service_accounts/bulk", {
+        data: { emails: [] },
+      });
     });
 
     it("should propagate errors", async () => {
       mockHttpInstance.delete.mockRejectedValue(new Error("Partial failure"));
 
       await expect(
-        service_accounts.bulkDelete("test-org", { emails: ["sa@example.com"] })
+        service_accounts.bulkDelete("test-org", { emails: ["sa@example.com"] }),
       ).rejects.toThrow("Partial failure");
     });
   });
@@ -231,7 +215,7 @@ describe("service_accounts service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/test-org/service_accounts/svc@example.com?rotateToken=true",
-        {}
+        {},
       );
     });
 
@@ -255,7 +239,7 @@ describe("service_accounts service", () => {
         await service_accounts.refresh_token(org, email);
         expect(mockHttpInstance.put).toHaveBeenCalledWith(
           `/api/${org}/service_accounts/${email}?rotateToken=true`,
-          {}
+          {},
         );
       }
     });
@@ -263,9 +247,9 @@ describe("service_accounts service", () => {
     it("should propagate errors", async () => {
       mockHttpInstance.put.mockRejectedValue(new Error("Token rotation failed"));
 
-      await expect(
-        service_accounts.refresh_token("test-org", "svc@example.com")
-      ).rejects.toThrow("Token rotation failed");
+      await expect(service_accounts.refresh_token("test-org", "svc@example.com")).rejects.toThrow(
+        "Token rotation failed",
+      );
     });
   });
 
@@ -286,19 +270,14 @@ describe("service_accounts service", () => {
       await service_accounts.refresh_token("test-org", email);
       await service_accounts.delete("test-org", email);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/test-org/service_accounts",
-        data
-      );
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/test-org/service_accounts"
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/test-org/service_accounts", data);
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/test-org/service_accounts");
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/test-org/service_accounts/${email}?rotateToken=true`,
-        {}
+        {},
       );
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/test-org/service_accounts/${email}`
+        `/api/test-org/service_accounts/${email}`,
       );
     });
   });

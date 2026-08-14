@@ -19,15 +19,12 @@ import { createRouter, createWebHistory } from "vue-router";
 import i18n from "@/locales";
 import Error404 from "./Error404.vue";
 
-
 describe("Error404", () => {
   let wrapper: VueWrapper;
 
   const router = createRouter({
     history: createWebHistory(),
-    routes: [
-      { path: "/", name: "home", component: { template: "<div>Home</div>" } },
-    ],
+    routes: [{ path: "/", name: "home", component: { template: "<div>Home</div>" } }],
   });
 
   beforeEach(() => {

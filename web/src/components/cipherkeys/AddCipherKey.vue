@@ -22,23 +22,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-      <template #title>
-        <span data-test="add-template-title">
-          {{ isUpdatingCipherKey ? t("cipherKey.update") : t("cipherKey.add") }}
-        </span>
-      </template>
+    <template #title>
+      <span data-test="add-template-title">
+        {{ isUpdatingCipherKey ? t("cipherKey.update") : t("cipherKey.add") }}
+      </span>
+    </template>
     <div class="create-cipher-form">
       <!-- One OForm owns every field across the stepper (the children render
            OForm* controls connected by name); a single Zod schema gates the
            whole form. Inline form → the footer Save is type="submit" (Enter
            works natively) and its spinner is form-driven via v-slot. -->
       <OForm :form="form" v-slot="{ isSubmitting }">
-        <div class="overflow-auto" style="height: calc(100vh -  var(--navbar-height) - 155px)">
+        <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+        <div class="overflow-auto" style="height: calc(100vh - var(--navbar-height) - 155px)">
           <!-- Constrain the whole form to a sensible reading width on wide screens
                while staying fluid below the breakpoint. -->
           <div class="w-full max-w-3xl">
             <div class="flex">
-              <div class="w-1/3 o2-input flex mx-3 mt-3 mb-4">
+              <div class="o2-input mx-3 mt-3 mb-4 flex w-1/3">
                 <OFormInput
                   data-test="add-cipher-key-name-input"
                   name="name"
@@ -52,18 +53,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div style="height: calc(100vh -  var(--navbar-height) - 300px);">
+            <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+            <div style="height: calc(100vh - var(--navbar-height) - 300px)">
               <OStepper
                 v-model="step"
                 orientation="vertical"
                 animated
                 navigable
-                class="mx-3 p-0 h-full"
+                class="mx-3 h-full p-0"
               >
                 <OStep
                   data-test="cipher-key-key-store-detils-step"
                   :name="1"
-                  :title="step1Title"
+                  :title="raw(step1Title)"
                   icon="edit"
                   :done="step > 1"
                 >
@@ -81,17 +83,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tabindex="0"
                       />
                     </div>
-                    <add-openobserve-type
+                    <AddOpenobserveType
                       v-if="storeType === 'local'"
                       class="mt-2"
                       :is-update="isUpdatingCipherKey"
                     />
-                    <add-akeyless-type
+                    <AddAkeylessType
                       v-else-if="storeType === 'akeyless'"
                       class="mt-2"
                       :is-update="isUpdatingCipherKey"
                     />
-                    <div class="flex gap-2 mt-4">
+                    <div class="mt-4 flex gap-2">
                       <OButton
                         data-test="add-report-step1-continue-btn"
                         variant="primary"
@@ -99,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="isSubmitting"
                         @click="continueToStep2"
                       >
-                        Continue
+                        {{ t("cipherKey.continue") }}
                       </OButton>
                     </div>
                   </div>
@@ -112,8 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="add"
                   :done="step > 2"
                 >
-                  <add-encryption-mechanism />
-                  <div class="flex gap-2 mt-4">
+                  <AddEncryptionMechanism />
+                  <div class="mt-4 flex gap-2">
                     <OButton
                       data-test="add-cipher-key-step2-back-btn"
                       variant="outline"
@@ -121,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disabled="isSubmitting"
                       @click="step = 1"
                     >
-                      {{ t('common.back') }}
+                      {{ t("common.back") }}
                     </OButton>
                   </div>
                 </OStep>
@@ -130,8 +132,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="mx-2">
-          <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default sticky"
-            style="bottom: 0px; z-index: 2"
+          <div
+            class="border-border-default sticky bottom-0 z-2 flex w-full justify-end gap-2 border-t px-2 py-4"
           >
             <OButton
               data-test="add-cipher-key-cancel-btn"
@@ -140,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="isSubmitting"
               @click="openCancelDialog"
             >
-              {{ t('common.cancel') }}
+              {{ t("common.cancel") }}
             </OButton>
             <OButton
               data-test="add-cipher-key-save-btn"
@@ -149,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="submit"
               :loading="isSubmitting"
             >
-              {{ t('common.save') }}
+              {{ t("common.save") }}
             </OButton>
           </div>
         </div>
@@ -166,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import { ref, computed, onMounted, onActivated } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import AddOpenobserveType from "@/components/cipherkeys/AddOpenobserveType.vue";
@@ -190,7 +192,7 @@ import {
 } from "@/components/cipherkeys/AddCipherKey.schema";
 
 const emit = defineEmits(["cancel:hideform"]);
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 
@@ -204,8 +206,8 @@ const pendingContinue = ref(false);
 const originalData = ref("");
 
 const cipherKeyTypes = [
-  { label: "OpenObserve", value: "local" },
-  { label: "Akeyless", value: "akeyless" },
+  { label: raw("OpenObserve"), value: "local" },
+  { label: raw("Akeyless"), value: "akeyless" },
 ];
 
 const dialog = ref({
@@ -215,8 +217,7 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const getTypeLabel = (type: string) =>
-  cipherKeyTypes.find((item) => item.value === type)?.label;
+const getTypeLabel = (type: string) => cipherKeyTypes.find((item) => item.value === type)?.label;
 
 // The parent OWNS the form (headless useOForm): it renders <OForm>, so it sits
 // above the provide boundary and can't inject — yet it needs store.type
@@ -235,9 +236,7 @@ const form = useOForm<AddCipherKeyForm>({
   onSubmit: (value) => onFormSubmit(value),
 });
 
-const storeType = form.useStore(
-  (s: any) => s?.values?.key?.store?.type ?? "local",
-);
+const storeType = form.useStore((s: any) => s?.values?.key?.store?.type ?? "local");
 
 const step1Title = computed(
   () => `${t("cipherKey.step1")} (Type: ${getTypeLabel(storeType.value)})`,
@@ -247,11 +246,7 @@ const step1Title = computed(
 // omits keeps its schema default (used for edit prefill).
 function mergeObjects(base: any, updates: any) {
   for (const key in updates) {
-    if (
-      updates[key] !== null &&
-      typeof updates[key] === "object" &&
-      !Array.isArray(updates[key])
-    ) {
+    if (updates[key] !== null && typeof updates[key] === "object" && !Array.isArray(updates[key])) {
       base[key] = mergeObjects(base[key] || {}, updates[key]);
     } else {
       base[key] = updates[key];
@@ -265,32 +260,23 @@ const setupTemplateData = () => {
     isUpdatingCipherKey.value = true;
     const name = String(router.currentRoute.value.query.name || "");
     if (name === "") {
-      toast({ variant: "error", message: "Invalid cipher key name" });
+      toast({ variant: "error", message: t("toastMessages.cipherkeys.invalidCipherKeyName") });
       emit("cancel:hideform");
       return;
     }
-    CipherKeysService.get_by_name(
-      store.state.selectedOrganization.identifier,
-      name,
-    )
+    CipherKeysService.get_by_name(store.state.selectedOrganization.identifier, name)
       .then((response) => {
         // :default-values is read once at mount; re-seed via reset now the
         // record has arrived.
-        const record = mergeObjects(
-          addCipherKeyDefaults(),
-          response.data,
-        ) as AddCipherKeyForm;
+        const record = mergeObjects(addCipherKeyDefaults(), response.data) as AddCipherKeyForm;
         form.reset(record);
-        originalData.value = JSON.stringify(
-          form.state.values ?? record,
-        );
+        originalData.value = JSON.stringify(form.state.values ?? record);
       })
       .catch((error) => {
         if (error.status != 403) {
           toast({
             variant: "error",
-            message:
-              error.response?.data?.message || "Error fetching cipher key.",
+            message: error.response?.data?.message || "Error fetching cipher key.",
           });
         }
       });
@@ -300,9 +286,7 @@ const setupTemplateData = () => {
 onActivated(() => setupTemplateData());
 onMounted(() => {
   // Baseline for the cancel diff; edit mode re-snapshots after the record loads.
-  originalData.value = JSON.stringify(
-    form.state.values ?? addCipherKeyDefaults(),
-  );
+  originalData.value = JSON.stringify(form.state.values ?? addCipherKeyDefaults());
   setupTemplateData();
 });
 
@@ -335,7 +319,7 @@ const onFormSubmit = async (value: AddCipherKeyForm) => {
 const createCipherKey = async (value: AddCipherKeyForm) => {
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while processing your request...",
+    message: t("toastMessages.cipherkeys.pleaseWaitWhileProcessingYourRequest"),
     timeout: 0,
   });
   try {
@@ -345,12 +329,15 @@ const createCipherKey = async (value: AddCipherKeyForm) => {
     // `isUpdate` is a UI flag, not a form field — merged in here outside the
     // schema. The backend ignores it (KeyAddRequest deserializes only `name` +
     // `key`, no deny_unknown_fields).
-    await CipherKeysService.create(
-      store.state.selectedOrganization.identifier,
-      { ...value, isUpdate: isUpdatingCipherKey.value } as any,
-    );
+    await CipherKeysService.create(store.state.selectedOrganization.identifier, {
+      ...value,
+      isUpdate: isUpdatingCipherKey.value,
+    } as any);
     dismiss();
-    toast({ variant: "success", message: "Cipher key created successfully" });
+    toast({
+      variant: "success",
+      message: t("toastMessages.cipherkeys.cipherKeyCreatedSuccessfully"),
+    });
     emit("cancel:hideform");
   } catch (error: any) {
     dismiss();
@@ -363,13 +350,13 @@ const createCipherKey = async (value: AddCipherKeyForm) => {
 const updateCipherKey = async (value: AddCipherKeyForm) => {
   const current = JSON.stringify(form.state.values ?? value);
   if (current === originalData.value) {
-    toast({ variant: "success", message: "No changes detected" });
+    toast({ variant: "success", message: t("toastMessages.cipherkeys.noChangesDetected") });
     emit("cancel:hideform");
     return;
   }
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while processing your request...",
+    message: t("toastMessages.cipherkeys.pleaseWaitWhileProcessingYourRequest"),
     timeout: 0,
   });
   try {
@@ -381,7 +368,10 @@ const updateCipherKey = async (value: AddCipherKeyForm) => {
       value.name,
     );
     dismiss();
-    toast({ variant: "success", message: "Cipher key updated successfully" });
+    toast({
+      variant: "success",
+      message: t("toastMessages.cipherkeys.cipherKeyUpdatedSuccessfully"),
+    });
     emit("cancel:hideform");
   } catch (error: any) {
     dismiss();

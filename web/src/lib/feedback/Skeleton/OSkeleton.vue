@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { SkeletonProps } from "./OSkeleton.types";
 import { computed, useAttrs } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<SkeletonProps>(), {
   type: "rect",
@@ -33,9 +36,7 @@ const callerClass = computed(() => {
 const setsWidth = computed(() =>
   /(?:^|\s)-?(?:w-|size-|flex-1|flex-auto|grow|basis-)/.test(callerClass.value),
 );
-const setsHeight = computed(() =>
-  /(?:^|\s)-?(?:h-|size-)/.test(callerClass.value),
-);
+const setsHeight = computed(() => /(?:^|\s)-?(?:h-|size-)/.test(callerClass.value));
 
 const shapeClasses = computed<string[]>(() => {
   switch (props.type ?? "rect") {
@@ -70,7 +71,7 @@ const classes = computed(() => [
   <span
     :class="classes"
     role="status"
-    aria-label="Loading"
+    :aria-label="t('components.skeleton.loading')"
     aria-live="polite"
     aria-busy="true"
   />
@@ -86,17 +87,21 @@ const classes = computed(() => [
   inset: 0;
   background: linear-gradient(
     90deg,
-    transparent        0%,
-    transparent       30%,
+    transparent 0%,
+    transparent 30%,
     var(--color-skeleton-shimmer) 50%,
-    transparent       70%,
-    transparent      100%
+    transparent 70%,
+    transparent 100%
   );
   animation: skeleton-shimmer 1.8s ease-in-out infinite;
 }
 
 @keyframes skeleton-shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 </style>

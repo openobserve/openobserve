@@ -19,6 +19,9 @@
 // testRun.result shape the canvas badges + step drawer read.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import i18nInstance from "@/locales";
+
+const t = (i18nInstance.global as any).t;
 
 vi.mock("@/services/workflows", () => ({
   default: { getWorkflowRun: vi.fn(), testWorkflow: vi.fn() },
@@ -47,6 +50,10 @@ import useWorkflowCanvas, {
   workflowObj,
   loadWorkflowRun,
   executeTestRun,
+  serializeWorkflow,
+  nodeTestInput,
+  nodeTestOutputBranches,
+  currentTriggerKind,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const triggerNode = () => ({
@@ -56,12 +63,8 @@ const triggerNode = () => ({
   data: { label: "t1", node_type: "workflow_trigger" },
 });
 
-const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<
-  typeof vi.fn
->;
-const mockTest = workflowService.testWorkflow as unknown as ReturnType<
-  typeof vi.fn
->;
+const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<typeof vi.fn>;
+const mockTest = workflowService.testWorkflow as unknown as ReturnType<typeof vi.fn>;
 
 describe("loadWorkflowRun — history run response mapping", () => {
   beforeEach(() => {
@@ -79,12 +82,16 @@ describe("loadWorkflowRun — history run response mapping", () => {
     workflowObj.testRun.result = null;
   });
 
-  it("maps errors.data (array) to a node-keyed map and node_map to nodeInputs", async () => {
+  it("maps errors.data (array) to a node-keyed map and input_map to the inputs map", async () => {
     const envelope = [{ meta: { alert_name: "t" }, data: [{ a: 1 }] }];
     mockRun.mockResolvedValue({
       data: {
         errors: { run_id: "r1", data: [{ node_id: "n2", error: ["boom"] }] },
-        data: { complete: envelope, node_map: { n2: envelope } },
+        // input_map = per-node input for ALL nodes (same shape as a Test run)
+        data: {
+          input_map: { n1: envelope, n2: envelope, n3: envelope },
+          error_node_map: { n2: envelope },
+        },
       },
     });
 
@@ -96,20 +103,28 @@ describe("loadWorkflowRun — history run response mapping", () => {
     expect(res.runId).toBe("r1");
     // array -> keyed map, in the { error_count, errors: [[msg]] } badge shape
     expect(res.errors.n2).toEqual({ error_count: 1, errors: [["boom"]] });
-    // per-node input carried through verbatim (the {meta,data} envelope)
-    expect(res.nodeInputs.n2).toEqual(envelope);
-    expect(res.fullInput).toEqual(envelope);
+    // per-node input stored under `inputs` (drives Input + derived Output + badges)
+    expect(res.inputs).toEqual({ n1: envelope, n2: envelope, n3: envelope });
     // every node counts as "ran"; n3 is downstream of the errored n2 -> blocked
     expect(res.ranNodeIds).toEqual(["n1", "n2", "n3"]);
     expect(res.blockedNodeIds).toContain("n3");
     expect(res.blockedNodeIds).not.toContain("n2");
   });
 
+  it("falls back to error_node_map for older runs that lack input_map", async () => {
+    const envelope = [{ meta: {}, data: [{ a: 1 }] }];
+    mockRun.mockResolvedValue({
+      data: { errors: { data: [] }, data: { error_node_map: { n2: envelope } } },
+    });
+    await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r1b" });
+    expect((workflowObj.testRun.result as any).inputs).toEqual({ n2: envelope });
+  });
+
   it("normalizes a non-array error field into a single-message list", async () => {
     mockRun.mockResolvedValue({
       data: {
         errors: { data: [{ node_id: "n2", error: "single" }] },
-        data: { node_map: {} },
+        data: { error_node_map: {} },
       },
     });
     await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r2" });
@@ -121,7 +136,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
 
   it("handles a clean run (no errors) with empty maps", async () => {
     mockRun.mockResolvedValue({
-      data: { errors: { data: [] }, data: { node_map: {} } },
+      data: { errors: { data: [] }, data: { error_node_map: {} } },
     });
     const r = await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r3" });
     expect(r.ok).toBe(true);
@@ -144,50 +159,44 @@ describe("loadWorkflowRun — history run response mapping", () => {
               { node_id: "deleted-node", error: ["gone"] },
             ],
           },
-          data: { node_map: {} },
+          data: { error_node_map: {} },
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r1" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "deleted-node",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["deleted-node"]);
     });
 
-    it("also flags a ghost referenced only by node_map (no error)", async () => {
+    it("also flags a ghost referenced only by error_node_map (no error)", async () => {
       mockRun.mockResolvedValue({
         data: {
           errors: { data: [] },
-          data: { node_map: { n1: [], "old-node": [] } },
+          data: { error_node_map: { n1: [], "old-node": [] } },
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r2" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "old-node",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["old-node"]);
     });
 
     it("is empty when the graph still matches the run", async () => {
       mockRun.mockResolvedValue({
         data: {
           errors: { data: [{ node_id: "n2", error: ["boom"] }] },
-          data: { node_map: { n1: [], n3: [] } },
+          data: { error_node_map: { n1: [], n3: [] } },
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r3" });
       expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([]);
     });
 
-    it("does not double-report a ghost referenced by BOTH errors and node_map", async () => {
+    it("does not double-report a ghost referenced by BOTH errors and error_node_map", async () => {
       mockRun.mockResolvedValue({
         data: {
           errors: { data: [{ node_id: "zombie", error: ["x"] }] },
-          data: { node_map: { zombie: [] } },
+          data: { error_node_map: { zombie: [] } },
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r4" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "zombie",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["zombie"]);
     });
   });
 
@@ -205,7 +214,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
 // (edge added/removed) should dirty the workflow — otherwise a second Test wrongly
 // asks to save unchanged work.
 describe("onEdgesChange — dirty flag only on structural changes", () => {
-  const { onEdgesChange } = useWorkflowCanvas();
+  const { onEdgesChange } = useWorkflowCanvas(t);
 
   beforeEach(() => {
     workflowObj.isEditWorkflow = true;
@@ -270,6 +279,19 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(res.blockedNodeIds).toEqual([]);
   });
 
+  it("sends the whole in-memory graph (test-without-saving), not just an id", async () => {
+    mockTest.mockResolvedValue({ data: { errors: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f" });
+    const arg = mockTest.mock.calls[0][0];
+    expect(arg.org_identifier).toBe("o");
+    expect(arg.from_node).toBe("f");
+    // no top-level workflow id — the graph rides in `workflow`
+    expect(arg.id).toBeUndefined();
+    expect(arg.workflow.id).toBe("wf1");
+    expect(arg.workflow.nodes.map((n: any) => n.id).sort()).toEqual(["d", "f", "t", "x"]);
+    expect(arg.workflow.edges).toHaveLength(2);
+  });
+
   it("replay from a mid-graph node marks that node + everything downstream", async () => {
     mockTest.mockResolvedValue({ data: { errors: {} } });
     await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f" });
@@ -312,9 +334,162 @@ describe("executeTestRun — ran-node scope + badge state", () => {
   });
 });
 
+// nodeTestInput / nodeTestOutputBranches derive per-node Input and Output from the
+// backend `inputs` map. Output on an edge == the child's input (single-incoming
+// tree), so these two helpers power the whole step-drawer.
+describe("nodeTestInput + nodeTestOutputBranches — per-node I/O derivation", () => {
+  beforeEach(() => {
+    // trigger(t) -> function(f) -> destination(d);  t also -> condition(c) (fan-out)
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [
+        { id: "t", data: { node_type: "workflow_trigger" } },
+        { id: "f", data: { node_type: "function", name: "fn" } },
+        { id: "d", data: { node_type: "destination", destination_id: "sink" } },
+        { id: "c", data: { node_type: "condition" } },
+      ],
+      edges: [
+        { source: "t", target: "f" },
+        { source: "t", target: "c" },
+        { source: "f", target: "d" },
+      ],
+    } as any;
+    workflowObj.testRun.result = {
+      errors: {},
+      inputs: { t: [{ x: 0 }], f: [{ x: 1 }], d: [{ x: 2 }] }, // c got nothing
+      ranNodeIds: ["t", "f", "c", "d"],
+      blockedNodeIds: [],
+    } as any;
+  });
+
+  it("nodeTestInput returns the records a node received, null when absent", () => {
+    expect(nodeTestInput("f")).toEqual([{ x: 1 }]);
+    expect(nodeTestInput("c")).toBeNull(); // filtered out — not in inputs
+    expect(nodeTestInput("missing")).toBeNull();
+  });
+
+  it("nodeTestInput is null when there is no run", () => {
+    workflowObj.testRun.result = null as any;
+    expect(nodeTestInput("f")).toBeNull();
+  });
+
+  it("nodeTestOutputBranches: a node's output == each child's input", () => {
+    const branches = nodeTestOutputBranches("f");
+    expect(branches).toHaveLength(1);
+    expect(branches[0]).toMatchObject({ targetId: "d", nodeType: "destination" });
+    expect(branches[0].records).toEqual([{ x: 2 }]); // == inputs[d]
+  });
+
+  it("fan-out yields one branch per outgoing edge; a filtered branch has null records", () => {
+    const branches = nodeTestOutputBranches("t");
+    expect(branches.map((b) => b.targetId).sort()).toEqual(["c", "f"]);
+    const toC = branches.find((b) => b.targetId === "c")!;
+    const toF = branches.find((b) => b.targetId === "f")!;
+    expect(toC.records).toBeNull(); // c received nothing
+    expect(toF.records).toEqual([{ x: 1 }]);
+  });
+
+  it("a terminal (destination) has no outgoing edges → no branches", () => {
+    expect(nodeTestOutputBranches("d")).toEqual([]);
+  });
+});
+
+// executeTestRun stores the per-node inputs map so the drawer/badges can read it.
+describe("executeTestRun — stores the per-node inputs map", () => {
+  it("keeps res.data.inputs on testRun.result", async () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [{ id: "t", data: { node_type: "workflow_trigger" } }],
+      edges: [],
+    } as any;
+    mockTest.mockResolvedValue({ data: { errors: {}, inputs: { t: [{ x: 1 }] } } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }] });
+    expect((workflowObj.testRun.result as any).inputs).toEqual({ t: [{ x: 1 }] });
+  });
+
+  it("defaults inputs to {} when the response omits it", async () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [{ id: "t", data: { node_type: "workflow_trigger" } }],
+      edges: [],
+    } as any;
+    mockTest.mockResolvedValue({ data: { errors: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }] });
+    expect((workflowObj.testRun.result as any).inputs).toEqual({});
+  });
+});
+
+// serializeWorkflow builds the backend `Workflow` object shared by both the
+// create/update payload and the Test run — so testing without saving sends the
+// exact same graph the editor would persist.
+describe("serializeWorkflow — backend Workflow shape", () => {
+  it("emits every required field and only the persisted node fields", () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf9",
+      name: "  padded name  ",
+      description: "desc",
+      enabled: false,
+      created_at: 10,
+      updated_at: 20,
+      nodes: [
+        {
+          id: "t",
+          type: "input",
+          position: { x: 5, y: 6 },
+          data: { node_type: "workflow_trigger", trigger_kind: "alert_fired" },
+          // VueFlow runtime state that must be dropped:
+          dimensions: { width: 1, height: 1 },
+          selected: true,
+          dragging: false,
+        },
+      ],
+      edges: [{ source: "t", target: "f" }],
+    } as any;
+
+    const wf = serializeWorkflow();
+    expect(Object.keys(wf).sort()).toEqual([
+      "created_at",
+      "created_by",
+      "description",
+      "edges",
+      "enabled",
+      "id",
+      "name",
+      "nodes",
+      "org_id",
+      "updated_at",
+    ]);
+    expect(wf.name).toBe("padded name"); // trimmed
+    expect(wf.enabled).toBe(false);
+    expect(wf.org_id).toBe(""); // backend overrides
+    expect(wf.created_by).toBe("");
+
+    const node = wf.nodes[0];
+    // persisted fields only — runtime state stripped
+    expect(Object.keys(node).sort()).toEqual(["data", "id", "io_type", "meta", "position"]);
+    expect(node.io_type).toBe("input");
+    // trigger kind carried in meta (NodeData::WorkflowTrigger is a unit variant)
+    expect(node.meta.trigger_kind).toBe("alert_fired");
+    expect(node.dimensions).toBeUndefined();
+    expect(node.selected).toBeUndefined();
+  });
+
+  it("defaults enabled to true and id/name to empty for a fresh graph", () => {
+    workflowObj.currentSelectedWorkflow = { nodes: [], edges: [] } as any;
+    const wf = serializeWorkflow();
+    expect(wf.enabled).toBe(true);
+    expect(wf.id).toBe("");
+    expect(wf.name).toBe("");
+    expect(wf.nodes).toEqual([]);
+    expect(wf.edges).toEqual([]);
+  });
+});
 
 describe("trigger-first guard — palette adds are blocked until a trigger exists", () => {
-  const { addNodeToEnd, onDrop } = useWorkflowCanvas();
+  const { addNodeToEnd, onDrop } = useWorkflowCanvas(t);
 
   beforeEach(() => {
     mockToast.mockClear();
@@ -326,9 +501,7 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
 
   it("addNodeToEnd (palette click) is blocked with a toast when no trigger exists", () => {
     addNodeToEnd("condition");
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "warning" }),
-    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
     expect(workflowObj.dialog.show).toBe(false);
     expect(workflowObj.currentSelectedNodeData).toBeNull();
   });
@@ -336,9 +509,7 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
   it("onDrop (palette drag) is blocked with a toast when no trigger exists", () => {
     workflowObj.draggedNodeType = "function";
     onDrop({ clientX: 10, clientY: 10 } as any);
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "warning" }),
-    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
     expect(workflowObj.dialog.show).toBe(false);
     expect(workflowObj.currentSelectedNodeData).toBeNull();
   });
@@ -358,5 +529,45 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
     expect(mockToast).not.toHaveBeenCalled();
     expect(workflowObj.dialog.show).toBe(true);
     expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("function");
+  });
+});
+
+describe("currentTriggerKind", () => {
+  const setNodes = (nodes: any[]) => {
+    workflowObj.currentSelectedWorkflow = { nodes } as any;
+  };
+
+  it("returns undefined when there is no trigger node", () => {
+    setNodes([{ id: "c1", data: { node_type: "condition" } }]);
+    expect(currentTriggerKind()).toBeUndefined();
+  });
+
+  it("reads the kind from a fresh trigger node (data.trigger_kind)", () => {
+    setNodes([
+      { id: "t1", data: { node_type: "workflow_trigger", trigger_kind: "incident_event" } },
+    ]);
+    expect(currentTriggerKind()).toBe("incident_event");
+  });
+
+  it("falls back to meta.trigger_kind (rehydrated from the API)", () => {
+    setNodes([
+      {
+        id: "t1",
+        data: { node_type: "workflow_trigger" },
+        meta: { trigger_kind: "alert_fired" },
+      },
+    ]);
+    expect(currentTriggerKind()).toBe("alert_fired");
+  });
+
+  it("prefers data.trigger_kind over meta.trigger_kind", () => {
+    setNodes([
+      {
+        id: "t1",
+        data: { node_type: "workflow_trigger", trigger_kind: "incident_event" },
+        meta: { trigger_kind: "alert_fired" },
+      },
+    ]);
+    expect(currentTriggerKind()).toBe("incident_event");
   });
 });

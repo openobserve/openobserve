@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   useRoute: () => ({ query: {}, params: {} }),
@@ -55,8 +54,7 @@ async function mountComp(props: Record<string, any> = {}) {
 }
 
 // Form helpers — name/description/stream_type/stream_name are form-owned now.
-const setField = (w: any, name: string, val: unknown) =>
-  w.vm.form.setFieldValue(name, val);
+const setField = (w: any, name: string, val: unknown) => w.vm.form.setFieldValue(name, val);
 const formVals = (w: any) => w.vm.form.state.values;
 const submitForm = async (w: any) => {
   await w.vm.form.handleSubmit();
@@ -82,58 +80,42 @@ describe("StreamSelection - rendering", () => {
 
   it("renders data-test='add-pipeline-section-title'", async () => {
     wrapper = await mountComp();
-    expect(
-      wrapper.find('[data-test="add-pipeline-section-title"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-pipeline-section-title"]').exists()).toBe(true);
   });
 
   it("renders data-test='add-pipeline-name-input'", async () => {
     wrapper = await mountComp();
-    expect(
-      wrapper.find('[data-test="add-pipeline-name-input"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-pipeline-name-input"]').exists()).toBe(true);
   });
 
   it("renders data-test='add-pipeline-description-input'", async () => {
     wrapper = await mountComp();
-    expect(
-      wrapper.find('[data-test="add-pipeline-description-input"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-pipeline-description-input"]').exists()).toBe(true);
   });
 
   it("renders data-test='add-pipeline-stream-type-select'", async () => {
     wrapper = await mountComp();
-    expect(
-      wrapper.find('[data-test="add-pipeline-stream-type-select"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-pipeline-stream-type-select"]').exists()).toBe(true);
   });
 
   it("renders data-test='add-pipeline-stream-select'", async () => {
     wrapper = await mountComp();
-    expect(
-      wrapper.find('[data-test="add-pipeline-stream-select"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-pipeline-stream-select"]').exists()).toBe(true);
   });
 
   it("renders data-test='add-pipeline-submit-btn'", async () => {
     wrapper = await mountComp();
-    expect(
-      wrapper.find('[data-test="add-pipeline-submit-btn"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-pipeline-submit-btn"]').exists()).toBe(true);
   });
 
   it("renders data-test='add-pipeline-cancel-btn'", async () => {
     wrapper = await mountComp();
-    expect(
-      wrapper.find('[data-test="add-pipeline-cancel-btn"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-pipeline-cancel-btn"]').exists()).toBe(true);
   });
 
   it("renders data-test='add-pipeline-close-dialog-btn'", async () => {
     wrapper = await mountComp();
-    expect(
-      wrapper.find('[data-test="add-pipeline-close-dialog-btn"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-pipeline-close-dialog-btn"]').exists()).toBe(true);
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
-import { h } from "vue";
+import { h, nextTick, ref } from "vue";
 import OToggleGroup from "./OToggleGroup.vue";
 import OToggleGroupItem from "./OToggleGroupItem.vue";
 
@@ -12,11 +12,7 @@ function mountGroup(
     props: groupProps,
     slots: {
       default: items.map((item) =>
-        h(
-          OToggleGroupItem,
-          { value: item.value, disabled: item.disabled },
-          () => item.label,
-        ),
+        h(OToggleGroupItem, { value: item.value, disabled: item.disabled }, () => item.label),
       ),
     },
   });
@@ -64,9 +60,7 @@ describe("OToggleGroup", () => {
   // --- Controlled value ---
 
   it("emits update:modelValue when an item is clicked", async () => {
-    const wrapper = mountGroup({ modelValue: "" }, [
-      { value: "left", label: "Left" },
-    ]);
+    const wrapper = mountGroup({ modelValue: "" }, [{ value: "left", label: "Left" }]);
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("update:modelValue")).toBeDefined();
   });
@@ -199,10 +193,7 @@ describe("OToggleGroup", () => {
     });
 
     it("uses the vertical midpoint when orientation is vertical", async () => {
-      const wrapper = mountGroup(
-        { reorderable: true, orientation: "vertical" },
-        ITEMS,
-      );
+      const wrapper = mountGroup({ reorderable: true, orientation: "vertical" }, ITEMS);
       // Item spans y 0..20. x is deliberately past the horizontal midpoint to
       // prove the vertical axis is the one being consulted.
       await dragOnto(wrapper, "a", "c", { clientX: 90, clientY: 2 });
@@ -233,6 +224,88 @@ describe("OToggleGroup", () => {
 
       await dragged.trigger("dragend");
       expect(itemAt(wrapper, "a").classes()).not.toContain("opacity-40");
+    });
+  });
+
+  // --- Sliding selection indicator ---
+
+  describe("sliding indicator", () => {
+    const ITEM_WIDTH = 100;
+
+    /**
+     * jsdom lays nothing out: every rect is zero-sized and `offsetParent` is
+     * always null, so `measure()` would bail. Give the track and its items a
+     * synthetic box where each item's left edge is derived from its *current*
+     * position in the DOM — that is what makes a reorder observable here.
+     */
+    function stubGeometry(track: HTMLElement) {
+      const rect = (left: number, width: number) =>
+        ({
+          left,
+          top: 0,
+          width,
+          height: 20,
+          right: left + width,
+          bottom: 20,
+          x: left,
+          y: 0,
+          toJSON: () => ({}),
+        }) as DOMRect;
+
+      track.getBoundingClientRect = () => rect(0, ITEM_WIDTH * 3);
+      for (const el of track.querySelectorAll<HTMLElement>("[data-otoggle-value]")) {
+        Object.defineProperty(el, "offsetParent", {
+          get: () => document.body,
+          configurable: true,
+        });
+        el.getBoundingClientRect = () => {
+          const order = Array.from(track.querySelectorAll<HTMLElement>("[data-otoggle-value]"));
+          return rect(order.indexOf(el) * ITEM_WIDTH, ITEM_WIDTH);
+        };
+      }
+    }
+
+    /** Lets Vue move the DOM node, the MutationObserver fire, and the raf settle. */
+    async function settle() {
+      await nextTick();
+      await Promise.resolve();
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    }
+
+    it("follows the active item when the items are reordered", async () => {
+      const order = ref(["a", "b", "c"]);
+      const wrapper = mount(
+        {
+          components: { OToggleGroup, OToggleGroupItem },
+          setup: () => ({ order }),
+          template: `
+            <OToggleGroup model-value="b">
+              <OToggleGroupItem v-for="value in order" :key="value" :value="value">
+                {{ value }}
+              </OToggleGroupItem>
+            </OToggleGroup>`,
+        },
+        { attachTo: document.body },
+      );
+
+      // The multi-root template above makes `wrapper.element` the VTU parent, so
+      // reach the ToggleGroupRoot (the indicator's offset parent) explicitly.
+      const track = wrapper.get("[data-variant]").element as HTMLElement;
+      stubGeometry(track);
+      const indicator = () => track.firstElementChild as HTMLElement;
+
+      // "b" dragged to the front — the pill must sit on it at index 0.
+      order.value = ["b", "a", "c"];
+      await settle();
+      expect(indicator().style.transform).toBe("translate(0px, 0px)");
+      expect(indicator().style.width).toBe(`${ITEM_WIDTH}px`);
+
+      // …and back to the end, without any selection change in between.
+      order.value = ["a", "c", "b"];
+      await settle();
+      expect(indicator().style.transform).toBe(`translate(${ITEM_WIDTH * 2}px, 0px)`);
+
+      wrapper.unmount();
     });
   });
 });

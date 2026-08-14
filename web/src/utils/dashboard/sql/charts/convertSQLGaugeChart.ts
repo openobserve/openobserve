@@ -76,6 +76,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
     enterable: true,
     backgroundColor: chartColor("--color-tooltip-bg"),
     extraCssText:
+      // eslint-disable-next-line local/no-hardcoded-px -- ECharts serialises this into its own container — no CSS cascade resolves rem
       "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
   };
   options.angleAxis = {
@@ -102,22 +103,14 @@ export function applyGaugeChart(ctx: SQLContext): void {
       //which grid will be used
       gridIndex: index,
       // radius, progress and axisline width will be calculated based on grid width and height
-      radius: `${
-        Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 -
-        5
-      }px`,
+      radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
       progress: {
         show: true,
-        width: `${
-          Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6
-        }`,
+        width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
       },
       axisLine: {
         lineStyle: {
-          width: `${
-            Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) /
-            6
-          }`,
+          width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
         },
       },
       title: {
@@ -132,14 +125,8 @@ export function applyGaugeChart(ctx: SQLContext): void {
       // x: left + width / 2,
       // y: top + height / 2,
       center: [
-        `${
-          parseFloat(options.grid[index].left) +
-          parseFloat(options.grid[index].width) / 2
-        }%`,
-        `${
-          parseFloat(options.grid[index].top) +
-          parseFloat(options.grid[index].height) / 2
-        }%`,
+        `${parseFloat(options.grid[index].left) + parseFloat(options.grid[index].width) / 2}%`,
+        `${parseFloat(options.grid[index].top) + parseFloat(options.grid[index].height) / 2}%`,
       ],
 
       data: [

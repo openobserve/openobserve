@@ -16,11 +16,12 @@
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, type I18nText } from "@/types/i18n";
 
 export interface HomeDashboard {
   dashboardId: string;
   folderId: string;
-  label: string;
+  label: I18nText;
 }
 
 const SETTING_KEY = "home_dashboard";
@@ -31,8 +32,7 @@ const homeDashboard: Ref<HomeDashboard | null> = ref(null);
 const isLoading = ref(false);
 
 export function useHomeDashboard() {
-  const isHome = (dashboardId: string) =>
-    homeDashboard.value?.dashboardId === dashboardId;
+  const isHome = (dashboardId: string) => homeDashboard.value?.dashboardId === dashboardId;
 
   const load = async (org: string) => {
     if (!org) return;
@@ -40,8 +40,7 @@ export function useHomeDashboard() {
     try {
       const res = await settings.getSetting(org, SETTING_KEY);
       const val = res?.data?.setting_value;
-      homeDashboard.value =
-        val && val.dashboardId ? (val as HomeDashboard) : null;
+      homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
     } catch {
       // Missing setting / 404 → no home dashboard for this org.
       homeDashboard.value = null;
@@ -63,7 +62,7 @@ export function useHomeDashboard() {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
-      toast({ variant: "error", message: errMessage(e, "set") });
+      toast({ variant: "error", message: raw(errMessage(e, "set")) });
     }
   };
 
@@ -81,7 +80,7 @@ export function useHomeDashboard() {
       // null, don't revert, don't toast. Only real errors revert.
       if (e?.response?.status === 404) return;
       homeDashboard.value = prev; // revert
-      toast({ variant: "error", message: errMessage(e, "remove") });
+      toast({ variant: "error", message: raw(errMessage(e, "remove")) });
     }
   };
 
@@ -91,18 +90,13 @@ export function useHomeDashboard() {
   // label. Fire-and-forget: a failed persist just leaves the fresh label for
   // this session and re-attempts on the next rename; never toast for it.
   const updateLabel = (org: string, dashboardId: string, label: string) => {
-    if (
-      homeDashboard.value?.dashboardId === dashboardId &&
-      homeDashboard.value.label !== label
-    ) {
-      const updated = { ...homeDashboard.value, label };
+    if (homeDashboard.value?.dashboardId === dashboardId && homeDashboard.value.label !== label) {
+      const updated = { ...homeDashboard.value, label: raw(label) };
       homeDashboard.value = updated;
       if (org) {
-        settings
-          .setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY)
-          .catch(() => {
-            /* label persist is best-effort; ref already shows the fresh label */
-          });
+        settings.setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY).catch(() => {
+          /* label persist is best-effort; ref already shows the fresh label */
+        });
       }
     }
   };

@@ -52,11 +52,7 @@ export const FLAT_THRESHOLD = 1;
  * @example computeTrend(100, 100, true)  // {flat, neutral, deltaPct: 0}
  * @example computeTrend(0, 0, true)      // null
  */
-export function computeTrend(
-  curr: number,
-  prev: number,
-  upIsBad: boolean,
-): KpiTrend | null {
+export function computeTrend(curr: number, prev: number, upIsBad: boolean): KpiTrend | null {
   if (!isFinite(curr) || !isFinite(prev)) return null;
   if (prev <= 0 && curr <= 0) return null;
   if (prev <= 0) {
@@ -101,8 +97,7 @@ export function splitNumberWithUnit(n: number): {
   value: string;
   unit: string;
 } {
-  if (n >= 1_000_000_000)
-    return { value: (n / 1_000_000_000).toFixed(1), unit: "B" };
+  if (n >= 1_000_000_000) return { value: (n / 1_000_000_000).toFixed(1), unit: "B" };
   if (n >= 1_000_000) return { value: (n / 1_000_000).toFixed(1), unit: "M" };
   if (n >= 10_000) return { value: (n / 1_000).toFixed(1), unit: "K" };
   return { value: n.toLocaleString(), unit: "" };
@@ -177,9 +172,7 @@ export function formatWindowLabel(durationMicros: number): string {
  * @example splitCost(0)         // { value: "$0.00", unit: "" }
  */
 export function splitCost(cost: number): { value: string; unit: string } {
-  if (cost >= 1_000_000)
-    return { value: `$${(cost / 1_000_000).toFixed(2)}`, unit: "M" };
-  if (cost >= 1_000)
-    return { value: `$${(cost / 1_000).toFixed(1)}`, unit: "K" };
+  if (cost >= 1_000_000) return { value: `$${(cost / 1_000_000).toFixed(2)}`, unit: "M" };
+  if (cost >= 1_000) return { value: `$${(cost / 1_000).toFixed(1)}`, unit: "K" };
   return { value: `$${cost.toFixed(2)}`, unit: "" };
 }

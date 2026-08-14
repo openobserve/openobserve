@@ -31,17 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   #tabs slot — it receives { tabs, filter } so you can render/filter yourself.
 -->
 <template>
-  <OSplitter
-    v-model="splitterWidthModel"
-    unit="px"
-    :horizontal="false"
-    class="h-full"
-  >
+  <OSplitter v-model="splitterWidthModel" unit="px" :horizontal="false" class="h-full">
     <template #before>
-      <div class="w-full h-full">
-        <div class="h-full bg-surface-panel border-r border-border-default">
+      <div class="h-full w-full">
+        <div class="bg-surface-panel border-border-default h-full border-r">
           <div
-            :class="['overflow-hidden h-full', { 'pt-1.5': !searchable }]"
+            :class="['h-full overflow-hidden', { 'pt-1.5': !searchable }]"
             :data-test="panelDataTest || undefined"
           >
             <div v-if="searchable" class="p-2">
@@ -49,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filter"
                 :data-test="searchDataTest || undefined"
                 clearable
-                class="w-full indexlist-search-input"
+                class="indexlist-search-input w-full"
                 :placeholder="searchPlaceholder || t('common.search')"
               />
             </div>
@@ -70,7 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :to="tab.to"
                   :icon="tab.icon"
                   :label="tab.label"
-                  :data-test="tab.dataTest || (tabDataTestPrefix ? tabDataTestPrefix + tab.name : undefined)"
+                  :data-test="
+                    tab.dataTest || (tabDataTestPrefix ? tabDataTestPrefix + tab.name : undefined)
+                  "
                 />
               </slot>
             </OTabs>
@@ -87,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -96,9 +93,9 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 interface DataSourceTab {
   name: string;
   to: Record<string, any>;
-  label: string;
+  label: I18nText;
   icon?: string;
-  title?: string;
+  title?: I18nText;
   dataTest?: string;
 }
 
@@ -115,7 +112,7 @@ const props = withDefaults(
     /** data-test for the search input. */
     searchDataTest?: string;
     /** Placeholder for the search input (defaults to common.search). */
-    searchPlaceholder?: string;
+    searchPlaceholder?: I18nText;
     /** Extra class(es) for the OTabs element. */
     tabsClass?: string;
     /** data-test for the tab-list wrapper. */
@@ -129,7 +126,7 @@ const props = withDefaults(
     splitterWidth: 250,
     searchable: false,
     searchDataTest: "",
-    searchPlaceholder: "",
+    searchPlaceholder: raw(""),
     tabsClass: "",
     panelDataTest: "",
     tabDataTestPrefix: "",
@@ -140,7 +137,7 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: string | number): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Splitter width is local state seeded from the prop; resizing stays internal.
 const splitterWidthModel = ref(props.splitterWidth);

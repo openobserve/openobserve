@@ -45,6 +45,7 @@ const mockIsLoadingChart = ref(false);
 const mockIsLoadingKpis = ref(false);
 const mockIsLoadingTrends = ref(false);
 const mockFetchAll = vi.fn().mockResolvedValue(undefined);
+const mockCancelAll = vi.fn();
 const mockFetchTrend = vi.fn().mockResolvedValue(undefined);
 
 // ---------------------------------------------------------------------------
@@ -66,6 +67,7 @@ vi.mock("@/composables/rum/useErrorIssuesData", () => ({
     isLoadingTrends: mockIsLoadingTrends,
     fetchAll: mockFetchAll,
     fetchTrend: mockFetchTrend,
+    cancelAll: mockCancelAll,
   }),
 }));
 
@@ -88,7 +90,14 @@ vi.mock("@/composables/useStreams", () => ({
 // Lightweight stubs for heavy async dependencies
 vi.mock("@/composables/useSuggestions", () => ({
   default: () => ({
-    autoCompleteData: ref({ query: "", cursorIndex: 0, popup: { open: false }, org: "", streamType: "", streamName: "" }),
+    autoCompleteData: ref({
+      query: "",
+      cursorIndex: 0,
+      popup: { open: false },
+      org: "",
+      streamType: "",
+      streamName: "",
+    }),
     effectiveKeywords: ref([]),
     effectiveSuggestions: ref([]),
     getSuggestions: vi.fn(),
@@ -120,9 +129,7 @@ vi.mock("@/components/logs/useQueryPlaceholder", () => ({
     // Same rationale (and same TDZ deferral) as above.
     Promise.resolve().then(() => {
       for (const arg of args) {
-        void (arg && typeof arg === "object" && "value" in arg
-          ? arg.value
-          : arg);
+        void (arg && typeof arg === "object" && "value" in arg ? arg.value : arg);
       }
     });
     return {
@@ -253,7 +260,19 @@ const TABLE_STUB = {
       </div>
     </div>
   `,
-  props: ["data", "columns", "loading", "rowKey", "pagination", "virtualScroll", "dense", "rowHeight", "showGlobalFilter", "horizontalScroll", "rowClass"],
+  props: [
+    "data",
+    "columns",
+    "loading",
+    "rowKey",
+    "pagination",
+    "virtualScroll",
+    "dense",
+    "rowHeight",
+    "showGlobalFilter",
+    "horizontalScroll",
+    "rowClass",
+  ],
   emits: ["row-click"],
 };
 
@@ -309,7 +328,15 @@ const NO_DATA_STUB = {
 const SEARCH_FIELD_LIST_STUB = {
   name: "SearchFieldList",
   template: '<div data-test="search-field-list-stub" />',
-  props: ["fields", "timeStamp", "streamName", "streamType", "enableGrouping", "query"],
+  props: [
+    "fields",
+    "timeStamp",
+    "streamName",
+    "streamType",
+    "enableGrouping",
+    "query",
+    "baseFilter",
+  ],
   emits: ["event-emitted"],
 };
 
@@ -341,7 +368,7 @@ async function mountAppErrors({ routeQuery = {} }: MountOptions = {}) {
         ErrorIssueCell: ERROR_ISSUE_CELL_STUB,
         ErrorTrendCell: ERROR_TREND_CELL_STUB,
         DateTime: DATETIME_STUB,
-        SyntaxGuide: { template: '<div />' },
+        SyntaxGuide: { template: "<div />" },
         SearchFieldList: SEARCH_FIELD_LIST_STUB,
         NoData: NO_DATA_STUB,
         // Phase 2/3 page furniture — covered by their own co-located specs.
@@ -856,6 +883,27 @@ describe("AppErrors", () => {
       // After removal, error_type condition should be gone
       expect(errorTrackingState.data.editorValue).not.toContain("error_type");
     });
+
+    it("passes the error-row base filter to the sidebar", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      const fieldList = wrapper.findComponent(SEARCH_FIELD_LIST_STUB);
+      expect(fieldList.props("baseFilter")).toBe("type='error'");
+    });
+
+    it("adds the service chip to the sidebar base filter", async () => {
+      ({ wrapper, router } = await mountAppErrors());
+      await flushPromises();
+
+      await wrapper
+        .findComponent({ name: "ErrorsFilterBar" })
+        .vm.$emit("update:service", "check'out");
+      await flushPromises();
+
+      const fieldList = wrapper.findComponent(SEARCH_FIELD_LIST_STUB);
+      expect(fieldList.props("baseFilter")).toBe("type='error' AND service='check''out'");
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -863,8 +911,7 @@ describe("AppErrors", () => {
   // ─────────────────────────────────────────────────────────────────────────
   describe("filtering", () => {
     // Helper: find the ErrorsFilterBar stub component instance
-    const filterBarStub = () =>
-      wrapper.findComponent({ name: "ErrorsFilterBar" });
+    const filterBarStub = () => wrapper.findComponent({ name: "ErrorsFilterBar" });
 
     // ── Status filter ───────────────────────────────────────────────────
     describe("status filter", () => {
@@ -1109,9 +1156,7 @@ describe("AppErrors", () => {
 
         // Assert — fetchAll re-fetches with the chosen service
         expect(mockFetchAll).toHaveBeenCalledTimes(1);
-        expect(mockFetchAll).toHaveBeenCalledWith(
-          expect.objectContaining({ service: "checkout" }),
-        );
+        expect(mockFetchAll).toHaveBeenCalledWith(expect.objectContaining({ service: "checkout" }));
       });
 
       it("calls fetchAll with empty service when filter bar emits update:service with empty string", async () => {
@@ -1124,9 +1169,7 @@ describe("AppErrors", () => {
         await flushPromises();
 
         expect(mockFetchAll).toHaveBeenCalledTimes(1);
-        expect(mockFetchAll).toHaveBeenCalledWith(
-          expect.objectContaining({ service: "" }),
-        );
+        expect(mockFetchAll).toHaveBeenCalledWith(expect.objectContaining({ service: "" }));
       });
     });
 
@@ -1302,8 +1345,7 @@ describe("AppErrors", () => {
   // ─────────────────────────────────────────────────────────────────────────
   describe("query editor events", () => {
     /** Returns true when the placeholder typewriter text is rendered. */
-    const placeholderVisible = () =>
-      wrapper.text().includes("Filter errors…");
+    const placeholderVisible = () => wrapper.text().includes("Filter errors…");
 
     it("shows the placeholder text when editorValue is empty and editor is not focused", async () => {
       const { errorTrackingState } = useErrorTracking();

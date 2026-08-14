@@ -8,9 +8,12 @@ import {
   useVueTable,
   type AggregationFn,
   type ColumnDef,
+  type ColumnFiltersState,
+  type FilterFn,
   type Row,
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
+import { raw } from "@/types/i18n";
 import { TABLE_INDEX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
 
 // Register the custom "avg" fn (provided via table options below) so
@@ -38,7 +41,7 @@ export function useTableCore<TData>(
     sortOrder?: "asc" | "desc";
     sortFieldMap?: Record<string, string>;
     globalFilter?: string;
-    rowKey?: string;
+    rowKey?: string | ((row: TData) => string);
     enableColumnResize?: boolean;
     enableColumnReorder?: boolean;
     enableColumnPin?: boolean;
@@ -72,7 +75,7 @@ export function useTableCore<TData>(
       : 0;
     return {
       id: "#",
-      header: "#",
+      header: raw("#"),
       size: TABLE_INDEX_COL_SIZE,
       sortable: false,
       hideable: false,
@@ -100,9 +103,7 @@ export function useTableCore<TData>(
   // keeps px-2; when false the actions column is last and gets the 1rem right
   // edge inset. `actionColumnWidth` reads this to budget the right padding.
   const hasTrailingSpacer = computed<boolean>(() => {
-    const base = indexColumn.value
-      ? [indexColumn.value, ...props.columns]
-      : props.columns;
+    const base = indexColumn.value ? [indexColumn.value, ...props.columns] : props.columns;
     const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
     return (
       (props.enableColumnResize ?? false) &&
@@ -113,9 +114,7 @@ export function useTableCore<TData>(
   });
 
   const effectiveColumns = computed<OTableColumnDef<TData>[]>(() => {
-    const base = indexColumn.value
-      ? [indexColumn.value, ...props.columns]
-      : props.columns;
+    const base = indexColumn.value ? [indexColumn.value, ...props.columns] : props.columns;
     // An `autoWidth` column flexes permanently and absorbs leftover on its own,
     // so those tables need no spacer. Every other resizable table gets an
     // invisible trailing spacer: it sits before the pinned actions column and
@@ -126,7 +125,7 @@ export function useTableCore<TData>(
     if (!hasTrailingSpacer.value) return base;
     const spacer: OTableColumnDef<TData> = {
       id: "__spacer__",
-      header: "",
+      header: raw(""),
       sortable: false,
       hideable: false,
       resizable: false,
@@ -166,6 +165,9 @@ export function useTableCore<TData>(
 
   // Track column order for drag-reorder
   const columnOrder = ref<string[]>([]) as Ref<string[]>;
+  // Set once the user drag-reorders a column. Until then the parent's columns
+  // array is the single source of order truth (see the sync watch below).
+  const userReorderedColumns = ref(false);
 
   // Track column sizing — seeded with persisted values when provided
   const columnSizing = ref<Record<string, number>>(props.initialColumnSizes ?? {});
@@ -189,18 +191,23 @@ export function useTableCore<TData>(
     return raw.map((c: any) => (typeof c === "string" ? c : c.id));
   });
   const rightPinnedIds = computed(() =>
-    effectiveColumns.value
-      .filter((c) => c.pinned === "right" || c.isAction)
-      .map((c) => c.id),
+    effectiveColumns.value.filter((c) => c.pinned === "right" || c.isAction).map((c) => c.id),
   );
   const leftPinnedIds = computed(() => {
-    const explicit = effectiveColumns.value
-      .filter((c) => c.pinned === "left")
-      .map((c) => c.id);
+    const explicit = effectiveColumns.value.filter((c) => c.pinned === "left").map((c) => c.id);
     const pivot = pivotRowColumnIds.value ?? [];
     return [...new Set([...explicit, ...pivot])];
   });
   const columnPinning = ref<{ left?: string[]; right?: string[] }>({});
+
+  // ── Per-column value filtering (multi-select) ────────────────────
+  // Each active filter is `{ id, value: rawValue[] }`: a row passes when its cell
+  // value is one of the selected values; an empty filter is no restriction.
+  const columnFilters = ref<ColumnFiltersState>([]);
+  const valueInSet: FilterFn<TData> = (row, columnId, filterValue) => {
+    if (!Array.isArray(filterValue) || filterValue.length === 0) return true;
+    return filterValue.includes(row.getValue(columnId));
+  };
 
   // Keep auto-pinned columns in sync
   watch(
@@ -234,10 +241,10 @@ export function useTableCore<TData>(
         accessorKey: col.accessorKey ?? col.id,
         accessorFn: col.accessorFn as any,
         cell: col.cell
-          ? (() => {
+          ? () => {
               if (typeof col.cell === "string") return col.cell;
               return col.cell;
-            })
+            }
           : undefined,
         size,
         // Resize floor: just enough that the dragged column stays usable (its
@@ -245,14 +252,20 @@ export function useTableCore<TData>(
         // layout guard, since the Excel-style width strategy means a drag only
         // ever changes the dragged column. Columns that need a larger minimum
         // (e.g. the name column) set their own `minSize`. Rigid columns locked.
-        minSize: rigid ? size : (col.minSize ?? (col.size !== undefined && col.size < 48 ? col.size : 48)),
+        minSize: rigid
+          ? size
+          : (col.minSize ?? (col.size !== undefined && col.size < 48 ? col.size : 48)),
         maxSize: rigid ? size : (col.maxSize ?? 800),
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
+        filterFn: col.filterable ? valueInSet : undefined,
         // Rigid (actions / #), permanent-elastic (autoWidth), and the invisible
         // spacer are never resizable. `flex` columns ARE resizable — dragging one
         // freezes it (OTable) then resizes it like any other column.
-        enableResizing: (rigid || col.meta?.autoWidth || col.meta?.spacer) ? false : (col.resizable ?? props.enableColumnResize ?? false),
+        enableResizing:
+          rigid || col.meta?.autoWidth || col.meta?.spacer
+            ? false
+            : (col.resizable ?? props.enableColumnResize ?? false),
         enablePinning: col.pinnable ?? props.enableColumnPin ?? false,
         meta: {
           // Action columns (pinned-right icon buttons) center by default — the
@@ -263,7 +276,9 @@ export function useTableCore<TData>(
           isAction: col.isAction,
           sortable: col.sortable,
           hideable: col.hideable,
-          closable: col.hideable,
+          // Opt-in per column via `meta.closable`; defaulting it to `hideable`
+          // would put a dead "x" on every table that never wires @close-column.
+          closable: false,
           showWrap: false,
           // Width is independent of sibling columns; OTableHeader/BodyCell pin
           // min+max to the column's CSS size var.
@@ -279,9 +294,7 @@ export function useTableCore<TData>(
 
   const isClientSort = computed(() => props.sorting === "client");
   const isClientPagination = computed(() => props.pagination === "client");
-  const isClientFilter = computed(
-    () => (props.filterMode ?? "client") === "client",
-  );
+  const isClientFilter = computed(() => (props.filterMode ?? "client") === "client");
 
   // Built-in aggregation functions for footer totals
   const aggregationFns: Record<string, AggregationFn<TData>> = {
@@ -293,7 +306,10 @@ export function useTableCore<TData>(
     },
     avg: (columnId: string, leafRows: Row<TData>[]) => {
       if (leafRows.length === 0) return 0;
-      return leafRows.reduce((sum, row) => sum + (Number(row.getValue(columnId)) || 0), 0) / leafRows.length;
+      return (
+        leafRows.reduce((sum, row) => sum + (Number(row.getValue(columnId)) || 0), 0) /
+        leafRows.length
+      );
     },
     min: (columnId: string, leafRows: Row<TData>[]) => {
       if (leafRows.length === 0) return undefined;
@@ -316,12 +332,12 @@ export function useTableCore<TData>(
     autoResetPageIndex: !props.keepPageOnDataChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: isClientSort.value ? getSortedRowModel() : undefined,
-    getFilteredRowModel: isClientFilter.value
-      ? getFilteredRowModel()
-      : undefined,
-    getPaginationRowModel: isClientPagination.value
-      ? getPaginationRowModel()
-      : undefined,
+    getFilteredRowModel: isClientFilter.value ? getFilteredRowModel() : undefined,
+    getPaginationRowModel: isClientPagination.value ? getPaginationRowModel() : undefined,
+    onColumnFiltersChange: (updater) => {
+      const old = columnFilters.value;
+      columnFilters.value = typeof updater === "function" ? updater(old) : updater;
+    },
     aggregationFns,
     getSubRows: props.getSubRows as any,
     enableSorting: props.sorting !== "none",
@@ -330,8 +346,7 @@ export function useTableCore<TData>(
     onSortingChange: (updater) => {
       if (props.sorting === "server") return;
       const old = sortingState.value;
-      const next =
-        typeof updater === "function" ? updater(old) : updater;
+      const next = typeof updater === "function" ? updater(old) : updater;
       sortingState.value = next;
     },
     onColumnSizingChange: (updater: any) => {
@@ -341,8 +356,7 @@ export function useTableCore<TData>(
     },
     onColumnPinningChange: (updater: any) => {
       const old = columnPinning.value;
-      const next =
-        typeof updater === "function" ? updater(old) : updater;
+      const next = typeof updater === "function" ? updater(old) : updater;
       columnPinning.value = next;
     },
     defaultColumn: {
@@ -369,13 +383,34 @@ export function useTableCore<TData>(
       get columnPinning() {
         return columnPinning.value;
       },
+      get columnFilters() {
+        return columnFilters.value;
+      },
     },
   });
 
-  // Sync columnOrder when columns change
+  // Sync columnOrder when columns change.
+  //
+  // Two regimes:
+  // - Before any user drag, the parent's array order is authoritative — a parent
+  //   that re-orders its columns prop IN PLACE (same ids, new order — e.g. the
+  //   dashboard column_order config re-sorting a PromQL table) must see that
+  //   order rendered. Merging here instead kept the stale first-render order and
+  //   appended "new" ids after it, so the reorder silently never applied.
+  // - After a user drag, preserve their order and only append/drop ids: the
+  //   watch also fires when effectiveColumns recomputes for unrelated reasons
+  //   (visibility toggles), and adopting the prop order then would wipe the
+  //   user's arrangement.
   watch(
     () => effectiveColumns.value.map((c) => c.id),
     (newIds) => {
+      if (!userReorderedColumns.value) {
+        const same =
+          newIds.length === columnOrder.value.length &&
+          newIds.every((id, i) => id === columnOrder.value[i]);
+        if (!same) columnOrder.value = [...newIds];
+        return;
+      }
       const existing = columnOrder.value.filter((id) => newIds.includes(id));
       const added = newIds.filter((id) => !existing.includes(id));
       columnOrder.value = [...existing, ...added];
@@ -410,11 +445,13 @@ export function useTableCore<TData>(
     table,
     effectiveColumns,
     columnOrder,
+    userReorderedColumns,
     columnSizing,
     sortingState,
     isClientSort,
     isClientPagination,
     isClientFilter,
+    columnFilters,
     tanstackColumns,
     columnResizeMode,
     columnSizeVars,

@@ -22,16 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   tinted-active treatment. Sentence-case group headings, soft single-line items.
 -->
 <template>
-  <nav
-    class="flex flex-col h-full min-h-0 bg-surface-panel"
-    data-test="section-rail"
-  >
+  <nav class="bg-surface-panel flex h-full min-h-0 flex-col" data-test="section-rail">
     <!-- Title aligns with the item LABELS below it (the page-edge grid line the
          OTab pills' text lands on), not the pill edge — so 'IAM'/'Settings' sits
          directly above 'Users'. Matches FolderList's heading. -->
     <div
       v-if="title"
-      class="shrink-0 pl-page-edge pr-1.5 pt-3 pb-1 text-sm font-semibold text-text-heading truncate"
+      class="pl-page-edge text-text-heading shrink-0 truncate pt-3 pr-1.5 pb-1 text-sm font-semibold"
     >
       {{ title }}
     </div>
@@ -40,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabs
         :model-value="activeKey ?? ''"
         orientation="vertical"
-        class="w-full section-rail-tabs"
+        class="section-rail-tabs w-full"
         @change="onTabChange"
       >
         <template v-for="(group, idx) in visibleGroups" :key="group.label">
@@ -49,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- pl-1.5 (on top of the container's px-1.5) puts the section label on
                the same 12px item-label grid line as the tabs below it. -->
           <div
-            class="py-1 pl-1.5 text-xs font-semibold text-text-secondary"
+            class="text-text-secondary py-1 pl-1.5 text-xs font-semibold"
             :class="{ 'mt-3': idx > 0 }"
           >
             {{ group.label }}
@@ -71,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -95,7 +93,7 @@ const props = defineProps<{
   /** Currently-active section key (highlighted). */
   activeKey?: string;
   /** Optional small heading shown above the groups (e.g. the module name). */
-  title?: string;
+  title?: I18nText;
 }>();
 
 // Drop hidden items/empty groups (each item may carry a `visible` flag).
@@ -107,5 +105,4 @@ const visibleGroups = computed(() =>
     }))
     .filter((g) => g.items.length > 0),
 );
-
 </script>

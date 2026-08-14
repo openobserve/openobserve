@@ -8,11 +8,11 @@ import OSQuery from "@/components/ingestion/security/OSQuery.vue";
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: { osquery: "https://docs.example.com/osquery" },
   })),
 }));
-
 
 describe("OSQuery.vue", () => {
   let store: any;
@@ -24,7 +24,12 @@ describe("OSQuery.vue", () => {
     return mount(OSQuery, {
       global: {
         plugins: [store],
-        stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
+        stubs: {
+          CopyContent: {
+            template: '<div data-test="copy-content-stub">{{ content }}</div>',
+            props: ["content"],
+          },
+        },
       },
     });
   };

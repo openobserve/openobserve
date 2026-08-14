@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getDashboard } from "../../utils/commons.ts";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
@@ -39,22 +39,17 @@ export default defineComponent({
   components: { OButton, OTooltip },
   props: ["dashboardId"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
     const downloadDashboard = async () => {
       // get the dashboard
-      const dashboard = await getDashboard(
-        store,
-        props.dashboardId,
-        route.query.folder,
-      );
+      const dashboard = await getDashboard(store, props.dashboardId, route.query.folder);
       dashboard.owner = "";
 
       // prepare json and download via a click
       const data =
-        "data:text/json;charset=utf-8," +
-        encodeURIComponent(JSON.stringify(dashboard, null, 2));
+        "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dashboard, null, 2));
       const htmlA = document.createElement("a");
       htmlA.setAttribute("href", data);
       const fileName = dashboard.title || "dashboard";

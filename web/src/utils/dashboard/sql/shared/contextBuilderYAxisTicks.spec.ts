@@ -55,17 +55,7 @@ const store = {
 const chartPanelRef = { value: { offsetWidth: 800, offsetHeight: 400 } };
 
 const buildCtx = (panelSchema: any, rows: any[]) =>
-  buildSQLContext(
-    panelSchema,
-    [rows],
-    store,
-    chartPanelRef,
-    null,
-    [{}],
-    { queries: [{}] },
-    {},
-    [],
-  );
+  buildSQLContext(panelSchema, [rows], store, chartPanelRef, null, [{}], { queries: [{}] }, {}, []);
 
 const basePanel = (over: any = {}) => ({
   id: "p1",
@@ -142,8 +132,6 @@ describe("buildSQLContext y-axis ticks", () => {
       basePanel({ config: { decimals: 2, unit: "megabytes" } }),
       rows.map(({ t, v }) => ({ t, v })),
     );
-    expect(ctx.options.yAxis.nameGap).toBeGreaterThan(
-      lineCtx.options.yAxis.nameGap,
-    );
+    expect(ctx.options.yAxis.nameGap).toBeGreaterThan(lineCtx.options.yAxis.nameGap);
   });
 });

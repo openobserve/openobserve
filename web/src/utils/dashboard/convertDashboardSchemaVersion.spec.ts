@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { convertDashboardSchemaVersion, CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import {
+  convertDashboardSchemaVersion,
+  CURRENT_DASHBOARD_SCHEMA_VERSION,
+} from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 describe("convertDashboardSchemaVersion", () => {
   // Test 1: Basic functionality - constants
@@ -38,7 +41,7 @@ describe("convertDashboardSchemaVersion", () => {
       id: "dashboard-123",
       title: "Test Dashboard",
       layouts: [],
-      panels: []
+      panels: [],
     };
 
     const result = convertDashboardSchemaVersion(dataWithoutVersion);
@@ -57,8 +60,8 @@ describe("convertDashboardSchemaVersion", () => {
           y: 0,
           h: 3,
           w: 6,
-          i: "panel-1"
-        }
+          i: "panel-1",
+        },
       ],
       panels: [
         {
@@ -71,7 +74,7 @@ describe("convertDashboardSchemaVersion", () => {
             legends_position: "right",
             unit: "bytes",
             unit_custom: "MB",
-            promql_legend: "test_legend"
+            promql_legend: "test_legend",
           },
           queryType: "sql",
           query: "SELECT * FROM test",
@@ -81,24 +84,24 @@ describe("convertDashboardSchemaVersion", () => {
             stream: "test_stream",
             x: [],
             y: [],
-            filter: []
-          }
-        }
-      ]
+            filter: [],
+          },
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV1);
 
     expect(result.version).toBe(8);
-    expect(result).not.toHaveProperty('layouts'); // layouts should be removed
-    expect(result).not.toHaveProperty('panels'); // panels should be moved to tabs
+    expect(result).not.toHaveProperty("layouts"); // layouts should be removed
+    expect(result).not.toHaveProperty("panels"); // panels should be moved to tabs
     expect(result.tabs).toBeDefined();
     expect(result.tabs[0].panels[0].layout).toEqual({
       x: 0, // After version 2 and 5 conversion: 0 * 4 * 4 = 0
       y: 0, // After version 6 conversion: 0 * 2 = 0
       h: 6, // After version 5 conversion: 3 * 2 = 6
       w: 96, // After version 2 and 5 conversion: 6 * 4 * 4 = 96
-      i: "panel-1"
+      i: "panel-1",
     });
   });
 
@@ -107,7 +110,7 @@ describe("convertDashboardSchemaVersion", () => {
       version: 1,
       title: "Test Dashboard",
       layouts: null,
-      panels: []
+      panels: [],
     };
 
     const result = convertDashboardSchemaVersion(dataV1WithNullLayouts);
@@ -125,17 +128,17 @@ describe("convertDashboardSchemaVersion", () => {
           y: 0,
           h: 3,
           w: 6,
-          i: "panel-1"
-        }
+          i: "panel-1",
+        },
       ],
       panels: [
         {
           id: "panel-1",
           type: "bar",
           config: {}, // Missing some config fields
-          fields: {} // Missing fields
-        }
-      ]
+          fields: {}, // Missing fields
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV1WithIncompletePanel);
@@ -159,22 +162,24 @@ describe("convertDashboardSchemaVersion", () => {
             y: 1,
             h: 4,
             w: 3,
-            i: "panel-1"
+            i: "panel-1",
           },
-          queries: [{
-            fields: {
-              x: [],
-              y: []
-            }
-          }]
-        }
-      ]
+          queries: [
+            {
+              fields: {
+                x: [],
+                y: [],
+              },
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV2);
 
     expect(result.version).toBe(8);
-    expect(result).not.toHaveProperty('panels'); // panels should be moved to tabs
+    expect(result).not.toHaveProperty("panels"); // panels should be moved to tabs
     expect(result.tabs).toBeDefined();
     expect(result.tabs[0].name).toBe("Default");
     expect(result.tabs[0].tabId).toBe("default");
@@ -199,21 +204,21 @@ describe("convertDashboardSchemaVersion", () => {
                 y: 0,
                 h: 4,
                 w: 12,
-                i: "panel-1"
+                i: "panel-1",
               },
               queries: [
                 {
                   fields: {
                     x: [],
                     y: [],
-                    breakdown: []
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                    breakdown: [],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV3);
@@ -239,20 +244,20 @@ describe("convertDashboardSchemaVersion", () => {
                 y: 0,
                 h: 4,
                 w: 12,
-                i: "panel-1"
+                i: "panel-1",
               },
               queries: [
                 {
                   fields: {
                     x: [],
-                    y: []
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                    y: [],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV3WithTable);
@@ -277,21 +282,21 @@ describe("convertDashboardSchemaVersion", () => {
                 y: 0,
                 h: 4,
                 w: 12,
-                i: "panel-1"
+                i: "panel-1",
               },
               queries: [
                 {
                   fields: {
                     x: [],
                     y: [],
-                    breakdown: []
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                    breakdown: [],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV3WithExistingBreakdown);
@@ -301,7 +306,7 @@ describe("convertDashboardSchemaVersion", () => {
     expect(result.tabs[0].panels[0].queries[0].fields.breakdown.length).toBe(0); // existing + moved field
   });
 
-  // Test 6: Version 4 conversion tests - filter format migration  
+  // Test 6: Version 4 conversion tests - filter format migration
   it("should convert version 4 dashboard - migrate filter array to new format", () => {
     const dataV4 = {
       version: 4,
@@ -317,7 +322,7 @@ describe("convertDashboardSchemaVersion", () => {
                 y: 0,
                 h: 4,
                 w: 12,
-                i: "panel-1"
+                i: "panel-1",
               },
               queries: [
                 {
@@ -330,23 +335,23 @@ describe("convertDashboardSchemaVersion", () => {
                         values: ["value1"],
                         column: "status",
                         operator: "=",
-                        value: "active"
+                        value: "active",
                       },
                       {
                         type: "condition",
                         values: ["value2"],
                         column: "category",
                         operator: "!=",
-                        value: "test"
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                        value: "test",
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV4);
@@ -361,26 +366,26 @@ describe("convertDashboardSchemaVersion", () => {
           values: ["value1"],
           column: {
             field: "status",
-            streamAlias: null
+            streamAlias: null,
           },
           operator: "=",
           value: "active",
           logicalOperator: "AND",
-          filterType: "condition"
+          filterType: "condition",
         },
         {
           type: "condition",
           values: ["value2"],
           column: {
             field: "category",
-            streamAlias: null
+            streamAlias: null,
           },
           operator: "!=",
           value: "test",
           logicalOperator: "AND",
-          filterType: "condition"
-        }
-      ]
+          filterType: "condition",
+        },
+      ],
     });
   });
 
@@ -399,21 +404,21 @@ describe("convertDashboardSchemaVersion", () => {
                 y: 0,
                 h: 4,
                 w: 12,
-                i: "panel-1"
+                i: "panel-1",
               },
               queries: [
                 {
                   fields: {
                     x: [],
                     y: [],
-                    filter: [] // empty filter array
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                    filter: [], // empty filter array
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV4WithEmptyFilter);
@@ -422,7 +427,7 @@ describe("convertDashboardSchemaVersion", () => {
     expect(result.tabs[0].panels[0].queries[0].fields.filter).toEqual({
       filterType: "group",
       logicalOperator: "AND",
-      conditions: []
+      conditions: [],
     });
   });
 
@@ -441,21 +446,21 @@ describe("convertDashboardSchemaVersion", () => {
                 y: 0,
                 h: 4,
                 w: 12,
-                i: "panel-1"
+                i: "panel-1",
               },
               queries: [
                 {
                   fields: {
                     x: [],
-                    y: []
+                    y: [],
                     // no filter property
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV4WithNoFilter);
@@ -480,7 +485,7 @@ describe("convertDashboardSchemaVersion", () => {
                 y: 1,
                 h: 4,
                 w: 12,
-                i: "panel-1"
+                i: "panel-1",
               },
               queries: [
                 {
@@ -490,15 +495,15 @@ describe("convertDashboardSchemaVersion", () => {
                     filter: {
                       filterType: "group",
                       logicalOperator: "AND",
-                      conditions: []
-                    }
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                      conditions: [],
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV5);
@@ -526,13 +531,13 @@ describe("convertDashboardSchemaVersion", () => {
                 y: 5,
                 h: 8,
                 w: 48,
-                i: "panel-1"
+                i: "panel-1",
               },
-              queries: []
-            }
-          ]
-        }
-      ]
+              queries: [],
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV6);
@@ -548,7 +553,7 @@ describe("convertDashboardSchemaVersion", () => {
     const dataV7 = {
       version: 8,
       title: "Test Dashboard",
-      tabs: []
+      tabs: [],
     };
 
     const result = convertDashboardSchemaVersion(dataV7);
@@ -573,21 +578,21 @@ describe("convertDashboardSchemaVersion", () => {
                 y: 0,
                 h: 4,
                 w: 12,
-                i: "panel-1"
+                i: "panel-1",
               },
               queries: [
                 {
                   fields: {
                     x: [], // single x field
                     y: [],
-                    breakdown: []
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                    breakdown: [],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV3WithSingleX);
@@ -612,20 +617,20 @@ describe("convertDashboardSchemaVersion", () => {
                 y: 0,
                 h: 4,
                 w: 12,
-                i: "panel-1"
+                i: "panel-1",
               },
               queries: [
                 {
                   fields: {
                     x: [], // empty x fields
-                    y: []
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                    y: [],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     const result = convertDashboardSchemaVersion(dataV3WithNoX);

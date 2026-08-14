@@ -23,8 +23,8 @@ vi.mock("@/utils/zincutils");
 vi.mock("vuex", () => ({
   useStore: () => ({
     dispatch: vi.fn(),
-    state: {}
-  })
+    state: {},
+  }),
 }));
 
 describe("Common Utils", () => {
@@ -33,21 +33,24 @@ describe("Common Utils", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock window.location
-    Object.defineProperty(window, 'location', {
+    Object.defineProperty(window, "location", {
       value: {
-        href: '',
-        replace: vi.fn()
+        href: "",
+        // `origin` is what the same-origin redirect check compares against;
+        // a real window.location always has it.
+        origin: "http://localhost:3000",
+        replace: vi.fn(),
       },
-      writable: true
+      writable: true,
     });
   });
 
   describe("getDefaultOrganization", () => {
     const mockUserInfo = {
       email: "test@example.com",
-      name: "Test User"
+      name: "Test User",
     };
 
     const mockOrgIdentifier = "test-org";
@@ -63,20 +66,20 @@ describe("Common Utils", () => {
             user_obj: { email: "test@example.com" },
             ingest_threshold: 1000,
             search_threshold: 500,
-            note: "Default organization"
+            note: "Default organization",
           },
           {
             id: 2,
-            name: "Secondary Organization", 
+            name: "Secondary Organization",
             org_type: "custom",
             identifier: "secondary-org",
             user_obj: { email: "test@example.com" },
             ingest_threshold: 2000,
             search_threshold: 1000,
-            note: "Secondary organization"
-          }
-        ]
-      }
+            note: "Secondary organization",
+          },
+        ],
+      },
     };
 
     it("should fetch and process organization list successfully", async () => {
@@ -87,7 +90,12 @@ describe("Common Utils", () => {
       await getDefaultOrganization(mockUserInfo, mockOrgIdentifier);
 
       expect(mockOrganizationsService.os_list).toHaveBeenCalledWith(
-        0, 100000, "id", false, "", mockOrgIdentifier
+        0,
+        100000,
+        "id",
+        false,
+        "",
+        mockOrgIdentifier,
       );
     });
 
@@ -103,8 +111,8 @@ describe("Common Utils", () => {
     it("should handle single organization case", async () => {
       const singleOrgResponse = {
         data: {
-          data: [mockOrgsResponse.data.data[0]]
-        }
+          data: [mockOrgsResponse.data.data[0]],
+        },
       };
 
       mockOrganizationsService.os_list = vi.fn().mockResolvedValue(singleOrgResponse);
@@ -119,8 +127,8 @@ describe("Common Utils", () => {
       const localOrg = {
         value: {
           user_email: "different@example.com",
-          name: "Different User Org"
-        }
+          name: "Different User Org",
+        },
       };
 
       mockOrganizationsService.os_list = vi.fn().mockResolvedValue(mockOrgsResponse);
@@ -135,8 +143,9 @@ describe("Common Utils", () => {
       const apiError = new Error("API request failed");
       mockOrganizationsService.os_list = vi.fn().mockRejectedValue(apiError);
 
-      await expect(getDefaultOrganization(mockUserInfo, mockOrgIdentifier))
-        .rejects.toThrow("API request failed");
+      await expect(getDefaultOrganization(mockUserInfo, mockOrgIdentifier)).rejects.toThrow(
+        "API request failed",
+      );
     });
 
     it("should map organization data correctly", async () => {
@@ -151,8 +160,8 @@ describe("Common Utils", () => {
     it("should handle empty organization list", async () => {
       const emptyResponse = {
         data: {
-          data: []
-        }
+          data: [],
+        },
       };
 
       mockOrganizationsService.os_list = vi.fn().mockResolvedValue(emptyResponse);
@@ -169,26 +178,40 @@ describe("Common Utils", () => {
       mockZincutils.getPath = vi.fn().mockReturnValue("/default-path");
     });
 
-    it("should redirect to external URL when redirectURI contains http", () => {
-      const externalUrl = "https://external-site.com/redirect";
-      
-      redirectUser(externalUrl);
+    // SECURITY: `redirectURI` comes from the attacker-controllable
+    // `?short_url=` query param. It previously only had to CONTAIN "http",
+    // so an off-origin URL sent the user to a phishing site right after they
+    // authenticated. Off-origin must now fall back to the home path.
+    it("refuses an off-origin redirect and goes to the default path instead", () => {
+      const replaceSpy = vi.spyOn(window.location, "replace");
 
-      expect(window.location.href).toBe(externalUrl);
+      redirectUser("https://external-site.com/redirect");
+
+      expect(replaceSpy).toHaveBeenCalledWith("/default-path");
+      expect(window.location.href).not.toContain("external-site.com");
+    });
+
+    it("refuses protocol-relative and backslash off-origin tricks", () => {
+      for (const hostile of ["//evil.com/", "/\\evil.com", "https://localhost.evil.com/"]) {
+        const replaceSpy = vi.spyOn(window.location, "replace");
+        redirectUser(hostile);
+        expect(replaceSpy, `accepted: ${hostile}`).toHaveBeenCalledWith("/default-path");
+        replaceSpy.mockRestore();
+      }
     });
 
     it("should use replace for internal redirects", () => {
       const internalPath = "/internal/path";
-      const replaceSpy = vi.spyOn(window.location, 'replace');
-      
+      const replaceSpy = vi.spyOn(window.location, "replace");
+
       redirectUser(internalPath);
 
       expect(replaceSpy).toHaveBeenCalledWith(internalPath);
     });
 
     it("should redirect to default path when redirectURI is null", () => {
-      const replaceSpy = vi.spyOn(window.location, 'replace');
-      
+      const replaceSpy = vi.spyOn(window.location, "replace");
+
       redirectUser(null);
 
       expect(replaceSpy).toHaveBeenCalledWith("/default-path");
@@ -196,33 +219,25 @@ describe("Common Utils", () => {
     });
 
     it("should redirect to default path when redirectURI is empty string", () => {
-      const replaceSpy = vi.spyOn(window.location, 'replace');
-      
+      const replaceSpy = vi.spyOn(window.location, "replace");
+
       redirectUser("");
 
       expect(replaceSpy).toHaveBeenCalledWith("/default-path");
     });
 
-    it("should handle https URLs", () => {
-      const httpsUrl = "https://secure.example.com/auth";
-      
-      redirectUser(httpsUrl);
+    it("still allows an absolute URL on the SAME origin", () => {
+      const sameOrigin = "http://localhost:3000/auth/callback";
 
-      expect(window.location.href).toBe(httpsUrl);
-    });
+      redirectUser(sameOrigin);
 
-    it("should handle http URLs", () => {
-      const httpUrl = "http://example.com/redirect";
-      
-      redirectUser(httpUrl);
-
-      expect(window.location.href).toBe(httpUrl);
+      expect(window.location.href).toBe(sameOrigin);
     });
 
     it("should handle relative paths", () => {
       const relativePath = "/app/dashboard";
-      const replaceSpy = vi.spyOn(window.location, 'replace');
-      
+      const replaceSpy = vi.spyOn(window.location, "replace");
+
       redirectUser(relativePath);
 
       expect(replaceSpy).toHaveBeenCalledWith(relativePath);
@@ -230,8 +245,8 @@ describe("Common Utils", () => {
 
     it("should handle absolute paths without protocol", () => {
       const absolutePath = "/admin/users";
-      const replaceSpy = vi.spyOn(window.location, 'replace');
-      
+      const replaceSpy = vi.spyOn(window.location, "replace");
+
       redirectUser(absolutePath);
 
       expect(replaceSpy).toHaveBeenCalledWith(absolutePath);
@@ -275,7 +290,7 @@ describe("Common Utils", () => {
     it("should handle complete organization selection workflow", async () => {
       const userInfo = {
         email: "workflow@example.com",
-        name: "Workflow User"
+        name: "Workflow User",
       };
 
       const orgResponse = {
@@ -289,10 +304,10 @@ describe("Common Utils", () => {
               user_obj: { email: "workflow@example.com" },
               ingest_threshold: 1000,
               search_threshold: 500,
-              note: "Workflow organization"
-            }
-          ]
-        }
+              note: "Workflow organization",
+            },
+          ],
+        },
       };
 
       mockOrganizationsService.os_list = vi.fn().mockResolvedValue(orgResponse);
@@ -301,13 +316,18 @@ describe("Common Utils", () => {
       await getDefaultOrganization(userInfo, "workflow-org");
 
       expect(mockOrganizationsService.os_list).toHaveBeenCalledWith(
-        0, 100000, "id", false, "", "workflow-org"
+        0,
+        100000,
+        "id",
+        false,
+        "",
+        "workflow-org",
       );
     });
 
     it("should handle redirect with error handling", () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
       try {
         redirectUser("https://valid-url.com");
         expect(window.location.href).toBe("https://valid-url.com");
@@ -315,7 +335,7 @@ describe("Common Utils", () => {
         // Handle any potential errors gracefully
         expect(consoleSpy).not.toHaveBeenCalled();
       }
-      
+
       consoleSpy.mockRestore();
     });
 
@@ -323,13 +343,13 @@ describe("Common Utils", () => {
       const serverErrors = [10001];
       const searchErrors = [20001, 20002, 20003, 20004];
 
-      serverErrors.forEach(code => {
+      serverErrors.forEach((code) => {
         const message = logsErrorMessage(code);
         expect(message).toBeTruthy();
         expect(typeof message).toBe("string");
       });
 
-      searchErrors.forEach(code => {
+      searchErrors.forEach((code) => {
         const message = logsErrorMessage(code);
         expect(message).toBeTruthy();
         expect(typeof message).toBe("string");
@@ -343,8 +363,9 @@ describe("Common Utils", () => {
       const networkError = new Error("Network connection failed");
       mockOrganizationsService.os_list = vi.fn().mockRejectedValue(networkError);
 
-      await expect(getDefaultOrganization({email: "test@test.com"}, "org"))
-        .rejects.toThrow("Network connection failed");
+      await expect(getDefaultOrganization({ email: "test@test.com" }, "org")).rejects.toThrow(
+        "Network connection failed",
+      );
     });
 
     it("should handle malformed organization data", async () => {
@@ -353,17 +374,17 @@ describe("Common Utils", () => {
           data: [
             {
               // Missing required fields
-              name: "Incomplete Org"
-            }
-          ]
-        }
+              name: "Incomplete Org",
+            },
+          ],
+        },
       };
 
       mockOrganizationsService.os_list = vi.fn().mockResolvedValue(malformedResponse);
       mockZincutils.useLocalOrganization = vi.fn().mockReturnValue({ value: null });
 
       // Should not throw when processing malformed data
-      await getDefaultOrganization({email: "test@test.com"}, "org");
+      await getDefaultOrganization({ email: "test@test.com" }, "org");
       expect(mockOrganizationsService.os_list).toHaveBeenCalled();
     });
   });

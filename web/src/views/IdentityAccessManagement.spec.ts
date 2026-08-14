@@ -29,7 +29,6 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
   }),
 }));
 
-
 /** Helper: collect all items from sectionGroups (flattened, excluding hidden ones) */
 function visibleItems(sectionGroups: any[]): any[] {
   return sectionGroups.flatMap((g: any) =>
@@ -45,8 +44,7 @@ function allItems(sectionGroups: any[]): any[] {
 const defaultStubs = {
   RouterView: { template: "<div>Router View</div>" },
   OPageLayout: {
-    template:
-      '<div><slot name="sidebar" /><slot /></div>',
+    template: '<div><slot name="sidebar" /><slot /></div>',
   },
   SectionRail: true,
 };
@@ -154,9 +152,7 @@ describe("IdentityAccessManagement.vue Component", () => {
 
     it("should always include ingestionTokens item", () => {
       const items = allItems(wrapper.vm.sectionGroups);
-      const hasTokens = items.some(
-        (item: any) => item.key === "ingestionTokens",
-      );
+      const hasTokens = items.some((item: any) => item.key === "ingestionTokens");
       expect(hasTokens).toBe(true);
     });
 
@@ -315,8 +311,7 @@ describe("IdentityAccessManagement.vue Component", () => {
     });
 
     it("should handle isEnterprise flag", () => {
-      const isEnterprise =
-        config.isEnterprise === "true" || config.isCloud === "true";
+      const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
       expect(typeof isEnterprise).toBe("boolean");
     });
 
@@ -565,6 +560,27 @@ describe("IdentityAccessManagement.vue Component", () => {
 
         const items = visibleItems(w.vm.sectionGroups);
         expect(items.some((i: any) => i.key === "invitations")).toBe(false);
+        w.unmount();
+      });
+
+      // The backend serves /{org}/mcp on every edition (only OAuth discovery is
+      // enterprise-only), so the card is not build- or ai_enabled-gated.
+      it("should include mcpServer in open source with ai_enabled off", async () => {
+        vi.spyOn(config, "isEnterprise", "get").mockReturnValue("false");
+        vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
+        store.state.zoConfig.ai_enabled = false;
+
+        const w = mount(IdentityAccessManagement, {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: defaultStubs,
+          },
+        });
+        await flushPromises();
+
+        const items = visibleItems(w.vm.sectionGroups);
+        expect(items.some((i: any) => i.key === "mcpServer")).toBe(true);
         w.unmount();
       });
     });

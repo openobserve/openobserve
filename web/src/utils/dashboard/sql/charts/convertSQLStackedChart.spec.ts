@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { applyStackedChart } from "@/utils/dashboard/sql/charts/convertSQLStackedChart";
+import { chartColor } from "@/utils/chartTheme";
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
   formatUnitValue: vi.fn((v) => String(v ?? "")),
@@ -54,7 +55,15 @@ function makeMockContext(overrides: Partial<any> = {}): any {
 
   return {
     options: {
-      xAxis: [{ data: ["Jan", "Feb", "Mar"], axisLabel: { rotate: 0, width: 120, margin: 5 }, axisTick: {}, nameGap: 25, name: "" }],
+      xAxis: [
+        {
+          data: ["Jan", "Feb", "Mar"],
+          axisLabel: { rotate: 0, width: 120, margin: 5 },
+          axisTick: {},
+          nameGap: 25,
+          name: "",
+        },
+      ],
       yAxis: [{ data: [], axisLabel: { width: 80 }, name: "" }],
       series: [],
       tooltip: { axisPointer: {}, textStyle: {} },
@@ -136,20 +145,14 @@ describe("applyStackedChart", () => {
     expect(ctx.options.tooltip.axisPointer.label.show).toBe(true);
   });
 
-  it("sets tooltip axisPointer label backgroundColor for dark theme", () => {
-    const ctx = makeMockContext({
-      store: { state: { theme: "dark", zoConfig: { timestamp_column: "_timestamp" } } },
-    });
+  it("sets tooltip axisPointer label backgroundColor from the crosshair token", () => {
+    const ctx = makeMockContext();
     applyStackedChart(ctx);
-    expect(ctx.options.tooltip.axisPointer.label.backgroundColor).toBe("#333");
-  });
-
-  it("sets tooltip axisPointer label backgroundColor to empty string for light theme", () => {
-    const ctx = makeMockContext({
-      store: { state: { theme: "light", zoConfig: { timestamp_column: "_timestamp" } } },
-    });
-    applyStackedChart(ctx);
-    expect(ctx.options.tooltip.axisPointer.label.backgroundColor).toBe("");
+    // No longer a theme branch: the chip bg comes from the --color-chart-crosshair-bg
+    // token (dark #333, light left "auto"/empty), resolved via chartColor().
+    expect(ctx.options.tooltip.axisPointer.label.backgroundColor).toBe(
+      chartColor("--color-chart-crosshair-bg"),
+    );
   });
 
   it("sets xAxis[0].axisTick to empty object", () => {

@@ -26,6 +26,7 @@ vi.mock("./http", () => ({
 }));
 
 import http from "./http";
+import store from "@/stores";
 
 describe("Synthetics locations service", () => {
   let mockHttp: any;
@@ -47,10 +48,7 @@ describe("Synthetics locations service", () => {
     it("makes a POST request to the correct URL with the payload", async () => {
       await synthetics.createLocation(orgIdentifier, payload);
 
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        `/api/test-org/synthetics/locations`,
-        payload,
-      );
+      expect(mockHttp.post).toHaveBeenCalledWith(`/api/test-org/synthetics/locations`, payload);
     });
 
     it("handles minimal payloads", async () => {
@@ -85,10 +83,7 @@ describe("Synthetics locations service", () => {
 
       for (const org of orgs) {
         await synthetics.createLocation(org, payload);
-        expect(mockHttp.post).toHaveBeenCalledWith(
-          `/api/${org}/synthetics/locations`,
-          payload,
-        );
+        expect(mockHttp.post).toHaveBeenCalledWith(`/api/${org}/synthetics/locations`, payload);
       }
     });
 
@@ -96,9 +91,9 @@ describe("Synthetics locations service", () => {
       const error = new Error("Location name already exists");
       mockHttp.post.mockRejectedValue(error);
 
-      await expect(
-        synthetics.createLocation(orgIdentifier, payload),
-      ).rejects.toThrow("Location name already exists");
+      await expect(synthetics.createLocation(orgIdentifier, payload)).rejects.toThrow(
+        "Location name already exists",
+      );
     });
   });
 
@@ -154,9 +149,9 @@ describe("Synthetics locations service", () => {
       const error = new Error("Location not found");
       mockHttp.put.mockRejectedValue(error);
 
-      await expect(
-        synthetics.updateLocation(orgIdentifier, id, payload),
-      ).rejects.toThrow("Location not found");
+      await expect(synthetics.updateLocation(orgIdentifier, id, payload)).rejects.toThrow(
+        "Location not found",
+      );
     });
   });
 
@@ -167,9 +162,7 @@ describe("Synthetics locations service", () => {
     it("makes a DELETE request to the correct URL with the id", async () => {
       await synthetics.deleteLocation(orgIdentifier, id);
 
-      expect(mockHttp.delete).toHaveBeenCalledWith(
-        `/api/test-org/synthetics/locations/loc-456`,
-      );
+      expect(mockHttp.delete).toHaveBeenCalledWith(`/api/test-org/synthetics/locations/loc-456`);
     });
 
     it("handles different location IDs", async () => {
@@ -188,9 +181,7 @@ describe("Synthetics locations service", () => {
 
       for (const org of orgs) {
         await synthetics.deleteLocation(org, id);
-        expect(mockHttp.delete).toHaveBeenCalledWith(
-          `/api/${org}/synthetics/locations/loc-456`,
-        );
+        expect(mockHttp.delete).toHaveBeenCalledWith(`/api/${org}/synthetics/locations/loc-456`);
       }
     });
 
@@ -198,9 +189,7 @@ describe("Synthetics locations service", () => {
       const error = new Error("Forbidden");
       mockHttp.delete.mockRejectedValue(error);
 
-      await expect(
-        synthetics.deleteLocation(orgIdentifier, id),
-      ).rejects.toThrow("Forbidden");
+      await expect(synthetics.deleteLocation(orgIdentifier, id)).rejects.toThrow("Forbidden");
     });
   });
 
@@ -212,10 +201,9 @@ describe("Synthetics locations service", () => {
 
       await synthetics.bulkDeleteLocations(orgIdentifier, ids);
 
-      expect(mockHttp.delete).toHaveBeenCalledWith(
-        `/api/test-org/synthetics/locations`,
-        { data: { ids: ["loc-1", "loc-2", "loc-3"] } },
-      );
+      expect(mockHttp.delete).toHaveBeenCalledWith(`/api/test-org/synthetics/locations`, {
+        data: { ids: ["loc-1", "loc-2", "loc-3"] },
+      });
     });
 
     it("handles a single id in the array", async () => {
@@ -223,10 +211,9 @@ describe("Synthetics locations service", () => {
 
       await synthetics.bulkDeleteLocations(orgIdentifier, ids);
 
-      expect(mockHttp.delete).toHaveBeenCalledWith(
-        `/api/test-org/synthetics/locations`,
-        { data: { ids: ["loc-single"] } },
-      );
+      expect(mockHttp.delete).toHaveBeenCalledWith(`/api/test-org/synthetics/locations`, {
+        data: { ids: ["loc-single"] },
+      });
     });
 
     it("handles an empty ids array", async () => {
@@ -234,10 +221,9 @@ describe("Synthetics locations service", () => {
 
       await synthetics.bulkDeleteLocations(orgIdentifier, ids);
 
-      expect(mockHttp.delete).toHaveBeenCalledWith(
-        `/api/test-org/synthetics/locations`,
-        { data: { ids: [] } },
-      );
+      expect(mockHttp.delete).toHaveBeenCalledWith(`/api/test-org/synthetics/locations`, {
+        data: { ids: [] },
+      });
     });
 
     it("handles a large number of ids", async () => {
@@ -245,10 +231,9 @@ describe("Synthetics locations service", () => {
 
       await synthetics.bulkDeleteLocations(orgIdentifier, ids);
 
-      expect(mockHttp.delete).toHaveBeenCalledWith(
-        `/api/test-org/synthetics/locations`,
-        { data: { ids } },
-      );
+      expect(mockHttp.delete).toHaveBeenCalledWith(`/api/test-org/synthetics/locations`, {
+        data: { ids },
+      });
     });
 
     it("handles different organization identifiers", async () => {
@@ -257,10 +242,9 @@ describe("Synthetics locations service", () => {
 
       for (const org of orgs) {
         await synthetics.bulkDeleteLocations(org, ids);
-        expect(mockHttp.delete).toHaveBeenCalledWith(
-          `/api/${org}/synthetics/locations`,
-          { data: { ids: ["loc-a", "loc-b"] } },
-        );
+        expect(mockHttp.delete).toHaveBeenCalledWith(`/api/${org}/synthetics/locations`, {
+          data: { ids: ["loc-a", "loc-b"] },
+        });
       }
     });
 
@@ -269,9 +253,57 @@ describe("Synthetics locations service", () => {
       const error = new Error("Server error");
       mockHttp.delete.mockRejectedValue(error);
 
-      await expect(
-        synthetics.bulkDeleteLocations(orgIdentifier, ids),
-      ).rejects.toThrow("Server error");
+      await expect(synthetics.bulkDeleteLocations(orgIdentifier, ids)).rejects.toThrow(
+        "Server error",
+      );
     });
+  });
+});
+
+// ── Artifact URLs ──────────────────────────────────────────────────────────
+//
+// These are used directly in `<img src>` and `fetch()`, bypassing the axios
+// wrapper — so unlike every other call in this file they do not inherit
+// `baseURL: store.state.API_ENDPOINT` and must carry the origin themselves.
+describe("artifactUrl origin", () => {
+  const KEY = "synthetics/default/mon-1/2026/07/30/RUN/EXEC/attempt-1-evidence.ndjson";
+
+  beforeEach(() => {
+    store.state.API_ENDPOINT = "";
+  });
+
+  it("prefixes the configured API endpoint, so it does not resolve against the dev server", () => {
+    // The dev server on :8081 serves no /api route; without the origin the
+    // request 404s and every screenshot and evidence bundle is dead locally.
+    store.state.API_ENDPOINT = "http://localhost:5080";
+    expect(synthetics.artifactUrl("default", KEY)).toBe(
+      `http://localhost:5080/api/default/synthetics/mon-1/artifact?key=${encodeURIComponent(KEY)}`,
+    );
+  });
+
+  it("stays a bare path when the app is served from the API's own origin", () => {
+    // "/" is same-origin, and "//api/..." would be protocol-relative — a
+    // request to a host named "api".
+    store.state.API_ENDPOINT = "/";
+    expect(synthetics.artifactUrl("default", KEY)).toBe(
+      `/api/default/synthetics/mon-1/artifact?key=${encodeURIComponent(KEY)}`,
+    );
+  });
+
+  it("does not double the separator when the endpoint has a trailing slash", () => {
+    store.state.API_ENDPOINT = "https://o2.example.dev/";
+    expect(synthetics.artifactUrl("default", KEY)).toBe(
+      `https://o2.example.dev/api/default/synthetics/mon-1/artifact?key=${encodeURIComponent(KEY)}`,
+    );
+  });
+
+  it("keeps a sub-path endpoint intact", () => {
+    store.state.API_ENDPOINT = "https://host.dev/o2";
+    expect(synthetics.artifactUrl("default", KEY)).toContain("https://host.dev/o2/api/default/");
+  });
+
+  it("still appends the folder when one is given", () => {
+    store.state.API_ENDPOINT = "http://localhost:5080";
+    expect(synthetics.artifactUrl("default", KEY, "fold-1")).toContain("&folder=fold-1");
   });
 });

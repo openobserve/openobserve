@@ -42,16 +42,11 @@ describe("JobPreviewPanel", () => {
     ["span", "Matched Spans", "spans matched · last 24h"],
     ["trace", "Matched Traces", "traces matched · last 24h"],
     ["session", "Matched Sessions", "sessions matched · last 24h"],
-  ] as const)(
-    "uses %s target terminology",
-    (targetScope, title, matchedSuffix) => {
-      const text = mountPreview(targetScope)
-        .find('[data-test="job-preview-matched-targets"]')
-        .text();
+  ] as const)("uses %s target terminology", (targetScope, title, matchedSuffix) => {
+    const text = mountPreview(targetScope).find('[data-test="job-preview-matched-targets"]').text();
 
-      expect(text).toContain(title);
-      expect(text).toContain("37");
-      expect(text).toContain(matchedSuffix);
-    },
-  );
+    expect(text).toContain(title);
+    expect(text).toContain("37");
+    expect(text).toContain(matchedSuffix);
+  });
 });

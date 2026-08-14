@@ -125,8 +125,7 @@ function mountComp(props: Record<string, any> = {}) {
 }
 
 // The add-user OForm is the first OForm in the tree.
-const getForm = (wrapper: VueWrapper<any>) =>
-  wrapper.findComponent({ name: "OForm" });
+const getForm = (wrapper: VueWrapper<any>) => wrapper.findComponent({ name: "OForm" });
 const setField = (wrapper: VueWrapper<any>, name: string, value: unknown) =>
   getForm(wrapper).vm.form.setFieldValue(name, value);
 const submitForm = async (wrapper: VueWrapper<any>) => {
@@ -158,9 +157,9 @@ describe("AddUser", () => {
     it("renders the OForm wired to the dialog via form-id", () => {
       wrapper = mountComp();
       expect(getForm(wrapper).exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id"),
-      ).toBe("add-user-form");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id")).toBe(
+        "add-user-form",
+      );
     });
 
     it("passes the owner-created form to OForm (Rule ③ OWNER wiring)", () => {
@@ -183,29 +182,21 @@ describe("AddUser", () => {
 
     it("reflects the open prop on the dialog", async () => {
       wrapper = mountComp();
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open")).toBe("true");
       await wrapper.setProps({ open: false });
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open")).toBe("false");
     });
 
     it("shows the add title in add mode and a different edit title in edit mode", async () => {
       wrapper = mountComp(); // add mode (empty modelValue)
-      const addTitle = wrapper
-        .find('[data-test-stub="o-dialog"]')
-        .attributes("data-title");
+      const addTitle = wrapper.find('[data-test-stub="o-dialog"]').attributes("data-title");
       expect(addTitle).toBeTruthy();
 
       const w = mountComp({
         modelValue: { email: "x@y.com", first_name: "X", org_member_id: "1" },
       });
       await flushPromises();
-      const editTitle = w
-        .find('[data-test-stub="o-dialog"]')
-        .attributes("data-title");
+      const editTitle = w.find('[data-test-stub="o-dialog"]').attributes("data-title");
       expect(editTitle).toBeTruthy();
       expect(editTitle).not.toBe(addTitle);
       w.unmount();
@@ -220,11 +211,7 @@ describe("AddUser", () => {
       expect(wrapper.vm.filterdOption).toEqual(["editor-role"]);
 
       wrapper.vm.filterFn("", (fn: () => void) => fn());
-      expect(wrapper.vm.filterdOption).toEqual([
-        "admin-role",
-        "editor-role",
-        "viewer",
-      ]);
+      expect(wrapper.vm.filterdOption).toEqual(["admin-role", "editor-role", "viewer"]);
     });
   });
 
@@ -672,9 +659,7 @@ describe("AddUser", () => {
     it("signout() clears auth state and redirects to /logout", () => {
       store.state.userInfo = { ...store.state.userInfo, email: ADMIN_EMAIL };
       store.state.organizations = [];
-      const dispatchSpy = vi
-        .spyOn(store, "dispatch")
-        .mockReturnValue(undefined as any);
+      const dispatchSpy = vi.spyOn(store, "dispatch").mockReturnValue(undefined as any);
       const push = vi.fn();
       const w = mount(AddUser, {
         global: {
@@ -744,9 +729,7 @@ describe("AddUser", () => {
       });
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="user-custom-role-field"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="user-custom-role-field"]').exists()).toBe(true);
     });
   });
 });

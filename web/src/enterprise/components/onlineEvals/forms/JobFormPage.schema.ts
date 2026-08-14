@@ -22,6 +22,7 @@ import { z } from "zod";
 import {
   MIN_COMPLETION_IDLE_WINDOW_SECS,
   TRACE_COMPLETION_WINDOW_DEFAULTS,
+  completionWindowLimitsForScope,
 } from "../utils/completionWindow";
 
 const requiredText = (message: string) =>
@@ -39,10 +40,7 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
       idleWindowSecs: z.coerce
         .number()
         .int()
-        .min(
-          MIN_COMPLETION_IDLE_WINDOW_SECS,
-          t("onlineEvals.job.validation.idleWindowMinimum"),
-        )
+        .min(MIN_COMPLETION_IDLE_WINDOW_SECS, t("onlineEvals.job.validation.idleWindowMinimum"))
         .default(TRACE_COMPLETION_WINDOW_DEFAULTS.idleWindowSecs),
       maxAgeSecs: z.coerce
         .number()
@@ -65,15 +63,40 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
     })
     .superRefine((val, ctx) => {
       // Sampling value is required unless the mode is "all" (which ignores it).
-      if (
-        val.samplingMode !== "all" &&
-        String(val.samplingValue ?? "").trim().length === 0
-      ) {
+      if (val.samplingMode !== "all" && String(val.samplingValue ?? "").trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["samplingValue"],
           message: t("onlineEvals.job.validation.samplingValueRequired"),
         });
+      }
+
+      // Per-scope hard ceilings, mirroring the backend guard rails.
+      const limits = completionWindowLimitsForScope(val.targetScope);
+      if (limits) {
+        const isTrace = val.targetScope === "trace";
+        if (val.idleWindowSecs > limits.maxIdleWindowSecs) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["idleWindowSecs"],
+            message: t(
+              isTrace
+                ? "onlineEvals.job.validation.idleWindowMaximumTrace"
+                : "onlineEvals.job.validation.idleWindowMaximumSession",
+            ),
+          });
+        }
+        if (val.maxAgeSecs > limits.maxAgeSecs) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["maxAgeSecs"],
+            message: t(
+              isTrace
+                ? "onlineEvals.job.validation.maxAgeMaximumTrace"
+                : "onlineEvals.job.validation.maxAgeMaximumSession",
+            ),
+          });
+        }
       }
     });
 

@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { InjectionKey } from "vue";
 
 export type CheckboxSize = "xs" | "sm" | "md";
@@ -12,10 +14,7 @@ export type CheckboxColor = "primary" | "negative";
  */
 export type CheckboxPrimitive = string | number;
 export type CheckboxModelValue =
-  | boolean
-  | "indeterminate"
-  | CheckboxPrimitive
-  | CheckboxPrimitive[];
+  boolean | "indeterminate" | CheckboxPrimitive | CheckboxPrimitive[];
 
 export interface CheckboxProps {
   /** Current checked state. Use `true`, `false`, or `'indeterminate'` */
@@ -29,7 +28,7 @@ export interface CheckboxProps {
   /** Compatibility alias for `value` */
   val?: CheckboxPrimitive;
   /** Accessible label rendered next to the checkbox */
-  label?: string;
+  label?: I18nText;
   /** Control size */
   size?: CheckboxSize;
   /** Value to emit when checked in custom-value mode */
@@ -73,8 +72,7 @@ export interface CheckboxGroupContext {
   isChecked(_value: CheckboxPrimitive): boolean;
 }
 
-export const CHECKBOX_GROUP_KEY: InjectionKey<CheckboxGroupContext> =
-  Symbol("CheckboxGroup");
+export const CHECKBOX_GROUP_KEY: InjectionKey<CheckboxGroupContext> = Symbol("CheckboxGroup");
 
 export interface CheckboxGroupProps {
   /** Array of currently checked values */

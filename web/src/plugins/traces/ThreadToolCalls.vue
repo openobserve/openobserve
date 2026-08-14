@@ -26,24 +26,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   CSS is allowed here per the redesign rules §5a).
 -->
 <template>
-  <div
-    v-if="toolCalls.length > 0"
-    class="thread-tools-thread"
-  >
+  <div v-if="toolCalls.length > 0" class="thread-tools-thread">
     <!-- One-way reveal: clicking shows the calls and removes the pill. -->
     <button v-if="!shown" class="tt-toggle" @click="shown = true">
       <span class="tt-zz"></span>
-      <span class="tt-pill">
-        <span class="tt-count">
+      <span class="tt-pill border-border-default bg-surface-base border">
+        <span class="tt-count text-text-secondary">
           {{ toolCalls.length }}
           {{
             toolCalls.length === 1
-              ? t('traces.threadToolCalls.toolCall')
-              : t('traces.threadToolCalls.toolCalls')
+              ? t("traces.threadToolCalls.toolCall")
+              : t("traces.threadToolCalls.toolCalls")
           }}
           · {{ formatDuration(totalToolDuration(toolCalls)) }}
         </span>
-        <span class="tt-link">{{ t('traces.threadToolCalls.showCalls') }}</span>
+        <span class="tt-link">{{ t("traces.threadToolCalls.showCalls") }}</span>
       </span>
       <span class="tt-zz"></span>
     </button>
@@ -55,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="thread-tool"
         :class="{ 'thread-tool--open': expandedTools.has(tool.span_id) }"
       >
-        <div class="thread-tool-row" @click="toggleTool(tool.span_id)">
-          <span class="thread-tool-row__caret">{{
+        <div class="thread-tool-row text-text-secondary" @click="toggleTool(tool.span_id)">
+          <span class="thread-tool-row__caret text-text-secondary">{{
             expandedTools.has(tool.span_id) ? "▾" : "▸"
           }}</span>
           <OIcon name="build" size="xs" class="thread-tool-row__icon" />
@@ -66,17 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex-1" />
           <span
             class="thread-pill"
-            :class="
-              tool.span_status === 'ERROR'
-                ? 'thread-pill--error'
-                : 'thread-pill--ok'
-            "
+            :class="tool.span_status === 'ERROR' ? 'thread-pill--error' : 'thread-pill--ok'"
           >
             {{ tool.span_status === "ERROR" ? "ERROR" : "OK" }}
             · {{ formatDuration(tool.duration) }}
           </span>
           <button
-            class="thread-tool-row__view"
+            class="thread-tool-row__view text-text-secondary"
             @click.stop="emit('span-selected', tool.span_id)"
             :title="t('traces.threadToolCalls.openSpanDetails')"
           >
@@ -84,25 +77,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
         </div>
 
-        <div v-if="expandedTools.has(tool.span_id)" class="thread-tool-body">
+        <div
+          v-if="expandedTools.has(tool.span_id)"
+          class="thread-tool-body bg-surface-base border-border-default border-t border-dashed"
+        >
           <div class="thread-tool-body__section">
-            <div class="thread-tool-body__label">{{ t('traces.threadToolCalls.arguments') }}</div>
-            <pre class="thread-tool-body__pre">{{
-              formatToolPayload(getInputRaw(tool) || tool.tool_args)
-            }}</pre>
+            <div class="thread-tool-body__label text-text-secondary">
+              {{ t("traces.threadToolCalls.arguments") }}
+            </div>
+            <pre
+              class="thread-tool-body__pre bg-surface-base border-border-default text-text-body border"
+              >{{ formatToolPayload(getInputRaw(tool) || tool.tool_args) }}</pre>
           </div>
           <div class="thread-tool-body__section">
-            <div class="thread-tool-body__label">
-              {{ t('traces.threadToolCalls.result') }}
+            <div class="thread-tool-body__label text-text-secondary">
+              {{ t("traces.threadToolCalls.result") }}
               <span v-if="tool.span_status === 'ERROR'" class="text-error-600">
-                · ERROR
+                · {{ t("traces.error") }}
               </span>
             </div>
-            <pre class="thread-tool-body__pre">{{
-              formatToolPayload(getOutputRaw(tool)) ||
-              tool.status_message ||
-              t('traces.threadToolCalls.empty')
-            }}</pre>
+            <pre
+              class="thread-tool-body__pre bg-surface-base border-border-default text-text-body border"
+              >{{
+                formatToolPayload(getOutputRaw(tool)) ||
+                tool.status_message ||
+                t("traces.threadToolCalls.empty")
+              }}</pre>
           </div>
         </div>
       </div>
@@ -112,8 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getInputRaw, getOutputRaw } from "./threadView.utils";
 
@@ -123,8 +122,7 @@ defineProps<{
 }>();
 const emit = defineEmits<{ (e: "span-selected", spanId: string): void }>();
 
-const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // One-way reveal for the whole group; per-tool rows expand independently.
 const shown = ref(false);
@@ -176,7 +174,7 @@ function formatDuration(ns: number): string {
 }
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(complex-state): the tiled SVG zigzag artwork (masked so it takes a theme
    token) plus the nested per-tool open/hover state cascade the utility layer
    cannot express. */
@@ -217,11 +215,12 @@ function formatDuration(ns: number): string {
     align-items: center;
     gap: 0.125rem;
     padding: 0.5rem 1.125rem;
-    border: 1px solid var(--color-border-default);
     border-radius: 0.625rem;
-    background: var(--color-surface-base);
+    /* eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow offset), not layout — scaling it with text makes elevation bloom */
     box-shadow: 0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent);
-    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    transition:
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
   }
 
   .tt-toggle:hover .tt-pill {
@@ -230,7 +229,6 @@ function formatDuration(ns: number): string {
 
   .tt-count {
     font-size: var(--text-xs);
-    color: var(--color-text-secondary);
     font-weight: 600;
     white-space: nowrap;
   }
@@ -259,6 +257,7 @@ function formatDuration(ns: number): string {
 }
 
 .thread-tool {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel tool row divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid color-mix(in srgb, var(--tt-accent) 15%, transparent);
   background: color-mix(in srgb, var(--tt-accent) 4%, transparent);
   transition: background 120ms ease;
@@ -266,10 +265,10 @@ function formatDuration(ns: number): string {
   &:last-child {
     border-bottom: none;
   }
+}
 
-  &--open {
-    background: color-mix(in srgb, var(--tt-accent) 10%, transparent);
-  }
+.thread-tool--open {
+  background: color-mix(in srgb, var(--tt-accent) 10%, transparent);
 }
 
 .thread-tool-row {
@@ -279,54 +278,51 @@ function formatDuration(ns: number): string {
   padding: 0.45rem 0.5rem 0.45rem 0.75rem;
   font-size: var(--text-xs);
   cursor: pointer;
-  color: var(--color-text-secondary);
   transition: background 120ms ease;
 
   &:hover {
     background: color-mix(in srgb, var(--tt-accent) 12%, transparent);
   }
+}
 
-  &__caret {
-    color: var(--color-text-secondary);
-    font-size: var(--text-2xs);
-    width: 0.75rem;
-    text-align: center;
-  }
+.thread-tool-row__caret {
+  font-size: var(--text-2xs);
+  width: 0.75rem;
+  text-align: center;
+}
 
-  &__icon {
-    width: 1.125rem;
-    height: 1.125rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--text-base);
-  }
+.thread-tool-row__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-base);
+}
 
-  &__name {
-    font-family: var(--font-mono);
+.thread-tool-row__name {
+  font-family: var(--font-mono);
+  color: var(--tt-accent-text);
+  font-weight: 500;
+}
+
+.thread-tool-row__view {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 0.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: all 120ms ease;
+
+  &:hover {
+    background: color-mix(in srgb, var(--tt-accent) 18%, transparent);
     color: var(--tt-accent-text);
-    font-weight: 500;
-  }
-
-  &__view {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.375rem;
-    height: 1.375rem;
-    border-radius: 0.25rem;
-    background: transparent;
-    border: none;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    line-height: 1;
-    flex-shrink: 0;
-    transition: all 120ms ease;
-
-    &:hover {
-      background: color-mix(in srgb, var(--tt-accent) 18%, transparent);
-      color: var(--tt-accent-text);
-    }
   }
 }
 
@@ -341,56 +337,52 @@ function formatDuration(ns: number): string {
   letter-spacing: 0.03rem;
   font-family: var(--font-mono);
   white-space: nowrap;
+}
 
-  &--ok {
-    background: color-mix(in srgb, var(--color-success-600) 10%, transparent);
-    color: var(--color-success-600);
-    border: 1px solid color-mix(in srgb, var(--color-success-600) 25%, transparent);
-  }
+.thread-pill--ok {
+  background: color-mix(in srgb, var(--color-success-600) 10%, transparent);
+  color: var(--color-success-600);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel pill border must not scale with text or it smears at fractional zoom */
+  border: 1px solid color-mix(in srgb, var(--color-success-600) 25%, transparent);
+}
 
-  &--error {
-    background: color-mix(in srgb, var(--color-error-600) 10%, transparent);
-    color: var(--color-error-600);
-    border: 1px solid color-mix(in srgb, var(--color-error-600) 25%, transparent);
-  }
+.thread-pill--error {
+  background: color-mix(in srgb, var(--color-error-600) 10%, transparent);
+  color: var(--color-error-600);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel pill border must not scale with text or it smears at fractional zoom */
+  border: 1px solid color-mix(in srgb, var(--color-error-600) 25%, transparent);
 }
 
 .thread-tool-body {
   padding: 0.5rem 0.75rem 0.75rem;
-  background: var(--color-surface-base);
-  border-top: 1px dashed var(--color-border-default);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
 
-  &__section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-  }
+.thread-tool-body__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
 
-  &__label {
-    font-size: var(--text-3xs);
-    font-weight: 700;
-    letter-spacing: 0.06rem;
-    color: var(--color-text-secondary);
-  }
+.thread-tool-body__label {
+  font-size: var(--text-3xs);
+  font-weight: 700;
+  letter-spacing: 0.06rem;
+}
 
-  &__pre {
-    margin: 0;
-    padding: 0.5rem 0.625rem;
-    background: var(--color-surface-base);
-    border: 1px solid var(--color-border-default);
-    border-radius: 0.25rem;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--color-text-body);
-    line-height: 1.45;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 17.5rem;
-    overflow: auto;
-  }
+.thread-tool-body__pre {
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 17.5rem;
+  overflow: auto;
 }
 
 /* ─── dark mode overrides ─────────────────────────────────────────────────
@@ -403,22 +395,26 @@ function formatDuration(ns: number): string {
   .thread-tool {
     background: color-mix(in srgb, var(--tt-accent) 6%, transparent);
     border-bottom-color: color-mix(in srgb, var(--tt-accent) 20%, transparent);
-
-    &--open {
-      background: color-mix(in srgb, var(--tt-accent) 14%, transparent);
-    }
   }
+}
 
+.dark .thread-tools-thread .thread-tool--open {
+  background: color-mix(in srgb, var(--tt-accent) 14%, transparent);
+}
+
+.dark .thread-tools-thread {
   .thread-tool-row {
     &:hover {
       background: color-mix(in srgb, var(--tt-accent) 16%, transparent);
     }
-
-    &__view:hover {
-      background: color-mix(in srgb, var(--tt-accent) 22%, transparent);
-    }
   }
+}
 
+.dark .thread-tools-thread .thread-tool-row__view:hover {
+  background: color-mix(in srgb, var(--tt-accent) 22%, transparent);
+}
+
+.dark .thread-tools-thread {
   .thread-pill--ok {
     background: color-mix(in srgb, var(--color-success-500) 14%, transparent);
     color: var(--color-success-400);

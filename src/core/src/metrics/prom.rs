@@ -47,9 +47,11 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use ingestion_common::IngestUser;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use proto::prometheus_rpc;
+use schema::{check_for_schema, stream_schema_exists};
 use search_service;
 
 use super::native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram};
@@ -62,9 +64,7 @@ use crate::{
     ingestion::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
     },
-    ingestion_types::IngestUser,
     pipeline::batch_execution::ExecutablePipeline,
-    schema::{check_for_schema, stream_schema_exists},
 };
 
 pub async fn remote_write(
@@ -109,6 +109,10 @@ pub async fn remote_write(
 
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
+
+    // check if stream is deleting from cache
+    let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
+    let mut skipped_records: u32 = 0;
 
     // parse metadata
     for item in request.metadata {
@@ -295,6 +299,26 @@ pub async fn remote_write(
             None => continue,
         };
 
+        // check stream if it is deleting
+        let is_deleting = match stream_delete_status.get(&metric_name) {
+            Some(v) => *v,
+            None => {
+                let flag = db::compact::retention::is_deleting_stream(
+                    org_id,
+                    StreamType::Metrics,
+                    &metric_name,
+                    None,
+                );
+                stream_delete_status.insert(metric_name.clone(), flag);
+                flag
+            }
+        };
+
+        if is_deleting {
+            skipped_records += 1;
+            continue;
+        }
+
         // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
         // before the loop to avoid repeated async queries
 
@@ -408,6 +432,12 @@ pub async fn remote_write(
         }
         sample_processing_time += sample_start.elapsed().as_micros();
     }
+
+    // warn if any records were skipped due to streams being deleted
+    if skipped_records > 0 {
+        log::warn!("[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted");
+    }
+
     let parse_timeseries_ms = step_start.elapsed().as_millis();
 
     // Detailed performance logging
@@ -529,6 +559,16 @@ pub async fn remote_write(
             .unwrap_or_default();
         let partition_time_level = get_partition_time_level(StreamType::Metrics);
 
+        let cur_stream_alerts = stream_alerts_map.get(&format!(
+            "{}/{}/{}",
+            org_id,
+            StreamType::Metrics,
+            stream_name
+        ));
+        let mut triggers: TriggerAlertData =
+            Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
+        let mut evaluated_alerts = HashSet::new();
+
         for (mut val_map, timestamp) in json_data {
             let hash = super::signature_without_labels(&val_map, &[VALUE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
@@ -601,27 +641,43 @@ pub async fn remote_write(
                 .push(Arc::new(json::Value::Object(val_map.to_owned())));
             hour_buf.records_size += value_str.len();
 
-            // real time alert
-            let need_trigger = !stream_trigger_map.contains_key(&stream_name);
-            if need_trigger && !stream_alerts_map.is_empty() {
-                // Start check for alert trigger
-                let key = format!("{}/{}/{}", org_id, StreamType::Metrics, stream_name);
-                if let Some(alerts) = stream_alerts_map.get(&key) {
-                    let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = now_micros();
-                    for alert in alerts {
-                        if let Ok(Some(data)) = alert
-                            .evaluate(Some(&val_map), (None, alert_end_time), None)
-                            .await
-                            .map(|res| res.data)
-                        {
-                            trigger_alerts.push((alert.clone(), data));
+            // start check for alert trigger
+            if let Some(alerts) = cur_stream_alerts
+                && triggers.len() < alerts.len()
+            {
+                let end_time = now_micros();
+                for alert in alerts {
+                    let key = format!(
+                        "{}/{}/{}/{}",
+                        org_id,
+                        StreamType::Metrics,
+                        alert.stream_name,
+                        alert.get_unique_key()
+                    );
+                    // For one alert, only one trigger per request
+                    // Trigger for this alert is already added.
+                    if evaluated_alerts.contains(&key) {
+                        continue;
+                    }
+                    match alert.evaluate(Some(&val_map), (None, end_time), None).await {
+                        Ok(trigger_results) if trigger_results.data.is_some() => {
+                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        Ok(_) => {
+                            // the data doesn't satisfy the alert condition
+                        }
+                        Err(e) => {
+                            log::error!("[METRICS] Error while evaluating realtime alert: {e}");
                         }
                     }
-                    stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
                 }
             }
-            // End check for alert trigger
+            // end check for alert triggers
+        }
+
+        if !triggers.is_empty() {
+            stream_trigger_map.insert(stream_name.clone(), Some(triggers));
         }
     }
     let elapsed_ms = step_start.elapsed().as_millis();
@@ -839,12 +895,31 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
     super::get_prom_metadata_from_schema(schema).map(Into::into)
 }
 
+/// Default lookback window for `/api/v1/series` when `start` is omitted.
+///
+/// The Prometheus spec makes `start`/`end` optional (defaulting to the full
+/// TSDB range), but an unbounded range is rejected by the file_list layer and
+/// would mean a full-retention scan. 24h keeps low-frequency metrics (daily
+/// jobs) discoverable while bounding the query cost.
+const DEFAULT_SERIES_LOOKBACK_MICROS: i64 = 24 * 3600 * 1_000_000;
+
+fn normalize_series_time_range(start: i64, end: i64) -> (i64, i64) {
+    let end = if end <= 0 { now_micros() } else { end };
+    let start = if start <= 0 {
+        end - DEFAULT_SERIES_LOOKBACK_MICROS
+    } else {
+        start
+    };
+    (start, end)
+}
+
 pub async fn get_series(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
     start: i64,
     end: i64,
 ) -> Result<Vec<serde_json::Value>> {
+    let (start, end) = normalize_series_time_range(start, end);
     let metric_name = match selector.as_ref().and_then(try_into_metric_name) {
         Some(name) => name,
         None => {
@@ -1570,5 +1645,29 @@ mod tests {
             at: None,
         };
         assert_eq!(try_into_metric_name(&sel), Some("direct_name".to_string()));
+    }
+
+    #[test]
+    fn test_normalize_series_time_range_defaults_to_lookback() {
+        // omitted start arrives as 0 (see validate_metadata_params); it must
+        // become a bounded window or file_list rejects the query (issue #13120)
+        let end = now_micros();
+        let (start, end_out) = normalize_series_time_range(0, end);
+        assert_eq!(end_out, end);
+        assert_eq!(start, end - DEFAULT_SERIES_LOOKBACK_MICROS);
+    }
+
+    #[test]
+    fn test_normalize_series_time_range_defaults_end_to_now() {
+        let before = now_micros();
+        let (start, end) = normalize_series_time_range(0, 0);
+        assert!(end >= before);
+        assert_eq!(start, end - DEFAULT_SERIES_LOOKBACK_MICROS);
+    }
+
+    #[test]
+    fn test_normalize_series_time_range_explicit_values_untouched() {
+        let (start, end) = normalize_series_time_range(1_000, 2_000);
+        assert_eq!((start, end), (1_000, 2_000));
     }
 }

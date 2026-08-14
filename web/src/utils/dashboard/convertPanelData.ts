@@ -15,10 +15,7 @@
 
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { convertMultiSQLData } from "@/utils/dashboard/convertSQLData";
-import {
-  convertTableData,
-  convertMultiQueryTableData,
-} from "@/utils/dashboard/convertTableData";
+import { convertTableData, convertMultiQueryTableData } from "@/utils/dashboard/convertTableData";
 import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
@@ -42,6 +39,8 @@ export const convertPanelData = async (
   chartPanelStyle: any,
   annotations: any,
   loading: any = false,
+  // Metric sparkline: per-query histogram hits (SQL metric only).
+  sparklineData?: any,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -59,19 +58,19 @@ export const convertPanelData = async (
     case "scatter":
     case "metric":
     case "gauge": {
-      // NOTE: on logs to visualize toggle, it shows below error because breakdown field is not required for all the charts
       // Skip conversion if no fields are selected in builder mode
       // (prevents echarts errors like "axis.getAxesOnZeroOf is not a function")
-      // PromQL queries don't use builder fields, so skip this check for them
+      // PromQL queries don't use builder fields, so skip this check for them.
+      // Custom-query panels (e.g. logs Timechart) derive axes from the
+      // SQL result asynchronously, so empty x/y is a valid transient state there.
       const query = panelSchema?.queries?.[0];
       if (
         panelSchema?.queryType !== "promql" &&
+        !query?.customQuery &&
         !query?.fields?.x?.length &&
         !query?.fields?.y?.length
       ) {
-        throw new Error(
-          "Please select required fields to render the chart",
-        );
+        throw new Error("Please select required fields to render the chart");
       }
 
       if (
@@ -110,6 +109,7 @@ export const convertPanelData = async (
               chartPanelStyle,
               annotations,
               loading,
+              sparklineData,
             )),
           };
         } catch (error) {
@@ -240,8 +240,7 @@ export const convertPanelData = async (
           ...safeResult,
         };
       } else {
-        if (panelSchema?.queries?.[0]?.query?.trim() == "")
-          throw new Error("No data found");
+        if (panelSchema?.queries?.[0]?.query?.trim() == "") throw new Error("No data found");
       }
     }
     // falls through — custom chart without data resolves to the default empty result

@@ -45,44 +45,38 @@ const useJumpToLatestData = () => {
   const { searchObj } = useTraces();
 
   // Stream's [min, max] doc time (µs), from the streams name-list stats.
-  const streamDocTimeRange = computed<{ min: number; max: number } | undefined>(
-    () => {
-      const selected = searchObj.data?.stream?.selectedStream?.value;
-      if (!selected) return undefined;
-      let min = Infinity;
-      let max = -Infinity;
-      for (const s of searchObj.data?.streamResults?.list ?? []) {
-        if (s.name !== selected) continue;
-        const st = s.stats;
-        if (!st) continue;
-        if (st.doc_time_min > 0 && st.doc_time_min < min) min = st.doc_time_min;
-        if (st.doc_time_max > 0 && st.doc_time_max > max) max = st.doc_time_max;
-      }
-      if (!isFinite(min) || !isFinite(max)) return undefined;
-      return { min, max };
-    },
-  );
+  const streamDocTimeRange = computed<{ min: number; max: number } | undefined>(() => {
+    const selected = searchObj.data?.stream?.selectedStream?.value;
+    if (!selected) return undefined;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const s of searchObj.data?.streamResults?.list ?? []) {
+      if (s.name !== selected) continue;
+      const st = s.stats;
+      if (!st) continue;
+      if (st.doc_time_min > 0 && st.doc_time_min < min) min = st.doc_time_min;
+      if (st.doc_time_max > 0 && st.doc_time_max > max) max = st.doc_time_max;
+    }
+    if (!isFinite(min) || !isFinite(max)) return undefined;
+    return { min, max };
+  });
 
   // Resolved current query window (µs).
-  const queryWindowUs = computed<{ start: number; end: number } | undefined>(
-    () => {
-      const dt = searchObj.data?.datetime;
-      if (!dt) return undefined;
-      if (dt.type === "absolute" && dt.startTime && dt.endTime) {
-        return { start: Number(dt.startTime), end: Number(dt.endTime) };
-      }
-      if (dt.type === "relative" && dt.relativeTimePeriod) {
-        const r = getConsumableRelativeTime(dt.relativeTimePeriod);
-        if (r) return { start: r.startTime, end: r.endTime };
-      }
-      return undefined;
-    },
-  );
+  const queryWindowUs = computed<{ start: number; end: number } | undefined>(() => {
+    const dt = searchObj.data?.datetime;
+    if (!dt) return undefined;
+    if (dt.type === "absolute" && dt.startTime && dt.endTime) {
+      return { start: Number(dt.startTime), end: Number(dt.endTime) };
+    }
+    if (dt.type === "relative" && dt.relativeTimePeriod) {
+      const r = getConsumableRelativeTime(dt.relativeTimePeriod);
+      if (r) return { start: r.startTime, end: r.endTime };
+    }
+    return undefined;
+  });
 
   // A filter (not the range) is what emptied an overlapping window.
-  const hasFilters = computed(
-    () => (searchObj.data?.editorValue || "").trim().length > 0,
-  );
+  const hasFilters = computed(() => (searchObj.data?.editorValue || "").trim().length > 0);
 
   // Does the current window overlap the stream's known data envelope? When
   // stats are unavailable, assume overlap (conservative). Mirrors the logs /

@@ -62,7 +62,10 @@ describe("DedupSummaryCards", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => vi.clearAllMocks());
-  afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks(); });
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
 
   describe("renders with minimum props", () => {
     it("renders the root container", async () => {
@@ -165,7 +168,9 @@ describe("DedupSummaryCards", () => {
 
     it("displays label text", async () => {
       wrapper = await mountComp();
-      expect(byTestId(wrapper, "suppression-rate-label").text()).toContain("Suppression Rate (24h)");
+      expect(byTestId(wrapper, "suppression-rate-label").text()).toContain(
+        "Suppression Rate (24h)",
+      );
     });
 
     it("renders the info icon for tooltip", async () => {
@@ -266,7 +271,12 @@ describe("DedupSummaryCards", () => {
   describe("edge cases", () => {
     it("handles all-zero values", async () => {
       wrapper = await mountComp(
-        makeSummary({ total_alerts: 0, alerts_with_dedup: 0, suppression_rate: 0, pending_batches: 0 })
+        makeSummary({
+          total_alerts: 0,
+          alerts_with_dedup: 0,
+          suppression_rate: 0,
+          pending_batches: 0,
+        }),
       );
       expect(byTestId(wrapper, "total-alerts-value").text()).toBe("0");
       expect(byTestId(wrapper, "alerts-with-dedup-value").text()).toBe("0");

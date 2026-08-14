@@ -20,7 +20,7 @@
 //! - Model training state updates (is_trained, version, training_completed_at)
 //!
 //! Only updates the local database for API reads. Training and detection run
-//! exclusively on the primary region (where the alert manager runs).
+//! exclusively on the primary region (where the scheduler runs).
 
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},

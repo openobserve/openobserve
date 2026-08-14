@@ -438,25 +438,27 @@ test.describe("Alerts Stream Switching Regression", () => {
     // === SAVE + VERIFY: Full alert creation flow ===
 
     // Capture the alert name that setupToQueryConfig filled.
-    // O2: OInput wraps the native <input>; use alertNameInputField to hit the real <input>.
-    const alertNameInput = page.locator(pm.alertsPage.alertNameInputField);
-    const alertName = await alertNameInput.inputValue();
+    // O2: the alert name is an OInlineEdit title — in display mode the committed
+    // value lives in the `-value` span; the `-input` only exists while editing.
+    // Reading inputValue() here times out because there is no input in the DOM,
+    // so read the display value instead.
+    const alertName = await pm.alertsPage.getAlertName();
     testLogger.info(`Saving alert: ${alertName}`);
 
     // Select destination using POM locator
-    const destDropdown = page.locator(pm.alertsPage.alertDestinationsSelect);
+    const destDropdown = pm.alertsPage.getAlertDestinationsSelectLocator();
     await destDropdown.waitFor({ state: 'visible', timeout: 10000 });
     await destDropdown.click();
     await page.waitForTimeout(1000);
 
-    const destMenu = page.locator('[data-test="alert-destinations-select-popover"]');
+    const destMenu = pm.alertsPage.getAlertDestinationsSelectPopover();
     await expect(destMenu).toBeVisible({ timeout: 5000 });
-    const firstDest = page.locator('[data-test="alert-destinations-select-option"]').first();
+    const firstDest = pm.alertsPage.getFirstAlertDestinationOption();
     await expect(firstDest).toBeVisible({ timeout: 5000 });
     await firstDest.click();
     testLogger.info(`Selected destination`);
     await page.waitForTimeout(500);
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pm.alertsPage.getBodyLocator().click({ position: { x: 10, y: 10 } });
 
     // Remove interfering portal elements
     await page.evaluate(() => {
@@ -467,13 +469,13 @@ test.describe("Alerts Stream Switching Regression", () => {
     await page.waitForTimeout(300);
 
     // Submit — button is clipped in scroll container, use evaluate() same as createScheduledAlertWithSQL
-    await page.locator(pm.alertsPage.alertSubmitButton).waitFor({ state: 'attached', timeout: 10000 });
+    await pm.alertsPage.getAlertSubmitButtonLocator().waitFor({ state: 'attached', timeout: 10000 });
     await page.evaluate(() => {
       const btn = document.querySelector(`[data-test="add-alert-submit-btn"]`);
       if (btn) btn.click();
     });
     testLogger.info('Clicked Save button via evaluate()');
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Alert saved successfully.' })).toBeVisible({ timeout: 30000 });
+    await expect(pm.alertsPage.getToastMessageByText('Alert saved successfully.')).toBeVisible({ timeout: 30000 });
     testLogger.info('Alert saved successfully');
 
     // Verify the alert appears in the list

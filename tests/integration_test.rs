@@ -56,24 +56,20 @@ mod tests {
             json,
         },
     };
-    use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS};
+    use enrichment_data::enrichment::storage::{Values, local};
+    use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST};
+    use ingestion_common::IngestionResponse;
     use openobserve::migration;
-    use openobserve_api::handler::{
-        grpc::{auth::check_auth, flight::FlightServiceImpl},
-        http::{
-            self,
-            router::{basic_routes, config_routes, service_routes},
-        },
+    use openobserve_api_grpc::handler::grpc::{auth::check_auth, flight::FlightServiceImpl};
+    use openobserve_api_http::handler::http::router::{
+        basic_routes, config_routes, service_routes,
     };
     use openobserve_api_management::models::{
         alerts::responses::{GetAlertResponseBody, ListAlertsResponseBody},
         destinations::{Destination, DestinationType},
     };
-    use openobserve_core::{
-        alerts::scheduler::handlers::handle_triggers,
-        enrichment::storage::{Values, local},
-        ingestion_types::IngestionResponse,
-    };
+    use openobserve_api_pipelines::models::pipelines::{Pipeline as ApiPipeline, PipelineList};
+    use openobserve_core::alerts::scheduler::handlers::handle_triggers;
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
     use search_service::SEARCH_SERVER;
@@ -2430,8 +2426,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
-        let pipeline_list: openobserve_api::handler::http::models::pipelines::PipelineList =
-            json::from_slice(&body).unwrap();
+        let pipeline_list: PipelineList = json::from_slice(&body).unwrap();
         let pipeline = pipeline_list.list.first();
         assert!(pipeline.is_some());
         let pipeline = pipeline.unwrap();
@@ -2546,8 +2541,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
-        let pipeline_list: openobserve_api::handler::http::models::pipelines::PipelineList =
-            json::from_slice(&body).unwrap();
+        let pipeline_list: PipelineList = json::from_slice(&body).unwrap();
         let pipelines = pipeline_list.list.first();
         assert!(pipelines.is_some());
         let pipeline = pipelines.unwrap();
@@ -2668,7 +2662,7 @@ mod tests {
         // Save pipeline directly to DB (bypassing API validation) to simulate a pipeline
         // with an invalid query that was saved before validation was added, or to test
         // what happens at evaluation time when the stream does not exist.
-        openobserve_core::pipeline::store::set(&pipeline_data)
+        openobserve_core::pipeline::db::set(&pipeline_data)
             .await
             .expect("Failed to set pipeline in DB");
         // Create the scheduler trigger directly with needs_validated=false so the
@@ -2721,7 +2715,7 @@ mod tests {
         assert!(trigger.retries > 0);
 
         // Clean up the invalid pipeline
-        let _ = openobserve_core::pipeline::store::delete(&pipeline.id).await;
+        let _ = openobserve_core::pipeline::db::delete(&pipeline.id).await;
     }
 
     // Test to handle case where pipeline triggers for invalid timerange where start time
@@ -2871,7 +2865,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = openobserve_core::pipeline::store::delete(&pipeline.id).await;
+        let _ = openobserve_core::pipeline::db::delete(&pipeline.id).await;
         // Also delete the trigger job from scheduled jobs table
         let _ = db::scheduler::delete(
             "e2e",
@@ -3052,7 +3046,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = openobserve_core::pipeline::store::delete(&pipeline.id).await;
+        let _ = openobserve_core::pipeline::db::delete(&pipeline.id).await;
         // Also delete the trigger job from scheduled jobs table
         let _ = db::scheduler::delete(
             "e2e",
@@ -3073,17 +3067,16 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
-        let pipeline_list: openobserve_api::handler::http::models::pipelines::PipelineList =
-            json::from_slice(&body).unwrap();
+        let pipeline_list: PipelineList = json::from_slice(&body).unwrap();
         let pipeline = pipeline_list.list.first();
         assert!(pipeline.is_some());
         let pipeline = pipeline.unwrap();
 
         // Clean up test pipelines
-        let _ = openobserve_core::pipeline::store::delete(&pipeline.id).await;
+        let _ = openobserve_core::pipeline::db::delete(&pipeline.id).await;
     }
 
-    async fn get_pipeline_from_api(pipeline_name: &str) -> http::models::pipelines::Pipeline {
+    async fn get_pipeline_from_api(pipeline_name: &str) -> ApiPipeline {
         let auth = setup();
         // Check if pipeline was saved successfully by doing a list using API
         let app = init_test_router();
@@ -3091,8 +3084,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success(), "Failed to list pipelines");
-        let pipeline_response: openobserve_api::handler::http::models::pipelines::PipelineList =
-            json::from_slice(&body).unwrap();
+        let pipeline_response: PipelineList = json::from_slice(&body).unwrap();
         // Get the pipeline that matches the pipeline name
         let pipeline = pipeline_response
             .list
@@ -3131,7 +3123,7 @@ mod tests {
         payload.push(record2);
 
         // Call save_enrichment_data
-        let result = openobserve_core::enrichment_table::save_enrichment_data(
+        let result = enrichment_data::enrichment_table::save_enrichment_data(
             org_id, table_name, payload, false, // append_data = false
         )
         .await;
@@ -3141,7 +3133,7 @@ mod tests {
         assert!(response.status().is_success());
 
         // Verify schema was created in database
-        let schema_exists = openobserve_core::schema::stream_schema_exists(
+        let schema_exists = schema::stream_schema_exists(
             org_id,
             table_name,
             config::meta::stream::StreamType::EnrichmentTables,
@@ -3170,9 +3162,7 @@ mod tests {
         drop(stream_schemas_latest);
 
         // Verify stream settings cache was updated
-        let stream_settings = STREAM_SETTINGS.read().await;
-        assert!(stream_settings.contains_key(&schema_key));
-        drop(stream_settings);
+        assert!(infra::schema::get_stream_settings_atomic(&schema_key).is_some());
 
         // Get the meta table stats for enrichment table
         let meta_table_stats = db::enrichment_table::get_meta_table_stats(org_id, table_name).await;
@@ -3183,7 +3173,7 @@ mod tests {
 
         // Check get_enrichment_table function, it should return same data
         let data =
-            openobserve_core::enrichment::get_enrichment_table(org_id, table_name, false).await;
+            enrichment_data::enrichment::get_enrichment_table(org_id, table_name, false).await;
         assert!(data.is_ok());
         let data = data.unwrap();
         assert!(data.len() == 2);
@@ -3226,7 +3216,7 @@ mod tests {
 
     async fn e2e_cleanup_enrichment_table(org_id: &str, stream_name: &str) {
         // Clean up the enrichment table and its schema
-        openobserve_core::enrichment_table::delete_enrichment_table(
+        enrichment_data::enrichment_table::delete_enrichment_table(
             org_id,
             stream_name,
             config::meta::stream::StreamType::EnrichmentTables,
@@ -3251,9 +3241,7 @@ mod tests {
         assert!(!stream_schemas_latest.contains_key(&schema_key));
         drop(stream_schemas_latest);
 
-        let stream_settings = STREAM_SETTINGS.read().await;
-        assert!(!stream_settings.contains_key(&schema_key));
-        drop(stream_settings);
+        assert!(infra::schema::get_stream_settings_atomic(&schema_key).is_none());
 
         // wait for 2 seconds
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
@@ -3284,7 +3272,7 @@ mod tests {
         );
         initial_payload.push(record1);
 
-        let result1 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result1 = enrichment_data::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             initial_payload,
@@ -3339,7 +3327,7 @@ mod tests {
         );
         append_payload.push(record2);
 
-        let result2 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result2 = enrichment_data::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             append_payload,
@@ -3349,7 +3337,7 @@ mod tests {
         assert!(result2.is_ok());
 
         // Verify schema still exists and is valid
-        let schema_exists = openobserve_core::schema::stream_schema_exists(
+        let schema_exists = schema::stream_schema_exists(
             org_id,
             table_name,
             config::meta::stream::StreamType::EnrichmentTables,
@@ -3409,7 +3397,7 @@ mod tests {
         record1.insert("age".to_string(), json::Value::String("25".to_string()));
         initial_payload.push(record1);
 
-        let result1 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result1 = enrichment_data::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             initial_payload,
@@ -3449,7 +3437,7 @@ mod tests {
         ); // New field
         append_payload.push(record2);
 
-        let result2 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result2 = enrichment_data::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             append_payload,

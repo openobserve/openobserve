@@ -17,7 +17,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import TracesMetricsContextMenu from "./TracesMetricsContextMenu.vue";
 
-
 const defaultProps = {
   visible: true,
   x: 100,

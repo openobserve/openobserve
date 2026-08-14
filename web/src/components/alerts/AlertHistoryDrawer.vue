@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="alert-history-drawer"
+  <ODrawer
+    data-test="alert-history-drawer"
     bleed
     :open="open"
     :width="65"
@@ -28,72 +29,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the other detail headers); the type badge + History/Condition toggle
          trail in header-left, the datetime picker sits in header-right. -->
     <template #header-left>
-          <div
-            class="flex items-center gap-2 flex-1 min-w-0"
-            data-test="alert-details-title"
-          >
-            <!-- Alert Type Badge -->
-            <div
-              v-if="alertDetails"
-              :class="[
-                'flex items-center gap-1 px-2 py-1 rounded-default border shrink-0',
-                'bg-surface-subtle border-border-default',
-              ]"
-            >
-              <OIcon
-                :name="
-                  isAnomaly
-                    ? 'query-stats'
-                    : alertDetails.is_real_time
-                      ? 'bolt'
-                      : 'schedule'
-                "
-                size="sm"
-                class="opacity-70"
-              />
-              <span
-                :class="[
-                  'text-xs font-semibold',
-                  'text-text-body',
-                ]"
-              >
-                {{
-                  isAnomaly
-                    ? "Anomaly Detection"
-                    : alertDetails.is_real_time
-                      ? "Real-time"
-                      : "Scheduled"
-                }}
-              </span>
-            </div>
-            <!-- Tab toggle -->
-            <OToggleGroup
-              class="shrink-0"
-              :model-value="activeTab"
-              @update:model-value="activeTab = $event as string"
-            >
-              <OToggleGroupItem
-                value="history"
-                size="sm"
-                data-test="alert-history-tab-history"
-              >
-                <template #icon-left>
-                  <OIcon name="history" size="sm" />
-                </template>
-                History
-              </OToggleGroupItem>
-              <OToggleGroupItem
-                value="condition"
-                size="sm"
-                data-test="alert-history-tab-condition"
-              >
-                <template #icon-left>
-                  <OIcon name="code" size="sm" />
-                </template>
-                Condition
-              </OToggleGroupItem>
-            </OToggleGroup>
-          </div>
+      <div class="flex min-w-0 flex-1 items-center gap-2" data-test="alert-details-title">
+        <!-- Alert Type Badge -->
+        <div
+          v-if="alertDetails"
+          :class="[
+            'rounded-default flex shrink-0 items-center gap-1 border px-2 py-1',
+            'bg-surface-subtle border-border-default',
+          ]"
+        >
+          <OIcon
+            :name="isAnomaly ? 'query-stats' : alertDetails.is_real_time ? 'bolt' : 'schedule'"
+            size="sm"
+            class="opacity-70"
+          />
+          <span :class="['text-xs font-semibold', 'text-text-body']">
+            {{
+              isAnomaly
+                ? t("alerts.anomalyDetection")
+                : alertDetails.is_real_time
+                  ? t("common.realTime")
+                  : t("alerts.scheduled")
+            }}
+          </span>
+        </div>
+        <!-- Tab toggle -->
+        <OToggleGroup
+          class="shrink-0"
+          :model-value="activeTab"
+          @update:model-value="activeTab = $event as string"
+        >
+          <OToggleGroupItem value="history" size="sm" data-test="alert-history-tab-history">
+            <template #icon-left>
+              <OIcon name="history" size="sm" />
+            </template>
+            {{ t("alert_list.alert_history") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="condition" size="sm" data-test="alert-history-tab-condition">
+            <template #icon-left>
+              <OIcon name="code" size="sm" />
+            </template>
+            {{ t("common.condition") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </div>
     </template>
     <template #header-right>
       <div class="col-auto flex items-center gap-1">
@@ -114,23 +93,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content -->
-    <div class="flex flex-col h-full min-h-0" v-if="alertDetails">
+    <div class="flex h-full min-h-0 flex-col" v-if="alertDetails">
       <!-- Tab Panels -->
       <OTabPanels
         v-model="activeTab"
         animated
-        class="flex-1 overflow-hidden bg-transparent flex flex-col"
+        class="flex flex-1 flex-col overflow-hidden bg-transparent"
       >
         <!-- History Panel -->
-        <OTabPanel
-          name="history"
-          layout="flex-col"
-          stretch
-          class="flex-1"
-        >
-          <div
-            class="flex h-full flex-col flex-1 overflow-hidden px-2 py-2"
-          >
+        <OTabPanel name="history" layout="flex-col" stretch class="flex-1">
+          <div class="flex h-full flex-1 flex-col overflow-hidden px-2 py-2">
             <!-- Empty state -->
             <OEmptyState
               v-if="!isLoadingHistory && alertHistory.length === 0"
@@ -143,21 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- History Table -->
-            <div
-              v-else
-              class="flex flex-col flex-1 overflow-hidden gap-2"
-            >
+            <div v-else class="flex flex-1 flex-col gap-2 overflow-hidden">
               <!-- Firing frequency timeline -->
-              <AlertHistoryTimeline
-                v-if="alertHistory.length > 0"
-                :history="alertHistory"
-              />
+              <AlertHistoryTimeline v-if="alertHistory.length > 0" :history="alertHistory" />
 
               <div
-                class="rounded-default overflow-hidden border flex flex-col flex-1"
-                :class="
-                  'border-border-default bg-surface-panel'
-                "
+                class="rounded-default flex flex-1 flex-col overflow-hidden border"
+                :class="'border-border-default bg-surface-base'"
               >
                 <OTable
                   :data="groupedHistory"
@@ -176,11 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @pagination-change="onPaginationChange"
                 >
                   <template #[`cell-#`]="{ row }">
-                    <span
-                      class="text-compact tabular-nums"
-                      :class="'text-text-secondary'"
-                    >
-                      {{ row._displayIndex ?? '—' }}
+                    <span class="text-compact tabular-nums" :class="'text-text-secondary'">
+                      {{ row._displayIndex ?? "—" }}
                     </span>
                   </template>
 
@@ -190,12 +151,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         :name="expandedGroups.has(row.timestamp) ? 'expand-less' : 'expand-more'"
                         size="sm"
-                        class="cursor-pointer opacity-50 shrink-0"
+                        class="shrink-0 cursor-pointer opacity-50"
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
-                      <OTag type="alertState" value="flapping" class="cursor-pointer shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
-                      <span class="text-2xs truncate text-text-secondary">
-                        {{ row._children.length }} rows · {{ row._duration }}
+                      <OTag
+                        type="alertState"
+                        value="flapping"
+                        class="shrink-0 cursor-pointer"
+                        @click="toggleFlappingGroup(row.timestamp)"
+                      />
+                      <span class="text-2xs text-text-secondary truncate">
+                        {{ row._children.length }} {{ t("alerts.alertDetails.rowsSeparator") }}
+                        {{ row._duration }}
                       </span>
                     </div>
                     <!-- Normal row -->
@@ -205,19 +172,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="row.status"
                         data-test="alert-history-status-chip"
                       />
-                      <OTooltip v-if="row.error" :max-width="'300px'" :content="row.error" />
+                      <OTooltip v-if="row.error" :max-width="'18.75rem'" :content="row.error" />
                     </span>
                   </template>
 
                   <template #cell-timestamp="{ row }">
-                    <span class="text-compact tabular-nums whitespace-nowrap" :class="row._child ? 'pl-5 opacity-70' : ''">
+                    <span
+                      class="text-compact whitespace-nowrap tabular-nums"
+                      :class="row._child ? 'pl-5 opacity-70' : ''"
+                    >
                       {{ formatTimestampFull(row.timestamp) }}
                     </span>
                   </template>
 
+                  <!-- T-10: what was observed, against what, and the level it
+                       classified to. Flapping group headers and pre-change
+                       rows (no actual_value) render "—". -->
+                  <template #cell-condition="{ row }">
+                    <span v-if="row._flappingGroup" class="text-text-secondary">—</span>
+                    <div v-else class="flex min-w-0 items-center gap-1.5">
+                      <span class="text-compact whitespace-nowrap tabular-nums">
+                        {{ conditionSummary(row) }}
+                      </span>
+                      <template v-if="row.level">
+                        <span class="text-text-secondary text-2xs shrink-0">→</span>
+                        <OTag type="alertLevel" :value="row.level" class="shrink-0" />
+                      </template>
+                      <span
+                        v-if="row.group_label"
+                        class="text-2xs text-text-secondary min-w-0 truncate"
+                        data-test="alert-history-group-label"
+                      >
+                        {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
+                        <OTooltip :content="row.group_label" :max-width="'18.75rem'" />
+                      </span>
+                    </div>
+                  </template>
+
                   <template #cell-evaluation_time="{ row }">
                     <span class="text-compact tabular-nums">
-                      {{ row.evaluation_took_in_secs ? row.evaluation_took_in_secs.toFixed(3) + "s" : "—" }}
+                      {{
+                        row.evaluation_took_in_secs
+                          ? row.evaluation_took_in_secs.toFixed(3) + "s"
+                          : "—"
+                      }}
                     </span>
                   </template>
 
@@ -241,8 +239,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template #bottom>
-                    <div class="flex items-center w-full h-12">
-                      <div class="text-xs font-normal flex items-center w-55">
+                    <div class="flex h-12 w-full items-center">
+                      <div class="flex w-55 items-center text-xs font-normal">
                         {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
                       </div>
                     </div>
@@ -254,42 +252,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
 
         <!-- Condition Panel -->
-        <OTabPanel
-          name="condition"
-          layout="flex-col"
-          stretch
-          class="flex-1"
-        >
-          <div
-            class="flex flex-col flex-1 overflow-hidden px-2 py-2"
-          >
+        <OTabPanel name="condition" layout="flex-col" stretch class="flex-1">
+          <div class="flex flex-1 flex-col overflow-hidden px-2 py-2">
             <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
               <div
-                class="rounded-default overflow-hidden border flex flex-col flex-1"
-                :class="
-                  'border-border-default bg-surface-panel'
-                "
+                class="rounded-default flex flex-1 flex-col overflow-hidden border"
+                :class="'border-border-default bg-surface-panel'"
               >
                 <div
-                  class="flex items-center justify-between py-1.5 px-2.5 border-b shrink-0"
-                  :class="
-                    'bg-surface-subtle border-border-default'
-                  "
+                  class="flex shrink-0 items-center justify-between border-b px-2.5 py-1.5"
+                  :class="'bg-surface-subtle border-border-default'"
                 >
                   <div class="flex items-center gap-1.5">
-                    <span
-                      class="text-2xs font-medium"
-                      :class="
-                        'text-text-secondary'
-                      "
-                    >
-                      SQL
+                    <span class="text-2xs font-medium" :class="'text-text-secondary'">
+                      {{ t("alerts.alertDetails.sql") }}
                     </span>
                   </div>
                   <OButton
                     v-if="anomalySql"
-                    @click="copyToClipboard(anomalySql, { successMessage: 'SQL Copied Successfully!', timeout: 3000 })"
+                    @click="
+                      copyToClipboard(anomalySql, t, {
+                        successMessage: 'SQL Copied Successfully!',
+                        timeout: 3000,
+                      })
+                    "
                     variant="ghost-muted"
                     size="icon-xs-sq"
                     data-test="anomaly-details-copy-sql-btn"
@@ -299,40 +286,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <pre
-                  class="p-[10px_14px] font-mono whitespace-pre-wrap overflow-x-auto text-compact m-0 leading-relaxed flex-1 overflow-y-auto"
-                  >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
-                >
+                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[0.625rem_0.875rem] font-mono leading-relaxed whitespace-pre-wrap"
+                  >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre>
               </div>
             </template>
 
             <!-- Regular alert condition view -->
             <template v-else>
               <div
-                class="rounded-default overflow-hidden border flex flex-col flex-1"
-                :class="
-                  'border-border-default bg-surface-panel'
-                "
+                class="rounded-default flex flex-1 flex-col overflow-hidden border"
+                :class="'border-border-default bg-surface-panel'"
               >
                 <!-- Code block header bar — stays fixed -->
                 <div
-                  class="flex items-center justify-between py-1.5 px-2.5 border-b shrink-0"
-                  :class="
-                    'bg-surface-subtle border-border-default'
-                  "
+                  class="flex shrink-0 items-center justify-between border-b px-2.5 py-1.5"
+                  :class="'bg-surface-subtle border-border-default'"
                 >
                   <div class="flex items-center gap-1.5">
-                    <span
-                      class="text-2xs font-medium"
-                      :class="
-                        'text-text-secondary'
-                      "
-                    >
+                    <span class="text-2xs font-medium" :class="'text-text-secondary'">
                       {{
                         alertDetails.type === "sql"
                           ? "SQL"
                           : alertDetails.type === "promql"
                             ? "PromQL"
-                            : "Conditions"
+                            : t("alerts.alertDetails.conditions")
                       }}
                     </span>
                   </div>
@@ -343,16 +320,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       alertDetails.conditions !== '--'
                     "
                     @click="
-                      copyToClipboard(
-                        alertDetails.conditions,
-                        {
-                          successMessage: (alertDetails.type === 'sql'
+                      copyToClipboard(alertDetails.conditions, t, {
+                        successMessage:
+                          (alertDetails.type === 'sql'
                             ? t('alerts.alertDetails.sqlQuery')
                             : alertDetails.type === 'promql'
                               ? t('alerts.alertDetails.promqlQuery')
                               : t('alerts.alertDetails.conditions')) + ' Copied Successfully!',
-                        },
-                      )
+                      })
                     "
                     variant="ghost-muted"
                     size="icon-xs-sq"
@@ -364,38 +339,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
-                  class="p-[10px_14px] font-mono whitespace-pre-wrap overflow-x-auto text-compact m-0 leading-relaxed flex-1 overflow-y-auto"
+                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[0.625rem_0.875rem] font-mono leading-relaxed whitespace-pre-wrap"
                   >{{
-                    alertDetails.conditions !== "" &&
-                    alertDetails.conditions !== "--"
-                      ? alertDetails.type === "sql" ||
-                        alertDetails.type === "promql"
+                    alertDetails.conditions !== "" && alertDetails.conditions !== "--"
+                      ? alertDetails.type === "sql" || alertDetails.type === "promql"
                         ? alertDetails.conditions
                         : alertDetails.conditions.length !== 2
-                          ? `if ${alertDetails.conditions}`
+                          ? t("alerts.alertDetails.ifCondition", {
+                              condition: alertDetails.conditions,
+                            })
                           : t("alerts.alertDetails.noCondition")
                       : t("alerts.alertDetails.noCondition")
-                  }}</pre
-                >
+                  }}</pre>
               </div>
             </template>
 
             <!-- Description (only show if exists) -->
             <div v-if="alertDetails.description" class="mt-3 shrink-0">
               <div
-                class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-1"
-                :class="
-                  'text-text-secondary'
-                "
+                class="mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase"
+                :class="'text-text-secondary'"
               >
                 <OIcon name="info-outline" size="xs" />
                 {{ t("common.description") }}
               </div>
               <div
-                class="text-compact px-3 py-2 rounded-default leading-relaxed"
-                :class="
-                  'bg-surface-panel text-text-body'
-                "
+                class="text-compact rounded-default px-3 py-2 leading-relaxed"
+                :class="'bg-surface-panel text-text-body'"
               >
                 {{ alertDetails.description }}
               </div>
@@ -413,7 +383,8 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { conditionSummary, isFiringOutcome, isOkOutcome } from "@/utils/alerts/runOutcome";
 import { formatTimestamp } from "@/utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -434,7 +405,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 // Props & Emits
@@ -474,15 +445,15 @@ const isLoadingHistory = ref(false);
 
 // ── Flapping group helpers ──────────────────────────────────────────────────
 const MIN_FLAP_TRANSITIONS = 3; // firing↔ok flips within a run to call it flapping
-const MIN_FLAP_WINDOW = 4;      // minimum consecutive rows needed
+const MIN_FLAP_WINDOW = 4; // minimum consecutive rows needed
 
+// Classification is shared with the timeline and the overview so the three
+// cannot disagree about a status again — see utils/alerts/runOutcome.
 function rowIsFiring(s: string) {
-  const v = s?.toLowerCase();
-  return v === "firing" || v === "error" || v === "anomaly" || v === "completed";
+  return isFiringOutcome(s);
 }
 function rowIsOk(s: string) {
-  const v = s?.toLowerCase();
-  return v === "ok" || v === "success" || v === "normal" || v === "condition_not_satisfied";
+  return isOkOutcome(s);
 }
 
 // Build a boolean mask: true = row is inside a flapping run.
@@ -500,7 +471,7 @@ function buildFlappingMask(rows: any[]): boolean[] {
 
   function stateOf(s: string): "firing" | "ok" | "other" {
     if (rowIsFiring(s)) return "firing";
-    if (rowIsOk(s))    return "ok";
+    if (rowIsOk(s)) return "ok";
     return "other";
   }
 
@@ -514,10 +485,16 @@ function buildFlappingMask(rows: any[]): boolean[] {
       const cur = stateOf(rows[j].status);
       if (cur !== "other" && prev !== "other" && cur !== prev) transitions++;
       if (cur !== "other") prev = cur;
-      if (transitions >= MIN_FLAP_TRANSITIONS) { windowEnd = j; break; }
+      if (transitions >= MIN_FLAP_TRANSITIONS) {
+        windowEnd = j;
+        break;
+      }
     }
 
-    if (windowEnd === -1) { i++; continue; } // no flapping here
+    if (windowEnd === -1) {
+      i++;
+      continue;
+    } // no flapping here
 
     // Found a flapping zone starting at i — now extend it forward
     let zoneEnd = windowEnd;
@@ -526,7 +503,11 @@ function buildFlappingMask(rows: any[]): boolean[] {
 
     for (let j = zoneEnd + 1; j < n; j++) {
       const cur = stateOf(rows[j].status);
-      if (cur === "other") { zoneEnd = j; stableTail = 0; continue; }
+      if (cur === "other") {
+        zoneEnd = j;
+        stableTail = 0;
+        continue;
+      }
       if (cur !== lastState) {
         // flip — still flapping
         lastState = cur;
@@ -541,7 +522,10 @@ function buildFlappingMask(rows: any[]): boolean[] {
     }
 
     // Trim stable tail off the end
-    while (zoneEnd > windowEnd && stateOf(rows[zoneEnd].status) === stateOf(rows[zoneEnd - 1].status)) {
+    while (
+      zoneEnd > windowEnd &&
+      stateOf(rows[zoneEnd].status) === stateOf(rows[zoneEnd - 1].status)
+    ) {
       zoneEnd--;
     }
 
@@ -554,7 +538,7 @@ function buildFlappingMask(rows: any[]): boolean[] {
 function durationLabel(startTs: number, endTs: number): string {
   // timestamps are in microseconds — convert to ms
   const startMs = startTs > 1e12 ? startTs / 1000 : startTs;
-  const endMs   = endTs   > 1e12 ? endTs   / 1000 : endTs;
+  const endMs = endTs > 1e12 ? endTs / 1000 : endTs;
   const ms = Math.abs(endMs - startMs);
   const mins = Math.round(ms / 60000);
   if (mins < 1) return "< 1 min";
@@ -656,7 +640,7 @@ const onPaginationChange = async (params: { page: number; size: number }) => {
 const alertHistoryColumns = [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorFn: () => null,
     sortable: false,
     size: 48,
@@ -676,6 +660,15 @@ const alertHistoryColumns = [
     accessorKey: "status",
     sortable: true,
     size: 280,
+    meta: { align: "left" as const },
+  },
+  {
+    // T-10 value context: "actual operator threshold → level" per run.
+    id: "condition",
+    header: t("alerts.historyTable.condition"),
+    accessorKey: "actual_value",
+    sortable: false,
+    size: 220,
     meta: { align: "left" as const },
   },
   {
@@ -707,7 +700,7 @@ const alertHistoryColumns = [
 const anomalyHistoryColumns = [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorFn: () => null,
     sortable: false,
     size: 48,
@@ -723,7 +716,7 @@ const anomalyHistoryColumns = [
   },
   {
     id: "status",
-    header: "Result",
+    header: t("alerts.historyTable.result"),
     accessorKey: "status",
     sortable: false,
     size: 120,
@@ -739,7 +732,7 @@ const anomalyHistoryColumns = [
   },
   {
     id: "anomaly_count",
-    header: "Anomalies",
+    header: t("alerts.historyTable.anomalies"),
     accessorKey: "anomaly_count",
     sortable: false,
     size: 120,
@@ -761,9 +754,11 @@ const getRowClass = (row: any) => {
   if (row?._child) {
     return "!bg-surface-subtle";
   }
-  const status = row?.status?.toLowerCase();
-  const isFiringStatus = status === "firing" || status === "error" || status === "anomaly" || status === "completed";
-  if (isFiringStatus) {
+  // The row wash means "needs attention", which covers both a firing alert and
+  // an evaluation that errored. They are distinguished by the status badge —
+  // only the classification of "did it fire" is shared with the timeline.
+  const status = String(row?.status ?? "").toLowerCase();
+  if (isFiringOutcome(status) || status === "error" || status === "failed") {
     return "!bg-status-error-bg";
   }
   return "";
@@ -805,10 +800,7 @@ const fetchAlertHistory = async (alertId: string) => {
     resultTotal.value = 0;
     toast({
       variant: "error",
-      message:
-        error.response?.data?.message ||
-        error.message ||
-        t("alerts.failedToFetchHistory"),
+      message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
       timeout: 5000,
     });
   }

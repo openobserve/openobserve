@@ -22,9 +22,11 @@ RUN cargo build --release
 
 # FROM gcr.io/distroless/cc as runtime
 FROM public.ecr.aws/debian/debian:trixie-slim AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
-RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
-RUN update-ca-certificates
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      ca-certificates curl htop iftop sysstat procps lsof net-tools && \
+    update-ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=builder /openobserve/target/release/openobserve /
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
 CMD ["/openobserve"]

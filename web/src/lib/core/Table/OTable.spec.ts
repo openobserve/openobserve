@@ -4,7 +4,6 @@ import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from "vite
 import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 
-
 // Set up i18n so OTable sub-components (loading, error, etc.) can use useI18n()
 const i18n = createI18n({
   legacy: false,
@@ -22,7 +21,9 @@ beforeAll(() => {
   config.global.plugins.unshift([i18n as any]);
 });
 
+import { nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
+import OTableHeader from "./sub-components/OTableHeader.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { OTableColumnDef } from "./OTable.types";
 
@@ -60,6 +61,45 @@ describe("OTable", () => {
 
   // ── Basic Rendering ──────────────────────────────────────────
 
+  // ── Streaming data (in-place mutation) ──────────────────────
+  // Logs streams partitions by PUSHING onto the same `hits` array. TanStack
+  // memoises its core row model on the array's identity, so a mutated array
+  // silently leaves the table frozen at whatever count existed when the memo
+  // last ran — 0 rows if the first partition hadn't landed yet.
+  describe("data mutated in place", () => {
+    // `reactive` mirrors the real caller: logs' hits live on a reactive store,
+    // so pushes are tracked — but the array's IDENTITY never changes, which is
+    // what defeats TanStack's memo.
+    it("should render rows appended to the same array reference", async () => {
+      const rows = reactive(makeRows(3));
+      wrapper = mount(OTable, {
+        props: { data: rows, columns: makeColumns() },
+      });
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(3);
+
+      rows.push(...makeRows(2).map((r, i) => ({ ...r, id: 100 + i })));
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.props("data")).toHaveLength(5);
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(5);
+    });
+
+    it("should render rows that arrive after mounting with an empty array", async () => {
+      const rows = reactive<TestRow[]>([]);
+      wrapper = mount(OTable, {
+        props: { data: rows, columns: makeColumns() },
+      });
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(0);
+
+      rows.push(...makeRows(4));
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test^="o2-table-row-"]').length).toBe(4);
+    });
+  });
+
   describe("basic rendering", () => {
     it("renders the table with correct data-test attribute", () => {
       wrapper = mount(OTable, {
@@ -87,6 +127,77 @@ describe("OTable", () => {
       expect(rows.length).toBe(5);
     });
 
+    it("should follow the parent's order when the columns prop is reordered in place", async () => {
+      // Same ids, new order — the dashboard column_order config does exactly
+      // this. The internal columnOrder state must adopt the prop order (it
+      // previously kept the first-render order and the reorder never applied).
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+      });
+      const headerIds = () =>
+        wrapper
+          .findAll("thead th[data-test^='o2-table-th-']")
+          .map((th) => th.attributes("data-test"));
+      expect(headerIds()).toEqual([
+        "o2-table-th-id",
+        "o2-table-th-name",
+        "o2-table-th-email",
+        "o2-table-th-status",
+      ]);
+
+      const reordered = makeColumns();
+      reordered.push(reordered.shift()!); // [name, email, status, id]
+      await wrapper.setProps({ columns: reordered });
+      await nextTick();
+
+      expect(headerIds()).toEqual([
+        "o2-table-th-name",
+        "o2-table-th-email",
+        "o2-table-th-status",
+        "o2-table-th-id",
+      ]);
+    });
+
+    it("should keep the user's drag order when the columns prop changes afterwards", async () => {
+      // After a user drag, the prop order is no longer authoritative: a columns
+      // recompute (new array, ids unchanged or extended) must preserve the
+      // dragged arrangement and only append genuinely new columns.
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+      });
+      const headerIds = () =>
+        wrapper
+          .findAll("thead th[data-test^='o2-table-th-']")
+          .map((th) => th.attributes("data-test"));
+
+      // Simulate the header's drag-reorder event: [status, id, name, email]
+      wrapper
+        .findComponent(OTableHeader)
+        .vm.$emit("update:column-order", ["status", "id", "name", "email"]);
+      await nextTick();
+      expect(headerIds()).toEqual([
+        "o2-table-th-status",
+        "o2-table-th-id",
+        "o2-table-th-name",
+        "o2-table-th-email",
+      ]);
+
+      // Parent re-emits its columns in original order plus a new column — the
+      // dragged order must survive, with the new column appended.
+      const next = makeColumns();
+      next.push({ id: "extra", header: "Extra", accessorKey: "status", size: 80 });
+      await wrapper.setProps({ columns: next });
+      await nextTick();
+
+      expect(headerIds()).toEqual([
+        "o2-table-th-status",
+        "o2-table-th-id",
+        "o2-table-th-name",
+        "o2-table-th-email",
+        "o2-table-th-extra",
+      ]);
+    });
+
     it("renders cell content", () => {
       wrapper = mount(OTable, {
         props: { data: makeRows(3), columns: makeColumns() },
@@ -112,9 +223,7 @@ describe("OTable", () => {
     });
 
     it("renders the pagination footer", () => {
-      expect(
-        wrapper.find('[data-test="o2-table-pagination-bottom"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(true);
     });
 
     it("shows only the first page of rows", () => {
@@ -129,18 +238,12 @@ describe("OTable", () => {
     });
 
     it("has page size select", () => {
-      expect(
-        wrapper.find('[data-test="o2-table-page-size-select"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-page-size-select"]').exists()).toBe(true);
     });
 
     it("has prev/next buttons", () => {
-      expect(
-        wrapper.find('[data-test="o2-table-prev-page-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-next-page-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-prev-page-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-next-page-btn"]').exists()).toBe(true);
     });
   });
 
@@ -182,6 +285,317 @@ describe("OTable", () => {
       const info = wrapper.find('[data-test="o2-table-pagination-info"]');
       expect(info.text()).toContain("200");
     });
+
+    it("supports lower-bound totals without pretending the last page is known", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(20),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 21,
+          totalCountExact: false,
+          pageSize: 20,
+          currentPage: 1,
+        },
+      });
+
+      expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("21+");
+      expect(wrapper.find('[data-test="o2-table-first-page-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-last-page-btn"]').exists()).toBe(false);
+
+      await wrapper.find('[data-test="o2-table-next-page-btn"]').trigger("click");
+      const events = wrapper.emitted("pagination-change") as any[][];
+      expect(events.at(-1)![0]).toEqual({ page: 2, size: 20 });
+    });
+
+    it("should reflect a pageSize prop change in the footer", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(10),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 45,
+          pageSize: 20,
+          currentPage: 1,
+        },
+      });
+      expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("1 - 20");
+
+      await wrapper.setProps({ pageSize: 10 });
+
+      expect(wrapper.find('[data-test="o2-table-pagination-info"]').text()).toContain("1 - 10");
+      expect(wrapper.findComponent(OSelect).props("modelValue")).toBe(10);
+    });
+
+    it("should emit the updated pageSize when paging after a pageSize change", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(10),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 45,
+          pageSize: 20,
+          currentPage: 1,
+        },
+      });
+
+      // Server mode: the parent owns page size, so it echoes the change back as a prop.
+      await wrapper.setProps({ pageSize: 10 });
+      await wrapper.find('[data-test="o2-table-next-page-btn"]').trigger("click");
+
+      const events = wrapper.emitted("pagination-change") as any[][];
+      expect(events.at(-1)![0]).toEqual({ page: 2, size: 10 });
+    });
+
+    it("should reflect a pageSizeOptions prop change in the footer select", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(10),
+          columns: makeColumns(),
+          pagination: "server",
+          totalCount: 45,
+          pageSize: 20,
+          pageSizeOptions: [20, 50],
+        },
+      });
+
+      await wrapper.setProps({ pageSizeOptions: [10, 20] });
+
+      expect(wrapper.findComponent(OSelect).props("options")).toEqual([
+        { label: "10", value: 10 },
+        { label: "20", value: 20 },
+      ]);
+    });
+  });
+
+  // ── Column reorder ──────────────────────────────────────────
+
+  describe("column reorder", () => {
+    // vue-draggable-next derives drop positions from the <tr>'s DOM children, so
+    // the list it sorts has to include the gutter <th>s (expand / select /
+    // row-drag) or every index is shifted right by their count.
+    function getDraggable(w: VueWrapper) {
+      return w.findComponent({ name: "VueDraggableNext" });
+    }
+
+    it("should pad the draggable model with one entry per gutter header", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          expansion: "multiple",
+          selection: "multiple",
+        },
+      });
+      const model = getDraggable(wrapper).props("modelValue") as string[];
+      // 2 gutters (expand + select) then the four data columns, in DOM order.
+      expect(model.slice(2)).toEqual(["id", "name", "email", "status"]);
+      expect(model.slice(0, 2).every((id) => id.startsWith("__o2-gutter-"))).toBe(true);
+    });
+
+    it("should emit the reordered columns without the gutter entries", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          expansion: "multiple",
+        },
+      });
+      const draggable = getDraggable(wrapper);
+      const model = draggable.props("modelValue") as string[];
+      const [gutter, id, name, email, status] = model;
+
+      // Drop "email" between "id" and "name" — the gutter entry stays put.
+      draggable.vm.$emit("update:modelValue", [gutter, id, email, name, status]);
+      await nextTick();
+
+      const emitted = wrapper.emitted("column-order-change") as any[][];
+      expect(emitted).toBeTruthy();
+      expect(emitted.at(-1)![0]).toEqual(["id", "email", "name", "status"]);
+    });
+
+    it("should keep the order correct when a column is dropped before the gutter", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          expansion: "multiple",
+        },
+      });
+      const draggable = getDraggable(wrapper);
+      const [gutter, id, name, email, status] = draggable.props("modelValue") as string[];
+
+      draggable.vm.$emit("update:modelValue", [status, gutter, id, name, email]);
+      await nextTick();
+
+      const emitted = wrapper.emitted("column-order-change") as any[][];
+      expect(emitted.at(-1)![0]).toEqual(["status", "id", "name", "email"]);
+    });
+
+    it("should mark the pinned-first column so Sortable filters it out of drags", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          pinnedFirstColumn: "id",
+        },
+      });
+      expect(getDraggable(wrapper).attributes("filter")).toBe(".o2-table-th-pinned-first");
+      expect(wrapper.find('[data-test="o2-table-th-id"]').classes()).toContain(
+        "o2-table-th-pinned-first",
+      );
+      expect(wrapper.find('[data-test="o2-table-th-name"]').classes()).not.toContain(
+        "o2-table-th-pinned-first",
+      );
+    });
+
+    it("should pull the pinned column back to the front when a drop displaces it", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          pinnedFirstColumn: "id",
+        },
+      });
+      const draggable = getDraggable(wrapper);
+      const [id, name, email, status] = draggable.props("modelValue") as string[];
+
+      // "status" dropped in front of the pinned "id".
+      draggable.vm.$emit("update:modelValue", [status, id, name, email]);
+      await nextTick();
+
+      const emitted = wrapper.emitted("column-order-change") as any[][];
+      expect(emitted.at(-1)![0]).toEqual(["id", "status", "name", "email"]);
+    });
+
+    it("should leave the order alone when the pinned column is already first", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          pinnedFirstColumn: "id",
+        },
+      });
+      const draggable = getDraggable(wrapper);
+      const [id, name, email, status] = draggable.props("modelValue") as string[];
+
+      draggable.vm.$emit("update:modelValue", [id, status, name, email]);
+      await nextTick();
+
+      const emitted = wrapper.emitted("column-order-change") as any[][];
+      expect(emitted.at(-1)![0]).toEqual(["id", "status", "name", "email"]);
+    });
+
+    it("should not mark any header when no column is pinned", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(2), columns: makeColumns(), enableColumnReorder: true },
+      });
+      expect(wrapper.findAll(".o2-table-th-pinned-first")).toHaveLength(0);
+    });
+
+    it("should have no gutter entries when the table has no gutter headers", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          expansion: "none",
+        },
+      });
+      expect(getDraggable(wrapper).props("modelValue")).toEqual(["id", "name", "email", "status"]);
+    });
+  });
+
+  // ── Cell context menu ───────────────────────────────────────
+
+  describe("cell-contextmenu", () => {
+    it("should emit the clicked cell's column, row and value", async () => {
+      const rows = makeRows(2);
+      wrapper = mount(OTable, {
+        props: { data: rows, columns: makeColumns() },
+      });
+
+      await wrapper.find('[data-test="o2-table-cell-email"]').trigger("contextmenu");
+
+      const emitted = wrapper.emitted("cell-contextmenu") as any[][];
+      expect(emitted).toBeTruthy();
+      expect(emitted[0][0]).toEqual({
+        columnId: "email",
+        row: rows[0],
+        value: rows[0].email,
+      });
+    });
+
+    it("should not prevent the native event, leaving the decision to the consumer", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]');
+      const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+      cell.element.dispatchEvent(event);
+      await nextTick();
+
+      expect(event.defaultPrevented).toBe(false);
+    });
+  });
+
+  // ── Exposed API ─────────────────────────────────────────────
+
+  describe("exposed hasResizedColumns", () => {
+    it("should expose false until a column is resized, then true", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          enableColumnResize: true,
+        },
+      });
+      expect(wrapper.vm.hasResizedColumns).toBe(false);
+
+      // No public API for a drag in jsdom — drive TanStack's sizing state directly.
+      (wrapper.vm as any).table.setColumnSizing({ name: 300 });
+      await nextTick();
+
+      expect(wrapper.vm.hasResizedColumns).toBe(true);
+    });
+
+    it("should expose false when column resizing is disabled", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          enableColumnResize: false,
+        },
+      });
+      (wrapper.vm as any).table.setColumnSizing({ name: 300 });
+      await nextTick();
+
+      expect(wrapper.vm.hasResizedColumns).toBe(false);
+    });
+
+    it("should go back to false after resetColumnSizes", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          enableColumnResize: true,
+        },
+      });
+      (wrapper.vm as any).table.setColumnSizing({ name: 300 });
+      await nextTick();
+      expect(wrapper.vm.hasResizedColumns).toBe(true);
+
+      (wrapper.vm as any).resetColumnSizes();
+      await nextTick();
+
+      expect(wrapper.vm.hasResizedColumns).toBe(false);
+    });
   });
 
   // ── Client-Side Sorting ────────────────────────────────────
@@ -196,9 +610,7 @@ describe("OTable", () => {
         },
       });
       // The ID column is sortable, so it should have sort trigger
-      expect(
-        wrapper.find('[data-test="o2-table-th-sort-trigger"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-th-sort-trigger"]').exists()).toBe(true);
     });
 
     it("displays sort icons on sortable columns when sortBy is provided", () => {
@@ -212,9 +624,7 @@ describe("OTable", () => {
         },
       });
       // Should have active sort icon on the sorted column
-      const activeIcon = wrapper.find(
-        '[data-test="o2-table-sort-icon-active"]',
-      );
+      const activeIcon = wrapper.find('[data-test="o2-table-sort-icon-active"]');
       expect(activeIcon.exists()).toBe(true);
       // The active icon must expose its direction for e2e sort assertions.
       expect(activeIcon.attributes("data-test-sort-direction")).toBe("asc");
@@ -233,9 +643,7 @@ describe("OTable", () => {
         },
       });
       expect(
-        asc
-          .find('[data-test="o2-table-sort-icon-active"]')
-          .attributes("data-test-sort-direction"),
+        asc.find('[data-test="o2-table-sort-icon-active"]').attributes("data-test-sort-direction"),
       ).toBe("asc");
 
       const desc = mount(OTable, {
@@ -248,9 +656,7 @@ describe("OTable", () => {
         },
       });
       expect(
-        desc
-          .find('[data-test="o2-table-sort-icon-active"]')
-          .attributes("data-test-sort-direction"),
+        desc.find('[data-test="o2-table-sort-icon-active"]').attributes("data-test-sort-direction"),
       ).toBe("desc");
 
       // An unsorted sortable column shows the inactive icon with direction none.
@@ -282,9 +688,7 @@ describe("OTable", () => {
           sortOrder: undefined,
         },
       });
-      const sortTrigger = wrapper.find(
-        '[data-test="o2-table-th-sort-trigger"]',
-      );
+      const sortTrigger = wrapper.find('[data-test="o2-table-th-sort-trigger"]');
       await sortTrigger.trigger("click");
       expect(wrapper.emitted("sort-change")).toBeTruthy();
       expect(wrapper.emitted("sort-change")?.[0][0]).toEqual({
@@ -303,9 +707,7 @@ describe("OTable", () => {
           sortOrder: "asc",
         },
       });
-      const sortTrigger = wrapper.find(
-        '[data-test="o2-table-th-sort-trigger"]',
-      );
+      const sortTrigger = wrapper.find('[data-test="o2-table-th-sort-trigger"]');
       await sortTrigger.trigger("click");
       expect(wrapper.emitted("sort-change")?.[0][0]).toEqual({
         column: "id",
@@ -325,9 +727,7 @@ describe("OTable", () => {
           selection: "multiple",
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-select-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-select-cell"]').exists()).toBe(true);
     });
 
     it("does not render checkbox column when selection is none", () => {
@@ -338,9 +738,7 @@ describe("OTable", () => {
           selection: "none",
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-select-cell"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-select-cell"]').exists()).toBe(false);
     });
 
     it("emits update:selectedIds when a row checkbox is toggled", async () => {
@@ -368,9 +766,7 @@ describe("OTable", () => {
           expansion: "single",
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-expand-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(true);
     });
 
     it("does not render expand button when expansion is none", () => {
@@ -381,9 +777,7 @@ describe("OTable", () => {
           expansion: "none",
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-expand-cell"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(false);
     });
   });
 
@@ -409,9 +803,7 @@ describe("OTable", () => {
           emptyMessage: "Nothing here",
         },
       });
-      expect(wrapper.find('[data-test="o2-table-empty"]').text()).toContain(
-        "Nothing here",
-      );
+      expect(wrapper.find('[data-test="o2-table-empty"]').text()).toContain("Nothing here");
     });
   });
 
@@ -427,9 +819,7 @@ describe("OTable", () => {
         },
       });
       // OTableLoading renders a skeleton tbody with data-test="o2-table-skeleton-body"
-      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
     });
 
     it("shows loading overlay when loading is true with existing rows", () => {
@@ -458,9 +848,7 @@ describe("OTable", () => {
         },
       });
       expect(wrapper.find('[data-test="o2-table-error"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="o2-table-error"]').text()).toContain(
-        "Failed to load data",
-      );
+      expect(wrapper.find('[data-test="o2-table-error"]').text()).toContain("Failed to load data");
     });
 
     it("shows error instead of empty when both error and empty data", () => {
@@ -509,9 +897,7 @@ describe("OTable", () => {
       const row = wrapper.find('[data-test="o2-table-row-0"]');
       await row.trigger("click");
       expect(wrapper.emitted("row-click")).toBeTruthy();
-      expect(wrapper.emitted("row-click")?.[0][0]).toEqual(
-        expect.objectContaining({ id: 1 }),
-      );
+      expect(wrapper.emitted("row-click")?.[0][0]).toEqual(expect.objectContaining({ id: 1 }));
     });
 
     it("emits row-dblclick when a row is double-clicked", async () => {
@@ -546,16 +932,89 @@ describe("OTable", () => {
       wrapper = mount(OTable, {
         props: {
           data: makeRows(1),
-          columns: [
-            ...makeColumns().slice(0, 1),
-            { id: "actions", header: "", isAction: true },
-          ],
+          columns: [...makeColumns().slice(0, 1), { id: "actions", header: "", isAction: true }],
         },
         slots: {
           "cell-actions": `<span data-test="custom-action">Edit</span>`,
         },
       });
       expect(wrapper.find('[data-test="custom-action"]').exists()).toBe(true);
+    });
+  });
+
+  // ── Cell hover-action overlay ─────────────────────────
+
+  describe("cell hover actions", () => {
+    it("teleports one cell-hover-actions toolbar, only for the hovered cell", async () => {
+      vi.useFakeTimers();
+      wrapper = mount(OTable, {
+        props: { data: makeRows(2), columns: makeColumns() },
+        slots: {
+          "cell-hover-actions": `<span class="hover-act" :data-active="active">A</span>`,
+        },
+      });
+
+      // The toolbar floats above the pointer, so it lives in <body> and exists only
+      // while a cell is hovered — never one overlay per cell.
+      const toolbars = () =>
+        document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]');
+      expect(toolbars().length).toBe(0);
+
+      await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseenter");
+      vi.advanceTimersByTime(250);
+      await nextTick();
+      expect(toolbars().length).toBe(1);
+      expect(document.querySelectorAll('.hover-act[data-active="true"]').length).toBe(1);
+
+      await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseleave");
+      vi.advanceTimersByTime(200);
+      await nextTick();
+      expect(toolbars().length).toBe(0);
+      vi.useRealTimers();
+    });
+
+    it("stays hidden on cells where the slot renders nothing", async () => {
+      vi.useFakeTimers();
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: {
+          "cell-hover-actions": `<span v-if="column.id === 'name'" class="hover-act">A</span>`,
+        },
+      });
+
+      // Hovering the 'id' cell yields only a v-if comment — no empty box should float.
+      await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseenter");
+      vi.advanceTimersByTime(250);
+      await nextTick();
+      expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
+        0,
+      );
+
+      await wrapper.find('[data-test="o2-table-cell-name"]').trigger("mouseenter");
+      vi.advanceTimersByTime(250);
+      await nextTick();
+      expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
+        1,
+      );
+      vi.useRealTimers();
+    });
+
+    it("does not collide with a per-column '#cell-actions' slot (id: 'actions')", () => {
+      // A column with id 'actions' renders its cell content via #cell-actions;
+      // the hover overlay must not hijack that slot name.
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(1),
+          columns: [...makeColumns().slice(0, 1), { id: "actions", header: "", isAction: true }],
+        },
+        slots: {
+          "cell-actions": `<span data-test="col-actions">Edit</span>`,
+        },
+      });
+      expect(wrapper.find('[data-test="col-actions"]').exists()).toBe(true);
+      expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
+        0,
+      );
     });
   });
 
@@ -587,9 +1046,7 @@ describe("OTable", () => {
           pagination: "none",
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-pagination-bottom"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(false);
     });
   });
 
@@ -656,9 +1113,132 @@ describe("OTable", () => {
       });
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
     });
+
+    // Variable-height virtual rows can't be asserted in jsdom: with no real
+    // scroll-element size the virtualizer returns 0 virtual items, so the
+    // branch carrying the measurement wiring never renders.
   });
 
   // ── Column Management ──────────────────────────────────────
+
+  describe("bounded elastic (fillRemaining) column width", () => {
+    // A scrolling table sizes columns to max-content, so without a clamp the
+    // filler stretches to its longest value instead of taking the leftover.
+    const longValue = "x".repeat(4000);
+    // Built, not written literally: a bare `var(--header-x-size)` in source
+    // trips scripts/check-css-tokens.mjs (no static `--header-x-size:` decl).
+    const sizeVar = (id: string) => `var(--header-${id}-size)`;
+
+    function mountElastic(
+      props: Record<string, unknown> = {},
+      fillMeta: Record<string, unknown> = { autoWidth: true, fillRemaining: true },
+    ) {
+      const cols: OTableColumnDef<any>[] = [
+        { id: "ts", header: "Timestamp", accessorKey: "ts", size: 236 },
+        {
+          id: "body",
+          header: "Body",
+          accessorKey: "body",
+          size: 800,
+          minSize: 800,
+          meta: fillMeta,
+        },
+      ];
+      return mount(OTable, {
+        props: {
+          data: [{ ts: "2026-07-31 10:00:00.000", body: longValue }],
+          columns: cols,
+          horizontalScroll: true,
+          ...props,
+        },
+      });
+    }
+
+    it("should clamp the elastic column to the leftover width when scrolling", () => {
+      wrapper = mountElastic();
+      const cell = wrapper.find('[data-test="o2-table-cell-body"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style")).toContain("max-width: 0");
+      expect(cell.attributes("style")).toContain("min-width: 800px");
+      expect(cell.classes()).toContain("text-ellipsis");
+      expect(cell.classes()).toContain("overflow-hidden");
+    });
+
+    it("should clamp the elastic header in step with its cells", () => {
+      wrapper = mountElastic();
+      const th = wrapper.find('[data-test="o2-table-th-body"]');
+      expect(th.exists()).toBe(true);
+      expect(th.attributes("style")).toContain("max-width: 0");
+    });
+
+    it("should pin sized columns beside it, since the table loses min-w-max", () => {
+      wrapper = mountElastic();
+      const cell = wrapper.find('[data-test="o2-table-cell-ts"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style")).not.toContain("max-width: 0");
+      expect(cell.attributes("style")).toContain(`min-width: ${sizeVar("ts")}`);
+    });
+
+    // Regression: once another field is selected `body` becomes an ordinary
+    // sized column, and nothing capped those — its own text stretched it to
+    // ~3000px and dragged the row into horizontal scroll.
+    it("should pin a long-valued sized column at its size instead of its content", () => {
+      wrapper = mountElastic({
+        columns: [
+          { id: "ts", header: "Timestamp", accessorKey: "ts", size: 236 },
+          // no longer last, so it is sized — and its value is enormous
+          { id: "body", header: "Body", accessorKey: "body", size: 800 },
+          {
+            id: "level",
+            header: "Level",
+            accessorKey: "level",
+            size: 150,
+            minSize: 150,
+            meta: { autoWidth: true, fillRemaining: true },
+          },
+        ],
+        data: [{ ts: "2026-07-31 10:00:00.000", body: longValue, level: "INFO" }],
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-body"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style")).toContain(`width: ${sizeVar("body")}`);
+      expect(cell.attributes("style")).toContain(`min-width: ${sizeVar("body")}`);
+      expect(cell.attributes("style")).toContain(`max-width: ${sizeVar("body")}`);
+      expect(cell.classes()).toContain("text-ellipsis");
+      const th = wrapper.find('[data-test="o2-table-th-body"]');
+      expect(th.attributes("style")).toContain(`max-width: ${sizeVar("body")}`);
+    });
+
+    it("should size the table to the container rather than max-content", () => {
+      wrapper = mountElastic();
+      const table = wrapper.find("table");
+      expect(table.classes()).toContain("w-full");
+      expect(table.classes()).not.toContain("min-w-max");
+    });
+
+    it("should leave a plain autoWidth column content-sized and scrolling", () => {
+      wrapper = mountElastic({}, { autoWidth: true });
+      const cell = wrapper.find('[data-test="o2-table-cell-body"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style") ?? "").not.toContain("max-width: 0");
+      expect(wrapper.find("table").classes()).toContain("min-w-max");
+    });
+
+    it("should release the clamp while wrapping so the text can reflow", () => {
+      wrapper = mountElastic({ wrap: true });
+      const cell = wrapper.find('[data-test="o2-table-cell-body"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style") ?? "").not.toContain("max-width: 0");
+      expect(cell.classes()).toContain("whitespace-normal");
+    });
+
+    it("should leave non-scrolling tables to the container-bounded layout", () => {
+      wrapper = mountElastic({ horizontalScroll: false });
+      const cell = wrapper.find('[data-test="o2-table-cell-body"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.attributes("style") ?? "").not.toContain("max-width: 0");
+    });
+  });
 
   describe("column resize", () => {
     it("shows resize handle on resizable columns", () => {
@@ -723,6 +1303,33 @@ describe("OTable", () => {
     });
   });
 
+  describe("column close", () => {
+    it("renders a close button only for meta.closable columns and emits close-column", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: [
+            { id: "id", header: "ID", accessorKey: "id" },
+            {
+              id: "name",
+              header: "Name",
+              accessorKey: "name",
+              meta: { closable: true },
+            },
+          ] as OTableColumnDef<TestRow>[],
+        },
+      });
+      // Only the closable column gets a remove button
+      expect(wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-th-remove-id-btn"]').exists()).toBe(false);
+
+      await wrapper.find('[data-test="o2-table-th-remove-name-btn"]').trigger("click");
+      const ev = wrapper.emitted("close-column");
+      expect(ev).toBeTruthy();
+      expect((ev![0][0] as OTableColumnDef).id).toBe("name");
+    });
+  });
+
   describe("column pinning", () => {
     it("pins left-pinned columns", () => {
       const cols: OTableColumnDef<TestRow>[] = [
@@ -746,7 +1353,6 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
     });
   });
-
 
   // ── Highlighting ────────────────────────────────────────────
 
@@ -788,9 +1394,7 @@ describe("OTable", () => {
           streaming: true,
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-streaming-bar"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-streaming-bar"]').exists()).toBe(true);
     });
 
     it("does not show streaming indicator when not streaming", () => {
@@ -801,9 +1405,7 @@ describe("OTable", () => {
           streaming: false,
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-streaming-bar"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-streaming-bar"]').exists()).toBe(false);
     });
   });
 
@@ -820,13 +1422,10 @@ describe("OTable", () => {
           streaming: true,
         },
         slots: {
-          "loading-banner":
-            '<div data-test="custom-loading-banner">Refreshing...</div>',
+          "loading-banner": '<div data-test="custom-loading-banner">Refreshing...</div>',
         },
       });
-      expect(
-        wrapper.find('[data-test="custom-loading-banner"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="custom-loading-banner"]').exists()).toBe(true);
     });
   });
 
@@ -841,13 +1440,10 @@ describe("OTable", () => {
           pagination: "client",
         },
         slots: {
-          bottom:
-            '<div data-test="custom-bottom">Bottom Content</div>',
+          bottom: '<div data-test="custom-bottom">Bottom Content</div>',
         },
       });
-      expect(
-        wrapper.find('[data-test="custom-bottom"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="custom-bottom"]').exists()).toBe(true);
     });
   });
 
@@ -915,8 +1511,7 @@ describe("OTable", () => {
         props: {
           data: makeRows(3),
           columns: makeColumns(),
-          rowClass: (row: TestRow) =>
-            row.status === "Active" ? "row-active" : "row-inactive",
+          rowClass: (row: TestRow) => (row.status === "Active" ? "row-active" : "row-inactive"),
         },
       });
       const activeRow = wrapper.find('[data-test="o2-table-row-0"]');
@@ -930,8 +1525,7 @@ describe("OTable", () => {
         props: {
           data: makeRows(3),
           columns: makeColumns(),
-          getRowStatusColor: (row: TestRow) =>
-            row.status === "Active" ? "#00ff00" : "#ff0000",
+          getRowStatusColor: (row: TestRow) => (row.status === "Active" ? "#00ff00" : "#ff0000"),
         },
       });
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
@@ -949,9 +1543,7 @@ describe("OTable", () => {
           enableCellCopy: true,
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-cell-copy-id"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-cell-copy-id"]').exists()).toBe(true);
     });
 
     it("does not show copy button when enableCellCopy is false", () => {
@@ -962,9 +1554,48 @@ describe("OTable", () => {
           enableCellCopy: false,
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-cell-copy-id"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-cell-copy-id"]').exists()).toBe(false);
+    });
+
+    it("should not render a copy button when the cell value is empty", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [{ id: 1, name: "", email: "a@b.c", status: "Active" }],
+          columns: makeColumns(),
+          enableCellCopy: true,
+        },
+      });
+      expect(wrapper.find('[data-test="o2-table-cell-copy-name"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-cell-copy-email"]').exists()).toBe(true);
+    });
+
+    it("should place the copy button before the value when the column is right-aligned", () => {
+      const columns = makeColumns();
+      columns[0].meta = { align: "right" };
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns, enableCellCopy: true },
+      });
+      const copyBtn = wrapper.find('[data-test="o2-table-cell-copy-id"]');
+      expect(copyBtn.exists()).toBe(true);
+      expect(copyBtn.classes()).toContain("order-first");
+    });
+
+    it("should place the copy button after the value when the column is left-aligned", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns(), enableCellCopy: true },
+      });
+      const copyBtn = wrapper.find('[data-test="o2-table-cell-copy-id"]');
+      expect(copyBtn.exists()).toBe(true);
+      expect(copyBtn.classes()).not.toContain("order-first");
+    });
+
+    it("should keep the copy button in flow so it cannot overlap the cell text", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns(), enableCellCopy: true },
+      });
+      const copyBtn = wrapper.find('[data-test="o2-table-cell-copy-id"]');
+      expect(copyBtn.classes()).not.toContain("absolute");
+      expect(copyBtn.element.parentElement?.className).toContain("flex");
     });
   });
 
@@ -1003,9 +1634,7 @@ describe("OTable", () => {
       wrapper = mount(OTable, {
         props: { data: makeRows(5), columns: cols },
       });
-      const footerCells = wrapper.findAll(
-        '[data-test^="o2-table-footer-cell-"]',
-      );
+      const footerCells = wrapper.findAll('[data-test^="o2-table-footer-cell-"]');
       expect(footerCells.length).toBeGreaterThan(0);
     });
 
@@ -1013,9 +1642,7 @@ describe("OTable", () => {
       wrapper = mount(OTable, {
         props: { data: makeRows(5), columns: makeColumns() },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-footer"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-footer"]').exists()).toBe(false);
     });
   });
 
@@ -1060,12 +1687,37 @@ describe("OTable", () => {
       });
 
       // Should render pivot header instead of standard header
-      expect(
-        wrapper.find('[data-test="o2-table-pivot-header"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-header"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-pivot-header"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-header"]').exists()).toBe(false);
+    });
+
+    it("merges consecutive same-value cells with a single pivotRowColumns entry", () => {
+      // Single row-field regression: rows of a run share identical row-field
+      // values, so a value-keyed merge map collided and hid the whole run
+      // (including the first row). Keyed by row identity, the first row keeps
+      // its content and only continuation rows blank out.
+      const rows: TestRow[] = [
+        { id: 1, name: "svc-a", email: "a1@example.com", status: "Active" },
+        { id: 2, name: "svc-a", email: "a2@example.com", status: "Active" },
+        { id: 3, name: "svc-b", email: "b1@example.com", status: "Active" },
+      ];
+      wrapper = mount(OTable, {
+        props: {
+          data: rows,
+          columns: makeColumns(),
+          pivotRowColumns: [{ name: "name" }],
+        },
+      });
+
+      const nameCells = wrapper
+        .findAll('[data-test="o2-table-cell-name"]')
+        .map((c) => c.text().trim());
+      expect(nameCells).toEqual(["svc-a", "", "svc-b"]);
+      // Non-merged columns are untouched
+      const emailCells = wrapper
+        .findAll('[data-test="o2-table-cell-email"]')
+        .map((c) => c.text().trim());
+      expect(emailCells).toEqual(["a1@example.com", "a2@example.com", "b1@example.com"]);
     });
 
     it("renders standard header when pivotHeaderLevels is empty", () => {
@@ -1076,12 +1728,8 @@ describe("OTable", () => {
           pivotHeaderLevels: [],
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-header"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-pivot-header"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-header"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-pivot-header"]').exists()).toBe(false);
     });
   });
 
@@ -1142,9 +1790,7 @@ describe("OTable", () => {
         },
       });
       // Should have expand cells
-      expect(
-        wrapper.find('[data-test="o2-table-expand-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(true);
     });
 
     it("expands and collapses tree rows", async () => {
@@ -1168,9 +1814,7 @@ describe("OTable", () => {
       });
 
       // Click expand button on first row
-      const expandBtn = wrapper.find(
-        '[data-test="o2-table-expand-0"]',
-      );
+      const expandBtn = wrapper.find('[data-test="o2-table-expand-0"]');
       expect(expandBtn.exists()).toBe(true);
       await expandBtn.trigger("click");
       expect(wrapper.emitted("update:expandedIds")).toBeTruthy();
@@ -1187,9 +1831,7 @@ describe("OTable", () => {
           columns: makeColumns(),
         },
       });
-      const scrollContainer = wrapper.find(
-        '[data-test="o2-table-scroll-container"]',
-      );
+      const scrollContainer = wrapper.find('[data-test="o2-table-scroll-container"]');
       expect(scrollContainer.exists()).toBe(true);
     });
   });
@@ -1220,9 +1862,126 @@ describe("OTable", () => {
         },
       });
       // OTableLoading skeleton renders inside the table with data-test="o2-table-skeleton-body"
-      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(
-        true,
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
+    });
+  });
+
+  // ── Per-column value filter ────────────────────────
+  describe("per-column value filter", () => {
+    function filterableColumns(): OTableColumnDef<TestRow>[] {
+      return makeColumns().map((c) => (c.id === "status" ? { ...c, filterable: true } : c));
+    }
+
+    it("filters rows to the selected values through the column API", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(10), // 5 Active, 5 Inactive
+          columns: filterableColumns(),
+          enableColumnFilter: true,
+          pagination: "none",
+          sorting: "none",
+        },
+      });
+      await nextTick();
+      const table = (wrapper.vm as any).table;
+
+      expect(table.getColumn("status").getCanFilter()).toBe(true);
+      expect(table.getColumn("email").getCanFilter()).toBe(false);
+      expect(table.getFilteredRowModel().rows.length).toBe(10);
+
+      table.getColumn("status").setFilterValue(["Active"]);
+      await nextTick();
+      const rows = table.getFilteredRowModel().rows;
+      expect(rows.length).toBe(5);
+      expect(rows.every((r: any) => r.original.status === "Active")).toBe(true);
+
+      // Multi-select is a union of the chosen values.
+      table.getColumn("status").setFilterValue(["Active", "Inactive"]);
+      await nextTick();
+      expect(table.getFilteredRowModel().rows.length).toBe(10);
+
+      // Clearing restores every row.
+      table.getColumn("status").setFilterValue(undefined);
+      await nextTick();
+      expect(table.getFilteredRowModel().rows.length).toBe(10);
+    });
+
+    it("shows the filter button only on filterable columns when enabled", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(4),
+          columns: filterableColumns(),
+          enableColumnFilter: true,
+          pagination: "none",
+          sorting: "none",
+        },
+      });
+      await nextTick();
+      expect(wrapper.find('[data-test="o2-table-column-filter-btn-status"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-column-filter-btn-email"]').exists()).toBe(false);
+    });
+
+    it("renders no filter buttons when enableColumnFilter is off", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(4),
+          columns: filterableColumns(),
+          pagination: "none",
+          sorting: "none",
+        },
+      });
+      await nextTick();
+      expect(wrapper.find('[data-test="o2-table-column-filter-btn-status"]').exists()).toBe(false);
+    });
+  });
+
+  // ── Column close "x" gating ────────────────────────
+  describe("column close (x) affordance", () => {
+    it("does NOT show the close x on a hideable column by default", async () => {
+      const columns: OTableColumnDef<TestRow>[] = makeColumns().map((c) =>
+        c.id === "name" ? { ...c, hideable: true } : c,
       );
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns, pagination: "none", sorting: "none" },
+      });
+      await nextTick();
+      // hideable must not imply closable, or every table's headers show a dead "x".
+      expect(wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists()).toBe(false);
+    });
+
+    it("shows the close x only when a column opts in via meta.closable", async () => {
+      const columns: OTableColumnDef<TestRow>[] = makeColumns().map((c) =>
+        c.id === "name" ? { ...c, hideable: true, meta: { closable: true } } : c,
+      );
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns, pagination: "none", sorting: "none" },
+      });
+      await nextTick();
+      expect(wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-th-remove-email-btn"]').exists()).toBe(false);
+    });
+  });
+
+  // ── Column reorder ────────────────────────────────
+  describe("column reorder", () => {
+    it("re-emits column-order-change when the header updates the order", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(4),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          pagination: "none",
+          sorting: "none",
+        },
+      });
+      await nextTick();
+      const header = wrapper.findComponent(OTableHeader);
+      const newOrder = ["status", "id", "name", "email"];
+      header.vm.$emit("update:column-order", newOrder);
+      await nextTick();
+      const emitted = wrapper.emitted("column-order-change");
+      expect(emitted).toBeTruthy();
+      expect(emitted![emitted!.length - 1][0]).toEqual(newOrder);
     });
   });
 });

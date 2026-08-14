@@ -42,9 +42,26 @@ import {
 
 /** Realistic namespaces that appear in telemetry streams. */
 const NAMESPACES = [
-  "k8s", "http", "db", "body", "geo", "log", "aws", "gcp", "azure",
-  "host", "process", "otel", "trace", "error", "service", "net",
-  "container", "app", "grpc", "jvm",
+  "k8s",
+  "http",
+  "db",
+  "body",
+  "geo",
+  "log",
+  "aws",
+  "gcp",
+  "azure",
+  "host",
+  "process",
+  "otel",
+  "trace",
+  "error",
+  "service",
+  "net",
+  "container",
+  "app",
+  "grpc",
+  "jvm",
 ];
 
 const DATA_TYPES = ["Utf8", "Int64", "Float64", "Boolean"];
@@ -161,9 +178,9 @@ function groupedAssembly(
 const aliases = makeAliases();
 const semanticIndex = buildSemanticIndex(aliases);
 
-const fields20k  = makeFields(20_000);
-const fields30k  = makeFields(30_000);
-const fields50k  = makeFields(50_000);
+const fields20k = makeFields(20_000);
+const fields30k = makeFields(30_000);
+const fields50k = makeFields(50_000);
 const fields100k = makeFields(100_000);
 
 // ---------------------------------------------------------------------------
@@ -186,31 +203,63 @@ function runWithGate(
 }
 
 describe("grouping pipeline — 20k fields", () => {
-  bench("baseline (no grouping)", () => { flatAssembly(fields20k); });
-  bench("UDS active (always groups)", () => { runWithGate(fields20k, true, 0); });
-  bench("no UDS, no limit (always groups)", () => { runWithGate(fields20k, false, 0); });
-  bench("no UDS, limit=500 (skips grouping)", () => { runWithGate(fields20k, false, 500); });
+  bench("baseline (no grouping)", () => {
+    flatAssembly(fields20k);
+  });
+  bench("UDS active (always groups)", () => {
+    runWithGate(fields20k, true, 0);
+  });
+  bench("no UDS, no limit (always groups)", () => {
+    runWithGate(fields20k, false, 0);
+  });
+  bench("no UDS, limit=500 (skips grouping)", () => {
+    runWithGate(fields20k, false, 500);
+  });
 });
 
 describe("grouping pipeline — 30k fields", () => {
-  bench("baseline (no grouping)", () => { flatAssembly(fields30k); });
-  bench("UDS active (always groups)", () => { runWithGate(fields30k, true, 0); });
-  bench("no UDS, no limit (always groups)", () => { runWithGate(fields30k, false, 0); });
-  bench("no UDS, limit=500 (skips grouping)", () => { runWithGate(fields30k, false, 500); });
+  bench("baseline (no grouping)", () => {
+    flatAssembly(fields30k);
+  });
+  bench("UDS active (always groups)", () => {
+    runWithGate(fields30k, true, 0);
+  });
+  bench("no UDS, no limit (always groups)", () => {
+    runWithGate(fields30k, false, 0);
+  });
+  bench("no UDS, limit=500 (skips grouping)", () => {
+    runWithGate(fields30k, false, 500);
+  });
 });
 
 describe("grouping pipeline — 50k fields", () => {
-  bench("baseline (no grouping)", () => { flatAssembly(fields50k); });
-  bench("UDS active (always groups)", () => { runWithGate(fields50k, true, 0); });
-  bench("no UDS, no limit (always groups)", () => { runWithGate(fields50k, false, 0); });
-  bench("no UDS, limit=500 (skips grouping)", () => { runWithGate(fields50k, false, 500); });
+  bench("baseline (no grouping)", () => {
+    flatAssembly(fields50k);
+  });
+  bench("UDS active (always groups)", () => {
+    runWithGate(fields50k, true, 0);
+  });
+  bench("no UDS, no limit (always groups)", () => {
+    runWithGate(fields50k, false, 0);
+  });
+  bench("no UDS, limit=500 (skips grouping)", () => {
+    runWithGate(fields50k, false, 500);
+  });
 });
 
 describe("grouping pipeline — 100k fields", () => {
-  bench("baseline (no grouping)", () => { flatAssembly(fields100k); });
-  bench("UDS active (always groups)", () => { runWithGate(fields100k, true, 0); });
-  bench("no UDS, no limit (always groups)", () => { runWithGate(fields100k, false, 0); });
-  bench("no UDS, limit=500 (skips grouping)", () => { runWithGate(fields100k, false, 500); });
+  bench("baseline (no grouping)", () => {
+    flatAssembly(fields100k);
+  });
+  bench("UDS active (always groups)", () => {
+    runWithGate(fields100k, true, 0);
+  });
+  bench("no UDS, no limit (always groups)", () => {
+    runWithGate(fields100k, false, 0);
+  });
+  bench("no UDS, limit=500 (skips grouping)", () => {
+    runWithGate(fields100k, false, 500);
+  });
 });
 
 // ---------------------------------------------------------------------------

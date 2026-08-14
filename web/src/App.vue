@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <router-view></router-view>
   <OToastProvider />
   <ConfirmDialogProvider />
+  <CreateAlertDialogProvider />
 </template>
 
 <script lang="ts">
@@ -27,9 +28,10 @@ import { onMounted, watch } from "vue";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
+import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
 
 export default {
-  components: { OToastProvider, ConfirmDialogProvider },
+  components: { OToastProvider, ConfirmDialogProvider, CreateAlertDialogProvider },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -55,7 +57,7 @@ export default {
       () => store.state.theme,
       () => {
         initializeThemeColors();
-      }
+      },
     );
 
     /**
@@ -72,7 +74,7 @@ export default {
 
     return {
       store,
-    }
+    };
   },
 };
 </script>

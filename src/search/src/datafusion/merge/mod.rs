@@ -17,9 +17,12 @@ use std::sync::Arc;
 
 use arrow::array::RecordBatch;
 use config::{
-    FileFormat, TIMESTAMP_COL_NAME, get_config,
+    FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileMeta, StreamType},
-    utils::{parquet::new_parquet_writer, util::DISTINCT_STREAM_PREFIX},
+    utils::{
+        parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
+        util::DISTINCT_STREAM_PREFIX,
+    },
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -29,9 +32,21 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
+use vortex::{
+    VortexSessionDefault,
+    array::ArrayRef,
+    arrow::{FromArrowArray, FromArrowType},
+    dtype::DType,
+    file::VortexWriteOptions,
+    io::session::RuntimeSessionExt,
+    session::VortexSession,
+};
 
 use super::table_provider::uniontable::NewUnionTable;
-use crate::datafusion::exec::DataFusionContextBuilder;
+use crate::datafusion::{
+    exec::DataFusionContextBuilder,
+    vortex::{VORTEX_RUNTIME, vortex_write_strategy},
+};
 
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
@@ -170,7 +185,7 @@ pub async fn merge_parquet_files(
             )
             .await?
         }
-        FileFormat::Vortex => write_vortex(schema, rx, read_task).await?,
+        FileFormat::Vortex => write_vortex(schema, &metadata, rx, read_task).await?,
     };
 
     log::debug!(
@@ -189,8 +204,9 @@ pub async fn merge_parquet_files(
 fn merge_output_file_format(
     stream_type: StreamType,
     is_ingester: bool,
-    configured: FileFormat,
+    configured: FileFormatConfig,
 ) -> FileFormat {
+    let configured = configured.for_stream(stream_type);
     if is_ingester {
         FileFormat::for_ingester_stream(stream_type, configured)
     } else {
@@ -242,20 +258,46 @@ async fn write_parquet(
 
 async fn write_vortex(
     schema: Arc<Schema>,
-    rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    metadata: &FileMeta,
+    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<u8>> {
-    #[cfg(all(feature = "enterprise", feature = "vortex"))]
-    {
-        o2_enterprise::enterprise::search::vortex::write_vortex(schema, rx, read_task).await
-    }
-    #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
-    {
-        let _ = (schema, rx, read_task);
-        Err(DataFusionError::Execution(
-            "Vortex file format requires enterprise and vortex features".to_string(),
-        ))
-    }
+    // metadata segments belong to the write options, they can't be appended at
+    // close time like parquet's, so `records` may drift from the rows written
+    let file_meta = encode_vortex_file_meta(metadata);
+    let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
+        VORTEX_RUNTIME.block_on(async move {
+            let mut buf = Vec::new();
+            let session = VortexSession::default().with_tokio();
+            let dtype = DType::from_arrow(schema.as_ref());
+            let write_options = VortexWriteOptions::new(session.clone())
+                .with_strategy(vortex_write_strategy())
+                .with_metadata_segment(VORTEX_FILE_META_KEY, file_meta);
+            let mut writer = write_options.writer(&mut buf, dtype);
+
+            while let Some(batch) = rx.recv().await {
+                let array: ArrayRef = ArrayRef::from_arrow(batch, false).map_err(|e| {
+                    DataFusionError::Execution(format!(
+                        "Failed to convert arrow array to vortex array: {e}"
+                    ))
+                })?;
+                writer.push(array).await?;
+            }
+
+            writer.finish().await?;
+
+            Ok::<Vec<u8>, anyhow::Error>(buf)
+        })
+    });
+
+    read_task
+        .await
+        .map_err(|e| DataFusionError::External(Box::new(e)))??;
+
+    writer_task
+        .await
+        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
+        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
 }
 
 pub fn append_metadata(
@@ -286,6 +328,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
+    use vortex::file::OpenOptionsSessionExt;
 
     use super::*;
 
@@ -299,21 +342,30 @@ mod tests {
 
     #[test]
     fn test_merge_output_file_format_uses_parquet_for_ingester_metrics() {
+        let configured = "parquet,metrics=vortex"
+            .parse::<FileFormatConfig>()
+            .unwrap();
         assert_eq!(
-            merge_output_file_format(StreamType::Metrics, true, FileFormat::Vortex),
+            merge_output_file_format(StreamType::Metrics, true, configured),
             FileFormat::Parquet
         );
         assert_eq!(
-            merge_output_file_format(StreamType::Logs, true, FileFormat::Vortex),
-            FileFormat::Vortex
-        );
-        assert_eq!(
-            merge_output_file_format(StreamType::Metrics, false, FileFormat::Vortex),
-            FileFormat::Vortex
-        );
-        assert_eq!(
-            merge_output_file_format(StreamType::Logs, false, FileFormat::Parquet),
+            merge_output_file_format(StreamType::Logs, true, configured),
             FileFormat::Parquet
+        );
+        assert_eq!(
+            merge_output_file_format(StreamType::Metrics, false, configured),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            merge_output_file_format(StreamType::Traces, false, configured),
+            FileFormat::Parquet
+        );
+
+        let configured = FileFormatConfig::new(FileFormat::Vortex);
+        assert_eq!(
+            merge_output_file_format(StreamType::Logs, true, configured),
+            FileFormat::Vortex
         );
     }
 
@@ -338,5 +390,53 @@ mod tests {
         // Should handle empty tables gracefully or return appropriate error
         // The exact behavior depends on implementation details
         assert!(result.is_ok() || result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_write_vortex_carries_file_meta() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = create_test_schema();
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![100, 200, 300])),
+                Arc::new(StringArray::from(vec!["a", "b", "c"])),
+                Arc::new(Int64Array::from(vec![1, 2, 3])),
+            ],
+        )
+        .unwrap();
+
+        let metadata = FileMeta {
+            min_ts: 100,
+            max_ts: 300,
+            records: 3,
+            original_size: 1024,
+            ..Default::default()
+        };
+
+        let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+        tx.send(batch).await.unwrap();
+        drop(tx);
+        let read_task = tokio::task::spawn(async { Ok(()) });
+
+        let buf = write_vortex(schema, &metadata, rx, read_task)
+            .await
+            .unwrap();
+
+        let session = VortexSession::default().with_tokio();
+        let vxf = session
+            .open_options()
+            .include_metadata()
+            .open_buffer(vortex::buffer::Buffer::from(buf))
+            .unwrap();
+        let segment = vxf.metadata_segment(VORTEX_FILE_META_KEY).unwrap();
+        let file_meta: config::utils::json::Value =
+            config::utils::json::from_slice(segment.as_slice()).unwrap();
+        assert_eq!(file_meta["min_ts"], metadata.min_ts);
+        assert_eq!(file_meta["max_ts"], metadata.max_ts);
+        assert_eq!(file_meta["records"], metadata.records);
+        assert_eq!(file_meta["original_size"], metadata.original_size);
+        assert_eq!(vxf.row_count(), 3);
     }
 }

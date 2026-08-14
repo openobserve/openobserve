@@ -6,13 +6,10 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <div
-    class="flex flex-col h-full p-4 min-h-0"
-    data-test="score-config-library"
-  >
+  <div class="flex h-full min-h-0 flex-col p-4" data-test="score-config-library">
     <div
       v-if="isLoadingCatalog"
-      class="flex flex-col items-center justify-center flex-1 p-8"
+      class="flex flex-1 flex-col items-center justify-center p-8"
       data-test="score-config-library-loading"
     >
       <OSpinner size="lg" />
@@ -20,43 +17,44 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="loadError"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-text-secondary"
+      class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="score-config-library-error"
     >
-      <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
+      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
       <div class="text-status-error-text">{{ loadError }}</div>
       <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
-        Retry
+        {{ t("common.retry") }}
       </OButton>
     </div>
 
-    <div v-else class="flex flex-col min-h-0 flex-1">
+    <div v-else class="flex min-h-0 flex-1 flex-col">
       <OSearchInput
         v-model="searchQuery"
-        placeholder="Search Score Configs..."
+        :placeholder="t('onlineEvals.scoreConfigLibrary.searchPlaceholder')"
         clearable
         class="mb-4"
         data-test="score-config-library-search"
       />
 
-      <div class="flex items-center justify-between gap-3 mb-2 pl-4.25 pr-3">
+      <div class="mb-2 flex items-center justify-between gap-3 pr-3 pl-4.25">
         <div
           v-if="filteredEntries.length > 0"
-          class="inline-flex items-center gap-2 py-0.5 px-1 text-xs font-medium text-text-secondary select-none"
+          class="text-text-secondary inline-flex items-center gap-2 px-1 py-0.5 text-xs font-medium select-none"
           data-test="score-config-library-select-all"
         >
-          <OCheckbox
-            :model-value="allVisibleSelected"
-            @update:model-value="toggleSelectAll"
-          />
-          <span class="cursor-pointer" @click="toggleSelectAll">{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
+          <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
+          <span class="cursor-pointer" @click="toggleSelectAll">{{
+            allVisibleSelected ? t("common.clearAll") : t("common.selectAll")
+          }}</span>
         </div>
-        <span class="text-xs text-text-secondary">
-          {{ filteredEntries.length }} score config(s)
+        <span class="text-text-secondary text-xs">
+          {{
+            t("onlineEvals.scoreConfigLibrary.scoreConfigsLabel", { count: filteredEntries.length })
+          }}
         </span>
       </div>
 
-      <div class="overflow-y-auto flex-1 min-h-0 pb-4">
+      <div class="min-h-0 flex-1 overflow-y-auto pb-4">
         <section
           v-for="(group, index) in groupedEntries"
           :key="group.dataType"
@@ -64,22 +62,18 @@ the Free Software Foundation, either version 3 of the License, or
           :data-test="`score-config-library-section-${group.dataType}`"
         >
           <div
-            class="flex items-baseline gap-1.5 mt-0 mx-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-text-heading"
+            class="text-text-heading mx-0 mt-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-bold tracking-[0.04em] uppercase"
           >
             <span class="text-text-heading">{{ group.label }}</span>
-            <span class="font-medium text-text-secondary">({{ group.entries.length }})</span>
+            <span class="text-text-secondary font-medium">({{ group.entries.length }})</span>
           </div>
-          <ul
-            class="flex flex-col rounded-default border border-border-default"
-          >
+          <ul class="rounded-default border-border-default flex flex-col border">
             <li
               v-for="entry in group.entries"
               :key="entry.name"
-              class="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors duration-200 border-l-4"
+              class="flex cursor-pointer items-center gap-2 border-l-4 px-3 py-2 transition-colors duration-200"
               :class="[
-                isSelected(entry.name)
-                  ? 'bg-primary/5 border-primary'
-                  : 'border-transparent',
+                isSelected(entry.name) ? 'bg-primary/5 border-primary' : 'border-transparent',
               ]"
               :data-test="`score-config-library-item-${entry.name}`"
               @click="toggle(entry)"
@@ -91,12 +85,9 @@ the Free Software Foundation, either version 3 of the License, or
                   @click.stop
                 />
               </div>
-              <div class="flex flex-col flex-1 min-w-0">
+              <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-sm font-medium">{{ entry.displayName }}</span>
-                <span
-                  v-if="entry.description"
-                  class="block text-xs text-text-secondary"
-                >
+                <span v-if="entry.description" class="text-text-secondary block text-xs">
                   {{ entry.description }}
                 </span>
               </div>
@@ -122,6 +113,9 @@ import {
   type CatalogScoreConfig,
 } from "@/services/online-evals-catalog.service";
 import { showError } from "./utils/evalFormat";
+import { useI18nTyped, raw } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   orgId: string;
@@ -218,11 +212,10 @@ function toggle(entry: CatalogScoreConfig) {
   selectedNames.value = next;
 }
 
-watch(
-  selectedNames,
-  (val) => emit("update:selected-count", val.size),
-  { deep: true, immediate: true },
-);
+watch(selectedNames, (val) => emit("update:selected-count", val.size), {
+  deep: true,
+  immediate: true,
+});
 
 async function importSelected() {
   if (isImporting.value || selectedNames.value.size === 0) return;
@@ -261,7 +254,7 @@ async function importSelected() {
     if (failCount) parts.push(`${failCount} failed`);
     toast({
       variant: failCount > 0 && successCount === 0 ? "error" : "success",
-      message: parts.join(" · "),
+      message: raw(parts.join(" · ")),
     });
   }
 }
@@ -279,4 +272,3 @@ function payloadFor(entry: CatalogScoreConfig) {
 
 defineExpose({ importSelected });
 </script>
-

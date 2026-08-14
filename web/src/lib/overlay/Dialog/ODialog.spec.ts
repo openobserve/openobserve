@@ -85,36 +85,28 @@ describe("ODialog", () => {
     const wrapper = mount(ODialog, {
       props: { open: true, title: "Test" },
     });
-    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(true);
   });
 
   it("hides the close button when showClose=false", () => {
     const wrapper = mount(ODialog, {
       props: { open: true, title: "Test", showClose: false },
     });
-    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(false);
   });
 
   it("shows the close button when persistent=true (persistent only blocks Escape/backdrop)", () => {
     const wrapper = mount(ODialog, {
       props: { open: true, title: "Test", persistent: true },
     });
-    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(true);
   });
 
   it("hides the close button when showClose=false even with persistent=true", () => {
     const wrapper = mount(ODialog, {
       props: { open: true, title: "Test", persistent: true, showClose: false },
     });
-    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(false);
   });
 
   it("emits update:open when triggered", async () => {
@@ -238,10 +230,7 @@ describe("ODialog", () => {
         props: { open: true, title: "Test" },
       });
       const panel = findDialogPanel(wrapper);
-      await panel.vm.$emit(
-        "escapeKeyDown",
-        new KeyboardEvent("keydown", { key: "Escape" }),
-      );
+      await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       const emitted = wrapper.emitted("update:open");
       expect(emitted).toBeTruthy();
       expect(emitted?.[0]).toEqual([false]);
@@ -252,10 +241,7 @@ describe("ODialog", () => {
         props: { open: true, title: "Test", persistent: true },
       });
       const panel = findDialogPanel(wrapper);
-      await panel.vm.$emit(
-        "escapeKeyDown",
-        new KeyboardEvent("keydown", { key: "Escape" }),
-      );
+      await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       expect(wrapper.emitted("update:open")).toBeFalsy();
     });
   });
@@ -269,9 +255,7 @@ describe("ODialog", () => {
     function dispatchKeydown(el: Element, init: KeyboardEventInit): boolean {
       const spy = vi.fn();
       document.addEventListener("keydown", spy);
-      el.dispatchEvent(
-        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init }),
-      );
+      el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init }));
       document.removeEventListener("keydown", spy);
       return spy.mock.calls.length > 0;
     }

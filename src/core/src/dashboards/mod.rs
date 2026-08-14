@@ -36,8 +36,9 @@ use infra::{
         distinct_values::{DistinctFieldRecord, OriginType},
     },
 };
+use stream::save_stream_settings;
 
-use super::{db::distinct_values, folders, stream::save_stream_settings};
+use super::{db::distinct_values, folders};
 use crate::common::meta::authz::Authz;
 pub mod reports;
 pub mod timed_annotations;
@@ -200,8 +201,10 @@ async fn update_distinct_variables(
 
     if !new_variables.is_empty() {
         for ((name, typ), fields) in new_variables.into_iter() {
+            // local editable copy; persisted via save_stream_settings below
             let mut stream_settings = infra::schema::get_settings(org_id, &name, typ)
                 .await
+                .map(|s| (*s).clone())
                 .unwrap_or_default();
             // we only store distinct values for logs and traces -
             // if anything else, we can ignore.

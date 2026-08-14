@@ -31,6 +31,19 @@ export default class DashboardDrilldownPage {
     this.confirmButton = page.locator(
       '[data-test="dashboard-drilldown-popup"] [data-test="o-dialog-primary-btn"]'
     );
+    // Unscoped primary dialog button (matches the spec's page-level confirm click).
+    this.dialogPrimaryButton = page.locator('[data-test="o-dialog-primary-btn"]');
+
+    // Drilldown popup — variable mapping + passAllVariables toggle
+    this.addVariableButton = page.locator('[data-test="dashboard-drilldown-add-variable"]');
+    this.passAllVariablesToggle = page.locator('[data-test="dashboard-drilldown-pass-all-variables"]');
+    // The variable-mapping OCombobox rows in DrilldownPopUp have no data-test —
+    // match by placeholder, scoped to the popup.
+    this.variableNameInput = this.popup.getByPlaceholder('Name').first();
+    this.variableValueInput = this.popup.getByPlaceholder('Value').first();
+
+    // Dashboard view — first table panel
+    this.panelTable = page.locator('[data-test="dashboard-panel-table"]').first();
 
     // Dashboard view — drilldown trigger overlay
     this.drilldownMenu = page.locator('[data-test="drilldown-menu"]');
@@ -49,6 +62,25 @@ export default class DashboardDrilldownPage {
 
   generateUniqueDrilldownName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
+  }
+
+  /**
+   * Get an ARIA-role listbox option by its (exact) accessible name.
+   * Used for the folder / dashboard / tab OSelect dropdowns which render
+   * role="option" items.
+   * @param {string} name - Exact option label
+   * @returns {import('@playwright/test').Locator}
+   */
+  optionByRole(name) {
+    return this.page.getByRole("option", { name, exact: true });
+  }
+
+  /**
+   * Get the first ARIA-role listbox option (used when any option is acceptable).
+   * @returns {import('@playwright/test').Locator}
+   */
+  firstOptionByRole() {
+    return this.page.getByRole("option").first();
   }
 
   /**
@@ -199,9 +231,9 @@ export default class DashboardDrilldownPage {
     await tablePanel.waitFor({ state: 'attached', timeout: 20000 });
     await tablePanel.scrollIntoViewIfNeeded();
 
-    // TanStack table (dashboard mode) renders rows directly in tbody with data-test="dashboard-data-row".
+    // Rows render directly in tbody, keyed data-test="o2-table-row-<index>".
     // Click the first data row to trigger the @click:dataRow event (emitted as row-click).
-    const tableRow = tablePanel.locator('[data-test="dashboard-data-row"]').first();
+    const tableRow = tablePanel.locator('[data-test^="o2-table-row-"]').first();
     await tableRow.waitFor({ state: 'visible', timeout: 30000 });
     await tableRow.click();
     await this.page.waitForTimeout(500);

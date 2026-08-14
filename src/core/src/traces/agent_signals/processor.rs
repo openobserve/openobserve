@@ -89,6 +89,12 @@ pub async fn process_agent_signals_stream(
     // emit an agent id don't carry that column, so schema-gate it here — a missing
     // column in the predicate would be a hard search error.
     let has_agent_id = has_field("gen_ai_agent_id");
+    // env/version come from optional resource attrs and are absent on many trace
+    // streams. Schema-gate them so the signal SQL never SELECTs/GROUP-BYs a missing
+    // column (a hard search error that would silently sink the whole pass) — same
+    // rationale as `has_agent_id`.
+    let has_agent_env = has_field("gen_ai_agent_env");
+    let has_agent_version = has_field("gen_ai_agent_version");
 
     let mut records = Vec::new();
 
@@ -102,6 +108,8 @@ pub async fn process_agent_signals_stream(
             &detail_fields,
             &taxonomy.failure_rules,
             has_agent_id,
+            has_agent_env,
+            has_agent_version,
         );
         match crate::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
             .await
@@ -114,7 +122,13 @@ pub async fn process_agent_signals_stream(
     }
     // R2 loop ratio — needs gen_ai_tool_name.
     if has_tool {
-        let sql = build_loop_ratio_sql(stream_name, start_time, end_time);
+        let sql = build_loop_ratio_sql(
+            stream_name,
+            start_time,
+            end_time,
+            has_agent_env,
+            has_agent_version,
+        );
         match crate::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
             .await
         {
@@ -124,7 +138,14 @@ pub async fn process_agent_signals_stream(
     }
     // R4 cost/diagnosis — needs gen_ai_usage_cost.
     if has_cost {
-        let sql = build_cost_sql(stream_name, start_time, end_time, has_agent_id);
+        let sql = build_cost_sql(
+            stream_name,
+            start_time,
+            end_time,
+            has_agent_id,
+            has_agent_env,
+            has_agent_version,
+        );
         match crate::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
             .await
         {

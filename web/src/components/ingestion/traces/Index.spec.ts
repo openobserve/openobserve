@@ -74,8 +74,7 @@ describe("IngestTraces (Index.vue)", () => {
         stubs: {
           RouterView: { template: "<div data-test='router-view'></div>" },
           OSplitter: {
-            template:
-              "<div><slot name='before'/><slot name='after'/></div>",
+            template: "<div><slot name='before'/><slot name='after'/></div>",
           },
         },
       },
@@ -110,9 +109,7 @@ describe("IngestTraces (Index.vue)", () => {
 
   describe("navigation on mount", () => {
     it("should redirect from ingestTraces to tracesOTLP on mount", async () => {
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "tracesOTLP" }),
-      );
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "tracesOTLP" }));
     });
 
     it("should not redirect when already on a valid ingest route", async () => {
@@ -134,9 +131,7 @@ describe("IngestTraces (Index.vue)", () => {
       await flushPromises();
 
       // When on tracesOTLP route, push should still be called with same route
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "tracesOTLP" }),
-      );
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "tracesOTLP" }));
       wrapperOnOTLP.unmount();
     });
   });
@@ -148,7 +143,7 @@ describe("IngestTraces (Index.vue)", () => {
       wrapper.vm.copyToClipboardFn(mockElement);
       await flushPromises();
 
-      expect(copyToClipboard).toHaveBeenCalledWith("some text to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("some text to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,

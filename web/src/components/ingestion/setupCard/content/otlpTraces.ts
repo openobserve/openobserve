@@ -20,13 +20,11 @@
 // The stream is a `streamInput`, so the name flows into the exporter config AND
 // the live detection — they can never drift apart.
 
+import { gt, raw } from "@/types/i18n";
+
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
-import type {
-  CardSubstitutions,
-  RichCardContent,
-  RichCardStepVariant,
-} from "../types";
+import type { CardSubstitutions, RichCardContent, RichCardStepVariant } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
 
 // Collector exporter config. {stream} is filled live by the renderer.
@@ -63,9 +61,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic {token},stream-name={stre
 export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 export OTEL_SERVICE_NAME="my-service"`;
 
-export default function otlpTracesCard(
-  subs: CardSubstitutions,
-): RichCardContent {
+export default function otlpTracesCard(subs: CardSubstitutions): RichCardContent {
   const isCloud = config.isCloud === "true";
   // The gRPC endpoint is a self-hosted port; cloud terminates HTTP only.
   const host = subs.url.replace(/^https?:\/\//, "").replace(/\/$/, "");
@@ -80,14 +76,14 @@ export default function otlpTracesCard(
   const variants: RichCardStepVariant[] = [
     {
       id: "http",
-      label: "Collector · OTLP HTTP",
+      label: raw("Collector · OTLP HTTP"),
       icon: getImageURL("images/ingestion/otlp.svg"),
       code: { ...code(HTTP_YAML), filename: "config.yaml" },
       note: "The default for the OpenTelemetry Collector — works everywhere, including behind proxies and load balancers.",
     },
     {
       id: "sdk",
-      label: "SDK (No Collector)",
+      label: raw("SDK (No Collector)"),
       icon: getImageURL("images/rum/events/terminal.png"),
       code: code(SDK_ENV, "bash"),
       note: "Standard OTEL_* environment variables — every OpenTelemetry SDK reads these, so no code change is needed.",
@@ -98,7 +94,7 @@ export default function otlpTracesCard(
   if (!isCloud) {
     variants.splice(1, 0, {
       id: "grpc",
-      label: "Collector · OTLP gRPC",
+      label: raw("Collector · OTLP gRPC"),
       icon: getImageURL("images/ingestion/otlp.svg"),
       code: { ...code(grpcYaml(host, insecure)), filename: "config.yaml" },
       note: "Lower overhead than HTTP for high span volumes. Port 5081 must be reachable from the collector.",
@@ -108,41 +104,43 @@ export default function otlpTracesCard(
   return {
     provider: {
       name: "Traces (OpenTelemetry)",
-      tagline:
-        "Point any OpenTelemetry exporter at OpenObserve — collector or SDK, HTTP or gRPC. Your endpoint and token are filled in below.",
+      tagline: gt("ingestion.setupCard.taglineOtlpTraces"),
       logo: getImageURL("images/ingestion/otlp.svg"),
       tone: "#f5a800",
       runtime: "Any",
       setupTime: "~2 min",
-      metaBadges: ["Traces"],
+      metaBadges: [gt("common.traces")],
     },
     steps: [
       {
         id: "configure",
-        title: "Point Your Exporter at OpenObserve",
-        description:
-          "Add this to your collector config, or set the environment variables if your app exports directly. Everything is already filled in for this organization.",
-        chip: { kind: "editor", label: "Editor" },
+        titleKey: "ingestion.setupCard.pointExporterTitle",
+        descriptionKey: "ingestion.setupCard.pointExporterDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.chipEditor" },
         required: true,
         completeOn: "copy",
         variants,
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Restart the collector (or your app), exercise a request that produces a span, then hit Test.",
-        chip: { kind: "traces", label: "Traces" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyOtlpTracesDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipTraces" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Spans", "Service Map", "Latency", "Errors"],
+        pills: [
+          gt("ingestion.setupCard.pillSpans"),
+          gt("ingestion.setupCard.pillServiceMap"),
+          gt("ingestion.setupCard.pillLatency"),
+          gt("rum.errors"),
+        ],
       },
     ],
     streamInput: {
-      label: "Traces Stream Name",
+      labelKey: "ingestion.setupCard.tracesStreamNameLabel",
       default: "default",
-      placeholder: "default",
-      help: "Written into the config above as `stream-name`, and watched by the check below.",
+      placeholder: raw("default"),
+      helpKey: "ingestion.setupCard.otlpTracesStreamHelp",
     },
     // Every span carries a trace id, so any row on the target stream proves the
     // exporter is wired up correctly.
@@ -181,7 +179,6 @@ export default function otlpTracesCard(
         },
       ],
     },
-    docUrl:
-      "https://openobserve.ai/docs/user-guide/data-sources-ingestion/traces/opentelemetry/",
+    docUrl: "https://openobserve.ai/docs/user-guide/data-sources-ingestion/traces/opentelemetry/",
   };
 }

@@ -34,7 +34,7 @@ vi.mock("vue-i18n", async () => {
         if (typeof msg !== "string") return key;
         return named
           ? msg.replace(/\{(\w+)\}/g, (_: string, p: string) =>
-              named[p] === undefined ? `{${p}}` : String(named[p])
+              named[p] === undefined ? `{${p}}` : String(named[p]),
             )
           : msg;
       },
@@ -141,8 +141,7 @@ describe("usePrebuiltDestinations", () => {
     });
 
     it("initial state: isLoading false, isTestInProgress false, lastTestResult null", () => {
-      const { isLoading, isTestInProgress, lastTestResult } =
-        usePrebuiltDestinations();
+      const { isLoading, isTestInProgress, lastTestResult } = usePrebuiltDestinations();
 
       expect(isLoading.value).toBe(false);
       expect(isTestInProgress.value).toBe(false);
@@ -346,13 +345,9 @@ describe("usePrebuiltDestinations", () => {
     it("throws and notifies negatively when validation fails", async () => {
       const { createDestination } = usePrebuiltDestinations();
 
-      await expect(
-        createDestination("slack", "my-slack", { webhookUrl: "" }),
-      ).rejects.toThrow();
+      await expect(createDestination("slack", "my-slack", { webhookUrl: "" })).rejects.toThrow();
 
-      expect(vi.mocked(toast)).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(vi.mocked(toast)).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("throws when destination type is unknown", async () => {
@@ -360,9 +355,7 @@ describe("usePrebuiltDestinations", () => {
 
       // validateCredentials runs first and returns "Unknown destination type" error,
       // which is wrapped in a "Validation error:" prefix before reaching the type check.
-      await expect(
-        createDestination("unknownType" as any, "test", {}),
-      ).rejects.toThrow();
+      await expect(createDestination("unknownType" as any, "test", {})).rejects.toThrow();
     });
 
     it("shows positive notification on success", async () => {
@@ -438,8 +431,7 @@ describe("usePrebuiltDestinations", () => {
       const { createDestination } = usePrebuiltDestinations();
       // ServiceNow requires the service-now.com domain with the incident table path
       await createDestination("servicenow", "snow-dest", {
-        instanceUrl:
-          "https://myinstance.service-now.com/api/now/table/incident",
+        instanceUrl: "https://myinstance.service-now.com/api/now/table/incident",
         username: "admin",
         password: "secret",
       });
@@ -457,12 +449,7 @@ describe("usePrebuiltDestinations", () => {
       mockDestUpdate.mockResolvedValue({ data: {} });
 
       const { updateDestination } = usePrebuiltDestinations();
-      await updateDestination(
-        "slack",
-        "original-name",
-        "new-name",
-        makeSlackCredentials(),
-      );
+      await updateDestination("slack", "original-name", "new-name", makeSlackCredentials());
 
       expect(mockDestUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ destination_name: "original-name" }),
@@ -472,21 +459,16 @@ describe("usePrebuiltDestinations", () => {
     it("throws when destination type is unknown", async () => {
       const { updateDestination } = usePrebuiltDestinations();
 
-      await expect(
-        updateDestination("unknownType" as any, "orig", "new", {}),
-      ).rejects.toThrow("Invalid destination type");
+      await expect(updateDestination("unknownType" as any, "orig", "new", {})).rejects.toThrow(
+        "Invalid destination type",
+      );
     });
 
     it("shows positive notification on success", async () => {
       mockDestUpdate.mockResolvedValue({ data: {} });
 
       const { updateDestination } = usePrebuiltDestinations();
-      await updateDestination(
-        "slack",
-        "orig",
-        "new",
-        makeSlackCredentials(),
-      );
+      await updateDestination("slack", "orig", "new", makeSlackCredentials());
 
       expect(vi.mocked(toast)).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "success" }),
@@ -497,12 +479,7 @@ describe("usePrebuiltDestinations", () => {
       mockDestUpdate.mockResolvedValue({ data: {} });
 
       const { updateDestination, isLoading } = usePrebuiltDestinations();
-      await updateDestination(
-        "slack",
-        "orig",
-        "new",
-        makeSlackCredentials(),
-      );
+      await updateDestination("slack", "orig", "new", makeSlackCredentials());
       expect(isLoading.value).toBe(false);
     });
   });
@@ -565,9 +542,9 @@ describe("usePrebuiltDestinations", () => {
       mockDestGetByName.mockResolvedValue({ data: {} });
 
       const { convertToPrebuilt } = usePrebuiltDestinations();
-      await expect(
-        convertToPrebuilt("my-dest", "unknownType" as any),
-      ).rejects.toThrow("Invalid target type");
+      await expect(convertToPrebuilt("my-dest", "unknownType" as any)).rejects.toThrow(
+        "Invalid target type",
+      );
     });
 
     it("shows negative notification when conversion fails", async () => {
@@ -576,9 +553,7 @@ describe("usePrebuiltDestinations", () => {
       const { convertToPrebuilt } = usePrebuiltDestinations();
       await expect(convertToPrebuilt("missing", "slack")).rejects.toThrow();
 
-      expect(vi.mocked(toast)).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(vi.mocked(toast)).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("sets isLoading to false after conversion", async () => {

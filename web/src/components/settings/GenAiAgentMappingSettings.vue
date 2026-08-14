@@ -5,91 +5,131 @@
     icon="smart-toy"
     bleed
   >
-      <template #title>
-        <span data-test="gen-ai-agent-mapping-page-title">{{
-          t("settings.genAiAgentMapping.title")
-        }}</span>
-      </template>
-      <!-- Content helpers (populate / clear the fields) live in the header,
+    <template #title>
+      <span data-test="gen-ai-agent-mapping-page-title">{{
+        t("settings.genAiAgentMapping.title")
+      }}</span>
+    </template>
+    <!-- Content helpers (populate / clear the fields) live in the header,
            separate from the primary Save action at the bottom. -->
-      <template #actions>
-        <OButton
-          data-test="gen-ai-agent-mapping-apply-defaults-btn"
-          variant="outline"
-          size="sm"
-          :loading="loadingDefaults"
-          @click="applyDefaults"
-        >
-          {{ t("settings.genAiAgentMapping.applyDefaults") }}
-        </OButton>
-        <OButton
-          data-test="gen-ai-agent-mapping-reset-empty-btn"
-          variant="outline"
-          size="sm"
-          @click="resetToEmpty"
-        >
-          {{ t("settings.genAiAgentMapping.resetToEmpty") }}
-        </OButton>
-        <OButton
-          data-test="gen-ai-agent-registry-clear-btn"
-          variant="outline-destructive"
-          size="sm"
-          :loading="clearingRegistry"
-          :disabled="loading || loadingDefaults || saving"
-          @click="openClearRegistryDialog"
-        >
-          {{ t("settings.genAiAgentMapping.clearRegistry") }}
-        </OButton>
-      </template>
+    <template #actions>
+      <OButton
+        data-test="gen-ai-agent-mapping-apply-defaults-btn"
+        variant="outline"
+        size="sm"
+        :loading="loadingDefaults"
+        @click="applyDefaults"
+      >
+        {{ t("settings.genAiAgentMapping.applyDefaults") }}
+      </OButton>
+      <OButton
+        data-test="gen-ai-agent-mapping-reset-empty-btn"
+        variant="outline"
+        size="sm"
+        @click="resetToEmpty"
+      >
+        {{ t("settings.genAiAgentMapping.resetToEmpty") }}
+      </OButton>
+      <OButton
+        data-test="gen-ai-agent-registry-clear-btn"
+        variant="outline-destructive"
+        size="sm"
+        :loading="clearingRegistry"
+        :disabled="loading || loadingDefaults || saving"
+        @click="openClearRegistryDialog"
+      >
+        {{ t("settings.genAiAgentMapping.clearRegistry") }}
+      </OButton>
+    </template>
 
-    <div
-      v-if="loading"
-      class="flex flex-1 items-center justify-center"
-    >
+    <div v-if="loading" class="flex flex-1 items-center justify-center">
       <OSpinner size="md" />
     </div>
 
     <template v-else>
       <!-- Scrollable form body -->
-      <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+      <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div class="grid grid-cols-1 gap-5">
-          <OTextarea
-            v-model="agentNameText"
-            :label="t('settings.genAiAgentMapping.agentNameFields')"
-            :help-text="t('settings.genAiAgentMapping.agentNameHelp')"
-            :placeholder="t('settings.genAiAgentMapping.fieldsPlaceholder')"
-            :rows="10"
-            spellcheck="false"
-            data-test="gen-ai-agent-name-fields-input"
-          >
-            <template #tooltip>
-              <OTooltip
-                :content="t('settings.genAiAgentMapping.agentNameInfo')"
-              />
-            </template>
-          </OTextarea>
-          <OTextarea
-            v-model="agentIdText"
-            :label="t('settings.genAiAgentMapping.agentIdFields')"
-            :help-text="t('settings.genAiAgentMapping.agentIdHelp')"
-            :placeholder="t('settings.genAiAgentMapping.fieldsPlaceholder')"
-            :rows="10"
-            spellcheck="false"
-            data-test="gen-ai-agent-id-fields-input"
-          >
-            <template #tooltip>
-              <OTooltip
-                :content="t('settings.genAiAgentMapping.agentIdInfo')"
-              />
-            </template>
-          </OTextarea>
+          <div class="flex flex-col gap-2">
+            <OTextarea
+              v-model="agentNameText"
+              :label="t('settings.genAiAgentMapping.agentNameFields')"
+              :help-text="t('settings.genAiAgentMapping.agentNameHelp')"
+              :placeholder="t('settings.genAiAgentMapping.agentNamePlaceholder')"
+              :rows="8"
+              spellcheck="false"
+              data-test="gen-ai-agent-name-fields-input"
+            >
+              <template #tooltip>
+                <OTooltip :content="t('settings.genAiAgentMapping.agentNameInfo')" />
+              </template>
+            </OTextarea>
+            <BuiltinFields
+              :standard="BUILTIN_FIELDS.agentName.standard"
+              data-test="gen-ai-agent-name-builtin"
+            />
+          </div>
+          <div class="flex flex-col gap-2">
+            <OTextarea
+              v-model="agentIdText"
+              :label="t('settings.genAiAgentMapping.agentIdFields')"
+              :help-text="t('settings.genAiAgentMapping.agentIdHelp')"
+              :placeholder="t('settings.genAiAgentMapping.agentIdPlaceholder')"
+              :rows="8"
+              spellcheck="false"
+              data-test="gen-ai-agent-id-fields-input"
+            >
+              <template #tooltip>
+                <OTooltip :content="t('settings.genAiAgentMapping.agentIdInfo')" />
+              </template>
+            </OTextarea>
+            <BuiltinFields
+              :standard="BUILTIN_FIELDS.agentId.standard"
+              data-test="gen-ai-agent-id-builtin"
+            />
+          </div>
+          <div class="flex flex-col gap-2">
+            <OTextarea
+              v-model="envFieldsText"
+              :label="t('settings.genAiAgentMapping.envFields')"
+              :help-text="t('settings.genAiAgentMapping.envHelp')"
+              :placeholder="t('settings.genAiAgentMapping.envPlaceholder')"
+              :rows="8"
+              spellcheck="false"
+              data-test="gen-ai-env-fields-input"
+            >
+              <template #tooltip>
+                <OTooltip :content="t('settings.genAiAgentMapping.envInfo')" />
+              </template>
+            </OTextarea>
+            <BuiltinFields :standard="BUILTIN_FIELDS.env.standard" data-test="gen-ai-env-builtin" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <OTextarea
+              v-model="versionFieldsText"
+              :label="t('settings.genAiAgentMapping.versionFields')"
+              :help-text="t('settings.genAiAgentMapping.versionHelp')"
+              :placeholder="t('settings.genAiAgentMapping.versionPlaceholder')"
+              :rows="8"
+              spellcheck="false"
+              data-test="gen-ai-version-fields-input"
+            >
+              <template #tooltip>
+                <OTooltip :content="t('settings.genAiAgentMapping.versionInfo')" />
+              </template>
+            </OTextarea>
+            <BuiltinFields
+              :standard="BUILTIN_FIELDS.version.standard"
+              data-test="gen-ai-version-builtin"
+            />
+          </div>
         </div>
       </div>
 
       <!-- Sticky footer action bar (mirrors AddAlert): primary Save pinned at
            the bottom-right while the body scrolls. -->
       <div
-        class="flex items-center justify-end gap-2 shrink-0 px-4 py-2.5 border-t border-border-default"
+        class="border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-4 py-2.5"
       >
         <OButton
           data-test="gen-ai-agent-mapping-save-btn"
@@ -109,15 +149,13 @@
       size="sm"
       :title="t('settings.genAiAgentMapping.clearRegistryTitle')"
       :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="
-        t('settings.genAiAgentMapping.clearRegistryConfirm')
-      "
+      :primary-button-label="t('settings.genAiAgentMapping.clearRegistryConfirm')"
       primary-button-variant="destructive"
       :primary-button-loading="clearingRegistry"
       @click:secondary="clearRegistryDialogOpen = false"
       @click:primary="clearAgentRegistry"
     >
-      <p class="text-sm text-text-body">
+      <p class="text-text-body text-sm">
         {{ t("settings.genAiAgentMapping.clearRegistryDescription") }}
       </p>
     </ODialog>
@@ -126,7 +164,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeMount, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -134,14 +172,28 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import BuiltinFields from "@/components/settings/BuiltinFields.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import genAiAgentMappingService, {
   fetchDefaultGenAiAgentMapping,
   type GenAiAgentMappingConfig,
 } from "@/services/gen-ai-agent-mapping.service";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
+
+// The standard-tier attribute the resolver ALWAYS checks first for each
+// dimension (current OTel / GenAI semconv), mirroring agent_registry.rs. Shown
+// read-only so users see the full detection order: this standard attribute, then
+// their editable fallbacks (which the boxes are seeded with on load). The
+// built-in fallbacks themselves are pre-populated into the editable textareas,
+// so they are not duplicated here.
+const BUILTIN_FIELDS = {
+  agentName: { standard: ["gen_ai.agent.name"] },
+  agentId: { standard: ["gen_ai.agent.id"] },
+  env: { standard: ["deployment.environment.name"] },
+  version: { standard: ["gen_ai.agent.version"] },
+} as const;
 
 const loading = ref(false);
 const loadingDefaults = ref(false);
@@ -150,6 +202,8 @@ const clearingRegistry = ref(false);
 const clearRegistryDialogOpen = ref(false);
 const agentNameText = ref("");
 const agentIdText = ref("");
+const envFieldsText = ref("");
+const versionFieldsText = ref("");
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
@@ -163,19 +217,44 @@ const textToFields = (text: string) =>
 const setDraft = (config: GenAiAgentMappingConfig) => {
   agentNameText.value = fieldsToText(config.agent_name_fields);
   agentIdText.value = fieldsToText(config.agent_id_fields);
+  envFieldsText.value = fieldsToText(config.env_fields);
+  versionFieldsText.value = fieldsToText(config.version_fields);
 };
 
 const draftConfig = (): GenAiAgentMappingConfig => ({
   agent_name_fields: textToFields(agentNameText.value),
   agent_id_fields: textToFields(agentIdText.value),
+  env_fields: textToFields(envFieldsText.value),
+  version_fields: textToFields(versionFieldsText.value),
 });
+
+/** True when a config has no user-set fallbacks in any list. */
+const isConfigEmpty = (c: GenAiAgentMappingConfig) =>
+  !c.agent_name_fields.length &&
+  !c.agent_id_fields.length &&
+  !c.env_fields.length &&
+  !c.version_fields.length;
 
 const loadConfig = async () => {
   if (!orgId.value) return;
 
   loading.value = true;
   try {
-    setDraft(await genAiAgentMappingService.get(orgId.value));
+    // Show what's actually IN EFFECT, seeded into the editable fields: the org's
+    // saved fallbacks if it has customized them, otherwise the defaults — so a
+    // fresh org sees the real default fields in the boxes (not empty
+    // placeholders) and can edit + save them to org settings. Mirrors the
+    // correlation settings pattern (server value → editable field → save → DB).
+    const saved = await genAiAgentMappingService.get(orgId.value);
+    if (isConfigEmpty(saved)) {
+      try {
+        setDraft(await fetchDefaultGenAiAgentMapping());
+      } catch {
+        setDraft(saved);
+      }
+    } else {
+      setDraft(saved);
+    }
   } catch (error: any) {
     toast({
       variant: "error",

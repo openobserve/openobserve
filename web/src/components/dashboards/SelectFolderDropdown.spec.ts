@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
-
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we
 // can assert on the props the component forwards + emit the click events
 // the component listens to.
@@ -147,9 +146,7 @@ describe("SelectFolderDropdown", () => {
   it("should render add folder button", () => {
     const wrapper = createWrapper({}, store, router);
 
-    const addButton = wrapper.find(
-      '[data-test="dashboard-folder-move-new-add"]',
-    );
+    const addButton = wrapper.find('[data-test="dashboard-folder-move-new-add"]');
     expect(addButton.exists()).toBe(true);
   });
 
@@ -158,9 +155,7 @@ describe("SelectFolderDropdown", () => {
 
     expect(wrapper.vm.showAddFolderDialog).toBe(false);
 
-    const addButton = wrapper.find(
-      '[data-test="dashboard-folder-move-new-add"]',
-    );
+    const addButton = wrapper.find('[data-test="dashboard-folder-move-new-add"]');
     await addButton.trigger("click");
 
     expect(wrapper.vm.showAddFolderDialog).toBe(true);
@@ -247,9 +242,7 @@ describe("SelectFolderDropdown", () => {
     it("should forward open=true to ODrawer when the add folder button is clicked", async () => {
       const wrapper = createWrapper({}, store, router);
 
-      await wrapper
-        .find('[data-test="dashboard-folder-move-new-add"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dashboard-folder-move-new-add"]').trigger("click");
 
       const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(true);
@@ -270,17 +263,13 @@ describe("SelectFolderDropdown", () => {
     it("should forward the localized save label to ODrawer primary button", () => {
       const wrapper = createWrapper({}, store, router);
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("primaryButtonLabel")).toBe(
-        i18n.global.t("dashboard.save"),
-      );
+      expect(drawer.props("primaryButtonLabel")).toBe(i18n.global.t("dashboard.save"));
     });
 
     it("should forward the localized cancel label to ODrawer secondary button", () => {
       const wrapper = createWrapper({}, store, router);
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("secondaryButtonLabel")).toBe(
-        i18n.global.t("dashboard.cancel"),
-      );
+      expect(drawer.props("secondaryButtonLabel")).toBe(i18n.global.t("dashboard.cancel"));
     });
 
     it("should attach the data-test attribute on the ODrawer", () => {
@@ -295,9 +284,7 @@ describe("SelectFolderDropdown", () => {
       const wrapper = createWrapper({}, store, router);
 
       // open it first
-      await wrapper
-        .find('[data-test="dashboard-folder-move-new-add"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dashboard-folder-move-new-add"]').trigger("click");
       expect(wrapper.vm.showAddFolderDialog).toBe(true);
 
       const drawer = wrapper.findComponent(ODialogStub);
@@ -310,9 +297,7 @@ describe("SelectFolderDropdown", () => {
       const wrapper = createWrapper({}, store, router);
 
       // open the drawer so the AddFolder ref is mounted
-      await wrapper
-        .find('[data-test="dashboard-folder-move-new-add"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dashboard-folder-move-new-add"]').trigger("click");
 
       const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("formId")).toBe("add-folder-dashboards-form");
@@ -358,19 +343,13 @@ describe("SelectFolderDropdown", () => {
 
   describe("Reactive folder list", () => {
     it("should refresh selectedFolder when the store folders list changes and current id no longer exists", async () => {
-      const wrapper = createWrapper(
-        { activeFolderId: "folder1" },
-        store,
-        router,
-      );
+      const wrapper = createWrapper({ activeFolderId: "folder1" }, store, router);
 
       expect(wrapper.vm.selectedFolder).toBe("folder1");
 
       // mutate folders so 'folder1' is no longer present — should fall back
       // to the default placeholder.
-      store.state.organizationData.folders = [
-        { name: "Folder 2", folderId: "folder2" },
-      ];
+      store.state.organizationData.folders = [{ name: "Folder 2", folderId: "folder2" }];
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.selectedFolder).toBe("default");

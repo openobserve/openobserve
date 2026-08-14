@@ -62,7 +62,8 @@ describe("PatternCard", () => {
     // Do NOT declare "click" in emits — VTU then treats the parent's @click.stop
     // as a native DOM listener on the root element, which fires on trigger("click").
     emits: [],
-    template: '<button :data-test="$attrs[\'data-test\']" :title="title" :disabled="disabled || null"><slot /></button>',
+    template:
+      '<button :data-test="$attrs[\'data-test\']" :title="title" :disabled="disabled || null"><slot /></button>',
   };
   const OIconStub = {
     name: "OIcon",
@@ -110,13 +111,10 @@ describe("PatternCard", () => {
     });
 
     it("should display percentage with 2 decimal places", () => {
-      const percentage = wrapper.find(
-        '[data-test="pattern-card-0-percentage"]',
-      );
+      const percentage = wrapper.find('[data-test="pattern-card-0-percentage"]');
       expect(percentage.exists()).toBe(true);
       expect(percentage.text()).toBe("45.67%");
     });
-
   });
 
   describe("Anomaly Detection", () => {
@@ -126,20 +124,15 @@ describe("PatternCard", () => {
         index: mockIndex,
       });
 
-      const anomalyBadge = wrapper.find(
-        '[data-test="pattern-card-0-anomaly-badge"]',
-      );
+      const anomalyBadge = wrapper.find('[data-test="pattern-card-0-anomaly-badge"]');
       expect(anomalyBadge.exists()).toBe(true);
       expect(anomalyBadge.text()).toContain("Rare Pattern");
     });
 
     it("should not display anomaly badge when pattern is not an anomaly", () => {
-      const anomalyBadge = wrapper.find(
-        '[data-test="pattern-card-0-anomaly-badge"]',
-      );
+      const anomalyBadge = wrapper.find('[data-test="pattern-card-0-anomaly-badge"]');
       expect(anomalyBadge.exists()).toBe(false);
     });
-
   });
 
   describe("Pattern Actions", () => {
@@ -236,6 +229,4 @@ describe("PatternCard", () => {
       expect(template.text()).toContain("logged in from IP");
     });
   });
-
 });
-

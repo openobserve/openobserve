@@ -49,8 +49,7 @@ const FunctionPickerStub = {
     "sampleEvents",
   ],
   emits: ["expand", "created"],
-  template:
-    '<div class="function-picker-stub" @click="$emit(\'expand\', true)" />',
+  template: '<div class="function-picker-stub" @click="$emit(\'expand\', true)" />',
   methods: {
     submit: () => Promise.resolve(pickerPayload),
   },
@@ -136,9 +135,10 @@ describe("AssociateFunction.vue (drawer chrome)", () => {
 
   it("passes the already-associated names to the picker for uniqueness", () => {
     const wrapper = createWrapper({}, { associatedFunctions: ["fn-a", "fn-b"] });
-    expect(
-      wrapper.findComponent({ name: "FunctionPicker" }).props("duplicateNames"),
-    ).toEqual(["fn-a", "fn-b"]);
+    expect(wrapper.findComponent({ name: "FunctionPicker" }).props("duplicateNames")).toEqual([
+      "fn-a",
+      "fn-b",
+    ]);
   });
 
   // ── Save ────────────────────────────────────────────────────────────────
@@ -179,21 +179,19 @@ describe("AssociateFunction.vue (drawer chrome)", () => {
 
   it("re-emits add:function when the picker creates one", async () => {
     const wrapper = createWrapper();
-    wrapper
-      .findComponent({ name: "FunctionPicker" })
-      .vm.$emit("created", { name: "new-fn" });
+    wrapper.findComponent({ name: "FunctionPicker" }).vm.$emit("created", { name: "new-fn" });
     await tick();
     expect(wrapper.emitted("add:function")[0]).toEqual([{ name: "new-fn" }]);
   });
 
   // ── Buttons / cancel / delete ───────────────────────────────────────────
   it("shows delete only when editing a node", () => {
-    expect(
-      createWrapper({ isEditNode: false }).find('[data-test="delete-btn"]').exists(),
-    ).toBe(false);
-    expect(
-      createWrapper({ isEditNode: true }).find('[data-test="delete-btn"]').exists(),
-    ).toBe(true);
+    expect(createWrapper({ isEditNode: false }).find('[data-test="delete-btn"]').exists()).toBe(
+      false,
+    );
+    expect(createWrapper({ isEditNode: true }).find('[data-test="delete-btn"]').exists()).toBe(
+      true,
+    );
   });
 
   it("prompts to discard on cancel", async () => {

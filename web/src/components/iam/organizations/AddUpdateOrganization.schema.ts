@@ -22,6 +22,4 @@ export const makeAddUpdateOrganizationSchema = (
     makeBilledMember: z.boolean().optional(),
   });
 
-export type AddUpdateOrganizationForm = z.infer<
-  ReturnType<typeof makeAddUpdateOrganizationSchema>
->;
+export type AddUpdateOrganizationForm = z.infer<ReturnType<typeof makeAddUpdateOrganizationSchema>>;

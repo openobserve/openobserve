@@ -15,13 +15,11 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { mockUpdateGroupedFields, mockMakeAutoSQLQuery, state } = vi.hoisted(
-  () => ({
-    mockUpdateGroupedFields: vi.fn(),
-    mockMakeAutoSQLQuery: vi.fn(),
-    state: { panel: null as any },
-  }),
-);
+const { mockUpdateGroupedFields, mockMakeAutoSQLQuery, state } = vi.hoisted(() => ({
+  mockUpdateGroupedFields: vi.fn(),
+  mockMakeAutoSQLQuery: vi.fn(),
+  state: { panel: null as any },
+}));
 
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
@@ -32,8 +30,7 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
     isAddXAxisNotAllowed: {
       get value() {
         const t = state.panel?.data?.type;
-        const xlen =
-          state.panel?.data?.queries?.[0]?.fields?.x?.length ?? 0;
+        const xlen = state.panel?.data?.queries?.[0]?.fields?.x?.length ?? 0;
         if (t === "metric") return xlen >= 0; // metric: x never allowed
         if (t === "gauge" || t === "pie" || t === "donut") return xlen >= 1;
         if (t === "table") return false;
@@ -42,8 +39,7 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
     },
     isAddYAxisNotAllowed: {
       get value() {
-        const ylen =
-          state.panel?.data?.queries?.[0]?.fields?.y?.length ?? 0;
+        const ylen = state.panel?.data?.queries?.[0]?.fields?.y?.length ?? 0;
         const t = state.panel?.data?.type;
         if (["pie", "donut", "gauge", "metric"].includes(t)) return ylen >= 1;
         return false;
@@ -116,9 +112,7 @@ describe("useDefaultPanelFields", () => {
         query: 'rate(mystream{env="dev"}[5m])',
         customQuery: true,
       });
-      currentQuery().fields.promql_labels = [
-        { label: "env", op: "=", value: "dev" },
-      ];
+      currentQuery().fields.promql_labels = [{ label: "env", op: "=", value: "dev" }];
       currentQuery().fields.promql_operations = [{ id: "rate" }];
 
       const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
@@ -146,9 +140,7 @@ describe("useDefaultPanelFields", () => {
       const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
       await applyDefaultPanelFields();
 
-      expect(currentQuery().fields.promql_labels).toEqual([
-        { label: "", op: "=", value: "" },
-      ]);
+      expect(currentQuery().fields.promql_labels).toEqual([{ label: "", op: "=", value: "" }]);
     });
 
     it("leaves the query empty when no stream is selected", async () => {

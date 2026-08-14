@@ -51,8 +51,7 @@ const toBool = (v: unknown): boolean => v === true || v === "true";
  * `generateDestinationUrl` in utils/prebuilt-templates/index.ts, which reads the
  * flag TRUTHILY).
  */
-const toggleSchema = () =>
-  z.preprocess((v) => toBool(v), z.boolean()).optional();
+const toggleSchema = () => z.preprocess((v) => toBool(v), z.boolean()).optional();
 
 /**
  * Build the Zod schema for one destination type from its `credentialFields`.
@@ -68,18 +67,14 @@ export const makePrebuiltDestinationSchema = (
 
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const field of fields) {
-    shape[field.key] =
-      field.type === "toggle" ? toggleSchema() : z.string().optional();
+    shape[field.key] = field.type === "toggle" ? toggleSchema() : z.string().optional();
   }
 
   return z.object(shape).superRefine((val, ctx) => {
     const values = val as Record<string, unknown>;
     for (const field of fields) {
       const value = values[field.key];
-      const isEmpty =
-        value === undefined ||
-        value === null ||
-        value.toString().trim() === "";
+      const isEmpty = value === undefined || value === null || value.toString().trim() === "";
 
       // Required + empty → "<label> is required" (do NOT run the validator).
       if (field.required && isEmpty) {

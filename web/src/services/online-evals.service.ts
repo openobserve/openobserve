@@ -233,6 +233,8 @@ export interface CompletionWindowConfig {
 
 export interface ManualEvalJobPayload {
   targetId: string;
+  startTime: number;
+  endTime: number;
   spanId?: string | null;
   traceId?: string | null;
   sessionId?: string | null;
@@ -301,8 +303,7 @@ const onlineEvalsService = {
       orgId: string,
       entityId: string,
       payload: Record<string, any>,
-    ): Promise<Scorer> =>
-      (await http().put(`/api/${orgId}/scorers/${entityId}`, payload)).data,
+    ): Promise<Scorer> => (await http().put(`/api/${orgId}/scorers/${entityId}`, payload)).data,
     delete: async (orgId: string, entityId: string): Promise<void> => {
       await http().delete(`/api/${orgId}/scorers/${entityId}`);
     },
@@ -322,11 +323,7 @@ const onlineEvalsService = {
     },
     create: async (orgId: string, payload: EvalJobPayload): Promise<EvalJob> =>
       (await http().post(`/api/${orgId}/eval_jobs`, payload)).data,
-    update: async (
-      orgId: string,
-      jobId: string,
-      payload: EvalJobPayload,
-    ): Promise<EvalJob> =>
+    update: async (orgId: string, jobId: string, payload: EvalJobPayload): Promise<EvalJob> =>
       (await http().put(`/api/${orgId}/eval_jobs/${jobId}`, payload)).data,
     delete: async (orgId: string, jobId: string): Promise<void> => {
       await http().delete(`/api/${orgId}/eval_jobs/${jobId}`);

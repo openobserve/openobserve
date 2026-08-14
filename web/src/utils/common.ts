@@ -16,22 +16,17 @@
 import { ref } from "vue";
 import organizationsService from "../services/organizations";
 import { useLocalOrganization, getPath } from "./zincutils";
+import { isSameOriginRedirect } from "@/utils/safeUrl";
 
 const selectedOrg = ref("");
 const orgOptions = ref([{ label: Number, value: String }]);
 
-export const getDefaultOrganization = async (
-  userInfo: any,
-  org_identifier: any,
-) => {
+export const getDefaultOrganization = async (userInfo: any, org_identifier: any) => {
   await organizationsService
     .os_list(0, 100000, "id", false, "", org_identifier)
     .then((res: any) => {
       const localOrg: any = useLocalOrganization();
-      if (
-        localOrg.value != null &&
-        localOrg.value.user_email !== userInfo.email
-      ) {
+      if (localOrg.value != null && localOrg.value.user_email !== userInfo.email) {
         localOrg.value = null;
         useLocalOrganization("");
       }
@@ -77,11 +72,21 @@ export const getDefaultOrganization = async (
 
 export const redirectUser = (redirectURI: string | null) => {
   const path = getPath();
+  // `redirectURI` comes from the `?short_url=` query param (router/index.ts),
+  // so it is attacker-controllable. The previous check was
+  // `redirectURI.includes("http")` — a substring test that happily matched
+  // `https://evil.com/` and sent the user off-site immediately AFTER they
+  // authenticated. Anything not on this origin falls back to the home path.
   if (redirectURI != null && redirectURI != "") {
-    if (redirectURI.includes("http")) {
-      window.location.href = redirectURI;
-    } else {
+    if (!isSameOriginRedirect(redirectURI)) {
+      // Off-origin: refuse it and go home instead.
+      window.location.replace(path);
+    } else if (redirectURI.startsWith("/")) {
+      // Relative path — keep using `replace` so the login page does not stay
+      // in history (unchanged from the original behaviour).
       window.location.replace(redirectURI);
+    } else {
+      window.location.href = redirectURI;
     }
   } else {
     // $router.push({ path: "/" });

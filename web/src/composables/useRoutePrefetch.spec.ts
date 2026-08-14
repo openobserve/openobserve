@@ -65,9 +65,7 @@ describe("useRoutePrefetch", () => {
       await composable.prefetchRoute("/metrics");
       await nextTick();
       // Set.size must still be 1
-      expect(
-        [...composable.prefetchedRoutes].filter((r) => r === "/metrics").length
-      ).toBe(1);
+      expect([...composable.prefetchedRoutes].filter((r) => r === "/metrics").length).toBe(1);
     });
 
     it("does nothing for an unknown route path", async () => {

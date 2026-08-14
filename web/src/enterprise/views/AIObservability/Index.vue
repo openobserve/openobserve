@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <section class="h-full min-w-0 min-h-0 overflow-y-auto">
+    <section class="h-full min-h-0 min-w-0 overflow-y-auto">
       <router-view />
     </section>
   </OPageLayout>
@@ -38,19 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import type {
-  SectionHubGroup,
-  SectionHubItem,
-} from "@/components/common/SectionHub.vue";
+import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
 
 defineOptions({ name: "AIObservabilityShell" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 
@@ -72,6 +69,14 @@ const activeSection = computed<string>(() => {
   if (route.name === "aiSessions") return "sessions";
   if (route.name === "aiAgentGraph") return "agentGraph";
   if (route.name === "aiAgentBehavior") return "agentBehavior";
+  if (route.name === "aiDiscovery") return "discovery";
+  if (
+    route.name === "aiQueues" ||
+    route.name === "aiQueueDetail" ||
+    route.name === "aiQueueWorkbench"
+  )
+    return "queues";
+  if (route.name === "aiDatasets") return "datasets";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";
     return tab;
@@ -115,6 +120,30 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
     group: "Monitor",
   },
   {
+    key: "discovery",
+    label: t("aiObservability.nav.discovery"),
+    icon: "saved-search",
+    to: { name: "aiDiscovery", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-discovery",
+    group: "Annotate",
+  },
+  {
+    key: "queues",
+    label: t("aiObservability.nav.queues"),
+    icon: "fact-check",
+    to: { name: "aiQueues", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-queues",
+    group: "Annotate",
+  },
+  {
+    key: "datasets",
+    label: t("aiObservability.nav.datasets"),
+    icon: "table-chart",
+    to: { name: "aiDatasets", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-datasets",
+    group: "Annotate",
+  },
+  {
     key: "quality",
     label: t("aiObservability.nav.quality"),
     icon: "star-rate",
@@ -152,11 +181,12 @@ const activeSectionItem = computed(() =>
   sectionItems.value.find((i) => i.key === activeSection.value),
 );
 
-// Group order: Monitor before Evaluate.
-const sectionGroupOrder = ["Monitor", "Evaluate"];
+// Group order: Monitor, then Evaluate, then Annotate at the bottom.
+const sectionGroupOrder = ["Monitor", "Evaluate", "Annotate"];
 
-const groupLabels = computed<Record<string, string>>(() => ({
+const groupLabels = computed<Record<string, I18nText>>(() => ({
   Monitor: t("aiObservability.sections.monitor"),
+  Annotate: t("aiObservability.sections.annotate"),
   Evaluate: t("aiObservability.sections.evaluate"),
 }));
 
@@ -173,7 +203,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   };
   return [...buckets.keys()]
     .sort((a, b) => rank(a) - rank(b))
-    .map((key) => ({ label: groupLabels.value[key] ?? key, items: buckets.get(key)! }));
+    .map((key) => ({ label: groupLabels.value[key] ?? raw(key), items: buckets.get(key)! }));
 });
 
 // Reserved for future per-section header chrome wiring (mirrors Settings'

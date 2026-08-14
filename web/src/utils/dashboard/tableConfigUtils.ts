@@ -38,10 +38,7 @@ export const OVERRIDE_CONFIG_TYPES = {
 } as const;
 
 /** Apply a per-column field-type override ("num"/"text" force; "auto"/absent keep detected). */
-export const resolveIsNumber = (
-  detected: boolean,
-  fieldType: string | undefined,
-): boolean =>
+export const resolveIsNumber = (detected: boolean, fieldType: string | undefined): boolean =>
   fieldType === "num" ? true : fieldType === "text" ? false : detected;
 
 // ---------------------------------------------------------------------------
@@ -52,9 +49,7 @@ export const resolveIsNumber = (
  * Strip regex literal delimiters if the user entered `/pattern/flags` syntax.
  * Returns the raw pattern and any flags so `new RegExp(pattern, flags)` works.
  */
-export const parseRegexPattern = (
-  input: string,
-): { pattern: string; flags: string } => {
+export const parseRegexPattern = (input: string): { pattern: string; flags: string } => {
   const match = input.match(/^\/(.+)\/([gimsuy]*)$/);
   if (match) {
     return { pattern: match[1], flags: match[2] };
@@ -63,9 +58,7 @@ export const parseRegexPattern = (
 };
 
 /** Build a fast-lookup cache from `config.mappings`, storing the full mapping object. */
-export const buildValueMappingCache = (
-  mappings: any,
-): Map<any, any> | null => {
+export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
   if (!mappings || !Array.isArray(mappings)) {
     return null;
   }
@@ -74,9 +67,11 @@ export const buildValueMappingCache = (
 
   mappings.forEach((mapping: any) => {
     if (!mapping) return;
-    const hasText = mapping.text != null && mapping.text !== "";
-    const hasColor = mapping.color != null && mapping.color !== "";
-    if (!hasText && !hasColor) return;
+    // A mapping is cached when it carries any effect: text, background, or text color.
+    const nonEmpty = (v: any) => v != null && v !== "";
+    if (!nonEmpty(mapping.text) && !nonEmpty(mapping.color) && !nonEmpty(mapping.textColor)) {
+      return;
+    }
 
     const hasRange =
       mapping.from !== undefined &&
@@ -84,8 +79,7 @@ export const buildValueMappingCache = (
       mapping.to !== undefined &&
       mapping.to !== "";
 
-    const type =
-      mapping.type ?? (mapping.pattern ? "regex" : hasRange ? "range" : "value");
+    const type = mapping.type ?? (mapping.pattern ? "regex" : hasRange ? "range" : "value");
 
     if (type === "regex") {
       // Regex mapping – stored with a special prefix; pattern tested during lookup
@@ -93,6 +87,8 @@ export const buildValueMappingCache = (
     } else if (type === "range") {
       // Range mapping – encoded key so direct + range share the same Map
       cache.set(`__range_${mapping.from}_${mapping.to}`, mapping);
+    } else if (type === "gt" || type === "lt" || type === "gte" || type === "lte") {
+      cache.set(`__op_${type}_${mapping.value}`, mapping);
     } else if (mapping.value !== undefined && mapping.value !== null) {
       cache.set(mapping.value, mapping);
     }
@@ -108,12 +104,11 @@ export const buildValueMappingCache = (
 export const lookupValueMappingFull = (
   value: any,
   cache: Map<any, any> | null,
-  requireField?: "text" | "color",
+  requireField?: "text" | "color" | "textColor",
 ): any | null => {
   if (!cache) return null;
 
-  const ok = (m: any) =>
-    !requireField || (m && m[requireField] != null && m[requireField] !== "");
+  const ok = (m: any) => !requireField || (m && m[requireField] != null && m[requireField] !== "");
 
   // Direct match (then string-coerced, e.g. key "3" vs numeric value 3)
   let m = cache.get(value);
@@ -124,8 +119,7 @@ export const lookupValueMappingFull = (
   if (m !== undefined && ok(m)) return m;
 
   // Range match — coerce the cell value to a number so numeric strings match too.
-  const numValue =
-    value === "" || value === null || value === undefined ? NaN : Number(value);
+  const numValue = value === "" || value === null || value === undefined ? NaN : Number(value);
   if (!Number.isNaN(numValue)) {
     for (const [key, mapping] of cache.entries()) {
       if (typeof key === "string" && key.startsWith("__range_")) {
@@ -137,6 +131,29 @@ export const lookupValueMappingFull = (
         }
       }
     }
+  }
+
+  // Threshold match (gt/lt/gte/lte) — numeric comparison against the operand.
+  // Last matching threshold wins, matching the column-formatting conditional
+  // rules convention (e.g. `>1000` overrides `>400` for 2301).
+  if (!Number.isNaN(numValue)) {
+    let thresholdHit: any = null;
+    for (const [key, mapping] of cache.entries()) {
+      if (typeof key === "string" && key.startsWith("__op_")) {
+        const rest = key.slice(5); // "__op_".length === 5
+        const sep = rest.indexOf("_");
+        const op = rest.slice(0, sep);
+        const operand = parseFloat(rest.slice(sep + 1));
+        if (Number.isNaN(operand) || !ok(mapping)) continue;
+        const hit =
+          (op === "gt" && numValue > operand) ||
+          (op === "lt" && numValue < operand) ||
+          (op === "gte" && numValue >= operand) ||
+          (op === "lte" && numValue <= operand);
+        if (hit) thresholdHit = mapping;
+      }
+    }
+    if (thresholdHit) return thresholdHit;
   }
 
   // Regex match
@@ -174,10 +191,7 @@ export const lookupValueMapping = (
  * Parse a potential timestamp value and return a timezone-aware formatted string.
  * Handles 16-digit microseconds, ISO strings, and standard milliseconds.
  */
-export const parseTimestampValue = (
-  value: any,
-  timezone: string,
-): string | null => {
+export const parseTimestampValue = (value: any, timezone: string): string | null => {
   if (value === undefined || value === null || value === "") return null;
 
   let timestamp: number;
@@ -196,8 +210,7 @@ export const parseTimestampValue = (
 
     // ISO string with 'T' — treat as UTC if no offset
     const iso8601WithT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value);
-    const hasOffsetOrZ =
-      /[+-]\d{2}(:?\d{2})?$/.test(value) || value.endsWith("Z");
+    const hasOffsetOrZ = /[+-]\d{2}(:?\d{2})?$/.test(value) || value.endsWith("Z");
 
     const isoString = iso8601WithT && !hasOffsetOrZ ? `${value}Z` : value;
     timestamp = new Date(isoString).getTime();
@@ -225,10 +238,7 @@ export const parseTimestampValue = (
  * Returns a Set of field aliases that should be formatted as timestamps.
  * Used by both convertTableData and convertPivotTableData.
  */
-export const detectTimestampFields = (
-  fields: any[],
-  tableRows: any[],
-): Set<string> => {
+export const detectTimestampFields = (fields: any[], tableRows: any[]): Set<string> => {
   const result = new Set<string>();
 
   for (const field of fields) {
@@ -289,16 +299,15 @@ export interface OverrideMaps {
 }
 
 /** Parse `config.override_config` into lookup maps keyed by lower-cased field alias. */
-export const parseOverrideConfigs = (
-  overrideConfigs: any[] | undefined,
-): OverrideMaps => {
+export const parseOverrideConfigs = (overrideConfigs: any[] | undefined): OverrideMaps => {
   const colorConfigMap: Record<string, ColorConfig> = {};
   const unitConfigMap: Record<string, UnitConfig> = {};
   const styleConfigMap: Record<string, ColumnStyleConfig> = {};
   const conditionalRulesMap: Record<string, ConditionalRule[]> = {};
   const fieldTypeMap: Record<string, string> = {};
 
-  if (!overrideConfigs) return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
+  if (!overrideConfigs)
+    return { colorConfigMap, unitConfigMap, styleConfigMap, conditionalRulesMap, fieldTypeMap };
 
   for (const o of overrideConfigs) {
     const alias = o?.field?.value;
@@ -388,8 +397,7 @@ export const formatNumericValue = (
   decimals: number,
   missingValue = "",
 ): string => {
-  if (val === null || val === undefined || val === "")
-    return String(missingValue);
+  if (val === null || val === undefined || val === "") return String(missingValue);
 
   const mapped = lookupValueMapping(val, valueMappingCache);
   if (mapped != null) return mapped;
@@ -398,4 +406,64 @@ export const formatNumericValue = (
   return !Number.isNaN(val)
     ? `${formatUnitValue(getUnitValue(val, unit ?? "", customUnit ?? "", decimals)) ?? 0}`
     : val;
+};
+
+// ---------------------------------------------------------------------------
+// Metric single-value styling (driven by config.mappings)
+// ---------------------------------------------------------------------------
+
+export interface ResolvedMetricStyle {
+  /** Display text: mapped string when a mapping matched, else the unit-formatted value. */
+  text: string;
+  /** Explicit text color; undefined means the caller applies its contrast fallback. */
+  textColor?: string;
+  /** Final background color ("" when none). */
+  bgColor: string;
+}
+
+export interface MetricStyleOptions {
+  mappings: any;
+  unit: string | null | undefined;
+  customUnit: string | null | undefined;
+  decimals: number | null | undefined;
+  panelBackground: string;
+}
+
+/**
+ * Resolve display text, text color, and background for a single metric value from
+ * `config.mappings` (value / range / regex / thresholds → text + colors). Precedence:
+ *   text: mapping text → unit-formatted value
+ *   fill: mapping textColor → (caller contrast fallback)
+ *   bg:   mapping color → panel background
+ */
+export const resolveMetricValueStyle = (
+  rawValue: unknown,
+  opts: MetricStyleOptions,
+): ResolvedMetricStyle => {
+  const { mappings, unit, customUnit, decimals, panelBackground } = opts;
+  const cache = buildValueMappingCache(mappings);
+  let mapping = lookupValueMappingFull(rawValue, cache);
+
+  const numValue =
+    rawValue === null || rawValue === undefined || rawValue === "" ? NaN : Number(rawValue);
+  if (!mapping && cache && !Number.isNaN(numValue)) {
+    const fixed = numValue.toFixed(decimals ?? 2);
+    if (fixed !== String(rawValue)) {
+      mapping = lookupValueMappingFull(fixed, cache);
+    }
+    if (!mapping) {
+      const normalized = String(Number(fixed));
+      if (normalized !== fixed && normalized !== String(rawValue)) {
+        mapping = lookupValueMappingFull(normalized, cache);
+      }
+    }
+  }
+
+  const formatted = formatNumericValue(rawValue, null, unit, customUnit, decimals ?? 2);
+  const mappedText = mapping?.text;
+  const text = mappedText != null && mappedText !== "" ? mappedText : formatted;
+  const textColor = mapping?.textColor || undefined;
+  const bgColor = mapping?.color || panelBackground || "";
+
+  return { text, textColor, bgColor };
 };

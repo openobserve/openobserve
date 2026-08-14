@@ -32,8 +32,7 @@ const OTagStub = defineComponent({
 });
 
 function row(
-  overrides: Partial<ScoreConfigRow> &
-    Pick<ScoreConfigRow, "configId" | "name" | "status">,
+  overrides: Partial<ScoreConfigRow> & Pick<ScoreConfigRow, "configId" | "name" | "status">,
 ): ScoreConfigRow {
   return {
     config: { id: overrides.configId, name: overrides.name } as any,

@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="showBackdrop"
       aria-hidden="true"
-      class="absolute inset-0 pointer-events-none"
+      class="pointer-events-none absolute inset-0"
       :style="dotGridStyle"
     />
 
@@ -65,15 +65,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- inline size shows a compact icon instead of a full illustration -->
       <span
         v-else-if="inlineIcon"
-        :class="['o2-empty-state__inline-icon inline-flex items-center justify-center rounded-full', sizeClass.iconWrap]"
+        :class="[
+          'o2-empty-state__inline-icon inline-flex items-center justify-center rounded-full',
+          sizeClass.iconWrap,
+        ]"
       >
         <OIcon :name="inlineIcon" :size="size === 'inline' ? 'lg' : 'xl'" />
       </span>
 
-      <div :class="['flex flex-col max-w-xl', sizeClass.copy]">
+      <div :class="['flex max-w-xl flex-col', sizeClass.copy]">
         <component
           :is="size === 'inline' ? 'p' : 'h2'"
-          :class="['font-medium text-text-heading tracking-[-0.01em]', sizeClass.title]"
+          :class="['text-text-heading font-medium tracking-[-0.01em]', sizeClass.title]"
         >
           <slot name="title">{{ resolvedTitle }}</slot>
         </component>
@@ -138,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, useSlots } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -170,12 +173,12 @@ const props = withDefaults(
     /** Icon for the compact `inline` size (when no illustration). */
     icon?: IconName;
     /** Copy — overrides preset i18n when provided. */
-    title?: string;
-    description?: string;
+    title?: I18nText;
+    description?: I18nText;
     /** Rich action cards; overrides the preset's actions when provided. */
     actions?: EmptyStateAction[];
     /** Simple primary button (used instead of cards); emits `action` on click. */
-    actionLabel?: string;
+    actionLabel?: I18nText;
     actionIcon?: IconName;
     /** Secondary action; emits `secondaryAction` on click. */
     secondaryActionLabel?: string;
@@ -205,7 +208,7 @@ const emit = defineEmits<{
 }>();
 
 const slots = useSlots();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Widen to the interface: the `satisfies` map keeps per-key literal types,
 // and unioning 25 literals breaks `?.actions` on entries without actions.
@@ -232,14 +235,12 @@ const FILTERED_ACTION: EmptyStateAction = {
 // --- copy resolution: filtered > explicit prop > preset i18n key ------------
 const resolvedTitle = computed(() => {
   if (props.title) return props.title;
-  if (isFiltered.value)
-    return t("emptyState.filtered.title", { noun: noun.value });
+  if (isFiltered.value) return t("emptyState.filtered.title", { noun: noun.value });
   return preset.value ? t(preset.value.titleKey) : "";
 });
 const resolvedDescription = computed(() => {
   if (props.description) return props.description;
-  if (isFiltered.value)
-    return t("emptyState.filtered.description", { noun: noun.value });
+  if (isFiltered.value) return t("emptyState.filtered.description", { noun: noun.value });
   const key = preset.value?.descriptionKey;
   return key ? t(key) : "";
 });
@@ -250,43 +251,29 @@ const resolvedActions = computed<EmptyStateAction[]>(() => {
   if (isFiltered.value) return [FILTERED_ACTION];
   return props.actions ?? preset.value?.actions ?? [];
 });
-const showCards = computed(
-  () => size.value !== "inline" && resolvedActions.value.length > 0,
-);
+const showCards = computed(() => size.value !== "inline" && resolvedActions.value.length > 0);
 
 // Simple button fallback (only when a call site passes actionLabel directly and
 // there are no cards).
-const resolvedActionLabel = computed(() =>
-  props.hideAction ? "" : (props.actionLabel ?? ""),
-);
-const resolvedActionIcon = computed<IconName | undefined>(
-  () => props.actionIcon,
-);
+const resolvedActionLabel = computed(() => (props.hideAction ? "" : (props.actionLabel ?? "")));
+const resolvedActionIcon = computed<IconName | undefined>(() => props.actionIcon);
 
 // --- variant / illustration -------------------------------------------------
 const variant = computed<EmptyStateVariant>(() =>
-  isFiltered.value
-    ? "no-results"
-    : (props.variant ?? preset.value?.variant ?? "neutral"),
+  isFiltered.value ? "no-results" : (props.variant ?? preset.value?.variant ?? "neutral"),
 );
-const actionVariant = computed(() =>
-  variant.value === "error" ? "outline" : "primary",
-);
+const actionVariant = computed(() => (variant.value === "error" ? "outline" : "primary"));
 
 // Filtered always uses the magnifier so it reads as "search found nothing".
 const illustrationName = computed<IllustrationName | undefined>(() =>
-  isFiltered.value
-    ? "no-results"
-    : (props.illustration ?? preset.value?.illustration),
+  isFiltered.value ? "no-results" : (props.illustration ?? preset.value?.illustration),
 );
 const illustrationComponent = computed(() =>
   illustrationName.value ? illustrations[illustrationName.value] : undefined,
 );
 // inline never shows the full illustration — it uses a compact icon instead.
 const hasIllustration = computed(
-  () =>
-    size.value !== "inline" &&
-    (!!slots.illustration || !!illustrationComponent.value),
+  () => size.value !== "inline" && (!!slots.illustration || !!illustrationComponent.value),
 );
 const inlineIcon = computed<IconName | undefined>(() => {
   if (size.value !== "inline") return undefined;
@@ -311,12 +298,11 @@ onMounted(() => {
 onBeforeUnmount(() => mq?.removeEventListener?.("change", syncMotion));
 
 // --- backdrop ---------------------------------------------------------------
-const showBackdrop = computed(() =>
-  props.backdrop ?? size.value !== "inline",
-);
+const showBackdrop = computed(() => props.backdrop ?? size.value !== "inline");
 const dotGridStyle =
+  // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
   "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
-  "background-size: 30px 30px;" +
+  "background-size: 1.875rem 1.875rem;" +
   "-webkit-mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);" +
   "mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);";
 
@@ -331,8 +317,8 @@ const SIZE_MAP: Record<
     copy: string;
     actions: string;
     extra: string;
-    title: string;
-    description: string;
+    title: I18nText;
+    description: I18nText;
     illustrationWidth: number;
     iconWrap: string;
   }
@@ -343,8 +329,8 @@ const SIZE_MAP: Record<
     copy: "gap-2.5",
     actions: "gap-3 pt-1",
     extra: "w-full flex flex-col items-center gap-3 pt-2",
-    title: "text-2xl!",
-    description: "text-base",
+    title: raw("text-2xl!"),
+    description: raw("text-base"),
     illustrationWidth: 300,
     iconWrap: "",
   },
@@ -354,8 +340,8 @@ const SIZE_MAP: Record<
     copy: "gap-2",
     actions: "gap-2.5 pt-0.5",
     extra: "w-full flex flex-col items-center gap-2 pt-1",
-    title: "text-lg!",
-    description: "text-sm",
+    title: raw("text-lg!"),
+    description: raw("text-sm"),
     illustrationWidth: 150,
     iconWrap: "",
   },
@@ -365,11 +351,10 @@ const SIZE_MAP: Record<
     copy: "gap-1",
     actions: "gap-2 pt-1",
     extra: "w-full flex flex-col items-center gap-1.5 pt-1",
-    title: "text-sm!",
-    description: "text-xs",
+    title: raw("text-sm!"),
+    description: raw("text-xs"),
     illustrationWidth: 0,
-    iconWrap:
-      "w-12 h-12 bg-surface-subtle text-text-secondary mb-0.5",
+    iconWrap: "w-12 h-12 bg-surface-subtle text-text-secondary mb-0.5",
   },
 };
 const sizeClass = computed(() => SIZE_MAP[size.value]);

@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
-import License from './License.vue';
-import { makeLicenseSchema } from './License.schema';
-import licenseServer from '@/services/license_server';
-import { createStore } from 'vuex';
-import i18n from '@/locales';
-import type { AxiosResponse } from 'axios';
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import License from "./License.vue";
+import { makeLicenseSchema } from "./License.schema";
+import licenseServer from "@/services/license_server";
+import { createStore } from "vuex";
+import i18n from "@/locales";
+import type { AxiosResponse } from "axios";
 
 // Helper to create mock Axios responses
 const createAxiosResponse = <T = any>(data: T): AxiosResponse<T> => ({
   data,
   status: 200,
-  statusText: 'OK',
+  statusText: "OK",
   headers: {},
   config: {} as any,
 });
@@ -20,30 +20,30 @@ const createAxiosResponse = <T = any>(data: T): AxiosResponse<T> => ({
 // and so we can assert on the props the component forwards + emit
 // the click events the component listens to.
 const ODialogStub = {
-  name: 'ODialog',
+  name: "ODialog",
   inheritAttrs: false,
   props: [
-    'open',
-    'size',
-    'title',
-    'subTitle',
-    'persistent',
-    'showClose',
-    'width',
-    'primaryButtonLabel',
-    'secondaryButtonLabel',
-    'neutralButtonLabel',
-    'primaryButtonVariant',
-    'secondaryButtonVariant',
-    'neutralButtonVariant',
-    'primaryButtonDisabled',
-    'secondaryButtonDisabled',
-    'neutralButtonDisabled',
-    'primaryButtonLoading',
-    'secondaryButtonLoading',
-    'neutralButtonLoading',
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
   ],
-  emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div
       data-test="o-dialog-stub"
@@ -72,7 +72,7 @@ const ODialogStub = {
 };
 
 // Mock the license server service
-vi.mock('@/services/license_server', () => ({
+vi.mock("@/services/license_server", () => ({
   default: {
     get_license: vi.fn(),
     update_license: vi.fn(),
@@ -80,16 +80,16 @@ vi.mock('@/services/license_server', () => ({
 }));
 
 // Mock the LicensePeriod component
-vi.mock('@/enterprise/components/billings/LicensePeriod.vue', () => ({
+vi.mock("@/enterprise/components/billings/LicensePeriod.vue", () => ({
   default: {
-    name: 'LicensePeriod',
+    name: "LicensePeriod",
     template: '<div data-test="license-period">License Period</div>',
-    emits: ['updateLicense'],
+    emits: ["updateLicense"],
   },
 }));
 
 const mockToast = vi.fn();
-vi.mock('@/lib/feedback/Toast/useToast', () => ({
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToast(...args),
 }));
 
@@ -98,25 +98,24 @@ const mockDialog = vi.fn().mockReturnValue({
   onCancel: vi.fn().mockReturnThis(),
 });
 
-
-describe('License.vue', () => {
+describe("License.vue", () => {
   let store: any;
   let wrapper: any;
 
   const mockLicenseData = {
-    installation_id: 'test-installation-123',
-    key: 'test-license-key-12345678901234567890',
+    installation_id: "test-installation-123",
+    key: "test-license-key-12345678901234567890",
     license: {
-      license_id: 'license-123',
+      license_id: "license-123",
       active: true,
       created_at: 1704067200000000, // 2024-01-01 00:00:00
       expires_at: 1735689600000000, // 2025-01-01 00:00:00
-      company: 'Test Company',
-      contact_name: 'John Doe',
-      contact_email: 'john@example.com',
+      company: "Test Company",
+      contact_name: "John Doe",
+      contact_email: "john@example.com",
       limits: {
         Ingestion: {
-          typ: 'PerDayCount',
+          typ: "PerDayCount",
           value: 50,
         },
       },
@@ -129,7 +128,7 @@ describe('License.vue', () => {
     store = createStore({
       state: {
         zoConfig: {
-          license_server_url: 'https://license.example.com',
+          license_server_url: "https://license.example.com",
           license_expiry: null,
         },
       },
@@ -137,10 +136,7 @@ describe('License.vue', () => {
 
     return mount(License, {
       global: {
-        plugins: [
-          store,
-          i18n,
-        ],
+        plugins: [store, i18n],
         stubs: {
           LicensePeriod: true,
           ODialog: ODialogStub,
@@ -157,32 +153,35 @@ describe('License.vue', () => {
     // Mock window.location
     delete (window as any).location;
     window.location = {
-      href: 'http://localhost:3000',
-      origin: 'http://localhost:3000',
-      search: '',
+      href: "http://localhost:3000",
+      origin: "http://localhost:3000",
+      search: "",
     } as any;
   });
 
-  describe('Component Mounting', () => {
-    it('should mount successfully', () => {
+  describe("Component Mounting", () => {
+    it("should mount successfully", () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it('should show loading spinner while fetching license data', async () => {
-      vi.mocked(licenseServer.get_license).mockImplementation(() =>
-        new Promise(resolve => setTimeout(() => resolve(createAxiosResponse(mockLicenseData)), 100))
+    it("should show loading spinner while fetching license data", async () => {
+      vi.mocked(licenseServer.get_license).mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(createAxiosResponse(mockLicenseData)), 100),
+          ),
       );
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
       // Check if loading text is present initially
-      const hasLoadingText = wrapper.text().includes('Loading license information');
+      const hasLoadingText = wrapper.text().includes("Loading license information");
       expect(hasLoadingText).toBe(true);
     });
 
-    it('should call loadLicenseData on mount', async () => {
+    it("should call loadLicenseData on mount", async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
@@ -191,9 +190,9 @@ describe('License.vue', () => {
     });
   });
 
-  describe('No License State', () => {
+  describe("No License State", () => {
     const noLicenseData = {
-      installation_id: 'test-installation-123',
+      installation_id: "test-installation-123",
       license: null,
     };
 
@@ -204,48 +203,48 @@ describe('License.vue', () => {
     });
 
     it('should display "No License Found" message when license is null', () => {
-      expect(wrapper.text()).toContain('No License Found');
+      expect(wrapper.text()).toContain("No License Found");
     });
 
-    it('should display installation ID', () => {
-      expect(wrapper.text()).toContain('Installation ID:');
-      expect(wrapper.text()).toContain('test-installation-123');
+    it("should display installation ID", () => {
+      expect(wrapper.text()).toContain("Installation ID:");
+      expect(wrapper.text()).toContain("test-installation-123");
     });
 
-    it('should show license key input textarea', () => {
+    it("should show license key input textarea", () => {
       const textarea = wrapper.find('textarea[placeholder="Paste your license key here..."]');
       expect(textarea.exists()).toBe(true);
     });
 
     it('should show "Get License" button', () => {
-      const buttons = wrapper.findAll('button');
-      const getLicenseBtn = buttons.find((btn: any) => btn.text().includes('Get License'));
+      const buttons = wrapper.findAll("button");
+      const getLicenseBtn = buttons.find((btn: any) => btn.text().includes("Get License"));
       expect(getLicenseBtn).toBeTruthy();
     });
 
-    it('keeps the Update License button enabled even when empty (R3 — schema-gated)', () => {
-      const updateBtn = wrapper.findAll('button').find((btn: any) =>
-        btn.text().includes('Update License')
-      );
-      expect(updateBtn?.attributes('disabled')).toBeUndefined();
+    it("keeps the Update License button enabled even when empty (R3 — schema-gated)", () => {
+      const updateBtn = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Update License"));
+      expect(updateBtn?.attributes("disabled")).toBeUndefined();
     });
 
-    it('should keep the Update License button enabled when a key is entered', async () => {
-      const textarea = wrapper.find('textarea');
-      await textarea.setValue('new-license-key-value');
+    it("should keep the Update License button enabled when a key is entered", async () => {
+      const textarea = wrapper.find("textarea");
+      await textarea.setValue("new-license-key-value");
       await wrapper.vm.$nextTick();
 
-      const updateBtn = wrapper.findAll('button').find((btn: any) =>
-        btn.text().includes('Update License')
-      );
-      expect(updateBtn?.attributes('disabled')).toBeUndefined();
+      const updateBtn = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Update License"));
+      expect(updateBtn?.attributes("disabled")).toBeUndefined();
     });
 
-    it('blocks the submit and does NOT call update_license when the key is empty (real OForm)', async () => {
+    it("blocks the submit and does NOT call update_license when the key is empty (real OForm)", async () => {
       vi.mocked(licenseServer.update_license).mockResolvedValue(
         createAxiosResponse({ success: true }),
       );
-      const form = wrapper.findComponent({ name: 'OForm' });
+      const form = wrapper.findComponent({ name: "OForm" });
       expect(form.exists()).toBe(true);
       await (form.vm as any).form.handleSubmit();
       await flushPromises();
@@ -254,72 +253,70 @@ describe('License.vue', () => {
       expect(licenseServer.update_license).not.toHaveBeenCalled();
     });
 
-    it('submits when a valid key is entered (real OForm)', async () => {
+    it("submits when a valid key is entered (real OForm)", async () => {
       vi.mocked(licenseServer.update_license).mockResolvedValue(
         createAxiosResponse({ success: true }),
       );
-      const textarea = wrapper.find('textarea');
-      await textarea.setValue('a-valid-license-key');
+      const textarea = wrapper.find("textarea");
+      await textarea.setValue("a-valid-license-key");
       await wrapper.vm.$nextTick();
 
-      const form = wrapper.findComponent({ name: 'OForm' });
+      const form = wrapper.findComponent({ name: "OForm" });
       await (form.vm as any).form.handleSubmit();
       await flushPromises();
 
-      expect(licenseServer.update_license).toHaveBeenCalledWith(
-        'a-valid-license-key',
-      );
+      expect(licenseServer.update_license).toHaveBeenCalledWith("a-valid-license-key");
     });
   });
 
-  describe('Active License State', () => {
+  describe("Active License State", () => {
     beforeEach(async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
 
-    it('should display license information when license exists', () => {
-      expect(wrapper.text()).toContain('License Information');
-      expect(wrapper.text()).toContain('license-123');
-      expect(wrapper.text()).toContain('Test Company');
+    it("should display license information when license exists", () => {
+      expect(wrapper.text()).toContain("License Information");
+      expect(wrapper.text()).toContain("license-123");
+      expect(wrapper.text()).toContain("Test Company");
     });
 
-    it('should display installation ID', () => {
-      expect(wrapper.text()).toContain('test-installation-123');
+    it("should display installation ID", () => {
+      expect(wrapper.text()).toContain("test-installation-123");
     });
 
-    it('should display license status as badge', () => {
-      expect(wrapper.text()).toContain('Active');
+    it("should display license status as badge", () => {
+      expect(wrapper.text()).toContain("Active");
     });
 
-    it('should display company name', () => {
-      expect(wrapper.text()).toContain('Test Company');
+    it("should display company name", () => {
+      expect(wrapper.text()).toContain("Test Company");
     });
 
-    it('should display contact information', () => {
-      expect(wrapper.text()).toContain('John Doe');
-      expect(wrapper.text()).toContain('john@example.com');
+    it("should display contact information", () => {
+      expect(wrapper.text()).toContain("John Doe");
+      expect(wrapper.text()).toContain("john@example.com");
     });
 
-    it('should display masked license key', () => {
-      expect(wrapper.text()).toContain('test-');
-      expect(wrapper.text()).toContain('*****');
+    it("should display masked license key", () => {
+      expect(wrapper.text()).toContain("test-");
+      expect(wrapper.text()).toContain("*****");
     });
 
     it('should show "Request new License" button', () => {
-      const buttons = wrapper.findAll('button');
-      const requestBtn = buttons.find((btn: any) => btn.text().includes('Request new License'));
+      const buttons = wrapper.findAll("button");
+      const requestBtn = buttons.find((btn: any) => btn.text().includes("Request new License"));
       expect(requestBtn).toBeTruthy();
     });
 
     it('should show "Add New License Key" button', () => {
-      const buttons = wrapper.findAll('button');
-      const addBtn = buttons.find((btn: any) => btn.text().includes('Add New License Key'));
+      const buttons = wrapper.findAll("button");
+      const addBtn = buttons.find((btn: any) => btn.text().includes("Add New License Key"));
       expect(addBtn).toBeTruthy();
     });
 
-    it('should hide update form by default', () => {
+    it("should hide update form by default", () => {
       expect(wrapper.vm.showUpdateForm).toBe(false);
     });
 
@@ -331,41 +328,41 @@ describe('License.vue', () => {
     });
   });
 
-  describe('Usage Information', () => {
+  describe("Usage Information", () => {
     beforeEach(async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
 
-    it('should display usage information section', () => {
-      expect(wrapper.text()).toContain('Usage Information');
-      expect(wrapper.text()).toContain('50 GB of data ingestion per day');
+    it("should display usage information section", () => {
+      expect(wrapper.text()).toContain("Usage Information");
+      expect(wrapper.text()).toContain("50 GB of data ingestion per day");
     });
 
-    it('should calculate ingestion usage percentage correctly', () => {
+    it("should calculate ingestion usage percentage correctly", () => {
       expect(wrapper.vm.ingestionUsagePercent).toBe(45.5);
     });
 
-    it('should display ingestion limit', () => {
-      expect(wrapper.text()).toContain('50 GB of data ingestion per day');
+    it("should display ingestion limit", () => {
+      expect(wrapper.text()).toContain("50 GB of data ingestion per day");
     });
 
-    it('should display ingestion type', () => {
+    it("should display ingestion type", () => {
       // The ingestion type is not directly displayed in the new UI
       // It's used internally for the limit calculation
-      expect(wrapper.vm.licenseData.license.limits.Ingestion.typ).toBe('PerDayCount');
+      expect(wrapper.vm.licenseData.license.limits.Ingestion.typ).toBe("PerDayCount");
     });
 
-    it('should display limit exceeded count', () => {
-      expect(wrapper.text()).toContain('The limit was exceeded on 2 days this month');
+    it("should display limit exceeded count", () => {
+      expect(wrapper.text()).toContain("The limit was exceeded on 2 days this month");
     });
 
-    it('should show green color for usage under 60%', () => {
-      expect(wrapper.vm.getIngestionUsageColor()).toBe('green');
+    it("should show green color for usage under 60%", () => {
+      expect(wrapper.vm.getIngestionUsageColor()).toBe("green");
     });
 
-    it('should show orange color for usage between 60-90%', async () => {
+    it("should show orange color for usage between 60-90%", async () => {
       const highUsageData = {
         ...mockLicenseData,
         ingestion_used: 75,
@@ -374,30 +371,32 @@ describe('License.vue', () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.getIngestionUsageColor()).toBe('orange');
+      expect(wrapper.vm.getIngestionUsageColor()).toBe("orange");
     });
 
-    it('should show red color for usage above 90%', async () => {
+    it("should show red color for usage above 90%", async () => {
       const criticalUsageData = {
         ...mockLicenseData,
         ingestion_used: 95,
       };
-      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(criticalUsageData));
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse(criticalUsageData),
+      );
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.getIngestionUsageColor()).toBe('red');
+      expect(wrapper.vm.getIngestionUsageColor()).toBe("red");
     });
   });
 
-  describe('Unlimited License', () => {
+  describe("Unlimited License", () => {
     const unlimitedLicenseData = {
       ...mockLicenseData,
       license: {
         ...mockLicenseData.license,
         limits: {
           Ingestion: {
-            typ: 'Unlimited',
+            typ: "Unlimited",
             value: 0,
           },
         },
@@ -405,102 +404,118 @@ describe('License.vue', () => {
     };
 
     beforeEach(async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(unlimitedLicenseData));
+      vi.mocked(licenseServer.get_license).mockResolvedValue(
+        createAxiosResponse(unlimitedLicenseData),
+      );
       wrapper = createWrapper();
       await flushPromises();
     });
 
-    it('should identify unlimited license type', () => {
+    it("should identify unlimited license type", () => {
       expect(wrapper.vm.isIngestionUnlimited).toBe(true);
     });
 
-    it('should show 0% usage for unlimited license', () => {
+    it("should show 0% usage for unlimited license", () => {
       expect(wrapper.vm.ingestionUsagePercent).toBe(0);
     });
 
     it('should display "Unlimited" in usage section', () => {
       // For unlimited license, the component displays a disclaimer instead of "Unlimited" text
       // Check that the disclaimer is displayed
-      expect(wrapper.text()).toContain('Usage shows 0% for unlimited plans');
+      expect(wrapper.text()).toContain("Usage shows 0% for unlimited plans");
     });
 
-    it('should show disclaimer for unlimited plans', () => {
-      expect(wrapper.text()).toContain('Usage shows 0% for unlimited plans');
+    it("should show disclaimer for unlimited plans", () => {
+      expect(wrapper.text()).toContain("Usage shows 0% for unlimited plans");
     });
   });
 
-  describe('Update License Functionality', () => {
+  describe("Update License Functionality", () => {
     beforeEach(async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
 
-    it('should call update_license API when updating license', async () => {
-      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
+    it("should call update_license API when updating license", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
 
       // Set license key directly
-      wrapper.vm.licenseKey = 'new-license-key';
+      wrapper.vm.licenseKey = "new-license-key";
 
       // Call update
       await wrapper.vm.updateLicense();
       await flushPromises();
 
-      expect(licenseServer.update_license).toHaveBeenCalledWith('new-license-key');
+      expect(licenseServer.update_license).toHaveBeenCalledWith("new-license-key");
     });
 
-    it('should show success notification on successful update', async () => {
-      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
+    it("should show success notification on successful update", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
 
-      wrapper.vm.licenseKey = 'new-license-key';
+      wrapper.vm.licenseKey = "new-license-key";
       await wrapper.vm.updateLicense();
       await flushPromises();
 
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: 'success',
-        message: 'License updated successfully',
-      }));
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: "License updated successfully",
+        }),
+      );
     });
 
-    it('should show error notification on failed update', async () => {
-      vi.mocked(licenseServer.update_license).mockRejectedValue(new Error('Update failed'));
+    it("should show error notification on failed update", async () => {
+      vi.mocked(licenseServer.update_license).mockRejectedValue(new Error("Update failed"));
 
-      wrapper.vm.licenseKey = 'invalid-license-key';
+      wrapper.vm.licenseKey = "invalid-license-key";
       await wrapper.vm.updateLicense();
       await flushPromises();
 
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: 'error',
-        message: expect.stringContaining('Failed to update license'),
-      }));
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: expect.stringContaining("Failed to update license"),
+        }),
+      );
     });
 
-    it('should clear license key after successful update', async () => {
-      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
+    it("should clear license key after successful update", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
 
-      wrapper.vm.licenseKey = 'new-license-key';
+      wrapper.vm.licenseKey = "new-license-key";
       await wrapper.vm.updateLicense();
       await flushPromises();
 
-      expect(wrapper.vm.licenseKey).toBe('');
+      expect(wrapper.vm.licenseKey).toBe("");
     });
 
-    it('should hide update form after successful update', async () => {
-      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
+    it("should hide update form after successful update", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
 
       wrapper.vm.showUpdateForm = true;
-      wrapper.vm.licenseKey = 'new-license-key';
+      wrapper.vm.licenseKey = "new-license-key";
       await wrapper.vm.updateLicense();
       await flushPromises();
 
       expect(wrapper.vm.showUpdateForm).toBe(false);
     });
 
-    it('should reload license data after successful update', async () => {
-      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
+    it("should reload license data after successful update", async () => {
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
       vi.mocked(licenseServer.get_license).mockClear();
 
-      wrapper.vm.licenseKey = 'new-license-key';
+      wrapper.vm.licenseKey = "new-license-key";
       await wrapper.vm.updateLicense();
       await flushPromises();
 
@@ -508,33 +523,33 @@ describe('License.vue', () => {
     });
   });
 
-  describe('License Key Masking', () => {
+  describe("License Key Masking", () => {
     beforeEach(async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
 
-    it('should mask license key correctly', () => {
-      const maskedKey = wrapper.vm.maskKey('test-license-key-12345678901234567890');
-      expect(maskedKey).toContain('test-');
-      expect(maskedKey).toContain('*****');
-      expect(maskedKey).toContain('67890');
+    it("should mask license key correctly", () => {
+      const maskedKey = wrapper.vm.maskKey("test-license-key-12345678901234567890");
+      expect(maskedKey).toContain("test-");
+      expect(maskedKey).toContain("*****");
+      expect(maskedKey).toContain("67890");
     });
 
-    it('should return original key if too short', () => {
-      const shortKey = 'short';
+    it("should return original key if too short", () => {
+      const shortKey = "short";
       const maskedKey = wrapper.vm.maskKey(shortKey);
       expect(maskedKey).toBe(shortKey);
     });
 
-    it('should show visibility button for license key', () => {
-      const oIcons = wrapper.findAllComponents({ name: 'OIcon' });
-      const visibilityIcon = oIcons.find((icon: any) => icon.props('name') === 'visibility');
+    it("should show visibility button for license key", () => {
+      const oIcons = wrapper.findAllComponents({ name: "OIcon" });
+      const visibilityIcon = oIcons.find((icon: any) => icon.props("name") === "visibility");
       expect(visibilityIcon).toBeTruthy();
     });
 
-    it('should open modal when visibility button is clicked', async () => {
+    it("should open modal when visibility button is clicked", async () => {
       wrapper.vm.showLicenseKeyModal = true;
       await wrapper.vm.$nextTick();
 
@@ -542,75 +557,75 @@ describe('License.vue', () => {
     });
   });
 
-  describe('License Key Modal', () => {
+  describe("License Key Modal", () => {
     beforeEach(async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
 
-    it('should render ODialog stub for license key modal', () => {
+    it("should render ODialog stub for license key modal", () => {
       expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
     });
 
-    it('should pass title prop to ODialog', () => {
+    it("should pass title prop to ODialog", () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props('title')).toBe('License Key');
+      expect(dialog.props("title")).toBe("License Key");
     });
 
     it('should pass size="md" prop to ODialog', () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props('size')).toBe('md');
+      expect(dialog.props("size")).toBe("md");
     });
 
-    it('should pass persistent prop to ODialog', () => {
+    it("should pass persistent prop to ODialog", () => {
       const dialog = wrapper.findComponent(ODialogStub);
       // Vue passes valueless boolean attributes through as an empty string for
       // string-typed props; either value satisfies the persistent contract.
-      expect(['', true]).toContain(dialog.props('persistent'));
+      expect(["", true]).toContain(dialog.props("persistent"));
     });
 
     it('should pass primaryButtonLabel "Copy Key" to ODialog', () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props('primaryButtonLabel')).toBe('Copy Key');
+      expect(dialog.props("primaryButtonLabel")).toBe("Copy Key");
     });
 
     it('should pass secondaryButtonLabel "Cancel" to ODialog', () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props('secondaryButtonLabel')).toBe('Cancel');
+      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
     });
 
-    it('should bind open prop from showLicenseKeyModal state', async () => {
+    it("should bind open prop from showLicenseKeyModal state", async () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props('open')).toBe(false);
+      expect(dialog.props("open")).toBe(false);
 
       wrapper.vm.showLicenseKeyModal = true;
       await wrapper.vm.$nextTick();
-      expect(dialog.props('open')).toBe(true);
+      expect(dialog.props("open")).toBe(true);
     });
 
-    it('should disable primary button when license key is empty', async () => {
+    it("should disable primary button when license key is empty", async () => {
       // Set license data with no key
-      wrapper.vm.licenseData = { ...wrapper.vm.licenseData, key: '' };
+      wrapper.vm.licenseData = { ...wrapper.vm.licenseData, key: "" };
       await wrapper.vm.$nextTick();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props('primaryButtonDisabled')).toBe(true);
+      expect(dialog.props("primaryButtonDisabled")).toBe(true);
     });
 
-    it('should enable primary button when license key exists', () => {
+    it("should enable primary button when license key exists", () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props('primaryButtonDisabled')).toBe(false);
+      expect(dialog.props("primaryButtonDisabled")).toBe(false);
     });
 
-    it('should show full license key in modal', async () => {
+    it("should show full license key in modal", async () => {
       wrapper.vm.showLicenseKeyModal = true;
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showLicenseKeyModal).toBe(true);
     });
 
-    it('should copy license key to clipboard when click:primary is emitted', async () => {
+    it("should copy license key to clipboard when click:primary is emitted", async () => {
       const clipboardWriteText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, {
         clipboard: {
@@ -619,13 +634,13 @@ describe('License.vue', () => {
       });
 
       const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit('click:primary');
+      await dialog.vm.$emit("click:primary");
       await flushPromises();
 
       expect(clipboardWriteText).toHaveBeenCalledWith(mockLicenseData.key);
     });
 
-    it('should copy license key to clipboard via method', async () => {
+    it("should copy license key to clipboard via method", async () => {
       const clipboardWriteText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, {
         clipboard: {
@@ -638,7 +653,7 @@ describe('License.vue', () => {
       expect(clipboardWriteText).toHaveBeenCalledWith(mockLicenseData.key);
     });
 
-    it('should show success notification after copying', async () => {
+    it("should show success notification after copying", async () => {
       Object.assign(navigator, {
         clipboard: {
           writeText: vi.fn().mockResolvedValue(undefined),
@@ -647,13 +662,15 @@ describe('License.vue', () => {
 
       await wrapper.vm.copyLicenseKey();
 
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: 'success',
-        message: expect.stringContaining('copied'),
-      }));
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: expect.stringContaining("copied"),
+        }),
+      );
     });
 
-    it('should close modal after copying', async () => {
+    it("should close modal after copying", async () => {
       Object.assign(navigator, {
         clipboard: {
           writeText: vi.fn().mockResolvedValue(undefined),
@@ -666,65 +683,62 @@ describe('License.vue', () => {
       expect(wrapper.vm.showLicenseKeyModal).toBe(false);
     });
 
-    it('should close modal when click:secondary is emitted', async () => {
+    it("should close modal when click:secondary is emitted", async () => {
       wrapper.vm.showLicenseKeyModal = true;
       await wrapper.vm.$nextTick();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit('click:secondary');
+      await dialog.vm.$emit("click:secondary");
       await flushPromises();
 
       expect(wrapper.vm.showLicenseKeyModal).toBe(false);
     });
   });
 
-  describe('Get License Redirect', () => {
+  describe("Get License Redirect", () => {
     beforeEach(async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
 
-    it('should open license request URL in new tab', () => {
-      const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    it("should open license request URL in new tab", () => {
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
       wrapper.vm.redirectToGetLicense();
 
       expect(windowOpenSpy).toHaveBeenCalledWith(
-        expect.stringContaining('license.example.com'),
-        '_blank'
+        expect.stringContaining("license.example.com"),
+        "_blank",
       );
     });
 
-    it('should include installation ID in license request URL', () => {
-      const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    it("should include installation ID in license request URL", () => {
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
       wrapper.vm.redirectToGetLicense();
 
       expect(windowOpenSpy).toHaveBeenCalledWith(
-        expect.stringContaining('test-installation-123'),
-        '_blank'
+        expect.stringContaining("test-installation-123"),
+        "_blank",
       );
     });
 
-    it('should include base URL in license request', () => {
-      const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    it("should include base URL in license request", () => {
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
       wrapper.vm.redirectToGetLicense();
 
-      expect(windowOpenSpy).toHaveBeenCalledWith(
-        expect.stringContaining('base_url='),
-        '_blank'
-      );
+      expect(windowOpenSpy).toHaveBeenCalledWith(expect.stringContaining("base_url="), "_blank");
     });
   });
 
-  describe('URL Auto-fill License Key', () => {
-    it('should auto-fill license key from URL parameters', async () => {
-      window.location.search = '?installation_id=test-installation-123&license_key=auto-filled-key';
+  describe("URL Auto-fill License Key", () => {
+    it("should auto-fill license key from URL parameters", async () => {
+      window.location.search = "?installation_id=test-installation-123&license_key=auto-filled-key";
 
       const noLicenseData = {
-        installation_id: 'test-installation-123',
+        installation_id: "test-installation-123",
         license: null,
       };
 
@@ -732,15 +746,15 @@ describe('License.vue', () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.licenseKey).toBe('auto-filled-key');
+      expect(wrapper.vm.licenseKey).toBe("auto-filled-key");
       expect(wrapper.vm.isLicenseKeyAutoFilled).toBe(true);
     });
 
-    it('should show auto-fill banner when license key is from URL', async () => {
-      window.location.search = '?installation_id=test-installation-123&license_key=auto-filled-key';
+    it("should show auto-fill banner when license key is from URL", async () => {
+      window.location.search = "?installation_id=test-installation-123&license_key=auto-filled-key";
 
       const noLicenseData = {
-        installation_id: 'test-installation-123',
+        installation_id: "test-installation-123",
         license: null,
       };
 
@@ -748,80 +762,84 @@ describe('License.vue', () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain('License key auto-filled from URL');
+      expect(wrapper.text()).toContain("License key auto-filled from URL");
     });
 
-    it('should clear URL parameters after successful update', async () => {
-      window.location.search = '?installation_id=test-installation-123&license_key=auto-filled-key';
-      const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+    it("should clear URL parameters after successful update", async () => {
+      window.location.search = "?installation_id=test-installation-123&license_key=auto-filled-key";
+      const replaceStateSpy = vi.spyOn(window.history, "replaceState");
 
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
-      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
+      vi.mocked(licenseServer.update_license).mockResolvedValue(
+        createAxiosResponse({ success: true }),
+      );
 
       wrapper = createWrapper();
       await flushPromises();
 
-      wrapper.vm.licenseKey = 'new-key';
+      wrapper.vm.licenseKey = "new-key";
       await wrapper.vm.updateLicense();
       await flushPromises();
 
       expect(replaceStateSpy).toHaveBeenCalled();
     });
 
-    it('should not auto-fill if installation IDs do not match', async () => {
-      window.location.search = '?installation_id=different-id&license_key=auto-filled-key';
+    it("should not auto-fill if installation IDs do not match", async () => {
+      window.location.search = "?installation_id=different-id&license_key=auto-filled-key";
 
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.licenseKey).toBe('');
+      expect(wrapper.vm.licenseKey).toBe("");
       expect(wrapper.vm.isLicenseKeyAutoFilled).toBe(false);
     });
   });
 
-  describe('Date Formatting', () => {
+  describe("Date Formatting", () => {
     beforeEach(async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
 
-    it('should format timestamp to readable date', () => {
+    it("should format timestamp to readable date", () => {
       const timestamp = 1704067200000000; // 2024-01-01 00:00:00
       const formatted = wrapper.vm.formatDate(timestamp);
       expect(formatted).toBeTruthy();
-      expect(typeof formatted).toBe('string');
+      expect(typeof formatted).toBe("string");
     });
 
-    it('should display formatted created date', () => {
-      expect(wrapper.text()).toContain('Created At');
+    it("should display formatted created date", () => {
+      expect(wrapper.text()).toContain("Created At");
     });
 
-    it('should display formatted expiry date', () => {
-      expect(wrapper.text()).toContain('Expires At');
+    it("should display formatted expiry date", () => {
+      expect(wrapper.text()).toContain("Expires At");
     });
   });
 
-  describe('Error Handling', () => {
-    it('should show error notification when loading license fails', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  describe("Error Handling", () => {
+    it("should show error notification when loading license fails", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      vi.mocked(licenseServer.get_license).mockRejectedValue(new Error('Network error'));
+      vi.mocked(licenseServer.get_license).mockRejectedValue(new Error("Network error"));
 
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: 'error',
-        message: expect.stringContaining('Failed to load'),
-      }));
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: expect.stringContaining("Failed to load"),
+        }),
+      );
 
       consoleErrorSpy.mockRestore();
     });
 
-    it('should handle clipboard copy failure gracefully', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    it("should handle clipboard copy failure gracefully", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
@@ -829,23 +847,25 @@ describe('License.vue', () => {
 
       Object.assign(navigator, {
         clipboard: {
-          writeText: vi.fn().mockRejectedValue(new Error('Clipboard error')),
+          writeText: vi.fn().mockRejectedValue(new Error("Clipboard error")),
         },
       });
 
       await wrapper.vm.copyLicenseKey();
 
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: 'error',
-        message: expect.stringContaining('Failed to copy'),
-      }));
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: expect.stringContaining("Failed to copy"),
+        }),
+      );
 
       consoleErrorSpy.mockRestore();
     });
   });
 
-  describe('limitBreachAllowedCount', () => {
-    it('should return limit_breach_allowed_count from license when version >= 2', async () => {
+  describe("limitBreachAllowedCount", () => {
+    it("should return limit_breach_allowed_count from license when version >= 2", async () => {
       const v2LicenseData = {
         ...mockLicenseData,
         license: {
@@ -861,7 +881,7 @@ describe('License.vue', () => {
       expect(wrapper.vm.limitBreachAllowedCount).toBe(2);
     });
 
-    it('should return limit_breach_allowed_count when version is 3 (>= 2)', async () => {
+    it("should return limit_breach_allowed_count when version is 3 (>= 2)", async () => {
       const v3LicenseData = {
         ...mockLicenseData,
         license: {
@@ -877,7 +897,7 @@ describe('License.vue', () => {
       expect(wrapper.vm.limitBreachAllowedCount).toBe(5);
     });
 
-    it('should return 3 when license has no version (v1 implied)', async () => {
+    it("should return 3 when license has no version (v1 implied)", async () => {
       const v1LicenseData = {
         ...mockLicenseData,
         license: {
@@ -892,7 +912,7 @@ describe('License.vue', () => {
       expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
     });
 
-    it('should return 3 when license version is 1', async () => {
+    it("should return 3 when license version is 1", async () => {
       const v1LicenseData = {
         ...mockLicenseData,
         license: {
@@ -908,9 +928,9 @@ describe('License.vue', () => {
       expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
     });
 
-    it('should return 3 when license is null', async () => {
+    it("should return 3 when license is null", async () => {
       const noLicenseData = {
-        installation_id: 'test-installation-123',
+        installation_id: "test-installation-123",
         license: null,
       };
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(noLicenseData));
@@ -920,7 +940,7 @@ describe('License.vue', () => {
       expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
     });
 
-    it('should fall back to 3 when version >= 2 but limit_breach_allowed_count is missing', async () => {
+    it("should fall back to 3 when version >= 2 but limit_breach_allowed_count is missing", async () => {
       const v2NoCountData = {
         ...mockLicenseData,
         license: {
@@ -936,7 +956,7 @@ describe('License.vue', () => {
       expect(wrapper.vm.limitBreachAllowedCount).toBe(3);
     });
 
-    it('should use limitBreachAllowedCount in remaining days calculation', async () => {
+    it("should use limitBreachAllowedCount in remaining days calculation", async () => {
       const v2LicenseData = {
         ...mockLicenseData,
         license: {
@@ -951,12 +971,14 @@ describe('License.vue', () => {
       await flushPromises();
 
       // With limit_breach_allowed_count=2 and ingestion_exceeded=1, remaining=1
-      expect(wrapper.vm.limitBreachAllowedCount - wrapper.vm.licenseData.ingestion_exceeded).toBe(1);
+      expect(wrapper.vm.limitBreachAllowedCount - wrapper.vm.licenseData.ingestion_exceeded).toBe(
+        1,
+      );
     });
   });
 
-  describe('Component Cleanup', () => {
-    it('should cleanup properly on unmount', async () => {
+  describe("Component Cleanup", () => {
+    it("should cleanup properly on unmount", async () => {
       vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
@@ -966,21 +988,21 @@ describe('License.vue', () => {
   });
 });
 
-describe('makeLicenseSchema', () => {
+describe("makeLicenseSchema", () => {
   const schema = makeLicenseSchema((k: string) => k);
 
-  it('rejects a whitespace-only key (the .trim() rule is load-bearing)', () => {
+  it("rejects a whitespace-only key (the .trim() rule is load-bearing)", () => {
     // Without .trim() a single space passes .min(1); this guards that.
-    expect(schema.safeParse({ licenseKey: '   ' }).success).toBe(false);
+    expect(schema.safeParse({ licenseKey: "   " }).success).toBe(false);
   });
 
-  it('rejects an empty key', () => {
-    expect(schema.safeParse({ licenseKey: '' }).success).toBe(false);
+  it("rejects an empty key", () => {
+    expect(schema.safeParse({ licenseKey: "" }).success).toBe(false);
   });
 
-  it('accepts a non-empty key and trims surrounding whitespace', () => {
-    const res = schema.safeParse({ licenseKey: '  abc-123  ' });
+  it("accepts a non-empty key and trims surrounding whitespace", () => {
+    const res = schema.safeParse({ licenseKey: "  abc-123  " });
     expect(res.success).toBe(true);
-    if (res.success) expect(res.data.licenseKey).toBe('abc-123');
+    if (res.success) expect(res.data.licenseKey).toBe("abc-123");
   });
 });

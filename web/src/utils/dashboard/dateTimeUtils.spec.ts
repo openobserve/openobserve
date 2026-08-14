@@ -88,11 +88,7 @@ describe("dateTimeUtils", () => {
     });
 
     it("returns true for array with all valid ISO timestamps", () => {
-      const sample = [
-        "2024-01-15T10:30:45",
-        "2024-02-20T15:45:00",
-        "2024-12-31T23:59:59",
-      ];
+      const sample = ["2024-01-15T10:30:45", "2024-02-20T15:45:00", "2024-12-31T23:59:59"];
       expect(isTimeSeries(sample)).toBe(true);
     });
   });

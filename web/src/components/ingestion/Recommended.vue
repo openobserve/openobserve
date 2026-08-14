@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     panel-data-test="data-sources-recommended-tabs"
     tab-data-test-prefix="ingestion-recommended-tab-"
   >
-    <div class="w-full h-full">
+    <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full">
-        <div class="overflow-auto h-full pt-1.5">
+        <div class="h-full overflow-auto pt-1.5">
           <router-view
             :title="tabs"
             :currOrgIdentifier="currOrgIdentifier"
@@ -41,10 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -61,15 +61,15 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const tabs = ref("");
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier,
-    );
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
 
-    const ingestTabType = ref(resolveTab("recommended", router.currentRoute.value.name as string, "ingestFromKubernetes"));
+    const ingestTabType = ref(
+      resolveTab("recommended", router.currentRoute.value.name as string, "ingestFromKubernetes"),
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "recommended") {
@@ -206,25 +206,20 @@ export default defineComponent({
       },
     ];
 
-    // MCP is an AI feature (endpoint requires O2_AI_ENABLED); available on
-    // enterprise and cloud, and only when ai_enabled is on at runtime.
-    if (
-      (config.isEnterprise == "true" || config.isCloud == "true") &&
-      store.state.zoConfig.ai_enabled
-    ) {
-      recommendedTabs.push({
+    // The MCP endpoint is served by every edition, so this pointer to the IAM
+    // setup page is unconditional.
+    recommendedTabs.push({
+      name: "recommendedMcp",
+      to: {
         name: "recommendedMcp",
-        to: {
-          name: "recommendedMcp",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
         },
-        icon: "mcp",
-        label: t("ingestion.mcp.shortName"),
-        contentClass: "tab_content",
-      });
-    }
+      },
+      icon: "mcp",
+      label: t("ingestion.mcp.shortName"),
+      contentClass: "tab_content",
+    });
 
     return {
       t,
@@ -242,4 +237,3 @@ export default defineComponent({
   },
 });
 </script>
-

@@ -20,6 +20,7 @@ use config::{
         alerts::alert::ListAlertsParams,
         dashboards::{ListDashboardsParams, reports::ListReportsParams},
         folder::{DEFAULT_FOLDER, Folder, FolderType},
+        synthetics::ListSyntheticsParams,
     },
 };
 use infra::{
@@ -71,16 +72,20 @@ pub enum FolderError {
     #[error("Folder contains reports. Please move/delete reports from folder.")]
     DeleteWithReports,
 
+    /// An error that occurs when trying to delete a folder that contains synthetics.
+    #[error("Folder contains synthetics. Please move/delete synthetics from folder.")]
+    DeleteWithSynthetics,
+
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
     NotFound,
 
-    /// An error occured trying to get the list of permitted folders in
+    /// An error occurred trying to get the list of permitted folders in
     /// enterprise mode because no user_id was provided.
     #[error("user_id required to get permitted folders in enterprise mode")]
     PermittedFoldersMissingUser,
 
-    /// An error occured trying to get the list of permitted folders in
+    /// An error occurred trying to get the list of permitted folders in
     /// enterprise mode using the validator.
     #[error("PermittedFoldersValidator# {0}")]
     PermittedFoldersValidator(String),
@@ -267,8 +272,30 @@ pub async fn delete_folder(
                 return Err(FolderError::DeleteWithReports);
             }
         }
-        // Synthetics monitor cleanup is handled by the enterprise synthetics handler.
-        FolderType::Synthetics => {}
+        FolderType::Synthetics => {
+            // `folder_id` here is the user-facing id from the URL — the
+            // `folders.folder_id` column. The synthetics table stores the
+            // folder's PRIMARY KEY instead, so the two must be translated
+            // before they can be compared. Comparing them directly always
+            // counted zero, which let the delete through to the database and
+            // surfaced as a raw "FOREIGN KEY constraint failed" 500 instead of
+            // the "move/delete synthetics from folder" message the other
+            // folder types give.
+            //
+            // A missing folder is left to the `exists` check below, which
+            // reports NotFound.
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+            {
+                let params = ListSyntheticsParams {
+                    folder_id: Some(folder_pk),
+                    ..Default::default()
+                };
+                if table::synthetics_checks::count(client, org_id, &params).await? > 0 {
+                    return Err(FolderError::DeleteWithSynthetics);
+                }
+            }
+        }
     };
 
     if !table::folders::exists(org_id, folder_id, folder_type).await? {

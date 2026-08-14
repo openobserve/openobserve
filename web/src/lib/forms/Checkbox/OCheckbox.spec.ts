@@ -81,5 +81,4 @@ describe("OCheckbox", () => {
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("Y");
   });
-
 });

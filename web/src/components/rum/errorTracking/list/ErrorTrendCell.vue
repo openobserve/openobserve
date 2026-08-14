@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rum-error-trend-cell"
     >
       <div
-        class="flex items-end gap-[0.0938rem] h-7"
+        class="flex h-7 items-end gap-[0.0938rem]"
         role="img"
         :aria-label="ariaLabel"
         :title="ariaLabel"
@@ -43,26 +43,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="{ height: barHeight(value) }"
         />
       </div>
-      <small
-        class="italic"
-        :class="annotationClass"
-        data-test="rum-error-trend-cell-annotation"
-        >{{ annotationLabel }}</small
-      >
+      <small class="italic" :class="annotationClass" data-test="rum-error-trend-cell-annotation">{{
+        annotationLabel
+      }}</small>
     </div>
 
     <!-- Pre-intersection and in-flight cells both show the skeleton — an
          em-dash would read as "no data" for rows not yet fetched. -->
     <div
       v-else-if="buckets === null || buckets === undefined"
-      class="flex items-end gap-[0.0938rem] h-7 animate-pulse"
+      class="flex h-7 animate-pulse items-end gap-[0.0938rem]"
       data-test="rum-error-trend-cell-loading"
       :aria-label="t('rum.loadingMsg')"
     >
       <span
         v-for="index in 12"
         :key="index"
-        class="trend-bar rounded-default bg-card-glass-border opacity-60 w-1.5"
+        class="trend-bar rounded-default bg-card-glass-border w-1.5 opacity-60"
         :style="{ height: `${20 + ((index * 11) % 60)}%` }"
       />
     </div>
@@ -79,11 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
-import {
-  computeTrendAnnotation,
-  type IssueStatus,
-} from "@/utils/rum/errorIssueUtils";
+import { useI18nTyped } from "@/types/i18n";
+import { computeTrendAnnotation, type IssueStatus } from "@/utils/rum/errorIssueUtils";
 
 const props = defineProps<{
   /**
@@ -100,7 +94,7 @@ const emit = defineEmits<{
   visible: [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /** Cap the sparkline at this many bars regardless of window resolution. */
 const MAX_BARS = 24;
@@ -134,6 +128,7 @@ onMounted(() => {
       }
     },
     // Prefetch slightly ahead of the fold so scrolling feels instant.
+    // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
     { rootMargin: "200px 0px" },
   );
   observer.observe(rootEl.value);
@@ -155,16 +150,12 @@ const displayBuckets = computed<number[]>(() => {
   const chunk = Math.ceil(buckets.length / MAX_BARS);
   const merged: number[] = [];
   for (let i = 0; i < buckets.length; i += chunk) {
-    merged.push(
-      buckets.slice(i, i + chunk).reduce((sum, value) => sum + value, 0),
-    );
+    merged.push(buckets.slice(i, i + chunk).reduce((sum, value) => sum + value, 0));
   }
   return merged;
 });
 
-const annotation = computed(() =>
-  computeTrendAnnotation(props.buckets, props.status),
-);
+const annotation = computed(() => computeTrendAnnotation(props.buckets, props.status));
 
 // Static per-kind utility strings (not built by interpolation) so Tailwind's
 // scanner sees every class it has to emit.
@@ -175,9 +166,7 @@ const ANNOTATION_CLASS: Record<string, string> = {
   flat: "text-text-secondary",
 };
 
-const annotationClass = computed(
-  () => ANNOTATION_CLASS[annotation.value.kind] ?? "",
-);
+const annotationClass = computed(() => ANNOTATION_CLASS[annotation.value.kind] ?? "");
 
 const annotationLabel = computed(() => {
   const { kind, factor } = annotation.value;
@@ -191,9 +180,7 @@ const maxValue = computed(() =>
   displayBuckets.value.reduce((max, value) => Math.max(max, value), 0),
 );
 
-const totalEvents = computed(() =>
-  displayBuckets.value.reduce((sum, value) => sum + value, 0),
-);
+const totalEvents = computed(() => displayBuckets.value.reduce((sum, value) => sum + value, 0));
 
 const barHeight = (value: number) => {
   if (value <= 0 || maxValue.value <= 0) return "0.125rem";
@@ -201,8 +188,5 @@ const barHeight = (value: number) => {
   return `${Math.max(15, (value / maxValue.value) * 100)}%`;
 };
 
-const ariaLabel = computed(() =>
-  t("rum.eventsCount", { count: totalEvents.value }),
-);
+const ariaLabel = computed(() => t("rum.eventsCount", { count: totalEvents.value }));
 </script>
-

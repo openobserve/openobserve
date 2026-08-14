@@ -31,6 +31,7 @@ import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/check
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useNotifications from "@/composables/useNotifications";
+import type { TranslateFn } from "@/types/i18n";
 
 /**
  * Options for usePanelEditor composable
@@ -38,6 +39,7 @@ import useNotifications from "@/composables/useNotifications";
 export interface UsePanelEditorOptions {
   /** The page type - determines default behavior */
   pageType: PanelEditorPageType;
+  t: TranslateFn;
   /** Resolved configuration (after merging props with presets) */
   config: PanelEditorConfig;
   /** Dashboard panel data from useDashboardPanelData composable */
@@ -65,6 +67,7 @@ export interface UsePanelEditorOptions {
  * Handles all shared state and actions across dashboard, metrics, and logs pages.
  */
 export function usePanelEditor(options: UsePanelEditorOptions) {
+  const { t } = options;
   const {
     pageType,
     config,
@@ -120,6 +123,9 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
   /** Series limit warning message */
   const limitNumberOfSeriesWarningMessage: Ref<string> = ref("");
 
+  /** Sparkline-unavailable warning (e.g. JOIN queries — API code 20013) */
+  const sparklineWarning: Ref<string> = ref("");
+
   /** General error message */
   const errorMessage: Ref<string> = ref("");
 
@@ -147,18 +153,17 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    */
   const injectedLoadingState = inject<any>("variablesAndPanelsDataLoadingState", null);
 
-  const variablesAndPanelsDataLoadingState = injectedLoadingState || reactive({
-    variablesData: {} as Record<string, boolean>,
-    panels: {} as Record<string, boolean>,
-    searchRequestTraceIds: {} as Record<string, string[]>,
-  });
+  const variablesAndPanelsDataLoadingState =
+    injectedLoadingState ||
+    reactive({
+      variablesData: {} as Record<string, boolean>,
+      panels: {} as Record<string, boolean>,
+      searchRequestTraceIds: {} as Record<string, string[]>,
+    });
 
   // Provide loading state for child components (either injected or newly created)
   // This ensures PanelSchemaRenderer can inject it
-  provide(
-    "variablesAndPanelsDataLoadingState",
-    variablesAndPanelsDataLoadingState,
-  );
+  provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
 
   /** Computed array of search request trace IDs (for cancel functionality) */
   const searchRequestTraceIds: ComputedRef<string[]> = computed(() => {
@@ -169,7 +174,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
   });
 
   // ---- Cancel Query Support ----
-  const { traceIdRef, cancelQuery } = useCancelQuery();
+  const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
   // ---- Hovered Series State (for chart interactions) ----
   const hoveredSeriesState = ref({
@@ -181,12 +186,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     setHoveredSeriesName: function (name: string) {
       hoveredSeriesState.value.hoveredSeriesName = name ?? "";
     },
-    setIndex: function (
-      dataIndex: number,
-      seriesIndex: number,
-      panelId: any,
-      hoveredTime?: any,
-    ) {
+    setIndex: function (dataIndex: number, seriesIndex: number, panelId: any, hoveredTime?: any) {
       hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
       hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
       hoveredSeriesState.value.panelId = panelId ?? -1;
@@ -220,11 +220,18 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
       dashboardPanelData.data.queries[0].fields?.breakdown?.length === 0 &&
       dashboardPanelData.data.queries[0].fields.y.length === 0 &&
       dashboardPanelData.data.queries[0].fields.z.length === 0 &&
-      dashboardPanelData.data.queries[0].fields.filter.conditions.length ===
-        0 &&
+      dashboardPanelData.data.queries[0].fields.filter.conditions.length === 0 &&
       dashboardPanelData.data.queries.length === 1
     );
   };
+
+  const appliedSparklineEnabled = ref(false);
+  let sparklineBaselineCaptured = false;
+  const sparklinePendingApply = computed(
+    () =>
+      dashboardPanelData.data?.config?.sparkline?.enabled === true &&
+      !appliedSparklineEnabled.value,
+  );
 
   /**
    * Whether the chart is out of date (panel data differs from chart data)
@@ -283,7 +290,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
       );
     }
 
-    return configNeedsApiCall || variablesChanged;
+    return configNeedsApiCall || variablesChanged || sparklinePendingApply.value;
   });
 
   /**
@@ -323,9 +330,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
         validatePanel(errors, true);
 
         if (errors.length) {
-          showErrorNotification(
-            "There are some errors, please fix them and try again",
-          );
+          showErrorNotification(t("toastMessages.composables.thereAreSomeErrorsPleaseFix"));
           // Do not return early — query still fires to allow partial results
         }
       }
@@ -340,6 +345,8 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
       // Copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // Applied — capture the sparkline state so the "pending" banner clears.
+      appliedSparklineEnabled.value = dashboardPanelData.data?.config?.sparkline?.enabled === true;
 
       // Refresh the date time picker if available
       if (dateTimePickerRef?.value) {
@@ -392,6 +399,10 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     limitNumberOfSeriesWarningMessage.value = message;
   };
 
+  const handleSparklineWarningUpdate = (message: string): void => {
+    sparklineWarning.value = message;
+  };
+
   /**
    * Handle partial data update from PanelSchemaRenderer
    * @param value - Whether data is partial (loading was interrupted)
@@ -421,10 +432,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    * @param metadata - Query metadata
    */
   const handleResultMetadataUpdate = (metadata: any): void => {
-    maxQueryRangeWarning.value = processQueryMetadataErrors(
-      metadata,
-      store.state.timezone,
-    );
+    maxQueryRangeWarning.value = processQueryMetadataErrors(metadata, store.state.timezone);
   };
 
   /**
@@ -553,9 +561,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
         const filteredFieldList = fields
           .filter(
             (field: string) =>
-              !aliasList.some(
-                (alias: string) => alias.toLowerCase() === field.toLowerCase(),
-              ),
+              !aliasList.some((alias: string) => alias.toLowerCase() === field.toLowerCase()),
           )
           .map((field: string) => ({ name: field, type: "Utf8" }));
         getQueryFields(queryIndex).vrlFunctionFieldList = filteredFieldList;
@@ -563,8 +569,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
       // Sync active query's VRL fields to shared meta for the field selector UI
       const activeQf = dashboardPanelData.meta.queryFields[currentQueryIndex];
-      dashboardPanelData.meta.stream.vrlFunctionFieldList =
-        activeQf?.vrlFunctionFieldList ?? [];
+      dashboardPanelData.meta.stream.vrlFunctionFieldList = activeQf?.vrlFunctionFieldList ?? [];
       return;
     }
 
@@ -573,9 +578,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     const filteredFieldList = (fieldList as string[])
       .filter(
         (field: any) =>
-          !aliasList.some(
-            (alias: string) => alias.toLowerCase() === field.toLowerCase(),
-          ),
+          !aliasList.some((alias: string) => alias.toLowerCase() === field.toLowerCase()),
       )
       .map((field: any) => ({ name: field, type: "Utf8" }));
 
@@ -628,6 +631,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     errorMessage.value = "";
     maxQueryRangeWarning.value = "";
     limitNumberOfSeriesWarningMessage.value = "";
+    sparklineWarning.value = "";
   };
 
   /**
@@ -707,8 +711,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
         dashboardPanelData.layout.querySplitter = 41;
       } else {
         if (expandedSplitterHeight.value !== null) {
-          dashboardPanelData.layout.querySplitter =
-            expandedSplitterHeight.value;
+          dashboardPanelData.layout.querySplitter = expandedSplitterHeight.value;
         }
       }
     },
@@ -727,12 +730,9 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
   // Watch loading state - update disable
   watch(variablesAndPanelsDataLoadingState, () => {
-    const panelsValues = Object.values(
-      variablesAndPanelsDataLoadingState.panels,
-    );
+    const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
     disable.value = panelsValues.some((item: any) => item === true);
   });
-
 
   // Check if externalChartData has actual VALUE (not just if the ref exists)
   // A ref is always truthy even if its value is undefined, so we must check .value
@@ -773,6 +773,13 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     // to date" on edit load.
     nextTick(() => {
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // Capture the sparkline baseline only on the first (load) init; later inits
+      // fire on every config edit and must NOT clear the pending banner.
+      if (!sparklineBaselineCaptured) {
+        appliedSparklineEnabled.value =
+          dashboardPanelData.data?.config?.sparkline?.enabled === true;
+        sparklineBaselineCaptured = true;
+      }
     });
   };
 
@@ -792,6 +799,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     shouldRefreshWithoutCache,
     maxQueryRangeWarning,
     limitNumberOfSeriesWarningMessage,
+    sparklineWarning,
     errorMessage,
     isPartialData,
     isPanelLoading,
@@ -816,6 +824,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     handleChartApiError,
     handleLastTriggeredAtUpdate,
     handleLimitNumberOfSeriesWarningMessage,
+    handleSparklineWarningUpdate,
     handleIsPartialDataUpdate,
     handleLoadingStateChange,
     handleIsCachedDataDifferWithCurrentTimeRangeUpdate,

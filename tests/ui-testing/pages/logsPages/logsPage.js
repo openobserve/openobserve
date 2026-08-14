@@ -10,10 +10,20 @@ import * as path from 'path';
 
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment, authedRequest } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 export class LogsPage {
+    /**
+     * Escape a value for embedding inside a double-quoted CSS attribute selector.
+     * Backslashes must be escaped first, otherwise a literal `\` in the text would
+     * be emitted unescaped and swallow the character that follows it (and a
+     * trailing `\` would escape the closing quote and break the whole selector).
+     */
+    static escapeCssAttrValue(text) {
+        return String(text).replace(/["\\]/g, '\\$&');
+    }
+
     constructor(page) {
         this.page = page;
         
@@ -49,6 +59,20 @@ export class LogsPage {
         this.indexDropDownTrigger = '[data-test="log-search-index-list-select-stream-trigger"]';
         this.indexDropDownPopover = '[data-test="log-search-index-list-select-stream-popover"]';
         this.indexDropDownSearch = '[data-test="log-search-index-list-select-stream-search"]';
+        // Quick Pick (no-stream-selected sidebar state) locators
+        this.quickPickContainer = '[data-test="logs-search-stream-quick-pick"]';
+        this.quickPickButton = (streamName) => `[data-test="logs-search-stream-quick-pick-${streamName}"]`;
+        // Match only the per-stream quick-pick buttons, NOT the "-more" footer
+        // span (which also starts with `logs-search-stream-quick-pick-`).
+        this.quickPickButtonWildcard = '[data-test^="logs-search-stream-quick-pick-"]:not([data-test="logs-search-stream-quick-pick-more"])';
+        this.quickPickMoreFooter = '[data-test="logs-search-stream-quick-pick-more"]';
+        // Hero state (main content no-stream-selected) locators
+        this.noStreamHero = '[data-test="logs-search-no-stream-selected-text"]';
+        this.selectStreamCard = '[data-test="logs-no-stream-select-stream-card"]';
+        this.queryGuideCard = '[data-test="logs-no-stream-query-guide-card"]';
+        this.recentChip = (streamName) => `[data-test="logs-no-stream-recent-${streamName}"]`;
+        // Post stream-selection: empty schema indicator
+        this.noFieldFoundText = '[data-test="logs-search-no-field-found-text"]';
         this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] [data-state]';
         this.searchPartitionButton = '[data-test="logs-search-partition-btn"]';
         this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
@@ -59,13 +83,13 @@ export class LogsPage {
         this.histogramToggleCheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="checked"]';
         this.histogramToggleUncheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="unchecked"]';
         this.exploreButton = '[data-test="logs-search-explore-btn"]';
-        this.timestampColumnMenu = '[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]';
+        this.timestampColumnMenu = '[data-test="o2-table-expand-1"]';
         this.resultText = '[data-test="logs-search-search-result"]';
         this.logsSearchResultLogsTable = '[data-test="logs-search-result-logs-table"]';
         this.kubernetesFieldsSelector = '[data-test*="log-search-expand-kubernetes"]';
         this.allFieldsSelector = '[data-test*="log-search-expand-"]';
         this.matchingFieldsSelector = '[data-test*="log-search-expand-"]';
-        this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
+        this.logTableColumnSource = '[data-test="o2-table-row-0"] [data-test="o2-table-cell-source"]';
         this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.searchBarRefreshButton = '[data-test="logs-search-bar-refresh-btn"]';
         this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
@@ -123,6 +147,8 @@ export class LogsPage {
         this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.errorMessage = '[data-test="logs-search-error-state"]';
+        // Generic error indicator (class/role based) used when no data-test error hook exists.
+        this.genericErrorSelector = '[class*="error"], [class*="negative"], [role="alert"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
         // Additional locators for multistream functionality
@@ -153,7 +179,7 @@ export class LogsPage {
         // [data-test="log-search-expand-<field>-field-btn"]. Deterministic data-test for waits.
         this.expandCodeFieldBtn = '[data-test="log-search-expand-code-field-btn"]';
         this.logsDetailTableSearchAroundBtn = '[data-test="logs-detail-table-search-around-btn"]';
-        this.logTableColumn3Source = '[data-test="log-table-column-3-source"]';
+        this.logTableColumn3Source = '[data-test="o2-table-row-3"] [data-test="o2-table-cell-source"]';
         this.histogramToggleDiv = '[data-test="logs-search-bar-show-histogram-toggle-btn"] div';
 
         // Additional locators
@@ -205,6 +231,7 @@ export class LogsPage {
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
+        this.explainQueryMenuBtn = '[data-test="logs-search-bar-explain-query-menu-btn"]';
         // Hover trigger for the nested CSV/JSON submenu (data-test added on the wrapper div).
         this.downloadSubmenuTrigger = '[data-test="search-download-submenu-trigger"]';
         this.downloadSubmenu = '[data-test="search-download-submenu"]';
@@ -291,6 +318,20 @@ export class LogsPage {
         this.dashboardPanelTable = '[data-test="dashboard-panel-table"]';
         // Composite: any of the three indicates the build/visualize tab finished initial render.
         this.buildInitIndicator = `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`;
+        // Composite: a *painted* chart — either an echarts canvas or a rendered table panel.
+        // Scoped with :visible because the logs histogram keeps its own (hidden) chart-renderer
+        // in the DOM while the Visualize tab is active.
+        this.renderedChartIndicator = `${this.chartRenderer} canvas:visible, ${this.dashboardPanelTable}:visible`;
+
+        // ===== VISUALIZE ERROR PANEL (DashboardErrors.vue) =====
+        // Rendered only when errorData.errors is non-empty (v-if), so count 0 == no errors.
+        this.dashboardError = '[data-test="dashboard-error"]';
+        this.dashboardErrorsListItem = '[data-test="dashboard-errors-list-item"]';
+        // Error text thrown by convertPanelData() for builder-mode panels with empty x/y
+        // (web/src/utils/dashboard/convertPanelData.ts).
+        this.requiredFieldsErrorText = 'Please select required fields to render the chart';
+        // logs.index.selectStarNotSupportedForVisualization (en-US.json)
+        this.selectStarNotSupportedToastText = 'Select * query is not supported for visualization';
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
@@ -300,6 +341,8 @@ export class LogsPage {
         // known variants on the root only — also dodges Monaco's `role="alert"` accessibility
         // hosts and the inner `o-toast-message` description node that share the `o-toast-` prefix.
         this.successNotification = '[data-test-variant="success"], [data-test-variant="error"], [data-test-variant="info"], [data-test-variant="warning"], [data-test-variant="loading"], [data-test-variant="default"]';
+        // Success-only toast variant (e.g. saved view created)
+        this.successToast = '[data-test-variant="success"]';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
 
@@ -378,8 +421,8 @@ export class LogsPage {
 
         // Table and pagination CSS selectors
         this.tableBottom = '[data-test="logs-search-result-pagination"]';
-        this.tableBodyRow = 'tbody tr';
-        this.tableBodyRowWithIndex = 'tbody tr[data-index]';
+        this.tableBodyRow = 'tbody tr[data-test^="o2-table-row-"]';
+        this.tableBodyRowWithIndex = 'tbody tr[data-test^="o2-table-row-"]';
         this.tableHeaderCell = 'thead th';
         this.tableHeaders = 'thead th';
 
@@ -399,15 +442,23 @@ export class LogsPage {
         // ===== SEARCH PATTERNS SELECTORS (Enterprise Feature) =====
         // Toggle button to switch to patterns view
         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
-        // Statistics summary
-        this.patternStatistics = '[data-test="pattern-statistics"]';
-        // Pattern cards (dynamic selectors with index)
-        this.patternCard = (index) => `[data-test="pattern-card-${index}"]`;
+        // Patterns-loaded signal. The old "pattern-statistics" summary element was
+        // dropped in the patterns UI redesign; the severity filter row is the
+        // stable stand-in because PatternList renders it under exactly the same
+        // condition (!loading && patterns.length > 0), and unlike a pattern card
+        // it is not subject to OVirtualScroll mounting only the visible window.
+        this.patternStatistics = '[data-test="pattern-list-severity-filter"]';
+        // Pattern cards (dynamic selectors with index).
+        // NOTE: These `pattern-card-${index}` selectors address cards by their
+        // ABSOLUTE OVirtualScroll item index, which is only mounted when inside the
+        // visible window. Card-root and details clicks must go through
+        // patternCardAt(index) (rendered position) instead — see that helper and
+        // getPatternCardCount(). The template/frequency/percentage getters use
+        // patternCardPart() for the same reason.
         this.patternCardTemplate = (index) => `[data-test="pattern-card-${index}-template"]`;
         this.patternCardAnomalyBadge = (index) => `[data-test="pattern-card-${index}-anomaly-badge"]`;
         this.patternCardFrequency = (index) => `[data-test="pattern-card-${index}-frequency"]`;
         this.patternCardPercentage = (index) => `[data-test="pattern-card-${index}-percentage"]`;
-        this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
         // Include/exclude/create-alert moved off the card and into the details
         // dialog in the patterns UI redesign, so they are no longer per-index.
         this.patternDetailIncludeBtn = '[data-test="pattern-detail-include-btn"]';
@@ -422,15 +473,19 @@ export class LogsPage {
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
         this.patternDetailNextBtn = '[data-test="pattern-detail-next-btn"]';
         // Pattern list states
-        this.patternLoadingSpinner = '[data-test="pattern-list-loading-indicator"]';
+        // The loader became a skeleton block and the empty state moved into
+        // OEmptyState during the patterns UI redesign. Both are matched by their
+        // data-test hooks rather than by visible copy, so wording/i18n changes
+        // cannot silently turn these waits into timeouts again.
+        this.patternLoadingSpinner = '[data-test="pattern-list-loading-skeleton"]';
         this.patternLoadingText = 'text=Extracting patterns from logs...';
-        this.patternEmptyState = 'text=No patterns found';
+        this.patternEmptyState = '[data-test="log-patterns-empty-state"]';
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
-        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr';
-        this.tableRowExpandMenu = '[data-test="table-row-expand-menu"]';
+        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
+        this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
-        this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
+        this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
         this.searchResultText = '[data-test="logs-search-search-result"]';
         this.logDetailPanel = '[data-test="logs-search-result-detail-dialog"], [data-test*="log-detail"]';
         this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
@@ -830,7 +885,9 @@ export class LogsPage {
             await expect.poll(async () => {
                 pollCount++;
                 try {
-                    const response = await this.page.request.get(url, { headers: getAuthHeaders() });
+                    // authedRequest self-heals on 401/403 (refresh passcode / re-auth) so a
+                    // rotated-credential 401 from a concurrent shard doesn't stall the poll.
+                    const response = await authedRequest(this.page, 'get', url);
                     const status = response.status();
                     if (response.ok()) {
                         const data = await response.json();
@@ -1060,7 +1117,7 @@ export class LogsPage {
     }
 
     async expectTimestampColumnVisible() {
-        const timestampColumn = this.page.locator('[data-test="log-table-column-1-_timestamp"]');
+        const timestampColumn = this.page.locator('[data-test="o2-table-row-1"] [data-test="o2-table-cell-_timestamp"]');
         await expect(timestampColumn, 'Timestamp column should be visible').toBeVisible({ timeout: 5000 });
         testLogger.info('Timestamp column visible in table');
     }
@@ -1488,7 +1545,7 @@ export class LogsPage {
     }
 
     async expectLogsTableRowCount(count) {
-        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr')).toHaveCount(count);
+        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]')).toHaveCount(count);
     }
 
     // Time and date methods
@@ -1513,6 +1570,11 @@ export class LogsPage {
     async setDateTimeTo15Minutes() {
         await this.page.locator(this.dateTimeButton).click();
         await this.page.locator('[data-test="date-time-relative-15-m-btn"]').click();
+    }
+
+    async setDateTimeToPast1Hour() {
+        await this.page.locator(this.dateTimeButton).click();
+        await this.page.locator(this.relative1HourButton).click();
     }
 
     async setAbsoluteDate(year, month, day, currentMonth, currentYear) {
@@ -1611,24 +1673,7 @@ export class LogsPage {
         return isOn;
     }
 
-    // Histogram methods
-    async toggleHistogram() {
-        // Histogram is a standalone toolbar button (data-test="logs-search-bar-histogram-btn")
-        // in normal-width viewports. It falls back into the utilities ("More") dropdown only
-        // when the viewport is very narrow (shouldMoveButtonsToMenu breakpoint < 328px).
-        await this.page.keyboard.press('Escape').catch(() => {});
-        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
-        const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
-        if (isInline) {
-            await inlineBtn.click();
-            return;
-        }
-        // Narrow-viewport fallback: open the utilities menu and click the menu item.
-        await this.page.locator(this.utilitiesMenuButton).click();
-        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
-        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        await histogramMenuItem.click();
-    }
+
 
     async toggleHistogramAndExecute() {
         await this.toggleHistogram();
@@ -1842,7 +1887,7 @@ export class LogsPage {
     async openTimestampMenu() {
         try {
             await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { state: 'visible', timeout: 10000 });
-            await this.page.waitForSelector('[data-test="log-table-column-1-_timestamp"]', { state: 'visible', timeout: 10000 });
+            await this.page.waitForSelector('[data-test="o2-table-row-1"] [data-test="o2-table-cell-_timestamp"]', { state: 'visible', timeout: 10000 });
             await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 10000 });
             await this.timestampColumnMenu.scrollIntoViewIfNeeded();
             
@@ -2271,11 +2316,11 @@ export class LogsPage {
             }
         }
 
-        const rows = await this.page.locator('[data-test^="logs-search-result-detail-"]').all();
+        const rows = await this.page.locator('[data-test^="o2-table-row-"]').all();
         let previousValue = orderType === 'desc' ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
 
         for (const row of rows) {
-            const sourceCell = await row.locator('[data-test^="log-table-column-"][data-test$="-source"]').textContent();
+            const sourceCell = await row.locator('[data-test="o2-table-cell-source"]').textContent();
             try {
                 const logcountMatch = sourceCell.match(/logcount":(\d+)/);
                 const currentValue = logcountMatch ? parseInt(logcountMatch[1]) : 0;
@@ -2360,6 +2405,30 @@ export class LogsPage {
 
     async clickRefresh() {
         return await this.logsQueryPage.clickRefresh();
+    }
+
+    // --- Sentinel POM helpers (relocated from spec files) ---
+
+
+
+    // Text of the quick-pick "+N more" footer.
+    async getQuickPickMoreFooterText() {
+        return await this.page.locator(this.quickPickMoreFooter).innerText();
+    }
+
+
+
+    getShareLinkButtonLocator() {
+        return this.page.locator(this.shareLinkButton);
+    }
+
+    // Readiness gates (deterministic waits keyed on the search-bar controls).
+    async waitForStreamSelectReady(timeout = 15000) {
+        await this.page.locator(this.indexDropDown).waitFor({ state: 'visible', timeout });
+    }
+
+    async waitForRefreshButtonReady(timeout = 15000) {
+        await this.page.locator(this.searchBarRefreshButton).waitFor({ state: 'visible', timeout });
     }
 
     async clickErrorMessage() {
@@ -2468,10 +2537,7 @@ export class LogsPage {
         return await this.managementPage.navigateToManagement();
     }
 
-    // Additional methods needed for tests
-    async clickDateTimeButton() {
-        return await this.page.locator(this.dateTimeButton).click({ force: true });
-    }
+
 
     async clickRelative15MinButton() {
         return await this.page.locator(this.relative15MinButton).click({ force: true });
@@ -2934,7 +3000,7 @@ export class LogsPage {
     async waitForTableHits(timeout = 15000) {
         try {
             await this.page.waitForFunction(
-                () => document.querySelector('[data-test^="log-table-column-0-"]') !== null,
+                () => document.querySelector('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]') !== null,
                 { timeout },
             );
             return true;
@@ -3014,6 +3080,10 @@ export class LogsPage {
 
     async clickSavedViewsButton() {
         return await this.clickSaveViewButton();
+    }
+
+    getSuccessToastLocator() {
+        return this.page.locator(this.successToast);
     }
 
     async clickSavedViewsExpand() {
@@ -3321,6 +3391,25 @@ export class LogsPage {
         }, this.queryEditor);
     }
 
+    /**
+     * Read the query-editor text, polling until it is populated. Monaco is lazy-loaded and
+     * prefills its model asynchronously (e.g. after a saved view is applied on a fresh page
+     * load), so a one-shot read can catch an empty editor and return "". Poll instead: return
+     * the text once it is non-empty (or contains `expectedSubstring` when given). If the editor
+     * never populates, expect.poll throws on timeout — so a genuine prefill failure still fails
+     * the test rather than being masked.
+     * @param {string} [expectedSubstring] substring that must be present before returning
+     * @param {number} [timeout] max time to wait for the editor to populate, ms
+     */
+    async getQueryEditorTextWhenReady(expectedSubstring = '', timeout = 15000) {
+        let last = '';
+        await expect.poll(async () => {
+            last = (await this.getQueryEditorText()) || '';
+            return expectedSubstring ? last.includes(expectedSubstring) : last.trim().length > 0;
+        }, { timeout, intervals: [300, 500, 800, 1200] }).toBe(true);
+        return last;
+    }
+
     async clickLogTableColumnSource() {
         // Open the first result row's detail/search-around. With the FTS
         // default-column feature the first cell may be the generic "source"
@@ -3330,7 +3419,7 @@ export class LogsPage {
         // Playwright's auto-retrying click is allowed to settle via a short
         // post-condition wait on the detail dialog by callers.
         const firstRowCell = this.page
-            .locator('[data-test^="log-table-column-0-"]')
+            .locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]')
             .first();
         await firstRowCell.waitFor({ state: 'visible', timeout: 30000 });
         return await firstRowCell.click();
@@ -3352,7 +3441,7 @@ export class LogsPage {
     /**
      * Opens the log detail sidebar by clicking the first result row.
      * Clicks whichever first-row cell is rendered (matched by the
-     * `log-table-column-0-` prefix) — the default column may be the generic
+     * first row) — the default column may be the generic
      * "source" column OR the FTS "body"/message column — then waits for the
      * detail dialog. Includes a force-click fallback for transient instability.
      * @returns {Promise<void>}
@@ -3363,7 +3452,7 @@ export class LogsPage {
         // the highlighting test stream). Waiting on the exact "...-source" cell timed out
         // whenever the body column was rendered instead, so target any first-row cell by
         // prefix — mirroring clickLogTableColumnSource / waitForSearchResults.
-        const sourceCell = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        const sourceCell = this.page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         // Under CI load the row can resolve in the DOM while the results table is still
         // streaming/re-rendering, so a plain click waits out its timeout on "element is not
         // stable". Wait for the cell to be visible, bring it into view, then click with a
@@ -3396,26 +3485,24 @@ export class LogsPage {
     }
 
     /**
-     * Verifies that the JSON tab is selected by default (Bug #9724)
-     * Checks that JSON tab is visible AND JSON content is visible
+     * Verifies that the JSON tab is selected by default.
+     * The log-detail sidebar opens on the JSON tab — the first tab in the bar.
+     * Checks that the JSON tab is visible AND is the active tab AND JSON content shows.
      * @returns {Promise<void>}
      */
     async verifyJsonTabSelectedByDefault() {
-        // Verify JSON tab exists
         const jsonTab = this.page.locator(this.logDetailJsonTab);
         await expect(jsonTab).toBeVisible();
 
         // The Reka OTab (TabsTrigger) carries data-state="active" when selected. The
         // DetailTable drawer is an async component, so on open the trigger can render a
-        // tick before Reka's reactive data-state settles to "active". A one-shot
-        // getAttribute read does NOT retry and flakes under CI load, so poll with
-        // toHaveAttribute, which auto-retries until the attribute settles (Bug #9724).
-        await expect(jsonTab, 'JSON tab should be selected by default (Bug #9724)')
+        // tick before Reka's reactive data-state settles. Poll with toHaveAttribute,
+        // which auto-retries until the attribute settles (avoids CI-load flakes).
+        await expect(jsonTab, 'JSON tab should be selected by default')
             .toHaveAttribute('data-state', 'active', { timeout: 10000 });
 
-        // Verify JSON content is visible
         await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
-        testLogger.info('✓ JSON tab is selected by default (Bug #9724 verified)');
+        testLogger.info('✓ JSON tab is selected by default');
     }
 
     /**
@@ -3545,8 +3632,11 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isViewRelatedButtonVisible() {
+        // Correlation ("View Related") was redesigned into inline tabs in the log-detail drawer;
+        // the old log-correlation-btn is gone. The presence of the traces correlation tab means
+        // the enterprise correlation feature is available (OSS lacks it, so the caller skips).
         try {
-            await this.page.locator(this.viewRelatedBtn).waitFor({ state: 'visible', timeout: 5000 });
+            await this.page.locator(this.correlatedTracesTab).waitFor({ state: 'visible', timeout: 5000 });
             return true;
         } catch (e) {
             return false;
@@ -3576,8 +3666,10 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickViewRelatedButton() {
-        await this.page.locator(this.viewRelatedBtn).click();
-        testLogger.info('Clicked View Related button');
+        // Open the traces correlation area — now an inline tab in the log-detail drawer
+        // (replaces the removed log-correlation-btn / correlation dashboard).
+        await this.page.locator(this.correlatedTracesTab).click();
+        testLogger.info('Opened correlated traces tab');
         // Wait for correlation to start loading
         await this.page.waitForTimeout(1000);
     }
@@ -3679,10 +3771,15 @@ export class LogsPage {
     }
 
     async hoverOnCorrelationDashboard() {
-        const closeBtn = this.page.locator(this.correlationDashboardClose);
-        const dashboardPanel = closeBtn.locator('..');
-        await dashboardPanel.hover();
-        testLogger.info('Hovered over correlation dashboard panel');
+        // Bug #11469: hovering the traces correlation area must NOT surface the log-field
+        // copy/include/exclude context menu. The old correlation-dashboard-close element is
+        // gone; hover the active traces correlation tab panel instead. Verified live on alpha:
+        // in this panel the include/exclude field buttons are not present, so the assertion in
+        // expectNoContextMenuVisible() stays real (fails if a menu ever appears on hover).
+        const panel = this.page.locator('[role="tabpanel"]:visible').first();
+        await panel.waitFor({ state: 'visible', timeout: 10000 });
+        await panel.hover();
+        testLogger.info('Hovered over correlated traces panel');
     }
 
     async expectNoContextMenuVisible() {
@@ -3703,7 +3800,7 @@ export class LogsPage {
     }
 
     async expectNotificationMessage(text) {
-        const escaped = String(text).replace(/"/g, '\\"');
+        const escaped = LogsPage.escapeCssAttrValue(text);
         const selector = [
             `[data-test-variant="success"][data-test-message*="${escaped}"]`,
             `[data-test-variant="error"][data-test-message*="${escaped}"]`,
@@ -3731,7 +3828,7 @@ export class LogsPage {
         // Some validations in the UX-revamp moved from $q.notify toasts to inline
         // OInput error messages (rendered as `[data-test="<name>-error"]`).
         // Cover both surfaces so the wait succeeds for either feedback channel.
-        const escaped = String(text).replace(/"/g, '\\"');
+        const escaped = LogsPage.escapeCssAttrValue(text);
         const selector = [
             `[data-test-variant="success"][data-test-message*="${escaped}"]`,
             `[data-test-variant="error"][data-test-message*="${escaped}"]`,
@@ -3871,12 +3968,7 @@ export class LogsPage {
         await expect(this.page.getByText(text, { exact: true })).toBeVisible();
     }
 
-    async expectLogsTableVisible() {
-        const table = this.page.locator(this.logsTable);
-        // Wait for the table to be visible with a timeout
-        await table.waitFor({ state: 'visible', timeout: 30000 });
-        return await expect(table).toBeVisible();
-    }
+
 
     async waitForSearchResults(timeout = 30000) {
         const table = this.page.locator(this.logsTable);
@@ -3884,7 +3976,7 @@ export class LogsPage {
         // The default view may render the generic "source" column OR the FTS
         // "body" column, so wait for any first-row cell rather than "source"
         // specifically — both mean "results rendered".
-        const firstRow = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        const firstRow = this.page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         await firstRow.waitFor({ state: 'visible', timeout });
         return true;
     }
@@ -3893,9 +3985,7 @@ export class LogsPage {
         return await expect(this.page.getByText(/Field is required/).first()).toBeVisible();
     }
 
-    async expectErrorWhileFetchingNotVisible() {
-        return await expect(this.page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
-    }
+
 
     async clickBarChartCanvas() {
         // Wait for network idle to ensure chart data has loaded
@@ -4445,9 +4535,7 @@ export class LogsPage {
         return await expect(this.page.locator(this.searchBarRefreshButton)).toBeVisible();
     }
 
-    async expectQuickModeToggleVisible() {
-        return await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
-    }
+
 
     async clickInterestingFieldButton(field) {
         const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
@@ -4702,12 +4790,7 @@ export class LogsPage {
         return await this.page.locator(this.savedFunctionNameInput).click();
     }
 
-    async fillSavedFunctionNameInput(text) {
-        // OInput wrapper data-test is "saved-function-name-input"; inner native input is "-field" (AGENT_RULES §4).
-        // Wait on the wrapper (visibility) but fill the -field variant.
-        await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 10000 });
-        return await this.page.locator(this.savedFunctionNameInputField).fill(text);
-    }
+
 
     async expectFunctionNameNotValid() {
         // OInput convention §4: the error span is `<parent>-error`. SearchBar.vue sets
@@ -4742,7 +4825,7 @@ export class LogsPage {
     }
 
     async expectTableColumnHeaderVisible(columnName) {
-        const columnHeader = this.page.locator(`[data-test="log-search-result-table-th-${columnName}"]`);
+        const columnHeader = this.page.locator(`[data-test="o2-table-th-${columnName}"]`);
         await expect(columnHeader, `Column header ${columnName} should be visible`).toBeVisible({ timeout: 5000 });
         testLogger.info(`Column header ${columnName} is visible`);
     }
@@ -4812,7 +4895,7 @@ export class LogsPage {
      */
     async expectLogTableColumnSourceVisible() {
         const sourceCol = this.page.locator(this.logTableColumnSource);
-        const anyFirstRowCol = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        const anyFirstRowCol = this.page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         // Whichever appears first satisfies "results rendered".
         await Promise.race([
             sourceCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
@@ -4832,7 +4915,7 @@ export class LogsPage {
      * @param {number} rowIndex - Row index (default 0 = first row)
      */
     async expectLogTableColumnVisible(columnName, rowIndex = 0) {
-        const element = this.page.locator(`[data-test="log-table-column-${rowIndex}-${columnName}"]`);
+        const element = this.page.locator(`[data-test="o2-table-row-${rowIndex}"] [data-test="o2-table-cell-${columnName}"]`);
         await element.waitFor({ state: 'visible', timeout: 30000 });
         return await expect(element).toBeVisible();
     }
@@ -5073,7 +5156,48 @@ export class LogsPage {
     }
 
     async clickExplainQuery() {
-        return await this.page.locator('[data-test="logs-search-bar-explain-query-menu-btn"]').click();
+        return await this.page.locator(this.explainQueryMenuBtn).click();
+    }
+
+    /**
+     * Get the query error-state message locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getErrorMessageLocator() {
+        return this.page.locator(this.errorMessage);
+    }
+
+    /**
+     * Get the more-options (hamburger) button locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getMoreOptionsButtonLocator() {
+        return this.page.locator(this.moreOptionsBtn);
+    }
+
+    /**
+     * Get the Explain Query menu item locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getExplainQueryMenuBtnLocator() {
+        return this.page.locator(this.explainQueryMenuBtn);
+    }
+
+    /**
+     * Get a generic error indicator locator (class/role based)
+     * @returns {import('@playwright/test').Locator}
+     */
+    getGenericErrorLocator() {
+        return this.page.locator(this.genericErrorSelector);
+    }
+
+    /**
+     * Get a menu item by (partial, case-insensitive) visible text
+     * @param {string} text - The menu text to match
+     * @returns {import('@playwright/test').Locator}
+     */
+    getMenuItemByText(text) {
+        return this.page.getByText(text, { exact: false }).first();
     }
 
     async hoverDownloadResults() {
@@ -5425,7 +5549,7 @@ export class LogsPage {
         // logs table. Wait for either signal — both fire on success.
         await Promise.any([
             this.page.locator(`[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`).waitFor({ state: 'visible', timeout: 10000 }),
-            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`).waitFor({ state: 'visible', timeout: 10000 }),
+            this.page.locator(`[data-test="o2-table-th-${fieldName}"]`).waitFor({ state: 'visible', timeout: 10000 }),
         ]).catch(() => {});
     }
 
@@ -5437,12 +5561,12 @@ export class LogsPage {
         // reverts to an add button. Wait on either DOM convergence.
         await Promise.any([
             this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`).waitFor({ state: 'visible', timeout: 10000 }),
-            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`).waitFor({ state: 'hidden', timeout: 10000 }),
+            this.page.locator(`[data-test="o2-table-th-${fieldName}"]`).waitFor({ state: 'hidden', timeout: 10000 }),
         ]).catch(() => {});
     }
 
     async expectFieldInTableHeader(fieldName, timeout = 10000) {
-        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible({ timeout });
+        return await expect(this.page.locator(`[data-test="o2-table-th-${fieldName}"]`)).toBeVisible({ timeout });
     }
 
     async expectFieldNotInTableHeader(fieldName) {
@@ -5450,7 +5574,7 @@ export class LogsPage {
         // (Asserting on the removed field is mode-agnostic: the default view may
         // fall back to the generic "source" column or the FTS "body" column.)
         return await expect(
-            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`),
+            this.page.locator(`[data-test="o2-table-th-${fieldName}"]`),
         ).toHaveCount(0);
     }
 
@@ -5465,8 +5589,8 @@ export class LogsPage {
      * @returns {Promise<'message'|'log'>} The FTS field currently in the header.
      */
     async resolveFtsDefaultField(timeout = 15000) {
-        const message = this.page.locator('[data-test="log-search-result-table-th-message"]');
-        const log = this.page.locator('[data-test="log-search-result-table-th-log"]');
+        const message = this.page.locator('[data-test="o2-table-th-message"]');
+        const log = this.page.locator('[data-test="o2-table-th-log"]');
         await expect(message.or(log).first()).toBeVisible({ timeout });
         return (await message.isVisible().catch(() => false)) ? 'message' : 'log';
     }
@@ -5485,10 +5609,10 @@ export class LogsPage {
      */
     async clickCloseColumnButton(fieldName) {
         const header = this.page.locator(
-            `[data-test="log-search-result-table-th-${fieldName}"]`,
+            `[data-test="o2-table-th-${fieldName}"]`,
         );
         const closeBtn = this.page.locator(
-            `[data-test="logs-search-result-table-th-remove-${fieldName}-btn"]`,
+            `[data-test="o2-table-th-remove-${fieldName}-btn"]`,
         );
         // Hover the column header to reveal its hover-gated X, then click normally
         // so the actionability check still runs (no force).
@@ -5539,7 +5663,7 @@ export class LogsPage {
 
     async openFirstLogDetails() {
         // Click on the first log entry to open details (expand the first column)
-        await this.page.locator('[data-index="0"] [data-test="table-row-expand-menu"]').click();
+        await this.page.locator('[data-test="o2-table-expand-0"]').click();
         // Wait for the details drawer to open — keys off the actual reveal instead of a buffer.
         await this.page.locator('[data-test="logs-search-result-detail-dialog"], [data-test="log-details-include-exclude-field-btn"], [data-test="log-details-include-field-btn"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     }
@@ -6049,11 +6173,11 @@ export class LogsPage {
     }
 
     async clickTableExpandMenuFirst() {
-        return await this.page.locator('[data-test="table-row-expand-menu"]').first().click({ force: true });
+        return await this.page.locator('[data-test^="o2-table-expand-"]').first().click({ force: true });
     }
 
     async clickTimestampColumnMenu() {
-        return await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+        return await this.page.locator('[data-test="o2-table-expand-0"]').click();
     }
 
     async clickDateTimeButton() {
@@ -6094,9 +6218,7 @@ export class LogsPage {
         return await this.page.locator(this.logSearchIndexListFieldSearchInput).fill(fieldName);
     }
 
-    async navigateToStreams() {
-        return await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
-    }
+
 
     async navigateToStreamsAlternate() {
         return await this.page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
@@ -6157,7 +6279,7 @@ export class LogsPage {
     }
 
     async getLogsTableRowCount() {
-        return await this.page.locator(`${this.logsTable} tbody tr`).count();
+        return await this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`).count();
     }
 
     /**
@@ -6166,7 +6288,7 @@ export class LogsPage {
      * @returns {Promise<string[]>} Array of row text content
      */
     async getLogsTableRowTexts(limit = 10) {
-        const rows = this.page.locator(`${this.logsTable} tbody tr`);
+        const rows = this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`);
         const count = Math.min(await rows.count(), limit);
         const texts = [];
         for (let i = 0; i < count; i++) {
@@ -6685,43 +6807,37 @@ export class LogsPage {
      */
     async countSeverityColorBars() {
         return await this.page
-            .locator('tbody tr[data-index] [data-test="log-table-row-status-color"]')
+            .locator('tbody tr[data-status-bar="true"]')
             .count();
     }
 
     async getSeverityColors() {
         return await this.page.evaluate(() => {
-            const rows = document.querySelectorAll('tbody tr[data-index]');
+            const rows = document.querySelectorAll('tbody tr[data-status-bar="true"]');
             const findings = [];
 
             for (const row of rows) {
                 const text = row.textContent;
-                // The status color bar carries data-test="log-table-row-status-color"
-                // and data-test-status-level="<level>". This makes the detected
-                // severity/level machine-readable regardless of which column is
-                // shown (the FTS "body" column hides the raw "source" JSON).
-                let colorDiv = row.querySelector('[data-test="log-table-row-status-color"]');
-
-                // Fallbacks for older renders: inline-style / absolute-positioned div.
-                if (!colorDiv) colorDiv = row.querySelector('div[style*="background"]');
-                if (!colorDiv) colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
-                if (!colorDiv) {
-                    const divs = row.querySelectorAll('div');
-                    for (const div of divs) {
-                        const style = window.getComputedStyle(div);
-                        if (style.position === 'absolute' && style.left === '0px' && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-                            colorDiv = div;
-                            break;
-                        }
-                    }
+                // OTable draws the spine as a ::before on the row's first cell, fed by
+                // the --row-status-color custom property set inline on the <tr>, and
+                // marks the row with data-status-bar. The level rides along on the row
+                // class (o2-log-level-<level>) so it stays machine-readable whichever
+                // column is shown.
+                const raw = row.style.getPropertyValue('--row-status-color').trim();
+                if (!raw || raw === 'rgba(0, 0, 0, 0)' || raw === 'transparent') continue;
+                // The token resolves to a hex; callers normalise through rgbToHex,
+                // so hand back the rgb() form a computed style would have given.
+                let bgColor = raw;
+                const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+                if (hex) {
+                    let h = hex[1];
+                    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+                    const n = parseInt(h, 16);
+                    bgColor = `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
                 }
 
-                if (!colorDiv) continue;
-
-                const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
-                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
-
-                const level = colorDiv.getAttribute('data-test-status-level') || null;
+                const levelClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-'));
+                const level = levelClass ? levelClass.replace('o2-log-level-', '') : null;
 
                 // Best-effort: also recover the raw severity number when the JSON
                 // source column is visible (kept for backward compatibility).
@@ -7087,7 +7203,7 @@ export class LogsPage {
      * reactive store before callers check for the analyze button or row-dependent UI.
      */
     async waitForSearchResultRows(timeout = 20000) {
-        await this.page.locator(`${this.logsTable} tbody tr`).first()
+        await this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`).first()
             .waitFor({ state: 'visible', timeout });
         testLogger.info('waitForSearchResultRows: at least one result row is visible');
     }
@@ -7324,6 +7440,32 @@ export class LogsPage {
         if (sharedUrl.startsWith('http://') && !sharedUrl.includes('localhost')) {
             sharedUrl = sharedUrl.replace('http://', 'https://');
             testLogger.info('Converted HTTP to HTTPS', { url: sharedUrl });
+        }
+
+        // Re-point the short URL at the host the tests authenticated against (ZO_BASE_URL).
+        // On deployed/cloud envs the app builds the share link from its PUBLIC base URL
+        // (e.g. *.external.zinclabs.dev) which differs from the ingress the tests use
+        // (e.g. *.internal.zinclabs.dev). Navigating cross-origin drops the auth cookies
+        // and bounces to Dex, so the redirected page reads back an empty/logged-out state.
+        // The /short/<id> id resolves identically on the backend regardless of ingress
+        // host, so swapping only the origin keeps the session valid and the test intent
+        // (verify state preservation through the short-URL redirect) unchanged. Same-origin
+        // envs (localhost, matching deployed host) fall through untouched.
+        const baseUrl = process.env.ZO_BASE_URL;
+        if (baseUrl && !sharedUrl.includes('localhost')) {
+            try {
+                const shared = new URL(sharedUrl);
+                const base = new URL(baseUrl);
+                if (shared.origin !== base.origin) {
+                    shared.protocol = base.protocol;
+                    shared.host = base.host;
+                    const rewritten = shared.toString();
+                    testLogger.info('Re-pointed share URL to ZO_BASE_URL origin', { from: sharedUrl, to: rewritten });
+                    sharedUrl = rewritten;
+                }
+            } catch (e) {
+                testLogger.warn('Could not re-point share URL origin', { error: e.message });
+            }
         }
 
         testLogger.info('Share link URL captured', { url: sharedUrl });
@@ -7773,8 +7915,9 @@ export class LogsPage {
             }
         }
         // Fallback: streams listing page (LogStream.vue) uses a custom #bottom
-        // slot that renders "{totalRows} Stream(s)" without a data-test.
-        const streamCount = this.page.locator('text=/\\d+ Stream\\(s\\)/').first();
+        // slot that renders "{count} Stream" / "{count} Streams" (pluralised via
+        // i18n, so match both forms) without a data-test.
+        const streamCount = this.page.locator('text=/\\d+ Streams?\\b/').first();
         if (await streamCount.count().catch(() => 0) > 0) {
             const text = await streamCount.textContent().catch(() => null);
             if (text && text.trim()) return text.trim();
@@ -8884,7 +9027,12 @@ export class LogsPage {
                 testLogger.info('Patterns loading result: statistics');
                 return 'statistics';
             }
-            if (await this.page.locator(this.patternCard(0)).isVisible().catch(() => false)) {
+            // Address the first *rendered* card, not absolute index 0 — OVirtualScroll
+            // stamps the absolute item index onto each card and mounts only the visible
+            // window, so `pattern-card-0` can be absent even while cards are on screen
+            // (see patternCardPart/patternCardAt). Anchoring on rendered position keeps
+            // this check consistent with getPatternCardCount() and the click helpers.
+            if (await this.patternCardAt(0).isVisible().catch(() => false)) {
                 testLogger.info('Patterns loading result: patterns');
                 return 'patterns';
             }
@@ -8926,7 +9074,8 @@ export class LogsPage {
      * Assert that at least one pattern card is visible
      */
     async expectPatternCardsVisible() {
-        await expect(this.page.locator(this.patternCard(0))).toBeVisible();
+        // First *rendered* card, not absolute index 0 — see patternCardPart().
+        await expect(this.patternCardAt(0)).toBeVisible();
         testLogger.info('At least one pattern card is visible');
     }
 
@@ -8952,11 +9101,51 @@ export class LogsPage {
     }
 
     /**
+     * Locate a sub-element of the Nth *rendered* pattern card.
+     *
+     * PatternList renders cards inside OVirtualScroll, which stamps the absolute
+     * item index onto each card (`pattern-card-<absoluteIndex>`) and mounts only
+     * the rows in the current window. Addressing `pattern-card-0-*` therefore
+     * fails outright once the list has scrolled past item 0, even though cards
+     * are on screen — getPatternCardCount() counts by suffix and stays > 0, so
+     * the two disagreed and the getters hung until timeout.
+     *
+     * Selecting by suffix and taking .nth() keeps these helpers consistent with
+     * how the count is measured: both address cards by rendered position.
+     *
+     * @param {number} index - Position among rendered cards (0-based)
+     * @param {string} part - Card sub-element suffix (template|frequency|percentage)
+     * @returns {import('@playwright/test').Locator}
+     */
+    patternCardPart(index, part) {
+        return this.page
+            .locator(`[data-test^="pattern-card-"][data-test$="-${part}"]`)
+            .nth(index);
+    }
+
+    /**
+     * Locate the Nth *rendered* pattern card root, for the same virtualization
+     * reason as patternCardPart(). The card root's data-test has no suffix, so
+     * anchor on the template child (exactly one per card) and walk up to the
+     * card element — that keeps "Nth rendered card" identical to what
+     * getPatternCardCount() counts.
+     *
+     * @param {number} index - Position among rendered cards (0-based)
+     * @returns {import('@playwright/test').Locator}
+     */
+    patternCardAt(index) {
+        return this.page
+            .locator('[data-test^="pattern-card-"]')
+            .filter({ has: this.page.locator('[data-test$="-template"]') })
+            .nth(index);
+    }
+
+    /**
      * Click on a pattern card to open details
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternCard(index = 0) {
-        await this.page.locator(this.patternCard(index)).click();
+        await this.patternCardAt(index).click();
         testLogger.info(`Clicked pattern card at index ${index}`);
     }
 
@@ -8966,7 +9155,7 @@ export class LogsPage {
      * @returns {Promise<string>} The template text
      */
     async getPatternCardTemplateText(index = 0) {
-        const text = await this.page.locator(this.patternCardTemplate(index)).textContent();
+        const text = await this.patternCardPart(index, 'template').textContent();
         testLogger.info(`Pattern ${index} template: ${text}`);
         return text;
     }
@@ -8977,7 +9166,7 @@ export class LogsPage {
      * @returns {Promise<string>} The frequency text
      */
     async getPatternCardFrequency(index = 0) {
-        const text = await this.page.locator(this.patternCardFrequency(index)).textContent();
+        const text = await this.patternCardPart(index, 'frequency').textContent();
         testLogger.info(`Pattern ${index} frequency: ${text}`);
         return text;
     }
@@ -8988,7 +9177,7 @@ export class LogsPage {
      * @returns {Promise<string>} The percentage text
      */
     async getPatternCardPercentage(index = 0) {
-        const text = await this.page.locator(this.patternCardPercentage(index)).textContent();
+        const text = await this.patternCardPart(index, 'percentage').textContent();
         testLogger.info(`Pattern ${index} percentage: ${text}`);
         return text;
     }
@@ -8999,7 +9188,7 @@ export class LogsPage {
      * @returns {Promise<number>} Number of wildcard chip elements
      */
     async getPatternCardWildcardChipCount(index = 0) {
-        const count = await this.page.locator(this.patternCardWildcardChips(index)).count().catch(() => 0);
+        const count = await this.patternCardAt(index).locator(this.wildcardChip).count().catch(() => 0);
         testLogger.info(`Pattern ${index} wildcard chips: ${count}`);
         return count;
     }
@@ -9048,7 +9237,10 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if anomaly badge is visible
      */
     async isPatternAnomaly(index = 0) {
-        const isAnomaly = await this.page.locator(this.patternCardAnomalyBadge(index)).isVisible({ timeout: 500 }).catch(() => false);
+        const isAnomaly = await this.patternCardAt(index)
+            .locator('[data-test$="-anomaly-badge"]')
+            .isVisible({ timeout: 500 })
+            .catch(() => false);
         testLogger.info(`Pattern ${index} is anomaly: ${isAnomaly}`);
         return isAnomaly;
     }
@@ -9059,7 +9251,10 @@ export class LogsPage {
      * @returns {Promise<string>} Badge text, or empty string if not visible
      */
     async getPatternAnomalyBadgeText(index = 0) {
-        const text = await this.page.locator(this.patternCardAnomalyBadge(index)).textContent().catch(() => '');
+        const text = await this.patternCardAt(index)
+            .locator('[data-test$="-anomaly-badge"]')
+            .textContent()
+            .catch(() => '');
         return text.trim();
     }
 
@@ -9069,7 +9264,7 @@ export class LogsPage {
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternIncludeBtn(index = 0) {
-        await this.page.locator(this.patternCard(index)).click();
+        await this.patternCardAt(index).click();
         await this.page.locator(this.patternDetailIncludeBtn).click();
         testLogger.info(`Clicked include button on pattern ${index}`);
     }
@@ -9080,18 +9275,28 @@ export class LogsPage {
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternExcludeBtn(index = 0) {
-        await this.page.locator(this.patternCard(index)).click();
+        await this.patternCardAt(index).click();
         await this.page.locator(this.patternDetailExcludeBtn).click();
         testLogger.info(`Clicked exclude button on pattern ${index}`);
     }
 
     /**
-     * Click the details icon on a pattern card
-     * @param {number} index - The pattern card index (0-based)
+     * Click the Nth rendered pattern card and return its absolute list index.
+     * @param {number} index - Position among rendered cards (0-based)
+     * @returns {Promise<number>} Absolute pattern index (0-based)
      */
     async clickPatternDetailsIcon(index = 0) {
-        await this.page.locator(this.patternCardDetailsIcon(index)).click();
-        testLogger.info(`Clicked details icon on pattern ${index}`);
+        const card = this.patternCardAt(index);
+        const dataTest = await card.getAttribute('data-test');
+        const absoluteIndex = Number.parseInt(dataTest?.match(/^pattern-card-(\d+)$/)?.[1] ?? '', 10);
+
+        if (!Number.isInteger(absoluteIndex)) {
+            throw new Error(`Unable to determine absolute pattern index from ${dataTest}`);
+        }
+
+        await card.click();
+        testLogger.info(`Clicked rendered pattern ${index} (absolute index ${absoluteIndex})`);
+        return absoluteIndex;
     }
 
     /**
@@ -9402,6 +9607,250 @@ export class LogsPage {
     async expectLiveModeStatusVisible() {
         await expect(this.page.locator(this.liveModeToggleBtn)).toBeVisible({ timeout: 10000 });
         testLogger.info('Live mode refresh-interval button is visible');
+    }
+
+    // ===== LOGS VISUALIZE — CHART RENDER / ERROR ASSERTIONS (PR #13244, issue #12897) =====
+
+    /**
+     * Wait for the Visualize (Timechart) panel to actually PAINT a chart, then
+     * assert the "No Data" empty state is gone.
+     *
+     * This is the deterministic positive end-state that every negative assertion
+     * below must be sequenced after — never assert "no error" against a panel
+     * that has not finished rendering yet.
+     * @param {number} timeout - Max wait for the chart to paint (default 45000)
+     */
+    async expectVisualizeChartRendered(timeout = 45000) {
+        await expect(this.page.locator(this.renderedChartIndicator).first())
+            .toBeVisible({ timeout });
+        // `no-data` is a v-if empty state, so it is removed from the DOM once the
+        // panel has rows. toHaveCount(0) auto-retries, so a brief no-data flash
+        // while the first chunk streams in does not fail the assertion.
+        await expect(this.page.locator(this.noDataMessage)).toHaveCount(0, { timeout: 15000 });
+        testLogger.info('Visualize chart is rendered (not the No Data state)');
+    }
+
+    /**
+     * Assert the Visualize errors panel (DashboardErrors.vue) is absent.
+     * The container is rendered behind `v-if="errors.length"`, and errors are only
+     * cleared by an explicit resetErrors() — i.e. an error raised at any point in
+     * the current run is still present when this runs. Call AFTER
+     * expectVisualizeChartRendered() so the panel has settled.
+     */
+    async expectNoDashboardErrors() {
+        await expect(this.page.locator(this.dashboardError)).toHaveCount(0, { timeout: 15000 });
+        testLogger.info('No dashboard error panel is present');
+    }
+
+    /**
+     * Assert the false "Please select required fields to render the chart" error
+     * (convertPanelData's builder-mode guard) never landed in the errors panel.
+     * Targets the message specifically so an unrelated backend error still reports
+     * a meaningful failure via expectNoDashboardErrors().
+     */
+    async expectNoRequiredFieldsError() {
+        const errorItems = this.page.locator(this.dashboardErrorsListItem, {
+            hasText: this.requiredFieldsErrorText,
+        });
+        await expect(errorItems).toHaveCount(0, { timeout: 15000 });
+        testLogger.info('No "required fields" error is present in the errors panel');
+    }
+
+    // ===== LOGS VISUALIZE — TOAST RECORDER =====
+
+    /**
+     * Install a toast recorder that survives navigation.
+     *
+     * Toasts auto-dismiss, so polling for one after the page has settled is
+     * inherently racy — the toast we are asserting the ABSENCE of may have come
+     * and gone. Instead this attaches a MutationObserver that records every
+     * `[data-test="o-toast-message"]` text into `window.__o2RecordedToasts`, and
+     * registers it as an init script so it is re-installed at document-start on
+     * every subsequent navigation (including `page.reload()`). The assertion then
+     * inspects the recorded log after a deterministic positive end-state.
+     *
+     * Call this BEFORE the navigation/reload under test.
+     */
+    async startToastRecorder() {
+        const installer = () => {
+            if (window.__o2ToastRecorderInstalled) return;
+            window.__o2ToastRecorderInstalled = true;
+            window.__o2RecordedToasts = [];
+            const SELECTOR = '[data-test="o-toast-message"]';
+            const scan = () => {
+                document.querySelectorAll(SELECTOR).forEach((el) => {
+                    const text = (el.textContent || '').trim();
+                    if (text && !window.__o2RecordedToasts.includes(text)) {
+                        window.__o2RecordedToasts.push(text);
+                    }
+                });
+            };
+            const start = () => {
+                scan();
+                // characterData is required too: Vue inserts the toast node first and
+                // fills its text on a later tick, so childList alone can miss the text.
+                new MutationObserver(scan).observe(document.documentElement, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true,
+                });
+            };
+            if (document.documentElement) {
+                start();
+            } else {
+                document.addEventListener('DOMContentLoaded', start);
+            }
+        };
+        await this.page.addInitScript(installer);
+        // Also install on the CURRENT document — addInitScript only affects future loads.
+        await this.page.evaluate(installer).catch(() => {});
+        testLogger.info('Toast recorder installed');
+    }
+
+    /**
+     * Read every toast message recorded since startToastRecorder().
+     * @returns {Promise<string[]>}
+     */
+    async getRecordedToastMessages() {
+        return await this.page.evaluate(() => window.__o2RecordedToasts ?? []);
+    }
+
+    /**
+     * Assert no recorded toast contains the given text.
+     * @param {string} text - Substring that must not appear in any recorded toast
+     */
+    async expectNoToastContaining(text) {
+        const messages = await this.getRecordedToastMessages();
+        const matches = messages.filter((m) => m.includes(text));
+        expect(
+            matches,
+            `Expected no toast containing "${text}". Recorded toasts: ${JSON.stringify(messages)}`
+        ).toEqual([]);
+        testLogger.info(`No toast containing "${text}" was emitted`);
+    }
+
+    /**
+     * Assert the "Select * query is not supported for visualization" toast was
+     * never emitted (the symptom of the `select * from "undefined"` page-load race).
+     */
+    async expectNoSelectStarVisualizationToast() {
+        await this.expectNoToastContaining(this.selectStarNotSupportedToastText);
+    }
+
+    /**
+     * Assert a toast containing the given text WAS emitted since startToastRecorder().
+     * Polls because the toast arrives asynchronously after the triggering action.
+     * @param {string} text - Substring expected in one of the recorded toasts.
+     */
+    async expectToastContaining(text, timeout = 15000) {
+        await expect
+            .poll(
+                async () => (await this.getRecordedToastMessages()).some((m) => m.includes(text)),
+                {
+                    timeout,
+                    message: `Expected a toast containing "${text}" but none was emitted`,
+                }
+            )
+            .toBe(true);
+        testLogger.info(`Toast containing "${text}" was emitted`);
+    }
+
+    /**
+     * Assert the "Select * query is not supported for visualization" toast WAS emitted.
+     */
+    async expectSelectStarVisualizationToast() {
+        await this.expectToastContaining(this.selectStarNotSupportedToastText);
+    }
+
+    /**
+     * Read `quick_mode_enabled` from the instance /config endpoint.
+     * isSelectStarForTable() short-circuits to false when this is off, so the
+     * SELECT * table guard simply does not apply on such an instance.
+     * @returns {Promise<boolean>}
+     */
+    async isQuickModeEnabledOnInstance() {
+        return await this.page
+            .evaluate(async () => {
+                const res = await fetch('/config');
+                if (!res.ok) return false;
+                const cfg = await res.json();
+                return cfg.quick_mode_enabled === true;
+            })
+            .catch(() => false);
+    }
+
+    // ===== LOGS VISUALIZE — URL STATE =====
+
+    /**
+     * Wait until the URL carries the Visualize tab state, so a subsequent
+     * page.reload() actually exercises URL restoration instead of reloading a URL
+     * that has not been synced yet (updateUrlQueryParams runs asynchronously after
+     * the chart renders).
+     * @param {{ requireVisualizationData?: boolean, requireFunctionContent?: boolean, timeout?: number }} options
+     */
+    async waitForVisualizeUrlState({
+        requireVisualizationData = true,
+        requireFunctionContent = false,
+        timeout = 20000,
+    } = {}) {
+        await expect
+            .poll(
+                () => {
+                    const url = this.page.url();
+                    const hasToggle = url.includes('logs_visualize_toggle=visualize');
+                    const hasConfig =
+                        !requireVisualizationData || url.includes('visualization_data=');
+                    // functionContent is only written when transformType === "function"
+                    // AND tempFunctionContent is non-empty, so requiring it proves a VRL
+                    // body really is part of the restorable state before we reload.
+                    const hasVrl = !requireFunctionContent || url.includes('functionContent=');
+                    return hasToggle && hasConfig && hasVrl;
+                },
+                {
+                    timeout,
+                    message:
+                        'URL never picked up logs_visualize_toggle=visualize / visualization_data' +
+                        (requireFunctionContent ? ' / functionContent' : ''),
+                }
+            )
+            .toBe(true);
+        testLogger.info('URL carries the visualize tab state');
+    }
+
+    /**
+     * Decode the `visualization_data` URL param (base64-encoded JSON written by
+     * updateUrlQueryParams from dashboardPanelData). After a reload the app
+     * regenerates this param from its restored in-memory state, so comparing the
+     * pre- and post-reload payloads proves the restore actually repopulated the
+     * panel — not merely that the query string survived.
+     * @returns {Promise<object|null>} Decoded payload, or null if absent/unparsable.
+     */
+    async getVisualizationDataFromUrl() {
+        const raw = new URL(this.page.url()).searchParams.get('visualization_data');
+        if (!raw) return null;
+        try {
+            // URLSearchParams decodes a literal '+' as a space, and standard base64
+            // uses '+', so put those back before decoding.
+            const normalized = raw.replace(/ /g, '+');
+            return JSON.parse(Buffer.from(normalized, 'base64').toString('utf8'));
+        } catch (error) {
+            testLogger.warn(`Could not decode visualization_data: ${error.message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Assert the VRL (transform) editor currently contains the given text.
+     * @param {string} text - Substring expected in the editor.
+     */
+    async expectVrlEditorContains(text) {
+        await expect
+            .poll(async () => await this.getVrlEditorContent(), {
+                timeout: 15000,
+                message: `VRL editor never contained "${text}"`,
+            })
+            .toContain(text);
+        testLogger.info(`VRL editor contains "${text}"`);
     }
 
     /**
@@ -9911,70 +10360,50 @@ export class LogsPage {
      * @returns {Promise<string|null>} The current chart type or null
      */
     async getCurrentChartType() {
-        const chartTypes = ['bar', 'line', 'area', 'area-stacked', 'metric', 'table', 'scatter', 'pie', 'donut', 'h-bar', 'h-stacked', 'stacked', 'heatmap', 'gauge'];
-
-        for (const chartType of chartTypes) {
-            const chartItem = this.page.locator(this.chartTypeItem(chartType)).first();
-            const isVisible = await chartItem.isVisible().catch(() => false);
-            if (isVisible) {
-                const parent = chartItem.locator('..');
-                // Prefer data-selected attribute (ChartSelection.vue exposes it on the <li>).
-                // Fall back to legacy bg-grey-3/5 (framework) and bg-gray-200/400 (Tailwind).
-                const dataSelected = await parent.getAttribute('data-selected');
-                if (dataSelected === 'true') {
-                    testLogger.info(`Current chart type detected: ${chartType}`);
-                    return chartType;
-                }
-                if (dataSelected === null) {
-                    const parentClassList = (await parent.getAttribute('class')) || '';
-                    if (
-                        parentClassList.includes('bg-grey-3') ||
-                        parentClassList.includes('bg-grey-5') ||
-                        parentClassList.includes('bg-gray-200') ||
-                        parentClassList.includes('bg-gray-400')
-                    ) {
-                        testLogger.info(`Current chart type detected: ${chartType}`);
-                        return chartType;
-                    }
+        // ChartSelection.vue marks the selected chart on the <li> via
+        // :data-test-selected="item.id" (the inner div carries data-selected="true|false",
+        // so reading data-selected off the <li> always yields null). PanelEditor is
+        // mounted in both the Build and Visualize tabs via v-show, so filter to the
+        // visible instance with offsetParent — same approach as verifyChartTypeSelected.
+        const chartType = await this.page.evaluate(() => {
+            const items = document.querySelectorAll('[data-test-selected]');
+            for (const item of items) {
+                if (item.offsetParent !== null) {
+                    return item.getAttribute('data-test-selected');
                 }
             }
+            return null;
+        }).catch(() => null);
+
+        if (chartType) {
+            testLogger.info(`Current chart type detected: ${chartType}`);
+            return chartType;
         }
         testLogger.warn('No chart type detected as selected');
         return null;
     }
 
     /**
-     * Wait for any chart type to become selected (theme-aware).
-     * Uses page.waitForFunction for reliable detection of bg-grey-3/bg-grey-5
-     * directly in the DOM, surviving reactive re-renders across tab switches.
+     * Wait for any chart type to become selected and return its id.
+     * ChartSelection.vue sets :data-test-selected="item.id" on the selected <li>
+     * (and only on that one), so the attribute value IS the chart type. The inner
+     * div's data-selected="true|false" lives on a different element, and the legacy
+     * bg-grey and bg-gray classes no longer exist (the selected <li> now uses the
+     * bg-label-chip-url-bg token), so neither is a usable signal here.
      * @param {number} timeout - Max wait time in ms (default 20000)
      * @returns {Promise<string|null>} The selected chart type or null if timeout
      */
     async waitForChartTypeStabilized(timeout = 20000) {
         try {
-            // Use waitForFunction to detect bg-grey-3 or bg-grey-5 on chart selection items
-            // This is more reliable than Playwright locator polling during reactive re-renders
+            // waitForFunction rather than locator polling: the panel re-renders
+            // reactively across tab switches and URL restoration.
             const result = await this.page.waitForFunction(() => {
-                const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
+                const items = document.querySelectorAll('[data-test-selected]');
                 for (const item of items) {
-                    const classes = item.className || '';
-                    // Prefer data-selected attribute (ChartSelection.vue), fall back to legacy classes
-                    const dataSelected = item.getAttribute('data-selected');
-                    const matchesSelected = dataSelected === 'true' ||
-                        (dataSelected === null && (
-                            classes.includes('bg-grey-3') ||
-                            classes.includes('bg-grey-5') ||
-                            classes.includes('bg-gray-200') ||
-                            classes.includes('bg-gray-400')
-                        ));
-                    if (matchesSelected) {
-                        // Found selected item - extract chart type from child data-test attribute
-                        const section = item.querySelector('[data-test^="selected-chart-"][data-test$="-item"]');
-                        if (section) {
-                            const attr = section.getAttribute('data-test');
-                            const match = attr.match(/^selected-chart-(.+)-item$/);
-                            if (match) return match[1];
-                        }
+                    // PanelEditor is mounted in both Build and Visualize tabs via
+                    // v-show, so skip the hidden copy.
+                    if (item.offsetParent !== null) {
+                        return item.getAttribute('data-test-selected');
                     }
                 }
                 return null;
@@ -10111,13 +10540,7 @@ export class LogsPage {
     // VRL fields, Query Inspector, Sorting, and Highlight tests
     // ============================================================================
 
-    /**
-     * Get the logs table element
-     * @returns {Locator} - The logs table locator
-     */
-    getLogsTable() {
-        return this.page.locator(this.logsSearchResultLogsTable);
-    }
+
 
     /**
      * Wait for logs table to be visible
@@ -10235,13 +10658,7 @@ export class LogsPage {
         return this.page.locator(this.logsSearchResultTableRows).last();
     }
 
-    /**
-     * Get the first row expand menu
-     * @returns {Locator} - The first expand menu locator
-     */
-    getFirstRowExpandMenu() {
-        return this.page.locator(this.tableRowExpandMenu).first();
-    }
+
 
     /**
      * Check if log detail panel is visible
@@ -10445,7 +10862,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getLogsTableRows() {
-        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
+        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]');
     }
 
     /**
@@ -10453,7 +10870,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getFirstRowExpandMenu() {
-        return this.page.locator('[data-test="table-row-expand-menu"]').first();
+        return this.page.locator('[data-test^="o2-table-expand-"]').first();
     }
 
     /**
@@ -10584,31 +11001,57 @@ export class LogsPage {
     }
 
     /**
+     * Locate the results scroll container in the browser context and return it.
+     * Shared by getScrollContainerPosition()/scrollToResultsBottom() so both
+     * always act on the same element.
+     *
+     * The results table (`[data-test="logs-search-result-logs-table"]`) does not
+     * own the scrollbar itself — it delegates scrolling to an ancestor pane that
+     * it shares with the pinned histogram. So walk UP from the table to the
+     * nearest ancestor with a scrollable computed overflow-y, matched by computed
+     * style so class renames (or another move of the scroller) don't break it.
+     *
+     * Falls back to the older pagination sibling-walk for the patterns view,
+     * where the whole `scrollContainerRef` pane still scrolls as one.
+     * @returns {string} evaluate-able IIFE body returning the container element.
+     */
+    static _scrollContainerFinder() {
+        return `(() => {
+            const isScrollable = (el) => /(auto|scroll)/.test(getComputedStyle(el).overflowY);
+            // Logs view: the results table owns the scrollbar.
+            const table = document.querySelector('[data-test="logs-search-result-logs-table"]');
+            if (table) {
+                let el = table.parentElement;
+                while (el && el !== document.body) {
+                    if (isScrollable(el)) return el;
+                    el = el.parentElement;
+                }
+            }
+            // Patterns view / fallback: scrollable sibling below the pagination header.
+            const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
+            if (pagination) {
+                let el = pagination.parentElement;
+                while (el && el !== document.body) {
+                    const container = Array.from(el.children).find(
+                        (child) => !child.contains(pagination) && isScrollable(child)
+                    );
+                    if (container) return container;
+                    el = el.parentElement;
+                }
+            }
+            return null;
+        })()`;
+    }
+
+    /**
      * Get the scroll position (scrollTop) of the main results scroll container.
      * Call waitForResultsLoaded() first to ensure the container exists.
-     * Post design-token migration (#13173) the `.search-list` wrapper is gone:
-     * the scroller is the combined scroll area (`ref="scrollContainerRef"` in
-     * logs/SearchResult.vue), a scrollable sibling below the pagination header.
-     * Walk up from the pagination until an ancestor has a scrollable child
-     * that is not the header itself (matched by computed overflow-y, so class
-     * renames don't break it).
      * @returns {Promise<number>}
      */
     async getScrollContainerPosition() {
-        return await this.page.evaluate(() => {
-            const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
-            if (!pagination) return -1;
-            let el = pagination.parentElement;
-            while (el && el !== document.body) {
-                const container = Array.from(el.children).find(
-                    (child) => !child.contains(pagination) &&
-                        /(auto|scroll)/.test(getComputedStyle(child).overflowY)
-                );
-                if (container) return container.scrollTop;
-                el = el.parentElement;
-            }
-            return -1;
-        });
+        return await this.page.evaluate(
+            `(() => { const c = ${LogsPage._scrollContainerFinder()}; return c ? c.scrollTop : -1; })()`
+        );
     }
 
     /**
@@ -10617,22 +11060,9 @@ export class LogsPage {
      * Uses the same container discovery as getScrollContainerPosition().
      */
     async scrollToResultsBottom() {
-        await this.page.evaluate(() => {
-            const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
-            if (!pagination) return;
-            let el = pagination.parentElement;
-            while (el && el !== document.body) {
-                const container = Array.from(el.children).find(
-                    (child) => !child.contains(pagination) &&
-                        /(auto|scroll)/.test(getComputedStyle(child).overflowY)
-                );
-                if (container) {
-                    container.scrollTop = container.scrollHeight;
-                    return;
-                }
-                el = el.parentElement;
-            }
-        });
+        await this.page.evaluate(
+            `(() => { const c = ${LogsPage._scrollContainerFinder()}; if (c) c.scrollTop = c.scrollHeight; })()`
+        );
         await this.page.waitForTimeout(500);
     }
 
@@ -10787,7 +11217,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getTimestampColumnHeader() {
-        return this.page.locator('[data-test="log-search-result-table-th-timestamp"]');
+        return this.page.locator('[data-test="o2-table-th-timestamp"]');
     }
 
     /**
@@ -10795,7 +11225,16 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getSourceColumnHeader() {
-        return this.page.locator('[data-test="log-search-result-table-th-source"]');
+        return this.page.locator('[data-test="o2-table-th-source"]');
+    }
+
+    /**
+     * Get a logs result table column header by field name.
+     * @param {string} fieldName - The field/column name.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getTableHeaderByField(fieldName) {
+        return this.page.locator(`[data-test="o2-table-th-${fieldName}"]`);
     }
 
     /**
@@ -11209,5 +11648,290 @@ export class LogsPage {
         const option = this.page.locator(this.datetimeTimezoneOption(value));
         await option.waitFor({ state: 'visible', timeout: 10000 });
         await option.click();
+    }
+
+    // ──────────────────────────────────────────────
+    //  Quick Pick (No-Stream-Selected) helpers
+    // ──────────────────────────────────────────────
+
+    /**
+     * Waits for the sidebar quick pick container to become visible.
+     */
+    async expectQuickPickContainerVisible() {
+        const container = this.page.locator(this.quickPickContainer);
+        await container.waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Quick pick container is visible');
+    }
+
+    /**
+     * Asserts the sidebar quick pick container is NOT visible (hidden or detached).
+     * Uses toBeHidden() which covers both CSS hidden and DOM-detached states.
+     */
+    async expectQuickPickContainerNotVisible() {
+        const container = this.page.locator(this.quickPickContainer);
+        await expect(container, 'Quick pick container should not be visible after stream selection').toBeHidden({ timeout: 15000 });
+        testLogger.info('Quick pick container is not visible');
+    }
+
+    /**
+     * Clicks a quick pick stream button in the sidebar.
+     * @param {string} streamName — e.g. "e2e_automate"
+     */
+    async clickQuickPickButton(streamName) {
+        testLogger.info(`Clicking quick pick button for stream: ${streamName}`);
+        const btn = this.page.locator(this.quickPickButton(streamName));
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        await btn.click();
+    }
+
+    /**
+     * Seeds `count` logs streams named `${prefix}${i}` (1-based) by ingesting a
+     * single record into each. First-time ingestion creates the stream, so this
+     * is how the footer test pushes the org above the quick-pick limit (8) to make
+     * the "more" footer render. Returns the created stream names.
+     *
+     * Freshly-ingested streams have no computed stats yet, so they sort to the
+     * bottom of the quick pick (ordered by stats.doc_time_max desc) and do NOT
+     * displace already-active streams like e2e_automate. These streams are swept
+     * by cleanup.spec.js via the matching `${prefix}` regex.
+     * @param {string} prefix — e.g. "e2e_qp_more_stream_"
+     * @param {number} count
+     * @returns {Promise<string[]>}
+     */
+    async seedLogStreams(prefix, count) {
+        const names = [];
+        for (let i = 1; i <= count; i++) {
+            const name = `${prefix}${i}`;
+            await this.ingestData(name, [{
+                level: 'info',
+                job: 'quickpick_more_footer_seed',
+                message: `quick-pick more-footer seed record ${i}`,
+            }]);
+            names.push(name);
+        }
+        testLogger.info(`Seeded ${names.length} quick-pick streams`, { prefix });
+        return names;
+    }
+
+    /**
+     * Polls the streams API until every name in `names` is listed (logs type),
+     * so a subsequent page load reflects the newly-seeded streams. Best-effort:
+     * returns true once all appear, false on timeout.
+     * @param {string[]} names
+     * @param {number} timeout
+     */
+    async waitForStreamsListed(names, timeout = 20000) {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = getOrgIdentifier();
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/streams?type=logs`;
+        const deadline = Date.now() + timeout;
+        while (Date.now() < deadline) {
+            try {
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                const body = await res.json();
+                const existing = new Set((body.list || []).map((s) => s.name));
+                if (names.every((n) => existing.has(n))) {
+                    testLogger.info('All seeded streams are listed', { count: names.length });
+                    return true;
+                }
+            } catch (e) {
+                testLogger.debug(`waitForStreamsListed retry: ${e.message}`);
+            }
+            await this.page.waitForTimeout(1000);
+        }
+        testLogger.warn('Not all seeded streams listed before timeout', { names });
+        return false;
+    }
+
+    /**
+     * Deselects a stream from the logs stream selector's checkbox zone.
+     *
+     * The logs stream OSelect runs in multi-mode with rowClickSingleSelect=true.
+     * In that mode clicking an option's LABEL zone re-selects it (single-select
+     * replace), while clicking its CHECKBOX zone — the area left of the option's
+     * `[data-select-separator]` — lets Reka toggle it OFF. See OSelect.vue
+     * handleItemClickCapture. The generic `deselectStream` clicks the option row
+     * (label zone), so it cannot clear a single selected stream here — this helper
+     * clicks inside the checkbox zone instead, computing the x offset from the
+     * separator's position (falling back to a small fixed offset) so it stays
+     * correct if the checkbox/padding dimensions change.
+     * @param {string} streamName
+     */
+    async deselectStreamViaCheckbox(streamName) {
+        testLogger.info(`Deselecting stream via checkbox zone: ${streamName}`);
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        const popover = this.page.locator(this.indexDropDownPopover);
+        const search = this.page.locator(this.indexDropDownSearch);
+
+        if (await trigger.count() > 0) {
+            await trigger.click();
+        } else {
+            await this.page.locator(this.indexDropDown).click();
+        }
+        await popover.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Narrow the list so the target option is rendered even with many streams.
+        if (await search.count() > 0) {
+            await search.fill(streamName).catch(() => {});
+            await this.page.waitForTimeout(300);
+        }
+
+        const option = this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
+        ).first();
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        const box = await option.boundingBox();
+        // The checkbox zone spans from the option's left edge to the separator.
+        // Click its midpoint so Reka toggles the option off (instead of the label
+        // zone, which would re-select it). Derive the x from the separator's
+        // position; fall back to a small fixed offset if it can't be measured.
+        const sepBox = await option
+            .locator('[data-select-separator]')
+            .first()
+            .boundingBox()
+            .catch(() => null);
+        const x = (sepBox && box) ? Math.max(4, (sepBox.x - box.x) / 2) : 6;
+        await option.click({ position: { x, y: box ? box.height / 2 : 12 } });
+        await this.page.keyboard.press('Escape').catch(() => {});
+        testLogger.info(`Deselected stream via checkbox zone: ${streamName}`);
+    }
+
+    /**
+     * Returns the count of visible quick pick stream buttons in the sidebar.
+     * @returns {Promise<number>}
+     */
+    async getQuickPickButtonCount() {
+        const buttons = this.page.locator(this.quickPickButtonWildcard);
+        await buttons.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        return await buttons.count();
+    }
+
+    /**
+     * Asserts the quick pick "more" footer is visible.
+     */
+    async expectQuickPickMoreFooterVisible() {
+        const footer = this.page.locator(this.quickPickMoreFooter);
+        await expect(footer, 'Quick pick more footer should be visible').toBeVisible({ timeout: 10000 });
+        testLogger.info('Quick pick more footer is visible');
+    }
+
+    /**
+     * Waits for the hero-state "no stream selected" container to be visible.
+     */
+    async expectNoStreamHeroVisible() {
+        const hero = this.page.locator(this.noStreamHero);
+        await hero.waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('No-stream hero is visible');
+    }
+
+    /**
+     * Asserts the "Select a stream" hero card is visible.
+     */
+    async expectSelectStreamCardVisible() {
+        const card = this.page.locator(this.selectStreamCard);
+        await expect(card, 'Select stream card should be visible').toBeVisible({ timeout: 10000 });
+        testLogger.info('Select stream card is visible');
+    }
+
+    /**
+     * Asserts the "Read the query guide" hero card is visible.
+     */
+    async expectQueryGuideCardVisible() {
+        const card = this.page.locator(this.queryGuideCard);
+        await expect(card, 'Query guide card should be visible').toBeVisible({ timeout: 10000 });
+        testLogger.info('Query guide card is visible');
+    }
+
+    /**
+     * Clicks the "Select a stream" hero card.
+     */
+    async clickSelectStreamCard() {
+        testLogger.info('Clicking Select a stream card');
+        const card = this.page.locator(this.selectStreamCard);
+        await card.waitFor({ state: 'visible', timeout: 10000 });
+        await card.click();
+    }
+
+    /**
+     * Clicks the "Read the query guide" hero card.
+     */
+    async clickQueryGuideCard() {
+        testLogger.info('Clicking Query guide card');
+        const card = this.page.locator(this.queryGuideCard);
+        await card.waitFor({ state: 'visible', timeout: 10000 });
+        await card.click();
+    }
+
+    /**
+     * Asserts a recent-stream chip is visible in the hero state.
+     * @param {string} streamName
+     */
+    async expectRecentChipVisible(streamName) {
+        const chip = this.page.locator(this.recentChip(streamName));
+        await expect(chip, `Recent chip for ${streamName} should be visible`).toBeVisible({ timeout: 10000 });
+        testLogger.info(`Recent chip for ${streamName} is visible`);
+    }
+
+    /**
+     * Clicks a recent-stream chip in the hero state.
+     * @param {string} streamName
+     */
+    async clickRecentChip(streamName) {
+        testLogger.info(`Clicking recent chip for stream: ${streamName}`);
+        const chip = this.page.locator(this.recentChip(streamName));
+        await chip.waitFor({ state: 'visible', timeout: 10000 });
+        await chip.click();
+    }
+
+    /**
+     * Asserts the stream dropdown popover is visible.
+     */
+    async expectStreamDropdownPopoverVisible() {
+        const popover = this.page.locator(this.indexDropDownPopover);
+        await expect(popover, 'Stream dropdown popover should be visible').toBeVisible({ timeout: 10000 });
+        testLogger.info('Stream dropdown popover is visible');
+    }
+
+    /**
+     * Asserts the stream dropdown wrapper shows the selected stream name
+     * (i.e. the placeholder "Select Stream" has been replaced by a selected-item chip).
+     * Uses the wrapper div since OSelect renders selected items as tokens within it.
+     * @param {string} streamName
+     */
+    async expectStreamDropdownShowsStream(streamName) {
+        const wrapper = this.page.locator(this.indexDropDown);
+        await expect(wrapper, `Stream dropdown should show ${streamName}`).toContainText(streamName, { timeout: 10000 });
+        testLogger.info(`Stream dropdown shows stream: ${streamName}`);
+    }
+
+    /**
+     * Waits for the field list to settle after selecting a stream via quick pick.
+     * Resolves as soon as EITHER the fields table or the "no field found" text
+     * appears (both are valid post-selection states). THROWS if neither shows
+     * within the timeout — a stream whose field list silently never loads is a
+     * real failure, not a state to swallow.
+     */
+    async waitForFieldListAfterStreamSelection() {
+        // The logs field list renders one `logs-field-list-item-<name>` row per
+        // field (GroupedFieldList / FieldRow), or the "no field found" empty text
+        // when the stream has no fields. (The old `log-search-index-list-fields-table`
+        // data-test only exists in the traces IndexList, never the logs one.)
+        const fieldItem = this.page.locator('[data-test^="logs-field-list-item-"]').first();
+        const noField = this.page.locator(this.noFieldFoundText);
+        // Promise.any resolves on the first success and only rejects if BOTH
+        // waits time out (unlike Promise.race, which would reject on the first
+        // timeout even when the other locator is about to appear).
+        try {
+            await Promise.any([
+                fieldItem.waitFor({ state: 'visible', timeout: 20000 }),
+                noField.waitFor({ state: 'visible', timeout: 20000 }),
+            ]);
+        } catch {
+            throw new Error(
+                'Field list did not load after stream selection: neither the fields '
+                + 'table nor the "no field found" text appeared within 20s',
+            );
+        }
+        testLogger.info('Field list loaded after stream selection');
     }
 }

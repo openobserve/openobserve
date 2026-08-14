@@ -31,14 +31,12 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
-#[cfg(all(feature = "enterprise", feature = "vortex"))]
-use o2_enterprise::enterprise::search::vortex::{Utf8Compressor, VORTEX_RUNTIME};
-#[cfg(all(feature = "enterprise", feature = "vortex"))]
 use vortex::{
     VortexSessionDefault,
-    array::{ArrayRef, arrow::FromArrowArray},
-    dtype::{DType, arrow::FromArrowType},
-    file::{VortexWriteOptions, WriteStrategyBuilder},
+    array::ArrayRef,
+    arrow::{FromArrowArray, FromArrowType},
+    dtype::DType,
+    file::VortexWriteOptions,
     io::session::RuntimeSessionExt,
     session::VortexSession,
 };
@@ -47,6 +45,7 @@ use crate::datafusion::{
     exec::DataFusionContextBuilder,
     merge::{MergeParquetResult, append_metadata},
     table_provider::uniontable::NewUnionTable,
+    vortex::{VORTEX_RUNTIME, vortex_write_strategy},
 };
 
 const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
@@ -112,15 +111,8 @@ pub async fn merge_parquet_files_with_downsampling(
         FileFormat::Parquet => {
             write_downsampled_parquet(rx, &schema, bloom_filter_fields, metadata, &cfg).await?
         }
-        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         FileFormat::Vortex => {
             write_downsampled_vortex(rx, schema.clone(), cfg.compact.max_file_size as i64).await?
-        }
-        #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
-        FileFormat::Vortex => {
-            return Err(DataFusionError::Execution(
-                "Vortex file format requires enterprise and vortex features".to_string(),
-            ));
         }
     };
 
@@ -198,6 +190,7 @@ async fn write_downsampled_parquet(
     // Finalize last file if it has data
     if file_meta.records > 0 {
         file_meta.min_ts = last_min_ts;
+        append_metadata(&mut writer, &file_meta)?;
         writer.close().await?;
         bufs.push(buf);
         file_metas.push(file_meta);
@@ -206,7 +199,6 @@ async fn write_downsampled_parquet(
     Ok((bufs, file_metas))
 }
 
-#[cfg(all(feature = "enterprise", feature = "vortex"))]
 async fn write_downsampled_vortex(
     mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     schema: Arc<datafusion::arrow::datatypes::Schema>,
@@ -225,10 +217,8 @@ async fn write_downsampled_vortex(
             let session = VortexSession::default().with_tokio();
             let dtype = DType::from_arrow(schema.as_ref());
 
-            // Helper to create write options - need to recreate for each writer
-            let strategy = WriteStrategyBuilder::default()
-                .with_compressor(Utf8Compressor::default())
-                .build();
+            // Reuse the strategy across files; write options are recreated for each writer.
+            let strategy = vortex_write_strategy();
 
             let write_options =
                 VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
@@ -412,6 +402,40 @@ mod tests {
             ],
         )
         .unwrap()
+    }
+
+    /// Every downsampled file must carry its own meta in the parquet footer,
+    /// including the last one.
+    #[tokio::test]
+    async fn test_write_downsampled_parquet_writes_metadata_for_every_file() {
+        let schema = create_test_schema();
+        let batch = create_test_record_batch();
+
+        // one batch per file
+        let mut cfg = config::Config::default();
+        cfg.compact.max_file_size = 1;
+
+        let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+        tx.send(batch.clone()).await.unwrap();
+        tx.send(batch).await.unwrap();
+        drop(tx);
+
+        let (bufs, file_metas) =
+            write_downsampled_parquet(rx, &schema, &[], &FileMeta::default(), &cfg)
+                .await
+                .unwrap();
+
+        assert_eq!(bufs.len(), 2);
+        assert_eq!(file_metas.len(), 2);
+        for (buf, file_meta) in bufs.into_iter().zip(file_metas) {
+            let footer = config::utils::parquet::read_metadata_from_bytes(&bytes::Bytes::from(buf))
+                .await
+                .unwrap();
+            assert_eq!(footer.min_ts, file_meta.min_ts);
+            assert_eq!(footer.max_ts, file_meta.max_ts);
+            assert_eq!(footer.records, file_meta.records);
+            assert_eq!(footer.original_size, file_meta.original_size);
+        }
     }
 
     #[test]

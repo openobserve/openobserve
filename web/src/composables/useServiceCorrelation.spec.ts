@@ -67,10 +67,7 @@ vi.mock("@/utils/telemetryCorrelation", () => ({
 // ---------------------------------------------------------------------------
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import {
-  useServiceCorrelation,
-  clearSemanticGroupsCaches,
-} from "./useServiceCorrelation";
+import { useServiceCorrelation, clearSemanticGroupsCaches } from "./useServiceCorrelation";
 
 // ---------------------------------------------------------------------------
 // Shared test data
@@ -107,7 +104,7 @@ describe("useServiceCorrelation", () => {
 
     // Set up default mock implementations
     mockGetIdentityConfig.mockResolvedValue({
-      data: { sets: [], tracked_alias_ids: [] }
+      data: { sets: [], tracked_alias_ids: [] },
     });
     mockFilterDimensionsForCorrelation.mockReturnValue({});
   });
@@ -211,8 +208,7 @@ describe("useServiceCorrelation", () => {
 
     it("resets semanticGroups computed to empty array", async () => {
       mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
-      const { loadSemanticGroups, clearAllCaches, semanticGroups } =
-        useServiceCorrelation();
+      const { loadSemanticGroups, clearAllCaches, semanticGroups } = useServiceCorrelation();
 
       await loadSemanticGroups();
       clearAllCaches();
@@ -267,12 +263,7 @@ describe("useServiceCorrelation", () => {
       mockGetSemanticGroups.mockResolvedValue({ data: [] });
       const { findRelatedTelemetry, error } = useServiceCorrelation();
 
-      const result = await findRelatedTelemetry(
-        mockContext as any,
-        "logs",
-        5,
-        "my-stream"
-      );
+      const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "my-stream");
 
       expect(result).toBeNull();
       expect(error.value).toContain("No semantic groups available");
@@ -283,12 +274,7 @@ describe("useServiceCorrelation", () => {
       mockExtractSemanticDimensions.mockReturnValue({});
       const { findRelatedTelemetry, error } = useServiceCorrelation();
 
-      const result = await findRelatedTelemetry(
-        mockContext as any,
-        "logs",
-        5,
-        "my-stream"
-      );
+      const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "my-stream");
 
       expect(result).toBeNull();
       expect(error.value).toContain("No recognizable dimensions");
@@ -303,12 +289,7 @@ describe("useServiceCorrelation", () => {
 
       const { findRelatedTelemetry } = useServiceCorrelation();
 
-      const result = await findRelatedTelemetry(
-        mockContext as any,
-        "logs",
-        5,
-        "default"
-      );
+      const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "default");
 
       expect(mockCorrelate).toHaveBeenCalledWith(
         "test-org",
@@ -316,28 +297,25 @@ describe("useServiceCorrelation", () => {
           source_stream: "default",
           source_type: "logs",
           available_dimensions: { service_name: "api-service" },
-        })
+        }),
       );
       expect(result).not.toBeNull();
       expect(result!.service.service_name).toBe("api-service");
     });
 
-    it("returns null when correlate API returns null (no matching service)", async () => {
+    it("flags noMatch (not error) when correlate API returns null", async () => {
       mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
       mockExtractSemanticDimensions.mockReturnValue({ service_name: "api-service" });
       mockCorrelate.mockResolvedValue({ data: null });
 
-      const { findRelatedTelemetry, error } = useServiceCorrelation();
+      const { findRelatedTelemetry, error, noMatch } = useServiceCorrelation();
 
-      const result = await findRelatedTelemetry(
-        mockContext as any,
-        "logs",
-        5,
-        "default"
-      );
+      const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "default");
 
+      // F28: 200-null is a successful no-match, not an error.
       expect(result).toBeNull();
-      expect(error.value).toContain("No matching service found");
+      expect(noMatch.value).toBe(true);
+      expect(error.value).toBeNull();
     });
 
     it("sets enterprise feature error message for 403 response", async () => {
@@ -347,33 +325,26 @@ describe("useServiceCorrelation", () => {
 
       const { findRelatedTelemetry, error } = useServiceCorrelation();
 
-      const result = await findRelatedTelemetry(
-        mockContext as any,
-        "logs",
-        5,
-        "default"
-      );
+      const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "default");
 
       expect(result).toBeNull();
       expect(error.value).toContain("enterprise feature");
     });
 
-    it("sets 'no matching service' error message for 404 response", async () => {
+    it("sets a distinct (non-no-match) error message for a genuine 404 response", async () => {
       mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
       mockExtractSemanticDimensions.mockReturnValue({ service_name: "api-service" });
       mockCorrelate.mockRejectedValue({ response: { status: 404 } });
 
-      const { findRelatedTelemetry, error } = useServiceCorrelation();
+      const { findRelatedTelemetry, error, noMatch } = useServiceCorrelation();
 
-      const result = await findRelatedTelemetry(
-        mockContext as any,
-        "logs",
-        5,
-        "default"
-      );
+      const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "default");
 
+      // F28: the backend signals no-match with 200-null, never 404 — a real
+      // 404 must not be aliased to "no matching service".
       expect(result).toBeNull();
-      expect(error.value).toContain("No matching service found");
+      expect(noMatch.value).toBe(false);
+      expect(error.value).toContain("Correlation service not found");
     });
 
     it("includes correlationData in the returned result", async () => {
@@ -385,12 +356,7 @@ describe("useServiceCorrelation", () => {
 
       const { findRelatedTelemetry } = useServiceCorrelation();
 
-      const result = await findRelatedTelemetry(
-        mockContext as any,
-        "traces",
-        5,
-        "traces"
-      );
+      const result = await findRelatedTelemetry(mockContext as any, "traces", 5, "traces");
 
       expect(result!.correlationData).toEqual(MOCK_CORRELATION_RESPONSE);
     });

@@ -361,7 +361,9 @@ describe("TabsSettings", () => {
       await wrapper.vm.$nextTick();
 
       const saveButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-save"]');
-      const cancelButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]');
+      const cancelButton = wrapper.find(
+        '[data-test="dashboard-tab-settings-tab-name-edit-cancel"]',
+      );
 
       expect(saveButton.exists()).toBe(true);
       expect(cancelButton.exists()).toBe(true);
@@ -431,7 +433,9 @@ describe("TabsSettings", () => {
 
       expect(wrapper.vm.editTabId).toBe("tab1");
 
-      const cancelButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]');
+      const cancelButton = wrapper.find(
+        '[data-test="dashboard-tab-settings-tab-name-edit-cancel"]',
+      );
       await cancelButton.trigger("click");
 
       expect(wrapper.vm.editTabId).toBeNull();

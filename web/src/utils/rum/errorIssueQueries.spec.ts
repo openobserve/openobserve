@@ -38,9 +38,7 @@ afterEach(() => {
 // Helper: build a context with a full schema
 // ---------------------------------------------------------------------------
 
-function makeCtx(
-  overrides: Partial<IssueQueryContext> = {},
-): IssueQueryContext {
+function makeCtx(overrides: Partial<IssueQueryContext> = {}): IssueQueryContext {
   return {
     streamName: "_rumdata",
     timestampColumn: "_timestamp",
@@ -160,17 +158,45 @@ describe("buildIssuesSql", () => {
   it("includes FIRST_VALUE(error_id ORDER BY ...) AS latest_error_id", () => {
     const sql = buildIssuesSql(makeCtx());
 
-    expect(sql).toContain(
-      "FIRST_VALUE(error_id ORDER BY _timestamp DESC) AS latest_error_id",
-    );
+    expect(sql).toContain("FIRST_VALUE(error_id ORDER BY _timestamp DESC) AS latest_error_id");
   });
 
   it("groups by error_type, error_message, error_handling", () => {
     const sql = buildIssuesSql(makeCtx());
 
-    expect(sql).toContain(
-      "GROUP BY error_type, error_message, error_handling",
-    );
+    expect(sql).toContain("GROUP BY error_type, error_message, error_handling");
+  });
+
+  describe("when the stream has no error-signature columns", () => {
+    // A schema shape seen on mobile RUM streams: identity + service columns exist,
+    // but none of error_type / error_message / error_handling. The old builder
+    // emitted "GROUP BY  ORDER BY ..." which the SQL parser rejected.
+    const noSignatureSchema = {
+      service: true,
+      view_url: true,
+      session_id: true,
+      usr_id: true,
+    };
+
+    it("omits the GROUP BY clause entirely instead of emitting an empty one", () => {
+      const sql = buildIssuesSql(makeCtx({ schema: noSignatureSchema }));
+
+      expect(sql).not.toContain("GROUP BY");
+    });
+
+    it("does not leave a dangling 'GROUP BY  ORDER BY'", () => {
+      const sql = buildIssuesSql(makeCtx({ schema: noSignatureSchema }));
+
+      expect(sql).not.toMatch(/GROUP BY\s+ORDER BY/);
+    });
+
+    it("still selects the impact aggregates and orders by users_affected", () => {
+      const sql = buildIssuesSql(makeCtx({ schema: noSignatureSchema }));
+
+      expect(sql).toContain("COUNT(*) AS events");
+      expect(sql).toContain("COUNT(DISTINCT usr_id) AS users_affected");
+      expect(sql).toContain("ORDER BY users_affected DESC");
+    });
   });
 
   it("orders by users_affected DESC when user field is available", () => {
@@ -213,9 +239,7 @@ describe("buildIssuesSql", () => {
   });
 
   it("appends user query as AND (<query>) when non-empty", () => {
-    const sql = buildIssuesSql(
-      makeCtx({ userQuery: "user_agent LIKE '%Chrome%'" }),
-    );
+    const sql = buildIssuesSql(makeCtx({ userQuery: "user_agent LIKE '%Chrome%'" }));
 
     expect(sql).toContain("AND (user_agent LIKE '%Chrome%')");
   });
@@ -269,9 +293,7 @@ describe("buildIssuesSql", () => {
         }),
       );
 
-      expect(sql).toContain(
-        "WHEN error_handling_stack IS NOT NULL THEN error_handling_stack",
-      );
+      expect(sql).toContain("WHEN error_handling_stack IS NOT NULL THEN error_handling_stack");
       expect(sql).not.toContain("WHEN error_stack IS NOT NULL THEN error_stack");
     });
 
@@ -287,9 +309,7 @@ describe("buildIssuesSql", () => {
         }),
       );
 
-      expect(sql).toContain(
-        "WHEN error_stack IS NOT NULL THEN error_stack",
-      );
+      expect(sql).toContain("WHEN error_stack IS NOT NULL THEN error_stack");
       expect(sql).not.toContain("error_handling_stack");
     });
 
@@ -339,21 +359,31 @@ describe("buildErrorsHistogramSql", () => {
   });
 
   it("appends user query when non-empty", () => {
-    const sql = buildErrorsHistogramSql(
-      makeCtx({ userQuery: "env='prod'" }),
-      "1 hour",
-    );
+    const sql = buildErrorsHistogramSql(makeCtx({ userQuery: "env='prod'" }), "1 hour");
 
     expect(sql).toContain("AND (env='prod')");
   });
 
   it("appends service filter when service is set", () => {
-    const sql = buildErrorsHistogramSql(
-      makeCtx({ service: "checkout" }),
-      "1 hour",
-    );
+    const sql = buildErrorsHistogramSql(makeCtx({ service: "checkout" }), "1 hour");
 
     expect(sql).toContain("AND service='checkout'");
+  });
+
+  describe("when the stream has no error_handling column", () => {
+    const noHandlingSchema = { session_id: true, usr_id: true };
+
+    it("does not reference the absent error_handling column", () => {
+      const sql = buildErrorsHistogramSql(makeCtx({ schema: noHandlingSchema }), "5 minute");
+
+      expect(sql).not.toContain("error_handling");
+    });
+
+    it("groups by ts only", () => {
+      const sql = buildErrorsHistogramSql(makeCtx({ schema: noHandlingSchema }), "5 minute");
+
+      expect(sql).toContain("GROUP BY ts ORDER BY ts");
+    });
   });
 });
 
@@ -371,6 +401,16 @@ describe("buildTrendsSql", () => {
     expect(buildTrendsSql(makeCtx(), "5 minute", [longMsg])).toBeNull();
   });
 
+  it("returns null when the stream has no error-signature columns", () => {
+    const sql = buildTrendsSql(
+      makeCtx({ schema: { session_id: true, usr_id: true } }),
+      "5 minute",
+      ["TypeError: fail"],
+    );
+
+    expect(sql).toBeNull();
+  });
+
   it("drops messages longer than MAX_TREND_MESSAGE_LEN but keeps valid ones", () => {
     const longMsg = "x".repeat(MAX_TREND_MESSAGE_LEN + 1);
     const shortMsg = "TypeError: fail";
@@ -383,10 +423,7 @@ describe("buildTrendsSql", () => {
   });
 
   it("includes AND error_message IN (...) with escaped messages", () => {
-    const sql = buildTrendsSql(makeCtx(), "5 minute", [
-      "TypeError: fail",
-      "o'clock error",
-    ]);
+    const sql = buildTrendsSql(makeCtx(), "5 minute", ["TypeError: fail", "o'clock error"]);
 
     expect(sql).toContain("AND error_message IN (");
     expect(sql).toContain("'TypeError: fail'");
@@ -412,11 +449,7 @@ describe("buildTrendsSql", () => {
   });
 
   it("appends user query when non-empty", () => {
-    const sql = buildTrendsSql(
-      makeCtx({ userQuery: "env='prod'" }),
-      "5 minute",
-      ["fail"],
-    );
+    const sql = buildTrendsSql(makeCtx({ userQuery: "env='prod'" }), "5 minute", ["fail"]);
 
     expect(sql).toContain("AND (env='prod')");
   });
@@ -424,9 +457,7 @@ describe("buildTrendsSql", () => {
   it("includes group fields in GROUP BY", () => {
     const sql = buildTrendsSql(makeCtx(), "5 minute", ["fail"]);
 
-    expect(sql).toContain(
-      "GROUP BY ts, error_type, error_message, error_handling",
-    );
+    expect(sql).toContain("GROUP BY ts, error_type, error_message, error_handling");
   });
 });
 
@@ -502,9 +533,7 @@ describe("buildDenominatorsSql", () => {
   });
 
   it("does NOT apply user query even when ctx.userQuery is set", () => {
-    const sql = buildDenominatorsSql(
-      makeCtx({ userQuery: "user_agent='Chrome'" }),
-    );
+    const sql = buildDenominatorsSql(makeCtx({ userQuery: "user_agent='Chrome'" }));
 
     expect(sql).not.toContain("AND (user_agent='Chrome')");
   });
@@ -627,9 +656,7 @@ describe("pivotStackedHistogram", () => {
 
   it("ignores hits that fall outside the window range", () => {
     // A timestamp 2 hours after windowEnd
-    const outOfRangeTs = new Date(
-      windowEnd / 1000 + 2 * 60 * 60 * 1000,
-    ).toISOString();
+    const outOfRangeTs = new Date(windowEnd / 1000 + 2 * 60 * 60 * 1000).toISOString();
     const hits = [{ ts: outOfRangeTs, error_handling: "handled", events: 99 }];
 
     const buckets = pivotStackedHistogram(hits, windowStart, windowEnd, intervalMicros);
@@ -654,9 +681,7 @@ describe("pivotStackedHistogram", () => {
 
   it("places hits in the correct bucket index", () => {
     // 7 minutes into window → bucket index 1 (5-10 min range)
-    const sevenMinTs = new Date(
-      windowStart / 1000 + 7 * 60 * 1000,
-    ).toISOString();
+    const sevenMinTs = new Date(windowStart / 1000 + 7 * 60 * 1000).toISOString();
     const hits = [{ ts: sevenMinTs, error_handling: "handled", events: 4 }];
 
     const buckets = pivotStackedHistogram(hits, windowStart, windowEnd, intervalMicros);
@@ -692,7 +717,13 @@ describe("pivotTrends", () => {
   it("creates a zero-filled array of length 12 for each issue key", () => {
     const ts = new Date(windowStart / 1000 + 2 * 60 * 1000).toISOString();
     const hits = [
-      { ts, error_type: "TypeError", error_message: "fail", error_handling: "unhandled", events: 1 },
+      {
+        ts,
+        error_type: "TypeError",
+        error_message: "fail",
+        error_handling: "unhandled",
+        events: 1,
+      },
     ];
 
     const result = pivotTrends(hits, windowStart, windowEnd, intervalMicros);
@@ -705,7 +736,13 @@ describe("pivotTrends", () => {
     // 7 min into window → bucket index 1
     const ts = new Date(windowStart / 1000 + 7 * 60 * 1000).toISOString();
     const hits = [
-      { ts, error_type: "TypeError", error_message: "fail", error_handling: "unhandled", events: 3 },
+      {
+        ts,
+        error_type: "TypeError",
+        error_message: "fail",
+        error_handling: "unhandled",
+        events: 3,
+      },
     ];
 
     const result = pivotTrends(hits, windowStart, windowEnd, intervalMicros);
@@ -719,8 +756,20 @@ describe("pivotTrends", () => {
     const ts1 = new Date(windowStart / 1000 + 1 * 60 * 1000).toISOString();
     const ts2 = new Date(windowStart / 1000 + 2 * 60 * 1000).toISOString();
     const hits = [
-      { ts: ts1, error_type: "TypeError", error_message: "fail", error_handling: "unhandled", events: 2 },
-      { ts: ts2, error_type: "TypeError", error_message: "fail", error_handling: "unhandled", events: 3 },
+      {
+        ts: ts1,
+        error_type: "TypeError",
+        error_message: "fail",
+        error_handling: "unhandled",
+        events: 2,
+      },
+      {
+        ts: ts2,
+        error_type: "TypeError",
+        error_message: "fail",
+        error_handling: "unhandled",
+        events: 3,
+      },
     ];
 
     const result = pivotTrends(hits, windowStart, windowEnd, intervalMicros);
@@ -732,8 +781,20 @@ describe("pivotTrends", () => {
   it("creates separate entries for different issue keys", () => {
     const ts = new Date(windowStart / 1000 + 1 * 60 * 1000).toISOString();
     const hits = [
-      { ts, error_type: "TypeError", error_message: "fail", error_handling: "unhandled", events: 1 },
-      { ts, error_type: "ReferenceError", error_message: "boom", error_handling: "handled", events: 2 },
+      {
+        ts,
+        error_type: "TypeError",
+        error_message: "fail",
+        error_handling: "unhandled",
+        events: 1,
+      },
+      {
+        ts,
+        error_type: "ReferenceError",
+        error_message: "boom",
+        error_handling: "handled",
+        events: 2,
+      },
     ];
 
     const result = pivotTrends(hits, windowStart, windowEnd, intervalMicros);
@@ -744,7 +805,13 @@ describe("pivotTrends", () => {
   it("ignores hits outside the window range", () => {
     const outTs = new Date(windowEnd / 1000 + 60 * 60 * 1000).toISOString();
     const hits = [
-      { ts: outTs, error_type: "TypeError", error_message: "fail", error_handling: "unhandled", events: 99 },
+      {
+        ts: outTs,
+        error_type: "TypeError",
+        error_message: "fail",
+        error_handling: "unhandled",
+        events: 99,
+      },
     ];
 
     const result = pivotTrends(hits, windowStart, windowEnd, intervalMicros);

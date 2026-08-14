@@ -21,30 +21,25 @@ describe("renderPanelSql", () => {
   // just the first. SQL templates often reference {{stream}} multiple
   // times (e.g. inside a CTE plus an outer SELECT).
   it("replaces every {{stream}} occurrence and quotes the identifier", () => {
-    const sql = renderPanelSql(
-      "SELECT * FROM {{stream}} JOIN {{stream}} s ON true",
-      { stream: "traces", startTime: 1, endTime: 2, interval: "1 minute" },
-    );
-    expect(sql).toBe(
-      `SELECT * FROM "traces" JOIN "traces" s ON true`,
-    );
+    const sql = renderPanelSql("SELECT * FROM {{stream}} JOIN {{stream}} s ON true", {
+      stream: "traces",
+      startTime: 1,
+      endTime: 2,
+      interval: "1 minute",
+    });
+    expect(sql).toBe(`SELECT * FROM "traces" JOIN "traces" s ON true`);
   });
 
   // start/end times are stamped in raw, unquoted — DataFusion expects them
   // as numeric literals on the WHERE side of the query.
   it("substitutes startTime / endTime as raw numbers (no quotes)", () => {
-    const sql = renderPanelSql(
-      "WHERE _timestamp BETWEEN {{startTime}} AND {{endTime}}",
-      {
-        stream: "x",
-        startTime: 1_700_000_000_000_000,
-        endTime: 1_700_000_900_000_000,
-        interval: "1 minute",
-      },
-    );
-    expect(sql).toBe(
-      "WHERE _timestamp BETWEEN 1700000000000000 AND 1700000900000000",
-    );
+    const sql = renderPanelSql("WHERE _timestamp BETWEEN {{startTime}} AND {{endTime}}", {
+      stream: "x",
+      startTime: 1_700_000_000_000_000,
+      endTime: 1_700_000_900_000_000,
+      interval: "1 minute",
+    });
+    expect(sql).toBe("WHERE _timestamp BETWEEN 1700000000000000 AND 1700000900000000");
     // No accidental wrapping in quotes.
     expect(sql).not.toContain(`'1700000000000000'`);
     expect(sql).not.toContain(`"1700000900000000"`);
@@ -55,10 +50,12 @@ describe("renderPanelSql", () => {
   // add the quotes — verify it leaves the value verbatim and trusts the
   // template author.
   it("substitutes {{interval}} verbatim without adding quotes", () => {
-    const sql = renderPanelSql(
-      "histogram(_timestamp, '{{interval}}')",
-      { stream: "x", startTime: 1, endTime: 2, interval: "5 minutes" },
-    );
+    const sql = renderPanelSql("histogram(_timestamp, '{{interval}}')", {
+      stream: "x",
+      startTime: 1,
+      endTime: 2,
+      interval: "5 minutes",
+    });
     expect(sql).toBe("histogram(_timestamp, '5 minutes')");
   });
 
@@ -285,9 +282,7 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
   // query the wrong table on stream switches.
   it("every panel SQL references the {{stream}} placeholder", () => {
     for (const p of LLM_INSIGHTS_PANELS) {
-      expect(p.query.sql, `panel ${p.id} sql missing {{stream}}`).toContain(
-        "{{stream}}",
-      );
+      expect(p.query.sql, `panel ${p.id} sql missing {{stream}}`).toContain("{{stream}}");
     }
   });
 
@@ -311,10 +306,7 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     const bars = LLM_INSIGHTS_PANELS.filter((p) => p.type === "horizontal-bar");
     expect(bars.length).toBeGreaterThan(0);
     for (const p of bars) {
-      expect(
-        p.query.seriesField,
-        `panel ${p.id} missing seriesField`,
-      ).toBeTruthy();
+      expect(p.query.seriesField, `panel ${p.id} missing seriesField`).toBeTruthy();
       const hasValue = !!p.query.valueField || (p.series?.length ?? 0) > 0;
       expect(hasValue, `panel ${p.id} missing valueField/series`).toBe(true);
     }
@@ -334,9 +326,7 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
   // Latency by model renders grouped bars — one Y series per percentile.
   // Each series must declare a field/label/color so the chart + legend render.
   it("latency-by-model declares grouped percentile series", () => {
-    const latency = LLM_INSIGHTS_PANELS.find(
-      (p) => p.id === "latency-by-model",
-    );
+    const latency = LLM_INSIGHTS_PANELS.find((p) => p.id === "latency-by-model");
     expect(latency).toBeTruthy();
     expect(latency!.series?.length ?? 0).toBeGreaterThan(1);
     for (const s of latency!.series!) {
@@ -349,9 +339,7 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
   // The "Recent errors" table renders an Operation column and a Trace ID
   // (View) link. Both are required for the panel's UX to be useful.
   it("recent-errors panel exposes operation + trace_id columns", () => {
-    const recentErrors = LLM_INSIGHTS_PANELS.find(
-      (p: LLMPanelDef) => p.id === "recent-errors",
-    );
+    const recentErrors = LLM_INSIGHTS_PANELS.find((p: LLMPanelDef) => p.id === "recent-errors");
     expect(recentErrors).toBeTruthy();
     const fields = recentErrors!.columns!.map((c) => c.field);
     expect(fields).toContain("operation");

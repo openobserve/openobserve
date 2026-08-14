@@ -69,10 +69,7 @@ const useTraceDetails = (span: Ref<any> | ComputedRef<any>) => {
 
   const spanStatusCode = computed(() => {
     if (!span.value) return null;
-    const code =
-      span.value["http_status_code"] ??
-      span.value["http_response_status_code"] ??
-      null;
+    const code = span.value["http_status_code"] ?? span.value["http_response_status_code"] ?? null;
     if (code === null || code === undefined) return null;
     const num = parseInt(String(code), 10);
     if (isNaN(num)) return null;
@@ -81,29 +78,20 @@ const useTraceDetails = (span: Ref<any> | ComputedRef<any>) => {
 
   const spanGrpcStatusCode = computed(() => {
     if (!span.value) return null;
-    const code =
-      span.value["rpc_grpc_status_code"] ??
-      span.value["grpc_status_code"] ??
-      null;
+    const code = span.value["rpc_grpc_status_code"] ?? span.value["grpc_status_code"] ?? null;
     if (code === null || code === undefined) return null;
     const num = parseInt(String(code), 10);
     if (isNaN(num)) return null;
     return num !== 0 ? String(code) : null;
   });
 
-  const spanGrpcErrorName = computed(
-    () => span.value?.["grpc_error_name"] ?? null,
-  );
+  const spanGrpcErrorName = computed(() => span.value?.["grpc_error_name"] ?? null);
 
-  const spanGrpcErrorMessage = computed(
-    () => span.value?.["grpc_error_message"] ?? null,
-  );
+  const spanGrpcErrorMessage = computed(() => span.value?.["grpc_error_message"] ?? null);
 
   const spanErrorType = computed(() => span.value?.["error_type"] ?? null);
 
-  const spanDbResponseStatusCode = computed(
-    () => span.value?.["db_response_status_code"] ?? null,
-  );
+  const spanDbResponseStatusCode = computed(() => span.value?.["db_response_status_code"] ?? null);
 
   const spanProcessExitCode = computed(() => {
     if (!span.value) return null;
@@ -115,8 +103,7 @@ const useTraceDetails = (span: Ref<any> | ComputedRef<any>) => {
 
   const hasSpanError = computed(() => {
     const isErrorStatus =
-      span.value?.span_status === SpanStatus.ERROR ||
-      span.value?.span_status === "ERROR";
+      span.value?.span_status === SpanStatus.ERROR || span.value?.span_status === "ERROR";
     if (isErrorStatus) return true;
     if (hasExceptionEvents.value.length > 0) return true;
     if (spanErrorType.value) return true;

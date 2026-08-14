@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import i18nInstance from "@/locales";
+
+const t = (i18nInstance.global as any).t;
 import useNotifications from "@/composables/useNotifications";
 import { toastRecords } from "@/lib/feedback/Toast/useToast";
 
@@ -61,9 +64,7 @@ describe("useNotifications composable", () => {
 
   describe("showConfictErrorNotificationWithRefreshBtn", () => {
     it("should add an error toast with timeout 0 and a Refresh action", () => {
-      notifications.showConfictErrorNotificationWithRefreshBtn(
-        "Conflict error occurred",
-      );
+      notifications.showConfictErrorNotificationWithRefreshBtn("Conflict error occurred", t);
       expect(toastRecords).toHaveLength(1);
       expect(toastRecords[0].variant).toBe("error");
       expect(toastRecords[0].timeout).toBe(0);
@@ -76,15 +77,13 @@ describe("useNotifications composable", () => {
         value: { reload: mockReload },
         writable: true,
       });
-      notifications.showConfictErrorNotificationWithRefreshBtn(
-        "Conflict error occurred",
-      );
+      notifications.showConfictErrorNotificationWithRefreshBtn("Conflict error occurred", t);
       toastRecords[0].action?.handler();
       expect(mockReload).toHaveBeenCalled();
     });
 
     it("should remain visible after default timeout (timeout: 0)", () => {
-      notifications.showConfictErrorNotificationWithRefreshBtn("Conflict");
+      notifications.showConfictErrorNotificationWithRefreshBtn("Conflict", t);
       vi.advanceTimersByTime(30000);
       expect(toastRecords[0].open).toBe(true);
     });

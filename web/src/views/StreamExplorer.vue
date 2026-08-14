@@ -10,6 +10,7 @@
       :is-loading="isLoading"
       @change:date-time="updateDateTime"
     />
+    <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div class="h-[calc(100vh-197px)]">
       <OTable
         data-test="stream-explorer-results-table"
@@ -30,7 +31,7 @@
         @pagination-change="onPaginationChange"
       >
         <template #empty>
-          <no-data />
+          <NoData />
         </template>
       </OTable>
     </div>
@@ -41,7 +42,7 @@
 import { onBeforeMount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
 
 import SearchBar from "@/components/logstream/explore/SearchBar.vue";
@@ -59,7 +60,7 @@ type SearchBarInstance = InstanceType<typeof SearchBar>;
 
 const store = useStore();
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const streamData = ref<any>(null);
 const searchBarRef = ref<SearchBarInstance | null>(null);
@@ -182,15 +183,12 @@ function buildSearch() {
       },
     };
 
-    var timestamps:
-      | {
-          startTime: number;
-          endTime: number;
-        }
-      | null =
+    var timestamps: {
+      startTime: number;
+      endTime: number;
+    } | null =
       queryData.value.dateTime.type === "relative"
-        ? getConsumableRelativeTime(queryData.value.dateTime.relativeTimePeriod) ||
-          null
+        ? getConsumableRelativeTime(queryData.value.dateTime.relativeTimePeriod) || null
         : cloneDeep(queryData.value.dateTime);
 
     if (streamData?.value?.stream_type === "enrichment_tables") {

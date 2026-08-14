@@ -36,7 +36,7 @@ const pickerSubmit = vi.fn();
 vi.mock("@/components/flow/forms/DestinationPicker.vue", () => ({
   default: {
     name: "DestinationPicker",
-    props: ["initialName"],
+    props: ["initialName", "forcedType"],
     emits: ["expand"],
     methods: {
       submit: (...args: any[]) => pickerSubmit(...args),
@@ -54,8 +54,7 @@ function createWrapper() {
   });
 }
 
-const picker = (wrapper: any) =>
-  wrapper.findComponent({ name: "DestinationPicker" });
+const picker = (wrapper: any) => wrapper.findComponent({ name: "DestinationPicker" });
 
 describe("WorkflowDestination", () => {
   beforeEach(() => {
@@ -70,9 +69,7 @@ describe("WorkflowDestination", () => {
   describe("props passed to the shared DestinationPicker", () => {
     it("renders the body and the shared picker", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="workflow-destination-body"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-destination-body"]').exists()).toBe(true);
       expect(picker(wrapper).exists()).toBe(true);
     });
 
@@ -97,6 +94,11 @@ describe("WorkflowDestination", () => {
       } as any;
       const wrapper = createWrapper();
       expect(picker(wrapper).props("initialName")).toBe("sink-a");
+    });
+
+    it("locks the inline create form to Custom (workflows only support custom)", () => {
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("forcedType")).toBe("custom");
     });
   });
 
@@ -130,9 +132,10 @@ describe("WorkflowDestination", () => {
         template_override: null,
       });
       // the picker's org_id is NOT carried into the workflow node payload
-      expect(
-        Object.keys(await (wrapper.vm as any).submit()),
-      ).toEqual(["destination_id", "template_override"]);
+      expect(Object.keys(await (wrapper.vm as any).submit())).toEqual([
+        "destination_id",
+        "template_override",
+      ]);
     });
 
     it("preserves an existing template_override from the saved node data", async () => {

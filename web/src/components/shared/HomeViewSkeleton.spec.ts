@@ -19,7 +19,6 @@ import HomeViewSkeleton from "./HomeViewSkeleton.vue";
 import { createStore } from "vuex";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
-
 describe("HomeViewSkeleton", () => {
   let store: any;
 

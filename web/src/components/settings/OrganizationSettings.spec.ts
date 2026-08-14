@@ -40,8 +40,7 @@ vi.mock("@/services/organizations", () => ({
 }));
 
 import organizations from "@/services/organizations";
-const mockPostOrganizationSettings =
-  organizations.post_organization_settings as any;
+const mockPostOrganizationSettings = organizations.post_organization_settings as any;
 
 // Mock useStore to return our test store
 vi.mock("vuex", () => ({
@@ -139,28 +138,16 @@ describe("OrganizationSettings", () => {
 
     it("should render trace and span ID field inputs (data-tests preserved)", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="settings-org-trace-id-input"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="settings-org-span-id-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="settings-org-trace-id-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="settings-org-span-id-input"]').exists()).toBe(true);
     });
 
     it("should render the ingestion + usage stream toggles (data-tests preserved)", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="add-toggle-ingestion"]').exists()).toBe(
-        true,
-      );
-      expect(
-        wrapper.find('[data-test="add-toggle-ingestion-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="add-toggle-usage-stream"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="add-toggle-usage-stream-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-toggle-ingestion"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-toggle-ingestion-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-toggle-usage-stream"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-toggle-usage-stream-btn"]').exists()).toBe(true);
     });
 
     it("should render the save button and keep it enabled (R3)", () => {
@@ -364,9 +351,7 @@ describe("OrganizationSettings", () => {
 
     it("should render CrossLinkManager when cross-linking is enabled", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="cross-link-manager"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="cross-link-manager"]').exists()).toBe(true);
     });
 
     it("should update crossLinks when the store watch triggers", async () => {
@@ -378,9 +363,7 @@ describe("OrganizationSettings", () => {
       };
       await nextTick();
 
-      expect(wrapper.vm.crossLinks).toEqual([
-        { sourceField: "trace_id", targetOrg: "other-org" },
-      ]);
+      expect(wrapper.vm.crossLinks).toEqual([{ sourceField: "trace_id", targetOrg: "other-org" }]);
     });
 
     it("should include crossLinks in the submit payload", async () => {

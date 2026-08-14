@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-
 // Mock getBoundingClientRect
 const mockGetBoundingClientRect = vi.fn(() => ({
   top: 100,
@@ -35,8 +34,7 @@ const mockGetBoundingClientRect = vi.fn(() => ({
 }));
 
 // Helpers to query the teleported content directly from document.body
-const getUserGuideEl = (): HTMLElement | null =>
-  document.body.querySelector(".user-guide");
+const getUserGuideEl = (): HTMLElement | null => document.body.querySelector(".user-guide");
 const getHighlightEls = (): HTMLElement[] =>
   Array.from(document.body.querySelectorAll(".user-guide .bg-highlight-bg"));
 const getGuideText = (): string => getUserGuideEl()?.textContent ?? "";
@@ -80,9 +78,7 @@ describe("DrilldownUserGuide", () => {
     it("should render user guide button", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="dashboard-drilldown-help-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-drilldown-help-btn"]').exists()).toBe(true);
     });
 
     it("should render help icon", () => {
@@ -97,9 +93,7 @@ describe("DrilldownUserGuide", () => {
 
       // Test that the component contains tooltip-related content
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-drilldown-help-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-drilldown-help-btn"]').exists()).toBe(true);
     });
 
     it("should not show user guide initially", () => {

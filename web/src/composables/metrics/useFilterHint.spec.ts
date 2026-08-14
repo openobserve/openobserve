@@ -45,9 +45,7 @@ describe("useFilterHint", () => {
       // Chips are ANDed, PromQL has no selector-level OR, and this engine
       // rejects `or` matchers — so `=~ "a|b"` is the ONLY way to say "either of
       // these", and nothing else on screen teaches it.
-      expect(prompts.some((p) => p.includes("=~") && p.includes("|"))).toBe(
-        true,
-      );
+      expect(prompts.some((p) => p.includes("=~") && p.includes("|"))).toBe(true);
     });
 
     it("covers the operators a user cannot guess, not just the obvious =", () => {

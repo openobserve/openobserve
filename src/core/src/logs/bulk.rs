@@ -20,7 +20,7 @@ use std::{
 
 use axum::body::Bytes;
 #[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_self_reporting_stream;
+use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     BLOCKED_STREAMS, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
@@ -32,15 +32,15 @@ use config::{
     },
 };
 use infra::errors::Result;
+use ingestion_common::{
+    BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
+};
+use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
 use crate::{
     ingestion::check_ingestion_allowed,
-    ingestion_types::{
-        BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
-    },
     logs::{ingestion_log_enabled, log_failed_record},
-    schema::{get_future_discard_error, get_upto_discard_error},
 };
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
@@ -50,7 +50,7 @@ pub async fn ingest(
     thread_id: usize,
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_types::IngestUser,
+    user: ingestion_common::IngestUser,
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
 
@@ -150,7 +150,7 @@ pub async fn ingest(
             // non-bulk `IngestionRequest::Usage` channel), so this is safe.
             // Cloud-only: OSS / self-hosted may legitimately use these names.
             #[cfg(feature = "cloud")]
-            if is_reserved_self_reporting_stream(&stream_name) {
+            if is_reserved_internal_stream(&stream_name) {
                 let err_msg =
                     format!("stream '{stream_name}' is reserved and cannot be ingested into");
                 log::warn!("[LOGS:BULK] {err_msg}");
@@ -403,8 +403,9 @@ pub fn add_record_status(
 
 #[cfg(test)]
 mod tests {
+    use ingestion_common::IngestUser;
+
     use super::*;
-    use crate::ingestion_types::IngestUser;
 
     #[test]
     fn test_add_record_status() {

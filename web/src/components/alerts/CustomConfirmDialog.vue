@@ -15,14 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="custom-confirm-dialog"
+  <ODialog
+    data-test="custom-confirm-dialog"
     v-model:open="isVisible"
     size="sm"
-    :title="title"
+    :title="resolvedTitle"
     persistent
     :show-close="false"
-    secondary-button-label="Cancel"
-    primary-button-label="Clear & Continue"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('confirmDialog.clearAndContinue')"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
@@ -33,8 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
+import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "CustomConfirmDialog",
@@ -45,23 +47,26 @@ export default defineComponent({
       default: false,
     },
     title: {
-      type: String,
-      default: "Confirm Action",
+      type: String as unknown as PropType<I18nText>,
+      // Resolved in setup, not here: a literal default would ship untranslated,
+      // and t() at module scope would freeze the copy at page-load locale.
+      default: undefined,
     },
     message: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
   },
   emits: ["update:modelValue", "confirm", "cancel"],
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const isVisible = ref(props.modelValue);
 
     watch(
       () => props.modelValue,
       (newVal) => {
         isVisible.value = newVal;
-      }
+      },
     );
 
     watch(isVisible, (newVal) => {
@@ -73,15 +78,20 @@ export default defineComponent({
       emit("cancel");
     };
 
+    const resolvedTitle = computed(() => props.title ?? t("common.confirmAction"));
+
     const onConfirm = () => {
       isVisible.value = false;
       emit("confirm");
     };
 
     return {
+      raw,
+      resolvedTitle,
       isVisible,
       onCancel,
       onConfirm,
+      t,
     };
   },
 });

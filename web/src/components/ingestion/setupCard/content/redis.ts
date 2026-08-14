@@ -18,6 +18,8 @@
 // Redis needs no monitoring user — the receiver connects with an optional AUTH
 // password — so there is no "prepare" step.
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants } from "./otelShared";
@@ -52,34 +54,44 @@ export default function redisCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Redis",
-      tagline:
-        "Collect Redis metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.redisTagline"),
       logo: getImageURL("images/ingestion/redis.svg"),
       tone: "#DC382D",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       collectorInstallStep(),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variantGroup: "os",
         variantToggle: false,
         inputs: [
-          { id: "host", label: "Redis Host", default: "localhost", placeholder: "localhost" },
-          { id: "port", label: "Port", default: "6379", placeholder: "6379", width: "sm" },
+          {
+            id: "host",
+            labelKey: "ingestion.setupCard.redisHostLabel",
+            default: "localhost",
+            placeholder: raw("localhost"),
+          },
+          {
+            id: "port",
+            labelKey: "ingestion.setupCard.portLabel",
+            default: "6379",
+            placeholder: raw("6379"),
+            width: "sm",
+          },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector (Redis AUTH password via env var).",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorRedisDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: {
           lang: "bash",
@@ -89,13 +101,15 @@ export default function redisCard(subs: CardSubstitutions): RichCardContent {
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `redis_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyRedisMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Commands", "Memory", "Clients", "Keyspace", "Hit Rate"],
+        // Redis INFO / redis-receiver stat names (redis.commands, redis.memory.used,
+        // redis.clients.connected, redis.keyspace.hits …) — kept untranslated so the
+        // pills match the ingested metrics.
+        pills: [raw("Commands"), raw("Memory"), raw("Clients"), raw("Keyspace"), raw("Hit Rate")],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "redis", filter: "" },

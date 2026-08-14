@@ -1,7 +1,7 @@
 import type { EvalTargetScope, Scorer } from "@/services/online-evals.service";
 import { entityId } from "./evalEntity";
 import { extractTemplateVariables } from "./evalFormat";
-import { isSystemProvidedVariable } from "./systemProvidedVariables";
+import { systemProvidedVariablesForScope } from "./systemProvidedVariables";
 
 export function scorerTemplateVariables(scorer: Scorer) {
   return [
@@ -12,7 +12,11 @@ export function scorerTemplateVariables(scorer: Scorer) {
   ];
 }
 
-export function defaultJobMappingValue(variable: string) {
+export function defaultJobMappingValue(variable: string, targetScope: EvalTargetScope = "span") {
+  if (systemProvidedVariablesForScope(targetScope).some(({ name }) => name === variable.trim())) {
+    return `{{${variable.trim()}}}`;
+  }
+
   const defaults: Record<string, string> = {
     input: "{{gen_ai_input_messages}}",
     output: "{{gen_ai_output_messages}}",
@@ -32,18 +36,20 @@ export function jobMappingVariablesForScorer(
   scorer: Scorer,
   existingMapping: Record<string, string> | undefined,
 ) {
-  return [
-    ...new Set([
-      ...scorerTemplateVariables(scorer),
-      ...Object.keys(existingMapping || {}),
-    ]),
-  ];
+  return [...new Set([...scorerTemplateVariables(scorer), ...Object.keys(existingMapping || {})])];
+}
+
+export function mappingUsesSystemProvidedSpans(
+  existingMapping: Record<string, string> | undefined,
+) {
+  return Object.values(existingMapping || {}).some(
+    (value) => value.trim().replace(/\s+/g, "") === "{{spans}}",
+  );
 }
 
 export function buildJobInputMappingPayload(
   scorerIds: string[],
   inputMappings: Record<string, Record<string, string>>,
-  targetScope: EvalTargetScope = "span",
 ) {
   const payload: Record<string, Record<string, string>> = {};
 
@@ -51,10 +57,7 @@ export function buildJobInputMappingPayload(
     const cleanMapping = Object.fromEntries(
       Object.entries(inputMappings[scorerId] || {})
         .map(([key, value]) => [key.trim(), value.trim()])
-        .filter(
-          ([key, value]) =>
-            key && value && !isSystemProvidedVariable(targetScope, key),
-        ),
+        .filter(([key, value]) => key && value),
     );
 
     if (Object.keys(cleanMapping).length) payload[scorerId] = cleanMapping;
@@ -63,17 +66,9 @@ export function buildJobInputMappingPayload(
   return Object.keys(payload).length ? payload : null;
 }
 
-export function normalizeJobInputMappings(
-  value: any,
-  selectedScorerIds: string[],
-) {
+export function normalizeJobInputMappings(value: any, selectedScorerIds: string[]) {
   const parsedValue = parseMaybeJson(value);
-  if (
-    !parsedValue ||
-    typeof parsedValue !== "object" ||
-    Array.isArray(parsedValue)
-  )
-    return {};
+  if (!parsedValue || typeof parsedValue !== "object" || Array.isArray(parsedValue)) return {};
 
   const entries = Object.entries(parsedValue);
   const hasPerScorerShape = entries.some(
@@ -81,22 +76,14 @@ export function normalizeJobInputMappings(
       mapping &&
       typeof mapping === "object" &&
       !Array.isArray(mapping) &&
-      Object.values(mapping).every(
-        (fieldValue) => typeof fieldValue === "string",
-      ),
+      Object.values(mapping).every((fieldValue) => typeof fieldValue === "string"),
   );
 
   if (hasPerScorerShape) {
     return Object.fromEntries(
       entries
-        .filter(
-          ([, mapping]) =>
-            mapping && typeof mapping === "object" && !Array.isArray(mapping),
-        )
-        .map(([scorerId, mapping]) => [
-          scorerId,
-          { ...(mapping as Record<string, string>) },
-        ]),
+        .filter(([, mapping]) => mapping && typeof mapping === "object" && !Array.isArray(mapping))
+        .map(([scorerId, mapping]) => [scorerId, { ...(mapping as Record<string, string>) }]),
     );
   }
 
@@ -104,9 +91,7 @@ export function normalizeJobInputMappings(
     entries.filter(([, mappingValue]) => typeof mappingValue === "string"),
   ) as Record<string, string>;
 
-  return Object.fromEntries(
-    selectedScorerIds.map((scorerId) => [scorerId, { ...flatMapping }]),
-  );
+  return Object.fromEntries(selectedScorerIds.map((scorerId) => [scorerId, { ...flatMapping }]));
 }
 
 export function syncJobInputMappings(
@@ -114,6 +99,7 @@ export function syncJobInputMappings(
   scorers: Scorer[],
   inputMappings: Record<string, Record<string, string>>,
   scorerVersions: Record<string, number | null>,
+  targetScope: EvalTargetScope = "span",
 ) {
   const selected = new Set(scorerIds);
   const nextMappings: Record<string, Record<string, string>> = {};
@@ -125,8 +111,9 @@ export function syncJobInputMappings(
 
     if (scorer) {
       scorerTemplateVariables(scorer).forEach((variable) => {
-        if (mapping[variable] === undefined)
-          mapping[variable] = defaultJobMappingValue(variable);
+        if (mapping[variable] === undefined) {
+          mapping[variable] = defaultJobMappingValue(variable, targetScope);
+        }
       });
     }
 

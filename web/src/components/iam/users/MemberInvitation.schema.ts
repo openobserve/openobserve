@@ -27,16 +27,12 @@ export const makeMemberInvitationSchema = (t: (_key: string) => string) =>
       .min(1, t("user.inviteEmailInvalid"))
       .refine((val) => {
         const emails = splitInviteEmails(val);
-        return (
-          emails.length > 0 && emails.every((e) => validateEmail(e) === true)
-        );
+        return emails.length > 0 && emails.every((e) => validateEmail(e) === true);
       }, t("user.inviteEmailInvalid")),
     role: z.string().default("admin"),
   });
 
-export type MemberInvitationForm = z.infer<
-  ReturnType<typeof makeMemberInvitationSchema>
->;
+export type MemberInvitationForm = z.infer<ReturnType<typeof makeMemberInvitationSchema>>;
 
 // Static defaults — create / "add another" form: blank email + the default role.
 export const memberInvitationDefaults = (): MemberInvitationForm => ({

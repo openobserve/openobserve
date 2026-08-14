@@ -46,55 +46,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <Teleport to="body">
     <!-- Transparent click-catcher: dismisses on outside click without dimming
          the canvas, so the graph stays readable while choosing. -->
-    <div
-      class="fixed inset-0 z-6000"
-      :data-test="testPrefix + '-backdrop'"
-      @click="emit('close')"
-    >
+    <div class="fixed inset-0 z-6000" :data-test="testPrefix + '-backdrop'" @click="emit('close')">
       <div
-        class="absolute left-[var(--sp-x)] top-[var(--sp-y)] w-80 max-h-96 flex flex-col rounded-surface border border-border-default bg-card-bg shadow-[0_0.5rem_1.5rem_color-mix(in_srgb,var(--color-black)_18%,transparent)] overflow-hidden"
+        class="rounded-surface border-border-default bg-card-bg absolute top-[var(--sp-y)] left-[var(--sp-x)] flex max-h-96 w-80 flex-col overflow-hidden border shadow-[0_0.5rem_1.5rem_color-mix(in_srgb,var(--color-black)_18%,transparent)]"
         :style="{ '--sp-x': panelX + 'px', '--sp-y': panelY + 'px' }"
         :data-test="testPrefix + '-dialog'"
         @click.stop
       >
-        <div class="p-2 shrink-0">
+        <div class="shrink-0 p-2">
           <OSearchInput
             ref="searchRef"
             v-model="search"
-            :placeholder="placeholderText"
+            :placeholder="raw(placeholderText)"
             clearable
             class="w-full"
             :data-test="testPrefix + '-search'"
           />
         </div>
 
-        <div v-if="filtered.length" class="flex-1 min-h-0 overflow-y-auto p-2 pt-0 flex flex-col gap-1">
+        <div
+          v-if="filtered.length"
+          class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2 pt-0"
+        >
           <button
             v-for="item in filtered"
             :key="item.key"
             type="button"
-            class="flow-step-card flex items-center gap-2.5 p-2 rounded-default bg-transparent text-left cursor-pointer transition-colors duration-[120ms] hover:bg-[color-mix(in_srgb,var(--color-primary-600)_8%,transparent)]"
+            class="flow-step-card rounded-default flex cursor-pointer items-center gap-2.5 bg-transparent p-2 text-left transition-colors duration-[120ms] hover:bg-[color-mix(in_srgb,var(--color-primary-600)_8%,transparent)]"
             :data-test="`${testPrefix}-${item.key}`"
             @click="emit('pick', item)"
           >
             <div
-              class="inline-flex items-center justify-center w-7 h-7 shrink-0 rounded-default"
+              class="rounded-default inline-flex h-7 w-7 shrink-0 items-center justify-center"
               :class="item.iconTint"
             >
               <OIcon :name="item.icon || 'help'" size="sm" />
             </div>
             <div class="min-w-0">
-              <div class="text-sm font-semibold text-text-body">
+              <div class="text-text-body text-sm font-semibold">
                 {{ item.title }}
               </div>
-              <div v-if="item.description" class="text-xs text-text-secondary leading-snug">
+              <div v-if="item.description" class="text-text-secondary text-xs leading-snug">
                 {{ item.description }}
               </div>
             </div>
           </button>
         </div>
 
-        <div v-else class="py-8 text-center text-sm text-text-secondary">
+        <div v-else class="text-text-secondary py-8 text-center text-sm">
           {{ emptyText }}
         </div>
       </div>
@@ -104,14 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 interface StepItem {
   key: string;
-  title: string;
-  description?: string;
+  title: I18nText;
+  description?: I18nText;
   icon?: string;
   iconTint?: string;
   [k: string]: any;
@@ -120,8 +119,8 @@ interface StepItem {
 const props = withDefaults(
   defineProps<{
     items: StepItem[];
-    searchPlaceholder?: string;
-    noMatchText?: string;
+    searchPlaceholder?: I18nText;
+    noMatchText?: I18nText;
     testPrefix?: string;
     /** Viewport point to open at (usually the click). Null = screen-centred. */
     anchor?: { x: number; y: number } | null;
@@ -131,8 +130,8 @@ const props = withDefaults(
     // Empty, not English: t() cannot run at module scope (no setup context), so
     // the locale fallback lives in the computeds below. A caller may still pass
     // its own already-translated string.
-    searchPlaceholder: "",
-    noMatchText: "",
+    searchPlaceholder: raw(""),
+    noMatchText: raw(""),
     testPrefix: "flow-step",
   },
 );
@@ -142,14 +141,10 @@ const emit = defineEmits<{
   (e: "close"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-const placeholderText = computed(
-  () => props.searchPlaceholder || (t("common.search") as string),
-);
-const emptyText = computed(
-  () => props.noMatchText || (t("common.noMatches") as string),
-);
+const placeholderText = computed(() => props.searchPlaceholder || (t("common.search") as string));
+const emptyText = computed(() => props.noMatchText || (t("common.noMatches") as string));
 
 // Panel box, kept in sync with the `w-80` / `max-h-96` utilities on it. Used to
 // keep the panel inside the viewport; measuring instead would need a render

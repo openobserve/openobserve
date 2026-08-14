@@ -41,10 +41,7 @@ vi.mock("@vue-flow/core", () => ({
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
-function mountCard(
-  props: Record<string, any> = {},
-  options: Record<string, any> = {},
-) {
+function mountCard(props: Record<string, any> = {}, options: Record<string, any> = {}) {
   return mount(FlowNodeCard as any, { props, ...options });
 }
 
@@ -197,12 +194,8 @@ describe("FlowNodeCard", () => {
         inputHandleTest: "pipeline-node-input-handle",
         outputHandleTest: "pipeline-node-output-handle",
       });
-      expect(
-        wrapper.find('[data-test="pipeline-node-input-handle"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="pipeline-node-output-handle"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-input-handle"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-output-handle"]').exists()).toBe(true);
     });
 
     it("omits data-test on the handles when the props are not supplied (workflow case)", () => {
@@ -229,18 +222,12 @@ describe("FlowNodeCard", () => {
     });
 
     it("renders #actions content (hover buttons) at the card root", () => {
-      wrapper = mountCard(
-        {},
-        { slots: { actions: '<button class="delete-btn">x</button>' } },
-      );
+      wrapper = mountCard({}, { slots: { actions: '<button class="delete-btn">x</button>' } });
       expect(wrapper.find(".delete-btn").exists()).toBe(true);
     });
 
     it("renders #footer content (hover-`+`) at the card root", () => {
-      wrapper = mountCard(
-        {},
-        { slots: { footer: '<button class="add-btn">+</button>' } },
-      );
+      wrapper = mountCard({}, { slots: { footer: '<button class="add-btn">+</button>' } });
       expect(wrapper.find(".add-btn").exists()).toBe(true);
     });
 
@@ -314,9 +301,9 @@ describe("FlowNodeCard", () => {
 
     it("forwards an arbitrary data-test attribute to the root element", () => {
       wrapper = mountCard({}, { attrs: { "data-test": "workflow-node-condition" } });
-      expect(
-        wrapper.find('[data-test="workflow-node-condition"]').classes(),
-      ).toContain("flow-node");
+      expect(wrapper.find('[data-test="workflow-node-condition"]').classes()).toContain(
+        "flow-node",
+      );
     });
   });
 

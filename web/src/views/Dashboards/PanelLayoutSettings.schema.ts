@@ -39,6 +39,4 @@ export const makePanelLayoutSettingsSchema = (t: (_key: string) => string) =>
       }
     });
 
-export type PanelLayoutSettingsForm = z.infer<
-  ReturnType<typeof makePanelLayoutSettingsSchema>
->;
+export type PanelLayoutSettingsForm = z.infer<ReturnType<typeof makePanelLayoutSettingsSchema>>;

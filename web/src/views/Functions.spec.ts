@@ -23,7 +23,6 @@ vi.mock("@/components/pipeline/PipelineSectionTabs.vue", () => ({
   },
 }));
 
-
 vi.mock("@/plugins/pipelines/useDnD", () => ({
   pipelineObj: {
     currentSelectedPipeline: { name: "" },
@@ -41,7 +40,7 @@ vi.mock("@/lib/core/Button/OButton.vue", () => ({
   default: {
     name: "OButton",
     template:
-      '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
+      "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click', $event)\"><slot /></button>",
     props: ["variant", "size", "iconLeft", "disabled"],
     emits: ["click"],
   },
@@ -58,8 +57,7 @@ vi.mock("@/lib/overlay/Dropdown/ODropdown.vue", () => ({
 vi.mock("@/lib/overlay/Dropdown/ODropdownItem.vue", () => ({
   default: {
     name: "ODropdownItem",
-    template:
-      '<div :data-test="$attrs[\'data-test\']" @click="$emit(\'select\')"><slot /></div>',
+    template: "<div :data-test=\"$attrs['data-test']\" @click=\"$emit('select')\"><slot /></div>",
     emits: ["select"],
   },
 }));
@@ -279,8 +277,16 @@ describe("Functions.vue", () => {
           { path: "/pipeline/editor", name: "pipelineEditor", component: { template: "<div />" } },
           { path: "/pipeline/create", name: "createPipeline", component: { template: "<div />" } },
           { path: "/pipeline/import", name: "importPipeline", component: { template: "<div />" } },
-          { path: "/pipeline/history", name: "pipelineHistory", component: { template: "<div />" } },
-          { path: "/pipeline/backfill", name: "pipelineBackfill", component: { template: "<div />" } },
+          {
+            path: "/pipeline/history",
+            name: "pipelineHistory",
+            component: { template: "<div />" },
+          },
+          {
+            path: "/pipeline/backfill",
+            name: "pipelineBackfill",
+            component: { template: "<div />" },
+          },
           { path: "/eval", name: "evalTemplates", component: { template: "<div />" } },
         ],
       });
@@ -290,7 +296,9 @@ describe("Functions.vue", () => {
       wrapper = mount(Functions, {
         global: {
           plugins: [store, router, i18n],
-          stubs: { RouterView: { name: "RouterView", template: '<div class="mock-router-view" />' } },
+          stubs: {
+            RouterView: { name: "RouterView", template: '<div class="mock-router-view" />' },
+          },
         },
       });
 
@@ -347,15 +355,12 @@ describe("Functions.vue", () => {
       wrapper = await createWrapper({}, "pipelines");
       expect((wrapper.vm as any).isDetailView).toBe(false);
     });
-
   });
 
   describe("Store Integration", () => {
     it("should access store state correctly", async () => {
       wrapper = await createWrapper();
-      expect((wrapper.vm as any).store.state.selectedOrganization.identifier).toBe(
-        "test-org-id",
-      );
+      expect((wrapper.vm as any).store.state.selectedOrganization.identifier).toBe("test-org-id");
     });
 
     it("should handle missing organization identifier gracefully", async () => {
@@ -397,9 +402,7 @@ describe("Functions.vue", () => {
       await router.push({ name: "pipeline" });
       await wrapper.vm.$nextTick();
 
-      expect(routerReplaceSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "pipelines" }),
-      );
+      expect(routerReplaceSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "pipelines" }));
     });
   });
 

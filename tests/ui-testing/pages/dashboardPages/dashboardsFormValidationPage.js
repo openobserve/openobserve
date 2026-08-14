@@ -160,8 +160,10 @@ export class DashboardsFormValidationPage {
         this.yAxisFieldChipFirst      = '[data-test="dashboard-y-item-y_axis_1"]';
 
         // ── AddPanel / PanelEditor toolbar ───────────────────────────────────
-        // OInput data-test="dashboard-panel-name" → -field (fill), -error (error)
-        this.panelNameField   = '[data-test="dashboard-panel-name-field"]';
+        // Panel name is an inline-edited title (OFormInlineEdit): -trigger opens
+        // the editor, -input is the revealed field, -error is the validation msg.
+        this.panelNameTrigger = '[data-test="dashboard-panel-name-trigger"]';
+        this.panelNameField   = '[data-test="dashboard-panel-name-input"]';
         this.panelNameError   = '[data-test="dashboard-panel-name-error"]';
         this.panelSaveBtn     = '[data-test="dashboard-panel-save"]';
         this.panelDiscardBtn  = '[data-test="dashboard-panel-discard"]';
@@ -549,22 +551,26 @@ export class DashboardsFormValidationPage {
 
     // ── AddPanel / PanelEditor helpers ────────────────────────────────────────
 
+    // The name display trigger (always rendered) — use it as the "editor opened"
+    // anchor. The `-input` only exists while editing, so it can't anchor setup.
+    getPanelNameTriggerLocator() { return this.page.locator(this.panelNameTrigger); }
     getPanelNameFieldLocator()  { return this.page.locator(this.panelNameField); }
     getPanelNameErrorLocator()  { return this.page.locator(this.panelNameError); }
     getPanelSaveBtnLocator()    { return this.page.locator(this.panelSaveBtn); }
     getPanelDiscardBtnLocator() { return this.page.locator(this.panelDiscardBtn); }
 
     async fillPanelName(name) {
+        // Open the inline editor via its trigger, then fill the revealed input.
+        await this.page.locator(this.panelNameTrigger).click();
         const field = this.page.locator(this.panelNameField);
         await field.waitFor({ state: 'visible', timeout: 10000 });
-        await field.click({ clickCount: 3 });
         await field.fill(name);
     }
 
     async clearPanelName() {
+        await this.page.locator(this.panelNameTrigger).click();
         const field = this.page.locator(this.panelNameField);
         await field.waitFor({ state: 'visible', timeout: 10000 });
-        await field.click({ clickCount: 3 });
         await field.fill('');
     }
 }

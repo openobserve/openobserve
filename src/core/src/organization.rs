@@ -29,6 +29,7 @@ use db::{self, org_users, user::is_root_user};
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
+use stream::get_streams;
 #[cfg(feature = "cloud")]
 use {
     chrono::{Duration, Utc},
@@ -56,7 +57,6 @@ use crate::{
         },
     },
     ingestion_tokens, self_reporting,
-    stream::get_streams,
     users::add_admin_to_org,
 };
 
@@ -675,6 +675,20 @@ pub async fn create_org(
                         org.identifier
                     );
                 }
+            }
+            // Best-effort — the compiled-in fallback (design §4.4) covers the
+            // race if this fails or the backfill hasn't run yet; never block
+            // org creation on it.
+            if let Err(e) = crate::alerts::notifications::org_default::set_org_default_template(
+                &org.identifier,
+                crate::alerts::notifications::default_template::DEFAULT_CONTENT_TEMPLATE_NAME,
+            )
+            .await
+            {
+                log::warn!(
+                    "Failed to set default_alert_template for org '{}': {e}",
+                    org.identifier
+                );
             }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {

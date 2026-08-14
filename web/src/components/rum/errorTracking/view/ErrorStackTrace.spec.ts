@@ -20,7 +20,7 @@ import i18n from "@/locales";
 
 // Stub tab components so the raw panel renders without full setup
 const tabPanelStub = {
-  template: '<div><slot /></div>',
+  template: "<div><slot /></div>",
   props: ["name", "animated"],
 };
 
@@ -46,15 +46,15 @@ describe("ErrorStackTrace Component", () => {
       global: {
         plugins: [i18n],
         stubs: {
-          OTabs: { template: '<div><slot /></div>', props: ["modelValue", "dense", "align"] },
-          OTab: { template: '<div />', props: ["name", "label"] },
+          OTabs: { template: "<div><slot /></div>", props: ["modelValue", "dense", "align"] },
+          OTab: { template: "<div />", props: ["name", "label"] },
           OTabPanels: {
-            template: '<div><slot /></div>',
+            template: "<div><slot /></div>",
             props: ["modelValue", "animated"],
           },
           OTabPanel: tabPanelStub,
-          OSeparator: { template: '<div />' },
-          PrettyStackTrace: { template: '<div />', props: ["error_stack", "error"] },
+          OSeparator: { template: "<div />" },
+          PrettyStackTrace: { template: "<div />", props: ["error_stack", "error"] },
         },
       },
     });
@@ -88,9 +88,7 @@ describe("ErrorStackTrace Component", () => {
     // Arrange + Act handled in beforeEach
 
     // Assert
-    expect(wrapper.text()).toContain(
-      "TypeError: Cannot read property 'foo' of undefined",
-    );
+    expect(wrapper.text()).toContain("TypeError: Cannot read property 'foo' of undefined");
   });
 
   it("renders the remaining stack lines (excluding the first)", () => {
@@ -107,9 +105,7 @@ describe("ErrorStackTrace Component", () => {
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     expect(stackLines[0].text()).toBe("at Object.fn (/app/src/main.js:15:20)");
-    expect(stackLines[1].text()).toBe(
-      "at process.processImmediate (internal/timers.js:461:26)",
-    );
+    expect(stackLines[1].text()).toBe("at process.processImmediate (internal/timers.js:461:26)");
     expect(stackLines[2].text()).toBe(
       "at process.processTicksAndRejections (internal/process/task_queues.js:95:5)",
     );
@@ -221,16 +217,12 @@ describe("ErrorStackTrace Component", () => {
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     const firstStyle = stackLines[0].attributes("style");
-    expect(firstStyle).toContain(
-      "border-top: 1px solid var(--color-border-default)",
-    );
+    expect(firstStyle).toContain("border-top: 1px solid var(--color-border-default)");
 
     for (let i = 1; i < stackLines.length; i++) {
       const style = stackLines[i].attributes("style");
       if (style) {
-        expect(style).not.toContain(
-          "border-top: 1px solid var(--color-border-default)",
-        );
+        expect(style).not.toContain("border-top: 1px solid var(--color-border-default)");
       }
     }
   });
@@ -241,7 +233,7 @@ describe("ErrorStackTrace Component", () => {
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     const style = stackLines[0].attributes("style");
-    expect(style).toContain("border-radius: 4px 4px 0 0");
+    expect(style).toContain("border-radius: 0.25rem 0.25rem 0 0");
   });
 
   it("applies bottom-rounded border radius to the last stack line", () => {
@@ -250,7 +242,7 @@ describe("ErrorStackTrace Component", () => {
     // Assert
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     const lastStyle = stackLines[stackLines.length - 1].attributes("style");
-    expect(lastStyle).toContain("border-radius: 0 0 4px 4px");
+    expect(lastStyle).toContain("border-radius: 0 0 0.25rem 0.25rem");
   });
 
   it("applies both border-radius values when there is only one stack line", async () => {
@@ -263,10 +255,8 @@ describe("ErrorStackTrace Component", () => {
     const stackLines = wrapper.findAll('[data-test="error-stack-trace-line"]');
     expect(stackLines).toHaveLength(1);
     const style = stackLines[0].attributes("style");
-    expect(style).toContain(
-      "border-top: 1px solid var(--color-border-default)",
-    );
-    expect(style).toContain("border-radius: 0 0 4px 4px");
+    expect(style).toContain("border-top: 1px solid var(--color-border-default)");
+    expect(style).toContain("border-radius: 0 0 0.25rem 0.25rem");
   });
 
   it("does not apply rounded border radius to middle stack lines", () => {
@@ -278,8 +268,8 @@ describe("ErrorStackTrace Component", () => {
       for (let i = 1; i < stackLines.length - 1; i++) {
         const style = stackLines[i].attributes("style");
         if (style) {
-          expect(style).not.toContain("border-radius: 4px 4px 0 0");
-          expect(style).not.toContain("border-radius: 0 0 4px 4px");
+          expect(style).not.toContain("border-radius: 0.25rem 0.25rem 0 0");
+          expect(style).not.toContain("border-radius: 0 0 0.25rem 0.25rem");
         }
       }
     }

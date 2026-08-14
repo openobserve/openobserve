@@ -39,7 +39,7 @@ const maxSearchRetries = 3;
 
 const isInDrainMode = ref(false);
 
-const socketMeta = ref<{[key: string]: { isReadOnly: boolean, socketId: string }}>({})
+const socketMeta = ref<{ [key: string]: { isReadOnly: boolean; socketId: string } }>({});
 
 // Add a set to track canceled trace IDs
 const canceledTraceIds = new Set<string>();
@@ -55,7 +55,7 @@ const useSearchWebSocket = () => {
   const onOpen = (response: any, socketId: string) => {
     isCreatingSocket.value = false;
     Object.keys(traces).forEach((traceId) => {
-      if(traces[traceId].socketId === socketId) {
+      if (traces[traceId].socketId === socketId) {
         traces[traceId].isInitiated = true;
         traces[traceId].open.forEach((handler: any) => handler(response));
       }
@@ -71,83 +71,87 @@ const useSearchWebSocket = () => {
 
     // closeDrainingSocket();
 
-    traces[response.content.trace_id]?.message?.forEach((handler: any) =>
-      handler(response),
-    );
+    traces[response.content.trace_id]?.message?.forEach((handler: any) => handler(response));
   };
 
-  const onClose = async (response: any, _socketId: string) => {    
+  const onClose = async (response: any, _socketId: string) => {
     isCreatingSocket.value = false;
-    
-    if(socketId.value && (socketId.value === _socketId)) {
+
+    if (socketId.value && socketId.value === _socketId) {
       socketId.value = null;
     }
 
-    if(inactiveSocketId.value && (_socketId === inactiveSocketId.value)) {
+    if (inactiveSocketId.value && _socketId === inactiveSocketId.value) {
       inactiveSocketId.value = null;
     }
 
     const shouldRetry = socketRetryCodes.includes(response.code);
-    
-    if(shouldRetry) socketFailureCount.value++;
+
+    if (shouldRetry) socketFailureCount.value++;
 
     if (shouldRetry && socketFailureCount.value < maxSearchRetries) {
       // console.log("shouldRetry", JSON.parse(JSON.stringify(traces)));
       setTimeout(() => {
         Object.keys(traces).forEach((traceId) => {
-          if(((traces[traceId].socketId === _socketId) && traces[traceId].isInitiated) || !traces[traceId].socketId) {
+          if (
+            (traces[traceId].socketId === _socketId && traces[traceId].isInitiated) ||
+            !traces[traceId].socketId
+          ) {
             // Don't send error event when retry is happening
-            traces[traceId]?.close.forEach((handler: any) => handler({
-              ...response,
-              type: "close",
-              code: 1000,
-            }));
+            traces[traceId]?.close.forEach((handler: any) =>
+              handler({
+                ...response,
+                type: "close",
+                code: 1000,
+              }),
+            );
 
-            closeSearchTrace(traceId, traces[traceId].data);      
+            closeSearchTrace(traceId, traces[traceId].data);
           }
         });
       }, 1000);
     } else {
       Object.keys(traces).forEach((traceId) => {
-        if((traces[traceId].socketId === _socketId) && traces[traceId].isInitiated) {
-            closeSearchTrace(traceId, response);
+        if (traces[traceId].socketId === _socketId && traces[traceId].isInitiated) {
+          closeSearchTrace(traceId, response);
         }
       });
     }
   };
 
   const onError = async (response: any) => {
-    if(response.type === 'error'){
-      if(response.content.should_client_retry && response.content.trace_id){
+    if (response.type === "error") {
+      if (response.content.should_client_retry && response.content.trace_id) {
         setTimeout(() => {
-              // Skip retrying if this trace ID was explicitly canceled
-              if(canceledTraceIds.has(response.content.trace_id)) {
-                // Don't retry the search
-                // clean up listeners will be called on cancel query response
-                closeSearchTrace(response.content.trace_id, {
-                  code: response.code,
-                });
-                return;
-              }
-              retryActiveTrace(response.content.trace_id, response);
-        }, 300)
+          // Skip retrying if this trace ID was explicitly canceled
+          if (canceledTraceIds.has(response.content.trace_id)) {
+            // Don't retry the search
+            // clean up listeners will be called on cancel query response
+            closeSearchTrace(response.content.trace_id, {
+              code: response.code,
+            });
+            return;
+          }
+          retryActiveTrace(response.content.trace_id, response);
+        }, 300);
 
         return;
       }
 
-      if(response.content.code === 401) {
+      if (response.content.code === 401) {
         // Store the current socketId as inactive and clear it
         // console.log("socketMeta ----------",traces[response.content.trace_id].socketId, socketMeta.value[traces[response.content.trace_id].socketId as string].isReadOnly);
 
         const currentSocketId = traces[response.content.trace_id]?.socketId;
         if (!currentSocketId) return;
 
-        const isReadOnly = socketMeta.value[traces[response.content.trace_id]?.socketId as string]?.isReadOnly;
-                
+        const isReadOnly =
+          socketMeta.value[traces[response.content.trace_id]?.socketId as string]?.isReadOnly;
+
         if (!isReadOnly) {
           // console.log("rest socket");
           inactiveSocketId.value = socketId.value;
-          socketId.value = null;        
+          socketId.value = null;
           isInDrainMode.value = true;
           socketMeta.value[traces[response.content.trace_id].socketId as string].isReadOnly = true;
         }
@@ -156,15 +160,13 @@ const useSearchWebSocket = () => {
 
         if (!isReadOnly) await resetAuthToken();
 
-        if(traceIdToRetry) retryActiveTrace(traceIdToRetry, response);
+        if (traceIdToRetry) retryActiveTrace(traceIdToRetry, response);
 
-        return;     
+        return;
       }
     }
 
-    traces[response.content.trace_id]?.error?.forEach((handler: any) =>
-      handler(response),
-    );
+    traces[response.content.trace_id]?.error?.forEach((handler: any) => handler(response));
     closeSearchTrace(response.content.trace_id, response);
   };
   // const closeDrainingSocket = () => {
@@ -181,13 +183,13 @@ const useSearchWebSocket = () => {
     socketId.value = getUUID();
 
     Object.keys(traces).forEach((traceId) => {
-      if(traces[traceId].socketId === null) traces[traceId].socketId = socketId.value;
+      if (traces[traceId].socketId === null) traces[traceId].socketId = socketId.value;
     });
 
     socketMeta.value[socketId.value as string] = {
       isReadOnly: false,
-      socketId: socketId.value as string
-    }
+      socketId: socketId.value as string,
+    };
 
     const url = getWebSocketUrl(socketId.value, org_id, store.state.API_ENDPOINT);
     // If needed we can store the socketID in global state
@@ -219,7 +221,7 @@ const useSearchWebSocket = () => {
       close: (data: any, response: any) => void;
       error: (data: any, response: any) => void;
       reset: (data: any, response: any) => void;
-    }  
+    },
   ) => {
     try {
       traces[data.traceId] = {
@@ -254,20 +256,23 @@ const useSearchWebSocket = () => {
     }
   };
 
-  const initiateSocketConnection = (data: {
-    queryReq: SearchRequestPayload;
-    type: "search" | "histogram" | "pageCount" | "values";
-    isPagination: boolean;
-    traceId: string;
-    org_id: string;
-    meta: any;
-  }, handlers: {
-    open: (data: any, response: any) => void;
-    message: (data: any, response: any) => void;
-    close: (data: any, response: any) => void;
-    error: (data: any, response: any) => void;
-    reset: (data: any, response: any) => void;
-  }) => {
+  const initiateSocketConnection = (
+    data: {
+      queryReq: SearchRequestPayload;
+      type: "search" | "histogram" | "pageCount" | "values";
+      isPagination: boolean;
+      traceId: string;
+      org_id: string;
+      meta: any;
+    },
+    handlers: {
+      open: (data: any, response: any) => void;
+      message: (data: any, response: any) => void;
+      close: (data: any, response: any) => void;
+      error: (data: any, response: any) => void;
+      reset: (data: any, response: any) => void;
+    },
+  ) => {
     // console.log("initiateSocketConnection", socketId.value, isCreatingSocket.value, data.traceId, JSON.parse(JSON.stringify(traces[data.traceId])));
     if (!socketId.value) {
       createSocketConnection(data.org_id);
@@ -278,13 +283,16 @@ const useSearchWebSocket = () => {
     } else if (isCreatingSocket.value && socketId.value) {
       traces[data.traceId].socketId = socketId.value;
     }
-  }
+  };
 
   const sendSearchMessageBasedOnRequestId = (data: any) => {
-    try {      
-      const _socketId = traces[data.content.trace_id]?.socketId
+    try {
+      const _socketId = traces[data.content.trace_id]?.socketId;
 
-      if(inactiveSocketId.value && (traces[data.content.trace_id]?.socketId === inactiveSocketId.value)) {
+      if (
+        inactiveSocketId.value &&
+        traces[data.content.trace_id]?.socketId === inactiveSocketId.value
+      ) {
         _webSocket!.sendMessage(inactiveSocketId.value as string, JSON.stringify(data));
         return;
       }
@@ -297,18 +305,13 @@ const useSearchWebSocket = () => {
     }
   };
 
-  const cancelSearchQueryBasedOnRequestId = (payload: {
-    trace_id: string;
-    org_id: string;
-  }) => {
-    const _socketId = traces[payload.trace_id]?.socketId
-    
+  const cancelSearchQueryBasedOnRequestId = (payload: { trace_id: string; org_id: string }) => {
+    const _socketId = traces[payload.trace_id]?.socketId;
+
     // Mark this trace ID as canceled to prevent retries
     canceledTraceIds.add(payload.trace_id);
 
-    const socket = _webSocket!.getWebSocketBasedOnSocketId(
-      _socketId as string,
-    );
+    const socket = _webSocket!.getWebSocketBasedOnSocketId(_socketId as string);
     // check state of socket
     if (socket && socket.readyState === WebSocket.OPEN) {
       _webSocket!.sendMessage(
@@ -338,65 +341,69 @@ const useSearchWebSocket = () => {
     if (traces[traceId]) traces[traceId].open.length = 0;
 
     delete traces[traceId];
-    
+
     // Remove from canceled set when cleaning up
     canceledTraceIds.delete(traceId);
   };
 
   const closeSocketWithError = () => {
-      _webSocket!.sendMessage(
-        socketId.value as string,
-        JSON.stringify({
-          type: "test_abnormal_close",
-          content: {
-            req_id: socketId.value,
-          },
-        }),
-      );
+    _webSocket!.sendMessage(
+      socketId.value as string,
+      JSON.stringify({
+        type: "test_abnormal_close",
+        content: {
+          req_id: socketId.value,
+        },
+      }),
+    );
   };
 
   const closeSocket = () => {
     _webSocket!.cleanupSocket(socketId.value as string);
-  }
+  };
 
   const retryActiveTrace = (traceId: string, response: any) => {
     traces[traceId]?.close.forEach((handler: any) => handler(response));
     traces[traceId]?.reset.forEach((handler: any) => handler(traces[traceId].data, traceId));
-    cleanUpListeners(traceId);   
-  }
+    cleanUpListeners(traceId);
+  };
 
   const closeSearchTrace = (traceId: string, response: any) => {
     traces[traceId]?.close?.forEach((handler: any) => handler(response));
     cleanUpListeners(traceId);
-  }
+  };
 
   const resetAuthToken = async () => {
     // console.log("reset auth token");
     isInDrainMode.value = true;
     return new Promise((resolve, reject) => {
-      authService.refresh_token().then((res: any) => {
-        isInDrainMode.value = false;
-        // Retry the request
-        Object.keys(traces).forEach((traceId) => {
-          if(!traces[traceId].isInitiated) {
-            initiateSocketConnection(traces[traceId].data, {
-              open: traces[traceId].open[0],
-              message: traces[traceId].message[0],
-              close: traces[traceId].close[0],
-              error: traces[traceId].error[0],
-              reset: traces[traceId].reset[0],
-            });
-          }
+      authService
+        .refresh_token()
+        .then((res: any) => {
+          isInDrainMode.value = false;
+          // Retry the request
+          Object.keys(traces).forEach((traceId) => {
+            if (!traces[traceId].isInitiated) {
+              initiateSocketConnection(traces[traceId].data, {
+                open: traces[traceId].open[0],
+                message: traces[traceId].message[0],
+                close: traces[traceId].close[0],
+                error: traces[traceId].error[0],
+                reset: traces[traceId].reset[0],
+              });
+            }
+          });
+          resolve(res);
+        })
+        .catch((err: any) => {
+          console.error("Error in refreshing auth token", err);
+          reject(err);
+        })
+        .finally(() => {
+          isInDrainMode.value = false;
         });
-        resolve(res);
-      }).catch((err: any) => {
-        console.error("Error in refreshing auth token", err);
-        reject(err);
-      }).finally(() => {
-        isInDrainMode.value = false;
-      });
-    })
-  }
+    });
+  };
 
   return {
     fetchQueryDataWithWebSocket,
@@ -405,7 +412,7 @@ const useSearchWebSocket = () => {
     closeSocketBasedOnRequestId,
     cleanUpListeners,
     closeSocketWithError,
-    closeSocket
+    closeSocket,
   };
 };
 

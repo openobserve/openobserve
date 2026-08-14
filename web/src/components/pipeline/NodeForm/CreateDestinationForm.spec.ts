@@ -41,7 +41,6 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: vi.fn(() => `test-uuid-${++uuidCounter}`),
 }));
 
-
 // CreateDestinationForm is migrated to the headless useOForm OWNER pattern
 // (Rule ③): the TanStack form is the SINGLE source of truth for EVERY field.
 // There is no `formData` mirror and no sync watches — the component reads form
@@ -78,7 +77,7 @@ describe("CreateDestinationForm", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          "OIcon": false,
+          OIcon: false,
         },
       },
     });
@@ -117,9 +116,7 @@ describe("CreateDestinationForm", () => {
     });
 
     it("initializes url_endpoint to OpenObserve default endpoint", () => {
-      expect(getFormField(wrapper, "url_endpoint")).toBe(
-        "/api/default/default/_json"
-      );
+      expect(getFormField(wrapper, "url_endpoint")).toBe("/api/default/default/_json");
     });
 
     it("has 'post' as default method", () => {
@@ -159,48 +156,32 @@ describe("CreateDestinationForm", () => {
     });
 
     it("renders destination card for openobserve", () => {
-      expect(
-        wrapper.find('[data-test="destination-type-card-openobserve"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-type-card-openobserve"]').exists()).toBe(true);
     });
 
     it("renders destination card for splunk", () => {
-      expect(
-        wrapper.find('[data-test="destination-type-card-splunk"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-type-card-splunk"]').exists()).toBe(true);
     });
 
     it("renders destination card for elasticsearch", () => {
-      expect(
-        wrapper
-          .find('[data-test="destination-type-card-elasticsearch"]')
-          .exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-type-card-elasticsearch"]').exists()).toBe(true);
     });
 
     it("renders destination card for datadog", () => {
-      expect(
-        wrapper.find('[data-test="destination-type-card-datadog"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-type-card-datadog"]').exists()).toBe(true);
     });
 
     it("renders destination card for custom", () => {
-      expect(
-        wrapper.find('[data-test="destination-type-card-custom"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="destination-type-card-custom"]').exists()).toBe(true);
     });
 
     it("openobserve card shows an image", () => {
-      const card = wrapper.find(
-        '[data-test="destination-type-card-openobserve"]'
-      );
+      const card = wrapper.find('[data-test="destination-type-card-openobserve"]');
       expect(card.find("img").exists()).toBe(true);
     });
 
     it("applies 'selected' class to the active destination card", () => {
-      const card = wrapper.find(
-        '[data-test="destination-type-card-openobserve"]'
-      );
+      const card = wrapper.find('[data-test="destination-type-card-openobserve"]');
       expect(card.classes()).toContain("selected");
     });
 
@@ -230,9 +211,7 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.step = 2;
       await nextTick();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-destination-method-select"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-method-select"]').exists()).toBe(true);
     });
   });
 
@@ -329,16 +308,8 @@ describe("CreateDestinationForm", () => {
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Default Headers per Destination Type", () => {
     it.each([
-      [
-        "openobserve",
-        1,
-        [{ key: "Authorization", value: "Basic <token>" }],
-      ],
-      [
-        "splunk",
-        1,
-        [{ key: "Authorization", value: "Splunk <splunk_token>" }],
-      ],
+      ["openobserve", 1, [{ key: "Authorization", value: "Basic <token>" }]],
+      ["splunk", 1, [{ key: "Authorization", value: "Splunk <splunk_token>" }]],
       [
         "elasticsearch",
         2,
@@ -384,7 +355,7 @@ describe("CreateDestinationForm", () => {
           expect(wrapper.vm.apiHeaders[i].key).toBe(key);
           expect(wrapper.vm.apiHeaders[i].value).toBe(value);
         });
-      }
+      },
     );
   });
 
@@ -406,9 +377,7 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.deleteApiHeader(before - 1);
 
       expect(wrapper.vm.apiHeaders).toHaveLength(before - 1);
-      expect(
-        wrapper.vm.apiHeaders.some((h: any) => h.key === "X-Test")
-      ).toBe(false);
+      expect(wrapper.vm.apiHeaders.some((h: any) => h.key === "X-Test")).toBe(false);
     });
 
     it("deleteApiHeader adds an empty header row when all headers are deleted", () => {
@@ -469,10 +438,7 @@ describe("CreateDestinationForm", () => {
       expect(renderedByName("value")).toEqual(["V0", "V2"]);
       // … and the form data agrees (index-based names re-bound correctly).
       expect(wrapper.vm.apiHeaders.map((h: any) => h.key)).toEqual(["H0", "H2"]);
-      expect(wrapper.vm.apiHeaders.map((h: any) => h.value)).toEqual([
-        "V0",
-        "V2",
-      ]);
+      expect(wrapper.vm.apiHeaders.map((h: any) => h.value)).toEqual(["V0", "V2"]);
     });
   });
 
@@ -572,6 +538,56 @@ describe("CreateDestinationForm", () => {
       wrapper.vm.prevStep();
       await nextTick();
       expect(wrapper.vm.step).toBe(1);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("forcedType (skip step 1, locked type, no going back)", () => {
+    it("opens directly on step 2, locked to the forced type", () => {
+      const w = createWrapper({ forcedType: "custom" });
+      expect(w.vm.step).toBe(2);
+      expect(w.vm.destinationType).toBe("custom");
+      w.unmount();
+    });
+
+    it("seeds the create defaults for the forced type", () => {
+      const w = createWrapper({ forcedType: "custom" });
+      const v = w.vm.form.state.values;
+      expect(v.destination_type).toBe("custom");
+      expect(v.method).toBe("post");
+      expect(v.output_format).toBe("json");
+      expect(v.url_endpoint).toBe("");
+      expect(v.headers).toEqual([{ key: "", value: "" }]);
+      w.unmount();
+    });
+
+    it("hides the Back button (there's no step 1 to return to)", () => {
+      const w = createWrapper({ forcedType: "custom" });
+      expect(w.find('[data-test="step3-back-btn"]').exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("hides the stepper header (single-step flow)", () => {
+      const forced = createWrapper({ forcedType: "custom" });
+      expect(forced.findComponent({ name: "OStepper" }).props("hideHeader")).toBe(true);
+      forced.unmount();
+      // ...and the default (no forcedType) keeps the header.
+      expect(wrapper.findComponent({ name: "OStepper" }).props("hideHeader")).toBe(false);
+    });
+
+    it("resetForm keeps it on step 2 when the type is forced", async () => {
+      const w = createWrapper({ forcedType: "custom" });
+      w.vm.resetForm();
+      await nextTick();
+      expect(w.vm.step).toBe(2);
+      expect(w.vm.form.state.values.destination_type).toBe("custom");
+      w.unmount();
+    });
+
+    it("without forcedType, the Back button and step 1 remain (unchanged default)", () => {
+      // default wrapper has no forcedType
+      expect(wrapper.vm.step).toBe(1);
+      expect(wrapper.find('[data-test="destination-type-card-openobserve"]').exists()).toBe(true);
     });
   });
 
@@ -740,43 +756,31 @@ describe("CreateDestinationForm", () => {
     });
 
     it("renders name input field", () => {
-      expect(
-        wrapper.find('[data-test="add-destination-name-input"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-name-input"]').exists()).toBe(true);
     });
 
     it("renders URL input field", () => {
-      expect(
-        wrapper.find('[data-test="add-destination-url-input"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-url-input"]').exists()).toBe(true);
     });
 
     it("renders url_endpoint input field", () => {
-      expect(
-        wrapper.find('[data-test="add-destination-url-endpoint-input"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-url-endpoint-input"]').exists()).toBe(true);
     });
 
     it("renders output format select field", () => {
-      expect(
-        wrapper
-          .find('[data-test="add-destination-output-format-select"]')
-          .exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-output-format-select"]').exists()).toBe(
+        true,
+      );
     });
 
     it("renders skip TLS verify toggle", () => {
-      expect(
-        wrapper
-          .find('[data-test="add-destination-skip-tls-verify-toggle"]')
-          .exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
+        true,
+      );
     });
 
     it("does NOT render Method field for openobserve type", () => {
-      expect(
-        wrapper.find('[data-test="add-destination-method-select"]').exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="add-destination-method-select"]').exists()).toBe(false);
     });
   });
 
@@ -790,15 +794,11 @@ describe("CreateDestinationForm", () => {
     });
 
     it("renders Method select for custom destination type", () => {
-      expect(
-        wrapper.find('[data-test="add-destination-method-select"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-method-select"]').exists()).toBe(true);
     });
 
     it("url_endpoint field is not disabled for custom type", () => {
-      const endpointField = wrapper.find(
-        '[data-test="add-destination-url-endpoint-input"]'
-      );
+      const endpointField = wrapper.find('[data-test="add-destination-url-endpoint-input"]');
       expect(endpointField.exists()).toBe(true);
     });
   });
@@ -812,9 +812,7 @@ describe("CreateDestinationForm", () => {
       await nextTick();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="add-destination-separator-input"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-separator-input"]').exists()).toBe(true);
     });
 
     it("hides separator field for other output formats", async () => {
@@ -824,9 +822,7 @@ describe("CreateDestinationForm", () => {
       await nextTick();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="add-destination-separator-input"]').exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="add-destination-separator-input"]').exists()).toBe(false);
     });
   });
 
@@ -839,11 +835,7 @@ describe("CreateDestinationForm", () => {
       await nextTick();
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="add-destination-esbulk-index-input"]')
-          .exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-destination-esbulk-index-input"]').exists()).toBe(true);
     });
 
     it("hides esbulk index field for non-esbulk formats", async () => {
@@ -852,11 +844,7 @@ describe("CreateDestinationForm", () => {
       await nextTick();
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="add-destination-esbulk-index-input"]')
-          .exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="add-destination-esbulk-index-input"]').exists()).toBe(false);
     });
   });
 
@@ -877,9 +865,7 @@ describe("CreateDestinationForm", () => {
       setFormField(wrapper, "url_endpoint", "/api/test");
       setFormField(wrapper, "method", "post");
       setFormField(wrapper, "output_format", "json");
-      setFormField(wrapper, "headers", [
-        { key: "Authorization", value: "Basic token123" },
-      ]);
+      setFormField(wrapper, "headers", [{ key: "Authorization", value: "Basic token123" }]);
 
       await wrapper.vm.createDestination();
       await flushPromises();
@@ -909,9 +895,7 @@ describe("CreateDestinationForm", () => {
       setFormField(wrapper, "url_endpoint", "/services/collector");
       setFormField(wrapper, "method", "post");
       setFormField(wrapper, "output_format", "nestedevent");
-      setFormField(wrapper, "headers", [
-        { key: "Authorization", value: "Splunk token" },
-      ]);
+      setFormField(wrapper, "headers", [{ key: "Authorization", value: "Splunk token" }]);
 
       await wrapper.vm.createDestination();
       await flushPromises();
@@ -922,7 +906,7 @@ describe("CreateDestinationForm", () => {
           data: expect.objectContaining({
             destination_type_name: "splunk",
           }),
-        })
+        }),
       );
     });
 
@@ -990,9 +974,7 @@ describe("CreateDestinationForm", () => {
       expect(getFormField(wrapper, "url")).toBe("");
       // Reset returns the form to its create-mode defaults (the OpenObserve
       // default endpoint) — the single source of truth, no mirror to diverge.
-      expect(getFormField(wrapper, "url_endpoint")).toBe(
-        "/api/default/default/_json"
-      );
+      expect(getFormField(wrapper, "url_endpoint")).toBe("/api/default/default/_json");
       expect(getFormField(wrapper, "destination_type")).toBe("openobserve");
       expect(wrapper.vm.step).toBe(1);
     });
@@ -1036,9 +1018,7 @@ describe("CreateDestinationForm", () => {
       });
 
       expect(getFormField(wrapper, "url")).toBe("https://splunk.host.com");
-      expect(getFormField(wrapper, "url_endpoint")).toBe(
-        "/services/collector?key=val"
-      );
+      expect(getFormField(wrapper, "url_endpoint")).toBe("/services/collector?key=val");
     });
 
     it("handles URL without path (sets url_endpoint to empty)", () => {
@@ -1065,9 +1045,7 @@ describe("CreateDestinationForm", () => {
         skip_tls_verify: false,
       });
 
-      expect(getFormField(wrapper, "url")).toBe(
-        "https://example.com/api/custom/endpoint"
-      );
+      expect(getFormField(wrapper, "url")).toBe("https://example.com/api/custom/endpoint");
       expect(getFormField(wrapper, "url_endpoint")).toBe("");
     });
 
@@ -1112,14 +1090,12 @@ describe("CreateDestinationForm", () => {
 
       expect(wrapper.vm.apiHeaders).toHaveLength(2);
       expect(
-        wrapper.vm.apiHeaders.some(
-          (h: any) => h.key === "X-Custom-Header" && h.value === "value1"
-        )
+        wrapper.vm.apiHeaders.some((h: any) => h.key === "X-Custom-Header" && h.value === "value1"),
       ).toBe(true);
       expect(
         wrapper.vm.apiHeaders.some(
-          (h: any) => h.key === "Authorization" && h.value === "Bearer token"
-        )
+          (h: any) => h.key === "Authorization" && h.value === "Bearer token",
+        ),
       ).toBe(true);
     });
 

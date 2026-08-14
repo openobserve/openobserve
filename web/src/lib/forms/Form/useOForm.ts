@@ -49,9 +49,7 @@ export interface UseOFormOptions<T extends Record<string, unknown>> {
  * read it with `form.useStore(selector)` and write it with
  * `form.setFieldValue(...)` — a single source of truth, no mirror.
  */
-export function useOForm<T extends Record<string, unknown>>(
-  options: UseOFormOptions<T>,
-) {
+export function useOForm<T extends Record<string, unknown>>(options: UseOFormOptions<T>) {
   return useForm({
     // Pass defaultValues unwidened so the form generic `T` flows into useForm and
     // the array-field helpers (pushFieldValue/removeFieldValue) resolve real

@@ -103,7 +103,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import orgService from "@/services/organizations";
 import UsageTab from "./UsageTab.vue";
 
-
 // ── Mount factory ───────────────────────────────────────────────────────────
 
 function mountUsageTab() {
@@ -117,12 +116,10 @@ function mountUsageTab() {
         UsageReportBanner: true,
         DatabaseDeprecationBanner: true,
         HomeViewSkeleton: {
-          template:
-            '<div data-test="usage-tab-loading-skeleton">Loading skeleton</div>',
+          template: '<div data-test="usage-tab-loading-skeleton">Loading skeleton</div>',
         },
         CustomChartRenderer: {
-          template:
-            '<div data-test="usage-tab-custom-chart-renderer"></div>',
+          template: '<div data-test="usage-tab-custom-chart-renderer"></div>',
           props: ["data"],
         },
         OButton: {
@@ -137,7 +134,7 @@ function mountUsageTab() {
           template: '<a data-test="usage-tab-router-link"><slot /></a>',
           props: ["to", "exact"],
         },
-        "OIcon": {
+        OIcon: {
           template: '<span class="OIcon-stub"></span>',
           props: ["name", "size"],
         },
@@ -197,12 +194,10 @@ describe("UsageTab", () => {
       wrapper = mountUsageTab();
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.find('[data-test="usage-tab-loading-skeleton"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="usage-tab-loading-skeleton"]').text(),
-      ).toBe("Loading skeleton");
+      expect(wrapper.find('[data-test="usage-tab-loading-skeleton"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="usage-tab-loading-skeleton"]').text()).toBe(
+        "Loading skeleton",
+      );
 
       // Resolve and clean up
       resolvePromise!({ data: mockSummaryData });
@@ -212,9 +207,7 @@ describe("UsageTab", () => {
     it("should hide the skeleton once loading completes", async () => {
       wrapper = mountUsageTab();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="usage-tab-loading-skeleton"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="usage-tab-loading-skeleton"]').exists()).toBe(false);
     });
   });
 
@@ -243,9 +236,7 @@ describe("UsageTab", () => {
       const panel = wrapper.find('[data-test="home-usage-tab-no-data"]');
       expect(panel.exists()).toBe(true);
       expect(panel.text()).toContain("No data ingested yet");
-      expect(panel.text()).toContain(
-        "This organization hasn't received any data",
-      );
+      expect(panel.text()).toContain("This organization hasn't received any data");
     });
   });
 
@@ -259,9 +250,7 @@ describe("UsageTab", () => {
 
     it("should render the streams overview section", () => {
       // The streams section renders the KPI tile row carrying the streams count
-      expect(
-        wrapper.find('[data-test="home-usage-tab-streams-count"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="home-usage-tab-streams-count"]').exists()).toBe(true);
     });
 
     it("should render streams count tile", () => {
@@ -278,9 +267,7 @@ describe("UsageTab", () => {
     });
 
     it("should render ingested data size tile", () => {
-      const tile = wrapper.find(
-        '[data-test="home-usage-tab-ingested-size"]',
-      );
+      const tile = wrapper.find('[data-test="home-usage-tab-ingested-size"]');
       expect(tile.exists()).toBe(true);
       // fallback: summary.value.ingested_data = formatSizeFromMB(2000) -> "2000 MB"
       expect(tile.text()).toBe("2000 MB");
@@ -304,9 +291,7 @@ describe("UsageTab", () => {
     });
 
     it("should render the pipelines overview section", () => {
-      const section = wrapper.find(
-        '[aria-label="Pipelines overview section"]',
-      );
+      const section = wrapper.find('[aria-label="Pipelines overview section"]');
       expect(section.exists()).toBe(true);
     });
 
@@ -317,25 +302,17 @@ describe("UsageTab", () => {
     it("should show scheduled and real-time alert counts", () => {
       const section = wrapper.find('[aria-label="Alerts overview section"]');
       // animated counts are 0, so fallback to summary values
-      expect(
-        section.find('[data-test="home-usage-tab-scheduled-alerts-count"]').text(),
-      ).toBe("3");
-      expect(
-        section.find('[data-test="home-usage-tab-rt-alerts-count"]').text(),
-      ).toBe("2");
+      expect(section.find('[data-test="home-usage-tab-scheduled-alerts-count"]').text()).toBe("3");
+      expect(section.find('[data-test="home-usage-tab-rt-alerts-count"]').text()).toBe("2");
     });
 
     it("should show scheduled and real-time pipeline counts", () => {
-      const section = wrapper.find(
-        '[aria-label="Pipelines overview section"]',
-      );
+      const section = wrapper.find('[aria-label="Pipelines overview section"]');
       // animated counts are 0, so fallback to summary values
-      expect(
-        section.find('[data-test="home-usage-tab-scheduled-pipelines-count"]').text(),
-      ).toBe("2");
-      expect(
-        section.find('[data-test="home-usage-tab-rt-pipelines-count"]').text(),
-      ).toBe("1");
+      expect(section.find('[data-test="home-usage-tab-scheduled-pipelines-count"]').text()).toBe(
+        "2",
+      );
+      expect(section.find('[data-test="home-usage-tab-rt-pipelines-count"]').text()).toBe("1");
     });
 
     it("should not show the empty-state panel when data exists", () => {
@@ -356,9 +333,7 @@ describe("UsageTab", () => {
     });
 
     it("should render compressed data size tile when isCloud is false", () => {
-      const tile = wrapper.find(
-        '[data-test="home-usage-tab-compressed-size"]',
-      );
+      const tile = wrapper.find('[data-test="home-usage-tab-compressed-size"]');
       expect(tile.exists()).toBe(true);
       expect(tile.text()).toBe("500 MB");
     });
@@ -378,9 +353,7 @@ describe("UsageTab", () => {
       await flushPromises();
 
       expect(orgService.get_organization_summary).toHaveBeenCalledTimes(1);
-      expect(orgService.get_organization_summary).toHaveBeenCalledWith(
-        "default",
-      );
+      expect(orgService.get_organization_summary).toHaveBeenCalledWith("default");
     });
 
     it("should show a loading notification while fetching", async () => {
@@ -407,9 +380,7 @@ describe("UsageTab", () => {
       await flushPromises();
 
       expect(orgService.get_organization_summary).toHaveBeenCalledTimes(2);
-      expect(orgService.get_organization_summary).toHaveBeenLastCalledWith(
-        "new-org",
-      );
+      expect(orgService.get_organization_summary).toHaveBeenLastCalledWith("new-org");
     });
 
     it("should re-fetch when org changes and summary was previously empty", async () => {

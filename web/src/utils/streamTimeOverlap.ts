@@ -35,10 +35,7 @@ interface StreamStats {
 
 // Streams without confirmed overlap (missing stats OR no intersection) are
 // demoted to the bottom — they still render and stay clickable.
-export function classifyOverlap(
-  stats: StreamStats | null | undefined,
-  range: TimeRange,
-): Overlap {
+export function classifyOverlap(stats: StreamStats | null | undefined, range: TimeRange): Overlap {
   if (!stats) return "no";
   const { doc_time_min, doc_time_max } = stats;
   if (typeof doc_time_min !== "number" || typeof doc_time_max !== "number") {
@@ -85,9 +82,7 @@ export function enrichStreamsWithOverlap(
 }
 
 // Sort: has-data first (by doc_time_max desc — most recently active first), no-data last.
-export function sortStreamsByOverlap(
-  streams: StreamWithOverlap[],
-): StreamWithOverlap[] {
+export function sortStreamsByOverlap(streams: StreamWithOverlap[]): StreamWithOverlap[] {
   const yes: StreamWithOverlap[] = [];
   const no: StreamWithOverlap[] = [];
   for (const s of streams) (s.overlap === "yes" ? yes : no).push(s);

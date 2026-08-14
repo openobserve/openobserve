@@ -28,6 +28,7 @@
 import { buildMetricCardFor, type MetricStream } from "./metricFamily";
 import {
   getMetricDefaults,
+  PANEL_PERCENTILE_WINDOW,
   PANEL_RATE_WINDOW,
   resolveVariant,
 } from "./metricDefaults";
@@ -71,6 +72,7 @@ export interface SeedOptions {
    * was picked.
    */
   rateWindow?: string;
+  percentileWindow?: string;
 }
 
 /**
@@ -127,6 +129,7 @@ export function buildPromqlSeed(
       familyType: card.familyType,
       labels: card.labels,
       rateWindow: opts.rateWindow ?? PANEL_RATE_WINDOW,
+      percentileWindow: opts.percentileWindow ?? PANEL_PERCENTILE_WINDOW,
     },
   );
 
@@ -152,8 +155,7 @@ export function buildPromqlSeed(
    * Custom-form query in a Builder panel is rewritten to a bare `metric{}` the
    * moment the user touches anything.
    */
-  const expressible = (v: any) =>
-    !opts.requireBuilder || !!v.queries?.[0]?.builder;
+  const expressible = (v: any) => !opts.requireBuilder || !!v.queries?.[0]?.builder;
 
   // Free to change the chart type ⇒ the rule set's default variant wins.
   // Otherwise honour the type the user already chose and pick the best variant
@@ -289,10 +291,7 @@ export function seedOwnsChartType(
   if (!text || !metric) return false;
   if (text === `${metric}{}`) return false;
 
-  return (
-    text ===
-    seedQueryFor(metric, streams, { ...opts, allowChartTypeChange: false })
-  );
+  return text === seedQueryFor(metric, streams, { ...opts, allowChartTypeChange: false });
 }
 
 /**

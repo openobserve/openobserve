@@ -21,7 +21,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
@@ -39,7 +38,6 @@ const store = createStore({
     theme: "light",
   },
 });
-const i18n = createI18n({ locale: "en", messages: { en: {} } });
 const router = createRouter({
   history: createWebHistory(),
   routes: [{ path: "/", component: { template: "<div/>" } }],
@@ -80,7 +78,7 @@ const CONTENT: RichCardContent = {
 const mountCard = (content: RichCardContent = CONTENT) =>
   mount(SetupCardRenderer, {
     props: { content, subs: SUBS },
-    global: { plugins: [store, i18n, router] },
+    global: { plugins: [store, router] },
     attachTo: document.body,
   });
 
@@ -117,9 +115,51 @@ describe("SetupCardRenderer — advanced section", () => {
 
   it("omits the accordion entirely when no advanced content is given", () => {
     wrapper = mountCard({ ...CONTENT, extras: { troubleshooting: [] } });
-    expect(wrapper.find('[data-test="ai-advanced-accordion"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('[data-test="ai-advanced-accordion"]').exists()).toBe(false);
+  });
+});
+
+// Content builders (setupCard/content/*) store copy as i18n keys and the
+// renderer resolves them; a consumer that forgets t() shows the user a key.
+describe("SetupCardRenderer — key-as-data copy", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const keyed: RichCardContent = {
+    ...CONTENT,
+    steps: [
+      {
+        id: "configure",
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        completeOn: "copy",
+        inputs: [
+          { id: "host", labelKey: "ingestion.setupCard.jmxHostLabel", default: "localhost" },
+        ],
+        variants: [
+          {
+            id: "generic",
+            labelKey: "ingestion.setupCard.genericWindowsVariant",
+            code: { lang: "bash", raw: "echo hi" },
+          },
+        ],
+      },
+      CONTENT.steps[1],
+    ],
+  };
+
+  it("translates titleKey / descriptionKey / labelKey instead of printing the key", () => {
+    wrapper = mountCard(keyed);
+    const text = wrapper.text();
+    expect(text).toContain("Configure the OpenTelemetry Collector");
+    // inlineMd turns the `config.yaml` backticks into <code>, so match the prose.
+    expect(text).toContain("set the host/port below");
+    expect(text).toContain("JMX Host");
+    expect(text).toContain("Generic Windows");
+    expect(text).not.toContain("ingestion.setupCard.");
   });
 });
 
@@ -162,9 +202,7 @@ describe("SetupCardRenderer — uninstall section", () => {
 
   it("omits the accordion when a card provides no uninstall path", () => {
     wrapper = mountCard();
-    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(false);
   });
 
   it("still renders the section wrapper when uninstall is the only extra", () => {
@@ -178,9 +216,7 @@ describe("SetupCardRenderer — uninstall section", () => {
         },
       },
     });
-    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(true);
   });
 });
 
@@ -200,17 +236,13 @@ describe("SetupCardRenderer — footer doc links", () => {
         { label: "Third Guide", url: "https://example.com/third" },
       ],
     });
-    const hrefs = wrapper
-      .findAll(".pv-foot a")
-      .map((a) => a.attributes("href"));
+    const hrefs = wrapper.findAll(".pv-foot a").map((a) => a.attributes("href"));
     expect(hrefs).toEqual([
       "https://example.com/main",
       "https://example.com/second",
       "https://example.com/third",
     ]);
-    expect(wrapper.find('[data-test="ai-doc-link-second-guide"]').text()).toBe(
-      "Second Guide →",
-    );
+    expect(wrapper.find('[data-test="ai-doc-link-second-guide"]').text()).toBe("Second Guide →");
   });
 
   it("renders only the primary link when there are no docLinks", () => {

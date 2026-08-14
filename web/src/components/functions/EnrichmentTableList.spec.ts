@@ -274,7 +274,10 @@ describe("EnrichmentTableList", () => {
       const vm = wrapper.vm as any;
       vm.jsTransforms = [
         makeTable({ name: "uploaded_table", urlJobs: [] }),
-        makeTable({ name: "url_table", urlJobs: [{ id: "job1", status: "completed", url: "http://x.com" }] }),
+        makeTable({
+          name: "url_table",
+          urlJobs: [{ id: "job1", status: "completed", url: "http://x.com" }],
+        }),
       ];
     };
 

@@ -21,8 +21,8 @@
  * rebuilt — e.g. after loading selectedFields from localStorage, after a
  * mode switch, or after the user adds/removes/reorders a column.
  *
- * Cell rendering is handled via scoped slots on <TenstackTable>:
- *   #cell-{columnId}="{ item, cell }"
+ * Cell rendering is handled via scoped slots on <OTable>:
+ *   #cell-{columnId}="{ row, value, column }"
  *
  * Column order is fully driven by `selectedFields` (an ordered string[]).
  * LLM columns (input_tokens, output_tokens, cost) are injected dynamically
@@ -35,27 +35,26 @@
  */
 
 import { ref } from "vue";
-import { type ColumnDef } from "@tanstack/vue-table";
 import { useStore } from "vuex";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nKey, type TranslateFn } from "@/types/i18n";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 /** IDs of LLM columns injected at runtime — never stored in selectedFields. */
-export const LLM_COLUMN_IDS = new Set([
-  "input_tokens",
-  "output_tokens",
-  "cost",
-]);
+export const LLM_COLUMN_IDS = new Set(["input_tokens", "output_tokens", "cost"]);
 
 /**
  * Known column metadata. Any field name NOT in this map gets a generic
  * prettified header and default width.
+ *
+ * `headerKey` stays an i18n key, not resolved text: this map is at module scope,
+ * so `t()` here would freeze the copy at the locale active on import.
  */
 const KNOWN_COLUMN_META: Record<
   string,
   {
-    header: string;
+    headerKey: I18nKey;
     size: number;
     meta: Record<string, unknown>;
     accessorFn?: (row: any) => any;
@@ -63,83 +62,81 @@ const KNOWN_COLUMN_META: Record<
   }
 > = {
   service_name: {
-    header: "Service",
+    headerKey: "traces.tableColumns.service",
     size: 160,
-    meta: { cellClass: "text-[var(--color-text-secondary)]", slot: true },
+    meta: { cellClass: "text-text-secondary" },
   },
   operation_name: {
-    header: "Operation Name",
+    headerKey: "traces.tableColumns.operationName",
     size: 200,
-    meta: { cellClass: "text-[var(--color-text-secondary)]", slot: true },
+    meta: { cellClass: "text-text-secondary" },
   },
   duration: {
-    header: "Duration",
+    headerKey: "traces.tableColumns.duration",
     size: 120,
     meta: {
       sortable: true,
-      slot: true,
-      cellClass: "text-[var(--color-text-heading)]!",
+      cellClass: "text-text-heading!",
     },
   },
   spans: {
-    header: "Spans",
+    headerKey: "traces.tableColumns.spans",
     size: 100,
     meta: {
       align: "right",
-      slot: false,
-      cellClass: "text-[var(--color-text-secondary)]!",
+      cellClass: "text-text-secondary!",
     },
     accessorFn: (row: any) => row.spans,
   },
   span_kind: {
-    header: "Span Kind",
+    headerKey: "traces.tableColumns.spanKind",
     size: 120,
-    meta: { align: "left", slot: false, closable: true },
-    accessorFn: (row: any) =>
-      SPAN_KIND_MAP[row.span_kind] ?? row.span_kind ?? "",
+    meta: { align: "left", closable: true },
+    accessorFn: (row: any) => SPAN_KIND_MAP[row.span_kind] ?? row.span_kind ?? "",
   },
   span_status: {
-    header: "Span Status",
+    headerKey: "traces.tableColumns.spanStatus",
     size: 120,
-    meta: { align: "left", slot: true, disableCellAction: true },
+    meta: { align: "left", disableCellAction: true },
   },
   status: {
-    header: "Status",
+    headerKey: "traces.tableColumns.status",
     size: 120,
-    meta: { align: "left", slot: true, disableCellAction: true },
+    meta: { align: "left", disableCellAction: true },
   },
   service_latency: {
-    header: "Service Latency",
+    headerKey: "traces.tableColumns.serviceLatency",
     size: 160,
-    meta: { slot: true, disableCellAction: true },
+    meta: { disableCellAction: true },
   },
   input_tokens: {
-    header: "Input Tokens",
+    headerKey: "traces.tableColumns.inputTokens",
     size: 130,
-    meta: { align: "right", slot: true },
+    meta: { align: "right" },
   },
   output_tokens: {
-    header: "Output Tokens",
+    headerKey: "traces.tableColumns.outputTokens",
     size: 130,
-    meta: { align: "right", slot: true },
+    meta: { align: "right" },
   },
   cost: {
-    header: "Cost",
+    headerKey: "traces.tableColumns.cost",
     size: 130,
-    meta: { align: "right", slot: true },
+    meta: { align: "right" },
   },
 };
 
 function toColumnDef(
   fieldName: string,
+  t: TranslateFn,
   searchMode?: "traces" | "spans",
-): ColumnDef<Record<string, any>> {
+): OTableColumnDef<Record<string, any>> {
   const known = KNOWN_COLUMN_META[fieldName];
   // "status" is a traces-mode special column; in spans mode treat it as generic
   if (known && !(fieldName === "status" && searchMode === "spans")) {
     return {
       id: fieldName,
-      header: known.header,
+      header: t(known.headerKey),
       size: known.size,
       meta: { ...known.meta },
       ...(known.accessorFn ? { accessorFn: known.accessorFn } : {}),
@@ -147,14 +144,12 @@ function toColumnDef(
     };
   }
   // Generic: prettify field name as header, default size
-  const header = fieldName
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  const header = fieldName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   return {
     id: fieldName,
-    header,
+    header: raw(header),
     size: 160,
-    meta: { slot: false, closable: true },
+    meta: { closable: true },
     accessorFn: (row: any) => row[fieldName],
   };
 }
@@ -164,27 +159,26 @@ export function useTracesTableColumns() {
    * Rebuild the `columns` ref from the given parameters.
    * Call this whenever selectedFields, searchMode, or showLlmColumns changes.
    */
-  const columns = ref<ColumnDef<Record<string, any>>[]>([]);
+  const columns = ref<OTableColumnDef<Record<string, any>>[]>([]);
   const store = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
 
   const buildColumns = (
     showLlmColumns: boolean,
     searchMode: "traces" | "spans",
     selectedFields: string[],
-  ): ColumnDef<Record<string, any>>[] => {
-    const cols: ColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
-      toColumnDef(field, searchMode),
+  ): OTableColumnDef<Record<string, any>>[] => {
+    const cols: OTableColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
+      toColumnDef(field, t, searchMode),
     );
 
-    const timestampCol =
-      store?.state?.zoConfig?.timestamp_column || "_timestamp";
+    const timestampCol = store?.state?.zoConfig?.timestamp_column || "_timestamp";
     if (!selectedFields.find((col) => col === timestampCol))
       cols.unshift({
         id: timestampCol,
-        header: t("traces.timestamp") + ` (${store.state.timezone})`,
+        header: raw(`${t("traces.timestamp")} (${store.state.timezone})`),
         size: 210,
-        meta: { slot: true, sortable: true, class: "capitalize!" },
+        meta: { sortable: true, headerClass: "capitalize!" },
         accessorFn: (row: any) =>
           timestampToTimezoneDate(
             (row[timestampCol] ?? row["zo_sql_timestamp"]) / 1000,
@@ -197,16 +191,16 @@ export function useTracesTableColumns() {
     // They are not stored in selectedFields — managed by the showLlmColumns flag.
     if (searchMode === "traces" && showLlmColumns) {
       const tailIdx = cols.findIndex((c) => c.id === "service_latency");
-      const llm: ColumnDef<Record<string, any>>[] = [];
+      const llm: OTableColumnDef<Record<string, any>>[] = [];
 
       if (!selectedFields.includes("input_tokens")) {
-        llm.push(toColumnDef("input_tokens", searchMode));
+        llm.push(toColumnDef("input_tokens", t, searchMode));
       }
       if (!selectedFields.includes("output_tokens")) {
-        llm.push(toColumnDef("output_tokens", searchMode));
+        llm.push(toColumnDef("output_tokens", t, searchMode));
       }
       if (!selectedFields.includes("cost")) {
-        llm.push(toColumnDef("cost", searchMode));
+        llm.push(toColumnDef("cost", t, searchMode));
       }
 
       if (tailIdx !== -1) {

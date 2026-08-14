@@ -106,7 +106,6 @@ describe("b64DecodeUnicode", () => {
   });
 
   it("returns undefined and logs on invalid base64", () => {
-
     const result = b64DecodeUnicode("!!!invalid!!!");
 
     expect(result).toBeUndefined();
@@ -132,7 +131,6 @@ describe("b64DecodeUnicodeSafe", () => {
   });
 
   it("returns fallback when decoding fails", () => {
-
     const result = b64DecodeUnicodeSafe("!!!invalid!!!", "default-fallback");
 
     expect(result).toBe("default-fallback");
@@ -223,7 +221,6 @@ describe("b64DecodeStandard", () => {
   });
 
   it("returns undefined and logs on invalid base64", () => {
-
     const result = b64DecodeStandard("!!!not-base64!!!");
 
     expect(result).toBeUndefined();
@@ -497,4 +494,3 @@ describe("convertToCamelCase", () => {
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
-

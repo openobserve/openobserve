@@ -1,4 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
@@ -38,12 +51,17 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({ t: (key: string) => key })),
 }));
 
+vi.mock("vue-router", () => ({
+  useRoute: vi.fn(() => ({ query: {} })),
+}));
+
 // ── Stubs for O2 and layout components ──────────────────────────────────────
 vi.mock("@/lib/core/PageHeader/OPageHeader.vue", () => ({
   default: {
     name: "OPageHeader",
     props: ["subtitle", "back", "drawerMode"],
-    template: '<div data-test="app-page-header"><slot name="title"></slot><slot name="title-trail"></slot></div>',
+    template:
+      '<div data-test="app-page-header"><slot name="title"></slot><slot name="title-trail"></slot></div>',
   },
 }));
 
@@ -83,6 +101,10 @@ function makeProtocolRun(overrides: Record<string, unknown> = {}) {
     error: "",
     errorClass: "",
     assertionsPassed: true,
+    // Default to the legacy shape (no per-assertion array) so the existing
+    // inference-path tests keep exercising that path; tests for the reported
+    // path pass their own array.
+    assertions: [],
     statusCode: 200,
     responseTimeMs: 245,
     responseBytes: 1234,
@@ -143,7 +165,7 @@ describe("ProtocolRunSummary", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="oskeleton"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-protocol-run-skeleton"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="oempty-state"]').exists()).toBe(false);
     });
   });
@@ -311,9 +333,7 @@ describe("ProtocolRunSummary", () => {
       mockGetSynthetics.mockResolvedValueOnce({
         data: {
           config: {
-            assertions: [
-              { field: "status_code", operator: "equals", value: "200" },
-            ],
+            assertions: [{ field: "status_code", operator: "equals", value: "200" }],
           },
         },
       });
@@ -323,6 +343,196 @@ describe("ProtocolRunSummary", () => {
       await flushPromises();
 
       expect(wrapper.text()).toContain("synthetics.protocolRun.assertionsFailed");
+    });
+
+    it("should report assertions as not evaluated when the request never responded", async () => {
+      loading.value = false;
+      protocolRunDetail.value = makeProtocolRun({
+        type: "http",
+        // The probe omits assertions_passed when it never got a response.
+        assertionsPassed: null,
+        error: 'Get "https://httpstat.us/200": EOF',
+        errorClass: "unknown",
+      });
+
+      mockGetSynthetics.mockResolvedValueOnce({
+        data: {
+          config: {
+            assertions: [{ field: "status_code", operator: "equals", value: "200" }],
+          },
+        },
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("synthetics.protocolRun.assertionsNotEvaluated");
+      expect(wrapper.text()).not.toContain("synthetics.protocolRun.assertionsPassed");
+      expect(wrapper.text()).toContain("synthetics.protocolRun.assertionsNotEvaluatedHint");
+    });
+
+    it("should keep reporting a pass when assertions actually ran", async () => {
+      loading.value = false;
+      protocolRunDetail.value = makeProtocolRun({ type: "http", assertionsPassed: true });
+
+      mockGetSynthetics.mockResolvedValueOnce({
+        data: {
+          config: {
+            assertions: [{ field: "status_code", operator: "equals", value: "200" }],
+          },
+        },
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("synthetics.protocolRun.assertionsPassed");
+      expect(wrapper.text()).not.toContain("synthetics.protocolRun.assertionsNotEvaluated");
+    });
+
+    it("should render every verdict the probe reported, not just the first failure", async () => {
+      loading.value = false;
+      protocolRunDetail.value = makeProtocolRun({
+        type: "http",
+        assertionsPassed: false,
+        error: "status 503 eq 200",
+        errorClass: "assertion",
+        assertions: [
+          {
+            field: "status_code",
+            operator: "eq",
+            value: "200",
+            passed: false,
+            detail: "status 503 eq 200",
+          },
+          { field: "body", operator: "contains", value: "ok", passed: true, detail: "" },
+          {
+            field: "response_time_ms",
+            operator: "lt",
+            value: "1",
+            passed: false,
+            detail: "response_time 4ms lt 1",
+          },
+        ],
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+      await flushPromises();
+
+      const variants = [0, 1, 2].map((i) =>
+        wrapper
+          .find(`[data-test="synthetics-protocol-run-assertion-${i}"]`)
+          .findComponent({ name: "OBadge" })
+          .props("variant"),
+      );
+      expect(variants).toEqual(["error", "success", "error"]);
+      // Both failures show their own comparison, not one shared error string.
+      expect(
+        wrapper.find('[data-test="synthetics-protocol-run-assertion-detail-0"]').text(),
+      ).toContain("status 503 eq 200");
+      expect(
+        wrapper.find('[data-test="synthetics-protocol-run-assertion-detail-2"]').text(),
+      ).toContain("response_time 4ms lt 1");
+    });
+
+    it("should render reported rows even when the check config could not be loaded", async () => {
+      loading.value = false;
+      protocolRunDetail.value = makeProtocolRun({
+        type: "http",
+        assertionsPassed: false,
+        error: "status 503 eq 200",
+        errorClass: "assertion",
+        assertions: [
+          {
+            field: "status_code",
+            operator: "eq",
+            value: "200",
+            passed: false,
+            detail: "status 503 eq 200",
+          },
+        ],
+      });
+      // Config fetch fails → assertionDefs stays empty; the run record alone
+      // must still be enough to render the section.
+      mockGetSynthetics.mockRejectedValueOnce(new Error("403"));
+
+      wrapper = mountComponent();
+      await flushPromises();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("synthetics.protocolRun.assertions");
+      expect(wrapper.find('[data-test="synthetics-protocol-run-assertion-0"]').exists()).toBe(true);
+    });
+
+    // Legacy record (no per-assertion array): both assertions fail, but the
+    // probe short-circuited on the first, so the record only ever names that
+    // one. The second row therefore renders as passing — a limit of the old
+    // single-verdict wire shape, not something the view can infer around.
+    it("should only flag the assertion the probe named on a legacy record", async () => {
+      loading.value = false;
+      protocolRunDetail.value = makeProtocolRun({
+        type: "http",
+        assertionsPassed: false,
+        error: "status 200 eq 999",
+        errorClass: "assertion",
+      });
+
+      mockGetSynthetics.mockResolvedValueOnce({
+        data: {
+          config: {
+            assertions: [
+              { field: "status_code", operator: "eq", value: "999" },
+              { field: "body", operator: "contains", value: "NOPE" },
+            ],
+          },
+        },
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+      await flushPromises();
+
+      const rows = [0, 1].map((i) =>
+        wrapper
+          .find(`[data-test="synthetics-protocol-run-assertion-${i}"]`)
+          .findComponent({ name: "OBadge" }),
+      );
+      expect(rows[0].props("variant")).toBe("error");
+      expect(rows[1].props("variant")).toBe("success");
+      expect(wrapper.text()).toContain("synthetics.protocolRun.assertionsFailed");
+    });
+
+    it("should flag the response_time_ms row the probe reported as failing", async () => {
+      loading.value = false;
+      protocolRunDetail.value = makeProtocolRun({
+        type: "http",
+        assertionsPassed: false,
+        // The probe's detail leads with `response_time`, not the config's
+        // `response_time_ms` — the row must still be matched.
+        error: "response_time 5300ms lt 5000",
+        errorClass: "assertion",
+      });
+
+      mockGetSynthetics.mockResolvedValueOnce({
+        data: {
+          config: {
+            assertions: [{ field: "response_time_ms", operator: "lt", value: "5000" }],
+          },
+        },
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+      await flushPromises();
+
+      const badge = wrapper
+        .find('[data-test="synthetics-protocol-run-assertion-0"]')
+        .findComponent({ name: "OBadge" });
+      expect(badge.props("variant")).toBe("error");
+      expect(badge.props("icon")).toBe("cancel");
     });
   });
 

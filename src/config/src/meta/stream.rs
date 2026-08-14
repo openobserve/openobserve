@@ -1019,6 +1019,9 @@ impl StreamSettings {
             crate::TIMESTAMP_COL_NAME.to_string(),
             get_config().common.column_all.to_string(),
         ];
+        if self.is_llm_stream {
+            columns.push(crate::O2_INGEST_TS_COL_NAME.to_string());
+        }
         if self.store_original_data || self.index_original_data {
             columns.push(crate::ID_COL_NAME.to_string());
             columns.push(crate::ORIGINAL_DATA_COL_NAME.to_string());
@@ -1431,13 +1434,16 @@ mod tests {
         let mut settings = StreamSettings::default();
         let columns = settings.uds_internal_columns();
         assert!(columns.contains(&crate::TIMESTAMP_COL_NAME.to_string()));
+        assert!(!columns.contains(&crate::O2_INGEST_TS_COL_NAME.to_string()));
         assert!(columns.contains(&get_config().common.column_all));
         assert!(!columns.contains(&crate::ID_COL_NAME.to_string()));
         assert!(!columns.contains(&crate::ALL_VALUES_COL_NAME.to_string()));
 
+        settings.is_llm_stream = true;
         settings.store_original_data = true;
         settings.index_all_values = true;
         let columns = settings.uds_internal_columns();
+        assert!(columns.contains(&crate::O2_INGEST_TS_COL_NAME.to_string()));
         assert!(columns.contains(&crate::ID_COL_NAME.to_string()));
         assert!(columns.contains(&crate::ORIGINAL_DATA_COL_NAME.to_string()));
         assert!(columns.contains(&crate::ALL_VALUES_COL_NAME.to_string()));
@@ -1456,8 +1462,10 @@ mod tests {
         assert!(settings.index_fields_updated_at.is_empty());
 
         // the map survives a serialize -> parse round trip
-        let mut settings = StreamSettings::default();
-        settings.index_updated_at = 100;
+        let mut settings = StreamSettings {
+            index_updated_at: 100,
+            ..Default::default()
+        };
         settings
             .index_fields_updated_at
             .insert("trace_id".to_string(), 200);
@@ -2069,7 +2077,6 @@ mod tests {
             doc_time_min: 1000,
             doc_time_max: 2000,
             created_at: 100,
-            ..Default::default()
         };
         let b = StreamStats {
             file_num: 2,
@@ -2080,7 +2087,6 @@ mod tests {
             doc_time_min: 500,
             doc_time_max: 3000,
             created_at: 50,
-            ..Default::default()
         };
         a.merge(&b);
         assert_eq!(a.file_num, 5);

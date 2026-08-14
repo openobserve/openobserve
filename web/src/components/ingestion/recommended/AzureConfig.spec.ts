@@ -1,70 +1,77 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import { createStore } from 'vuex';
-import { createI18n } from 'vue-i18n';
-import enUS from '@/locales/languages/en-US.json';
-import { createRouter, createWebHistory } from 'vue-router';
-import AzureConfig from './AzureConfig.vue';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+import enUS from "@/locales/languages/en-US.json";
+import { createRouter, createWebHistory } from "vue-router";
+import AzureConfig from "./AzureConfig.vue";
 
-vi.mock('../../../aws-exports', () => ({
-  default: { API_ENDPOINT: 'http://localhost:5080', region: 'us-east-1' },
+vi.mock("../../../aws-exports", () => ({
+  default: { API_ENDPOINT: "http://localhost:5080", region: "us-east-1" },
 }));
 
-vi.mock('../../../utils/zincutils', () => ({
+vi.mock("../../../utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mock-image-url-${path}`),
-  getEndPoint: vi.fn(() => ({ url: 'http://localhost:5080', host: 'localhost', port: '5080', protocol: 'http', tls: false })),
-  getIngestionURL: vi.fn(() => 'http://localhost:5080'),
+  getEndPoint: vi.fn(() => ({
+    url: "http://localhost:5080",
+    host: "localhost",
+    port: "5080",
+    protocol: "http",
+    tls: false,
+  })),
+  getIngestionURL: vi.fn(() => "http://localhost:5080"),
   b64EncodeStandard: vi.fn((str) => btoa(str)),
-  maskText: vi.fn(() => '***'),
+  maskText: vi.fn(() => "***"),
 }));
 
-vi.mock('../../../utils/azureIntegrations', () => ({
+vi.mock("../../../utils/azureIntegrations", () => ({
   azureIntegrations: [
     {
-      id: 'activity-logs',
-      name: 'Activity Logs',
-      displayName: 'Azure Activity Logs',
-      description: 'Stream Azure subscription activity logs',
-      armTemplate: 'https://mock-s3-bucket.s3.amazonaws.com/activity-logs.json',
+      id: "activity-logs",
+      name: "Activity Logs",
+      displayName: "Azure Activity Logs",
+      description: "Stream Azure subscription activity logs",
+      armTemplate: "https://mock-s3-bucket.s3.amazonaws.com/activity-logs.json",
       hasDashboard: false,
-      category: 'logs',
+      category: "logs",
     },
   ],
-  generateARMTemplateURL: vi.fn(() => 'https://portal.azure.com/#create/Microsoft.Template/uri/mock'),
-  generateAzureDashboardURL: vi.fn(() => 'https://mock-dashboard-url'),
+  generateARMTemplateURL: vi.fn(
+    () => "https://portal.azure.com/#create/Microsoft.Template/uri/mock",
+  ),
+  generateAzureDashboardURL: vi.fn(() => "https://mock-dashboard-url"),
 }));
 
-vi.mock('@/services/segment_analytics', () => ({
+vi.mock("@/services/segment_analytics", () => ({
   default: { track: vi.fn() },
 }));
 
 const mockStore = createStore({
   state: {
-    selectedOrganization: { identifier: 'test-org', name: 'Test Organization' },
-    userInfo: { email: 'test@example.com' },
-    organizationData: { organizationPasscode: 'test-passcode' },
+    selectedOrganization: { identifier: "test-org", name: "Test Organization" },
+    userInfo: { email: "test@example.com" },
+    organizationData: { organizationPasscode: "test-passcode" },
   },
 });
 
 // Real locale messages: the component renders t() keys, and several
 // assertions below check the resulting English text.
-const mockI18n = createI18n({ locale: 'en', messages: { en: enUS } });
+const mockI18n = createI18n({ locale: "en", messages: { en: enUS } });
 const mockRouter = createRouter({
   history: createWebHistory(),
-  routes: [{ path: '/', component: { template: '<div>Home</div>' } }],
+  routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
 });
 
-
-describe('AzureConfig.vue', () => {
+describe("AzureConfig.vue", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal('open', vi.fn());
+    vi.stubGlobal("open", vi.fn());
     // afterEach's unstubAllGlobals also clears the ResizeObserver stub that
     // setupTests installs globally, and OTabs needs it (jsdom has none).
     vi.stubGlobal(
-      'ResizeObserver',
+      "ResizeObserver",
       class {
         observe() {}
         unobserve() {}
@@ -86,77 +93,75 @@ describe('AzureConfig.vue', () => {
       },
     });
 
-  describe('Component Rendering', () => {
-    it('should mount without errors', () => {
+  describe("Component Rendering", () => {
+    it("should mount without errors", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it('should unmount without errors', () => {
+    it("should unmount without errors", () => {
       wrapper = createWrapper();
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
-    it('should render the deploy button', () => {
+    it("should render the deploy button", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="azure-activity-logs-deploy-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="azure-activity-logs-deploy-btn"]').exists()).toBe(true);
     });
 
-    it('should render Azure Activity Logs title', () => {
+    it("should render Azure Activity Logs title", () => {
       wrapper = createWrapper();
-      expect(wrapper.text()).toContain('Azure Activity Logs');
+      expect(wrapper.text()).toContain("Azure Activity Logs");
     });
 
-    it('should render deploy button', () => {
+    it("should render deploy button", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="azure-activity-logs-deploy-btn"]').exists()).toBe(true);
     });
   });
 
-  describe('Component Identity', () => {
-    it('should have correct component name', () => {
+  describe("Component Identity", () => {
+    it("should have correct component name", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.$options.name).toBe('AzureConfig');
+      expect(wrapper.vm.$options.name).toBe("AzureConfig");
     });
 
-    it('should be a Vue component', () => {
+    it("should be a Vue component", () => {
       wrapper = createWrapper();
       expect(wrapper.vm).toBeDefined();
-      expect(typeof wrapper.vm).toBe('object');
+      expect(typeof wrapper.vm).toBe("object");
     });
   });
 
-  describe('Step 2 Mode Toggle', () => {
-    it('should default to portal mode', () => {
+  describe("Step 2 Mode Toggle", () => {
+    it("should default to portal mode", () => {
       wrapper = createWrapper();
-      expect((wrapper.vm as any).step2Mode).toBe('portal');
+      expect((wrapper.vm as any).step2Mode).toBe("portal");
     });
 
-    it('should switch to cli mode', async () => {
+    it("should switch to cli mode", async () => {
       wrapper = createWrapper();
-      (wrapper.vm as any).step2Mode = 'cli';
+      (wrapper.vm as any).step2Mode = "cli";
       await wrapper.vm.$nextTick();
-      expect((wrapper.vm as any).step2Mode).toBe('cli');
+      expect((wrapper.vm as any).step2Mode).toBe("cli");
     });
   });
 
-  describe('Category Selection', () => {
-    it('should start with all categories enabled', () => {
+  describe("Category Selection", () => {
+    it("should start with all categories enabled", () => {
       wrapper = createWrapper();
       expect((wrapper.vm as any).enabledCategories.length).toBe(8);
     });
 
-    it('should clear categories', () => {
+    it("should clear categories", () => {
       wrapper = createWrapper();
       (wrapper.vm as any).enabledCategories = [];
       expect((wrapper.vm as any).enabledCategories.length).toBe(0);
     });
   });
 
-  describe('handleDeploy', () => {
-    it('should call window.open when credentials are valid', () => {
+  describe("handleDeploy", () => {
+    it("should call window.open when credentials are valid", () => {
       wrapper = createWrapper();
       (wrapper.vm as any).handleDeploy();
       expect(window.open).toHaveBeenCalled();

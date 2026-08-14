@@ -22,13 +22,12 @@ import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 const MockChartRenderer = {
   name: "ChartRenderer",
   template: '<div data-test="chart-renderer-mock">Chart Renderer</div>',
-  props: ["data"]
+  props: ["data"],
 };
 
 vi.mock("../panels/ChartRenderer.vue", () => ({
-  default: MockChartRenderer
+  default: MockChartRenderer,
 }));
-
 
 describe("VariablesDependenciesGraph", () => {
   let wrapper: VueWrapper<any>;
@@ -38,27 +37,21 @@ describe("VariablesDependenciesGraph", () => {
       name: "variable1",
       type: "query_values",
       query_data: {
-        filter: [
-          { name: "field1", operator: "=", value: "$variable2" }
-        ]
-      }
+        filter: [{ name: "field1", operator: "=", value: "$variable2" }],
+      },
     },
     {
-      name: "variable2", 
+      name: "variable2",
       type: "custom",
-      options: [
-        { label: "Option 1", value: "value1" }
-      ]
+      options: [{ label: "Option 1", value: "value1" }],
     },
     {
       name: "variable3",
-      type: "query_values", 
+      type: "query_values",
       query_data: {
-        filter: [
-          { name: "field2", operator: "=", value: "$variable1" }
-        ]
-      }
-    }
+        filter: [{ name: "field2", operator: "=", value: "$variable1" }],
+      },
+    },
   ];
 
   beforeEach(() => {
@@ -66,12 +59,12 @@ describe("VariablesDependenciesGraph", () => {
       global: {
         plugins: [],
         stubs: {
-          ChartRenderer: MockChartRenderer
-        }
+          ChartRenderer: MockChartRenderer,
+        },
       },
       props: {
-        variablesList: mockVariablesList
-      }
+        variablesList: mockVariablesList,
+      },
     });
   });
 
@@ -90,7 +83,7 @@ describe("VariablesDependenciesGraph", () => {
     });
 
     it("should accept required props", () => {
-      expect(wrapper.props('variablesList')).toEqual(mockVariablesList);
+      expect(wrapper.props("variablesList")).toEqual(mockVariablesList);
     });
 
     it("should have default empty array for variablesList", async () => {
@@ -98,13 +91,13 @@ describe("VariablesDependenciesGraph", () => {
         global: {
           plugins: [],
           stubs: {
-            ChartRenderer: MockChartRenderer
-          }
-        }
+            ChartRenderer: MockChartRenderer,
+          },
+        },
       });
 
-      expect(wrapperWithoutProps.props('variablesList')).toEqual([]);
-      
+      expect(wrapperWithoutProps.props("variablesList")).toEqual([]);
+
       wrapperWithoutProps.unmount();
     });
   });
@@ -112,19 +105,19 @@ describe("VariablesDependenciesGraph", () => {
   describe("Chart Configuration", () => {
     it("should initialize options correctly", async () => {
       await nextTick();
-      
+
       expect(wrapper.vm.options).toBeDefined();
     });
 
     it("should configure chart with transparent background", async () => {
       await nextTick();
-      
+
       expect(wrapper.vm.options?.backgroundColor).toBe("transparent");
     });
 
     it("should disable tooltip", async () => {
       await nextTick();
-      
+
       if (wrapper.vm.options) {
         expect(wrapper.vm.options.tooltip.show).toBe(false);
       }
@@ -132,10 +125,10 @@ describe("VariablesDependenciesGraph", () => {
 
     it("should configure graph series correctly", async () => {
       await nextTick();
-      
+
       if (wrapper.vm.options && wrapper.vm.options.series) {
         const graphSeries = wrapper.vm.options.series[0];
-        
+
         expect(graphSeries.type).toBe("graph");
         expect(graphSeries.layout).toBe("force");
         expect(graphSeries.roam).toBe(true);
@@ -146,10 +139,10 @@ describe("VariablesDependenciesGraph", () => {
 
     it("should configure node appearance", async () => {
       await nextTick();
-      
+
       if (wrapper.vm.options && wrapper.vm.options.series) {
         const graphSeries = wrapper.vm.options.series[0];
-        
+
         expect(graphSeries.symbol).toBe("rect");
         expect(graphSeries.symbolSize).toEqual([50, 10]);
         expect(graphSeries.label.show).toBe(true);
@@ -158,10 +151,10 @@ describe("VariablesDependenciesGraph", () => {
 
     it("should configure edge appearance", async () => {
       await nextTick();
-      
+
       if (wrapper.vm.options && wrapper.vm.options.series) {
         const graphSeries = wrapper.vm.options.series[0];
-        
+
         expect(graphSeries.edgeSymbol).toEqual(["none", "arrow"]);
         expect(graphSeries.lineStyle.opacity).toBe(0.5);
         expect(graphSeries.lineStyle.width).toBe(2);
@@ -170,12 +163,12 @@ describe("VariablesDependenciesGraph", () => {
 
     it("should pass correct data to ChartRenderer", async () => {
       await nextTick();
-      
+
       const chartRenderer = wrapper.findComponent(MockChartRenderer);
       expect(chartRenderer.exists()).toBe(true);
-      
-      const chartData = chartRenderer.props('data');
-      expect(chartData).toHaveProperty('options');
+
+      const chartData = chartRenderer.props("data");
+      expect(chartData).toHaveProperty("options");
     });
   });
 
@@ -185,18 +178,18 @@ describe("VariablesDependenciesGraph", () => {
         global: {
           plugins: [],
           stubs: {
-            ChartRenderer: MockChartRenderer
-          }
+            ChartRenderer: MockChartRenderer,
+          },
         },
         props: {
-          variablesList: []
-        }
+          variablesList: [],
+        },
       });
 
       await nextTick();
 
       expect(emptyWrapper.vm.options).toBeDefined();
-      
+
       emptyWrapper.unmount();
     });
 
@@ -205,18 +198,18 @@ describe("VariablesDependenciesGraph", () => {
         global: {
           plugins: [],
           stubs: {
-            ChartRenderer: MockChartRenderer
-          }
+            ChartRenderer: MockChartRenderer,
+          },
         },
         props: {
-          variablesList: [{ name: "variable1", type: "custom" }]
-        }
+          variablesList: [{ name: "variable1", type: "custom" }],
+        },
       });
 
       await nextTick();
 
       expect(singleVarWrapper.vm.options).toBeDefined();
-      
+
       singleVarWrapper.unmount();
     });
   });
@@ -225,35 +218,37 @@ describe("VariablesDependenciesGraph", () => {
     it("should handle props change", async () => {
       const newVariablesList = [
         { name: "newVar1", type: "custom" },
-        { name: "newVar2", type: "query_values" }
+        { name: "newVar2", type: "query_values" },
       ];
 
       await wrapper.setProps({ variablesList: newVariablesList });
       await nextTick();
 
-      expect(wrapper.props('variablesList')).toEqual(newVariablesList);
+      expect(wrapper.props("variablesList")).toEqual(newVariablesList);
     });
   });
 
   describe("Component Styling and Layout", () => {
     it("should have correct container styling", () => {
-      const container = wrapper.find('[data-test="dashboard-variables-dependencies-graph-container"]');
+      const container = wrapper.find(
+        '[data-test="dashboard-variables-dependencies-graph-container"]',
+      );
       // Sizing moved from an inline style to Tailwind utilities.
-      expect(container.classes()).toContain('h-full');
-      expect(container.classes()).toContain('w-full');
+      expect(container.classes()).toContain("h-full");
+      expect(container.classes()).toContain("w-full");
     });
 
     it("should pass transparent background to chart", async () => {
       await nextTick();
-      
+
       const chartRenderer = wrapper.findComponent(MockChartRenderer);
-      const options = chartRenderer.props('data').options;
-      
+      const options = chartRenderer.props("data").options;
+
       if (options) {
         expect(options.backgroundColor).toBe("transparent");
       } else {
         // If options is null, it should have default background
-        expect(chartRenderer.props('data')).toHaveProperty('options');
+        expect(chartRenderer.props("data")).toHaveProperty("options");
       }
     });
   });
@@ -266,11 +261,11 @@ describe("VariablesDependenciesGraph", () => {
 
     it("should pass correct props to ChartRenderer", async () => {
       await nextTick();
-      
+
       const chartRenderer = wrapper.findComponent(MockChartRenderer);
-      const chartData = chartRenderer.props('data');
-      
-      expect(chartData).toHaveProperty('options');
+      const chartData = chartRenderer.props("data");
+
+      expect(chartData).toHaveProperty("options");
     });
 
     it("should handle ChartRenderer with fallback options", () => {
@@ -278,19 +273,19 @@ describe("VariablesDependenciesGraph", () => {
         global: {
           plugins: [],
           stubs: {
-            ChartRenderer: MockChartRenderer
-          }
+            ChartRenderer: MockChartRenderer,
+          },
         },
         props: {
-          variablesList: []
-        }
+          variablesList: [],
+        },
       });
 
       const chartRenderer = nullOptionsWrapper.findComponent(MockChartRenderer);
-      const chartData = chartRenderer.props('data');
-      
-      expect(chartData.options).toEqual({ backgroundColor: 'transparent' });
-      
+      const chartData = chartRenderer.props("data");
+
+      expect(chartData.options).toEqual({ backgroundColor: "transparent" });
+
       nullOptionsWrapper.unmount();
     });
   });
@@ -298,18 +293,18 @@ describe("VariablesDependenciesGraph", () => {
   describe("Data Processing", () => {
     it("should process variables list and create graph", async () => {
       await nextTick();
-      
+
       // The component should process the variables and create options
       expect(wrapper.vm.options).toBeDefined();
-      
+
       if (wrapper.vm.options && wrapper.vm.options.series) {
         const series = wrapper.vm.options.series;
         expect(Array.isArray(series)).toBe(true);
         expect(series.length).toBeGreaterThanOrEqual(1);
-        
+
         const graphSeries = series[0];
-        expect(graphSeries).toHaveProperty('data');
-        expect(graphSeries).toHaveProperty('links');
+        expect(graphSeries).toHaveProperty("data");
+        expect(graphSeries).toHaveProperty("links");
         expect(Array.isArray(graphSeries.data)).toBe(true);
         expect(Array.isArray(graphSeries.links)).toBe(true);
       }
@@ -320,27 +315,27 @@ describe("VariablesDependenciesGraph", () => {
         global: {
           plugins: [],
           stubs: {
-            ChartRenderer: MockChartRenderer
-          }
+            ChartRenderer: MockChartRenderer,
+          },
         },
         props: {
           variablesList: [
             { name: "variable1", type: "custom" },
-            { name: "variable2", type: "custom" }
-          ]
-        }
+            { name: "variable2", type: "custom" },
+          ],
+        },
       });
 
       await nextTick();
 
       expect(noDepsWrapper.vm.options).toBeDefined();
-      
+
       if (noDepsWrapper.vm.options && noDepsWrapper.vm.options.series) {
         const graphSeries = noDepsWrapper.vm.options.series[0];
         expect(Array.isArray(graphSeries.data)).toBe(true);
         expect(Array.isArray(graphSeries.links)).toBe(true);
       }
-      
+
       noDepsWrapper.unmount();
     });
   });
@@ -352,17 +347,17 @@ describe("VariablesDependenciesGraph", () => {
         global: {
           plugins: [],
           stubs: {
-            ChartRenderer: MockChartRenderer
-          }
+            ChartRenderer: MockChartRenderer,
+          },
         },
         props: {
-          variablesList: mockVariablesList
-        }
+          variablesList: mockVariablesList,
+        },
       });
 
       expect(asyncWrapper.exists()).toBe(true);
       expect(asyncWrapper.findComponent(MockChartRenderer).exists()).toBe(true);
-      
+
       asyncWrapper.unmount();
     });
   });
@@ -371,27 +366,27 @@ describe("VariablesDependenciesGraph", () => {
     it("should handle malformed variablesList gracefully", async () => {
       const malformedVariables = [
         { name: "var1" }, // missing type
-        { type: "custom" } // missing name
+        { type: "custom" }, // missing name
       ];
 
       const errorWrapper = mount(VariablesDependenciesGraph, {
         global: {
           plugins: [],
           stubs: {
-            ChartRenderer: MockChartRenderer
-          }
+            ChartRenderer: MockChartRenderer,
+          },
         },
         props: {
-          variablesList: malformedVariables
-        }
+          variablesList: malformedVariables,
+        },
       });
 
       await nextTick();
-      
+
       // Component should still render even with malformed data
       expect(errorWrapper.exists()).toBe(true);
       expect(errorWrapper.vm.options).toBeDefined();
-      
+
       errorWrapper.unmount();
     });
   });

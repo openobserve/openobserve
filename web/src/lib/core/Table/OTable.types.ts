@@ -1,7 +1,25 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { Component } from "vue";
+import type { I18nText } from "@/types/i18n";
+
+import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
+
+// ─── Cell hover-actions context ──────────────────────────────────
+/**
+ * Single-active-cell hover model shared by OTable → OTableBodyCell via
+ * provide/inject, so a consumer's hover overlay renders for one cell at a time.
+ * `enabled` is false when no `#cell-hover-actions` slot is present, letting
+ * cells skip the mouse bookkeeping entirely.
+ */
+export interface OTableCellActionsContext {
+  activeCellKey: Ref<string | null>;
+  setActiveCell: (key: string | null) => void;
+  enabled: ComputedRef<boolean>;
+}
+
+export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
+  Symbol("OTableCellActions");
 
 // ─── Shared column size constants ────────────────────────────────
 /**
@@ -21,46 +39,46 @@ export const TABLE_CHECKBOX_COL_SIZE = 44;
 export const TABLE_INDEX_COL_SIZE = 56;
 
 export const COL = {
-  name:         200,
-  firstName:    130,
-  lastName:     130,
-  email:        220,
-  description:  300,
-  status:       100,
-  toggle:        80,
-  date:         200,
+  name: 200,
+  firstName: 130,
+  lastName: 130,
+  email: 220,
+  description: 300,
+  status: 100,
+  toggle: 80,
+  date: 200,
   // Full "YYYY-MM-DD HH:mm:ss" timestamps — predictable, so fix their width.
-  createdAt:    200,
-  updatedAt:    200,
+  createdAt: 200,
+  updatedAt: 200,
   dateAbsolute: 160,
-  duration:     120,
-  frequency:    130,
-  type:         180,
-  streamType:   120,
-  streamName:   180,
-  method:        80,
-  count:         90,
-  sizeBytes:    130,
-  url:          220,
-  template:     180,
-  owner:        220,
-  folder:       150,
-  role:         160,
-  authType:     100,
-  token:        200,
-  cron:         160,
-  price:        110,
+  duration: 120,
+  frequency: 130,
+  type: 180,
+  streamType: 120,
+  streamName: 180,
+  method: 80,
+  count: 90,
+  sizeBytes: 130,
+  url: 220,
+  template: 180,
+  owner: 220,
+  folder: 150,
+  role: 160,
+  authType: 100,
+  token: 200,
+  cron: 160,
+  price: 110,
   defaultModel: 180,
-  version:      100,
+  version: 100,
   // Synthetic monitoring
   responseTime: 90,
-  uptime:       130,
-  locations:    120,
-  interval:     72,
-  steps:        72,
-  assertions:   90,
-  lastCheck:    100,
-  history:      180,
+  uptime: 130,
+  locations: 120,
+  interval: 72,
+  steps: 72,
+  assertions: 90,
+  lastCheck: 100,
+  history: 180,
 } as const;
 
 // ── Column Definition ────────────────────────────────────────────
@@ -85,6 +103,19 @@ export interface OTableColumnMeta {
   isName?: boolean;
   /** Format function applied to cell value before rendering */
   format?: (value: any, row: any) => any;
+  /**
+   * Elastic column: no explicit width, so it absorbs the leftover. In a
+   * `horizontalScroll` table it is content-sized — it grows to its longest
+   * value and the table scrolls.
+   */
+  autoWidth?: boolean;
+  /**
+   * Bounded elastic column: absorbs the leftover like `autoWidth`, but stays
+   * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
+   */
+  fillRemaining?: boolean;
+  /** Show the per-column "format this column" icon (requires `enableColumnFormat` on OTable) */
+  formattable?: boolean;
   /** Arbitrary metadata for custom cell renderers */
   [key: string]: any;
 }
@@ -92,8 +123,8 @@ export interface OTableColumnMeta {
 export interface OTableColumnDef<TData = any> {
   /** Unique column identifier (used as accessorKey when accessorKey not explicitly set) */
   id: string;
-  /** Header display text or render function */
-  header: string | Component;
+  /** Header display text or render function. `raw()` for a glyph or empty header. */
+  header: I18nText | Component;
   /** Key in the data row object */
   accessorKey?: string;
   /** Custom accessor function (receives the full row) */
@@ -185,8 +216,13 @@ export interface OTableProps<TData = any> {
   currentPage?: number;
   /** Total record count (required for server-side pagination) */
   totalCount?: number;
+  /** False when totalCount is a lower bound. The footer adds `+` and omits Last page. */
+  totalCountExact?: boolean;
   /** When true, the page index is NOT reset when the data array changes (e.g. on row expand/collapse). Defaults to false. */
   keepPageOnDataChange?: boolean;
+  /** When true, the caller's `#bottom` slot IS the pagination bar and replaces
+   *  the built-in controls. Leave false when `#bottom` holds only bulk actions. */
+  customPaginationBar?: boolean;
 
   // ── Sorting ──
   sorting?: OTableSortingMode;
@@ -206,7 +242,7 @@ export interface OTableProps<TData = any> {
   showGlobalFilter?: boolean;
   filterMode?: OTableFilterMode;
   /** Label shown bold in the footer as "N footerTitle" (e.g. "2 Dashboards") */
-  footerTitle?: string;
+  footerTitle?: I18nText;
 
   // ── Selection ──
   selection?: OTableSelectionMode;
@@ -216,8 +252,11 @@ export interface OTableProps<TData = any> {
    *  (renders with `cursor: not-allowed` and ignores toggles). E.g. block bulk
    *  selection of the root user in IAM. */
   isRowSelectable?: (row: TData) => boolean;
-  /** Field used as unique row identifier */
-  rowKey?: string;
+  /** Field used as unique row identifier, or a resolver for rows that have no
+   *  naturally unique field. Pass a resolver when the obvious candidate can
+   *  repeat across rows (e.g. log hits sharing a `_timestamp`), otherwise every
+   *  row with the same value expands/selects as one. */
+  rowKey?: string | ((row: TData) => string);
 
   // ── Expansion ──
   expansion?: OTableExpansionMode;
@@ -249,6 +288,12 @@ export interface OTableProps<TData = any> {
   virtualScroll?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
   virtualScrollItemSize?: number;
+  /**
+   * Rows rendered beyond the visible window on each side while virtualizing
+   * (default 100). Lower it (e.g. 10–20) for heavy rows / moderate datasets so
+   * the DOM stays small; the default suits long, light lists that scroll fast.
+   */
+  overscan?: number;
   /** Container max height; falls back to parent height when not set */
   maxHeight?: string | number;
 
@@ -264,7 +309,17 @@ export interface OTableProps<TData = any> {
   showIndex?: boolean;
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
+  /**
+   * Column id that is locked to the first position (e.g. the timestamp column in
+   * logs). It cannot be picked up by a drag, and any reorder that would push it
+   * out of slot 0 is normalised back. Only meaningful with `enableColumnReorder`.
+   */
+  pinnedFirstColumn?: string;
   enableColumnPin?: boolean;
+  /** Show the per-column value-filter dropdown on `filterable` columns (client-side) */
+  enableColumnFilter?: boolean;
+  /** Show the per-column "format this column" icon on `formattable` columns */
+  enableColumnFormat?: boolean;
   /** Initial column visibility */
   columnVisibility?: Record<string, boolean>;
   /**
@@ -284,7 +339,7 @@ export interface OTableProps<TData = any> {
   streaming?: boolean;
   error?: string | null;
   /** Text shown when data is empty and not loading */
-  emptyMessage?: string;
+  emptyMessage?: I18nText;
   dense?: boolean;
   bordered?: boolean;
   /**
@@ -331,11 +386,7 @@ export interface OTableProps<TData = any> {
   /** Returns a CSS color for the status bar (4px left border) per row */
   getRowStatusColor?: (row: TData) => string | undefined;
   /** Returns inline styles for individual cells */
-  getCellStyle?: (params: {
-    columnId: string;
-    row: TData;
-    value: any;
-  }) => Record<string, any>;
+  getCellStyle?: (params: { columnId: string; row: TData; value: any }) => Record<string, any>;
   /** Show hover-visible copy button on each cell */
   enableCellCopy?: boolean;
   /** Fixed row height in px (for virtual scroll accuracy) */
@@ -350,9 +401,12 @@ export interface OTableProps<TData = any> {
   // ── Pivot (Dashboard) ──
   /** Pivot header levels (multi-level headers) */
   pivotHeaderLevels?: any[];
-  /** Pivot row field columns (for sticky headers) */
+  /** Pivot row field columns (for sticky headers + row-field cell merge) */
   pivotRowColumns?: any[];
-  /** Show sticky row totals */
+  /** Grand-total row rendered as a sticky `<tfoot>`, keyed by each column's
+   *  `accessorKey`/`id`; values run through the column's `meta.format`. */
+  stickyTotalRow?: Record<string, any> | null;
+  /** Show sticky row totals (pins the grand-total `<tfoot>` to the bottom) */
   stickyRowTotals?: boolean;
   /** Show sticky column totals */
   stickyColTotals?: boolean;
@@ -394,14 +448,18 @@ export interface OTableEmits<TData = any> {
   "row-mouseenter": [row: TData, event: MouseEvent];
   "row-mouseleave": [row: TData];
   "cell-click": [params: { columnId: string; row: TData; value: any }];
+  /** Right-click on a body cell. Not prevented — the consumer decides whether
+   *  to open its own menu. */
+  "cell-contextmenu": [params: { columnId: string; row: TData; value: any }];
 
   // Column events
   "column-order-change": [order: string[]];
   "column-visibility-change": [visibility: Record<string, boolean>];
-  "update:columnSizes": [
-    sizes: Record<string, number>,
-    idMap: Record<string, string>,
-  ];
+  /** A column's close ("x") affordance was clicked; the consumer decides how to remove it. */
+  "close-column": [column: OTableColumnDef<TData>];
+  /** A `formattable` column's format icon was clicked (requires `enableColumnFormat`). */
+  "format-column": [columnId: string];
+  "update:columnSizes": [sizes: Record<string, number>, idMap: Record<string, string>];
 
   // Row reorder
   "row-reorder": [data: TData[]];
@@ -421,13 +479,30 @@ export interface OTableSlots<TData = any> {
     value: any;
     table: Table<TData>;
   }) => any;
-  /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data (`row.original`) + row index */
+  /**
+   * Per-cell hover-action overlay, absolutely positioned inside every data cell.
+   * `active` is true only for the cell the pointer is hovering (debounced), so
+   * consumers can mount heavy action menus lazily.
+   *
+   * NOTE: deliberately not named `cell-actions` — that is the per-column cell
+   * slot for a column whose `id` is `"actions"` (the `#cell-{id}` convention).
+   */
+  "cell-hover-actions"?: (props: {
+    row: TData;
+    column: OTableColumnDef<TData>;
+    value: any;
+    active?: boolean;
+  }) => any;
+  /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data
+   *  (`row.original`) + row index. `active` is only ever passed to the reserved
+   *  `cell-hover-actions` key, which this signature has to admit. */
   [key: `cell-${string}`]:
     | ((props: {
         row: TData;
         column: OTableColumnDef<TData>;
         value: any;
         index: number;
+        active?: boolean;
       }) => any)
     | undefined;
   /** Custom header content */
@@ -439,6 +514,8 @@ export interface OTableSlots<TData = any> {
   toolbar?: () => any;
   /** Trailing toolbar actions rendered AFTER the auto-injected column toggle (e.g. a refresh button). */
   "toolbar-trailing"?: () => any;
+  /** Full-width content between the toolbar and the table body (e.g. a summary-stat strip). */
+  subheader?: () => any;
   /** Content below the table (above pagination). Scoped with pagination state. */
   bottom?: (props: {
     currentPage: number;
@@ -476,6 +553,9 @@ export interface OTableExposed<TData = any> {
   toggleAllRows: () => void;
   /** Clear selection */
   clearSelection: () => void;
+  /** True when column resizing is enabled and the user has resized at least one
+   *  column. Read this when rendering your own `OTableColumnToggle`. */
+  hasResizedColumns: boolean;
   /** Reset column sizes to default */
   resetColumnSizes: () => void;
   /** Reset column order to default */

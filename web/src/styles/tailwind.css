@@ -22,14 +22,6 @@
 
 @source "../**/*.{vue,js,ts}";
 
-/* Stacking utility for portaled floating surfaces. Tailwind v4 has no z-index
-   theme namespace (`z-*` only takes bare numbers or arbitrary values), so the
-   token is exposed as a real utility here rather than left as an arbitrary
-   z-index at each call site. Value lives in tokens/base.css — change it there. */
-@utility z-menu {
-  z-index: var(--z-menu);
-}
-
 /*
  * Light↔dark mode switch — soft curtain sweep (View Transitions API, started
  * by switchThemeMode in utils/theme.ts). The outgoing theme holds fully opaque
@@ -135,10 +127,11 @@ html.theme-switching *::after {
   /* Tailwind's v3-compat default border colour, token-backed so it follows the
      theme (a raw hex would paint light-grey borders in dark mode on any element
      that sets a border-width without a colour). */
-  *, :before, :after {
+  *,
+  :before,
+  :after {
     border-color: var(--color-border-default);
   }
-
 }
 
 /*
@@ -166,19 +159,42 @@ html.theme-switching *::after {
  * `round 0.5rem` keeps the corners rounded throughout the wipe.
  */
 @keyframes o2-reveal-down-in {
-  from { opacity: 0; clip-path: inset(0 0 100% 0 round 0.5rem); }
-  to   { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0 round 0.5rem);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
+  }
 }
 @keyframes o2-reveal-down-out {
-  from { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
-  to   { opacity: 0; clip-path: inset(0 0 100% 0 round 0.5rem); }
+  from {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
+  }
+  to {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0 round 0.5rem);
+  }
 }
 @keyframes o2-reveal-up-in {
-  from { opacity: 0; clip-path: inset(100% 0 0 0 round 0.5rem); }
-  to   { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
+  from {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0 round 0.5rem);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
+  }
 }
 @keyframes o2-reveal-up-out {
-  from { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
-  to   { opacity: 0; clip-path: inset(100% 0 0 0 round 0.5rem); }
+  from {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
+  }
+  to {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0 round 0.5rem);
+  }
 }
-

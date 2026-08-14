@@ -22,12 +22,31 @@ import Zookeeper from "./Zookeeper.vue";
 import zookeeperCard from "@/components/ingestion/setupCard/content/zookeeper";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 
-const mockEndpoint = ref({ url: "https://test.openobserve.ai", host: "h", port: 443, protocol: "https", tls: true });
-vi.mock("@/composables/useIngestion", () => ({ default: vi.fn(() => ({ endpoint: mockEndpoint })) }));
-vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
-  default: { name: "SetupCardRenderer", props: ["content", "subs", "logoUrl", "logoUrlDark"], template: '<div data-test="rich-card-stub" />' },
+const mockEndpoint = ref({
+  url: "https://test.openobserve.ai",
+  host: "h",
+  port: 443,
+  protocol: "https",
+  tls: true,
+});
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
 }));
-const mockStore = createStore({ state: { selectedOrganization: { identifier: "test-org" }, userInfo: { email: "t@e.com" }, organizationData: { organizationPasscode: "pc" }, theme: "light" } });
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
+  },
+}));
+const mockStore = createStore({
+  state: {
+    selectedOrganization: { identifier: "test-org" },
+    userInfo: { email: "t@e.com" },
+    organizationData: { organizationPasscode: "pc" },
+    theme: "light",
+  },
+});
 const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
 
@@ -35,11 +54,17 @@ describe("zookeeperCard builder", () => {
   it("builds metadata + step flow (no prepare step)", () => {
     const card = zookeeperCard(SUBS);
     expect(card.provider.name).toBe("Zookeeper");
-    expect(card.detect).toMatchObject({ streamType: "metrics", match: "keyword", streamName: "zookeeper" });
+    expect(card.detect).toMatchObject({
+      streamType: "metrics",
+      match: "keyword",
+      streamName: "zookeeper",
+    });
     expect(card.steps.map((s) => s.id)).toEqual(["install", "configure", "run", "verify"]);
   });
   it("has a zookeeper receiver config with the org's exporter", () => {
-    const config = zookeeperCard(SUBS).steps.find((s) => s.id === "configure")!.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    const config = zookeeperCard(SUBS)
+      .steps.find((s) => s.id === "configure")!
+      .variants!.find((v) => v.id === "linux-amd64")!.code.raw;
     expect(config).toContain("zookeeper:");
     expect(config).toContain(`endpoint: ${SUBS.url}/api/${SUBS.org}`);
     expect(config).toContain(`Basic ${SUBS.token}`);
@@ -47,7 +72,9 @@ describe("zookeeperCard builder", () => {
 });
 describe("Zookeeper.vue", () => {
   let wrapper: VueWrapper<any>;
-  afterEach(() => { if (wrapper) wrapper.unmount(); });
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
   it("renders the shared card", () => {
     expect(getDataSourceCard("zookeeper", SUBS)?.provider.name).toBe("Zookeeper");
     wrapper = mount(Zookeeper, { global: { plugins: [mockStore, mockI18n] } });

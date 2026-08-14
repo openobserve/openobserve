@@ -16,27 +16,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-      <OForm id="add-folder-dashboards-form" :schema="addFolderSchema" :default-values="addFolderDefaults" @submit="onSubmit">
-        <OFormInput
-          name="name"
-          :label="t('dashboard.nameOfVariable')"
-          required
-          data-test="dashboard-folder-add-name"
-        />
-        <span>&nbsp;</span>
-        <OFormInput
-          name="description"
-          :label="t('dashboard.typeDesc')"
-          data-test="dashboard-folder-add-description"
-        />
-      </OForm>
+    <OForm
+      id="add-folder-dashboards-form"
+      :schema="addFolderSchema"
+      :default-values="addFolderDefaults"
+      @submit="onSubmit"
+    >
+      <OFormInput
+        name="name"
+        :label="t('dashboard.nameOfVariable')"
+        required
+        data-test="dashboard-folder-add-name"
+      />
+      <span>&nbsp;</span>
+      <OFormInput
+        name="description"
+        :label="t('dashboard.typeDesc')"
+        data-test="dashboard-folder-add-description"
+      />
+    </OForm>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { createFolder, updateFolder } from "@/utils/commons";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -60,16 +65,13 @@ export default defineComponent({
   emits: ["update:modelValue", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const addFolderSchema = makeAddFolderSchema(t);
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
     const { track } = useReo();
 
     const findFolder = () =>
-      store.state.organizationData.folders.find(
-        (item: any) => item.folderId === props.folderId,
-      );
+      store.state.organizationData.folders.find((item: any) => item.folderId === props.folderId);
 
     // The OForm is the single source of truth. OForm reads `defaultValues`
     // once at mount, so this computed seeds the fields (edit → the folder's

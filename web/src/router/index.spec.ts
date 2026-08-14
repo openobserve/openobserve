@@ -219,9 +219,7 @@ describe("router/index (factory)", () => {
         .push({ path: "/logs", query: { short_url: "https://short.example.com" } })
         .catch(() => {});
 
-      const callArgs = sessionSetItemSpy.mock.calls.find(
-        (c) => c[0] === "redirectURI",
-      );
+      const callArgs = sessionSetItemSpy.mock.calls.find((c) => c[0] === "redirectURI");
       if (callArgs) {
         expect(callArgs[1]).toBe("https://short.example.com");
       }
@@ -229,9 +227,7 @@ describe("router/index (factory)", () => {
 
     it("should dispatch login action when sessionUserInfo exists but store is not logged in", async () => {
       vi.spyOn(store, "dispatch");
-      vi.mocked(getDecodedUserInfo).mockReturnValue(
-        JSON.stringify({ email: "test@example.com" }),
-      );
+      vi.mocked(getDecodedUserInfo).mockReturnValue(JSON.stringify({ email: "test@example.com" }));
       store = buildStore(false);
       router = createAppRouter(store);
 
@@ -244,9 +240,7 @@ describe("router/index (factory)", () => {
   // -------------------------------------------------------------------------
   describe("beforeEach navigation guard – authenticated user", () => {
     beforeEach(() => {
-      vi.mocked(getDecodedUserInfo).mockReturnValue(
-        JSON.stringify({ email: "user@example.com" }),
-      );
+      vi.mocked(getDecodedUserInfo).mockReturnValue(JSON.stringify({ email: "user@example.com" }));
       store = buildStore(true);
       router = createAppRouter(store);
     });
@@ -265,9 +259,7 @@ describe("router/index (factory)", () => {
   // -------------------------------------------------------------------------
   describe("document.title management", () => {
     beforeEach(() => {
-      vi.mocked(getDecodedUserInfo).mockReturnValue(
-        JSON.stringify({ email: "user@example.com" }),
-      );
+      vi.mocked(getDecodedUserInfo).mockReturnValue(JSON.stringify({ email: "user@example.com" }));
       store = buildStore(true);
       router = createAppRouter(store);
     });

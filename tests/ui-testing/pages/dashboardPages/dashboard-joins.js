@@ -176,8 +176,15 @@ export class JoinHelper {
    * @param {number} currentConditionIndex - Index of the current condition
    */
   async addAnotherCondition(currentConditionIndex) {
+    // The join popup was redesigned to use a single "add clause" button at the
+    // bottom of the condition list (data-test="dashboard-join-add-clause"),
+    // replacing the previous per-condition-row add buttons
+    // (data-test="dashboard-join-condition-add-${index}"). currentConditionIndex
+    // is retained for call-site compatibility but is no longer needed to locate
+    // the button.
+    void currentConditionIndex;
     const addConditionBtn = this.page.locator(
-      `[data-test="dashboard-join-condition-add-${currentConditionIndex}"]`
+      '[data-test="dashboard-join-add-clause"]'
     );
     await addConditionBtn.click();
     await this.page.waitForTimeout(500);

@@ -1,11 +1,30 @@
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import ApiDashboard from "./ApiDashboard.vue";
 
 // ---------------------------------------------------------------------------
 // Module mocks — must be at top level
 // ---------------------------------------------------------------------------
+
+// Shared reactive `_rumdata` schema state, mirroring the module-level singleton the real
+// usePerformance() exposes. `mock` prefix so the vi.mock factories may reference it.
+const mockPerformanceState = reactive({
+  data: {
+    datetime: { startTime: 0, endTime: 0, relativeTimePeriod: "15m", valueType: "relative" },
+    streams: {} as Record<string, any>,
+  },
+});
+
+const mockGetStream = vi.fn();
+
+vi.mock("@/composables/rum/usePerformance", () => ({
+  default: () => ({ performanceState: mockPerformanceState }),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: mockGetStream }),
+}));
 
 vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   default: {
@@ -19,8 +38,28 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   },
 }));
 
+// At least one panel is required: the capability filter treats a zero-panel dashboard as
+// "everything dropped", which flips the component into its empty state. This panel's SQL
+// references gated resource columns, so it survives a network-capable schema and is
+// dropped by a stream without resource instrumentation.
 vi.mock("@/utils/rum/api.json", () => ({
-  default: { title: "RUM API Dashboard", panels: [], variables: { list: [] } },
+  default: {
+    title: "RUM API Dashboard",
+    panels: [
+      {
+        id: "slow-resources",
+        title: "Slowest resources",
+        layout: { x: 0, y: 0, w: 12, h: 4, i: 1 },
+        queries: [
+          {
+            query:
+              'SELECT avg(resource_duration) as y_axis, resource_url as x_axis FROM "_rumdata"',
+          },
+        ],
+      },
+    ],
+    variables: { list: [] },
+  },
 }));
 
 vi.mock("@/services/search", () => ({
@@ -46,11 +85,47 @@ const mockStore = {
 
 vi.mock("vuex", () => ({ useStore: () => mockStore }));
 
-vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// Columns the API dashboard's panels gate on — a stream that instruments network calls.
+const RESOURCE_FIELDS = [
+  "resource_url",
+  "resource_duration",
+  "resource_size",
+  "resource_status_code",
+  "resource_method",
+];
+
+function buildSchemaMap(fieldNames: string[]): Record<string, any> {
+  const schemaMap: Record<string, any> = {};
+  fieldNames.forEach((name) => {
+    schemaMap[name] = { name };
+  });
+  return schemaMap;
+}
+
+// A schema carrying every resource column the API panels need.
+const resourceSchemaMap = buildSchemaMap(RESOURCE_FIELDS);
+
+// Seeds the shared performanceState so ensureRumSchema() short-circuits without calling
+// getStream — the dashboard branch then renders after a single flush.
+function seedRumSchema(schemaMap: Record<string, any> | null) {
+  if (schemaMap === null) {
+    delete mockPerformanceState.data.streams["_rumdata"];
+    return;
+  }
+  mockPerformanceState.data.streams["_rumdata"] = { schema: schemaMap, name: "_rumdata" };
+}
+
+/** Mounts with a resolved, network-capable schema so the dashboard branch is rendered. */
+async function createResolvedWrapper(props: Record<string, any> = {}) {
+  seedRumSchema(resourceSchemaMap);
+  const mounted = createWrapper(props);
+  await flushPromises();
+  return mounted;
+}
 
 const defaultProps = {
   dateTime: { startTime: 1234567890, endTime: 1234568000, type: "relative", period: "15m" },
@@ -67,9 +142,15 @@ function createWrapper(props: Record<string, any> = {}) {
           template: '<div data-test="render-dashboard-charts"><slot /></div>',
           props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
           emits: ["variablesManagerReady"],
-          setup() { return { layoutUpdate: vi.fn() }; },
+          setup() {
+            return { layoutUpdate: vi.fn() };
+          },
         },
         OSpinner: { template: '<div data-test="spinner" />' },
+        OEmptyState: {
+          name: "OEmptyState",
+          template: '<div><slot name="title" /><slot name="description" /></div>',
+        },
       },
     },
   });
@@ -81,6 +162,13 @@ function createWrapper(props: Record<string, any> = {}) {
 
 describe("ApiDashboard", () => {
   let wrapper: ReturnType<typeof createWrapper>;
+
+  beforeEach(() => {
+    // Every test starts with no known `_rumdata` schema; tests opt into one as needed.
+    seedRumSchema(null);
+    mockGetStream.mockReset();
+    mockGetStream.mockResolvedValue({ schema: [] });
+  });
 
   afterEach(() => {
     wrapper?.unmount();
@@ -128,21 +216,20 @@ describe("ApiDashboard", () => {
       expect(wrapper.vm.refreshInterval).toBe(0);
     });
 
-    it("initializes variablesData with isVariablesLoading false and empty values", () => {
+    it("initializes variablesData as loading with empty values", () => {
       // Arrange + Act
       wrapper = createWrapper();
 
       // Assert
-      expect(wrapper.vm.variablesData).toEqual({ isVariablesLoading: false, values: [] });
+      expect(wrapper.vm.variablesData).toEqual({ isVariablesLoading: true, values: [] });
     });
 
-    it("initializes currentDashboardData with a data property", () => {
+    it("exposes the capability-filtered dashboard as dashboardData", () => {
       // Arrange + Act
       wrapper = createWrapper();
 
       // Assert
-      expect(wrapper.vm.currentDashboardData).toBeTruthy();
-      expect(wrapper.vm.currentDashboardData.data).toBeDefined();
+      expect(wrapper.vm.dashboardData).toMatchObject({ title: "RUM API Dashboard" });
     });
 
     it("accepts dateTime prop correctly", () => {
@@ -163,7 +250,12 @@ describe("ApiDashboard", () => {
 
     it("accepts custom dateTime prop", () => {
       // Arrange
-      const customDateTime = { startTime: 1609459200, endTime: 1609545600, type: "absolute", period: "1h" };
+      const customDateTime = {
+        startTime: 1609459200,
+        endTime: 1609545600,
+        type: "absolute",
+        period: "1h",
+      };
 
       // Act
       wrapper = createWrapper({ dateTime: customDateTime });
@@ -190,8 +282,10 @@ describe("ApiDashboard", () => {
   });
 
   describe("template rendering", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+    beforeEach(async () => {
+      // A known network-capable schema resolves the gate without calling getStream, so
+      // the dashboard branch (not the spinner or the empty state) renders.
+      wrapper = await createResolvedWrapper();
     });
 
     it("renders the api-performance-dashboards container", () => {
@@ -243,12 +337,12 @@ describe("ApiDashboard", () => {
       expect(charts.props("currentTimeObj")).toEqual(defaultProps.dateTime);
     });
 
-    it("passes currentDashboardData.data as dashboardData to RenderDashboardCharts", () => {
+    it("passes the capability-filtered dashboardData to RenderDashboardCharts", () => {
       // Act
       const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
 
       // Assert
-      expect(charts.props("dashboardData")).toBe(wrapper.vm.currentDashboardData.data);
+      expect(charts.props("dashboardData")).toEqual(wrapper.vm.dashboardData);
     });
 
     it("renders loading spinner when isLoading has items", async () => {
@@ -270,45 +364,93 @@ describe("ApiDashboard", () => {
     });
   });
 
-  describe("dashboard loading", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("exposes loadDashboard as a function", () => {
-      // Assert
-      expect(typeof wrapper.vm.loadDashboard).toBe("function");
-    });
-
-    it("sets currentDashboardData.data after loadDashboard is called", async () => {
-      // Act
-      await wrapper.vm.loadDashboard();
-
-      // Assert
-      expect(wrapper.vm.currentDashboardData.data).toBeTruthy();
-    });
-
-    it("calls convertDashboardSchemaVersion during loadDashboard", async () => {
+  describe("schema gating", () => {
+    it("migrates the dashboard schema while setting up", async () => {
       // Arrange
       const convertModule = await import("@/utils/dashboard/convertDashboardSchemaVersion");
       const mockConvert = vi.mocked(convertModule.convertDashboardSchemaVersion);
 
       // Act
-      await wrapper.vm.loadDashboard();
+      wrapper = await createResolvedWrapper();
 
       // Assert
       expect(mockConvert).toHaveBeenCalled();
     });
 
-    it("sets variablesData.isVariablesLoading to false when no variables exist", async () => {
-      // Arrange
-      wrapper.vm.variablesData.isVariablesLoading = true;
+    it("shows the loading spinner and no dashboard while the schema is unresolved", async () => {
+      // Arrange — a getStream that never settles keeps the gate open.
+      let resolveStream!: (value: { schema: any[] }) => void;
+      mockGetStream.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveStream = resolve;
+        }),
+      );
 
       // Act
-      await wrapper.vm.loadDashboard();
+      wrapper = createWrapper();
 
       // Assert
-      expect(wrapper.vm.variablesData.isVariablesLoading).toBe(false);
+      expect(wrapper.find('[data-test="api-dashboard-schema-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="api-dashboard-empty"]').exists()).toBe(false);
+
+      // Cleanup — settle the pending promise so it can't leak into other tests.
+      resolveStream({ schema: [] });
+      await flushPromises();
+    });
+
+    it("renders the dashboard when the resolved schema has the resource columns", async () => {
+      // Arrange
+      mockGetStream.mockResolvedValueOnce({
+        schema: RESOURCE_FIELDS.map((name) => ({ name })),
+      });
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      expect(mockGetStream).toHaveBeenCalledWith("_rumdata", "logs", true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="api-dashboard-empty"]').exists()).toBe(false);
+    });
+
+    it("renders the empty state when the resolved schema has no resource columns", async () => {
+      // Arrange — a stream with no network instrumentation.
+      mockGetStream.mockResolvedValueOnce({
+        schema: [{ name: "view_name" }, { name: "session_id" }],
+      });
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="api-dashboard-empty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
+    });
+
+    it("does not call getStream when the schema is already in the shared state", async () => {
+      // Arrange + Act
+      wrapper = await createResolvedWrapper();
+
+      // Assert
+      expect(mockGetStream).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
+    });
+
+    it("renders the full dashboard when getStream rejects and the schema stays inconclusive", async () => {
+      // Arrange
+      mockGetStream.mockRejectedValueOnce(new Error("network error"));
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert — a transient error must never degrade a working dashboard.
+      expect(wrapper.find('[data-test="api-dashboard-schema-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="api-dashboard-empty"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
     });
   });
 
@@ -442,8 +584,18 @@ describe("ApiDashboard", () => {
       mockSearch.mockResolvedValue({
         data: {
           hits: [
-            { url: "https://api.example.com/users?id=1", max_duration: 150.25, max_resource_size: 1024.5, error_count: 5 },
-            { url: "https://api.example.com/orders", max_duration: 89.75, max_resource_size: 512.0, error_count: 2 },
+            {
+              url: "https://api.example.com/users?id=1",
+              max_duration: 150.25,
+              max_resource_size: 1024.5,
+              error_count: 5,
+            },
+            {
+              url: "https://api.example.com/orders",
+              max_duration: 89.75,
+              max_resource_size: 512.0,
+              error_count: 2,
+            },
           ],
         },
       });

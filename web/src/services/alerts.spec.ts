@@ -62,11 +62,11 @@ describe("alerts service", () => {
         params.sort_by,
         params.desc,
         params.name,
-        params.org_identifier
+        params.org_identifier,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/alerts?page_num=${params.page_num}&page_size=${params.page_size}&sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}`
+        `/api/${params.org_identifier}/alerts?page_num=${params.page_num}&page_size=${params.page_size}&sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}`,
       );
     });
   });
@@ -92,11 +92,11 @@ describe("alerts service", () => {
         params.desc,
         params.name,
         params.org_identifier,
-        params.folder_id
+        params.folder_id,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&folder=${params.folder_id}`
+        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&folder=${params.folder_id}`,
       );
     });
 
@@ -121,11 +121,11 @@ describe("alerts service", () => {
         params.name,
         params.org_identifier,
         undefined,
-        params.query
+        params.query,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&alert_name_substring=${params.query}`
+        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&alert_name_substring=${params.query}`,
       );
     });
 
@@ -151,11 +151,11 @@ describe("alerts service", () => {
         params.name,
         params.org_identifier,
         params.folder_id,
-        params.query
+        params.query,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&folder=${params.folder_id}&alert_name_substring=${params.query}`
+        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}&folder=${params.folder_id}&alert_name_substring=${params.query}`,
       );
     });
 
@@ -177,11 +177,11 @@ describe("alerts service", () => {
         params.sort_by,
         params.desc,
         params.name,
-        params.org_identifier
+        params.org_identifier,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}`
+        `/api/v2/${params.org_identifier}/alerts?sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}`,
       );
     });
   });
@@ -201,12 +201,12 @@ describe("alerts service", () => {
         params.org_identifier,
         params.stream_name,
         params.stream_type,
-        params.data
+        params.data,
       );
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/${params.stream_name}/alerts?type=${params.stream_type}`,
-        params.data
+        params.data,
       );
     });
   });
@@ -226,12 +226,12 @@ describe("alerts service", () => {
         params.org_identifier,
         params.stream_name,
         params.stream_type,
-        params.data
+        params.data,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/${params.stream_name}/alerts/test%20alert%20with%20spaces?type=${params.stream_type}`,
-        params.data
+        params.data,
       );
     });
   });
@@ -246,14 +246,10 @@ describe("alerts service", () => {
 
       mockHttpInstance.get.mockResolvedValue({ data: { id: "alert123" } });
 
-      await alerts.get_with_name(
-        params.org_identifier,
-        params.stream_name,
-        params.alert_name
-      );
+      await alerts.get_with_name(params.org_identifier, params.stream_name, params.alert_name);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/alerts/test%20alert%20with%20spaces`
+        `/api/${params.org_identifier}/${params.stream_name}/alerts/test%20alert%20with%20spaces`,
       );
     });
   });
@@ -273,11 +269,11 @@ describe("alerts service", () => {
         params.org_identifier,
         params.stream_name,
         params.alert_name,
-        params.type
+        params.type,
       );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert?type=${params.type}`
+        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert?type=${params.type}`,
       );
     });
 
@@ -295,11 +291,11 @@ describe("alerts service", () => {
         params.org_identifier,
         params.stream_name,
         params.alert_name,
-        params.type
+        params.type,
       );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert`
+        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert`,
       );
     });
   });
@@ -321,11 +317,11 @@ describe("alerts service", () => {
         params.stream_name,
         params.alert_name,
         params.enable,
-        params.stream_type
+        params.stream_type,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert/enable?value=${params.enable}&type=${params.stream_type}`
+        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert/enable?value=${params.enable}&type=${params.stream_type}`,
       );
     });
   });
@@ -345,11 +341,11 @@ describe("alerts service", () => {
         params.org_identifier,
         params.stream_name,
         params.alert_name,
-        params.stream_type
+        params.stream_type,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert/preview?type=${params.stream_type}`
+        `/api/${params.org_identifier}/${params.stream_name}/alerts/test-alert/preview?type=${params.stream_type}`,
       );
     });
   });
@@ -364,15 +360,11 @@ describe("alerts service", () => {
 
       mockHttpInstance.post.mockResolvedValue({ data: { id: "alert123" } });
 
-      await alerts.create_by_alert_id(
-        params.org_identifier,
-        params.data,
-        params.folder_id
-      );
+      await alerts.create_by_alert_id(params.org_identifier, params.data, params.folder_id);
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts?folder=${params.folder_id}`,
-        params.data
+        params.data,
       );
     });
 
@@ -388,7 +380,7 @@ describe("alerts service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts`,
-        params.data
+        params.data,
       );
     });
   });
@@ -403,15 +395,11 @@ describe("alerts service", () => {
 
       mockHttpInstance.put.mockResolvedValue({ data: { success: true } });
 
-      await alerts.update_by_alert_id(
-        params.org_identifier,
-        params.data,
-        params.folder_id
-      );
+      await alerts.update_by_alert_id(params.org_identifier, params.data, params.folder_id);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts/${params.data.id}?folder=${params.folder_id}`,
-        params.data
+        params.data,
       );
     });
 
@@ -427,7 +415,7 @@ describe("alerts service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts/${params.data.id}`,
-        params.data
+        params.data,
       );
     });
   });
@@ -442,14 +430,10 @@ describe("alerts service", () => {
 
       mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
 
-      await alerts.delete_by_alert_id(
-        params.org_identifier,
-        params.alert_id,
-        params.folder_id
-      );
+      await alerts.delete_by_alert_id(params.org_identifier, params.alert_id, params.folder_id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}?folder=${params.folder_id}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}?folder=${params.folder_id}`,
       );
     });
 
@@ -464,7 +448,7 @@ describe("alerts service", () => {
       await alerts.delete_by_alert_id(params.org_identifier, params.alert_id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}`,
       );
     });
   });
@@ -484,11 +468,11 @@ describe("alerts service", () => {
         params.org_identifier,
         params.alert_id,
         params.enable,
-        params.folder_id
+        params.folder_id,
       );
 
       expect(mockHttpInstance.patch).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}/enable?value=${params.enable}&folder=${params.folder_id}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}/enable?value=${params.enable}&folder=${params.folder_id}`,
       );
     });
 
@@ -501,14 +485,10 @@ describe("alerts service", () => {
 
       mockHttpInstance.patch.mockResolvedValue({ data: { enabled: false } });
 
-      await alerts.toggle_state_by_alert_id(
-        params.org_identifier,
-        params.alert_id,
-        params.enable
-      );
+      await alerts.toggle_state_by_alert_id(params.org_identifier, params.alert_id, params.enable);
 
       expect(mockHttpInstance.patch).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}/enable?value=${params.enable}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}/enable?value=${params.enable}`,
       );
     });
   });
@@ -523,14 +503,10 @@ describe("alerts service", () => {
 
       mockHttpInstance.get.mockResolvedValue({ data: { id: "alert123" } });
 
-      await alerts.get_by_alert_id(
-        params.org_identifier,
-        params.alert_id,
-        params.folder_id
-      );
+      await alerts.get_by_alert_id(params.org_identifier, params.alert_id, params.folder_id);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}?folder=${params.folder_id}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}?folder=${params.folder_id}`,
       );
     });
 
@@ -545,8 +521,35 @@ describe("alerts service", () => {
       await alerts.get_by_alert_id(params.org_identifier, params.alert_id);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}`
+        `/api/v2/${params.org_identifier}/alerts/${params.alert_id}`,
       );
+    });
+  });
+
+  describe("list_by_slo", () => {
+    it("should filter to SLO alerts, not just to the slo_id", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { list: [] } });
+
+      await alerts.list_by_slo("org123", "slo-123");
+
+      // `alert_type=slo` is load-bearing, not belt-and-braces. Absent, the
+      // param defaults to `all`, and on enterprise builds the handler then
+      // APPENDS every anomaly-detection config in the org to the response —
+      // those rows never went through the SQL `slo_id` predicate, so they come
+      // back regardless of which SLO was asked for. Callers count this list to
+      // tell a user how many alerts an SLO delete destroys.
+      const url = mockHttpInstance.get.mock.calls[0][0] as string;
+      expect(url).toContain("/api/v2/org123/alerts");
+      expect(url).toContain("slo_id=slo-123");
+      expect(url).toContain("alert_type=slo");
+    });
+
+    it("should encode the slo id", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { list: [] } });
+
+      await alerts.list_by_slo("org123", "a b&c");
+
+      expect(mockHttpInstance.get.mock.calls[0][0]).toContain("slo_id=a%20b%26c");
     });
   });
 
@@ -560,15 +563,11 @@ describe("alerts service", () => {
 
       mockHttpInstance.patch.mockResolvedValue({ data: { success: true } });
 
-      await alerts.move_to_another_folder(
-        params.org_identifier,
-        params.data,
-        params.folder_id
-      );
+      await alerts.move_to_another_folder(params.org_identifier, params.data, params.folder_id);
 
       expect(mockHttpInstance.patch).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts/move?folder=${params.folder_id}`,
-        params.data
+        params.data,
       );
     });
 
@@ -584,7 +583,7 @@ describe("alerts service", () => {
 
       expect(mockHttpInstance.patch).toHaveBeenCalledWith(
         `/api/v2/${params.org_identifier}/alerts/move`,
-        params.data
+        params.data,
       );
     });
   });
@@ -594,36 +593,34 @@ describe("alerts service", () => {
       const error = new Error("Network error");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        alerts.list(1, 20, "name", false, "test", "org123")
-      ).rejects.toThrow("Network error");
+      await expect(alerts.list(1, 20, "name", false, "test", "org123")).rejects.toThrow(
+        "Network error",
+      );
     });
 
     it("should handle API errors gracefully for create method", async () => {
       const error = new Error("Validation error");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        alerts.create("org123", "logs", "logs", { name: "test" })
-      ).rejects.toThrow("Validation error");
+      await expect(alerts.create("org123", "logs", "logs", { name: "test" })).rejects.toThrow(
+        "Validation error",
+      );
     });
 
     it("should handle API errors gracefully for update method", async () => {
       const error = new Error("Not found");
       mockHttpInstance.put.mockRejectedValue(error);
 
-      await expect(
-        alerts.update("org123", "logs", "logs", { name: "test" })
-      ).rejects.toThrow("Not found");
+      await expect(alerts.update("org123", "logs", "logs", { name: "test" })).rejects.toThrow(
+        "Not found",
+      );
     });
 
     it("should handle API errors gracefully for delete method", async () => {
       const error = new Error("Forbidden");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        alerts.delete("org123", "logs", "test", "logs")
-      ).rejects.toThrow("Forbidden");
+      await expect(alerts.delete("org123", "logs", "test", "logs")).rejects.toThrow("Forbidden");
     });
   });
 });

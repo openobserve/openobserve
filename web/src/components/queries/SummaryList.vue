@@ -36,11 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     table-id="settings-query-management-summary"
   >
     <template #toolbar>
-      <div
-        class="flex-1 text-xs font-bold"
-        data-test="summary-list-last-refresh"
-      >
-        Last Data Refresh Time: {{ lastRefreshed }}
+      <div class="flex-1 text-xs font-bold" data-test="summary-list-last-refresh">
+        {{ t("queries.lastDataRefreshTime") }} {{ lastRefreshed }}
       </div>
     </template>
     <template #toolbar-trailing>
@@ -92,26 +89,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm-action"
         @click="handleMultiQueryCancel"
       >
-        {{ t('queries.cancelQuery') }}
+        {{ t("queries.cancelQuery") }}
       </OButton>
     </template>
   </OTable>
 </template>
 
 <script lang="ts">
-
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { durationFormatter } from "@/utils/zincutils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
@@ -154,19 +148,67 @@ export default defineComponent({
       data: null as any,
     });
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showListSchemaDialog = ref(false);
 
     const pageSize = ref(20);
     const pageSizeOptions = [5, 10, 20, 50, 100];
 
     const columns = ref<OTableColumnDef[]>([
-      { id: "user_id", header: t("user.email"), accessorKey: "user_id", size: COL.email, sortable: true, hideable: true, meta: { align: "left" , autoWidth: true } },
-      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: 130, sortable: true, hideable: true, meta: { align: "left"  } },
-      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", size: 170, sortable: true, hideable: true, meta: { align: "right" } },
-      { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", size: 190, cell: " ", sortable: true, hideable: true, meta: { align: "left" } },
-      { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", size: 170, cell: " ", sortable: true, hideable: true, meta: { align: "left" } },
-      { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center", actionCount: 1 } },
+      {
+        id: "user_id",
+        header: t("user.email"),
+        accessorKey: "user_id",
+        size: COL.email,
+        sortable: true,
+        hideable: true,
+        meta: { align: "left", autoWidth: true },
+      },
+      {
+        id: "search_type_label",
+        header: t("queries.searchType"),
+        accessorKey: "search_type_label",
+        size: 130,
+        sortable: true,
+        hideable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "numOfQueries",
+        header: t("queries.numOfQueries"),
+        accessorKey: "numOfQueries",
+        size: 170,
+        sortable: true,
+        hideable: true,
+        meta: { align: "right" },
+      },
+      {
+        id: "duration",
+        header: t("queries.totalDuration"),
+        accessorKey: "duration",
+        size: 190,
+        cell: " ",
+        sortable: true,
+        hideable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "queryRange",
+        header: t("queries.totalTimeRange"),
+        accessorKey: "queryRange",
+        size: 170,
+        cell: " ",
+        sortable: true,
+        hideable: true,
+        meta: { align: "left" },
+      },
+      {
+        id: "actions",
+        header: t("common.actions"),
+        isAction: true,
+        size: 100,
+        meta: { align: "center", actionCount: 1 },
+      },
     ]);
 
     const selectedIds = computed({
@@ -199,7 +241,7 @@ export default defineComponent({
       pageSize,
       pageSizeOptions,
       showListSchemaDialog,
-      "cancel": "cancel",
+      cancel: "cancel",
       loadingState,
       isMetaOrg,
       selectedIds,

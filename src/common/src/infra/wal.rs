@@ -50,10 +50,6 @@ impl SearchingFileLocker {
         }
     }
 
-    pub fn shrink_to_fit(&mut self) {
-        self.inner.shrink_to_fit()
-    }
-
     pub fn len(&self) -> usize {
         self.inner.len()
     }
@@ -85,7 +81,6 @@ pub fn release_files(files: &[String]) {
     for file in files.iter() {
         locker.release(file);
     }
-    locker.shrink_to_fit();
 }
 
 pub fn lock_files_exists(file: &str) -> bool {
@@ -110,7 +105,6 @@ pub fn release_request(trace_id: &str) {
     log::info!("[trace_id: {trace_id}] release_request for wal files");
     let mut locker = SEARCHING_REQUESTS.write();
     let files = locker.remove(trace_id);
-    locker.shrink_to_fit();
     drop(locker);
     if let Some(files) = files {
         release_files(&files);
@@ -122,8 +116,14 @@ mod tests {
 
     use super::*;
 
+    // tests below mutate the shared global SEARCHING_FILES map; serialize the
+    // ones that assert on lock presence so clean_lock_files() from a parallel
+    // test cannot clear locks mid-assertion
+    static TEST_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
     #[tokio::test]
     async fn test_wal_file_locking() {
+        let _guard = TEST_LOCK.lock();
         let files = vec![
             "files/test_org/logs/test_stream/1/2025/06/06/01/1/md5/test_key1.json".to_string(),
             "files/test_org/logs/test_stream/1/2025/06/06/01/1/md5/test_key2.json".to_string(),
@@ -142,6 +142,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wal_request_locking() {
+        let _guard = TEST_LOCK.lock();
         let trace_id = "test_trace_1234";
         let files = vec![
             "files/test_org/logs/test_stream/1/2025/06/06/01/1/md5/test_key3.json".to_string(),
@@ -176,6 +177,7 @@ mod tests {
 
     #[test]
     fn test_clean_lock_files_clears_all() {
+        let _guard = TEST_LOCK.lock();
         let files = vec![
             "files/org/logs/stream/1/md5/clean_test_a.json".to_string(),
             "files/org/logs/stream/1/md5/clean_test_b.json".to_string(),
@@ -189,6 +191,7 @@ mod tests {
 
     #[test]
     fn test_file_lock_reference_counting() {
+        let _guard = TEST_LOCK.lock();
         let files = vec!["files/org/logs/stream/1/md5/refcount_test.json".to_string()];
         lock_files(&files);
         lock_files(&files);

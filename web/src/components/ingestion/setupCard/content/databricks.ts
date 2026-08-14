@@ -17,6 +17,8 @@
 // https://openobserve.ai/blog/monitor-databricks/ — Databricks ships LOGS by
 // POSTing them from a notebook to OpenObserve's logs API (no OTel collector).
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
@@ -33,25 +35,21 @@ headers = {
 records = [{"source": "databricks", "message": "hello from databricks"}]
 requests.post(url, headers=headers, json=records)`;
 
-export default function databricksCard(
-  subs: CardSubstitutions,
-): RichCardContent {
+export default function databricksCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Databricks",
-      tagline:
-        "Ship Databricks notebook logs to OpenObserve over the logs API.",
+      tagline: gt("ingestion.setupCard.taglineDatabricks"),
       logo: getImageURL("images/ingestion/databricks.svg"),
       tone: "#FF3621",
-      metaBadges: ["Logs"],
+      metaBadges: [gt("common.logs")],
     },
     steps: [
       {
         id: "notebook",
-        title: "Send Logs From Your Notebook",
-        description:
-          "Paste into a Databricks notebook cell — it POSTs records to OpenObserve's logs API.",
-        chip: { kind: "editor", label: "notebook.py" },
+        titleKey: "ingestion.setupCard.sendNotebookLogsTitle",
+        descriptionKey: "ingestion.setupCard.sendNotebookLogsDesc",
+        chip: { kind: "editor", label: raw("notebook.py") },
         completeOn: "copy",
         code: {
           lang: "python",
@@ -62,13 +60,13 @@ export default function databricksCard(
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or open Logs and search `source:databricks`.",
-        chip: { kind: "traces", label: "Logs" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyDatabricksLogsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["databricks_logs"],
+        // The stream name the notebook writes to, not prose.
+        pills: [raw("databricks_logs")],
       },
     ],
     detect: { streamType: "logs", match: "keyword", streamName: "databricks", filter: "" },

@@ -45,6 +45,7 @@ use config::{
 };
 use db;
 use infra::schema::{SchemaCache, get_partition_time_level};
+use ingestion_common::IngestUser;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
@@ -53,6 +54,7 @@ use opentelemetry_proto::tonic::{
     metrics::v1::{metric::Data, *},
 };
 use prost::Message;
+use schema::{check_for_schema, stream_schema_exists};
 
 use crate::{
     alerts::alert::AlertExt,
@@ -64,13 +66,12 @@ use crate::{
     },
     metrics::get_exclude_labels,
     pipeline::batch_execution::ExecutablePipeline,
-    schema::{check_for_schema, stream_schema_exists},
 };
 
 pub async fn otlp_proto(
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_types::IngestUser,
+    user: IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
@@ -98,7 +99,7 @@ pub async fn otlp_proto(
 pub async fn otlp_json(
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_types::IngestUser,
+    user: IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let mut body_json = match serde_json::from_slice::<json::Value>(body.as_ref()) {
         Ok(v) => v,
@@ -133,7 +134,7 @@ pub async fn handle_otlp_request(
     org_id: &str,
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
-    user: crate::ingestion_types::IngestUser,
+    user: IngestUser,
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
@@ -179,6 +180,10 @@ pub async fn handle_otlp_request(
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
 
+    // check if stream is deleting from cache
+    let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
+    let mut skipped_records: u32 = 0;
+
     for resource_metric in &request.resource_metrics {
         if resource_metric.scope_metrics.is_empty() {
             continue;
@@ -186,6 +191,26 @@ pub async fn handle_otlp_request(
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
                 let metric_name = format_stream_name(metric.name.to_string());
+
+                // check stream if it is deleting
+                let is_deleting = match stream_delete_status.get(&metric_name) {
+                    Some(v) => *v,
+                    None => {
+                        let flag = db::compact::retention::is_deleting_stream(
+                            org_id,
+                            StreamType::Metrics,
+                            &metric_name,
+                            None,
+                        );
+                        stream_delete_status.insert(metric_name.clone(), flag);
+                        flag
+                    }
+                };
+
+                if is_deleting {
+                    skipped_records += 1;
+                    continue;
+                }
 
                 let mut rec = json::json!({});
                 if let Some(res) = &resource_metric.resource {
@@ -403,6 +428,11 @@ pub async fn handle_otlp_request(
         }
     }
 
+    // warn if any records were skipped due to streams being deleted
+    if skipped_records > 0 {
+        log::warn!("[METRICS:OTLP] Skipped {skipped_records} records due to streams being deleted");
+    }
+
     // process records buffered for pipeline processing
     for (stream_name, pipelines) in &stream_executable_pipelines {
         if pipelines.is_empty() {
@@ -520,6 +550,16 @@ pub async fn handle_otlp_request(
         )
         .await?;
 
+        let cur_stream_alerts = stream_alerts_map.get(&format!(
+            "{}/{}/{}",
+            org_id,
+            StreamType::Metrics,
+            local_metric_name
+        ));
+        let mut triggers: TriggerAlertData =
+            Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
+        let mut evaluated_alerts = HashSet::new();
+
         for val_map in json_data {
             let timestamp = val_map
                 .get(TIMESTAMP_COL_NAME)
@@ -558,27 +598,43 @@ pub async fn handle_otlp_request(
                 .push(Arc::new(json::Value::Object(val_map.to_owned())));
             hour_buf.records_size += value_str.len();
 
-            // real time alert
-            let need_trigger = !stream_trigger_map.contains_key(&local_metric_name);
-            if need_trigger && !stream_alerts_map.is_empty() {
-                // Start check for alert trigger
-                let key = format!("{}/{}/{}", org_id, StreamType::Metrics, local_metric_name);
-                if let Some(alerts) = stream_alerts_map.get(&key) {
-                    let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = now_micros();
-                    for alert in alerts {
-                        if let Ok(Some(data)) = alert
-                            .evaluate(Some(&val_map), (None, alert_end_time), None)
-                            .await
-                            .map(|res| res.data)
-                        {
-                            trigger_alerts.push((alert.clone(), data))
+            // start check for alert trigger
+            if let Some(alerts) = cur_stream_alerts
+                && triggers.len() < alerts.len()
+            {
+                let end_time = now_micros();
+                for alert in alerts {
+                    let key = format!(
+                        "{}/{}/{}/{}",
+                        org_id,
+                        StreamType::Metrics,
+                        alert.stream_name,
+                        alert.get_unique_key()
+                    );
+                    // For one alert, only one trigger per request
+                    // Trigger for this alert is already added.
+                    if evaluated_alerts.contains(&key) {
+                        continue;
+                    }
+                    match alert.evaluate(Some(&val_map), (None, end_time), None).await {
+                        Ok(trigger_results) if trigger_results.data.is_some() => {
+                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        Ok(_) => {
+                            // the data doesn't satisfy the alert condition
+                        }
+                        Err(e) => {
+                            log::error!("[METRICS] Error while evaluating realtime alert: {e}");
                         }
                     }
-                    stream_trigger_map.insert(local_metric_name.clone(), Some(trigger_alerts));
                 }
             }
-            // End check for alert trigger
+            // end check for alert triggers
+        }
+
+        if !triggers.is_empty() {
+            stream_trigger_map.insert(local_metric_name.clone(), Some(triggers));
         }
     }
 

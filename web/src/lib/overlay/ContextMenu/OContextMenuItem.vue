@@ -17,12 +17,8 @@ const emit = defineEmits<ContextMenuItemEmits>();
 
 defineSlots<ContextMenuItemSlots>();
 
-const variantClasses: Record<
-  NonNullable<ContextMenuItemProps["variant"]>,
-  string
-> = {
-  default:
-    "text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg",
+const variantClasses: Record<NonNullable<ContextMenuItemProps["variant"]>, string> = {
+  default: "text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg",
   destructive:
     "text-dropdown-item-destructive-text data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
 };
@@ -34,8 +30,8 @@ const variantClasses: Record<
     :text-value="textValue"
     :class="[
       'relative flex items-center gap-2',
-      'w-full px-3 py-1.5 rounded-default',
-      'cursor-pointer select-none outline-none',
+      'rounded-default w-full px-3 py-1.5',
+      'cursor-pointer outline-none select-none',
       'transition-colors duration-150',
       variantClasses[variant],
       'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',

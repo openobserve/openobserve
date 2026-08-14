@@ -160,10 +160,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
             case "left": {
               // Position chart to the left within ONLY the chart area
               const leftPositionInChartArea = chartAreaWidth * 0.25; // 25% into chart area
-              centerX = Math.max(
-                minSafeXInChartArea,
-                (leftPositionInChartArea / chartWidth) * 100,
-              );
+              centerX = Math.max(minSafeXInChartArea, (leftPositionInChartArea / chartWidth) * 100);
               break;
             }
             case "center":
@@ -182,12 +179,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
           options.series[0].center = ["50%", "50%"];
         }
       } else {
-        applyPieDonutCenterAdjustment(
-          panelSchema,
-          options,
-          chartWidth,
-          chartHeight,
-        );
+        applyPieDonutCenterAdjustment(panelSchema, options, chartWidth, chartHeight);
       }
     }
 
@@ -280,12 +272,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
       options.series[0].radius = [`${innterRadius}%`, `${outerRadius}%`];
 
       // Apply chart alignment and center positioning using centralized function
-      applyPieDonutChartAlignment(
-        panelSchema,
-        options,
-        chartWidth,
-        chartHeight,
-      );
+      applyPieDonutChartAlignment(panelSchema, options, chartWidth, chartHeight);
     }
 
     options.xAxis = [];

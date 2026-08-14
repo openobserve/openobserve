@@ -3,12 +3,12 @@
     <template #trigger>
       <OButton
         :style="{
-          width: changeStyle ? '170px' : '180px',
-          height: changeStyle ? '40px' : '',
+          width: changeStyle ? '10.625rem' : '11.25rem',
+          height: changeStyle ? '2.5rem' : '',
         }"
         data-test="date-time-btn"
         variant="outline"
-        class="h-full rounded-default py-0 px-1.25 text-xs min-w-auto bg-[rgba(89,96,178,0.2)]!"
+        class="rounded-default h-full min-w-auto bg-[rgba(89,96,178,0.2)]! px-1.25 py-0 text-xs"
         :class="changeStyle ? computedClass : 'h-8!'"
         :disabled="isFirstEntry"
       >
@@ -17,27 +17,27 @@
         </template>
         {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
         <template #icon-right>
-          <OIcon name="arrow-drop-down" size="sm"
+          <OIcon
+            name="arrow-drop-down"
+            size="sm"
             class="transition-transform duration-[250ms] ease-in-out"
-            :class="picker.showMenu ? 'rotate-180' : ''" />
+            :class="picker.showMenu ? 'rotate-180' : ''"
+          />
         </template>
       </OButton>
     </template>
-    <div class="date-time-dialog w-85.25 z-[10001] max-h-150">
+    <div class="date-time-dialog z-10001 max-h-150 w-85.25">
       <div class="flex justify-between">
         <OTabPanels v-model="picker.activeTab">
           <OTabPanel name="relative">
             <div class="date-time-table relative flex flex-col">
               <div
-                class="relative-row [&>*]:mr-1.5 px-3 py-2 flex items-center border-b border-border-default"
+                class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:mr-1.5"
                 v-for="(period, periodIndex) in relativePeriods"
                 :key="'date_' + periodIndex"
               >
-                <div class="text-sm font-semibold min-w-18.75">{{ period.label }}</div>
-                <div
-                  v-for="item in relativeDates[period.value]"
-                  :key="item"
-                >
+                <div class="min-w-18.75 text-sm font-semibold">{{ period.label }}</div>
+                <div v-for="item in relativeDates[period.value]" :key="item">
                   <OButton
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
                     variant="ghost"
@@ -52,10 +52,12 @@
                   >
                 </div>
               </div>
-              <div class="relative-row [&>*]:mr-1.5 px-3 py-2 flex items-center border-b border-border-default">
-                <div class="text-sm font-semibold min-w-18.75">Custom</div>
+              <div
+                class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:mr-1.5"
+              >
+                <div class="min-w-18.75 text-sm font-semibold">{{ t("common.custom") }}</div>
                 <div class="flex gap-2">
-                  <div class="flex flex-col w-20">
+                  <div class="flex w-20 flex-col">
                     <OInput
                       v-model.number="picker.data.selectedDate.relative.value"
                       type="number"
@@ -96,12 +98,15 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import type { DropdownAlign } from "@/lib/overlay/Dropdown/ODropdown.types";
 import { ref, reactive, watch, computed } from "vue";
 import type { PropType } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 // Period keys used to index relativeDates and label lookups.
 type PeriodKey = "s" | "m" | "h" | "d" | "w" | "M";
 
 interface RelativePeriod {
-  label: string;
+  label: I18nText;
   value: PeriodKey;
 }
 
@@ -118,8 +123,7 @@ const props = defineProps({
     default: "end",
     required: false,
     type: String as PropType<DropdownAlign>,
-    validator: (v: DropdownAlign) =>
-      ["start", "center", "end"].includes(v),
+    validator: (v: DropdownAlign) => ["start", "center", "end"].includes(v),
   },
 });
 
@@ -133,7 +137,7 @@ const picker = reactive({
       relative: {
         value: 0,
         period: "m",
-        label: "Minutes",
+        label: t("common.minutes"),
       },
     },
   },
@@ -141,12 +145,12 @@ const picker = reactive({
 
 // Periods for selection
 const relativePeriods: RelativePeriod[] = [
-  { label: "Seconds", value: "s" },
-  { label: "Minutes", value: "m" },
-  { label: "Hours", value: "h" },
-  { label: "Days", value: "d" },
-  { label: "Weeks", value: "w" },
-  { label: "Months", value: "M" },
+  { label: t("common.seconds"), value: "s" },
+  { label: t("common.minutes"), value: "m" },
+  { label: t("common.hours"), value: "h" },
+  { label: t("common.days"), value: "d" },
+  { label: t("common.weeks"), value: "w" },
+  { label: t("common.months"), value: "M" },
 ];
 
 const relativeDates: Record<PeriodKey, number[]> = {
@@ -160,18 +164,18 @@ const relativeDates: Record<PeriodKey, number[]> = {
 
 // Options for custom period input
 const relativePeriodsSelect = ref([
-  { label: "Seconds", value: "s" },
-  { label: "Minutes", value: "m" },
-  { label: "Hours", value: "h" },
-  { label: "Days", value: "d" },
-  { label: "Weeks", value: "w" },
-  { label: "Months", value: "M" },
+  { label: t("common.seconds"), value: "s" },
+  { label: t("common.minutes"), value: "m" },
+  { label: t("common.hours"), value: "h" },
+  { label: t("common.days"), value: "d" },
+  { label: t("common.weeks"), value: "w" },
+  { label: t("common.months"), value: "M" },
 ]);
 
 // Function to map period values to their labels
 const getPeriodLabelFromValue = (periodValue: SelectModelValue | string) => {
   const period = relativePeriods.find((p) => p.value === periodValue);
-  return period ? period.label : "Minutes";
+  return period ? period.label : t("common.minutes");
 };
 
 // Watch modelValue to reflect the correct offset when passed in from parent
@@ -186,9 +190,7 @@ watch(
 
       picker.data.selectedDate.relative.value = Number(value);
       picker.data.selectedDate.relative.period = period ?? "";
-      picker.data.selectedDate.relative.label = getPeriodLabelFromValue(
-        period ?? "",
-      ); // Dynamically set label
+      picker.data.selectedDate.relative.label = getPeriodLabelFromValue(period ?? ""); // Dynamically set label
     }
   },
   { immediate: true },
@@ -198,9 +200,7 @@ watch(
 const setRelativeDate = (period: RelativePeriod, item: number) => {
   picker.data.selectedDate.relative.period = period.value;
   picker.data.selectedDate.relative.value = item;
-  picker.data.selectedDate.relative.label = getPeriodLabelFromValue(
-    period.value,
-  ); // Set label dynamically
+  picker.data.selectedDate.relative.label = getPeriodLabelFromValue(period.value); // Set label dynamically
 
   // Emit the new value to update modelValue in the parent component
   emit("update:modelValue", `${item}${period.value}`);
@@ -209,19 +209,23 @@ const setRelativeDate = (period: RelativePeriod, item: number) => {
 // Function to update custom period when selecting from the select
 const updateCustomPeriod = (newPeriod: SelectModelValue | string) => {
   picker.data.selectedDate.relative.label = getPeriodLabelFromValue(newPeriod);
-  emit(
-    "update:modelValue",
-    `${picker.data.selectedDate.relative.value}${newPeriod}`,
-  );
+  emit("update:modelValue", `${picker.data.selectedDate.relative.value}${newPeriod}`);
 };
 
 // Display the current selected offset
+// Parameterised rather than concatenated — word order around the value varies by language.
 const getDisplayValue = () => {
-  return `${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label} ago`;
+  return t("common.relativeTimeAgo", {
+    value: picker.data.selectedDate.relative.value,
+    unit: picker.data.selectedDate.relative.label,
+  });
 };
 
 const getTrimmedDisplayValue = () => {
-  return `Past ${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
+  return t("common.relativeTimePast", {
+    value: picker.data.selectedDate.relative.value,
+    unit: picker.data.selectedDate.relative.label,
+  });
 };
 
 // Check if the current selection matches the modelValue
@@ -237,11 +241,10 @@ const getPeriodLabel = () => {
   const selectedPeriod = relativePeriods.find(
     (p) => p.value === picker.data.selectedDate.relative.period,
   );
-  return selectedPeriod ? selectedPeriod.label : "Minutes";
+  return selectedPeriod ? selectedPeriod.label : t("common.minutes");
 };
 
 const computedClass = computed(() => {
   return props.changeStyle ? "bg-surface-base!" : "";
 });
 </script>
-

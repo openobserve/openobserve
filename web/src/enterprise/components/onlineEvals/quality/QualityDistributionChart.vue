@@ -1,19 +1,21 @@
 <template>
-  <div ref="chartEl" class="w-full h-full min-h-50" data-test="quality-distribution-chart" />
+  <div ref="chartEl" class="h-full min-h-50 w-full" data-test="quality-distribution-chart" />
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
 import { chartColor } from "@/utils/chartTheme";
+import { CHART_THRESHOLD_COLOR } from "@/utils/dashboard/colorPalette";
 import type { DistributionBucket } from "../composables/useQualityDetailCharts";
 import { withChartFont } from "@/utils/fonts";
 
 const props = defineProps<{
   buckets: DistributionBucket[];
   threshold: { value: number; direction: "gte" | "lte" } | null;
-  legendHealthy: string;
+  legendHealthy: I18nText;
   legendUnhealthy: string;
 }>();
 
@@ -59,11 +61,11 @@ function buildOption(): echarts.EChartsOption {
         symbol: "none",
         label: {
           formatter: `healthy ${sign} ${props.threshold.value}`,
-          color: "#b25400",
+          color: CHART_THRESHOLD_COLOR,
           fontSize: 10,
           position: "insideEndTop",
         },
-        lineStyle: { color: "#b25400", type: "dashed", width: 1.2 },
+        lineStyle: { color: CHART_THRESHOLD_COLOR, type: "dashed", width: 1.2 },
         data: [{ xAxis: thresholdBucketIndex() }],
       },
     });
@@ -79,8 +81,16 @@ function buildOption(): echarts.EChartsOption {
       itemHeight: 8,
       textStyle: { color: text, fontSize: 11 },
       data: [
-        { name: props.legendHealthy, icon: "rect", itemStyle: { color: "rgba(46, 125, 50, 0.85)" } as any },
-        { name: props.legendUnhealthy, icon: "rect", itemStyle: { color: "rgba(178, 84, 0, 0.85)" } as any },
+        {
+          name: props.legendHealthy,
+          icon: "rect",
+          itemStyle: { color: "rgba(46, 125, 50, 0.85)" } as any,
+        },
+        {
+          name: props.legendUnhealthy,
+          icon: "rect",
+          itemStyle: { color: "rgba(178, 84, 0, 0.85)" } as any,
+        },
       ],
     },
     xAxis: {

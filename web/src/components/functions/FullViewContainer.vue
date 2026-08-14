@@ -1,7 +1,5 @@
 <template>
-  <div
-    class="py-0.5 bg-section-header-bg"
-  >
+  <div class="bg-section-header-bg py-0.5">
     <div
       class="flex justify-between"
       :class="{ 'items-center': minHeaderHeight }"
@@ -12,13 +10,13 @@
           v-if="showExpandIcon"
           name="keyboard-arrow-up"
           @click.stop="expanded = !expanded"
-          class="mr-1 cursor-pointer transition-all text-text-secondary"
-          :class="expanded ? 'transform rotate-180' : ''"
+          class="text-text-secondary mr-1 cursor-pointer transition-all"
+          :class="expanded ? 'rotate-180 transform' : ''"
           size="md"
         />
         <div
-          @click="showExpandIcon ? expanded = !expanded : null"
-          class="text-sm font-bold text-text-secondary"
+          @click="showExpandIcon ? (expanded = !expanded) : null"
+          class="text-text-secondary text-sm font-bold"
           :class="labelClass"
         >
           {{ label }}
@@ -33,8 +31,8 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed } from "vue";
-import { useStore } from "vuex";
+import { type I18nText } from "@/types/i18n";
+import { computed, type PropType } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
@@ -43,7 +41,7 @@ const props = defineProps({
     required: true,
   },
   label: {
-    type: String,
+    type: String as unknown as PropType<I18nText>,
     required: true,
   },
   isExpandable: {
@@ -75,11 +73,8 @@ const props = defineProps({
 
 const emits = defineEmits(["update:isExpanded"]);
 
-const store = useStore();
-
 const expanded = computed({
   get: () => props.isExpanded,
   set: (value) => emits("update:isExpanded", value),
 });
 </script>
-

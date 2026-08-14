@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import {
-  ALERT_PAYLOAD_FIELDS,
-  TRIGGER_META_VARS,
-} from "@/plugins/workflows/alertFields";
+import { ALERT_PAYLOAD_FIELDS, TRIGGER_META_VARS } from "@/plugins/workflows/alertFields";
 import en from "@/locales/languages/en-US.json";
 
 /** Resolve a dotted i18n key against the en.json translation tree. */
@@ -69,9 +66,21 @@ describe("alertFields", () => {
       });
     });
 
-    it("types every meta field as string (the real payload's meta is a string:string map)", () => {
-      const types = new Set(TRIGGER_META_VARS.map((v) => v.type));
-      expect([...types]).toEqual(["string"]);
+    it("types the numeric alert fields as int and the rest as string (matches the real payload)", () => {
+      const typeByRef = Object.fromEntries(TRIGGER_META_VARS.map((v) => [v.ref, v.type]));
+      // numeric alert fields + microsecond timestamps -> int
+      expect(typeByRef["meta.alert_period"]).toBe("int");
+      expect(typeByRef["meta.alert_threshold"]).toBe("int");
+      expect(typeByRef["meta.alert_count"]).toBe("int");
+      expect(typeByRef["meta.alert_start_time"]).toBe("int");
+      expect(typeByRef["meta.alert_end_time"]).toBe("int");
+      // everything else is text
+      expect(typeByRef["meta.org_id"]).toBe("string");
+      expect(typeByRef["meta.stream_type"]).toBe("string");
+      expect(typeByRef["meta.stream_name"]).toBe("string");
+      expect(typeByRef["meta.alert_name"]).toBe("string");
+      expect(typeByRef["meta.alert_type"]).toBe("string");
+      expect(typeByRef["meta.alert_operator"]).toBe("string");
     });
 
     it("declares enumValues only on meta.alert_type", () => {
@@ -157,12 +166,8 @@ describe("alertFields", () => {
     });
 
     it("carries two runtime-only columns beyond the trigger meta schema", () => {
-      const fromSchema = new Set(
-        TRIGGER_META_VARS.map((v) => v.ref.replace(/^meta\./, "meta_")),
-      );
-      const extra = ALERT_PAYLOAD_FIELDS.map((f) => f.value).filter(
-        (v) => !fromSchema.has(v),
-      );
+      const fromSchema = new Set(TRIGGER_META_VARS.map((v) => v.ref.replace(/^meta\./, "meta_")));
+      const extra = ALERT_PAYLOAD_FIELDS.map((f) => f.value).filter((v) => !fromSchema.has(v));
       expect(extra.sort()).toEqual(["meta_alert_trigger_time", "meta_alert_url"]);
     });
 

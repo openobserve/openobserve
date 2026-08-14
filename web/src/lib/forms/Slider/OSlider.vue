@@ -38,9 +38,7 @@ const currentValue = computed(() => {
   return props.min;
 });
 
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
 const fillPercent = computed(() => {
@@ -99,7 +97,7 @@ const resolvedSize = computed(() => props.size ?? "md");
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="flex flex-col gap-1 w-full">
+  <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <div
       v-if="$slots.label || label || showValue || $slots.tooltip"
       class="flex items-center justify-between gap-2"
@@ -109,24 +107,23 @@ const resolvedSize = computed(() => props.size ?? "md");
         :for="inputId"
         :class="[
           labelSize[resolvedSize],
-          'font-medium text-slider-label leading-none flex items-center gap-1',
+          'text-slider-label flex items-center gap-1 leading-none font-medium',
         ]"
       >
-        <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
+        <slot name="label">{{ label }}</slot
+        ><span v-if="required" aria-hidden="true" class="select-none">*</span>
         <OIcon
           v-if="$slots.tooltip"
           name="info-outline"
           size="sm"
           :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-          class="cursor-help text-slider-label"
-        ><slot name="tooltip" /></OIcon>
+          class="text-slider-label cursor-help"
+          ><slot name="tooltip"
+        /></OIcon>
       </label>
       <span
         v-if="showValue"
-        :class="[
-          labelSize[resolvedSize],
-          'tabular-nums text-slider-value leading-none',
-        ]"
+        :class="[labelSize[resolvedSize], 'text-slider-value leading-none tabular-nums']"
       >
         {{ displayValue }}
       </span>
@@ -134,13 +131,13 @@ const resolvedSize = computed(() => props.size ?? "md");
 
     <div
       :class="[
-        'relative flex items-center w-full',
+        'relative flex w-full items-center',
         disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
       ]"
     >
       <div
         :class="[
-          'absolute left-0 right-0 rounded-full',
+          'absolute right-0 left-0 rounded-full',
           trackHeight[resolvedSize],
           disabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
         ]"
@@ -150,9 +147,7 @@ const resolvedSize = computed(() => props.size ?? "md");
         :class="[
           'absolute left-0 rounded-full',
           trackHeight[resolvedSize],
-          disabled
-            ? 'bg-slider-disabled-track-fill'
-            : 'bg-slider-track-fill',
+          disabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
         ]"
         :style="{ width: fillPercent + '%' }"
         aria-hidden="true"
@@ -171,8 +166,8 @@ const resolvedSize = computed(() => props.size ?? "md");
         :aria-invalid="hasError || undefined"
         :class="[
           'o2-slider-input',
-          'relative z-10 w-full bg-transparent appearance-none m-0',
-          'outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-slider-focus-ring rounded-full transition-[box-shadow] duration-150',
+          'relative z-10 m-0 w-full appearance-none bg-transparent',
+          'ring-offset-surface-base focus-visible:ring-slider-focus-ring rounded-full ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2',
           trackHeight[resolvedSize],
           disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         ]"
@@ -184,7 +179,7 @@ const resolvedSize = computed(() => props.size ?? "md");
 
       <span
         :class="[
-          'absolute rounded-full pointer-events-none border-2 border-slider-thumb-border',
+          'border-slider-thumb-border pointer-events-none absolute rounded-full border-2',
           thumbSize[resolvedSize],
           disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
         ]"
@@ -195,21 +190,15 @@ const resolvedSize = computed(() => props.size ?? "md");
       />
     </div>
 
-    <div
-      v-if="effectiveError || helpText"
-      class="flex items-center justify-between gap-2"
-    >
+    <div v-if="effectiveError || helpText" class="flex items-center justify-between gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
-        class="text-xs text-slider-error-text leading-none"
+        class="text-slider-error-text text-xs leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-slider-value leading-none"
-      >
+      <span v-else-if="helpText" class="text-slider-value text-xs leading-none">
         {{ helpText }}
       </span>
     </div>

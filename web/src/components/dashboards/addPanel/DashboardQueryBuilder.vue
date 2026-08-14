@@ -25,23 +25,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <!-- x axis container -->
-    <div
-      class="pl-3 flex flex-row w-full"
-      v-if="dashboardPanelData.data.type != 'metric'"
-    >
+    <div class="flex w-full flex-row pl-3" v-if="dashboardPanelData.data.type != 'metric'">
       <div class="flex-1">
         <div class="flex flex-row">
-          <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
+          <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
+            <span
+              class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+              aria-hidden="true"
+            ></span>
             {{ currentXLabel }}
             <OIcon name="info-outline" size="sm" class="ml-1" />
-              <OTooltip :content="xAxisHint" />
+            <OTooltip :content="xAxisHint" />
           </div>
-          <span class="layout-separator flex items-center mx-0.5">:</span>
+          <span class="layout-separator mx-0.5 flex items-center">:</span>
           <div
-            class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
+            class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent text-center"
             :class="{
-              'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-              'transition-all duration-200 bg-field-list-row-hover-bg':
+              '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
+                dashboardPanelData.meta.dragAndDrop.dragging,
+              'bg-field-list-row-hover-bg transition-colors duration-200':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x',
             }"
@@ -50,9 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               onDrop(
                 $event,
                 'x',
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.x?.length || 0,
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                  ?.x?.length || 0,
               )
             "
             @dragenter="onDragEnter($event, 'x', null)"
@@ -60,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-x-layout"
           >
             <div
-              class="flex mr-2 my-1"
+              class="my-0.5 mr-2 flex"
               v-for="(itemX, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.x"
@@ -68,102 +69,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="
-                  dashboardPanelData.meta.dragAndDrop.targetDragIndex ==
-                    index &&
+                  dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
                   dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'
                 "
-                class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
+                class="dragItem bg-theme-accent rounded-default h-full w-5 opacity-70"
                 data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field overflow-hidden"
+                class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
                 radius="sm"
-                :draggable="true"
+                :divided="true"
+                :draggable="isDragArmed('x-' + index)"
                 @dragstart="onFieldDragStart($event, itemX, 'x', Number(index))"
                 @drop="onDrop($event, 'x', Number(index))"
                 @dragenter="onDragEnter($event, 'x', index)"
               >
                 <OButton
-                  variant="outline"
+                  variant="ghost"
                   size="icon-chip"
-                  class="cursor-grab"
+                  class="!w-4 !cursor-grab"
+                  @mousedown="armDrag('x-' + index)"
                   :data-test="`dashboard-x-item-${itemX?.alias}-drag`"
                 >
                   <template #icon-left>
-                    <OIcon name="drag-indicator" size="xs" />
+                    <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                   </template>
                 </OButton>
                 <ODropdown>
                   <template #trigger>
                     <OButton
-                      variant="primary"
+                      variant="ghost"
                       size="chip-12"
+                      class="!ps-1 !pe-1"
                       :data-test="`dashboard-x-item-${itemX?.alias}`"
                     >
-                      {{ xLabel[index] }}
-                      <template #icon-right
-><OIcon name="arrow-drop-down" size="sm"
-                      /></template>
+                      <AxisFieldChipLabel :label="xLabel[index]" />
+                      <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                     </OButton>
                   </template>
                   <div
                     :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
                     :style="{
                       width:
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery ||
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.x[index].isDerived
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .customQuery ||
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .fields.x[index].isDerived
                           ? 'auto'
                           : FIELD_FUNCTION_MENU_WIDTH,
                     }"
                   >
                     <DynamicFunctionPopUp
                       v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.x[index]
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .fields.x[index]
                       "
                       :allowAggregation="false"
                       :customQuery="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .customQuery
                       "
                       :chartType="dashboardPanelData.data.type"
                     />
                   </div>
                 </ODropdown>
                 <OButton
-                  variant="outline"
+                  variant="ghost"
                   size="icon-chip"
+                  class="!w-4"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                   @click="removeXAxisItemByIndex(Number(index))"
-                  icon-left="close"
                 >
+                  <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
             <div
-              class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+              class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
               v-if="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.x?.length < 1
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                  ?.x?.length < 1
               "
             >
-              <div class="mt-1">{{ xAxisHint }}</div>
+              <div>{{ xAxisHint }}</div>
             </div>
           </div>
         </div>
       </div>
       <!-- b axis container -->
-      <div class="flex-1"
+      <div
+        class="flex-1"
         v-if="
           dashboardPanelData.data.type == 'table' ||
           dashboardPanelData.data.type == 'area' ||
@@ -176,50 +174,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked'
         "
       >
-        <div class="pl-3 h-full flex flex-row">
+        <div class="flex h-full flex-row pl-3">
           <!-- Separator between X and Breakdown/Pivot -->
           <OSeparator vertical class="mr-4" />
-          <div class="layout-name whitespace-nowrap min-w-0 flex items-center">
+          <div class="layout-name flex min-w-0 items-center whitespace-nowrap">
+            <span
+              class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
+              aria-hidden="true"
+            ></span>
             {{
-              dashboardPanelData.data.type == "table"
-                ? t("panel.pivotField")
-                : t("panel.breakdown")
+              dashboardPanelData.data.type == "table" ? t("panel.pivotField") : t("panel.breakdown")
             }}
             <OIcon name="info-outline" size="sm" class="ml-1" />
-              <OTooltip side="top" align="center">
-                <template #content>
-                  <span v-if="dashboardPanelData.data.type == 'table'">{{
-                    t("panel.pivotFieldTooltip")
-                  }}</span>
-                  <span
-                    v-else-if="
-                      dashboardPanelData.data.type == 'h-bar' ||
-                      dashboardPanelData.data.type == 'h-stacked'
-                    "
+            <OTooltip side="top" align="center">
+              <template #content>
+                <span v-if="dashboardPanelData.data.type == 'table'">{{
+                  t("panel.pivotFieldTooltip")
+                }}</span>
+                <span
+                  v-else-if="
+                    dashboardPanelData.data.type == 'h-bar' ||
+                    dashboardPanelData.data.type == 'h-stacked'
+                  "
                   >{{ t("panel.breakdownTooltipHBar") }}</span
-                  >
-                  <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
-                </template>
-              </OTooltip>
+                >
+                <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
+              </template>
+            </OTooltip>
           </div>
-          <span class="layout-separator flex items-center mx-0.5">:</span>
+          <span class="layout-separator mx-0.5 flex items-center">:</span>
           <div
-            class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
+            class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent text-center"
             :class="{
-              'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-              'transition-all duration-200 bg-field-list-row-hover-bg':
+              '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
+                dashboardPanelData.meta.dragAndDrop.dragging,
+              'bg-field-list-row-hover-bg transition-colors duration-200':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
-                dashboardPanelData.meta.dragAndDrop.currentDragArea ==
-                  'breakdown',
+                dashboardPanelData.meta.dragAndDrop.currentDragArea == 'breakdown',
             }"
             @dragover="onDragOver($event, 'breakdown')"
             @drop="
               onDrop(
                 $event,
                 'breakdown',
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.breakdown?.length || 0,
+                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                  ?.breakdown?.length || 0,
               )
             "
             @dragenter="onDragEnter($event, 'breakdown', null)"
@@ -227,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-b-layout"
           >
             <div
-              class="flex mr-2 my-1"
+              class="my-0.5 mr-2 flex"
               v-for="(itemB, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.breakdown"
@@ -235,99 +234,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="
-                  dashboardPanelData.meta.dragAndDrop.targetDragIndex ==
-                    index &&
-                  dashboardPanelData.meta.dragAndDrop.currentDragArea ==
-                    'breakdown'
+                  dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
+                  dashboardPanelData.meta.dragAndDrop.currentDragArea == 'breakdown'
                 "
-                class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
+                class="dragItem bg-theme-accent rounded-default h-full w-5 opacity-70"
                 data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field overflow-hidden"
+                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
                 radius="sm"
-                :draggable="true"
-                @dragstart="
-                  onFieldDragStart($event, itemB, 'breakdown', Number(index))
-                "
+                :divided="true"
+                :draggable="isDragArmed('breakdown-' + index)"
+                @dragstart="onFieldDragStart($event, itemB, 'breakdown', Number(index))"
                 @drop="onDrop($event, 'breakdown', Number(index))"
                 @dragenter="onDragEnter($event, 'breakdown', index)"
               >
                 <OButton
-                  variant="outline"
+                  variant="ghost"
                   size="icon-chip"
-                  class="cursor-grab"
+                  class="!w-4 !cursor-grab"
+                  @mousedown="armDrag('breakdown-' + index)"
                   :data-test="`dashboard-b-item-${itemB?.alias}-drag`"
                 >
                   <template #icon-left>
-                    <OIcon name="drag-indicator" size="xs" />
+                    <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                   </template>
                 </OButton>
                 <ODropdown>
                   <template #trigger>
                     <OButton
-                      variant="primary"
+                      variant="ghost"
                       size="chip-12"
+                      class="!ps-1 !pe-1"
                       :data-test="`dashboard-b-item-${itemB?.alias}`"
                     >
-                      {{ bLabel[index] }}
-                      <template #icon-right
-><OIcon name="arrow-drop-down" size="sm"
-                      /></template>
+                      <AxisFieldChipLabel :label="bLabel[index]" />
+                      <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                     </OButton>
                   </template>
                   <div
                     :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
                     :style="{
                       width:
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery ||
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.breakdown[index].isDerived
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .customQuery ||
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .fields.breakdown[index].isDerived
                           ? 'auto'
                           : FIELD_FUNCTION_MENU_WIDTH,
                     }"
                   >
                     <DynamicFunctionPopUp
                       v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.breakdown[index]
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .fields.breakdown[index]
                       "
                       :allowAggregation="false"
                       :customQuery="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .customQuery
                       "
                       :chartType="dashboardPanelData.data.type"
                     />
                   </div>
                 </ODropdown>
                 <OButton
-                  variant="outline"
+                  variant="ghost"
                   size="icon-chip"
+                  class="!w-4"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                   @click="removeBreakdownItemByIndex(Number(index))"
-                  icon-left="close"
                 >
+                  <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
             <div
-              class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+              class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
               v-if="
-                !dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.breakdown?.length
+                !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                  ?.breakdown?.length
               "
             >
-              <div class="mt-1">{{ bAxisHint }}</div>
+              <div>{{ bAxisHint }}</div>
             </div>
           </div>
         </div>
@@ -335,18 +327,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator v-if="dashboardPanelData.data.type != 'metric'" />
     <!-- y axis container -->
-    <div class="pl-3 flex flex-row">
-      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
+    <div class="flex flex-row pl-3">
+      <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
+        <span
+          class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ currentYLabel }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
-          <OTooltip :content="yAxisHint" />
+        <OTooltip :content="yAxisHint" />
       </div>
-      <span class="layout-separator flex items-center mx-0.5">:</span>
+      <span class="layout-separator mx-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
+        class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent text-center"
         :class="{
-          'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-field-list-row-hover-bg':
+          '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
+            dashboardPanelData.meta.dragAndDrop.dragging,
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y',
         }"
@@ -355,9 +352,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           onDrop(
             $event,
             'y',
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.y?.length || 0,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.y
+              ?.length || 0,
           )
         "
         @dragenter="onDragEnter($event, 'y', null)"
@@ -365,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <div
-          class="flex mr-2 my-1"
+          class="my-0.5 mr-2 flex"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
@@ -376,116 +372,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y'
             "
-            class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
+            class="dragItem bg-theme-accent rounded-default h-full w-5 opacity-70"
             data-test="dashboard-query-builder-drag-item"
           >
             &nbsp;
           </div>
           <OButtonGroup
-            class="axis-field overflow-hidden"
+            class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
             radius="sm"
-            :draggable="true"
+            :divided="true"
+            :draggable="isDragArmed('y-' + index)"
             @dragstart="onFieldDragStart($event, itemY, 'y', Number(index))"
             @drop="onDrop($event, 'y', Number(index))"
             @dragenter="onDragEnter($event, 'y', index)"
           >
             <OButton
-              variant="outline"
+              variant="ghost"
               size="icon-chip"
-              class="cursor-grab"
+              class="!w-4 cursor-grab"
+              @mousedown="armDrag('y-' + index)"
               :data-test="`dashboard-y-item-${itemY?.alias}-drag`"
             >
               <template #icon-left>
-                <OIcon name="drag-indicator" size="xs" />
+                <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
               </template>
             </OButton>
             <ODropdown>
               <template #trigger>
                 <OButton
-                  variant="primary"
+                  variant="ghost"
                   size="chip-12"
+                  class="!ps-1 !pe-1"
                   :data-test="`dashboard-y-item-${itemY?.alias}`"
                 >
-                  {{ yLabel[index] }}
-                  <template #icon-right
-><OIcon name="arrow-drop-down" size="sm"
-                  /></template>
+                  <AxisFieldChipLabel :label="yLabel[index]" />
+                  <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                 </OButton>
               </template>
               <div
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
-                class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
+                class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
                 :style="{
                   width:
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery ||
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.y[index].isDerived
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery ||
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.y[index].isDerived
                       ? 'auto'
                       : FIELD_FUNCTION_MENU_WIDTH,
                 }"
               >
                 <DynamicFunctionPopUp
                   v-model="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.y[index]
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.y[index]
                   "
-                  :allowAggregation="
-                    dashboardPanelData.data.type == 'heatmap'
-                      ? false
-                      : true
-                  "
+                  :allowAggregation="dashboardPanelData.data.type == 'heatmap' ? false : true"
                   :customQuery="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery
                   "
                   :chartType="dashboardPanelData.data.type"
                 />
               </div>
             </ODropdown>
             <OButton
-              variant="outline"
+              variant="ghost"
               size="icon-chip"
+              class="!w-4"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
               @click="removeYAxisItemByIndex(Number(index))"
-              icon-left="close"
             >
+              <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
             </OButton>
           </OButtonGroup>
         </div>
         <div
-          class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.y?.length < 1
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.y
+              ?.length < 1
           "
         >
-          <div class="mt-1">{{ yAxisHint }}</div>
+          <div>{{ yAxisHint }}</div>
         </div>
       </div>
     </div>
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
       <OSeparator />
-      <div class="pl-3 flex flex-row">
-        <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
-          {{
-            dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
-          }}
+      <div class="flex flex-row pl-3">
+        <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
+          <span
+            class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+            aria-hidden="true"
+          ></span>
+          {{ dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : "" }}
           <OIcon name="info-outline" size="sm" class="ml-1" />
-            <OTooltip :content="zAxisHint" />
+          <OTooltip :content="zAxisHint" />
         </div>
-        <span class="layout-separator flex items-center mx-0.5">:</span>
+        <span class="layout-separator mx-0.5 flex items-center">:</span>
         <div
-          class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
+          class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent text-center"
           :class="{
-            'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-            'transition-all duration-200 bg-field-list-row-hover-bg':
+            '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
+              dashboardPanelData.meta.dragAndDrop.dragging,
+            'bg-field-list-row-hover-bg transition-colors duration-200':
               dashboardPanelData.meta.dragAndDrop.dragging &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z',
           }"
@@ -494,9 +486,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             onDrop(
               $event,
               'z',
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.z?.length || 0,
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.z
+                ?.length || 0,
             )
           "
           @dragenter="onDragEnter($event, 'z', null)"
@@ -504,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-z-layout"
         >
           <div
-            class="flex mr-2 my-1"
+            class="my-0.5 mr-2 flex"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.z"
@@ -515,92 +506,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'
               "
-              class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
+              class="dragItem bg-theme-accent rounded-default h-full w-5 opacity-70"
               data-test="dashboard-query-builder-drag-item"
             >
               &nbsp;
             </div>
             <OButtonGroup
-              class="axis-field overflow-hidden"
+              class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
               radius="sm"
-              :draggable="true"
+              :divided="true"
+              :draggable="isDragArmed('z-' + index)"
               @dragstart="onFieldDragStart($event, itemZ, 'z', Number(index))"
               @drop="onDrop($event, 'z', Number(index))"
               @dragenter="onDragEnter($event, 'z', index)"
             >
               <OButton
-                variant="outline"
+                variant="ghost"
                 size="icon-chip"
-                class="cursor-grab"
+                class="!w-4 cursor-grab"
+                @mousedown="armDrag('z-' + index)"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-drag`"
               >
                 <template #icon-left>
-                  <OIcon name="drag-indicator" size="xs" />
+                  <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                 </template>
               </OButton>
               <ODropdown>
                 <template #trigger>
                   <OButton
-                    variant="primary"
+                    variant="ghost"
                     size="chip-12"
+                    class="!ps-1 !pe-1"
                     :data-test="`dashboard-z-item-${itemZ?.alias}`"
                   >
-                    {{ zLabel[index] }}
-                    <template #icon-right
-><OIcon name="arrow-drop-down" size="sm"
-                    /></template>
+                    <AxisFieldChipLabel :label="zLabel[index]" />
+                    <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                   </OButton>
                 </template>
                 <div
                   :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
-                  class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
+                  class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
                   :style="{
                     width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.z[index].isDerived
+                      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                        .customQuery ||
+                      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                        .fields.z[index].isDerived
                         ? 'auto'
                         : FIELD_FUNCTION_MENU_WIDTH,
                   }"
                 >
                   <DynamicFunctionPopUp
                     v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.z[index]
+                      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                        .fields.z[index]
                     "
                     :allowAggregation="true"
                     :customQuery="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery
+                      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                        .customQuery
                     "
                     :chartType="dashboardPanelData.data.type"
                   />
                 </div>
               </ODropdown>
               <OButton
-                variant="outline"
+                variant="ghost"
                 size="icon-chip"
+                class="!w-4"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                 @click="removeZAxisItemByIndex(Number(index))"
-                icon-left="close"
               >
+                <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
               </OButton>
             </OButtonGroup>
           </div>
           <div
-            class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+            class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
             v-if="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.z?.length < 1
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.z
+                ?.length < 1
             "
           >
-            <div class="mt-1">{{ zAxisHint }}</div>
+            <div>{{ zAxisHint }}</div>
           </div>
         </div>
       </div>
@@ -609,11 +597,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator />
       <DashboardJoinsOption
         :dashboardData="dashboardData"
+        :label-width-class="labelWidthClass"
       ></DashboardJoinsOption>
       <OSeparator />
       <!-- filters container -->
       <DashboardFiltersOption
         :dashboardData="dashboardData"
+        :label-width-class="labelWidthClass"
       ></DashboardFiltersOption>
     </template>
   </div>
@@ -640,18 +630,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  reactive,
-  watch,
-  computed,
-  inject,
-  nextTick,
-  onMounted,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, reactive, watch, computed, inject, nextTick, onMounted } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import useDragHandle from "@/composables/useDragHandle";
 import { getImageURL } from "../../../utils/zincutils";
 import DashboardGeoMapsQueryBuilder from "./DashboardGeoMapsQueryBuilder.vue";
 import DashboardMapsQueryBuilder from "./DashboardMapsQueryBuilder.vue";
@@ -660,12 +642,10 @@ import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
+import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { useStore } from "vuex";
-import {
-  MAX_FIELD_LABEL_CHARS,
-  FIELD_FUNCTION_MENU_WIDTH,
-} from "@/utils/dashboard/constants";
+import { MAX_FIELD_LABEL_CHARS, FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
@@ -707,6 +687,7 @@ export default defineComponent({
     DashboardFiltersOption,
     DashboardJoinsOption,
     DynamicFunctionPopUp,
+    AxisFieldChipLabel,
     LabelFilterEditor,
     OperationsList,
     PromQLBuilderOptions,
@@ -720,7 +701,7 @@ export default defineComponent({
     const showXAxis = ref(true);
     const panelName = ref("");
     const panelDesc = ref("");
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
     const expansionItems = reactive({
       x: true,
@@ -730,10 +711,7 @@ export default defineComponent({
       config: true,
       filter: false,
     });
-    const dashboardPanelDataPageKey = inject<string>(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject<string>("dashboardPanelDataPageKey", "dashboard");
     const store = useStore();
     const {
       dashboardPanelData,
@@ -754,7 +732,7 @@ export default defineComponent({
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
       isPivotMode,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const { parsePromQlQuery } = usePromqlSuggestions();
 
@@ -772,34 +750,34 @@ export default defineComponent({
 
     const currentYLabel = computed(() => {
       if (dashboardPanelData.data.type == "table") {
-        return isPivotMode.value
-          ? t("panel.valueFields")
-          : t("panel.otherColumn");
+        return isPivotMode.value ? t("panel.valueFields") : t("panel.otherColumn");
       }
       return dashboardPanelData.data.type == "h-bar"
         ? t("panel.xAxisShort")
         : t("panel.yAxisShort");
     });
 
+    // Axis-label column width: wide enough for the current chart's longest
+    // label so every ":" separator (axis rows + Joins + Filters) lines up.
+    // Table uses long labels ("First Column" / "Other Columns" / "Row Fields"
+    // / "Value Fields"); every other type uses the short "X-Axis"/"Y-Axis".
+    const labelWidthClass = computed(() =>
+      dashboardPanelData.data.type == "table" ? "min-w-32.5" : "min-w-20",
+    );
+
     // Joins and Filters hide themselves in custom-SQL mode; the separators
     // around them must follow the same condition or they stack into a
     // double border after the Y-axis row.
     const showJoinsAndFilters = computed(() => {
       const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
-      return !(
-        currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql"
-      );
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+      return !(currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql");
     });
 
     // Initialize treatAsNonTimestamp for existing fields (only for table charts)
     const initializeTreatAsNonTimestamp = () => {
       const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
 
       // Check if this is a new panel (no ID means it's new)
       const isNewPanel = !dashboardPanelData.data.id;
@@ -818,24 +796,17 @@ export default defineComponent({
         } else {
           // For existing panels: only set if treatAsNonTimestamp is not already defined
           // This preserves the saved values from the database
-          if (
-            field.treatAsNonTimestamp === undefined ||
-            field.treatAsNonTimestamp === null
-          ) {
+          if (field.treatAsNonTimestamp === undefined || field.treatAsNonTimestamp === null) {
             field.treatAsNonTimestamp = false;
           }
         }
       };
 
       const setShowFieldAsJsonForField = (field: any) => {
-        if (
-          field.showFieldAsJson === undefined ||
-          field.showFieldAsJson === null
-        ) {
+        if (field.showFieldAsJson === undefined || field.showFieldAsJson === null) {
           field.showFieldAsJson =
             dashboardPanelDataPageKey === "logs"
-              ? (store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ??
-                false)
+              ? (store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ?? false)
               : false;
         }
       };
@@ -915,21 +886,17 @@ export default defineComponent({
 
     const onDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
       e.stopPropagation();
-      const dragSourceIndex =
-        dashboardPanelData.meta.dragAndDrop.dragSourceIndex;
+      const dragSourceIndex = dashboardPanelData.meta.dragAndDrop.dragSourceIndex;
       // reorder items if source and target are same
       if (dashboardPanelData.meta.dragAndDrop.dragSource === targetAxis) {
         // we need to reorder the item
         // Swap the elements in the array
         const fieldList =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields[targetAxis];
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields[
+            targetAxis
+          ];
         const draggedItem = dashboardPanelData.meta.dragAndDrop.dragElement;
-        fieldList?.splice(
-          dashboardPanelData.meta.dragAndDrop.dragSourceIndex,
-          1,
-        );
+        fieldList?.splice(dashboardPanelData.meta.dragAndDrop.dragSourceIndex, 1);
         fieldList?.splice(droppedAtIndex, 0, draggedItem);
       } else {
         // move the items  between axis or from the field list
@@ -973,9 +940,7 @@ export default defineComponent({
           )?.value;
 
           if (!firstFieldTypeArg) {
-            showErrorNotification(
-              t("dashboard.dashboardQueryBuilder.withoutFieldDragError"),
-            );
+            showErrorNotification(t("dashboard.dashboardQueryBuilder.withoutFieldDragError"));
             cleanupDraggingFields();
             return;
           }
@@ -983,9 +948,8 @@ export default defineComponent({
           // In custom query mode, use the field's alias/column (which matches the SQL column name)
           // instead of the raw field name from args, since custom mode fields represent SQL result columns
           const isCustomQuery =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].customQuery;
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+              .customQuery;
 
           const fieldObj = {
             name: isCustomQuery
@@ -1027,13 +991,10 @@ export default defineComponent({
                   break;
               }
 
-              const errorMessage = t(
-                "dashboard.dashboardQueryBuilder.maxFieldsAllowed",
-                {
-                  count: maxAllowedAxisFields,
-                  axis: targetAxis.toUpperCase(),
-                },
-              );
+              const errorMessage = t("dashboard.dashboardQueryBuilder.maxFieldsAllowed", {
+                count: maxAllowedAxisFields,
+                axis: targetAxis.toUpperCase(),
+              });
 
               showErrorNotification(errorMessage);
               cleanupDraggingFields();
@@ -1069,9 +1030,9 @@ export default defineComponent({
           }
           reorderItems(
             targetAxis,
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields[targetAxis]?.length - 1 || 0,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields[
+              targetAxis
+            ]?.length - 1 || 0,
             droppedAtIndex,
           );
 
@@ -1081,15 +1042,11 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
-    const reorderItems = (
-      targetAxis: string,
-      sourceIndex: number,
-      targetIndex: number,
-    ) => {
+    const reorderItems = (targetAxis: string, sourceIndex: number, targetIndex: number) => {
       const fieldList =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields[targetAxis];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields[
+          targetAxis
+        ];
 
       if (!fieldList) {
         return;
@@ -1106,37 +1063,28 @@ export default defineComponent({
     const getAxisArray = (area: string) => {
       switch (area) {
         case "x":
-          return dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.x;
+          return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            ?.x;
         case "y":
-          return dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.y;
+          return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            ?.y;
         case "z":
-          return dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.z;
+          return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            ?.z;
         case "breakdown":
-          return dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.breakdown;
+          return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            ?.breakdown;
         default:
           return [];
       }
     };
     const onDragEnter = (e: any, area: string, index: any) => {
-      if (
-        dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" &&
-        area === "f"
-      ) {
+      if (dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" && area === "f") {
         e.preventDefault();
         return;
       }
       dashboardPanelData.meta.dragAndDrop.targetDragIndex =
-        index != null && index >= 0
-          ? index
-          : dashboardPanelData.meta.dragAndDrop.targetDragIndex;
+        index != null && index >= 0 ? index : dashboardPanelData.meta.dragAndDrop.targetDragIndex;
       dashboardPanelData.meta.dragAndDrop.currentDragArea = area;
       e.preventDefault();
     };
@@ -1149,12 +1097,7 @@ export default defineComponent({
       e.preventDefault();
     };
 
-    const onFieldDragStart = (
-      e: any,
-      item: any,
-      axis: string,
-      index: number,
-    ) => {
+    const onFieldDragStart = (e: any, item: any, axis: string, index: number) => {
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
       dashboardPanelData.meta.dragAndDrop.dragSource = axis;
@@ -1164,6 +1107,9 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
+
+    // Handle-gated drag: chips drag only from the grip, not the label.
+    const { arm: armDrag, isArmed: isDragArmed } = useDragHandle();
 
     const xAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
@@ -1228,20 +1174,15 @@ export default defineComponent({
     });
     const commonBtnLabel = (field: any) => {
       if (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery
       ) {
         return field?.alias;
       }
       const label = buildSQLQueryFromInput(
         field,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.joins?.length
-          ? dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.stream
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins?.length
+          ? dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.stream
           : "",
       );
       return label?.length > MAX_FIELD_LABEL_CHARS
@@ -1251,33 +1192,26 @@ export default defineComponent({
 
     const xLabel = computed(() => {
       const xFields =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields?.x;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.x;
       return xFields.map(commonBtnLabel);
     });
 
     const bLabel = computed(() => {
       const bFields =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields?.breakdown;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+          ?.breakdown;
       return bFields.map(commonBtnLabel);
     });
 
     const yLabel = computed(() => {
       const yFields =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields?.y;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.y;
       return yFields.map(commonBtnLabel);
     });
 
     const zLabel = computed(() => {
       const zFields =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields?.z;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.z;
       return zFields.map(commonBtnLabel);
     });
 
@@ -1285,9 +1219,7 @@ export default defineComponent({
     const promqlBuilderMode = computed(
       () =>
         dashboardPanelData.data.queryType == "promql" &&
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.customQuery,
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery,
     );
 
     const promqlBuilderQuery = reactive<PromqlBuilderQuery>({
@@ -1309,9 +1241,7 @@ export default defineComponent({
      * upgrading, so a changed reference is the signal that this panel was saved
      * under old ids. A modern panel is not touched.
      */
-    const loadSavedSteps = (
-      currentQuery: DashboardQuerySlot | undefined,
-    ): PromqlStep[] => {
+    const loadSavedSteps = (currentQuery: DashboardQuerySlot | undefined): PromqlStep[] => {
       const stored: PromqlStep[] = currentQuery?.fields?.promql_operations || [];
       const upgraded = normalizeSteps(stored);
 
@@ -1342,9 +1272,8 @@ export default defineComponent({
     // Watch for metric changes from FieldList (stream selection)
     watch(
       () =>
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.stream,
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields
+          ?.stream,
       (newStream, oldStream) => {
         if (!promqlBuilderMode.value || !newStream) return;
 
@@ -1373,9 +1302,7 @@ export default defineComponent({
         // what we would have produced for it, they have edited it — leave it be.
         if (
           !isAutoSeededQuery(
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ]?.query,
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query,
             oldStream,
             metricsStreamsOf(dashboardPanelData),
             { chartType: dashboardPanelData.data.type, requireBuilder: true },
@@ -1395,11 +1322,7 @@ export default defineComponent({
         // Chart type + unit + the chart-type contracts, through the one helper
         // that also RETRACTS the contracts of the type being left and refuses to
         // let a secondary query slot redefine the panel.
-        applySeedPanelShape(
-          dashboardPanelData,
-          seed,
-          dashboardPanelData.layout.currentQueryIndex,
-        );
+        applySeedPanelShape(dashboardPanelData, seed, dashboardPanelData.layout.currentQueryIndex);
       },
       { immediate: true },
     );
@@ -1410,9 +1333,7 @@ export default defineComponent({
       (isBuilderMode) => {
         if (isBuilderMode) {
           const currentQuery =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ];
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
           // Initialize metric from stream
           if (currentQuery?.fields?.stream) {
             promqlBuilderQuery.metric = currentQuery.fields.stream;
@@ -1446,17 +1367,13 @@ export default defineComponent({
      */
     watch(
       () => {
-        const q =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ];
+        const q = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
         return [q?.fields?.promql_labels, q?.fields?.promql_operations];
       },
       ([labels, operations]: any) => {
         if (!promqlBuilderMode.value) return;
 
-        const same = (a: any, b: any) =>
-          JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+        const same = (a: any, b: any) => JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
 
         // Compare against the UPGRADED form, not the raw one. A panel saved
         // under the old step ids would otherwise never look equal to the
@@ -1480,9 +1397,7 @@ export default defineComponent({
       () => {
         if (promqlBuilderMode.value) {
           const currentQuery =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ];
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
           // Load metric
           if (currentQuery?.fields?.stream) {
             promqlBuilderQuery.metric = currentQuery.fields.stream;
@@ -1503,9 +1418,7 @@ export default defineComponent({
         if (!promqlBuilderMode.value) return;
 
         const currentQuery =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ];
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
 
         // Save labels and operations to schema
         currentQuery.fields.promql_labels = promqlBuilderQuery.labels;
@@ -1570,10 +1483,7 @@ export default defineComponent({
 
     // Watch for query changes in PromQL custom mode and extract metric name to set as stream
     watch(
-      () =>
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.query,
+      () => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query,
       (newQuery) => {
         // Only process if in PromQL custom mode (not builder mode)
         if (promqlMode.value && !promqlBuilderMode.value && newQuery) {
@@ -1582,9 +1492,7 @@ export default defineComponent({
 
           if (metricName) {
             const currentQuery =
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ];
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
             // Set the extracted metric name as the stream
             currentQuery.fields.stream = metricName;
           }
@@ -1629,8 +1537,11 @@ export default defineComponent({
       bLabel,
       onFieldDragStart,
       onDragEnd,
+      armDrag,
+      isDragArmed,
       currentXLabel,
       currentYLabel,
+      labelWidthClass,
       isPivotMode,
       reorderItems,
       showJoinsAndFilters,

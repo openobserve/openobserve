@@ -69,7 +69,7 @@ export function isDatetimeChanged(
   if (!prev) return true;
   const isRelative = !!value.relativeTimePeriod;
   if (isRelative) {
-    return (prev.relativeTimePeriod !== value.relativeTimePeriod) || prev.type === 'absolute';
+    return prev.relativeTimePeriod !== value.relativeTimePeriod || prev.type === "absolute";
   }
   return prev.startTime !== value.startTime || prev.endTime !== value.endTime;
 }

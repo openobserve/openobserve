@@ -34,22 +34,17 @@ describe("rumcssworker", () => {
         const cssString = data.cssString;
         const proxyUrl = data.proxyUrl;
         const id = data.id;
-        const updatedCssString = replaceAbsoluteUrlsWithProxies(
-          proxyUrl,
-          cssString,
-          ["fonts.gstatic.com", "fonts.googleapis.com"]
-        );
+        const updatedCssString = replaceAbsoluteUrlsWithProxies(proxyUrl, cssString, [
+          "fonts.gstatic.com",
+          "fonts.googleapis.com",
+        ]);
         global.self.postMessage({ updatedCssString, id });
       },
     };
   });
 
   // Helper function extracted from worker
-  function replaceAbsoluteUrlsWithProxies(
-    proxyUrl,
-    cssString,
-    excludedDomains = []
-  ) {
+  function replaceAbsoluteUrlsWithProxies(proxyUrl, cssString, excludedDomains = []) {
     const urlRegex = /url\(\s*(['"]?)(https?:\/\/[^'")]+)\1\s*\)/g;
 
     function replaceWithProxy(match, t1, url) {
@@ -65,62 +60,49 @@ describe("rumcssworker", () => {
 
   describe("replaceAbsoluteUrlsWithProxies", () => {
     it("should replace absolute URLs with proxy URLs", () => {
-      const cssString =
-        'body { background-image: url("https://example.com/image.png"); }';
+      const cssString = 'body { background-image: url("https://example.com/image.png"); }';
       const proxyUrl = "https://proxy.local";
       const result = replaceAbsoluteUrlsWithProxies(proxyUrl, cssString);
 
       expect(result).toBe(
-        'body { background-image: url("https://proxy.local/https://example.com/image.png"); }'
+        'body { background-image: url("https://proxy.local/https://example.com/image.png"); }',
       );
     });
 
     it("should handle URLs without quotes", () => {
-      const cssString =
-        "body { background-image: url(https://example.com/image.png); }";
+      const cssString = "body { background-image: url(https://example.com/image.png); }";
       const proxyUrl = "https://proxy.local";
       const result = replaceAbsoluteUrlsWithProxies(proxyUrl, cssString);
 
       expect(result).toBe(
-        'body { background-image: url("https://proxy.local/https://example.com/image.png"); }'
+        'body { background-image: url("https://proxy.local/https://example.com/image.png"); }',
       );
     });
 
     it("should handle URLs with single quotes", () => {
-      const cssString =
-        "body { background-image: url('https://example.com/image.png'); }";
+      const cssString = "body { background-image: url('https://example.com/image.png'); }";
       const proxyUrl = "https://proxy.local";
       const result = replaceAbsoluteUrlsWithProxies(proxyUrl, cssString);
 
       expect(result).toBe(
-        'body { background-image: url("https://proxy.local/https://example.com/image.png"); }'
+        'body { background-image: url("https://proxy.local/https://example.com/image.png"); }',
       );
     });
 
     it("should exclude fonts.gstatic.com from proxying", () => {
-      const cssString =
-        '@font-face { src: url("https://fonts.gstatic.com/font.woff2"); }';
+      const cssString = '@font-face { src: url("https://fonts.gstatic.com/font.woff2"); }';
       const proxyUrl = "https://proxy.local";
       const excludedDomains = ["fonts.gstatic.com", "fonts.googleapis.com"];
-      const result = replaceAbsoluteUrlsWithProxies(
-        proxyUrl,
-        cssString,
-        excludedDomains
-      );
+      const result = replaceAbsoluteUrlsWithProxies(proxyUrl, cssString, excludedDomains);
 
       expect(result).toBe(cssString); // Should remain unchanged
     });
 
     it("should exclude fonts.googleapis.com from proxying", () => {
-      const cssString =
-        '@import url("https://fonts.googleapis.com/css?family=Roboto");';
+      const cssString = '@import url("https://fonts.googleapis.com/css?family=Roboto");';
       const proxyUrl = "https://proxy.local";
       const excludedDomains = ["fonts.gstatic.com", "fonts.googleapis.com"];
-      const result = replaceAbsoluteUrlsWithProxies(
-        proxyUrl,
-        cssString,
-        excludedDomains
-      );
+      const result = replaceAbsoluteUrlsWithProxies(proxyUrl, cssString, excludedDomains);
 
       expect(result).toBe(cssString); // Should remain unchanged
     });
@@ -137,12 +119,8 @@ describe("rumcssworker", () => {
       const proxyUrl = "https://proxy.local";
       const result = replaceAbsoluteUrlsWithProxies(proxyUrl, cssString);
 
-      expect(result).toContain(
-        'url("https://proxy.local/https://example.com/bg.png")'
-      );
-      expect(result).toContain(
-        'url("https://proxy.local/https://cdn.example.com/icon.svg")'
-      );
+      expect(result).toContain('url("https://proxy.local/https://example.com/bg.png")');
+      expect(result).toContain('url("https://proxy.local/https://cdn.example.com/icon.svg")');
     });
 
     it("should handle mixed excluded and non-excluded URLs", () => {
@@ -156,27 +134,20 @@ describe("rumcssworker", () => {
       `;
       const proxyUrl = "https://proxy.local";
       const excludedDomains = ["fonts.gstatic.com", "fonts.googleapis.com"];
-      const result = replaceAbsoluteUrlsWithProxies(
-        proxyUrl,
-        cssString,
-        excludedDomains
-      );
+      const result = replaceAbsoluteUrlsWithProxies(proxyUrl, cssString, excludedDomains);
 
-      expect(result).toContain(
-        'url("https://proxy.local/https://example.com/bg.png")'
-      );
+      expect(result).toContain('url("https://proxy.local/https://example.com/bg.png")');
       expect(result).toContain('url("https://fonts.gstatic.com/font.woff2")');
     });
 
     it("should handle URLs with whitespace", () => {
-      const cssString =
-        "body { background-image: url(  https://example.com/image.png  ); }";
+      const cssString = "body { background-image: url(  https://example.com/image.png  ); }";
       const proxyUrl = "https://proxy.local";
       const result = replaceAbsoluteUrlsWithProxies(proxyUrl, cssString);
 
       // The regex captures whitespace, so it's preserved after the URL
       expect(result).toBe(
-        'body { background-image: url("https://proxy.local/https://example.com/image.png  "); }'
+        'body { background-image: url("https://proxy.local/https://example.com/image.png  "); }',
       );
     });
 
@@ -197,13 +168,12 @@ describe("rumcssworker", () => {
     });
 
     it("should handle http URLs", () => {
-      const cssString =
-        'body { background-image: url("http://example.com/image.png"); }';
+      const cssString = 'body { background-image: url("http://example.com/image.png"); }';
       const proxyUrl = "https://proxy.local";
       const result = replaceAbsoluteUrlsWithProxies(proxyUrl, cssString);
 
       expect(result).toBe(
-        'body { background-image: url("https://proxy.local/http://example.com/image.png"); }'
+        'body { background-image: url("https://proxy.local/http://example.com/image.png"); }',
       );
     });
   });

@@ -206,7 +206,9 @@ describe("ErrorEventDescription Component", () => {
     });
 
     // Assert
-    expect(wrapper.find('[data-test="error-event-description-default"]').text()).toBe("undefined : undefined");
+    expect(wrapper.find('[data-test="error-event-description-default"]').text()).toBe(
+      "undefined : undefined",
+    );
   });
 
   it("shows empty text for unknown type", async () => {
@@ -237,16 +239,12 @@ describe("ErrorEventDescription Component", () => {
     // Arrange + Act handled in beforeEach
 
     // Assert
-    expect(wrapper.vm.getDescription).toBe(
-      "Cannot read property 'foo' of undefined",
-    );
+    expect(wrapper.vm.getDescription).toBe("Cannot read property 'foo' of undefined");
   });
 
   it("reactively updates getDescription when column type changes", async () => {
     // Arrange
-    expect(wrapper.vm.getDescription).toBe(
-      "Cannot read property 'foo' of undefined",
-    );
+    expect(wrapper.vm.getDescription).toBe("Cannot read property 'foo' of undefined");
 
     // Act
     await wrapper.setProps({
@@ -291,9 +289,7 @@ describe("ErrorEventDescription Component", () => {
     await wrapper.setProps({
       column: { type: "error", error_message: "Default" },
     });
-    const defaultSpan = wrapper.find(
-      '[data-test="error-event-description-default"]',
-    );
+    const defaultSpan = wrapper.find('[data-test="error-event-description-default"]');
     expect(defaultSpan.exists()).toBe(true);
     expect(defaultSpan.text()).toBe("Default");
   });

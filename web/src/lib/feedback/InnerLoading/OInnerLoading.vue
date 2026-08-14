@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import type { InnerLoadingProps } from "./OInnerLoading.types";
 import OSpinner from "../Spinner/OSpinner.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 withDefaults(defineProps<InnerLoadingProps>(), {
   size: "xs",
   scrim: true,
 });
+
+const { t } = useI18nTyped();
 </script>
 
 <template>
@@ -21,13 +24,10 @@ withDefaults(defineProps<InnerLoadingProps>(), {
       :class="scrim ? 'bg-inner-loading-overlay' : ''"
       role="status"
       aria-live="polite"
-      :aria-label="label ?? 'Loading'"
+      :aria-label="label ?? t('common.loadingLabel')"
     >
       <OSpinner variant="ring" :size="size" />
-      <span
-        v-if="label"
-        class="text-xs text-inner-loading-label select-none"
-      >
+      <span v-if="label" class="text-inner-loading-label text-xs select-none">
         {{ label }}
       </span>
     </div>

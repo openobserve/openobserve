@@ -2,6 +2,8 @@
 // Batched latest-score aggregates across span, trace, and session targets,
 // keyed by each Score Config's stable entity_id.
 
+import { raw, type I18nText } from "@/types/i18n";
+
 import { computed, ref, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
@@ -12,34 +14,20 @@ import {
   combineWhere,
   type AgentFilterSelection,
 } from "../utils/agentFilterSql";
-import {
-  latestScoreAttemptsFromSql,
-  latestScoresFromSql,
-} from "../utils/latestScoreSql";
+import { latestScoreAttemptsFromSql, latestScoresFromSql } from "../utils/latestScoreSql";
 import { scopeCountsFromRow, type ScopeCounts } from "../utils/qualityScope";
-import {
-  qualitySummaryForConfig,
-  type QualityFormat,
-} from "../utils/qualitySummary";
-import {
-  buildUnhealthyCaseBranches,
-  thresholdForConfig,
-} from "../utils/scoreThreshold";
+import { qualitySummaryForConfig, type QualityFormat } from "../utils/qualitySummary";
+import { buildUnhealthyCaseBranches, thresholdForConfig } from "../utils/scoreThreshold";
 
 // "unhealthy" | "warn" | "noThreshold" are legacy — no longer produced here,
 // but QualityConfigSidebar still branches on them.
-export type ConfigStatus =
-  | "healthy"
-  | "noData"
-  | "unhealthy"
-  | "warn"
-  | "noThreshold";
+export type ConfigStatus = "healthy" | "noData" | "unhealthy" | "warn" | "noThreshold";
 
 export interface ScoreConfigRow {
   config: ScoreConfig;
   configId: string;
   name: string;
-  description: string;
+  description: I18nText;
   dataType: "numeric" | "categorical" | "boolean" | "unknown";
   totalScores: number;
   scopeCounts: ScopeCounts;
@@ -104,9 +92,7 @@ function trendBucketMs(bucket: unknown): number | null {
     return bucket > 1e14 ? Math.round(bucket / 1000) : bucket;
   }
   if (typeof bucket !== "string" || !bucket) return null;
-  const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(bucket)
-    ? bucket
-    : `${bucket}Z`;
+  const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(bucket) ? bucket : `${bucket}Z`;
   const parsed = Date.parse(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -120,10 +106,7 @@ export function buildTrendSeries(
   const intervalMs = bucketIntervalMs(interval);
   const startMs = Math.floor(startUs / 1000 / intervalMs) * intervalMs;
   const endMs = Math.floor(endUs / 1000 / intervalMs) * intervalMs;
-  const bucketCount = Math.max(
-    1,
-    Math.min(1000, Math.floor((endMs - startMs) / intervalMs) + 1),
-  );
+  const bucketCount = Math.max(1, Math.min(1000, Math.floor((endMs - startMs) / intervalMs) + 1));
   const countsByConfig: Record<string, Map<number, number>> = {};
 
   for (const row of rows) {
@@ -252,9 +235,7 @@ export function useQualityScoreConfigs(
     try {
       const { startUs, endUs } = dateWindow.value;
       const interval = chooseBucketInterval((endUs - startUs) / 1000);
-      const agentWhere = buildScoresAgentFilterWhere(
-        agentFilter?.value ?? null,
-      );
+      const agentWhere = buildScoresAgentFilterWhere(agentFilter?.value ?? null);
       const aggSql = buildQualityConfigAggSql(scoreConfigs.value, agentWhere);
       const trendSql = buildTrendSql(interval, agentWhere);
       const categorySql = buildCategorySql(agentWhere);
@@ -275,22 +256,15 @@ export function useQualityScoreConfigs(
           console.debug(`[Quality:${label}]`, { hitCount: hits.length });
           return hits as T[];
         } catch (err: any) {
-          console.warn(
-            `[Quality:${label}] query failed:`,
-            err?.response?.data ?? err,
-          );
+          console.warn(`[Quality:${label}] query failed:`, err?.response?.data ?? err);
           return null;
         }
       };
 
       const [aggHits, trendHits, categoryHits] = await Promise.all([
         runQuery<AggRow>(aggSql, "configs.agg").then((rows) => rows ?? []),
-        runQuery<TrendRow>(trendSql, "configs.trend", true).then(
-          (rows) => rows ?? [],
-        ),
-        runQuery<CategoryRow>(categorySql, "configs.categories").then(
-          (rows) => rows ?? [],
-        ),
+        runQuery<TrendRow>(trendSql, "configs.trend", true).then((rows) => rows ?? []),
+        runQuery<CategoryRow>(categorySql, "configs.categories").then((rows) => rows ?? []),
       ]);
 
       const byId: Record<string, AggRow> = {};
@@ -310,9 +284,7 @@ export function useQualityScoreConfigs(
       const hitIds = Object.keys(byId);
       const matched = localIds.filter((l) => byId[l.joinId]);
       const unmatchedLocal = localIds.filter((l) => !byId[l.joinId]);
-      const unmatchedHits = hitIds.filter(
-        (h) => !localIds.find((l) => l.joinId === h),
-      );
+      const unmatchedHits = hitIds.filter((h) => !localIds.find((l) => l.joinId === h));
       console.debug("[Quality:configs.match]", {
         localIds,
         hitIds,
@@ -321,12 +293,7 @@ export function useQualityScoreConfigs(
         unmatchedHits,
       });
 
-      trendByConfig.value = buildTrendSeries(
-        trendHits,
-        startUs,
-        endUs,
-        interval,
-      );
+      trendByConfig.value = buildTrendSeries(trendHits, startUs, endUs, interval);
 
       const categoryById: Record<string, CategoryRow[]> = {};
       for (const row of categoryHits) {
@@ -348,22 +315,13 @@ export function useQualityScoreConfigs(
       const agg = aggByConfig.value[lookup];
       const total = toNumber(agg?.total_scores) ?? 0;
       const lastUpdatedUs = toNumber(agg?.last_updated_us);
-      const dataType =
-        (dataTypeOf(config) as ScoreConfigRow["dataType"]) || "unknown";
+      const dataType = (dataTypeOf(config) as ScoreConfigRow["dataType"]) || "unknown";
       const threshold = thresholdForConfig(config);
       const hasThreshold = threshold.unhealthyExpr != null;
-      const unhealthyCount = hasThreshold
-        ? (toNumber(agg?.unhealthy_scores) ?? 0)
-        : null;
+      const unhealthyCount = hasThreshold ? (toNumber(agg?.unhealthy_scores) ?? 0) : null;
       const unhealthyPercent =
-        total > 0 && unhealthyCount != null
-          ? (unhealthyCount / total) * 100
-          : null;
-      const { status, priority } = configHealthStatus(
-        total,
-        unhealthyCount,
-        hasThreshold,
-      );
+        total > 0 && unhealthyCount != null ? (unhealthyCount / total) * 100 : null;
+      const { status, priority } = configHealthStatus(total, unhealthyCount, hasThreshold);
       const summary = qualitySummaryForConfig(
         config,
         {
@@ -383,7 +341,7 @@ export function useQualityScoreConfigs(
         config,
         configId,
         name: config.name,
-        description: config.description ?? "",
+        description: raw(config.description),
         dataType,
         totalScores: total,
         scopeCounts: scopeCountsFromRow(agg),
@@ -392,8 +350,7 @@ export function useQualityScoreConfigs(
         thresholdLabel: threshold.label,
         unhealthyCount,
         unhealthyPercent,
-        lastUpdatedMs:
-          lastUpdatedUs != null ? Math.round(lastUpdatedUs / 1000) : null,
+        lastUpdatedMs: lastUpdatedUs != null ? Math.round(lastUpdatedUs / 1000) : null,
         status,
         statusPriority: priority,
         trendSparkline: trendByConfig.value[lookup] ?? [],
@@ -401,8 +358,7 @@ export function useQualityScoreConfigs(
     });
 
     out.sort((a, b) => {
-      if (a.statusPriority !== b.statusPriority)
-        return a.statusPriority - b.statusPriority;
+      if (a.statusPriority !== b.statusPriority) return a.statusPriority - b.statusPriority;
       if (
         a.status === "unhealthy" &&
         b.status === "unhealthy" &&

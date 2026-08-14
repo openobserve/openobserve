@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use arrow_schema::Schema;
 use hashbrown::HashMap;
 use proto::prometheus_rpc;
 use regex::Regex;
@@ -75,6 +76,25 @@ pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
+
+pub fn get_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
+    let metadata = schema.metadata.get(METADATA_LABEL)?;
+    let mut metadata: Metadata = match crate::utils::json::from_str(metadata) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            log::warn!("failed to parse {METADATA_LABEL} from schema: {e}, input: {metadata}");
+            return None;
+        }
+    };
+
+    // Historical schemas can contain a JSON-quoted family name. Parse it as a JSON string when
+    // possible, otherwise preserve the already-clean value.
+    let family_name = metadata.metric_family_name.trim();
+    metadata.metric_family_name = crate::utils::json::from_str::<String>(family_name)
+        .unwrap_or_else(|_| family_name.to_string());
+
+    Some(metadata)
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Metric<'a> {

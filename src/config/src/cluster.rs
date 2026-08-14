@@ -156,9 +156,9 @@ mod tests {
         assert_eq!(parse("querier"), Role::Querier);
         assert_eq!(parse("compactor"), Role::Compactor);
         assert_eq!(parse("router"), Role::Router);
-        assert_eq!(parse("alertmanager"), Role::AlertManager);
-        assert_eq!(parse("alertManager"), Role::AlertManager);
-        assert_eq!(parse("AlertManager"), Role::AlertManager);
+        assert_eq!(parse("scheduler"), Role::Scheduler);
+        assert_eq!(parse("alertManager"), Role::Scheduler);
+        assert_eq!(parse("Scheduler"), Role::Scheduler);
         assert!("alert_manager".parse::<Role>().is_ok());
     }
 

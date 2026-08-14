@@ -161,10 +161,7 @@ export const getUnitValue = (
       }
 
       // calculate the final value: sign * absValue / divisor
-      const finalValue = (
-        (sign * absValue) /
-        units[unit][unitIndex].divisor
-      ).toFixed(decimals);
+      const finalValue = ((sign * absValue) / units[unit][unitIndex].divisor).toFixed(decimals);
       const finalUnit = units[unit][unitIndex].unit;
 
       // console.timeEnd("getUnitValue:");
@@ -235,17 +232,12 @@ export const getUnitValue = (
     case "default":
     default: {
       return {
-        value: isNaN(value)
-          ? value
-          : value === ""
-            ? "-"
-            : ((+value)?.toFixed(decimals) ?? 0),
+        value: isNaN(value) ? value : value === "" ? "-" : ((+value)?.toFixed(decimals) ?? 0),
         unit: "",
       };
     }
   }
 };
-
 
 /**
  * Formats a unit value.

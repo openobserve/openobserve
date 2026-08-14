@@ -93,13 +93,9 @@ export function useAlertInsights() {
       if (filter.panelTitle === "Alert Volume Over Time") {
         // Time-based filter from zoom
         if (filter.start !== null && filter.end !== null) {
-          filters.push(
-            `_timestamp >= ${filter.start} AND _timestamp <= ${filter.end}`
-          );
+          filters.push(`_timestamp >= ${filter.start} AND _timestamp <= ${filter.end}`);
         }
-      } else if (
-        filter.panelTitle === "Alert Frequency (Dedup Candidates)"
-      ) {
+      } else if (filter.panelTitle === "Alert Frequency (Dedup Candidates)") {
         // Frequency threshold filter
         if (filter.start !== null) {
           // This creates a subquery to filter alerts by frequency
@@ -114,9 +110,7 @@ export function useAlertInsights() {
       } else if (filter.start !== null || filter.end !== null) {
         // Generic numeric filter for other panels
         if (filter.start !== null && filter.end !== null) {
-          filters.push(
-            `metric_value >= ${filter.start} AND metric_value <= ${filter.end}`
-          );
+          filters.push(`metric_value >= ${filter.start} AND metric_value <= ${filter.end}`);
         } else if (filter.start !== null) {
           filters.push(`metric_value >= ${filter.start}`);
         } else if (filter.end !== null) {

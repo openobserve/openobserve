@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="bg-surface-base"
-    title="Upload Source Maps"
-    :back="{ label: 'Source Maps', onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
+    :title="t('rum.uploadSourceMaps')"
+    :back="{ label: t('rum.sourceMaps'), onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
     bleed
   >
     <OForm
@@ -30,48 +30,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form Content Area -->
-      <div class="flex-1 overflow-y-auto bg-card-glass-bg mb-[0.675rem] p-6 overflow-auto" style="height: calc(100vh - 172px)">
-        <div class="max-w-300 mx-auto">
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+      <div
+        class="bg-card-glass-bg mb-[0.675rem] flex-1 overflow-auto overflow-y-auto p-6"
+        style="height: calc(100vh - 172px)"
+      >
+        <!-- eslint-enable local/no-hardcoded-px -->
+        <div class="mx-auto max-w-300">
           <!-- Input Fields -->
-          <div class="grid grid-cols-1 gap-4 mb-6">
+          <div class="mb-6 grid grid-cols-1 gap-4">
             <!-- Service Input -->
             <OFormInput
               name="service"
               data-test="rum-upload-source-maps-service-input"
-              label="Service"
+              :label="t('rum.service')"
               required
-              placeholder="Enter service name"
+              :placeholder="t('rum.serviceNamePlaceholder')"
             />
 
             <!-- Version Input -->
             <OFormInput
               name="version"
               data-test="rum-upload-source-maps-version-input"
-              label="Version"
+              :label="t('common.version')"
               required
-              placeholder="Enter version (e.g., 1.0.0)"
+              :placeholder="t('rum.versionPlaceholder')"
             />
 
             <!-- Environment Input -->
             <OFormInput
               name="environment"
               data-test="rum-upload-source-maps-environment-input"
-              label="Environment"
-              placeholder="Enter environment (optional)"
+              :label="t('rum.environment')"
+              :placeholder="t('rum.environmentPlaceholder')"
             />
           </div>
 
           <!-- File Upload Area (form-owned `file` field, schema-validated) -->
           <div class="mb-6">
-            <div class="text-sm font-medium font-medium mb-2">Source Map ZIP File *</div>
+            <div class="mb-2 text-sm font-medium">{{ t("rum.sourceMapZipFileLabel") }}</div>
             <SourceMapDropzone name="file" />
           </div>
         </div>
       </div>
 
       <!-- Bottom Action Bar -->
-      <div class="action-bar shrink-0 bg-card-glass-bg flex items-center justify-end gap-3 py-3 pr-3 border-t border-card-glass-border sticky"
-        style="z-index: 2">
+      <div
+        class="action-bar bg-card-glass-bg border-card-glass-border sticky z-2 flex shrink-0 items-center justify-end gap-3 border-t py-3 pr-3"
+      >
         <OButton
           data-test="rum-upload-source-maps-cancel-btn"
           variant="outline"
@@ -79,14 +85,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="button"
           @click="navigateBack"
           :disabled="isSubmitting"
-        >Cancel</OButton>
+          >{{ t("common.cancel") }}</OButton
+        >
         <OButton
           data-test="rum-upload-source-maps-upload-btn"
           variant="primary"
           size="sm-action"
           type="submit"
           :loading="isSubmitting"
-        >Upload</OButton>
+          >{{ t("rum.upload") }}</OButton
+        >
       </div>
     </OForm>
   </OPageLayout>
@@ -94,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
@@ -104,12 +112,9 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import SourceMapDropzone from "./SourceMapDropzone.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  makeUploadSourceMapsSchema,
-  type UploadSourceMapsForm,
-} from "./UploadSourceMaps.schema";
+import { makeUploadSourceMapsSchema, type UploadSourceMapsForm } from "./UploadSourceMaps.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
@@ -150,12 +155,12 @@ const uploadSourceMaps = async (value: UploadSourceMapsForm) => {
 
     await sourcemapsService.uploadSourceMaps(
       store.state.selectedOrganization.identifier,
-      uploadData
+      uploadData,
     );
 
     toast({
       variant: "success",
-      message: "Source maps uploaded successfully",
+      message: t("toastMessages.RUM.sourceMapsUploadedSuccessfully"),
     });
 
     // Navigate back to source maps list

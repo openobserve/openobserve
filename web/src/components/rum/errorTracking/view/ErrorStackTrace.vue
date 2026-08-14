@@ -15,20 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex mt-4 ml-1">
+  <div class="mt-4 ml-1 flex">
     <div class="w-full">
-      <div class="text-base font-bold mb-1">{{ t("rum.errorStack") }}</div>
+      <div class="mb-1 text-base font-bold">{{ t("rum.errorStack") }}</div>
       <div class="mb-2">{{ error_stack[0] }}</div>
 
       <!-- Tabs for Pretty and Raw views -->
-      <OTabs
-        v-model="activeTab"
-        dense
-        class="text-text-secondary mb-1"
-        align="left"
-      >
-        <OTab name="raw" :label="t('rum.stackTraceRaw')" data-test="rum-error-stack-trace-raw-tab" />
-        <OTab name="pretty" :label="t('rum.stackTracePretty')" data-test="rum-error-stack-trace-pretty-tab" />
+      <OTabs v-model="activeTab" dense class="text-text-secondary mb-1" align="left">
+        <OTab
+          name="raw"
+          :label="t('rum.stackTraceRaw')"
+          data-test="rum-error-stack-trace-raw-tab"
+        />
+        <OTab
+          name="pretty"
+          :label="t('rum.stackTracePretty')"
+          data-test="rum-error-stack-trace-pretty-tab"
+        />
       </OTabs>
 
       <OSeparator class="mb-2" />
@@ -39,20 +42,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="raw">
           <div class="error-stacks">
             <template v-for="(stack, index) in error_stack" :key="stack">
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
                 v-if="index"
                 data-test="error-stack-trace-line"
-                class="border-b border-l border-r border-solid border-border-default text-compact py-1.5 px-2"
+                class="border-border-default text-compact border-r border-b border-l border-solid px-2 py-1.5"
                 :style="{
                   'border-top': Number(index) === 1 ? '1px solid var(--color-border-default)' : '',
                   'border-radius':
                     Number(index) === error_stack.length - 1
-                      ? '0 0 4px 4px'
+                      ? '0 0 0.25rem 0.25rem'
                       : Number(index) === 1
-                      ? '4px 4px 0 0'
-                      : '',
+                        ? '0.25rem 0.25rem 0 0'
+                        : '',
                 }"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ stack }}
               </div>
             </template>
@@ -61,7 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Pretty formatted view -->
         <OTabPanel name="pretty">
-          <PrettyStackTrace v-if="activeTab === 'pretty'" :error_stack="error_stack" :error="error" />
+          <PrettyStackTrace
+            v-if="activeTab === 'pretty'"
+            :error_stack="error_stack"
+            :error="error"
+          />
         </OTabPanel>
       </OTabPanels>
     </div>
@@ -69,16 +78,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import { useI18n } from "vue-i18n";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { useI18nTyped } from "@/types/i18n";
 import { ref } from "vue";
 import PrettyStackTrace from "./PrettyStackTrace.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 defineProps({
   error_stack: {
@@ -93,4 +102,3 @@ defineProps({
 
 const activeTab = ref("raw");
 </script>
-

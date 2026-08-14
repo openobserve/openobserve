@@ -9,8 +9,8 @@ import { nextTick } from "vue";
 // Mock config
 vi.mock("@/aws-exports", () => ({
   default: {
-    isEnterprise: "true"
-  }
+    isEnterprise: "true",
+  },
 }));
 
 // Mock the search service with proper error handling
@@ -19,8 +19,8 @@ vi.mock("@/services/search", () => ({
     get_scheduled_search_list: vi.fn(),
     cancel_scheduled_search: vi.fn(),
     retry_scheduled_search: vi.fn(),
-    delete_scheduled_search: vi.fn()
-  }
+    delete_scheduled_search: vi.fn(),
+  },
 }));
 
 // Mock useLogs composable
@@ -30,41 +30,41 @@ vi.mock("@/composables/useLogs", () => ({
       meta: {},
       data: {
         datetime: {
-          type: 'relative'
-        }
-      }
+          type: "relative",
+        },
+      },
     },
-    extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 })
-  })
+    extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 }),
+  }),
 }));
 
 // Mock vue-router
-vi.mock('vue-router', () => ({
+vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
     push: vi.fn(),
     currentRoute: {
       value: {
         query: {
-          org_identifier: 'test-org'
-        }
-      }
-    }
+          org_identifier: "test-org",
+        },
+      },
+    },
   })),
   useRoute: vi.fn(() => ({
     query: {},
     params: {},
-    path: '/search-schedulers'
-  }))
+    path: "/search-schedulers",
+  })),
 }));
 
 // Mock vue-i18n
-vi.mock('vue-i18n', async (importOriginal) => {
+vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     useI18n: () => ({
-      t: (key) => key
-    })
+      t: (key) => key,
+    }),
   };
 });
 
@@ -78,18 +78,18 @@ describe("SearchSchedulersList Component", () => {
     mockStore = {
       state: {
         selectedOrganization: {
-          identifier: "test-org"
+          identifier: "test-org",
         },
         userInfo: {
-          email: "test@example.com"
+          email: "test@example.com",
         },
         zoConfig: {
           usage_publish_interval: 60,
-          timestamp_column: "_timestamp"
+          timestamp_column: "_timestamp",
         },
         timezone: "UTC",
-        theme: 'light'
-      }
+        theme: "light",
+      },
     };
 
     // Setup router mock
@@ -99,14 +99,18 @@ describe("SearchSchedulersList Component", () => {
       currentRoute: {
         value: {
           query: {
-            org_identifier: 'test-org'
-          }
-        }
-      }
+            org_identifier: "test-org",
+          },
+        },
+      },
     }));
 
     // Clear all mocks before each test
     vi.clearAllMocks();
+
+    // Component now fetches on mount (standalone route); default the list API to an
+    // empty result so mounting resolves cleanly. Individual tests override as needed.
+    searchService.get_scheduled_search_list.mockResolvedValue({ data: [] });
 
     // Mount component with default props and data
     wrapper = mount(SearchSchedulersList, {
@@ -116,40 +120,35 @@ describe("SearchSchedulersList Component", () => {
           store: mockStore,
         },
         stubs: {
-          QPage: true,
-          QTable: true,
           QTr: true,
           QTd: true,
-          QBtn: true,
-          QIcon: true,
-          QToggle: true,
           DateTime: {
             template: '<div class="mock-datetime"></div>',
             methods: {
-              setAbsoluteTime: vi.fn()
-            }
+              setAbsoluteTime: vi.fn(),
+            },
           },
           AppTabs: true,
           QueryEditor: true,
           ConfirmDialog: true,
-          NoData: true
+          NoData: true,
         },
         mocks: {
-          $router: { push: routerPushMock }
-        }
+          $router: { push: routerPushMock },
+        },
       },
       props: {
-        isClicked: false
-      }
+        isClicked: false,
+      },
     });
 
     // Mock component methods
-    wrapper.vm.formatTime = vi.fn(took => `${took.toFixed(2)} sec`);
+    wrapper.vm.formatTime = vi.fn((took) => `${took.toFixed(2)} sec`);
     wrapper.vm.calculateDuration = vi.fn(() => ({
       formatted: "1 second",
-      raw: 1.0
+      raw: 1.0,
     }));
-    wrapper.vm.convertUnixToDateFormat = vi.fn(timestamp => {
+    wrapper.vm.convertUnixToDateFormat = vi.fn((timestamp) => {
       const date = new Date(timestamp);
       return date.toISOString().slice(0, 19) + "+00:00";
     });
@@ -160,8 +159,11 @@ describe("SearchSchedulersList Component", () => {
   });
 
   describe("Component Initialization", () => {
-    it("initializes with correct default state", () => {
-      expect(wrapper.vm.columnsToBeRendered).toEqual([]);
+    it("initializes with correct default state", async () => {
+      await flushPromises();
+      // Columns are a fixed schema, generated up front so the loading skeleton
+      // has a shape (they no longer start empty).
+      expect(wrapper.vm.columnsToBeRendered.length).toBeGreaterThan(0);
       expect(wrapper.vm.dataToBeLoaded).toEqual([]);
       expect(wrapper.vm.expandedIds).toEqual([]);
       expect(wrapper.vm.isLoading).toBe(false);
@@ -170,7 +172,7 @@ describe("SearchSchedulersList Component", () => {
   });
 
   describe("Data Fetching", () => {
-    it("fetches search schedulers when isClicked becomes true", async () => {
+    it("fetches search schedulers via fetchSearchHistory", async () => {
       const mockResponse = {
         data: [
           {
@@ -183,28 +185,23 @@ describe("SearchSchedulersList Component", () => {
             payload: JSON.stringify({
               query: {
                 sql: "SELECT * FROM logs",
-                stream_names: JSON.stringify(["test-stream"])
-              }
+                stream_names: JSON.stringify(["test-stream"]),
+              },
             }),
             stream_type: "logs",
-            duration: "1 second"
-          }
-        ]
+            duration: "1 second",
+          },
+        ],
       };
 
-      searchService.get_scheduled_search_list.mockImplementation(() => Promise.resolve(mockResponse));
-      
-      // First ensure isLoading is false
-      wrapper.vm.isLoading = false;
-      await nextTick();
-      
-      // Then trigger the watcher
-      await wrapper.setProps({ isClicked: true });
-      await nextTick();
+      searchService.get_scheduled_search_list.mockResolvedValue(mockResponse);
+
+      // Fetch is now triggered on mount / refresh, not via an isClicked prop.
+      await wrapper.vm.fetchSearchHistory();
       await flushPromises();
 
       expect(searchService.get_scheduled_search_list).toHaveBeenCalledWith({
-        org_identifier: "test-org"
+        org_identifier: "test-org",
       });
       expect(wrapper.vm.dataToBeLoaded).toHaveLength(1);
     });
@@ -212,28 +209,24 @@ describe("SearchSchedulersList Component", () => {
     it("sets loading state correctly during fetch", async () => {
       const mockResponse = { data: [] };
       let resolvePromise;
-      const promise = new Promise(resolve => {
+      const promise = new Promise((resolve) => {
         resolvePromise = resolve;
       });
-      
+
       searchService.get_scheduled_search_list.mockImplementation(() => promise);
-      
-      // First ensure isLoading is false
-      wrapper.vm.isLoading = false;
+
+      // Kick off a fetch without awaiting so we can observe the in-flight state.
+      wrapper.vm.fetchSearchHistory();
       await nextTick();
-      
-      // Then trigger the watcher
-      await wrapper.setProps({ isClicked: true });
-      await nextTick();
-      
+
       // Check loading state is true during fetch
       expect(wrapper.vm.isLoading).toBe(true);
-      
+
       // Resolve the API call
       resolvePromise(mockResponse);
       await flushPromises();
       await nextTick();
-      
+
       // Check loading state is false after fetch
       expect(wrapper.vm.isLoading).toBe(false);
     });
@@ -245,12 +238,12 @@ describe("SearchSchedulersList Component", () => {
       status: 1,
       stream_names: JSON.stringify(["test-stream"]),
       sql: "SELECT * FROM logs",
-      duration: "1 second"
+      duration: "1 second",
     };
 
     it("deletes job successfully", async () => {
       searchService.delete_scheduled_search.mockImplementation(() => Promise.resolve({}));
-      
+
       await wrapper.vm.confirmDeleteJob(mockJob);
       await nextTick();
       expect(wrapper.vm.confirmDelete).toBe(true);
@@ -262,7 +255,7 @@ describe("SearchSchedulersList Component", () => {
 
       expect(searchService.delete_scheduled_search).toHaveBeenCalledWith({
         org_identifier: "test-org",
-        jobId: "123"
+        jobId: "123",
       });
     });
   });
@@ -301,27 +294,29 @@ describe("SearchSchedulersList Component", () => {
         toBeStoredStartTime: 1000,
         toBeStoredEndTime: 2000,
         id: "123",
-        duration: "1 second"
+        duration: "1 second",
       };
 
       await wrapper.vm.fetchSearchResults(mockRow);
       await flushPromises();
       await nextTick();
-      
+
       expect(routerPushMock).toHaveBeenCalledWith({
         path: "/logs",
         query: expect.objectContaining({
           stream_type: "logs",
           stream: "test-stream",
           sql_mode: "true",
-          type: "search_scheduler"
-        })
+          type: "search_scheduler",
+        }),
       });
     });
 
-    it("emits closeSearchHistory event", async () => {
+    it("navigates back to logs on closeSearchHistory", async () => {
+      // Standalone route: close now navigates to the Logs route (no history to pop
+      // in jsdom) instead of emitting to a parent overlay.
       await wrapper.vm.closeSearchHistory();
-      expect(wrapper.emitted().closeSearchHistory).toBeTruthy();
+      expect(routerPushMock).toHaveBeenCalledWith({ name: "logs" });
     });
   });
 

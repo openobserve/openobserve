@@ -25,7 +25,7 @@ use crate::{
     alerts::alert::AlertError,
     common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
     dashboards::{DashboardError, reports::ReportError},
-    pipeline::store::PipelineError,
+    pipeline::db::PipelineError,
 };
 #[cfg(feature = "enterprise")]
 use crate::{
@@ -69,12 +69,32 @@ impl From<AlertError> for Response {
             | AlertError::AlertDestinationMissing
             | AlertError::TemplateNotConfigured { .. }
             | AlertError::RealtimeMissingCustomQuery
+            // Both are user input errors -> 400, same as the other
+            // trigger-condition validations.
+            | AlertError::InvalidWarningThreshold(_)
+            | AlertError::InvalidAggregationThreshold(_)
+            | AlertError::InvalidMultiAlert(_)
+            | AlertError::WarningThresholdOnRealtimeAlert
+            | AlertError::WarningOnCoverageGate { .. }
+            | AlertError::PromqlWarningWithoutCondition
+            | AlertError::InvalidTag(_)
+            // Feature 5: every variant names its own bound, so the body is
+            // actionable. A dangling `slo_id` is user input too — the alert
+            // being saved is what is wrong, not a missing resource the caller
+            // asked for.
+            | AlertError::InvalidSloAlert(_)
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
             | AlertError::PromqlMissingQuery
             | AlertError::PeriodExceedsMaxQueryRange { .. }
             | AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
-            AlertError::CreateAlreadyExists => MetaHttpResponse::conflict(value),
+            // S-16 PR 4. A conflict, not a bad request: the alert being sent is
+            // fine on its own terms — it is the SLOs that already exist and
+            // measure from it that the request collides with. Both messages
+            // name them, so the 409 body says what to change.
+            AlertError::CreateAlreadyExists
+            | AlertError::AlertSourceOfSlos { .. }
+            | AlertError::AlertSourceEditBreaksSlos { .. } => MetaHttpResponse::conflict(value),
             AlertError::CreateFolderNotFound
             | AlertError::MoveDestinationFolderNotFound
             | AlertError::AlertNotFound
@@ -226,6 +246,10 @@ impl From<EvalJobError> for Response {
             EvalJobError::NotFound => MetaHttpResponse::not_found(value),
             EvalJobError::ReconcilerError(err) => {
                 log::error!("[EvalJob] reconciler error: {err}");
+                MetaHttpResponse::internal_error("Internal server error")
+            }
+            EvalJobError::TaskPublish(err) => {
+                log::error!("[EvalJob] task publish error: {err}");
                 MetaHttpResponse::internal_error("Internal server error")
             }
             EvalJobError::InvalidStatus(_)

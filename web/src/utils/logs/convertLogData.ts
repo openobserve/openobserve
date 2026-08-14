@@ -3,10 +3,7 @@ import {
   classicColorPaletteLightTheme,
   classicColorPaletteDarkTheme,
 } from "@/utils/dashboard/colorPalette";
-import {
-  formatUnitValue,
-  getUnitValue,
-} from "@/utils/dashboard/convertDataIntoUnitValue";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export const convertLogData = (
   x: any,
@@ -31,7 +28,10 @@ export const convertLogData = (
       containLabel: true,
       left: "20",
       right: "20",
-      top: "5",
+      // 8 rather than 5: `containLabel` reserves room for the axis labels but
+      // not for the half of the topmost y-axis label that sits above its tick,
+      // which clipped that number against the top of the histogram strip.
+      top: "8",
       bottom: "5",
     },
     tooltip: {
@@ -103,7 +103,8 @@ export const convertLogData = (
           ? params.itemStyle
           : {
               color: (() => {
-                const isDarkMode = document.documentElement.classList.contains('dark');
+                // eslint-disable-next-line no-restricted-syntax -- reads the applied `dark` class off the document, not store.state.theme. This runs inside an ECharts formatter callback outside any component scope, where useTheme() is not callable.
+                const isDarkMode = document.documentElement.classList.contains("dark");
                 if (isDarkMode) {
                   return getComputedStyle(document.body)
                     .getPropertyValue("--color-theme-accent")
@@ -148,46 +149,46 @@ const getSeriesHash = (seriesName: string, palette: string[]): number => {
 // Must stay aligned with STATUS_COLORS / STATUS_COLORS_DARK in statusParser.ts.
 const SEMANTIC_COLORS_LIGHT: Record<string, string> = {
   // severity / log_level / level — severity axis
-  fatal:     "#E53935",
+  fatal: "#E53935",
   emergency: "#E53935",
-  alert:     "#ea580c",
-  critical:  "#F4511E",
-  error:     "#EF5350",
-  warn:      "#FB8C00",
-  warning:   "#FB8C00",
-  notice:    "#16a34a",
-  info:      "#1E88E5",
-  debug:     "#00ACC1",
-  trace:     "#90A4AE",
+  alert: "#ea580c",
+  critical: "#F4511E",
+  error: "#EF5350",
+  warn: "#FB8C00",
+  warning: "#FB8C00",
+  notice: "#16a34a",
+  info: "#1E88E5",
+  debug: "#00ACC1",
+  trace: "#90A4AE",
   // status — job/task pipeline axis
-  failure:   "#EF5350",
-  timeout:   "#FF7043",
+  failure: "#EF5350",
+  timeout: "#FF7043",
   cancelled: "#9E9E9E",
-  pending:   "#FFC107",
-  success:   "#43A047",
-  ok:        "#43A047",
+  pending: "#FFC107",
+  success: "#43A047",
+  ok: "#43A047",
   // untagged
   "(empty)": "#BDBDBD",
 };
 
 const SEMANTIC_COLORS_DARK: Record<string, string> = {
-  fatal:     "#E07070",
+  fatal: "#E07070",
   emergency: "#E07070",
-  alert:     "#ea580c",
-  critical:  "#DC6030",
-  error:     "#D95C5C",
-  warn:      "#D4944A",
-  warning:   "#D4944A",
-  notice:    "#16a34a",
-  info:      "#4D8FD4",
-  debug:     "#3DAAB8",
-  trace:     "#7A9BAA",
-  failure:   "#D95C5C",
-  timeout:   "#D47845",
+  alert: "#ea580c",
+  critical: "#DC6030",
+  error: "#D95C5C",
+  warn: "#D4944A",
+  warning: "#D4944A",
+  notice: "#16a34a",
+  info: "#4D8FD4",
+  debug: "#3DAAB8",
+  trace: "#7A9BAA",
+  failure: "#D95C5C",
+  timeout: "#D47845",
   cancelled: "#909090",
-  pending:   "#D4A83A",
-  success:   "#4DAD55",
-  ok:        "#4DAD55",
+  pending: "#D4A83A",
+  success: "#4DAD55",
+  ok: "#4DAD55",
   "(empty)": "#707070",
 };
 
@@ -203,7 +204,7 @@ export const formatCount = (value: number): string => {
 // severity data are numbers. useHistogram.ts coerces these to strings.
 // Only maps 0-7; other numeric strings (200, 500, etc.) pass through.
 const NUMERIC_SEVERITY_TO_SEMANTIC: Record<string, string> = {
-  "0": "info",     // OTEL UNSPECIFIED
+  "0": "info", // OTEL UNSPECIFIED
   "1": "alert",
   "2": "critical",
   "3": "error",
@@ -219,13 +220,16 @@ const getSemanticColor = (
   fallbackPalette: string[],
 ): string => {
   const map = isDarkTheme ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS_LIGHT;
-  const lowerLabel = String(label ?? "").trim().toLowerCase();
+  const lowerLabel = String(label ?? "")
+    .trim()
+    .toLowerCase();
 
   const directMatch = map[lowerLabel];
   if (directMatch) return directMatch;
 
   const semanticName = NUMERIC_SEVERITY_TO_SEMANTIC[lowerLabel];
-  if (semanticName) return map[semanticName] ?? fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
+  if (semanticName)
+    return map[semanticName] ?? fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
 
   return fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
 };
@@ -236,16 +240,15 @@ export const convertStackedLogData = (
   params: { title: any; timezone: string; breakdownField?: string | null },
   isDarkTheme: boolean,
 ): { options: any } => {
-  const palette = isDarkTheme
-    ? classicColorPaletteDarkTheme
-    : classicColorPaletteLightTheme;
+  const palette = isDarkTheme ? classicColorPaletteDarkTheme : classicColorPaletteLightTheme;
 
   const series = [...breakdownSeries.entries()].map(([category, values]) => {
     // Use explicit check so numeric 0 is treated as a real value, not empty.
     // `category || "(empty)"` would incorrectly map 0 → "(empty)" because 0 is falsy.
     // Case is preserved from the source data — "INFO", "Info", "info" render as
     // three distinct series instead of being collapsed to one normalized label.
-    const label = (category === null || category === undefined || category === "") ? "(empty)" : String(category);
+    const label =
+      category === null || category === undefined || category === "" ? "(empty)" : String(category);
     return {
       name: label,
       type: "bar",
@@ -273,7 +276,9 @@ export const convertStackedLogData = (
         containLabel: true,
         left: "20",
         right: "20",
-        top: "5",
+        // Matches convertLogData: 3 extra pixels so the topmost y-axis number
+        // is not clipped by the top of the histogram strip.
+        top: "8",
         bottom: series.length > 1 ? "20" : "5",
       },
       tooltip: {
@@ -297,15 +302,16 @@ export const convertStackedLogData = (
         formatter: (tooltipParams: any[]) => {
           if (!tooltipParams?.length) return "";
 
-          let html = `<div style="min-width:190px;padding:4px 0;">`;
-          html += `<div style="font-size:11px;font-weight:500;opacity:0.65;padding:0 10px 4px;margin-bottom:0;border-bottom:1px solid rgba(128,128,128,0.15);color:${textColor}">${esc(tooltipParams[0].axisValueLabel)}</div>`;
+          let html = `<div style="min-width:11.875rem;padding:0.25rem 0;">`;
+          // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
+          html += `<div style="font-size:0.6875rem;font-weight:500;opacity:0.65;padding:0 0.625rem 0.25rem;margin-bottom:0;border-bottom:1px solid rgba(128,128,128,0.15);color:${textColor}">${esc(tooltipParams[0].axisValueLabel)}</div>`;
 
           tooltipParams.forEach((p: any) => {
             html += `
-              <div style="display:flex;align-items:center;gap:6px;padding:1px 10px;">
+              <div style="display:flex;align-items:center;gap:0.375rem;padding:0.0625rem 0.625rem;">
                 ${p.marker}
-                <span style="flex:1;color:${textColor};font-size:12px">${esc(p.seriesName)}</span>
-                <span style="font-weight:600;color:${textColor};min-width:32px;text-align:right;font-size:12px">${esc(formatCount(p.value[1]))}</span>
+                <span style="flex:1;color:${textColor};font-size:0.75rem">${esc(p.seriesName)}</span>
+                <span style="font-weight:600;color:${textColor};min-width:2rem;text-align:right;font-size:0.75rem">${esc(formatCount(p.value[1]))}</span>
               </div>`;
             // p.marker is ECharts-generated HTML (a colored dot span) — intentionally not escaped
           });
@@ -327,8 +333,7 @@ export const convertStackedLogData = (
         axisPointer: { label: { precision: 0 } },
         splitNumber: 3,
         axisLabel: {
-          formatter: (value: number) =>
-            formatUnitValue(getUnitValue(value, "numbers", "", 2)),
+          formatter: (value: number) => formatUnitValue(getUnitValue(value, "numbers", "", 2)),
         },
       },
       toolbox: {

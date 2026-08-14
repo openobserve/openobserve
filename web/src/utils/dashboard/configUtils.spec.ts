@@ -1291,8 +1291,27 @@ describe("configUtils", () => {
   });
 
   describe("shouldShowCartesianAxisConfig", () => {
-    const cartesianTypes = ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "stacked", "h-stacked"];
-    const nonCartesianTypes = ["pie", "donut", "table", "heatmap", "metric", "gauge", "geomap", "sankey", "maps"];
+    const cartesianTypes = [
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "stacked",
+      "h-stacked",
+    ];
+    const nonCartesianTypes = [
+      "pie",
+      "donut",
+      "table",
+      "heatmap",
+      "metric",
+      "gauge",
+      "geomap",
+      "sankey",
+      "maps",
+    ];
 
     cartesianTypes.forEach((type) => {
       it(`should return true for ${type} chart`, () => {
@@ -1309,7 +1328,16 @@ describe("configUtils", () => {
 
   describe("shouldShowAxisLabelConfig", () => {
     const supportedTypes = ["area", "area-stacked", "bar", "line", "scatter", "stacked"];
-    const unsupportedTypes = ["h-bar", "h-stacked", "pie", "donut", "table", "heatmap", "gauge", "metric"];
+    const unsupportedTypes = [
+      "h-bar",
+      "h-stacked",
+      "pie",
+      "donut",
+      "table",
+      "heatmap",
+      "gauge",
+      "metric",
+    ];
 
     supportedTypes.forEach((type) => {
       it(`should return true for ${type} chart`, () => {
@@ -1397,7 +1425,16 @@ describe("configUtils", () => {
   });
 
   describe("shouldShowTimeShift", () => {
-    const timeShiftTypes = ["area", "bar", "line", "h-bar", "h-stacked", "scatter", "area-stacked", "stacked"];
+    const timeShiftTypes = [
+      "area",
+      "bar",
+      "line",
+      "h-bar",
+      "h-stacked",
+      "scatter",
+      "area-stacked",
+      "stacked",
+    ];
     const nonTimeShiftTypes = ["pie", "donut", "table", "metric", "gauge"];
 
     timeShiftTypes.forEach((type) => {

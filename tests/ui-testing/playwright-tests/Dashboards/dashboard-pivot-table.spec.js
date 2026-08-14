@@ -73,9 +73,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       // Search for a field and verify +P is NOT visible for line chart
       await pm.chartTypeSelector.searchField("kubernetes_container_name");
 
-      const pivotButton = page
-        .locator('[data-test="dashboard-add-p-data"]')
-        .first();
+      const pivotButton = pm.chartTypeSelector.pivotAddBtn.first();
       await expect(pivotButton).not.toBeVisible();
 
       testLogger.info("Verified +P button is NOT visible for line chart");
@@ -88,8 +86,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
 
       // Hover over the field row to reveal the action buttons (they are hidden
       // by CSS until the row is hovered — see OFieldRow.__actions display:none)
-      const fieldRow = page
-        .locator('[data-test="o-field-list-row-kubernetes_container_name"]')
+      const fieldRow = pm.chartTypeSelector
+        .getFieldListRow("kubernetes_container_name")
         .first();
       await fieldRow.waitFor({ state: "visible", timeout: 5000 });
       await fieldRow.hover();
@@ -149,19 +147,15 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.waitForTableDataLoad();
 
       // Verify pivot table rendered - breakdown layout should show the pivot field
-      const breakdownLayout = page.locator(
-        '[data-test="dashboard-b-layout"]'
-      );
+      const breakdownLayout = pm.chartTypeSelector.breakdownLayout;
       await expect(breakdownLayout).toBeVisible();
 
       // Verify the breakdown item is present
-      const breakdownItem = page.locator(
-        '[data-test="dashboard-b-item-breakdown_1"]'
-      );
+      const breakdownItem = pm.chartTypeSelector.getBreakdownItem(1);
       await expect(breakdownItem).toBeVisible();
 
       // Verify table has data
-      const table = page.locator('[data-test="dashboard-panel-table"]');
+      const table = pm.dashboardPanelActions.dashboardTable;
       await expect(table).toBeVisible();
 
       testLogger.info("Verified basic pivot table renders successfully");
@@ -209,9 +203,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
 
       // Open config panel - pivot options should NOT be visible
       await pm.dashboardPanelConfigs.openConfigPanel();
-      const pivotRowTotals = page.locator(
-        '[data-test="dashboard-config-pivot-row-totals"]'
-      );
+      const pivotRowTotals = pm.dashboardPanelConfigs.pivotRowTotals;
       await expect(pivotRowTotals).not.toBeVisible();
 
       testLogger.info(
@@ -228,9 +220,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pivotRowTotals.waitFor({ state: "visible", timeout: 10000 });
       await expect(pivotRowTotals).toBeVisible();
 
-      const pivotColTotals = page.locator(
-        '[data-test="dashboard-config-pivot-col-totals"]'
-      );
+      const pivotColTotals = pm.dashboardPanelConfigs.pivotColTotals;
       await expect(pivotColTotals).toBeVisible();
 
       testLogger.info("Verified pivot options appear when pivot mode active");
@@ -278,12 +268,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
 
       // Open config panel - verify transpose and dynamic columns are enabled
       await pm.dashboardPanelConfigs.openConfigPanel();
-      const transposeToggle = page.locator(
-        '[data-test="dashboard-config-table_transpose"]'
-      );
-      const dynamicColumnsToggle = page.locator(
-        '[data-test="dashboard-config-table_dynamic_columns"]'
-      );
+      const transposeToggle = pm.dashboardPanelConfigs.transpose;
+      const dynamicColumnsToggle = pm.dashboardPanelConfigs.dynamicColumn;
 
       await expect(transposeToggle).toBeVisible();
       await expect(dynamicColumnsToggle).toBeVisible();
@@ -357,8 +343,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       // Check for "First Column" label (non-pivot mode)
-      await expect(page.getByText("First Column")).toBeVisible();
-      await expect(page.getByText("Other Columns")).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("First Column")).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("Other Columns")).toBeVisible();
 
       testLogger.info("Verified non-pivot labels: First Column, Other Columns");
 
@@ -366,8 +352,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
 
       // Labels should update to pivot mode
-      await expect(page.getByText("Row Fields")).toBeVisible();
-      await expect(page.getByText("Value Fields")).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("Row Fields")).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("Value Fields")).toBeVisible();
 
       testLogger.info("Verified pivot labels: Row Fields, Value Fields");
 
@@ -375,8 +361,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.removeField("breakdown_1", "b");
 
       // Labels should revert to non-pivot mode
-      await expect(page.getByText("First Column")).toBeVisible();
-      await expect(page.getByText("Other Columns")).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("First Column")).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("Other Columns")).toBeVisible();
 
       testLogger.info("Verified labels revert when pivot field removed");
 
@@ -426,12 +412,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.dashboardPanelConfigs.openConfigPanel();
 
       // Verify pivot options are visible
-      const rowTotalsToggle = page.locator(
-        '[data-test="dashboard-config-pivot-row-totals"]'
-      );
-      const colTotalsToggle = page.locator(
-        '[data-test="dashboard-config-pivot-col-totals"]'
-      );
+      const rowTotalsToggle = pm.dashboardPanelConfigs.pivotRowTotals;
+      const colTotalsToggle = pm.dashboardPanelConfigs.pivotColTotals;
       await expect(rowTotalsToggle).toBeVisible();
       await expect(colTotalsToggle).toBeVisible();
 
@@ -449,9 +431,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       expect(rowTotalsCheckedAfter).toBe(true);
 
       // Sticky column totals sub-option should appear
-      const stickyColTotals = page.locator(
-        '[data-test="dashboard-config-pivot-sticky-col-totals"]'
-      );
+      const stickyColTotals = pm.dashboardPanelConfigs.pivotStickyColTotals;
       await expect(stickyColTotals).toBeVisible();
 
       testLogger.info(
@@ -465,9 +445,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       expect(colTotalsCheckedAfter).toBe(true);
 
       // Sticky row totals sub-option should appear
-      const stickyRowTotals = page.locator(
-        '[data-test="dashboard-config-pivot-sticky-row-totals"]'
-      );
+      const stickyRowTotals = pm.dashboardPanelConfigs.pivotStickyRowTotals;
       await expect(stickyRowTotals).toBeVisible();
 
       testLogger.info(
@@ -484,8 +462,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       // With single breakdown + single y-axis, buildPivotHeaderLevels returns []
       // (no multi-row header needed), so the Total column is rendered as a regular
       // column header: data-test="o2-table-th-Total_y_axis_1".
-      const totalHeader = page
-        .locator('[data-test^="o2-table-th-"]')
+      const totalHeader = pm.dashboardPanelActions.tableThCells
         .filter({ hasText: /^Total$/ })
         .first();
 
@@ -535,9 +512,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
 
       // Open config panel - pivot options should be visible
       await pm.dashboardPanelConfigs.openConfigPanel();
-      const pivotRowTotals = page.locator(
-        '[data-test="dashboard-config-pivot-row-totals"]'
-      );
+      const pivotRowTotals = pm.dashboardPanelConfigs.pivotRowTotals;
       await expect(pivotRowTotals).toBeVisible();
 
       testLogger.info("Verified pivot options visible with pivot field");
@@ -552,9 +527,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await expect(pivotRowTotals).not.toBeVisible();
 
       // Transpose should be re-enabled
-      const transposeToggle = page.locator(
-        '[data-test="dashboard-config-table_transpose"]'
-      );
+      const transposeToggle = pm.dashboardPanelConfigs.transpose;
       const transposeDisabled =
         await transposeToggle.getAttribute("aria-disabled");
       expect(transposeDisabled).not.toBe("true");
@@ -613,13 +586,13 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
 
       // Verify all 3 breakdown items are present
       await expect(
-        page.locator('[data-test="dashboard-b-item-breakdown_1"]')
+        pm.chartTypeSelector.getBreakdownItem(1)
       ).toBeVisible();
       await expect(
-        page.locator('[data-test="dashboard-b-item-breakdown_2"]')
+        pm.chartTypeSelector.getBreakdownItem(2)
       ).toBeVisible();
       await expect(
-        page.locator('[data-test="dashboard-b-item-breakdown_3"]')
+        pm.chartTypeSelector.getBreakdownItem(3)
       ).toBeVisible();
 
       testLogger.info("Verified 3 pivot fields added successfully");
@@ -627,9 +600,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       // Try to add a 4th pivot field - the +P button should be disabled
       await pm.chartTypeSelector.searchField("log");
 
-      const pivotButton = page
-        .locator('[data-test="dashboard-add-p-data"]')
-        .first();
+      const pivotButton = pm.chartTypeSelector.pivotAddBtn.first();
 
       // The button should be disabled (greyed out / not clickable)
       const isDisabled = await pivotButton.isDisabled();
@@ -690,24 +661,19 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.dashboardPanelActions.savePanel();
 
       // Wait for panel to be saved
-      await page
-        .locator(
-          `[data-test="dashboard-edit-panel-${panelName}-dropdown"]`
-        )
+      await pm.dashboardPanelActions
+        .getEditPanelDropdown(panelName)
         .waitFor({ state: "visible", timeout: 30000 });
 
       testLogger.info("Saved pivot table panel with row/col totals enabled");
 
       // Edit the panel again
       await pm.dashboardPanelActions.selectPanelAction(panelName, "Edit");
-      await page
-        .locator('[data-test="dashboard-apply"]')
+      await pm.dashboardPanelActions.applyDashboard
         .waitFor({ state: "visible", timeout: 30000 });
 
       // Verify pivot field still present
-      const breakdownItem = page.locator(
-        '[data-test="dashboard-b-item-breakdown_1"]'
-      );
+      const breakdownItem = pm.chartTypeSelector.getBreakdownItem(1);
       await expect(breakdownItem).toBeVisible();
 
       // Open config panel and verify settings persisted
@@ -766,9 +732,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Verify breakdown field is present
-      const breakdownItem = page.locator(
-        '[data-test="dashboard-b-item-breakdown_1"]'
-      );
+      const breakdownItem = pm.chartTypeSelector.getBreakdownItem(1);
       await expect(breakdownItem).toBeVisible();
 
       testLogger.info("Pivot table created with breakdown field");
@@ -792,7 +756,7 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await expect(breakdownItem).toBeVisible();
 
       // Verify pivot mode is active (labels should show "Row Fields")
-      await expect(page.getByText("Row Fields")).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("Row Fields")).toBeVisible();
 
       testLogger.info(
         "Breakdown preserved when switching back to table (pivot mode restored)"
@@ -841,12 +805,8 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       // Open config panel
       await pm.dashboardPanelConfigs.openConfigPanel();
 
-      const stickyColTotals = page.locator(
-        '[data-test="dashboard-config-pivot-sticky-col-totals"]'
-      );
-      const stickyRowTotals = page.locator(
-        '[data-test="dashboard-config-pivot-sticky-row-totals"]'
-      );
+      const stickyColTotals = pm.dashboardPanelConfigs.pivotStickyColTotals;
+      const stickyRowTotals = pm.dashboardPanelConfigs.pivotStickyRowTotals;
 
       // Initially, sticky sub-options should NOT be visible
       await expect(stickyColTotals).not.toBeVisible();
@@ -927,13 +887,11 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       // Open config panel - pivot options should NOT be visible
       // (no X field → isPivotMode is false)
       await pm.dashboardPanelConfigs.openConfigPanel();
-      const pivotRowTotals = page.locator(
-        '[data-test="dashboard-config-pivot-row-totals"]'
-      );
+      const pivotRowTotals = pm.dashboardPanelConfigs.pivotRowTotals;
       await expect(pivotRowTotals).not.toBeVisible();
 
       // Labels should show "First Column" (non-pivot mode)
-      await expect(page.getByText("First Column")).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("First Column")).toBeVisible();
 
       testLogger.info(
         "Verified flat table renders when breakdown + Y without X"
@@ -986,13 +944,11 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       // Open config panel - pivot options should NOT be visible
       // (no Y field → isPivotMode is false)
       await pm.dashboardPanelConfigs.openConfigPanel();
-      const pivotRowTotals = page.locator(
-        '[data-test="dashboard-config-pivot-row-totals"]'
-      );
+      const pivotRowTotals = pm.dashboardPanelConfigs.pivotRowTotals;
       await expect(pivotRowTotals).not.toBeVisible();
 
       // Labels should show "First Column" (non-pivot mode)
-      await expect(page.getByText("First Column")).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("First Column")).toBeVisible();
 
       testLogger.info(
         "Verified flat table renders when X + breakdown without Y"
@@ -1044,13 +1000,11 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.waitForTableDataLoad();
 
       // Verify that the breakdown layout accommodates multiple Y aggregations correctly
-      const table = page.locator('[data-test="dashboard-panel-table"]');
+      const table = pm.dashboardPanelActions.dashboardTable;
       await expect(table).toBeVisible();
 
       // Verify breakdown is present, signifying pivot mode is active
-      const breakdownItem = page.locator(
-        '[data-test="dashboard-b-item-breakdown_1"]'
-      );
+      const breakdownItem = pm.chartTypeSelector.getBreakdownItem(1);
       await expect(breakdownItem).toBeVisible();
 
       testLogger.info("Verified render pivot with compound hierarchical headers");
@@ -1097,11 +1051,11 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await streamPromise;
       await pm.chartTypeSelector.waitForTableDataLoad();
 
-      const table = page.locator('[data-test="dashboard-panel-table"]');
+      const table = pm.dashboardPanelActions.dashboardTable;
       await expect(table).toBeVisible();
 
       // Ensure 2 X Fields and 1 breakdown were handled correctly
-      const bLayout = page.locator('[data-test="dashboard-b-layout"]');
+      const bLayout = pm.chartTypeSelector.breakdownLayout;
       await expect(bLayout).toBeVisible();
 
       testLogger.info("Verified multi-row pivot configuration");

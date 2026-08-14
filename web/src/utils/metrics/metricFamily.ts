@@ -312,10 +312,7 @@ export function buildMetricCards(streams: MetricStream[]): MetricCard[] {
  * is a phantom base, and what its help/unit/type are, are facts about its
  * FAMILY. But that pass is cheap; the rule set is not, and it now runs once.
  */
-export function buildMetricCardFor(
-  streams: MetricStream[],
-  name: string,
-): MetricCard | undefined {
+export function buildMetricCardFor(streams: MetricStream[], name: string): MetricCard | undefined {
   if (!name) return undefined;
   const stream = (streams ?? []).find((s) => s?.name === name);
   if (!stream) return undefined;
@@ -368,9 +365,7 @@ function computeCardContext(streams: MetricStream[]): CardContext {
 
   return {
     familyOfStream,
-    streamNames: new Set(
-      (streams ?? []).map((s) => s?.name).filter(Boolean) as string[],
-    ),
+    streamNames: new Set((streams ?? []).map((s) => s?.name).filter(Boolean) as string[]),
     suppressed,
   };
 }
@@ -386,16 +381,11 @@ function cardFor(
 
   const declaredUnit = family?.unit || stream.metrics_meta?.unit || "";
 
-  const defaults = getMetricDefaults(
-    stream.name,
-    stream.metrics_meta?.metric_type,
-    declaredUnit,
-    {
-      streamNames,
-      familyType: family?.familyType,
-      labels,
-    },
-  );
+  const defaults = getMetricDefaults(stream.name, stream.metrics_meta?.metric_type, declaredUnit, {
+    streamNames,
+    familyType: family?.familyType,
+    labels,
+  });
 
   // The backend's fallback help is the stream's own name; showing it would
   // just repeat the card title.
@@ -454,13 +444,9 @@ export function operandStreamsOf(card: MetricCard): string[] {
  * `buildMetricCards` suppresses — the dropdown still lists them, so they still
  * need a badge.
  */
-export function buildTypeFilterBuckets(
-  streams: MetricStream[],
-): Record<string, string> {
+export function buildTypeFilterBuckets(streams: MetricStream[]): Record<string, string> {
   const { familyOfStream } = buildMetricFamilies(streams);
-  const streamNames = new Set(
-    (streams ?? []).map((s) => s?.name).filter(Boolean) as string[],
-  );
+  const streamNames = new Set((streams ?? []).map((s) => s?.name).filter(Boolean) as string[]);
 
   const buckets: Record<string, string> = {};
   for (const stream of streams ?? []) {

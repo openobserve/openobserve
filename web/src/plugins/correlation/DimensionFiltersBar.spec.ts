@@ -34,7 +34,6 @@ const i18n = createI18n({
   },
 });
 
-
 describe("DimensionFiltersBar.vue", () => {
   let wrapper: any;
 
@@ -81,10 +80,7 @@ describe("DimensionFiltersBar.vue", () => {
         ...props,
       },
       global: {
-        plugins: [
-          i18n,
-          store,
-        ],
+        plugins: [i18n, store],
         stubs: {
           OSelect: OSelectStub,
           OTooltip: OTooltipStub,
@@ -269,9 +265,7 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should compute unstableDimensionTooltipComputed with default", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.unstableDimensionTooltipComputed).toBe(
-        "This dimension is unstable"
-      );
+      expect(wrapper.vm.unstableDimensionTooltipComputed).toBe("This dimension is unstable");
     });
   });
 

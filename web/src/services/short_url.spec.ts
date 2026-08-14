@@ -51,10 +51,9 @@ describe("short_url service", () => {
 
       await shortURL.create(org_identifier, url);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/${org_identifier}/short`,
-        { original_url: url }
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/${org_identifier}/short`, {
+        original_url: url,
+      });
     });
 
     it("should send the url as original_url in the request body", async () => {
@@ -80,7 +79,7 @@ describe("short_url service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/production-org/short`,
-        expect.any(Object)
+        expect.any(Object),
       );
     });
   });
@@ -97,7 +96,7 @@ describe("short_url service", () => {
       await shortURL.get(org_identifier, id);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/short/${id}?type=ui`
+        `/api/${org_identifier}/short/${id}?type=ui`,
       );
     });
 
@@ -121,9 +120,7 @@ describe("short_url service", () => {
 
       await shortURL.get(org_identifier, id);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/prod-org/short/short-id-001?type=ui`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/prod-org/short/short-id-001?type=ui`);
     });
 
     it("should make GET request with different org and id values", async () => {
@@ -134,9 +131,7 @@ describe("short_url service", () => {
 
       await shortURL.get(org_identifier, id);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/dev-org/short/uniqueId42?type=ui`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/dev-org/short/uniqueId42?type=ui`);
     });
   });
 
@@ -145,36 +140,32 @@ describe("short_url service", () => {
       const error = new Error("Network error");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        shortURL.create("org123", "https://example.com/url")
-      ).rejects.toThrow("Network error");
+      await expect(shortURL.create("org123", "https://example.com/url")).rejects.toThrow(
+        "Network error",
+      );
     });
 
     it("should propagate errors from get", async () => {
       const error = new Error("Not found");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(shortURL.get("org123", "missing-id")).rejects.toThrow(
-        "Not found"
-      );
+      await expect(shortURL.get("org123", "missing-id")).rejects.toThrow("Not found");
     });
 
     it("should propagate server errors from create", async () => {
       const error = new Error("Internal Server Error");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        shortURL.create("org123", "https://example.com")
-      ).rejects.toThrow("Internal Server Error");
+      await expect(shortURL.create("org123", "https://example.com")).rejects.toThrow(
+        "Internal Server Error",
+      );
     });
 
     it("should propagate unauthorized errors from get", async () => {
       const error = new Error("Unauthorized");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(shortURL.get("org123", "abc123")).rejects.toThrow(
-        "Unauthorized"
-      );
+      await expect(shortURL.get("org123", "abc123")).rejects.toThrow("Unauthorized");
     });
   });
 });

@@ -29,9 +29,7 @@ function applyFilterToQuery(currentQuery: string, filter: string): string {
   if (fieldName && hasFieldCondition(currentQuery, fieldName)) {
     return replaceExistingFieldCondition(currentQuery, fieldName, filter);
   }
-  return currentQuery.length === 0
-    ? filter
-    : currentQuery + " and " + filter;
+  return currentQuery.length === 0 ? filter : currentQuery + " and " + filter;
 }
 
 // ===========================================================================
@@ -55,15 +53,11 @@ describe("getFieldFromExpression", () => {
   });
 
   it("should extract field name from a parenthesized multi-value group", () => {
-    expect(
-      getFieldFromExpression("(status = 'error' OR status = 'warning')"),
-    ).toBe("status");
+    expect(getFieldFromExpression("(status = 'error' OR status = 'warning')")).toBe("status");
   });
 
   it("should extract field name from a SQL stream-prefixed expression", () => {
-    expect(getFieldFromExpression('"my_stream".status = \'error\'')).toBe(
-      "status",
-    );
+    expect(getFieldFromExpression("\"my_stream\".status = 'error'")).toBe("status");
   });
 
   it("should extract field name from a numeric value expression", () => {
@@ -100,18 +94,11 @@ describe("hasFieldCondition", () => {
   });
 
   it("should return true when a multi-value group exists for the field", () => {
-    expect(
-      hasFieldCondition(
-        "(status = 'error' OR status = 'warning')",
-        "status",
-      ),
-    ).toBe(true);
+    expect(hasFieldCondition("(status = 'error' OR status = 'warning')", "status")).toBe(true);
   });
 
   it("should return true when the field appears within a larger query", () => {
-    expect(
-      hasFieldCondition("level = 'info' and status = 'error'", "status"),
-    ).toBe(true);
+    expect(hasFieldCondition("level = 'info' and status = 'error'", "status")).toBe(true);
   });
 
   it("should return false when the field is not present in the query", () => {
@@ -123,12 +110,7 @@ describe("hasFieldCondition", () => {
   });
 
   it("should return false when only unrelated fields are present", () => {
-    expect(
-      hasFieldCondition(
-        "level = 'warn' and severity = 'high'",
-        "status",
-      ),
-    ).toBe(false);
+    expect(hasFieldCondition("level = 'warn' and severity = 'high'", "status")).toBe(false);
   });
 
   it("should return true for numeric value conditions", () => {
@@ -155,22 +137,14 @@ describe("replaceExistingFieldCondition", () => {
     // was found and appending — producing "status = 'error' and status = 'error'".
     // replaceExistingFieldCondition itself returns the correct string; the bug
     // was in the caller deciding whether a match was found.
-    const result = replaceExistingFieldCondition(
-      "status = 'error'",
-      "status",
-      "status = 'error'",
-    );
+    const result = replaceExistingFieldCondition("status = 'error'", "status", "status = 'error'");
     // The result is the same string — hasFieldCondition must be used by the
     // caller to know a replacement was appropriate (i.e. do NOT append).
     expect(result).toBe("status = 'error'");
   });
 
   it("should replace an include condition with an exclude condition for the same field", () => {
-    const result = replaceExistingFieldCondition(
-      "status = 'error'",
-      "status",
-      "status != 'error'",
-    );
+    const result = replaceExistingFieldCondition("status = 'error'", "status", "status != 'error'");
     expect(result).toBe("status != 'error'");
   });
 
@@ -212,11 +186,7 @@ describe("replaceExistingFieldCondition", () => {
 
   it("should return the original query when the field is not found", () => {
     const original = "level = 'info'";
-    const result = replaceExistingFieldCondition(
-      original,
-      "status",
-      "status = 'error'",
-    );
+    const result = replaceExistingFieldCondition(original, "status", "status = 'error'");
     expect(result).toBe(original);
   });
 
@@ -230,11 +200,7 @@ describe("replaceExistingFieldCondition", () => {
   });
 
   it("should handle null-check conditions", () => {
-    const result = replaceExistingFieldCondition(
-      "status is null",
-      "status",
-      "status = 'active'",
-    );
+    const result = replaceExistingFieldCondition("status is null", "status", "status = 'active'");
     expect(result).toBe("status = 'active'");
   });
 });
@@ -253,10 +219,7 @@ describe("include/exclude filter deduplication (watcher behavior)", () => {
     });
 
     it("should append when no existing condition for the field exists", () => {
-      const result = applyFilterToQuery(
-        "level = 'info'",
-        "status = 'error'",
-      );
+      const result = applyFilterToQuery("level = 'info'", "status = 'error'");
       expect(result).toBe("level = 'info' and status = 'error'");
     });
 
@@ -301,10 +264,7 @@ describe("include/exclude filter deduplication (watcher behavior)", () => {
     });
 
     it("should append exclude when no existing condition for the field exists", () => {
-      const result = applyFilterToQuery(
-        "level = 'info'",
-        "status != 'error'",
-      );
+      const result = applyFilterToQuery("level = 'info'", "status != 'error'");
       expect(result).toBe("level = 'info' and status != 'error'");
     });
 
@@ -316,9 +276,7 @@ describe("include/exclude filter deduplication (watcher behavior)", () => {
       // Second exclude with same value — must replace, not duplicate
       query = applyFilterToQuery(query, "status != 'error'");
       expect(query).toBe("status != 'error'");
-      expect(query).not.toContain(
-        "status != 'error' and status != 'error'",
-      );
+      expect(query).not.toContain("status != 'error' and status != 'error'");
     });
 
     it("should REPLACE when exclude is applied with a different value for the same field", () => {
@@ -339,61 +297,37 @@ describe("include/exclude filter deduplication (watcher behavior)", () => {
 
   describe("multi-value select (include/exclude multiple values)", () => {
     it("should add a multi-value include group when query is empty", () => {
-      const result = applyFilterToQuery(
-        "",
-        "(status = 'error' OR status = 'warning')",
-      );
+      const result = applyFilterToQuery("", "(status = 'error' OR status = 'warning')");
       expect(result).toBe("(status = 'error' OR status = 'warning')");
     });
 
     it("should REPLACE existing single include when multi-value group is applied", () => {
       let query = applyFilterToQuery("", "status = 'error'");
-      query = applyFilterToQuery(
-        query,
-        "(status = 'error' OR status = 'warning')",
-      );
+      query = applyFilterToQuery(query, "(status = 'error' OR status = 'warning')");
       expect(query).toBe("(status = 'error' OR status = 'warning')");
       expect(query).not.toContain("status = 'error' and");
     });
 
     it("should REPLACE not APPEND when the same multi-value group is applied again", () => {
-      let query = applyFilterToQuery(
-        "",
-        "(status = 'error' OR status = 'warning')",
-      );
-      query = applyFilterToQuery(
-        query,
-        "(status = 'error' OR status = 'warning')",
-      );
+      let query = applyFilterToQuery("", "(status = 'error' OR status = 'warning')");
+      query = applyFilterToQuery(query, "(status = 'error' OR status = 'warning')");
       expect(query).toBe("(status = 'error' OR status = 'warning')");
     });
 
     it("should REPLACE existing multi-value group with single include", () => {
-      let query = applyFilterToQuery(
-        "",
-        "(status = 'error' OR status = 'warning')",
-      );
+      let query = applyFilterToQuery("", "(status = 'error' OR status = 'warning')");
       query = applyFilterToQuery(query, "status = 'critical'");
       expect(query).toBe("status = 'critical'");
     });
 
     it("should add a multi-value exclude group when query is empty", () => {
-      const result = applyFilterToQuery(
-        "",
-        "(status != 'error' AND status != 'warning')",
-      );
+      const result = applyFilterToQuery("", "(status != 'error' AND status != 'warning')");
       expect(result).toBe("(status != 'error' AND status != 'warning')");
     });
 
     it("should REPLACE not APPEND when the same multi-value exclude group is applied again", () => {
-      let query = applyFilterToQuery(
-        "",
-        "(status != 'error' AND status != 'warning')",
-      );
-      query = applyFilterToQuery(
-        query,
-        "(status != 'error' AND status != 'warning')",
-      );
+      let query = applyFilterToQuery("", "(status != 'error' AND status != 'warning')");
+      query = applyFilterToQuery(query, "(status != 'error' AND status != 'warning')");
       expect(query).toBe("(status != 'error' AND status != 'warning')");
     });
   });

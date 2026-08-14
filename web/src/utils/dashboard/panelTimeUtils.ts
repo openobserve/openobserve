@@ -97,9 +97,7 @@ export const convertPanelTimeRangeToPicker = (
 /**
  * Convert time object (with Date objects) to picker format
  */
-export const convertTimeObjToPickerFormat = (
-  timeObj: any,
-): PanelTimePickerValue | null => {
+export const convertTimeObjToPickerFormat = (timeObj: any): PanelTimePickerValue | null => {
   if (!timeObj || !timeObj.start_time || !timeObj.end_time) {
     return null;
   }
@@ -115,9 +113,7 @@ export const convertTimeObjToPickerFormat = (
 /**
  * Convert global time object to picker format
  */
-export const convertGlobalTimeToPickerFormat = (
-  globalTime: any,
-): PanelTimePickerValue | null => {
+export const convertGlobalTimeToPickerFormat = (globalTime: any): PanelTimePickerValue | null => {
   if (!globalTime || !globalTime.start_time || !globalTime.end_time) {
     return null;
   }
@@ -133,9 +129,7 @@ export const convertGlobalTimeToPickerFormat = (
 /**
  * Build panel time range object from picker value
  */
-export const buildPanelTimeRange = (
-  pickerValue: PanelTimePickerValue,
-): PanelTimeRange => {
+export const buildPanelTimeRange = (pickerValue: PanelTimePickerValue): PanelTimeRange => {
   const timeType = pickerValue.valueType || pickerValue.type;
 
   if (timeType === "relative") {
@@ -157,9 +151,7 @@ export const buildPanelTimeRange = (
  * Returns true if panel_time_enabled is ON (regardless of whether a custom range is set)
  * When enabled with no custom range (panel_time_range=null), panel uses global time dynamically
  */
-export const hasPanelTime = (
-  panel: any,
-): boolean => {
+export const hasPanelTime = (panel: any): boolean => {
   return !!panel?.config?.panel_time_enabled;
 };
 
@@ -168,10 +160,7 @@ export const hasPanelTime = (
  * Panel has its own time when panel_time_range is explicitly set (not null/undefined)
  */
 export const shouldUsePanelTime = (panel: any): boolean => {
-  return !!(
-    panel?.config?.panel_time_enabled &&
-    panel?.config?.panel_time_range
-  );
+  return !!(panel?.config?.panel_time_enabled && panel?.config?.panel_time_range);
 };
 
 /**

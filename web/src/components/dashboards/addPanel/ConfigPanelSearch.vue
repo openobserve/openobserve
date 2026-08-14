@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface Props {
   modelValue: string;
@@ -22,7 +22,7 @@ defineEmits<{
     :model-value="props.modelValue"
     @update:model-value="$emit('update:modelValue', String($event || ''))"
     :placeholder="t('dashboard.configPanelSearchPlaceholder')"
-    class="flex flex-col config-panel-search"
+    class="config-panel-search flex flex-col"
     size="xs"
     clearable
     autofocus

@@ -101,10 +101,10 @@ describe("computeTrend — direction + sentiment matrix", () => {
   // Down + upIsBad → good (cost / errors decreasing)
   // Down + !upIsBad → bad
   it.each([
-    [200, 100, true,  "up",   "bad"],
-    [200, 100, false, "up",   "good"],
-    [50,  100, true,  "down", "good"],
-    [50,  100, false, "down", "bad"],
+    [200, 100, true, "up", "bad"],
+    [200, 100, false, "up", "good"],
+    [50, 100, true, "down", "good"],
+    [50, 100, false, "down", "bad"],
   ])(
     "computeTrend(%d, %d, upIsBad=%s) → direction=%s, sentiment=%s",
     (curr, prev, upIsBad, direction, sentiment) => {
@@ -158,9 +158,7 @@ describe("splitNumberWithUnit", () => {
     // Allow either US-style "1,234" or other locale separators in CI.
     // Compare unit strictly, value loosely (digits + optional separators).
     expect(result.unit).toBe(expected.unit);
-    expect(result.value.replace(/[^\d.]/g, "")).toBe(
-      expected.value.replace(/[^\d.]/g, ""),
-    );
+    expect(result.value.replace(/[^\d.]/g, "")).toBe(expected.value.replace(/[^\d.]/g, ""));
   });
 });
 
@@ -172,21 +170,21 @@ describe("splitDuration", () => {
   it.each([
     // ms tier
     [0, { value: "0", unit: "ms" }],
-    [123_000, { value: "123", unit: "ms" }],              // 123 ms
+    [123_000, { value: "123", unit: "ms" }], // 123 ms
     // s tier
-    [1_000_000, { value: "1.0", unit: "s" }],             // 1 s
-    [12_345_000, { value: "12.3", unit: "s" }],           // 12.3 s
+    [1_000_000, { value: "1.0", unit: "s" }], // 1 s
+    [12_345_000, { value: "12.3", unit: "s" }], // 12.3 s
     // min tier
-    [120_000_000, { value: "2.0", unit: "min" }],         // 2 min
-    [3_599_000_000, { value: "59.98", unit: "min" }],     // ~60 min (just under 1 h)
+    [120_000_000, { value: "2.0", unit: "min" }], // 2 min
+    [3_599_000_000, { value: "59.98", unit: "min" }], // ~60 min (just under 1 h)
     // h tier  (>= 3 600 000 ms = 3_600_000_000 µs)
-    [3_600_000_000, { value: "1.0", unit: "h" }],         // exactly 1 h
-    [7_200_000_000, { value: "2.0", unit: "h" }],         // 2 h
-    [12_600_000_000, { value: "3.5", unit: "h" }],        // 3.5 h
+    [3_600_000_000, { value: "1.0", unit: "h" }], // exactly 1 h
+    [7_200_000_000, { value: "2.0", unit: "h" }], // 2 h
+    [12_600_000_000, { value: "3.5", unit: "h" }], // 3.5 h
     // d tier  (>= 86 400 000 ms = 86_400_000_000 µs)
-    [86_400_000_000, { value: "1.0", unit: "d" }],        // exactly 1 d
-    [172_800_000_000, { value: "2.0", unit: "d" }],       // 2 d
-    [7 * 86_400_000_000, { value: "7.0", unit: "d" }],    // 1 week
+    [86_400_000_000, { value: "1.0", unit: "d" }], // exactly 1 d
+    [172_800_000_000, { value: "2.0", unit: "d" }], // 2 d
+    [7 * 86_400_000_000, { value: "7.0", unit: "d" }], // 1 week
   ])("splits %d microseconds → %j", (micros, expected) => {
     // For the ~60 min case the exact decimal depends on rounding — just check unit.
     const result = splitDuration(micros);
@@ -250,7 +248,7 @@ describe("formatWindowLabel", () => {
   it.each([
     [30 * 1_000_000, "30s"],
     [59 * 1_000_000, "59s"],
-    [60 * 1_000_000, "1m"],          // 1 minute exactly → seconds branch fails (60 < 60 is false) → minutes
+    [60 * 1_000_000, "1m"], // 1 minute exactly → seconds branch fails (60 < 60 is false) → minutes
     [5 * 60 * 1_000_000, "5m"],
     [59 * 60 * 1_000_000, "59m"],
     [60 * 60 * 1_000_000, "1h"],
@@ -266,7 +264,7 @@ describe("formatWindowLabel", () => {
   // Sub-second windows round to whole seconds.
   it("rounds sub-second windows to the nearest whole second", () => {
     expect(formatWindowLabel(1_500_000)).toBe("2s"); // 1.5s → rounds up
-    expect(formatWindowLabel(400_000)).toBe("0s");   // 0.4s → rounds down
+    expect(formatWindowLabel(400_000)).toBe("0s"); // 0.4s → rounds down
   });
 
   // Defensive: zero / negative → empty string so the chip falls back

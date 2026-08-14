@@ -15,22 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    ref="chartPanelRef"
-    class="border border-border-default h-full relative flex flex-col"
-  >
+  <div ref="chartPanelRef" class="border-border-default relative flex h-full flex-col border">
     <!-- Chart -->
-    <div
-      data-test="alert-preview-chart"
-      class="preview-alert-chart flex-1 min-h-0 p-4"
-    >
+    <div data-test="alert-preview-chart" class="preview-alert-chart min-h-0 flex-1 p-4">
       <!-- Empty query placeholder -->
       <div
         v-if="!query && (selectedTab === 'sql' || selectedTab === 'promql')"
-        class="flex flex-col items-center justify-center h-full gap-2"
+        class="flex h-full flex-col items-center justify-center gap-2"
       >
         <OIcon name="edit" size="xl" class="opacity-20" />
-        <span class="text-sm opacity-40">Write a query to see preview</span>
+        <span class="text-sm opacity-40">{{ t("alerts.writeQueryToSeePreview") }}</span>
       </div>
       <PanelSchemaRenderer
         ref="panelRendererRef"
@@ -51,122 +45,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch, onMounted, computed, nextTick } from "vue";
+import { buildThresholdMarkLines } from "@/utils/alerts/thresholdMarkLines";
+import {
+  cleanAggregationQuery,
+  getDefaultDashboardPanelData,
+} from "@/utils/alerts/aggregationPreviewQuery";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { reactive } from "vue";
 import { onBeforeMount } from "vue";
 import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import searchService from "@/services/search";
-import {
-  b64EncodeUnicode,
-  smartDecodeVrlFunction,
-} from "@/utils/zincutils";
+import { b64EncodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-
-const getDefaultDashboardPanelData: any = () => ({
-  data: {
-    version: 2,
-    id: "",
-    type: "line",
-    title: "",
-    description: "",
-    config: {
-      show_legends: true,
-      legends_position: "bottom",
-      unit: "short",
-      unit_custom: "",
-      promql_legend: "",
-      axis_border_show: true,
-      connect_nulls: true,
-      no_value_replacement: "",
-      wrap_table_cells: false,
-      table_transpose: false,
-      table_dynamic_columns: false,
-      base_map: {
-        type: "osm",
-      },
-      map_view: {
-        zoom: 1,
-        lat: 0,
-        lng: 0,
-      },
-      // Custom chart options for alert preview to prevent tooltip clipping
-      custom_chart_options: {
-        tooltip: {
-          appendToBody: true,
-          confine: false,
-        },
-      },
-      mark_line: [],
-    },
-    queryType: "sql",
-    queries: [
-      {
-        query: "",
-        customQuery: false,
-        query_fn: null,
-        fields: {
-          stream: "",
-          stream_type: "logs",
-          x: [],
-          y: [],
-          z: [],
-          breakdown: [],
-          filter: {
-            filterType: "group",
-            logicalOperator: "AND",
-            conditions: [],
-          },
-          latitude: null,
-          longitude: null,
-          weight: null,
-        },
-        config: {
-          promql_legend: "",
-          layer_type: "scatter",
-          weight_fixed: 1,
-          limit: 0,
-          // gauge min and max values
-          min: 0,
-          max: 100,
-          time_shift: [],
-        },
-      },
-    ],
-  },
-  layout: {
-    splitter: 20,
-    querySplitter: 20,
-    showQueryBar: false,
-    isConfigPanelOpen: false,
-    currentQueryIndex: 0,
-  },
-  meta: {
-    parsedQuery: "",
-    dragAndDrop: {
-      dragging: false,
-      dragElement: null,
-      dragSource: null,
-      dragSourceIndex: null,
-      currentDragArea: null,
-      targetDragIndex: null,
-    },
-    errors: {
-      queryErrors: [],
-    },
-    editorValue: "",
-    dateTime: { start_time: "", end_time: "" },
-    filterValue: <any>[],
-    stream: {
-      selectedStreamFields: [],
-      customQueryFields: [],
-      functions: [],
-      streamResults: <any>[],
-      filterField: "",
-    },
-  },
-});
 
 let dashboardPanelData: any = null;
 
@@ -200,8 +92,12 @@ const props = defineProps({
 // Strip axis labels from field config so ECharts doesn't render axis titles
 // and the grid margins shrink accordingly (hasXAxisName/hasYAxisName become false)
 const clearFieldLabels = (data: any) => {
-  data.queries[0].fields.x.forEach((f: any) => { f.label = ""; });
-  data.queries[0].fields.y.forEach((f: any) => { f.label = ""; });
+  data.queries[0].fields.x.forEach((f: any) => {
+    f.label = "";
+  });
+  data.queries[0].fields.y.forEach((f: any) => {
+    f.label = "";
+  });
 };
 
 // Helper function to get decoded VRL function
@@ -216,22 +112,18 @@ const getDecodedVrlFunction = (): string | null => {
 onBeforeMount(() => {
   dashboardPanelData = reactive({ ...getDefaultDashboardPanelData() });
   dashboardPanelData.data.type = "line";
-  dashboardPanelData.data.queryType =
-    props.selectedTab === "promql" ? "promql" : "sql";
+  dashboardPanelData.data.queryType = props.selectedTab === "promql" ? "promql" : "sql";
   dashboardPanelData.data.queries[0].query = props.query;
   // VRL function is only supported in SQL mode
   dashboardPanelData.data.queries[0].vrlFunctionQuery =
     props.selectedTab === "sql" ? getDecodedVrlFunction() : null;
   // Enable dynamic columns when VRL function is present
   dashboardPanelData.data.config.table_dynamic_columns =
-    props.selectedTab === "sql" && props.formData.query_condition?.vrl_function
-      ? true
-      : false;
+    props.selectedTab === "sql" && props.formData.query_condition?.vrl_function ? true : false;
   // Give y-axis labels enough room so they don't collide with the chart
-  dashboardPanelData.data.config.unit = "numbers"
+  dashboardPanelData.data.config.unit = "numbers";
   dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
-  dashboardPanelData.data.queries[0].fields.stream_type =
-    props.formData.stream_type;
+  dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
   dashboardPanelData.data.queries[0].customQuery = true;
 });
 
@@ -243,7 +135,7 @@ const evaluationStatus = ref<{
   wouldTrigger: boolean;
   reason: string;
 } | null>(null);
-useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
@@ -262,9 +154,7 @@ const shouldUseHistogram = computed(() => {
 
 // When aggregation is enabled use "dashboards" search type so the panel does not
 // add histogram-specific query params (zo_sql_min_time / zo_sql_max_time etc.)
-const searchTypeForPanel = computed(() =>
-  props.isAggregationEnabled ? "dashboards" : "UI",
-);
+const searchTypeForPanel = computed(() => (props.isAggregationEnabled ? "dashboards" : "UI"));
 
 // Clean the aggregation query for preview:
 //  • Remove HAVING clause (added by alert engine, irrelevant for chart)
@@ -274,57 +164,6 @@ const searchTypeForPanel = computed(() =>
 //  • Ensure histogram(_timestamp) AS zo_sql_key is in SELECT and GROUP BY
 //  • Move zo_sql_num immediately after zo_sql_key in the SELECT list so the
 //    field order is: zo_sql_key, zo_sql_num, <breakdown fields…>
-const cleanAggregationQuery = (query: string): string => {
-  let cleaned = query;
-  // Remove HAVING clause (and everything after it)
-  cleaned = cleaned.replace(/\s+HAVING\s+[\s\S]*$/gi, "");
-  // Remove zo_sql_min_time and zo_sql_max_time from SELECT list
-  cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_min_time/g, "");
-  cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_max_time/g, "");
-  // Rename aggregation value aliases to zo_sql_num
-  cleaned = cleaned.replace(/\bzo_sql_val\b/g, "zo_sql_num");
-  cleaned = cleaned.replace(/\balert_agg_value\b/g, "zo_sql_num");
-  // Ensure histogram(...) is aliased as zo_sql_key
-  cleaned = cleaned.replace(
-    /\bhistogram\s*\([^)]+\)(?:\s+[aA][sS]\s+\w+)?/g,
-    (match) => {
-      if (/\bas\s+zo_sql_key\b/i.test(match)) return match;
-      return match.replace(/\s+[aA][sS]\s+\w+$/, "") + " AS zo_sql_key";
-    },
-  );
-  // If zo_sql_key is still absent, inject histogram(_timestamp) AS zo_sql_key
-  if (!/\bzo_sql_key\b/i.test(cleaned)) {
-    cleaned = cleaned.replace(
-      /\bSELECT\s+/i,
-      "SELECT histogram(_timestamp) AS zo_sql_key, ",
-    );
-    if (/\bGROUP\s+BY\s+/i.test(cleaned)) {
-      // Existing GROUP BY — prepend zo_sql_key to it
-      cleaned = cleaned.replace(/\bGROUP\s+BY\s+/i, "GROUP BY zo_sql_key, ");
-    } else {
-      // No GROUP BY at all — append one before ORDER BY / LIMIT or at end
-      if (/\bORDER\s+BY\b/i.test(cleaned)) {
-        cleaned = cleaned.replace(/\bORDER\s+BY\b/i, "GROUP BY zo_sql_key ORDER BY");
-      } else if (/\bLIMIT\b/i.test(cleaned)) {
-        cleaned = cleaned.replace(/\bLIMIT\b/i, "GROUP BY zo_sql_key LIMIT");
-      } else {
-        cleaned += " GROUP BY zo_sql_key";
-      }
-    }
-  }
-  // Move zo_sql_num field to sit right after zo_sql_key in the SELECT list.
-  // Pattern: remove ", <expr> AS zo_sql_num" from wherever it is, then
-  // re-insert it immediately after the zo_sql_key field expression.
-  const numFieldMatch = cleaned.match(/,\s*([^,]+?\s+[aA][sS]\s+zo_sql_num)/);
-  if (numFieldMatch) {
-    const numExpr = numFieldMatch[1].trim();
-    // Remove the original occurrence (with its leading comma)
-    cleaned = cleaned.replace(numFieldMatch[0], "");
-    // Insert right after zo_sql_key field (before the next comma or FROM)
-    cleaned = cleaned.replace(/(\bzo_sql_key\b(?:\s*\))?)/i, `$1, ${numExpr}`);
-  }
-  return cleaned.trim();
-};
 
 // Determine chart type based on result schema from API
 const determineChartType = (extractedFields: {
@@ -357,10 +196,7 @@ const determineChartType = (extractedFields: {
   }
 
   // If we have group by without time series, use line chart
-  if (
-    extractedFields.group_by.length > 0 &&
-    extractedFields.group_by.length <= 2
-  ) {
+  if (extractedFields.group_by.length > 0 && extractedFields.group_by.length <= 2) {
     return "line";
   }
 
@@ -483,9 +319,20 @@ const fetchQuerySchema = async () => {
         label: field,
       }));
 
-      const thresholdValue =
-        props.formData.query_condition?.aggregation?.having?.value ??
-        props.formData.trigger_condition?.threshold;
+      const aggregationCfg = props.formData.query_condition?.aggregation;
+      const hasHavingValue =
+        aggregationCfg?.having?.value !== undefined &&
+        aggregationCfg?.having?.value !== null &&
+        aggregationCfg?.having?.value !== "";
+      const thresholdValue = hasHavingValue
+        ? aggregationCfg.having.value
+        : props.formData.trigger_condition?.threshold;
+      // Warning must come from the same threshold family as the critical value
+      // (aggregate value vs row count) — mixing the two would draw a line on
+      // the wrong scale.
+      const warningValue = hasHavingValue
+        ? aggregationCfg?.warning_value
+        : props.formData.trigger_condition?.warning_threshold;
 
       dashboardPanelData.data.type = "line";
       dashboardPanelData.data.queryType = "sql";
@@ -493,10 +340,8 @@ const fetchQuerySchema = async () => {
       dashboardPanelData.data.queries[0].query = queryForPreview;
       dashboardPanelData.data.queries[0].vrlFunctionQuery = null;
       dashboardPanelData.data.config.table_dynamic_columns = false;
-      dashboardPanelData.data.queries[0].fields.stream =
-        props.formData.stream_name;
-      dashboardPanelData.data.queries[0].fields.stream_type =
-        props.formData.stream_type;
+      dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
+      dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
       dashboardPanelData.data.queries[0].fields.x = [
         {
           alias: "zo_sql_key",
@@ -508,7 +353,9 @@ const fetchQuerySchema = async () => {
       const aggFunction = props.formData.query_condition?.aggregation?.function || "";
       const aggColumn = props.formData.query_condition?.aggregation?.having?.column || "";
       const yLabel = aggColumn
-        ? aggFunction ? `${aggFunction}(${aggColumn})` : aggColumn
+        ? aggFunction
+          ? `${aggFunction}(${aggColumn})`
+          : aggColumn
         : "zo_sql_num";
 
       dashboardPanelData.data.queries[0].fields.y = [
@@ -521,13 +368,10 @@ const fetchQuerySchema = async () => {
       ];
       dashboardPanelData.data.queries[0].fields.z = [];
       dashboardPanelData.data.queries[0].fields.breakdown = breakdown;
-      dashboardPanelData.data.config.mark_line = [
-        {
-          name: "Threshold",
-          type: "yAxis",
-          value: String(thresholdValue ?? ""),
-        },
-      ];
+      dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+        thresholdValue,
+        warningValue,
+      );
 
       if (
         !dashboardPanelData.data.queries[0].fields.filter ||
@@ -563,9 +407,7 @@ const fetchQuerySchema = async () => {
             streaming_output: false,
             streaming_id: null,
           },
-          ...(store.state.zoConfig.sql_base64_enabled
-            ? { encoding: "base64" }
-            : {}),
+          ...(store.state.zoConfig.sql_base64_enabled ? { encoding: "base64" } : {}),
         },
         page_type: props.formData.stream_type || "logs",
         is_streaming: false,
@@ -586,30 +428,21 @@ const fetchQuerySchema = async () => {
     // Set up the query
     dashboardPanelData.data.queries[0].customQuery = true;
     dashboardPanelData.data.queries[0].query = props.query;
-    dashboardPanelData.data.queries[0].vrlFunctionQuery =
-      getDecodedVrlFunction();
+    dashboardPanelData.data.queries[0].vrlFunctionQuery = getDecodedVrlFunction();
     // Enable dynamic columns when VRL function is present
-    dashboardPanelData.data.config.table_dynamic_columns = props.formData
-      .query_condition?.vrl_function
+    dashboardPanelData.data.config.table_dynamic_columns = props.formData.query_condition
+      ?.vrl_function
       ? true
       : false;
-    dashboardPanelData.data.queries[0].fields.stream =
-      props.formData.stream_name;
-    dashboardPanelData.data.queries[0].fields.stream_type =
-      props.formData.stream_type;
+    dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
+    dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
-    dashboardPanelData.data.config.mark_line = props.formData
-      .trigger_condition?.threshold
-      ? [
-          {
-            name: "Threshold",
-            type: "yAxis",
-            value: String(
-              props.formData.trigger_condition.threshold,
-            ),
-          },
-        ]
-      : [];
+    // Critical + optional Warning marklines (alerts_2.md Feature 1). Both are
+    // drawn so the two bands are visible on the preview, matching the mock.
+    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+      props.formData.trigger_condition?.threshold,
+      props.formData.trigger_condition?.warning_threshold,
+    );
 
     // Set the fields from schema
     dashboardPanelData.data.queries[0].fields.x = fields.x;
@@ -643,17 +476,14 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.type = "table";
     dashboardPanelData.data.queries[0].customQuery = true;
     dashboardPanelData.data.queries[0].query = props.query;
-    dashboardPanelData.data.queries[0].vrlFunctionQuery =
-      getDecodedVrlFunction();
+    dashboardPanelData.data.queries[0].vrlFunctionQuery = getDecodedVrlFunction();
     // Enable dynamic columns when VRL function is present
-    dashboardPanelData.data.config.table_dynamic_columns = props.formData
-      .query_condition?.vrl_function
+    dashboardPanelData.data.config.table_dynamic_columns = props.formData.query_condition
+      ?.vrl_function
       ? true
       : false;
-    dashboardPanelData.data.queries[0].fields.stream =
-      props.formData.stream_name;
-    dashboardPanelData.data.queries[0].fields.stream_type =
-      props.formData.stream_type;
+    dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
+    dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.queries[0].fields.x = [];
     dashboardPanelData.data.queries[0].fields.y = [];
@@ -682,9 +512,7 @@ const fetchQuerySchema = async () => {
 const handleChartDataUpdate = (resultMetaData: any) => {
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
-    console.warn(
-      "[PreviewAlert] No trigger_condition found, skipping evaluation",
-    );
+    console.warn("[PreviewAlert] No trigger_condition found, skipping evaluation");
     return;
   }
 
@@ -702,8 +530,7 @@ const handleChartDataUpdate = (resultMetaData: any) => {
 
       if (Array.isArray(firstQueryMetadata) && firstQueryMetadata.length > 0) {
         // Get the latest partition metadata (last element in array)
-        const latestPartition =
-          firstQueryMetadata[firstQueryMetadata.length - 1];
+        const latestPartition = firstQueryMetadata[firstQueryMetadata.length - 1];
 
         // Determine result count based on query mode
         // Custom builder with aggregation: re-aggregate per group across time buckets
@@ -712,23 +539,32 @@ const handleChartDataUpdate = (resultMetaData: any) => {
         // SQL mode uses simple row count (trigger = "did SQL return >= N rows?")
         if (props.selectedTab === "custom" && props.isAggregationEnabled) {
           const havingValue = props.formData.query_condition?.aggregation?.having?.value;
-          const havingOperator = props.formData.query_condition?.aggregation?.having?.operator || ">=";
+          const havingOperator =
+            props.formData.query_condition?.aggregation?.having?.operator || ">=";
           const aggFunction = props.formData.query_condition?.aggregation?.function || "avg";
-          const groupByFields: string[] = (props.formData.query_condition?.aggregation?.group_by || [])
-            .filter((f: string) => f && f.trim() !== "");
+          const groupByFields: string[] = (
+            props.formData.query_condition?.aggregation?.group_by || []
+          ).filter((f: string) => f && f.trim() !== "");
           const numHaving = havingValue != null && havingValue !== "" ? Number(havingValue) : null;
 
           const passesHaving = (val: number): boolean => {
             if (numHaving === null) return true;
             switch (havingOperator) {
-              case ">=": return val >= numHaving;
-              case ">":  return val > numHaving;
-              case "<=": return val <= numHaving;
-              case "<":  return val < numHaving;
+              case ">=":
+                return val >= numHaving;
+              case ">":
+                return val > numHaving;
+              case "<=":
+                return val <= numHaving;
+              case "<":
+                return val < numHaving;
               case "=":
-              case "==": return val === numHaving;
-              case "!=": return val !== numHaving;
-              default:   return val >= numHaving;
+              case "==":
+                return val === numHaving;
+              case "!=":
+                return val !== numHaving;
+              default:
+                return val >= numHaving;
             }
           };
 
@@ -753,12 +589,20 @@ const handleChartDataUpdate = (resultMetaData: any) => {
             for (const values of groupMap.values()) {
               let aggVal: number;
               switch (aggFunction) {
-                case "min":    aggVal = Math.min(...values); break;
-                case "max":    aggVal = Math.max(...values); break;
+                case "min":
+                  aggVal = Math.min(...values);
+                  break;
+                case "max":
+                  aggVal = Math.max(...values);
+                  break;
                 case "sum":
-                case "count":  aggVal = values.reduce((a, b) => a + b, 0); break;
+                case "count":
+                  aggVal = values.reduce((a, b) => a + b, 0);
+                  break;
                 case "avg":
-                default:       aggVal = values.reduce((a, b) => a + b, 0) / values.length; break;
+                default:
+                  aggVal = values.reduce((a, b) => a + b, 0) / values.length;
+                  break;
               }
               if (passesHaving(aggVal)) resultCount++;
             }
@@ -767,25 +611,43 @@ const handleChartDataUpdate = (resultMetaData: any) => {
             const values = allHits.map((h: any) => Number(h.zo_sql_num ?? h.alert_agg_value ?? 0));
             let aggVal: number;
             switch (aggFunction) {
-              case "min":    aggVal = Math.min(...values); break;
-              case "max":    aggVal = Math.max(...values); break;
+              case "min":
+                aggVal = Math.min(...values);
+                break;
+              case "max":
+                aggVal = Math.max(...values);
+                break;
               case "sum":
-              case "count":  aggVal = values.reduce((a, b) => a + b, 0); break;
+              case "count":
+                aggVal = values.reduce((a, b) => a + b, 0);
+                break;
               case "avg":
-              default:       aggVal = values.reduce((a, b) => a + b, 0) / values.length; break;
+              default:
+                aggVal = values.reduce((a, b) => a + b, 0) / values.length;
+                break;
             }
             if (passesHaving(aggVal)) resultCount = 1;
           }
 
           // Fallback: if no hits available, use total row count
-          if (resultCount === 0 && allHits.length === 0 && firstQueryMetadata.some((p: any) => p?.total !== undefined)) {
-            resultCount = firstQueryMetadata.reduce((sum: number, p: any) => sum + (p?.total || 0), 0);
+          if (
+            resultCount === 0 &&
+            allHits.length === 0 &&
+            firstQueryMetadata.some((p: any) => p?.total !== undefined)
+          ) {
+            resultCount = firstQueryMetadata.reduce(
+              (sum: number, p: any) => sum + (p?.total || 0),
+              0,
+            );
           }
         }
         // SQL mode: trigger = "SQL returned >= N rows", so count total rows returned
         else if (props.selectedTab === "sql") {
           if (firstQueryMetadata.some((p: any) => p?.total !== undefined)) {
-            resultCount = firstQueryMetadata.reduce((sum: number, p: any) => sum + (p?.total || 0), 0);
+            resultCount = firstQueryMetadata.reduce(
+              (sum: number, p: any) => sum + (p?.total || 0),
+              0,
+            );
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
           }
@@ -798,33 +660,20 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           // 2. OR count data points above/below threshold - for "value" alerts
 
           // Check if we have PromQL result structure
-          if (
-            latestPartition?.result &&
-            Array.isArray(latestPartition.result)
-          ) {
+          if (latestPartition?.result && Array.isArray(latestPartition.result)) {
             // Count the number of time series
             resultCount = latestPartition.result.length;
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
-          } else if (
-            firstQueryMetadata.some(
-              (partition: any) => partition?.total !== undefined,
-            )
-          ) {
+          } else if (firstQueryMetadata.some((partition: any) => partition?.total !== undefined)) {
             // Sum up total from all partitions for PromQL fallback
-            resultCount = firstQueryMetadata.reduce(
-              (sum: number, partition: any) => {
-                return sum + (partition?.total || 0);
-              },
-              0,
-            );
+            resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
+              return sum + (partition?.total || 0);
+            }, 0);
           }
         }
         // Custom mode without aggregations: sum zo_sql_num from all partitions
-        else if (
-          props.selectedTab === "custom" &&
-          !props.isAggregationEnabled
-        ) {
+        else if (props.selectedTab === "custom" && !props.isAggregationEnabled) {
           // Iterate through ALL partitions to sum zo_sql_num values
           for (const partition of firstQueryMetadata) {
             if (Array.isArray(partition?.hits)) {
@@ -839,17 +688,10 @@ const handleChartDataUpdate = (resultMetaData: any) => {
         // Fallback for any other modes (traces, logs without aggregation, etc.)
         else {
           // Sum up total from all partitions instead of just taking the last one
-          if (
-            firstQueryMetadata.some(
-              (partition: any) => partition?.total !== undefined,
-            )
-          ) {
-            resultCount = firstQueryMetadata.reduce(
-              (sum: number, partition: any) => {
-                return sum + (partition?.total || 0);
-              },
-              0,
-            );
+          if (firstQueryMetadata.some((partition: any) => partition?.total !== undefined)) {
+            resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
+              return sum + (partition?.total || 0);
+            }, 0);
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
           } else {
@@ -911,9 +753,7 @@ const handleSeriesDataUpdate = (seriesData: any) => {
 
 // Separate function to evaluate and set status based on result count
 const evaluateAndSetStatus = (resultCount: number) => {
-  const isRealTime =
-    props.formData.is_real_time === "true" ||
-    props.formData.is_real_time === true;
+  const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
 
   // Use the configured trigger condition threshold values
   const threshold = props.formData.trigger_condition?.threshold || 0;
@@ -995,9 +835,7 @@ const refreshData = () => {
 
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
-    console.warn(
-      "[PreviewAlert] No trigger_condition found, skipping refreshData",
-    );
+    console.warn("[PreviewAlert] No trigger_condition found, skipping refreshData");
     return;
   }
 
@@ -1008,8 +846,7 @@ const refreshData = () => {
   // Priority order for time range:
   // 1. Use env variable ZO_ALERT_PREVIEW_TIMERANGE_MINUTES if set and > 0
   // 2. Fall back to alert period
-  const previewTimerangeMinutes =
-    store.state.zoConfig.alert_preview_timerange_minutes || 0;
+  const previewTimerangeMinutes = store.state.zoConfig.alert_preview_timerange_minutes || 0;
   let new_relative_time;
 
   if (previewTimerangeMinutes > 0) {
@@ -1037,7 +874,7 @@ const refreshData = () => {
   ];
 
   let yAxis: Array<{
-    label: string;
+    label: I18nText;
     alias: string;
     column: string;
     color: string | null;
@@ -1064,20 +901,17 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].fields.y = [];
     dashboardPanelData.data.queries[0].fields.z = [];
     dashboardPanelData.data.queries[0].fields.breakdown = [];
-    dashboardPanelData.data.queries[0].fields.stream =
-      props.formData.stream_name;
-    dashboardPanelData.data.queries[0].fields.stream_type =
-      props.formData.stream_type;
+    dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
+    dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queries[0].config.promql_mode = true;
     dashboardPanelData.data.queryType = "promql";
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
     // Add threshold mark line from promql_condition
-    const promqlThreshold = props.formData.query_condition?.promql_condition?.value;
-    dashboardPanelData.data.config.mark_line =
-      promqlThreshold !== undefined && promqlThreshold !== null && promqlThreshold !== ""
-        ? [{ name: "Threshold", type: "yAxis", value: String(promqlThreshold) }]
-        : [];
+    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+      props.formData.query_condition?.promql_condition?.value,
+      props.formData.query_condition?.promql_warning_value,
+    );
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
@@ -1106,7 +940,7 @@ const refreshData = () => {
     // Configure y-axis for zo_sql_num (counts)
     yAxis = [
       {
-        label: "count",
+        label: raw("count"),
         alias: "zo_sql_num",
         column: "zo_sql_num",
         color: "#5960b2",
@@ -1121,24 +955,14 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].query = props.query;
     dashboardPanelData.data.queries[0].vrlFunctionQuery = null; // VRL not supported in custom mode
     dashboardPanelData.data.config.table_dynamic_columns = false; // VRL not supported in custom mode
-    dashboardPanelData.data.queries[0].fields.stream =
-      props.formData.stream_name;
-    dashboardPanelData.data.queries[0].fields.stream_type =
-      props.formData.stream_type;
-    const thresholdValue =
-      props.formData.trigger_condition?.threshold;
-
+    dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
+    dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.type = "line"; // Line chart for histogram
-    dashboardPanelData.data.config.mark_line = thresholdValue
-      ? [
-          {
-            name: "Threshold",
-            type: "yAxis",
-            value: String(thresholdValue),
-          },
-        ]
-      : [];
+    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+      props.formData.trigger_condition?.threshold,
+      props.formData.trigger_condition?.warning_threshold,
+    );
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
@@ -1156,22 +980,17 @@ const refreshData = () => {
   dashboardPanelData.data.queries[0].fields.y = yAxis;
   dashboardPanelData.data.queries[0].fields.breakdown = [];
 
-  dashboardPanelData.data.queries[0].customQuery =
-    props.selectedTab === "custom";
+  dashboardPanelData.data.queries[0].customQuery = props.selectedTab === "custom";
   dashboardPanelData.data.queries[0].query = props.query;
   // VRL function is only supported in SQL mode
   dashboardPanelData.data.queries[0].vrlFunctionQuery =
     props.selectedTab === "sql" ? getDecodedVrlFunction() : null;
   // Enable dynamic columns when VRL function is present
   dashboardPanelData.data.config.table_dynamic_columns =
-    props.selectedTab === "sql" && props.formData.query_condition?.vrl_function
-      ? true
-      : false;
+    props.selectedTab === "sql" && props.formData.query_condition?.vrl_function ? true : false;
   dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
-  dashboardPanelData.data.queries[0].fields.stream_type =
-    props.formData.stream_type;
-  dashboardPanelData.data.queryType =
-    props.selectedTab === "promql" ? "promql" : "sql";
+  dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
+  dashboardPanelData.data.queryType = props.selectedTab === "promql" ? "promql" : "sql";
 
   // Update both refs together
   // Note: Updating both chartData and selectedTimeObj may trigger two separate watchers
@@ -1231,16 +1050,12 @@ watch(
     }
 
     // Check if aggregation is enabled but required fields are missing
-    if (
-      props.isAggregationEnabled &&
-      props.formData.query_condition?.aggregation
-    ) {
+    if (props.isAggregationEnabled && props.formData.query_condition?.aggregation) {
       const hasColumn =
         props.formData.query_condition.aggregation.having?.column &&
         props.formData.query_condition.aggregation.having.column.trim() !== "";
       const hasValue =
-        props.formData.query_condition.aggregation.having?.value !==
-          undefined &&
+        props.formData.query_condition.aggregation.having?.value !== undefined &&
         props.formData.query_condition.aggregation.having.value !== null &&
         props.formData.query_condition.aggregation.having.value !== "";
 
@@ -1283,4 +1098,3 @@ const resizeChart = async () => {
 // The watcher internally still uses refreshDataOnce to prevent duplicate calls on rapid prop changes.
 defineExpose({ refreshData, resizeChart, evaluationStatus });
 </script>
-

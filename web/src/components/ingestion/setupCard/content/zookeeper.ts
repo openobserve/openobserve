@@ -17,6 +17,8 @@
 // https://openobserve.ai/blog/how-to-monitor-zookeeper-with-openteletemtry
 // (zookeeper receiver). No monitoring user needed.
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants } from "./otelShared";
@@ -42,46 +44,64 @@ export default function zookeeperCard(subs: CardSubstitutions): RichCardContent 
   return {
     provider: {
       name: "Zookeeper",
-      tagline:
-        "Collect Zookeeper metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.zookeeperTagline"),
       logo: getImageURL("images/ingestion/zookeeper.png"),
       tone: "#FF9900",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       collectorInstallStep(),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variantGroup: "os",
         variantToggle: false,
         inputs: [
-          { id: "host", label: "Zookeeper Host", default: "localhost", placeholder: "localhost" },
-          { id: "port", label: "Port", default: "2181", placeholder: "2181", width: "sm" },
+          {
+            id: "host",
+            labelKey: "ingestion.setupCard.zookeeperHostLabel",
+            default: "localhost",
+            placeholder: raw("localhost"),
+          },
+          {
+            id: "port",
+            labelKey: "ingestion.setupCard.portLabel",
+            default: "2181",
+            placeholder: raw("2181"),
+            width: "sm",
+          },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector.",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: { lang: "bash", raw: "./otelcol-contrib --config ./config.yaml" },
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `zookeeper_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyZookeeperMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Connections", "Latency", "Outstanding Requests", "Watches", "Znodes"],
+        // ZooKeeper `mntr` stat names (zookeeper.connection.active,
+        // zookeeper.latency.avg, zookeeper.request.active, zookeeper.watch.count,
+        // zookeeper.znode.count) — untranslated so the pills match the data.
+        pills: [
+          raw("Connections"),
+          raw("Latency"),
+          raw("Outstanding Requests"),
+          raw("Watches"),
+          raw("Znodes"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "zookeeper", filter: "" },

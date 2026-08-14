@@ -57,9 +57,13 @@ vi.mock("@/composables/useChatHistory", () => ({
   })),
 }));
 
+// vi.hoisted, not a plain const: O2AIChat.vue destructures useAiChat() at module
+// scope, so the factory runs during import.
+const { mockFetchAiChat } = vi.hoisted(() => ({ mockFetchAiChat: vi.fn() }));
+
 vi.mock("@/composables/useAiChat", () => ({
   default: vi.fn(() => ({
-    fetchAiChat: vi.fn(),
+    fetchAiChat: mockFetchAiChat,
     submitFeedback: vi.fn().mockResolvedValue(true),
     registerAiChatHandler: vi.fn(),
     removeAiChatHandler: vi.fn(),
@@ -110,34 +114,21 @@ vi.mock("@/composables/contextProviders", () => ({
 // Component import must come after all vi.mock() declarations.
 import O2AIChat from "./O2AIChat.vue";
 
-
 // ── Stub definitions ─────────────────────────────────────────────────────────
 
 const stubs = {
   RichTextInput: {
-    template: "<div data-test=\"rich-text-input\" />",
-    props: [
-      "modelValue",
-      "placeholder",
-      "disabled",
-      "theme",
-      "references",
-      "borderless",
-    ],
-    emits: [
-      "update:modelValue",
-      "keydown",
-      "submit",
-      "update:references",
-    ],
+    template: '<div data-test="rich-text-input" />',
+    props: ["modelValue", "placeholder", "disabled", "theme", "references", "borderless"],
+    emits: ["update:modelValue", "keydown", "submit", "update:references"],
   },
   ConfirmDialog: {
-    template: "<div data-test=\"confirm-dialog\" />",
+    template: '<div data-test="confirm-dialog" />',
     props: ["modelValue", "title", "message"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
   },
   O2AIConfirmDialog: {
-    template: "<div data-test=\"o2-ai-confirm-dialog\" />",
+    template: '<div data-test="o2-ai-confirm-dialog" />',
     props: ["visible", "confirmation"],
     emits: ["confirm", "cancel", "always-confirm"],
   },
@@ -147,12 +138,12 @@ const stubs = {
   ODialog: {
     name: "ODialog",
     template:
-      "<div data-test=\"o-dialog\" v-if=\"open\">" +
-      "<div data-test=\"o-dialog-title\">{{ title }}</div>" +
-      "<div data-test=\"o-dialog-body\"><slot /></div>" +
-      "<button data-test=\"o-dialog-primary\" @click=\"$emit('click:primary')\">{{ primaryButtonLabel }}</button>" +
-      "<button data-test=\"o-dialog-secondary\" @click=\"$emit('click:secondary')\">{{ secondaryButtonLabel }}</button>" +
-      "<button data-test=\"o-dialog-close\" @click=\"$emit('update:open', false)\">x</button>" +
+      '<div data-test="o-dialog" v-if="open">' +
+      '<div data-test="o-dialog-title">{{ title }}</div>' +
+      '<div data-test="o-dialog-body"><slot /></div>' +
+      '<button data-test="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primaryButtonLabel }}</button>' +
+      '<button data-test="o-dialog-secondary" @click="$emit(\'click:secondary\')">{{ secondaryButtonLabel }}</button>' +
+      '<button data-test="o-dialog-close" @click="$emit(\'update:open\', false)">x</button>' +
       "</div>",
     props: [
       "open",
@@ -175,22 +166,17 @@ const stubs = {
       "secondaryButtonLoading",
       "neutralButtonLoading",
     ],
-    emits: [
-      "update:open",
-      "click:primary",
-      "click:secondary",
-      "click:neutral",
-    ],
+    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   },
   // Stub ODrawer with the same surface (default slot, v-model:open) so the
   // History drawer can be asserted without pulling in the real component.
   ODrawer: {
     name: "ODrawer",
     template:
-      "<div data-test=\"o-drawer\" v-if=\"open\">" +
-      "<div data-test=\"o-drawer-title\">{{ title }}</div>" +
-      "<div data-test=\"o-drawer-body\"><slot /></div>" +
-      "<button data-test=\"o-drawer-close\" @click=\"$emit('update:open', false)\">x</button>" +
+      '<div data-test="o-drawer" v-if="open">' +
+      '<div data-test="o-drawer-title">{{ title }}</div>' +
+      '<div data-test="o-drawer-body"><slot /></div>' +
+      '<button data-test="o-drawer-close" @click="$emit(\'update:open\', false)">x</button>' +
       "</div>",
     props: [
       "open",
@@ -204,12 +190,7 @@ const stubs = {
       "secondaryButtonLabel",
       "neutralButtonLabel",
     ],
-    emits: [
-      "update:open",
-      "click:primary",
-      "click:secondary",
-      "click:neutral",
-    ],
+    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   },
 };
 
@@ -529,9 +510,7 @@ describe("O2AIChat", () => {
       expect(drawer.props("open")).toBe(true);
       expect(drawer.props("title")).toBe("Chat History");
       expect(drawer.props("size")).toBe("sm");
-      expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe(
-        "Chat History",
-      );
+      expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe("Chat History");
     });
 
     it("should close the drawer when update:open is emitted with false", async () => {
@@ -646,11 +625,7 @@ describe("O2AIChat", () => {
       // The image preview dialog has no primary/secondary labels.
       return wrapper
         .findAllComponents({ name: "ODialog" })
-        .find(
-          (d) =>
-            d.props("size") === "lg" &&
-            d.props("primaryButtonLabel") === undefined,
-        );
+        .find((d) => d.props("size") === "lg" && d.props("primaryButtonLabel") === undefined);
     }
 
     it("should not render the image preview dialog when showImagePreview is false", async () => {
@@ -762,6 +737,228 @@ describe("O2AIChat", () => {
         identifier: "default",
         user_email: "example@gmail.com",
         subscription_type: "",
+      });
+    });
+  });
+  describe("session restore (HA)", () => {
+    // A session lives on one o2-ai replica. When that replica can no longer serve
+    // it, the UI restores the transcript into a fresh session.
+
+    describe("isSessionOwnerUnavailable", () => {
+      it("should detect the code nested under detail (FastAPI shape)", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const fn = (wrapper.vm as any).isSessionOwnerUnavailable;
+        expect(fn({ detail: { code: "session_owner_unavailable" } })).toBe(true);
+      });
+
+      it("should detect the code at the top level", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const fn = (wrapper.vm as any).isSessionOwnerUnavailable;
+        expect(fn({ code: "session_owner_unavailable" })).toBe(true);
+      });
+
+      it("should NOT treat other failures as a lost session", () => {
+        // Restoring abandons the current session, so anything short of the
+        // explicit server code must not trigger it.
+        wrapper = mountO2AIChat({ isOpen: true });
+        const fn = (wrapper.vm as any).isSessionOwnerUnavailable;
+        expect(fn({ detail: { code: "some_other_error" } })).toBe(false);
+        expect(fn({ message: "Server error (503)" })).toBe(false);
+        expect(fn({})).toBe(false);
+        expect(fn(null)).toBe(false);
+        expect(fn(undefined)).toBe(false);
+      });
+    });
+
+    describe("sendConfirmation", () => {
+      it("should report success when the confirmation is accepted", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+
+        const ok = await (wrapper.vm as any).sendConfirmation("sess-1", true);
+
+        expect(ok).toBe(true);
+        expect((wrapper.vm as any).chatMessages).toHaveLength(0);
+      });
+
+      it("should surface a 404 instead of silently reporting success", async () => {
+        // The bug the .ok check exists for: a dropped confirmation looked
+        // identical to an accepted one while the agent auto-denied.
+        wrapper = mountO2AIChat({ isOpen: true });
+        global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+
+        const ok = await (wrapper.vm as any).sendConfirmation("sess-1", true);
+
+        expect(ok).toBe(false);
+        const msgs = (wrapper.vm as any).chatMessages;
+        expect(msgs.length).toBeGreaterThan(0);
+        expect(msgs[msgs.length - 1].contentBlocks[0].type).toBe("error");
+      });
+
+      it("should surface a network failure", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        global.fetch = vi.fn().mockRejectedValue(new Error("network down"));
+
+        const ok = await (wrapper.vm as any).sendConfirmation("sess-1", false);
+
+        expect(ok).toBe(false);
+        expect((wrapper.vm as any).chatMessages.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe("streamOwnerUnavailable lifecycle", () => {
+      // A turn that throws or is aborted skips the clear at the end of the try
+      // block, so sendMessage clears the flag on entry instead.
+
+      it("should clear a stale flag on entry, even when the turn fails early", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+
+        // Left over from a previous turn that threw after an owner-unavailable.
+        vm.streamOwnerUnavailable = true;
+
+        // Fail before the stream opens — fetchAiChat returns null on a network
+        // error, the earliest realistic exit.
+        mockFetchAiChat.mockResolvedValueOnce(null);
+        vm.inputMessage = "how many errors today";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(vm.streamOwnerUnavailable).toBe(false);
+      });
+
+      it("should not restore a healthy session because of a previous turn's flag", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+
+        const sessionId = "11111111-1111-7111-8111-111111111111";
+        vm.currentSessionId = sessionId;
+        vm.streamOwnerUnavailable = true;
+
+        // Immediately-closed but clean, so the turn reaches the restore check.
+        // An early failure would exit first and pass for the wrong reason.
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: true,
+          body: {
+            getReader: () => ({
+              read: () => Promise.resolve({ done: true, value: undefined }),
+              releaseLock: () => {},
+              cancel: () => Promise.resolve(),
+            }),
+          },
+        });
+        vm.inputMessage = "follow-up question";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        // Exactly one request: the stale flag must not trigger a restoring
+        // second one, which would also have replaced the session id.
+        expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
+        expect(vm.currentSessionId).toBe(sessionId);
+      });
+    });
+
+    describe("restore and detached streams", () => {
+      // A detached turn keeps writing to the array it captured, but must not
+      // restore — chatMessages.value now points at a different conversation.
+
+      /** A reader that reports an owner-unavailable stream, then closes. */
+      const ownerLostReader = (vm: any, onRead?: () => void) => ({
+        getReader: () => ({
+          read: () => {
+            vm.streamOwnerUnavailable = true;
+            onRead?.();
+            return Promise.resolve({ done: true, value: undefined });
+          },
+          releaseLock: () => {},
+          cancel: () => Promise.resolve(),
+        }),
+      });
+
+      it("should restore when the turn is still the one on screen", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+        const original = "11111111-1111-7111-8111-111111111111";
+        vm.currentSessionId = original;
+
+        mockFetchAiChat
+          .mockResolvedValueOnce({ ok: true, body: ownerLostReader(vm) })
+          .mockResolvedValueOnce({
+            ok: true,
+            body: {
+              getReader: () => ({
+                read: () => Promise.resolve({ done: true, value: undefined }),
+                releaseLock: () => {},
+                cancel: () => Promise.resolve(),
+              }),
+            },
+          });
+        vm.inputMessage = "keep going";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        // Resent under a fresh id.
+        expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
+        expect(vm.currentSessionId).not.toBe(original);
+      });
+
+      it("should NOT restore into whichever chat the user switched to", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+        const original = "11111111-1111-7111-8111-111111111111";
+        vm.currentSessionId = original;
+
+        // Mid-stream the user opens another chat: loadChat replaces the array,
+        // which is how the component detects detachment elsewhere.
+        const otherChat = [{ role: "user", content: "a different conversation" }];
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: true,
+          body: ownerLostReader(vm, () => {
+            vm.chatMessages = otherChat;
+          }),
+        });
+        vm.inputMessage = "keep going";
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        // No resend, and the chat now on screen keeps its session id and
+        // transcript.
+        expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
+        expect(vm.currentSessionId).toBe(original);
+        expect(otherChat).toHaveLength(1);
+      });
+    });
+
+    describe("appendErrorBlock", () => {
+      it("should attach to the trailing assistant message", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        (wrapper.vm as any).chatMessages = [
+          { role: "user", content: "hi" },
+          { role: "assistant", content: "hello", contentBlocks: [] },
+        ];
+
+        (wrapper.vm as any).appendErrorBlock("something went wrong");
+
+        const msgs = (wrapper.vm as any).chatMessages;
+        expect(msgs).toHaveLength(2);
+        expect(msgs[1].contentBlocks).toHaveLength(1);
+        expect(msgs[1].contentBlocks[0].message).toBe("something went wrong");
+      });
+
+      it("should start a new assistant message when the last is from the user", () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        (wrapper.vm as any).chatMessages = [{ role: "user", content: "hi" }];
+
+        (wrapper.vm as any).appendErrorBlock("restored", true);
+
+        const msgs = (wrapper.vm as any).chatMessages;
+        expect(msgs).toHaveLength(2);
+        expect(msgs[1].role).toBe("assistant");
+        expect(msgs[1].contentBlocks[0].recoverable).toBe(true);
       });
     });
   });

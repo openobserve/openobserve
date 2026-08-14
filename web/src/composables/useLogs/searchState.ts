@@ -16,17 +16,13 @@
 import { reactive, ref, type Ref, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-// import { useI18n } from "vue-i18n";
-import type {
-  SearchRequestPayload,
-  ParsedSQLResult,
-} from "@/ts/interfaces";
+import { raw, type I18nText } from "@/types/i18n";
+import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
 import {
   DEFAULT_LOGS_CONFIG,
   DEFAULT_SEARCH_DEBUG_DATA,
   DEFAULT_SEARCH_AGG_DATA,
 } from "@/utils/logs/constants";
-
 
 // Cross-link definition returned by the backend cross-linking API.
 export interface CrossLinkField {
@@ -43,7 +39,7 @@ export interface CrossLink {
 export interface Transform {
   name?: string;
   function?: string;
-  content?: string;
+  content?: I18nText;
   id?: string;
   [key: string]: unknown;
 }
@@ -63,7 +59,7 @@ export interface ActionItem {
 }
 
 export interface RefreshTimeItem {
-  label: string;
+  label: I18nText;
   value: number;
 }
 
@@ -77,13 +73,34 @@ export interface SearchConfig {
   refreshTimes: RefreshTimeItem[][];
 }
 
+/**
+ * The values the histogram summary is built from, kept alongside the rendered
+ * sentence so a second view can present them differently.
+ *
+ * SearchResult's chips read THESE, never `chartParams.title` — parsing the title
+ * apart only worked while it was hardcoded English.
+ */
+export interface HistogramTitleParts {
+  start: number;
+  end: number;
+  /** Formatted, may carry a "+" suffix when the total is a lower bound. */
+  total: string;
+  took: number;
+  /** Logs mode only — "Scan Size" or its delta variant, already translated. */
+  scanLabel?: I18nText;
+  /** Logs mode only — formatted size, may carry the same "+" suffix. */
+  scanSize?: string;
+}
+
 export interface HistogramData {
   xData: number[];
   yData: number[];
   breakdownField: string | null;
   breakdownSeries: Map<string, number[]> | null;
   chartParams: {
-    title: string;
+    title: I18nText;
+    /** Structured source of `title`; null when there is nothing to summarise. */
+    titleParts: HistogramTitleParts | null;
     unparsed_x_data: unknown[];
     timezone: string;
   };
@@ -188,7 +205,12 @@ export interface SearchObjectData {
   highlightQuery: string;
   crossLinks: { stream_links: CrossLink[]; org_links: CrossLink[] };
   crossLinkQuery: string;
-  sqlSyntaxErrorRanges: Array<{ startLine: number; endLine: number; column?: number; error: string }>;
+  sqlSyntaxErrorRanges: Array<{
+    startLine: number;
+    endLine: number;
+    column?: number;
+    error: string;
+  }>;
 }
 
 export interface SearchObject {
@@ -213,9 +235,7 @@ export interface SearchObject {
 // Main search object containing all search state.
 // DEFAULT_LOGS_CONFIG is declared `as const`, so its readonly literal type does
 // not overlap with the mutable SearchObject interface; bridge via unknown.
-const searchObj = reactive(
-  Object.assign({}, DEFAULT_LOGS_CONFIG),
-) as unknown as SearchObject;
+const searchObj = reactive(Object.assign({}, DEFAULT_LOGS_CONFIG)) as unknown as SearchObject;
 
 // Debug data for search operations
 const searchObjDebug = reactive(Object.assign({}, DEFAULT_SEARCH_DEBUG_DATA));
@@ -251,7 +271,7 @@ const schemaRequestToken = ref(0);
 export const searchState = () => {
   const store = useStore();
   const router = useRouter();
-  // const { t } = useI18n();
+  // const { t } = useI18nTyped();
 
   // Field values reference
   const fieldValues = ref();
@@ -312,6 +332,7 @@ export const searchState = () => {
             breakdownSeries: null,
             chartParams: {
               title: "",
+              titleParts: null,
               unparsed_x_data: [],
               timezone: "",
             },
@@ -325,34 +346,24 @@ export const searchState = () => {
       await nextTick();
 
       // Restore cached query results and histogram data
-      searchObj.data.queryResults = JSON.parse(
-        JSON.stringify(state.data.queryResults),
-      );
-      searchObj.data.sortedQueryResults = JSON.parse(
-        JSON.stringify(state.data.sortedQueryResults),
-      );
+      searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
+      searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
       // Restore histogram — breakdownSeries was serialized as an entries array
       // (Map is not JSON-serializable), so reconstruct the Map here.
       const savedBreakdown = state.data.histogram.breakdownSeries;
       searchObj.data.histogram = {
-        ...JSON.parse(
-          JSON.stringify({ ...state.data.histogram, breakdownSeries: null }),
-        ),
-        breakdownSeries: Array.isArray(savedBreakdown)
-          ? new Map(savedBreakdown)
-          : null,
+        ...JSON.parse(JSON.stringify({ ...state.data.histogram, breakdownSeries: null })),
+        breakdownSeries: Array.isArray(savedBreakdown) ? new Map(savedBreakdown) : null,
       };
 
       await nextTick();
       return true;
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("Error while initializing logs state:", errorMessage);
 
       // Fallback to current organization and reset state
-      searchObj.organizationIdentifier =
-        store.state?.selectedOrganization?.identifier || "";
+      searchObj.organizationIdentifier = store.state?.selectedOrganization?.identifier || "";
       resetSearchObj();
       return true;
     } finally {
@@ -383,7 +394,8 @@ export const searchState = () => {
       breakdownField: null,
       breakdownSeries: null,
       chartParams: {
-        title: "",
+        title: raw(""),
+        titleParts: null,
         unparsed_x_data: [],
         timezone: "",
       },

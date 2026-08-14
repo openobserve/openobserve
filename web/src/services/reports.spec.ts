@@ -50,9 +50,7 @@ describe("reports service", () => {
 
       await reports.list(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports?`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/reports?`);
     });
 
     it("should include folder_id in query string when provided", async () => {
@@ -64,7 +62,7 @@ describe("reports service", () => {
       await reports.list(org_identifier, folder_id);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports?folder_id=${folder_id}`
+        `/api/${org_identifier}/reports?folder_id=${folder_id}`,
       );
     });
 
@@ -78,7 +76,7 @@ describe("reports service", () => {
       await reports.list(org_identifier, folder_id, dashboard_id);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports?dashboard_id=${dashboard_id}`
+        `/api/${org_identifier}/reports?dashboard_id=${dashboard_id}`,
       );
     });
 
@@ -93,7 +91,7 @@ describe("reports service", () => {
       await reports.list(org_identifier, folder_id, dashboard_id, cache);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports?cache=true`
+        `/api/${org_identifier}/reports?cache=true`,
       );
     });
 
@@ -108,7 +106,7 @@ describe("reports service", () => {
       await reports.list(org_identifier, folder_id, dashboard_id, cache);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports?folder_id=${folder_id}&dashboard_id=${dashboard_id}&cache=${cache}`
+        `/api/${org_identifier}/reports?folder_id=${folder_id}&dashboard_id=${dashboard_id}&cache=${cache}`,
       );
     });
 
@@ -123,7 +121,7 @@ describe("reports service", () => {
       await reports.list(org_identifier, folder_id, dashboard_id, cache);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports?folder_id=${folder_id}&dashboard_id=${dashboard_id}`
+        `/api/${org_identifier}/reports?folder_id=${folder_id}&dashboard_id=${dashboard_id}`,
       );
     });
 
@@ -149,7 +147,7 @@ describe("reports service", () => {
       await reports.getReport(org_identifier, reportName);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`
+        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
       );
     });
 
@@ -162,7 +160,7 @@ describe("reports service", () => {
       await reports.getReport(org_identifier, reportName);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/my%20report%20with%20spaces`
+        `/api/${org_identifier}/reports/my%20report%20with%20spaces`,
       );
     });
 
@@ -175,7 +173,7 @@ describe("reports service", () => {
       await reports.getReport(org_identifier, reportName);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`
+        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
       );
     });
   });
@@ -193,10 +191,7 @@ describe("reports service", () => {
 
       await reports.createReport(org_identifier, payload);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports`,
-        payload
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/${org_identifier}/reports`, payload);
     });
 
     it("should pass the payload as the POST body", async () => {
@@ -226,7 +221,7 @@ describe("reports service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${org_identifier}/reports/${encodeURIComponent(payload.name)}`,
-        payload
+        payload,
       );
     });
 
@@ -240,7 +235,7 @@ describe("reports service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${org_identifier}/reports/my%20report%20with%20spaces`,
-        payload
+        payload,
       );
     });
 
@@ -271,7 +266,7 @@ describe("reports service", () => {
       await reports.deleteReport(org_identifier, reportName);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`
+        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
       );
     });
 
@@ -284,7 +279,7 @@ describe("reports service", () => {
       await reports.deleteReport(org_identifier, reportName);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/report%20with%20spaces`
+        `/api/${org_identifier}/reports/report%20with%20spaces`,
       );
     });
   });
@@ -298,10 +293,9 @@ describe("reports service", () => {
 
       await reports.bulkDelete(org_identifier, data);
 
-      expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/bulk`,
-        { data }
-      );
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith(`/api/${org_identifier}/reports/bulk`, {
+        data,
+      });
     });
 
     it("should wrap the data in a data property for the DELETE config", async () => {
@@ -327,7 +321,7 @@ describe("reports service", () => {
       await reports.triggerReport(org_identifier, reportName);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/trigger`
+        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/trigger`,
       );
     });
 
@@ -340,7 +334,7 @@ describe("reports service", () => {
       await reports.triggerReport(org_identifier, reportName);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/daily%20report%20summary/trigger`
+        `/api/${org_identifier}/reports/daily%20report%20summary/trigger`,
       );
     });
   });
@@ -356,7 +350,7 @@ describe("reports service", () => {
       await reports.toggleReportState(org_identifier, reportName, state);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/enable?value=${state}`
+        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/enable?value=${state}`,
       );
     });
 
@@ -370,7 +364,7 @@ describe("reports service", () => {
       await reports.toggleReportState(org_identifier, reportName, state);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/enable?value=false`
+        `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/enable?value=false`,
       );
     });
 
@@ -384,7 +378,7 @@ describe("reports service", () => {
       await reports.toggleReportState(org_identifier, reportName, state);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${org_identifier}/reports/weekly%20report/enable?value=true`
+        `/api/${org_identifier}/reports/weekly%20report/enable?value=true`,
       );
     });
   });
@@ -408,18 +402,18 @@ describe("reports service", () => {
       const error = new Error("Validation error");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        reports.createReport("org123", { name: "bad-report" })
-      ).rejects.toThrow("Validation error");
+      await expect(reports.createReport("org123", { name: "bad-report" })).rejects.toThrow(
+        "Validation error",
+      );
     });
 
     it("should propagate errors from updateReport", async () => {
       const error = new Error("Conflict");
       mockHttpInstance.put.mockRejectedValue(error);
 
-      await expect(
-        reports.updateReport("org123", { name: "conflict-report" })
-      ).rejects.toThrow("Conflict");
+      await expect(reports.updateReport("org123", { name: "conflict-report" })).rejects.toThrow(
+        "Conflict",
+      );
     });
 
     it("should propagate errors from deleteReport", async () => {
@@ -440,9 +434,9 @@ describe("reports service", () => {
       const error = new Error("Server error");
       mockHttpInstance.put.mockRejectedValue(error);
 
-      await expect(
-        reports.toggleReportState("org123", "my-report", true)
-      ).rejects.toThrow("Server error");
+      await expect(reports.toggleReportState("org123", "my-report", true)).rejects.toThrow(
+        "Server error",
+      );
     });
   });
 });

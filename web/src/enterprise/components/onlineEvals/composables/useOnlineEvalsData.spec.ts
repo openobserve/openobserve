@@ -129,9 +129,7 @@ describe("useOnlineEvalsData — loadAll", () => {
 
   it("toggles isLoading true during the request and false at the end", async () => {
     let resolveProviders: (v: any) => void = () => {};
-    mockProvidersList.mockImplementation(
-      () => new Promise((res) => (resolveProviders = res)),
-    );
+    mockProvidersList.mockImplementation(() => new Promise((res) => (resolveProviders = res)));
     mockScoreConfigsList.mockResolvedValue([]);
     mockScorersList.mockResolvedValue([]);
     mockJobsList.mockResolvedValue([]);

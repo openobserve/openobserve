@@ -15,9 +15,7 @@ const props = defineProps<FormOptionGroupProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormOptionGroup] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormOptionGroup] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
@@ -37,9 +35,7 @@ if (import.meta.env.DEV && !form) {
           :size="props.size"
           :name="props.name"
           :model-value="field.state.value"
-          :error="
-            field.state.meta.errors.length > 0
-          "
+          :error="field.state.meta.errors.length > 0"
           @update:model-value="
             (v: OptionGroupValue) => {
               field.handleChange(v);
@@ -51,12 +47,7 @@ if (import.meta.env.DEV && !form) {
             <slot name="label" />
           </template>
         </OOptionGroup>
-        <div
-          v-if="
-            field.state.meta.errors.length > 0
-          "
-          class="text-xs text-option-group-error-text"
-        >
+        <div v-if="field.state.meta.errors.length > 0" class="text-option-group-error-text text-xs">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

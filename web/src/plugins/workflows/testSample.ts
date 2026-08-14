@@ -18,36 +18,36 @@
 // Derived from TRIGGER_META_VARS so the sample's `meta` keys stay in sync with
 // the Alert-Trigger schema reference. Shape matches a real alert firing (verified
 // against live payload):
-//   [ { meta: { ...fixed alert fields, all STRING values }, data: [ { ...rows } ] } ]
-// The `meta` block is a string:string map — even numeric fields (count,
-// threshold, period) and the microsecond-epoch timestamps are quoted strings.
-// `data[]` rows keep their native column types (the alert query's result rows).
+//   [ { meta: { ...fixed alert fields }, data: [ { ...rows } ] } ]
+// The `meta` block is a MIXED map: text fields are strings, but the numeric alert
+// fields (period, threshold, count) and the microsecond-epoch timestamps
+// (start/end time) arrive as real numbers — the backend now types them, so the
+// sample must too. `data[]` rows keep their native column types.
 import { TRIGGER_META_VARS } from "./alertFields";
 
 const SAMPLE_TS = 1700000000000000; // microsecond epoch, matches alert timestamps
 
 // A readable placeholder per meta field, keyed by the field name (ref minus the
-// "meta." prefix). All values are STRINGS to match the real payload. Falls back
-// to "" for anything unmapped.
-const NAMED_DEFAULTS: Record<string, string> = {
+// "meta." prefix). Numeric fields are numbers, text fields are strings — matching
+// the real payload's types. Falls back to "" for anything unmapped.
+const NAMED_DEFAULTS: Record<string, string | number> = {
   org_id: "default",
   stream_type: "logs",
   stream_name: "default",
   alert_name: "High Error Rate",
   alert_type: "scheduled",
   alert_operator: ">=",
-  alert_period: "10",
-  alert_threshold: "100",
-  alert_count: "137",
-  alert_start_time: String(SAMPLE_TS),
-  alert_end_time: String(SAMPLE_TS + 600000000),
+  alert_period: 10,
+  alert_threshold: 100,
+  alert_count: 137,
+  alert_start_time: SAMPLE_TS,
+  alert_end_time: SAMPLE_TS + 600000000,
 };
 
-const typeDefault = (v: { enumValues?: string[] }) =>
-  v.enumValues?.length ? v.enumValues[0] : "";
+const typeDefault = (v: { enumValues?: string[] }) => (v.enumValues?.length ? v.enumValues[0] : "");
 
 export const buildTestSample = (): unknown[] => {
-  const meta: Record<string, string> = {};
+  const meta: Record<string, string | number> = {};
   for (const v of TRIGGER_META_VARS) {
     const key = v.ref.replace(/^meta\./, "");
     meta[key] = key in NAMED_DEFAULTS ? NAMED_DEFAULTS[key] : typeDefault(v);
@@ -63,19 +63,18 @@ export const buildTestSample = (): unknown[] => {
 };
 
 // Pretty-printed JSON string for seeding the editor.
-export const buildTestSampleText = (): string =>
-  JSON.stringify(buildTestSample(), null, 2);
+export const buildTestSampleText = (): string => JSON.stringify(buildTestSample(), null, 2);
 
 // The FLATTENED view a Function node sees when "After Flattening" (RAF, the
-// default) is on: the `meta` block becomes `meta_<field>` string columns merged
-// onto each `data[]` row — matching the field names Conditions use. Derived from
-// buildTestSample() so both stay in sync. Meta values are strings (the flattened
-// `meta` block is a string:string map for now).
+// default) is on: the `meta` block becomes `meta_<field>` columns merged onto
+// each `data[]` row — matching the field names Conditions use. Derived from
+// buildTestSample() so both stay in sync, preserving each field's native type
+// (numeric alert fields stay numbers, text fields stay strings).
 export const buildFlatTestSample = (): unknown[] => {
   const [{ meta, data }] = buildTestSample() as [
     { meta: Record<string, unknown>; data: Record<string, unknown>[] },
   ];
-  const metaFlat: Record<string, string> = {};
-  for (const k of Object.keys(meta)) metaFlat[`meta_${k}`] = String(meta[k]);
+  const metaFlat: Record<string, unknown> = {};
+  for (const k of Object.keys(meta)) metaFlat[`meta_${k}`] = meta[k];
   return data.map((row) => ({ ...metaFlat, ...row }));
 };

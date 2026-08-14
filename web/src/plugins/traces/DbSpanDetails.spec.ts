@@ -9,21 +9,13 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
   default: {
     name: "CodeQueryEditor",
     template: '<div data-test="mock-code-editor" />',
-    props: [
-      "query",
-      "language",
-      "readOnly",
-      "showAutoComplete",
-      "showAiIcon",
-      "editorId",
-    ],
+    props: ["query", "language", "readOnly", "showAutoComplete", "showAiIcon", "editorId"],
   },
 }));
 
 import DbSpanDetails from "./DbSpanDetails.vue";
- 
-import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
+import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
 function mountDbSpanDetails(span: Record<string, unknown> = {}) {
   return mount(DbSpanDetails, { props: { span } });
@@ -205,9 +197,9 @@ describe("DbSpanDetails", () => {
   describe("metadata grid rendering", () => {
     it("should render the metadata grid", () => {
       wrapper = mountDbSpanDetails({ db_system: "postgresql" });
-      expect(
-        wrapper.find('[data-test="traces-db-span-details-metadata-grid"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="traces-db-span-details-metadata-grid"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should show a row for each non-empty metadata field", () => {
@@ -242,9 +234,7 @@ describe("DbSpanDetails", () => {
   describe("query code block", () => {
     it("should render the query editor wrapper", () => {
       wrapper = mountDbSpanDetails({ db_query_text: "SELECT 1" });
-      expect(
-        wrapper.find('[data-test="traces-db-span-details-query-editor"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="traces-db-span-details-query-editor"]').exists()).toBe(true);
     });
 
     it("should render CodeQueryEditor when query text is present", () => {
@@ -259,16 +249,12 @@ describe("DbSpanDetails", () => {
 
     it("should render no-query placeholder when query text is absent", () => {
       wrapper = mountDbSpanDetails({});
-      expect(
-        wrapper.find('[data-test="traces-db-span-details-no-query"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="traces-db-span-details-no-query"]').exists()).toBe(true);
     });
 
     it("should not render no-query placeholder when query text is present", () => {
       wrapper = mountDbSpanDetails({ db_query_text: "SELECT 1" });
-      expect(
-        wrapper.find('[data-test="traces-db-span-details-no-query"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="traces-db-span-details-no-query"]').exists()).toBe(false);
     });
 
     it("should pass the correct language to the editor", () => {
@@ -290,48 +276,52 @@ describe("DbSpanDetails", () => {
   describe("performance section", () => {
     it("should not render performance section when no performance data present", () => {
       wrapper = mountDbSpanDetails({ db_system: "postgresql" });
-      expect(
-        wrapper.find('[data-test="traces-db-span-details-performance"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="traces-db-span-details-performance"]').exists()).toBe(false);
     });
 
     it("should render performance section when db_response_returned_rows present", () => {
       wrapper = mountDbSpanDetails({ db_response_returned_rows: 10 });
-      expect(
-        wrapper.find('[data-test="traces-db-span-details-performance"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="traces-db-span-details-performance"]').exists()).toBe(true);
     });
 
     it("should show rows returned value", async () => {
       wrapper = mountDbSpanDetails({ db_response_returned_rows: 42 });
-      await wrapper.find('[data-test="traces-db-span-details-performance"] button').trigger("click");
-      expect(
-        wrapper.find('[data-test="traces-db-span-details-performance"]').text(),
-      ).toContain("42");
+      await wrapper
+        .find('[data-test="traces-db-span-details-performance"] button')
+        .trigger("click");
+      expect(wrapper.find('[data-test="traces-db-span-details-performance"]').text()).toContain(
+        "42",
+      );
     });
 
     it("should show batch size value", async () => {
       wrapper = mountDbSpanDetails({ db_operation_batch_size: 5 });
-      await wrapper.find('[data-test="traces-db-span-details-performance"] button').trigger("click");
-      expect(
-        wrapper.find('[data-test="traces-db-span-details-performance"]').text(),
-      ).toContain("5");
+      await wrapper
+        .find('[data-test="traces-db-span-details-performance"] button')
+        .trigger("click");
+      expect(wrapper.find('[data-test="traces-db-span-details-performance"]').text()).toContain(
+        "5",
+      );
     });
 
     it("should show query summary value", async () => {
       wrapper = mountDbSpanDetails({ db_query_summary: "SELECT users" });
-      await wrapper.find('[data-test="traces-db-span-details-performance"] button').trigger("click");
-      expect(
-        wrapper.find('[data-test="traces-db-span-details-performance"]').text(),
-      ).toContain("SELECT users");
+      await wrapper
+        .find('[data-test="traces-db-span-details-performance"] button')
+        .trigger("click");
+      expect(wrapper.find('[data-test="traces-db-span-details-performance"]').text()).toContain(
+        "SELECT users",
+      );
     });
 
     it("should show response status code value", async () => {
       wrapper = mountDbSpanDetails({ db_response_status_code: "08P01" });
-      await wrapper.find('[data-test="traces-db-span-details-performance"] button').trigger("click");
-      expect(
-        wrapper.find('[data-test="traces-db-span-details-performance"]').text(),
-      ).toContain("08P01");
+      await wrapper
+        .find('[data-test="traces-db-span-details-performance"] button')
+        .trigger("click");
+      expect(wrapper.find('[data-test="traces-db-span-details-performance"]').text()).toContain(
+        "08P01",
+      );
     });
   });
 });

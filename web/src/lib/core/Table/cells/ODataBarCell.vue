@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
-// ODataBarCell — the headline "bars like Datadog" cell. Renders
+// ODataBarCell — the headline in-cell bar chart. Renders
 // a (right-aligned) formatted value with a subtle horizontal bar behind it,
 // width proportional to value / columnMax. The caller computes the column max
 // over the visible page and passes it in, plus the already-formatted display
@@ -24,9 +25,9 @@ const props = withDefaults(
     display?: string | number;
     /** Bar tone. Default teal; "warning"/"danger" for threshold columns. */
     variant?: "default" | "warning" | "danger";
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
   }>(),
-  { variant: "default", emptyLabel: "—" },
+  { variant: "default", emptyLabel: raw("—") },
 );
 
 const num = computed<number | null>(() => {
@@ -62,14 +63,15 @@ const barClass = computed(
   <!-- Value on top, a thin magnitude bar UNDERNEATH (no overlap with the
        number). Both right-aligned so the bars share a common right edge and
        lengths stay comparable across rows. -->
-  <div class="flex flex-col items-end justify-center gap-0.75 w-full min-w-0">
+  <div class="flex w-full min-w-0 flex-col items-end justify-center gap-0.75">
     <span
-      class="tabular-nums whitespace-nowrap leading-none"
+      class="leading-none whitespace-nowrap tabular-nums"
       :class="num === null ? 'text-text-body text-xs' : ''"
-    >{{ text }}</span>
+      >{{ text }}</span
+    >
     <div
       v-if="widthPct > 0"
-      class="h-0.75 rounded-full opacity-80 pointer-events-none transition-[width] duration-300"
+      class="pointer-events-none h-0.75 rounded-full opacity-80 transition-[width] duration-300"
       :class="barClass"
       :style="{ width: widthPct + '%' }"
       aria-hidden="true"

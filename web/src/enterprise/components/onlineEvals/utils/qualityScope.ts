@@ -8,11 +8,7 @@ export type ScopeCounts = {
   session: number;
 };
 
-export const QUALITY_TARGET_SCOPES: readonly EvalTargetScope[] = [
-  "span",
-  "trace",
-  "session",
-];
+export const QUALITY_TARGET_SCOPES: readonly EvalTargetScope[] = ["span", "trace", "session"];
 
 export function emptyScopeCounts(): ScopeCounts {
   return { span: 0, trace: 0, session: 0 };

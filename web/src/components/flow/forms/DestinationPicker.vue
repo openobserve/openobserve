@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   its own footer — CreateDestinationForm carries its own Save/Cancel).
 -->
 <template>
-  <div data-test="destination-picker" class="w-full flex flex-col gap-4">
+  <div data-test="destination-picker" class="flex w-full flex-col gap-4">
     <!-- Mode toggle — a bare control OUTSIDE the form: it swaps the
          select-existing form for the CreateDestinationForm create child. -->
     <OSwitch
@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- inline create destination form (own save/cancel) -->
     <div v-if="createNewDestination" class="w-full">
       <CreateDestinationForm
+        :forced-type="forcedType"
         @created="onDestinationCreated"
         @cancel="createNewDestination = false"
       />
@@ -62,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed, onBeforeMount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -76,12 +77,15 @@ import {
   type ExternalDestinationForm,
 } from "@/components/pipeline/NodeForm/ExternalDestination.schema";
 
-const props = withDefaults(defineProps<{ initialName?: string }>(), {
+// `forcedType`, when set, is forwarded to the inline create form to lock its
+// destination type and skip the type-selection step (workflows → "custom").
+const props = withDefaults(defineProps<{ initialName?: string; forcedType?: string }>(), {
   initialName: "",
+  forcedType: undefined,
 });
 const emit = defineEmits<{ (e: "expand", value: boolean): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const destinations = ref<any[]>([]);

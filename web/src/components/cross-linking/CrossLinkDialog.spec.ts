@@ -46,12 +46,7 @@ describe("CrossLinkDialog Component", () => {
               "primaryButtonLabel",
               "secondaryButtonLabel",
             ],
-            emits: [
-              "update:open",
-              "click:primary",
-              "click:secondary",
-              "click:neutral",
-            ],
+            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
           },
           // OFormCombobox (chip-builder scratch input) renders REAL so the
           // newFieldName form-field binding + forwarded clear() are exercised.
@@ -60,19 +55,16 @@ describe("CrossLinkDialog Component", () => {
     });
   };
 
-  const getForm = (w: any) =>
-    (w.findComponent({ name: "OForm" }).vm as any).form;
+  const getForm = (w: any) => (w.findComponent({ name: "OForm" }).vm as any).form;
 
   // newFieldName is now an OForm-owned scratch field (not a vm ref).
-  const setNewField = (w: any, v: string) =>
-    getForm(w).setFieldValue("newFieldName", v);
+  const setNewField = (w: any, v: string) => getForm(w).setFieldValue("newFieldName", v);
   const newFieldVal = (w: any) => getForm(w).state.values.newFieldName;
 
   // `fields` is now a form-owned array (the old `fieldsModel` mirror was
   // removed) — read/seed it THROUGH the form, the single source of truth.
   const fieldsVal = (w: any) => getForm(w).state.values.fields ?? [];
-  const setFields = (w: any, v: Array<{ name: string }>) =>
-    getForm(w).setFieldValue("fields", v);
+  const setFields = (w: any, v: Array<{ name: string }>) => getForm(w).setFieldValue("fields", v);
 
   const submit = async (w: any) => {
     await getForm(w).handleSubmit();
@@ -154,13 +146,8 @@ describe("CrossLinkDialog Component", () => {
 
       const form = getForm(wrapper);
       expect(form.state.values.name).toBe("View Trace");
-      expect(form.state.values.url).toBe(
-        "https://example.com/trace/${trace_id}",
-      );
-      expect(fieldsVal(wrapper)).toEqual([
-        { name: "trace_id" },
-        { name: "span_id" },
-      ]);
+      expect(form.state.values.url).toBe("https://example.com/trace/${trace_id}");
+      expect(fieldsVal(wrapper)).toEqual([{ name: "trace_id" }, { name: "span_id" }]);
     });
 
     it("seeds an empty newFieldName on a fresh open", async () => {
@@ -277,23 +264,14 @@ describe("CrossLinkDialog Component", () => {
   describe("Field Chip Removal", () => {
     it("should remove field when chip remove button is clicked", async () => {
       wrapper = createWrapper();
-      setFields(wrapper, [
-        { name: "trace_id" },
-        { name: "span_id" },
-        { name: "service_name" },
-      ]);
+      setFields(wrapper, [{ name: "trace_id" }, { name: "span_id" }, { name: "service_name" }]);
       await nextTick();
 
-      const removeBtn = wrapper.find(
-        '[data-test="cross-link-field-chip-remove-1"]',
-      );
+      const removeBtn = wrapper.find('[data-test="cross-link-field-chip-remove-1"]');
       expect(removeBtn.exists()).toBe(true);
       await removeBtn.trigger("click");
 
-      expect(fieldsVal(wrapper)).toEqual([
-        { name: "trace_id" },
-        { name: "service_name" },
-      ]);
+      expect(fieldsVal(wrapper)).toEqual([{ name: "trace_id" }, { name: "service_name" }]);
     });
   });
 
@@ -417,9 +395,7 @@ describe("CrossLinkDialog Component", () => {
       wrapper = createWrapper();
       setNewField(wrapper, "my_field");
       await nextTick();
-      await wrapper
-        .find('[data-test="cross-link-add-field-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="cross-link-add-field-btn"]').trigger("click");
       expect(fieldsVal(wrapper)).toEqual([{ name: "my_field" }]);
     });
   });
@@ -429,12 +405,8 @@ describe("CrossLinkDialog Component", () => {
       wrapper = createWrapper();
       // OFormCombobox → OCombobox forwards data-test onto the root; the inner
       // <input> is `<data-test>-input` (e2e selectors unchanged).
-      expect(
-        wrapper.find('[data-test="cross-link-field-input"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="cross-link-field-input-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="cross-link-field-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="cross-link-field-input-input"]').exists()).toBe(true);
     });
 
     it("updates the newFieldName form field when typing in the combobox", async () => {

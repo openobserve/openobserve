@@ -57,7 +57,7 @@ const mockHttpGet = vi.fn().mockResolvedValue({
         timestamp: 1700000000000000,
         start_time: 1700000000000000,
         end_time: 1700003600000000,
-        status: "success",
+        status: "firing",
         is_realtime: false,
         is_silenced: false,
         retries: 0,
@@ -79,12 +79,7 @@ vi.mock("@/services/http", () => ({
 vi.mock("@/components/DateTime.vue", () => ({
   default: {
     template: '<div data-test="pipeline-history-date-picker" />',
-    props: [
-      "autoApply",
-      "defaultType",
-      "defaultAbsoluteTime",
-      "defaultRelativeTime",
-    ],
+    props: ["autoApply", "defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
     emits: ["on:date-change"],
     methods: {
       setCustomDate: vi.fn(),
@@ -229,7 +224,7 @@ describe("PipelineHistory", () => {
             timestamp: 1700000000000000,
             start_time: 1700000000000000,
             end_time: 1700003600000000,
-            status: "success",
+            status: "firing",
             is_realtime: false,
             is_silenced: false,
             retries: 0,
@@ -263,9 +258,7 @@ describe("PipelineHistory", () => {
     it("renders data-test='pipeline-history-page'", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="pipeline-history-page"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-history-page"]').exists()).toBe(true);
     });
 
     it.skip("renders data-test='alert-history-back-btn'", async () => {
@@ -281,33 +274,25 @@ describe("PipelineHistory", () => {
     it("renders data-test='pipeline-history-date-picker'", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="pipeline-history-date-picker"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-history-date-picker"]').exists()).toBe(true);
     });
 
     it("renders data-test='pipeline-history-search-select'", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="pipeline-history-search-select"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-history-search-select"]').exists()).toBe(true);
     });
 
     it("renders data-test='pipeline-history-refresh-btn'", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="pipeline-history-refresh-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-history-refresh-btn"]').exists()).toBe(true);
     });
 
     it("renders data-test='pipeline-history-table'", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="pipeline-history-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-history-table"]').exists()).toBe(true);
     });
   });
 
@@ -345,6 +330,7 @@ describe("PipelineHistory", () => {
       const vm = wrapper.vm as any;
       expect(vm.rows.length).toBe(1);
       expect(vm.rows[0].pipeline_name).toBe("Alpha Pipeline");
+      expect(vm.rows[0].status).toBe("firing");
     });
 
     it("updates pagination.rowsNumber from API response total", async () => {
@@ -558,7 +544,6 @@ describe("PipelineHistory", () => {
         expect(vm.formatDuration(3900000000)).toBe("1h 5m");
       });
     });
-
   });
 
   describe("filteredPipelineOptions initialization", () => {
@@ -583,9 +568,7 @@ describe("PipelineHistory", () => {
       const wrapper = createWrapper();
       await flushPromises();
       const vm = wrapper.vm as any;
-      const alphaOption = vm.filteredPipelineOptions.find(
-        (p: any) => p.value === "pid-alpha",
-      );
+      const alphaOption = vm.filteredPipelineOptions.find((p: any) => p.value === "pid-alpha");
       expect(alphaOption).toBeDefined();
       expect(alphaOption.label).toBe("Alpha Pipeline");
     });
@@ -642,9 +625,7 @@ describe("PipelineHistory", () => {
       vm.loading = true;
       await nextTick();
 
-      const refreshBtn = wrapper.find(
-        '[data-test="pipeline-history-refresh-btn"]',
-      );
+      const refreshBtn = wrapper.find('[data-test="pipeline-history-refresh-btn"]');
       expect(refreshBtn.exists()).toBe(true);
       // loading attribute or class reflects loading state
       expect(vm.loading).toBe(true);
@@ -658,9 +639,7 @@ describe("PipelineHistory", () => {
       vi.clearAllMocks();
       mockHttpGet.mockResolvedValue({ data: { hits: [], total: 0 } });
 
-      await wrapper
-        .find('[data-test="pipeline-history-refresh-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="pipeline-history-refresh-btn"]').trigger("click");
       await flushPromises();
 
       expect(mockHttpGet).toHaveBeenCalled();

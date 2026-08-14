@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 const mockPush = vi.fn();
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockPush, back: vi.fn() }),
@@ -68,7 +67,9 @@ vi.mock("@/utils/alerts/insights-metrics.json", () => ({
           {
             id: "p1",
             title: "Overview Panel",
-            queries: [{ query: "SELECT [WHERE_CLAUSE]", fields: { stream: "logs", stream_type: "logs" } }],
+            queries: [
+              { query: "SELECT [WHERE_CLAUSE]", fields: { stream: "logs", stream_type: "logs" } },
+            ],
           },
         ],
       },
@@ -198,9 +199,7 @@ describe("AlertInsights - goBack", () => {
   it("calls router.push with alertList", async () => {
     const w = await mountComp();
     (w.vm as any).goBack();
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "alertList" }),
-    );
+    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
   });
 
   it("clicking back button calls goBack", async () => {
@@ -289,7 +288,10 @@ describe("AlertInsights - handleEditAlert", () => {
     await flushPromises();
     await (w.vm as any).handleEditAlert("TestAlert");
     expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "alertList", query: expect.objectContaining({ action: "update" }) }),
+      expect.objectContaining({
+        name: "alertList",
+        query: expect.objectContaining({ action: "update" }),
+      }),
     );
   });
 });

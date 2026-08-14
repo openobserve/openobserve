@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import router from "src/router";
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
-import { ref } from 'vue';
+import { ref } from "vue";
 
 export const panelIdToBeRefreshed = ref<string | null>(null);
 
@@ -28,7 +27,6 @@ export const panelIdToBeRefreshed = ref<string | null>(null);
  * @param {any} store - the store object
  * @return {Object} - the options object for rendering the chart
  */
-
 
 export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   return new Promise((resolve, reject) => {
@@ -152,8 +150,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   </script>
     `;
 
-
-
     iframe.srcdoc = scriptContent;
 
     window.addEventListener("message", function handler(event) {
@@ -187,16 +183,14 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
       iframe?.contentWindow?.postMessage(
         {
           type: "execute",
-          code: userCode, 
+          code: userCode,
           data: JSON.stringify(searchQueryData),
         },
-        "*"
+        "*",
       );
     };
   });
 };
-
-
 
 export const validateUserCode = (code: string): string | null => {
   try {
@@ -229,18 +223,12 @@ export const validateUserCode = (code: string): string | null => {
     walk.simple(ast, {
       CallExpression(node: acorn.Node & { callee: any; arguments: any[] }) {
         // **Direct function call check (eval(), fetch(), etc.)**
-        if (
-          node.callee.type === "Identifier" &&
-          forbiddenFunctions.includes(node.callee.name)
-        ) {
+        if (node.callee.type === "Identifier" && forbiddenFunctions.includes(node.callee.name)) {
           errorMessage = `Use of '${node.callee.name}()' is not allowed.`;
         }
 
         // **Detect setTimeout() misuse**
-        if (
-          node.callee.type === "Identifier" &&
-          node.callee.name === "setTimeout"
-        ) {
+        if (node.callee.type === "Identifier" && node.callee.name === "setTimeout") {
           if (
             node.arguments.length > 1 &&
             node.arguments[1].type === "Literal" &&
@@ -259,7 +247,8 @@ export const validateUserCode = (code: string): string | null => {
             node.arguments.length > 0 &&
             node.arguments[0].type === "CallExpression" &&
             node.arguments[0].callee.type === "Identifier" &&
-           ( node.arguments[0].callee.name === "eval" || node.arguments[0].callee.name === "Function")
+            (node.arguments[0].callee.name === "eval" ||
+              node.arguments[0].callee.name === "Function")
           ) {
             errorMessage = `Use of ${node.arguments[0].callee.name} inside 'setTimeout()' is not allowed.`;
           }
@@ -280,10 +269,7 @@ export const validateUserCode = (code: string): string | null => {
 
       MemberExpression(node: acorn.Node & { object: any; property: any }) {
         // **Detect direct access to forbidden objects (e.g., document.cookie, localStorage.setItem)**
-        if (
-          node.object.type === "Identifier" &&
-          forbiddenIdentifiers.includes(node.object.name)
-        ) {
+        if (node.object.type === "Identifier" && forbiddenIdentifiers.includes(node.object.name)) {
           errorMessage = `Access to '${node.object.name}' is not allowed.`;
         }
 

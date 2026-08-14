@@ -334,6 +334,8 @@ mod tests {
             alert_destinations: None,
             folder_id: "folder-1".to_string(),
             owner: None,
+            priority: None,
+            tags: None,
             status: 0,
             retries: 0,
             last_updated: 0,
@@ -425,7 +427,7 @@ mod tests {
         assert_eq!(active.anomaly_id.unwrap(), "anom-all");
         assert_eq!(active.org_id.unwrap(), "org-all");
         assert_eq!(active.stream_name.unwrap(), "default");
-        assert_eq!(active.enabled.unwrap(), true);
+        assert!(active.enabled.unwrap());
         assert_eq!(active.threshold.unwrap(), 95);
     }
 }

@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
-    title="Import Semantic Groups"
+    :title="t('correlation.importSemanticGroups.title')"
     test-prefix="semantic-groups"
     :is-importing="isImporting"
     :show-splitter="false"
@@ -29,14 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Full-width content for diff view -->
     <template #full-width-content>
-      <div class="w-full p-2 h-full flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden p-2">
         <!-- Compact Header with File Upload -->
-        <div class="bg-card-glass-bg p-2 mb-2">
+        <div class="bg-card-glass-bg mb-2 p-2">
           <div class="flex items-center">
-            <div class="w-full col-md-8">
+            <div class="col-md-8 w-full">
               <OFile
                 v-model="jsonFile"
-                label="Select JSON file"
+                :label="t('correlation.importSemanticGroups.selectJsonFile')"
                 accept=".json"
                 @update:model-value="loadFile"
                 data-test="semantic-groups-import-file"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OFile>
             </div>
-            <div class="w-full col-md-4 text-right pl-2">
+            <div class="col-md-4 w-full pl-2 text-right">
               <OButton
                 v-if="diffData"
                 variant="primary"
@@ -64,93 +64,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="applyChanges"
                 :disable="!hasSelectedChanges"
                 :loading="isApplying"
-                >Apply Changes</OButton
+                >{{ t("correlation.importSemanticGroups.applyChanges") }}</OButton
               >
             </div>
           </div>
         </div>
 
         <!-- Diff Preview Section with Scrollable Content -->
-        <div v-if="diffData" class="flex flex-col h-full overflow-hidden">
+        <div v-if="diffData" class="flex h-full flex-col overflow-hidden">
           <!-- Compact Summary Bar -->
-          <div class="bg-card-glass-bg p-2 mb-2">
+          <div class="bg-card-glass-bg mb-2 p-2">
             <div class="flex items-center gap-2">
               <div class="col-auto">
                 <OTag type="diffCategory" value="new" class="text-sm!">
                   <strong class="text-sm">{{ diffData.additions.length }}</strong
-                  >&nbsp;New
+                  >&nbsp;{{ t("correlation.importSemanticGroups.new") }}
                 </OTag>
               </div>
               <div class="col-auto">
                 <OTag type="diffCategory" value="modified" class="text-sm!">
                   <strong class="text-sm">{{ diffData.modifications.length }}</strong
-                  >&nbsp;Modified
+                  >&nbsp;{{ t("correlation.importSemanticGroups.modified") }}
                 </OTag>
               </div>
               <div class="col-auto">
                 <OTag type="diffCategory" value="unchanged" class="text-sm!">
-                  {{ diffData.unchanged.length }} Unchanged
+                  {{ diffData.unchanged.length }}
+                  {{ t("correlation.importSemanticGroups.unchanged") }}
                 </OTag>
               </div>
               <div class="flex flex-col">
                 <OButtonGroup class="float-right">
-                  <OButton
-                    variant="ghost-primary"
-                    size="xs"
-                    @click="selectAllAdditions"
-                    >Select All New</OButton
-                  >
-                  <OButton
-                    variant="ghost-warning"
-                    size="xs"
-                    @click="selectAllModifications"
-                    >Select All Modified</OButton
-                  >
-                  <OButton variant="ghost-muted" size="xs" @click="deselectAll"
-                    >Clear All</OButton
-                  >
+                  <OButton variant="ghost-primary" size="xs" @click="selectAllAdditions">{{
+                    t("correlation.importSemanticGroups.selectAllNew")
+                  }}</OButton>
+                  <OButton variant="ghost-warning" size="xs" @click="selectAllModifications">{{
+                    t("correlation.importSemanticGroups.selectAllModified")
+                  }}</OButton>
+                  <OButton variant="ghost-muted" size="xs" @click="deselectAll">{{
+                    t("correlation.importSemanticGroups.clearAll")
+                  }}</OButton>
                 </OButtonGroup>
               </div>
             </div>
           </div>
 
           <!-- Scrollable Groups Container -->
-          <div class="bg-card-glass-bg groups-scroll-container flex-1 overflow-y-auto overflow-x-hidden p-2">
+          <div
+            class="bg-card-glass-bg groups-scroll-container flex-1 overflow-x-hidden overflow-y-auto p-2"
+          >
             <!-- Additions -->
             <div v-if="diffData.additions.length > 0" class="mb-2">
-              <div class="text-sm font-semibold border-b border-separator mb-1 text-status-positive p-1">
+              <div
+                class="border-separator text-status-positive mb-1 border-b p-1 text-sm font-semibold"
+              >
                 <OIcon name="add-circle" size="sm" />
-                New ({{ selectedAdditions.length }}/{{
+                {{ t("correlation.importSemanticGroups.new") }} ({{ selectedAdditions.length }}/{{
                   diffData.additions.length
                 }})
               </div>
-              <ul class="flex flex-col divide-y divide-border border rounded-default mb-0">
+              <ul class="divide-border rounded-default mb-0 flex flex-col divide-y border">
                 <li
                   v-for="group in diffData.additions"
                   :key="group.id"
                   data-test="semantic-groups-addition-item"
-                  class="compact-item flex items-start gap-2 px-2 py-1 min-h-11 cursor-pointer hover:bg-muted/50"
+                  class="compact-item hover:bg-muted/50 flex min-h-11 cursor-pointer items-start gap-2 px-2 py-1"
                   @click="toggleAddition(group.id)"
                 >
-                  <div class="flex items-start shrink-0 pt-1">
+                  <div class="flex shrink-0 items-start pt-1">
                     <OCheckbox
                       :model-value="selectedAdditions.includes(group.id)"
                       @update:model-value="toggleAddition(group.id)"
                     />
                   </div>
-                  <div class="flex flex-col flex-1 min-w-0 px-2">
+                  <div class="flex min-w-0 flex-1 flex-col px-2">
                     <span class="text-compact font-medium">{{ group.display }}</span>
-                    <span class="block text-2xs text-muted-foreground truncate">
-                      {{ group.id }} • {{ group.fields.length }} fields
-                      <OTag v-if="group.normalize" type="normalizeState" value="true" class="ml-1" />
+                    <span class="text-2xs text-muted-foreground block truncate">
+                      {{ group.id }} • {{ group.fields.length }}
+                      {{ t("correlation.importSemanticGroups.fields") }}
+                      <OTag
+                        v-if="group.normalize"
+                        type="normalizeState"
+                        value="true"
+                        class="ml-1"
+                      />
                     </span>
                   </div>
-                  <div class="flex items-center shrink-0 ms-auto">
-                    <OButton
-                      variant="ghost"
-                      size="icon-circle-sm"
-                      @click.stop="viewGroup(group)"
-                    >
+                  <div class="ms-auto flex shrink-0 items-center">
+                    <OButton variant="ghost" size="icon-circle-sm" @click.stop="viewGroup(group)">
                       <OIcon name="visibility" size="sm" />
                     </OButton>
                   </div>
@@ -160,35 +161,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Modifications -->
             <div v-if="diffData.modifications.length > 0" class="mb-2">
-              <div class="text-sm font-semibold border-b border-separator mb-1 text-status-warning-text p-1">
+              <div
+                class="border-separator text-status-warning-text mb-1 border-b p-1 text-sm font-semibold"
+              >
                 <OIcon name="edit" size="sm" />
-                Modified ({{ selectedModifications.length }}/{{
-                  diffData.modifications.length
-                }})
+                {{ t("correlation.importSemanticGroups.modified") }} ({{
+                  selectedModifications.length
+                }}/{{ diffData.modifications.length }})
               </div>
-              <ul class="flex flex-col divide-y divide-border border rounded-default mb-0">
+              <ul class="divide-border rounded-default mb-0 flex flex-col divide-y border">
                 <li
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
                   data-test="semantic-groups-modification-item"
-                  class="compact-item flex items-start gap-2 px-2 py-1 min-h-11 cursor-pointer hover:bg-muted/50"
+                  class="compact-item hover:bg-muted/50 flex min-h-11 cursor-pointer items-start gap-2 px-2 py-1"
                   @click="toggleModification(mod.proposed.id)"
                 >
-                  <div class="flex items-start shrink-0 pt-1">
+                  <div class="flex shrink-0 items-start pt-1">
                     <OCheckbox
-                      :model-value="
-                        selectedModifications.includes(mod.proposed.id)
-                      "
+                      :model-value="selectedModifications.includes(mod.proposed.id)"
                       @update:model-value="toggleModification(mod.proposed.id)"
                     />
                   </div>
-                  <div class="flex flex-col flex-1 min-w-0 px-2">
+                  <div class="flex min-w-0 flex-1 flex-col px-2">
                     <span class="text-compact font-medium">{{ mod.proposed.display }}</span>
-                    <span class="block text-2xs text-muted-foreground truncate">
-                      {{ mod.proposed.id }} • {{ mod.current.fields.length }} → {{ mod.proposed.fields.length }} fields
+                    <span class="text-2xs text-muted-foreground block truncate">
+                      {{ mod.proposed.id }} • {{ mod.current.fields.length }}
+                      {{ t("correlation.importSemanticGroups.fieldsChangeArrow") }}
+                      {{ mod.proposed.fields.length }}
+                      {{ t("correlation.importSemanticGroups.fields") }}
                     </span>
                   </div>
-                  <div class="flex items-center shrink-0 ms-auto">
+                  <div class="ms-auto flex shrink-0 items-center">
                     <OButton
                       variant="ghost"
                       size="icon-circle-sm"
@@ -205,18 +209,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="diffData.unchanged.length > 0">
               <OCollapsible
                 v-model="unchangedOpen"
-                :label="`Unchanged (${diffData.unchanged.length})`"
+                :label="t('common.unchangedCount', { count: diffData.unchanged.length })"
                 icon="check-circle"
               >
-                <ul class="flex flex-col divide-y divide-border border rounded-default mb-0">
+                <ul class="divide-border rounded-default mb-0 flex flex-col divide-y border">
                   <li
                     v-for="group in diffData.unchanged"
                     :key="group.id"
-                    class="compact-item flex items-center gap-2 px-2 py-1 min-h-11"
+                    class="compact-item flex min-h-11 items-center gap-2 px-2 py-1"
                   >
-                    <div class="flex flex-col flex-1 min-w-0 px-2">
+                    <div class="flex min-w-0 flex-1 flex-col px-2">
                       <span class="text-compact">{{ group.display }}</span>
-                      <span class="block text-2xs text-muted-foreground">{{ group.id }} • {{ group.fields.length }} fields</span>
+                      <span class="text-2xs text-muted-foreground block"
+                        >{{ group.id }} • {{ group.fields.length }}
+                        {{ t("correlation.importSemanticGroups.fields") }}</span
+                      >
                     </div>
                   </li>
                 </ul>
@@ -226,35 +233,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- No Diff State -->
-        <div
-          v-else-if="!isImporting && !diffData"
-          class="bg-card-glass-bg p-4 text-center"
-        >
+        <div v-else-if="!isImporting && !diffData" class="bg-card-glass-bg p-4 text-center">
           <OIcon name="cloud-upload" class="mb-3 size-16!" />
-          <div class="text-xl font-semibold text-text-muted mb-2">
-            Upload a JSON file to get started
+          <div class="text-text-muted mb-2 text-xl font-semibold">
+            {{ t("correlation.importSemanticGroups.uploadPrompt") }}
           </div>
-          <div class="text-sm text-text-secondary">
-            The system will analyze the file and show you what will change
+          <div class="text-text-secondary text-sm">
+            {{ t("correlation.importSemanticGroups.uploadHint") }}
           </div>
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 
   <!-- Group Details Dialog -->
   <ODialog
     data-test="import-semantic-groups-group-dialog"
     v-model:open="showGroupDialog"
     size="md"
-    :title="selectedGroup?.display"
-    :sub-title="`ID: ${selectedGroup?.id}`"
-    primary-button-label="Close"
+    :title="raw(selectedGroup?.display)"
+    :sub-title="t('common.idPrefix', { id: selectedGroup?.id })"
+    :primary-button-label="t('common.close')"
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="text-sm font-medium mb-2">
-        Fields ({{ selectedGroup?.fields.length }})
+      <div class="mb-2 text-sm font-medium">
+        {{ t("correlation.importSemanticGroups.fieldsHeading") }} ({{
+          selectedGroup?.fields.length
+        }})
       </div>
       <OTag
         v-for="field in selectedGroup?.fields"
@@ -276,18 +282,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="import-semantic-groups-modification-dialog"
     v-model:open="showModificationDialog"
     size="lg"
-    :title="selectedModification?.proposed.display"
-    sub-title="Compare Changes"
-    primary-button-label="Close"
+    :title="raw(selectedModification?.proposed.display)"
+    :sub-title="t('correlation.importSemanticGroups.compareChanges')"
+    :primary-button-label="t('common.close')"
     @click:primary="showModificationDialog = false"
   >
     <div class="flex gap-3">
       <div class="w-1/2">
-        <div class="text-sm font-medium text-status-error-text mb-2">Current</div>
-        <div class="text-xs mb-1">
-          {{ selectedModification?.current.fields.length }} fields
+        <div class="text-status-error-text mb-2 text-sm font-medium">
+          {{ t("correlation.importSemanticGroups.current") }}
         </div>
-        <div class="field-chips-container max-h-62.5 overflow-y-auto p-2 bg-surface-base rounded-default">
+        <div class="mb-1 text-xs">
+          {{ selectedModification?.current.fields.length }}
+          {{ t("correlation.importSemanticGroups.fields") }}
+        </div>
+        <div
+          class="field-chips-container bg-surface-base rounded-default max-h-62.5 overflow-y-auto p-2"
+        >
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -300,11 +311,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="w-1/2">
-        <div class="text-sm font-medium text-status-positive mb-2">Proposed</div>
-        <div class="text-xs mb-1">
-          {{ selectedModification?.proposed.fields.length }} fields
+        <div class="text-status-positive mb-2 text-sm font-medium">
+          {{ t("correlation.importSemanticGroups.proposed") }}
         </div>
-        <div class="field-chips-container max-h-62.5 overflow-y-auto p-2 bg-surface-base rounded-default">
+        <div class="mb-1 text-xs">
+          {{ selectedModification?.proposed.fields.length }}
+          {{ t("correlation.importSemanticGroups.fields") }}
+        </div>
+        <div
+          class="field-chips-container bg-surface-base rounded-default max-h-62.5 overflow-y-auto p-2"
+        >
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
@@ -314,12 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ field }}
             <template #trailing>
-              <OIcon
-                v-if="isNewField(field)"
-                name="add"
-                size="xs"
-                class="ml-1"
-              />
+              <OIcon v-if="isNewField(field)" name="add" size="xs" class="ml-1" />
             </template>
           </OTag>
         </div>
@@ -344,6 +355,7 @@ import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 interface SemanticGroup {
   id: string;
@@ -363,6 +375,7 @@ interface SemanticGroupDiff {
   unchanged: SemanticGroup[];
 }
 
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 
@@ -380,9 +393,7 @@ const selectedGroup = ref<SemanticGroup | null>(null);
 const selectedModification = ref<SemanticGroupModification | null>(null);
 
 const hasSelectedChanges = computed(() => {
-  return (
-    selectedAdditions.value.length > 0 || selectedModifications.value.length > 0
-  );
+  return selectedAdditions.value.length > 0 || selectedModifications.value.length > 0;
 });
 
 const loadFile = async (value: FileValue) => {
@@ -407,7 +418,7 @@ const loadFile = async (value: FileValue) => {
     await previewDiff(groups);
   } catch (error: any) {
     toast({
-      message: `Failed to parse JSON: ${error.message}`,
+      message: t("toastMessages.alerts.failedToParseJson", { error: error.message }),
       variant: "error",
     });
     clearFile();
@@ -431,15 +442,15 @@ const previewDiff = async (groups: SemanticGroup[]) => {
     diffData.value = response.data;
 
     // Auto-select all additions and modifications
-    selectedAdditions.value = response.data.additions.map(
-      (g: SemanticGroup) => g.id,
-    );
+    selectedAdditions.value = response.data.additions.map((g: SemanticGroup) => g.id);
     selectedModifications.value = response.data.modifications.map(
       (m: SemanticGroupModification) => m.proposed.id,
     );
   } catch (error: any) {
     toast({
-      message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
+      message: t("toastMessages.alerts.failedToPreviewChanges", {
+        error: error.response?.data?.error || error.message,
+      }),
       variant: "error",
     });
   }
@@ -452,9 +463,7 @@ const selectAllAdditions = () => {
 
 const selectAllModifications = () => {
   if (!diffData.value) return;
-  selectedModifications.value = diffData.value.modifications.map(
-    (m) => m.proposed.id,
-  );
+  selectedModifications.value = diffData.value.modifications.map((m) => m.proposed.id);
 };
 
 const deselectAll = () => {
@@ -529,7 +538,9 @@ const applyChanges = async () => {
     await alertsService.saveSemanticGroups(org, finalGroups);
 
     toast({
-      message: `Successfully applied ${selectedAdditions.value.length + selectedModifications.value.length} changes`,
+      message: t("toastMessages.alerts.successfullyAppliedChanges", {
+        count: selectedAdditions.value.length + selectedModifications.value.length,
+      }),
       variant: "success",
     });
 
@@ -537,7 +548,9 @@ const applyChanges = async () => {
     handleBack();
   } catch (error: any) {
     toast({
-      message: `Failed to save changes: ${error.response?.data?.error || error.message}`,
+      message: t("toastMessages.alerts.failedToSaveChanges", {
+        error: error.response?.data?.error || error.message,
+      }),
       variant: "error",
     });
   } finally {
@@ -569,7 +582,7 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
     await previewDiff(jsonArray);
   } catch (error: any) {
     toast({
-      message: `Invalid JSON: ${error.message}`,
+      message: t("toastMessages.alerts.invalidJson", { error: error.message }),
       variant: "error",
     });
   } finally {

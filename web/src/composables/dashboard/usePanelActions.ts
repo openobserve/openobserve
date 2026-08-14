@@ -13,8 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
+import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { ref } from "vue";
 import { downloadFile } from "@/utils/dom";
+import { toast } from "@/lib/feedback/Toast/useToast";
+// `gt`, not useI18nTyped: this composable takes router/store as injected deps
+// so it can be constructed outside a component, and useI18n() throws there.
+import { gt } from "@/types/i18n";
 
 // Helper function to properly wrap CSV values
 export const wrapCsvValue = (val: any): string => {
@@ -27,10 +33,7 @@ export const wrapCsvValue = (val: any): string => {
 
   // Wrap in quotes if the value contains comma, quotes, or newlines
   const needsQuotes =
-    str.includes(",") ||
-    str.includes('"') ||
-    str.includes("\n") ||
-    str.includes("\r");
+    str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r");
   return needsQuotes ? `"${str}"` : str;
 };
 
@@ -83,10 +86,7 @@ export function usePanelAlertCreation({
     contextMenuVisible.value = false;
   };
 
-  const handleCreateAlert = (selection: {
-    condition: string;
-    threshold: number;
-  }) => {
+  const handleCreateAlert = (selection: { condition: string; threshold: number }) => {
     hideContextMenu();
 
     // Prepare panel data to pass to alert creation
@@ -126,14 +126,8 @@ export function usePanelAlertCreation({
         // Extract from SQL to get the exact case (without quotes)
         if (sqlQuery) {
           // Look for pattern: aggregation_func(...) as "alias" or aggregation_func(...) as alias
-          const escapedAlias = aliasOrColumn.replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&",
-          );
-          const regex = new RegExp(
-            `\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`,
-            "i",
-          );
+          const escapedAlias = aliasOrColumn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const regex = new RegExp(`\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`, "i");
           const match = sqlQuery.match(regex);
           if (match && match[1]) {
             // Strip quotes - the parser will add them back if needed
@@ -169,29 +163,35 @@ export function usePanelAlertCreation({
       }
     }
 
-    const panelDataToPass = {
-      panelTitle: panelSchema.value.title || "Unnamed Panel",
-      panelId: panelSchema.value.id,
-      queries: panelSchema.value.queries,
-      queryType: queryType,
-      timeRange: selectedTimeObj.value,
-      threshold: selection.threshold,
-      condition: selection.condition,
-      // Pass the Y-axis column name for threshold comparison
-      yAxisColumn: yAxisColumn,
-      // Pass the executed query with variables already replaced
-      executedQuery: executedQuery,
-    };
+    // The panel's y-axis extraction above is this surface's own knowledge; from
+    // here on it is the shared path — the same adapter, launcher, and form that
+    // every other surface uses. No confirm dialog here: the user already chose
+    // the threshold and condition in the context menu itself.
+    const { openAlertCreation } = useAlertCreation({ router, store });
 
-    // Navigate to alert creation page
-    router.push({
-      name: "addAlert",
-      query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-        fromPanel: "true",
-        panelData: encodeURIComponent(JSON.stringify(panelDataToPass)),
-      },
-    });
+    const launched = openAlertCreation(
+      buildPrefillFromPanel({
+        panelTitle: panelSchema.value.title || "Unnamed Panel",
+        panelId: panelSchema.value.id,
+        queries: panelSchema.value.queries,
+        queryType,
+        timeRange: selectedTimeObj.value,
+        threshold: selection.threshold,
+        condition: selection.condition as "above" | "below",
+        yAxisColumn,
+        executedQuery,
+      }),
+    );
+
+    // There is no confirm dialog on this path, so a refusal would otherwise be
+    // an unexplained no-op — the user right-clicks, picks a threshold, and
+    // nothing happens. Say why instead.
+    if (!launched) {
+      toast({
+        variant: "error",
+        message: gt("toastMessages.dashboard.panelQueryHasNoStreamToAlertOn"),
+      });
+    }
   };
 
   return {
@@ -296,8 +296,7 @@ export function usePanelDownload({
           // Iterate through all datasets/arrays in the response
           data?.value?.forEach((dataset: any) => {
             // Skip if dataset is empty or not an array
-            if (!dataset || !Array.isArray(dataset) || dataset.length === 0)
-              return;
+            if (!dataset || !Array.isArray(dataset) || dataset.length === 0) return;
 
             dataset.forEach((row: any) => {
               flattenedData.push({
@@ -325,18 +324,12 @@ export function usePanelDownload({
           csvContent = [
             headers.join(","), // Headers row
             ...flattenedData.map((row: any) =>
-              headers
-                .map((header: any) => wrapCsvValue(row[header] ?? ""))
-                .join(","),
+              headers.map((header: any) => wrapCsvValue(row[header] ?? "")).join(","),
             ),
           ].join("\r\n");
         }
 
-        const status = downloadFile(
-          (title ?? "chart-export") + ".csv",
-          csvContent,
-          "text/csv",
-        );
+        const status = downloadFile((title ?? "chart-export") + ".csv", csvContent, "text/csv");
 
         if (status === true) {
           showPositiveNotification("Chart data downloaded as a CSV file", {
@@ -360,9 +353,7 @@ export function usePanelDownload({
         // Handle non-table charts
         // Use filteredData for PromQL to exclude hidden queries, otherwise use data
         const chartData =
-          panelSchema.value.queryType === "promql"
-            ? filteredData.value
-            : data.value;
+          panelSchema.value.queryType === "promql" ? filteredData.value : data.value;
 
         if (!chartData || !chartData.length) {
           showErrorNotification("No data available to download");
@@ -434,9 +425,7 @@ export function usePanelDownload({
 
       return [
         keys.join(","),
-        ...flattenedData.map((row) =>
-          keys.map((key) => wrapCsvValue(row[key] ?? "")).join(","),
-        ),
+        ...flattenedData.map((row) => keys.map((key) => wrapCsvValue(row[key] ?? "")).join(",")),
       ].join("\r\n");
     } else {
       const flattenedData: any[] = [];
@@ -454,9 +443,7 @@ export function usePanelDownload({
 
       return [
         headers.join(","),
-        ...flattenedData.map((row) =>
-          headers.map((h) => wrapCsvValue(row[h] ?? "")).join(","),
-        ),
+        ...flattenedData.map((row) => headers.map((h) => wrapCsvValue(row[h] ?? "")).join(",")),
       ].join("\r\n");
     }
   };

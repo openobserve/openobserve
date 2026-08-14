@@ -64,4 +64,3 @@ describe("LoongCollector.vue", () => {
     expect(wrapper.vm.content).toContain("Authorization: Basic [BASIC_PASSCODE]");
   });
 });
-

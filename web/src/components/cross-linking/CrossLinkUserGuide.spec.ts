@@ -4,7 +4,6 @@ import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 describe("CrossLinkUserGuide Component", () => {
   let wrapper: any;
 

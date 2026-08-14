@@ -15,11 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OToggleGroup
-    v-if="show"
-    :model-value="activeTab"
-    @update:model-value="onSelect"
-  >
+  <OToggleGroup v-if="show" :model-value="activeTab" @update:model-value="onSelect">
     <OToggleGroupItem
       v-for="tab in visibleTabs"
       :key="tab.value"
@@ -31,23 +27,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`tab-${tab.value}`"
     >
       <template v-if="tab.icon" #icon-left>
-        <OIcon v-if="typeof tab.icon === 'string'" :name="(tab.icon as any)" size="sm" />
+        <OIcon v-if="typeof tab.icon === 'string'" :name="tab.icon as any" size="sm" />
         <component v-else :is="tab.icon" class="size-3.5 shrink-0" />
       </template>
       {{ tab.label }}
       <span
         v-if="tab.dirty"
-        class="ml-1.5 w-2 h-2 rounded-full bg-button-primary shrink-0"
+        class="bg-button-primary ml-1.5 h-2 w-2 shrink-0 rounded-full"
         :title="dirtyTitle"
         :data-test="`tab-${tab.value}-dirty-dot`"
         aria-hidden="true"
       />
-      <OTooltip v-if="tab.tooltipLabel" :content="tab.tooltipLabel" />
+      <OTooltip v-if="tab.tooltipLabel" :content="raw(tab.tooltipLabel)" />
     </OToggleGroupItem>
   </OToggleGroup>
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import type { Component } from "vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -57,11 +54,11 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { ToggleGroupItemSize } from "@/lib/core/ToggleGroup/OToggleGroupItem.types";
 
 interface Tab {
-  label: string;
+  label: I18nText;
   value: string;
   style?: Record<string, string>;
   disabled?: boolean;
-  title?: string;
+  title?: I18nText;
   tooltipLabel?: string;
   hide?: boolean;
   icon?: Component | string;
@@ -79,18 +76,16 @@ const props = withDefaults(
     activeTab: string;
     size?: ToggleGroupItemSize;
     // Tooltip shown when hovering an unsaved-changes dot (optional).
-    dirtyTitle?: string;
+    dirtyTitle?: I18nText;
   }>(),
   {
     show: true,
     size: "sm",
-    dirtyTitle: "",
-  }
+    dirtyTitle: raw(""),
+  },
 );
 
-const visibleTabs = computed(() =>
-  (props.tabs as Tab[]).filter((t) => !t.hide)
-);
+const visibleTabs = computed(() => (props.tabs as Tab[]).filter((t) => !t.hide));
 
 const onSelect = (value: unknown) => {
   if (!value) return;

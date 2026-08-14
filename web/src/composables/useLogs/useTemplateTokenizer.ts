@@ -130,8 +130,10 @@ export function wildcardChipColor(token: string, sampleValues?: any[]): string {
 
   if (token === "<*>") return "bg-label-chip-pattern-bg text-label-chip-pattern-text";
   if (/^<:IP/.test(token)) return "bg-label-chip-ip-bg text-label-chip-ip-text";
-  if (/^<:(?:NUM|INT|FLOAT|HEX)/.test(token)) return "bg-label-chip-num-bg text-label-chip-num-text";
-  if (/^<:(?:TIMESTAMP|DATE|TIME)/.test(token)) return "bg-label-chip-ts-bg text-label-chip-ts-text";
+  if (/^<:(?:NUM|INT|FLOAT|HEX)/.test(token))
+    return "bg-label-chip-num-bg text-label-chip-num-text";
+  if (/^<:(?:TIMESTAMP|DATE|TIME)/.test(token))
+    return "bg-label-chip-ts-bg text-label-chip-ts-text";
   return "bg-label-chip-default-bg text-label-chip-default-text";
 }
 
@@ -147,20 +149,20 @@ export function wildcardChipColor(token: string, sampleValues?: any[]): string {
  */
 export function chipColorForLabel(label: string): string {
   const colorMap: Record<string, string> = {
-    ip:      "bg-label-chip-ip-bg text-label-chip-ip-text",
-    ipv4:    "bg-label-chip-ip-bg text-label-chip-ip-text",
-    ipv6:    "bg-label-chip-ip-bg text-label-chip-ip-text",
-    method:  "bg-label-chip-method-bg text-label-chip-method-text",
-    url:     "bg-label-chip-url-bg text-label-chip-url-text",
-    num:     "bg-label-chip-num-bg text-label-chip-num-text",
-    float:   "bg-label-chip-float-bg text-label-chip-float-text",
-    hex:     "bg-label-chip-hex-bg text-label-chip-hex-text",
-    ts:      "bg-label-chip-ts-bg text-label-chip-ts-text",
-    date:    "bg-label-chip-ts-bg text-label-chip-ts-text",
-    time:    "bg-label-chip-ts-bg text-label-chip-ts-text",
-    id:      "bg-label-chip-id-bg text-label-chip-id-text",
-    email:   "bg-label-chip-email-bg text-label-chip-email-text",
-    str:     "bg-label-chip-str-bg text-label-chip-str-text",
+    ip: "bg-label-chip-ip-bg text-label-chip-ip-text",
+    ipv4: "bg-label-chip-ip-bg text-label-chip-ip-text",
+    ipv6: "bg-label-chip-ip-bg text-label-chip-ip-text",
+    method: "bg-label-chip-method-bg text-label-chip-method-text",
+    url: "bg-label-chip-url-bg text-label-chip-url-text",
+    num: "bg-label-chip-num-bg text-label-chip-num-text",
+    float: "bg-label-chip-float-bg text-label-chip-float-text",
+    hex: "bg-label-chip-hex-bg text-label-chip-hex-text",
+    ts: "bg-label-chip-ts-bg text-label-chip-ts-text",
+    date: "bg-label-chip-ts-bg text-label-chip-ts-text",
+    time: "bg-label-chip-ts-bg text-label-chip-ts-text",
+    id: "bg-label-chip-id-bg text-label-chip-id-text",
+    email: "bg-label-chip-email-bg text-label-chip-email-text",
+    str: "bg-label-chip-str-bg text-label-chip-str-text",
     pattern: "bg-label-chip-pattern-bg text-label-chip-pattern-text",
   };
   return colorMap[label] ?? "bg-label-chip-default-bg text-label-chip-default-text";
@@ -234,7 +236,15 @@ function normalizeValueStrings(raw: any[]): string[] {
 }
 
 const HTTP_METHODS = new Set([
-  "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "CONNECT", "TRACE",
+  "GET",
+  "POST",
+  "PUT",
+  "DELETE",
+  "PATCH",
+  "HEAD",
+  "OPTIONS",
+  "CONNECT",
+  "TRACE",
 ]);
 
 const IPV4_RE = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -261,27 +271,65 @@ export function inferTypeFromValues(rawValues: any[]): string {
 
   const threshold = Math.max(1, Math.floor(values.length * 0.5));
 
-  let ip = 0, method = 0, url = 0, uuid = 0, ts = 0, email = 0;
-  let int = 0, float = 0, hex = 0, pattern = 0;
+  let ip = 0,
+    method = 0,
+    url = 0,
+    uuid = 0,
+    ts = 0,
+    email = 0;
+  let int = 0,
+    float = 0,
+    hex = 0,
+    pattern = 0;
 
   // Matches wildcard placeholders like <*>, <:NUM>, <:IP>, etc.
   const templateRe = /<(?:[*]|:[A-Z0-9_]+)>/;
 
   for (const v of values) {
     // Check if the value itself looks like a log pattern template
-    if (templateRe.test(v)) { pattern++; continue; }
+    if (templateRe.test(v)) {
+      pattern++;
+      continue;
+    }
     // Timestamp — check before IP (time strings like 10:30:00 can match IPv6 regex)
-    if (TS_DATE_RE.test(v) || TS_TIME_RE.test(v)) { ts++; continue; }
+    if (TS_DATE_RE.test(v) || TS_TIME_RE.test(v)) {
+      ts++;
+      continue;
+    }
     // Structural patterns
-    if (IPV4_RE.test(v) || IPV6_RE.test(v)) { ip++; continue; }
-    if (HTTP_METHODS.has(v.toUpperCase())) { method++; continue; }
-    if (UUID_RE.test(v)) { uuid++; continue; }
-    if (EMAIL_RE.test(v)) { email++; continue; }
-    if (/^https?:\/\//.test(v)) { url++; continue; }
+    if (IPV4_RE.test(v) || IPV6_RE.test(v)) {
+      ip++;
+      continue;
+    }
+    if (HTTP_METHODS.has(v.toUpperCase())) {
+      method++;
+      continue;
+    }
+    if (UUID_RE.test(v)) {
+      uuid++;
+      continue;
+    }
+    if (EMAIL_RE.test(v)) {
+      email++;
+      continue;
+    }
+    if (/^https?:\/\//.test(v)) {
+      url++;
+      continue;
+    }
     // Numeric — check float before int (float pattern is more specific)
-    if (FLOAT_RE.test(v)) { float++; continue; }
-    if (INT_RE.test(v)) { int++; continue; }
-    if (HEX_RE.test(v) && v.length >= 4) { hex++; continue; }
+    if (FLOAT_RE.test(v)) {
+      float++;
+      continue;
+    }
+    if (INT_RE.test(v)) {
+      int++;
+      continue;
+    }
+    if (HEX_RE.test(v) && v.length >= 4) {
+      hex++;
+      continue;
+    }
   }
 
   if (pattern >= threshold) return "pattern";
@@ -326,7 +374,11 @@ export function anomalyExplanation(
   }
   if (z < -1.5 && avg > 0) {
     const key = freq === 1 ? "search.patternAnomalyLowFreq" : "search.patternAnomalyLowFreqPlural";
-    return t(key, { freq: freq.toLocaleString(), avg: Math.round(avg).toLocaleString(), z: z.toFixed(2) });
+    return t(key, {
+      freq: freq.toLocaleString(),
+      avg: Math.round(avg).toLocaleString(),
+      z: z.toFixed(2),
+    });
   }
   const score = pattern.anomaly_score ?? 0;
   return t("search.patternAnomalyScore", { score: (score * 100).toFixed(0) });

@@ -5,18 +5,22 @@ import { inject } from "vue";
 import ODate from "./ODate.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
+import { raw, type I18nText } from "@/types/i18n";
 import type { FormDateProps } from "./OFormDate.types";
 
 defineOptions({ inheritAttrs: false });
+
+const errorText = (errors: readonly unknown[] | undefined): I18nText | undefined => {
+  const message = firstFieldError(errors);
+  return message ? raw(message) : undefined;
+};
 
 const props = defineProps<FormDateProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormDate] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormDate] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
@@ -38,13 +42,9 @@ if (import.meta.env.DEV && !form) {
         :id="props.id"
         :name="props.name"
         :model-value="field.state.value"
-        :error="
-          field.state.meta.errors.length > 0
-        "
+        :error="field.state.meta.errors.length > 0"
         :error-message="
-          field.state.meta.errors.length > 0
-            ? firstFieldError(field.state.meta.errors)
-            : undefined
+          field.state.meta.errors.length > 0 ? errorText(field.state.meta.errors) : undefined
         "
         @update:model-value="field.handleChange"
         @blur="field.handleBlur"

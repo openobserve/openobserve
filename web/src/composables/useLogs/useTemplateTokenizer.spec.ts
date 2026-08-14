@@ -149,46 +149,46 @@ describe("tokenizeTemplate", () => {
 });
 
 describe("wildcardChipColor", () => {
-  it('returns pattern chip color for generic wildcard <*>', () => {
+  it("returns pattern chip color for generic wildcard <*>", () => {
     const cls = wildcardChipColor("<*>");
     expect(cls).toContain("bg-label-chip-pattern-bg");
     expect(cls).toContain("text-label-chip-pattern-text");
   });
 
-  it('returns ip chip color for IP wildcard <:IP>', () => {
+  it("returns ip chip color for IP wildcard <:IP>", () => {
     const cls = wildcardChipColor("<:IP>");
     expect(cls).toContain("bg-label-chip-ip-bg");
   });
 
-  it('returns ip chip color for <:IPV4>', () => {
+  it("returns ip chip color for <:IPV4>", () => {
     expect(wildcardChipColor("<:IPV4>")).toContain("bg-label-chip-ip-bg");
   });
 
-  it('returns num chip color for numeric wildcard <:NUM>', () => {
+  it("returns num chip color for numeric wildcard <:NUM>", () => {
     expect(wildcardChipColor("<:NUM>")).toContain("bg-label-chip-num-bg");
   });
 
-  it('returns num chip color for <:INT>', () => {
+  it("returns num chip color for <:INT>", () => {
     expect(wildcardChipColor("<:INT>")).toContain("bg-label-chip-num-bg");
   });
 
-  it('returns num chip color for <:FLOAT>', () => {
+  it("returns num chip color for <:FLOAT>", () => {
     expect(wildcardChipColor("<:FLOAT>")).toContain("bg-label-chip-num-bg");
   });
 
-  it('returns num chip color for <:HEX>', () => {
+  it("returns num chip color for <:HEX>", () => {
     expect(wildcardChipColor("<:HEX>")).toContain("bg-label-chip-num-bg");
   });
 
-  it('returns ts chip color for timestamp wildcard <:TIMESTAMP>', () => {
+  it("returns ts chip color for timestamp wildcard <:TIMESTAMP>", () => {
     expect(wildcardChipColor("<:TIMESTAMP>")).toContain("bg-label-chip-ts-bg");
   });
 
-  it('returns ts chip color for <:DATE>', () => {
+  it("returns ts chip color for <:DATE>", () => {
     expect(wildcardChipColor("<:DATE>")).toContain("bg-label-chip-ts-bg");
   });
 
-  it('returns ts chip color for <:TIME>', () => {
+  it("returns ts chip color for <:TIME>", () => {
     expect(wildcardChipColor("<:TIME>")).toContain("bg-label-chip-ts-bg");
   });
 
@@ -315,7 +315,7 @@ describe("wildcardLabel", () => {
     expect(wildcardLabel("<:IDENTIFIERS>")).toBe("id");
   });
 
-  it('returns <*> for generic wildcard without sampleValues', () => {
+  it("returns <*> for generic wildcard without sampleValues", () => {
     expect(wildcardLabel("<*>")).toBe("<*>");
   });
 
@@ -457,20 +457,14 @@ describe("anomalyExplanation", () => {
   };
 
   it("returns patternAnomalyRare key for very low percentage with freq===1", () => {
-    const result = anomalyExplanation(
-      { percentage: 0.05, frequency: 1 },
-      t,
-    );
+    const result = anomalyExplanation({ percentage: 0.05, frequency: 1 }, t);
     expect(result).toContain("search.patternAnomalyRare");
     expect(result).toContain("pct=0.05");
     expect(result).toContain("freq=1");
   });
 
   it("returns patternAnomalyRarePlural for very low percentage with freq>1", () => {
-    const result = anomalyExplanation(
-      { percentage: 0.5, frequency: 3 },
-      t,
-    );
+    const result = anomalyExplanation({ percentage: 0.5, frequency: 3 }, t);
     expect(result).toContain("search.patternAnomalyRarePlural");
     expect(result).toContain("freq=3");
   });
@@ -493,10 +487,7 @@ describe("anomalyExplanation", () => {
   });
 
   it("falls back to anomaly score when no other condition matches", () => {
-    const result = anomalyExplanation(
-      { percentage: 50, anomaly_score: 0.1234 },
-      t,
-    );
+    const result = anomalyExplanation({ percentage: 50, anomaly_score: 0.1234 }, t);
     expect(result).toContain("search.patternAnomalyScore");
     expect(result).toContain("score=12"); // 0.1234 * 100 = 12.34 → "12"
   });

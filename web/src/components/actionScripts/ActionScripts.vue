@@ -23,19 +23,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bleed
         :title="t('actions.header')"
         icon="code"
-        :subtitle="'Custom automation and scripting'"
+        :subtitle="t('actions.pageSubtitle')"
       >
         <!-- Row 1: standard header — title + actions only. Search moved into the
              table's own toolbar below. -->
-            <template #actions>
-              <OButton
-                data-test="action-list-add-btn"
-                variant="primary"
-                size="sm"
-                @click="showAddUpdateFn({})"
-                >{{ t("actions.add") }}</OButton
-              >
-            </template>
+        <template #actions>
+          <OButton
+            data-test="action-list-add-btn"
+            variant="primary"
+            size="sm"
+            @click="showAddUpdateFn({})"
+            >{{ t("actions.add") }}</OButton
+          >
+        </template>
         <OTable
           data-test="action-scripts-table"
           :data="visibleRows"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <OSearchInput
               v-model="filterQuery"
-              class="w-64 no-border o2-search-input"
+              class="no-border o2-search-input w-64"
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
             />
@@ -78,98 +78,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="actionsRefresh" />
             </OButton>
           </template>
-            <template #empty>
-              <NoData />
-            </template>
-            <template #cell-created_by="{ row }">
-              <OUserCell :value="row.created_by" />
-            </template>
-            <template #cell-created_at="{ row }">
-              <OTimeCell
-                :value="row.created_at_raw"
-                unit="us"
-                :timezone="store.state.timezone"
-              />
-            </template>
-            <template #cell-execution_details_type="{ row }">
-              <OTag :value="row.execution_details_type" />
-            </template>
-            <template #cell-last_run_at="{ row }">
-              <OTimeCell
-                :value="row.last_run_at_raw"
-                unit="us"
-                mode="absolute"
-                :timezone="store.state.timezone"
-                empty-label="Never"
-              />
-            </template>
-            <template #cell-last_successful_at="{ row }">
-              <OTimeCell
-                :value="row.last_successful_at_raw"
-                unit="us"
-                mode="absolute"
-                :timezone="store.state.timezone"
-                empty-label="Never"
-              />
-            </template>
-            <template #cell-status="{ row }">
-              <OTag :value="row.status" />
-            </template>
-            <template #cell-actions="{ row }">
-              <div
-                data-test="action-scripts-loading"
-                v-if="alertStateLoadingMap[row.uuid]"
-                style="display: inline-block; width: 33.14px"
-                class="flex justify-center items-center ml-1 h-auto"
-                :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
-              >
-                <OSpinner size="xs" />
-              </div>
-              <OButton
-                :data-test="`alert-list-${row.name}-update-alert`"
-                data-row-action="edit"
-                variant="ghost"
-                size="icon-sm"
-                :title="t('alerts.edit')"
-                @click="showAddUpdateFn({ row })"
-                ><OIcon name="edit" size="sm"
-              /></OButton>
-              <OButton
-                :data-test="`alert-list-${row.name}-delete-alert`"
-                data-row-action="delete"
-                variant="ghost"
-                size="icon-sm"
-                :title="t('alerts.delete')"
-                @click="showDeleteDialogFn({ row })"
-                ><OIcon name="delete" size="sm"
-              /></OButton>
-            </template>
+          <template #empty>
+            <NoData />
+          </template>
+          <template #cell-created_by="{ row }">
+            <OUserCell :value="row.created_by" />
+          </template>
+          <template #cell-created_at="{ row }">
+            <OTimeCell :value="row.created_at_raw" unit="us" :timezone="store.state.timezone" />
+          </template>
+          <template #cell-execution_details_type="{ row }">
+            <OTag :value="row.execution_details_type" />
+          </template>
+          <template #cell-last_run_at="{ row }">
+            <OTimeCell
+              :value="row.last_run_at_raw"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              :empty-label="t('alerts.never')"
+            />
+          </template>
+          <template #cell-last_successful_at="{ row }">
+            <OTimeCell
+              :value="row.last_successful_at_raw"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              :empty-label="t('alerts.never')"
+            />
+          </template>
+          <template #cell-status="{ row }">
+            <OTag :value="row.status" />
+          </template>
+          <template #cell-actions="{ row }">
+            <div
+              data-test="action-scripts-loading"
+              v-if="alertStateLoadingMap[row.uuid]"
+              style="display: inline-block; width: 2.07125rem"
+              class="ml-1 flex h-auto items-center justify-center"
+              :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
+            >
+              <OSpinner size="xs" />
+            </div>
+            <OButton
+              :data-test="`alert-list-${row.name}-update-alert`"
+              data-row-action="edit"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('alerts.edit')"
+              @click="showAddUpdateFn({ row })"
+              ><OIcon name="edit" size="sm"
+            /></OButton>
+            <OButton
+              :data-test="`alert-list-${row.name}-delete-alert`"
+              data-row-action="delete"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('alerts.delete')"
+              @click="showDeleteDialogFn({ row })"
+              ><OIcon name="delete" size="sm"
+            /></OButton>
+          </template>
 
-            <template #bottom>
-              <div
-                class="flex items-center justify-between w-full h-12"
-              >
-                <div class="flex items-center gap-2">
-                  <div
-                    class="text-xs font-normal flex items-center w-20 mr-md"
-                  >
-                    {{ resultTotal }} {{ t("actions.header") }}
-                  </div>
-                  <OButton
-                    v-if="selectedActionScripts.length > 0"
-                    data-test="action-scripts-bulk-delete-btn"
-                    variant="secondary"
-                    size="sm"
-                    :loading="bulkDeleteLoading"
-                    @click="openBulkDeleteDialog"
-                    ><OIcon name="delete" size="sm" /><span class="ml-1.5"
-                      >Delete</span
-                    ></OButton
-                  >
+          <template #bottom>
+            <div class="flex h-12 w-full items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="mr-md flex w-20 items-center text-xs font-normal">
+                  {{ resultTotal }} {{ t("actions.header") }}
                 </div>
+                <OButton
+                  v-if="selectedActionScripts.length > 0"
+                  data-test="action-scripts-bulk-delete-btn"
+                  variant="secondary"
+                  size="sm"
+                  :loading="bulkDeleteLoading"
+                  @click="openBulkDeleteDialog"
+                  ><OIcon name="delete" size="sm" /><span class="ml-1.5">{{
+                    t("common.delete")
+                  }}</span></OButton
+                >
               </div>
-            </template>
-          </OTable>
+            </div>
+          </template>
+        </OTable>
       </OPageLayout>
     </div>
     <template v-else>
@@ -183,15 +175,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <ConfirmDialog
-      title="Delete Action"
-      message="Are you sure you want to delete Action?"
+      :title="t('alerts.deleteActionTitle')"
+      :message="t('alerts.deleteActionMessage')"
       @update:ok="deleteAlert"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      title="Bulk Delete Action Scripts"
-      :message="`Are you sure you want to delete ${selectedActionScripts.length} action script(s)?`"
+      :title="t('alerts.bulkDeleteActionScriptsTitle')"
+      :message="
+        t('actionScripts.confirmDeleteActionScripts', { count: selectedActionScripts.length })
+      "
       @update:ok="bulkDeleteActionScripts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -212,9 +206,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header-left>
         <div
           data-test="add-action-back-btn"
-          class="flex justify-center items-center cursor-pointer"
-          style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
-          title="Go Back"
+          class="flex size-5.5 cursor-pointer items-center justify-center rounded-full border border-current"
+          :title="t('common.goBack')"
           @click="showForm = false"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
@@ -224,12 +217,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           data-test="to-be-clone-action-name"
           v-model="toBeCloneAlertName"
-          label="Alert Name"
+          :label="t('alerts.alertName')"
         />
         <OSelect
           data-test="to-be-clone-stream-type"
           v-model="toBeClonestreamType"
-          label="Stream Type"
+          :label="t('alerts.streamType')"
           :options="streamTypes"
           @update:model-value="updateStreams()"
         />
@@ -238,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="toBeClonestreamName"
           :loading="isFetchingStreams"
           :disabled="!toBeClonestreamType"
-          label="Stream Name"
+          :label="t('alerts.stream_name')"
           :options="streamNames"
           @update:model-value="updateStreamName"
         />
@@ -248,20 +241,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  watch,
-  defineAsyncComponent,
-  computed,
-} from "vue";
+import { defineComponent, ref, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
@@ -311,9 +298,7 @@ export default defineComponent({
   components: {
     OPageLayout,
     OIcon,
-    EditScript: defineAsyncComponent(
-      () => import("@/components/actionScripts/EditScript.vue"),
-    ),
+    EditScript: defineAsyncComponent(() => import("@/components/actionScripts/EditScript.vue")),
     NoData,
     ConfirmDialog,
     OButton,
@@ -329,14 +314,10 @@ export default defineComponent({
     OUserCell,
     OTag,
   },
-  emits: [
-    "updated:fields",
-    "update:changeRecordPerPage",
-    "update:maxRecordToReturn",
-  ],
+  emits: ["updated:fields", "update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const alerts: Ref<Alert[]> = ref([]);
     const actionsScriptRows: Ref<ActionScriptList[]> = ref([]);
@@ -360,7 +341,7 @@ export default defineComponent({
     const { getAllActions } = useActions();
     const { track } = useReo();
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     // Clone-dialog bindings referenced by the template; nothing opens the dialog yet.
     const showForm = ref(false);
@@ -460,12 +441,8 @@ export default defineComponent({
     );
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
-      const map = new Map(
-        actionsScriptRows.value.map((r: any) => [r.id, r]),
-      );
-      selectedActionScripts.value = ids
-        .map((id: any) => map.get(id))
-        .filter(Boolean);
+      const map = new Map(actionsScriptRows.value.map((r: any) => [r.id, r]));
+      selectedActionScripts.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
 
     const activeTab: any = ref("alerts");
@@ -475,42 +452,34 @@ export default defineComponent({
     const getActionScripts = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading actions...",
-              timeout: 0,
-});
+        message: t("toastMessages.actionScripts.pleaseWaitWhileLoadingActions"),
+        timeout: 0,
+      });
 
       loading.value = true;
       getAllActions()
         .then(() => {
           resultTotal.value = store.state.organizationData.actions.length;
-          alerts.value = store.state.organizationData.actions.map(
-            (alert: any) => {
-              return {
-                ...alert,
-                uuid: getUUID(),
-              };
-            },
-          );
+          alerts.value = store.state.organizationData.actions.map((alert: any) => {
+            return {
+              ...alert,
+              uuid: getUUID(),
+            };
+          });
           actionsScriptRows.value = alerts.value.map((data: any) => {
-            if (data.execution_details_type === "repeat")
-              data.execution_details_type = "Cron Job";
+            if (data.execution_details_type === "repeat") data.execution_details_type = "Cron Job";
             if (data.execution_details_type === "service")
               data.execution_details_type = "Real Time";
-            if (data.execution_details_type === "once")
-              data.execution_details_type = "Once";
+            if (data.execution_details_type === "once") data.execution_details_type = "Once";
             return {
               id: data.id,
               name: data.name,
               uuid: data.uuid,
               created_by: data.created_by,
               created_at_raw: data.created_at || null,
-              created_at: data.created_at
-                ? convertUnixToDateFormat(data.created_at)
-                : "-",
+              created_at: data.created_at ? convertUnixToDateFormat(data.created_at) : "-",
               last_run_at_raw: data.last_run_at || null,
-              last_run_at: data.last_run_at
-                ? convertUnixToDateFormat(data.last_run_at)
-                : "-",
+              last_run_at: data.last_run_at ? convertUnixToDateFormat(data.last_run_at) : "-",
               last_successful_at_raw: data.last_successful_at || null,
               last_successful_at: data.last_successful_at
                 ? convertUnixToDateFormat(data.last_successful_at)
@@ -538,7 +507,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "error",
-            message: "Error while pulling Actions.",
+            message: t("toastMessages.actionScripts.errorWhilePullingActions"),
           });
         })
         .finally(() => {
@@ -572,9 +541,7 @@ export default defineComponent({
     };
 
     const showAddUpdateFn = (props: any) => {
-      formData.value = alerts.value.find(
-        (alert: any) => alert.uuid === props.row?.uuid,
-      ) as Alert;
+      formData.value = alerts.value.find((alert: any) => alert.uuid === props.row?.uuid) as Alert;
       let action;
       if (!props.row) {
         isUpdated.value = false;
@@ -624,10 +591,7 @@ export default defineComponent({
 
     const deleteAlert = () => {
       actions
-        .delete(
-          store.state.selectedOrganization.identifier,
-          selectedDelete.value.id,
-        )
+        .delete(store.state.selectedOrganization.identifier, selectedDelete.value.id)
         .then((res: any) => {
           if (res.data.code == 200) {
             toast({
@@ -677,18 +641,15 @@ export default defineComponent({
         if (selectedActionScripts.value.length === 0) {
           toast({
             variant: "warning",
-            message: "No action scripts selected",
+            message: t("toastMessages.actionScripts.noActionScriptsSelected"),
           });
           confirmBulkDelete.value = false;
           return;
         }
 
-        const response = await actions.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          {
-            ids: selectedActionScripts.value.map((script: any) => script.id),
-          },
-        );
+        const response = await actions.bulkDelete(store.state.selectedOrganization.identifier, {
+          ids: selectedActionScripts.value.map((script: any) => script.id),
+        });
 
         const { successful = [], unsuccessful = [], err } = response.data || {};
 
@@ -699,17 +660,24 @@ export default defineComponent({
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
             variant: "success",
-            message: `Successfully deleted ${successful.length} action script(s)`,
+            message: t("toastMessages.actionScripts.successfullyDeletedActionScripts", {
+              count: successful.length,
+            }),
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             variant: "warning",
-            message: `Deleted ${successful.length} action script(s). Failed to delete ${unsuccessful.length} action script(s)`,
+            message: t("toastMessages.actionScripts.actionScriptsDeletedWithFailures", {
+              count: successful.length,
+              failed: unsuccessful.length,
+            }),
           });
         } else if (unsuccessful.length > 0) {
           toast({
             variant: "error",
-            message: `Failed to delete ${unsuccessful.length} action script(s)`,
+            message: t("toastMessages.actionScripts.failedToDeleteActionScripts", {
+              count: unsuccessful.length,
+            }),
           });
         }
 
@@ -739,11 +707,9 @@ export default defineComponent({
       if (resetStream) toBeClonestreamName.value = "";
       if (streams.value[toBeClonestreamType.value]) {
         schemaList.value = streams.value[toBeClonestreamType.value];
-        indexOptions.value = streams.value[toBeClonestreamType.value].map(
-          (data: any) => {
-            return data.name;
-          },
-        );
+        indexOptions.value = streams.value[toBeClonestreamType.value].map((data: any) => {
+          return data.name;
+        });
         updateStreamName(toBeClonestreamName.value);
 
         return;
@@ -771,8 +737,7 @@ export default defineComponent({
       for (var i = 0; i < rows.length; i++) {
         if (
           rows[i]["name"].toLowerCase().includes(terms) ||
-          (rows[i]["owner"] != null &&
-            rows[i]["owner"].toLowerCase().includes(terms)) ||
+          (rows[i]["owner"] != null && rows[i]["owner"].toLowerCase().includes(terms)) ||
           (rows[i]["description"] != null &&
             rows[i]["description"].toString().toLowerCase().includes(terms))
         ) {
@@ -799,7 +764,12 @@ export default defineComponent({
     );
 
     useShortcuts([
-      { id: "actionsRefresh", handler: () => { if (!isInputFocused()) getActionScripts(); } },
+      {
+        id: "actionsRefresh",
+        handler: () => {
+          if (!isInputFocused()) getActionScripts();
+        },
+      },
     ]);
 
     return {
@@ -863,4 +833,3 @@ export default defineComponent({
   },
 });
 </script>
-

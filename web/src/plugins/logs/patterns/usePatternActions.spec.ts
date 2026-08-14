@@ -90,22 +90,21 @@ vi.mock("@/composables/useLogs/usePatterns", () => ({
 }));
 
 // patternUtils mock
-vi.mock("./patternUtils", () => ({
-  extractConstantsFromPattern: vi.fn(),
-  escapeForMatchAll: vi.fn((s: string) => s),
-  buildPatternAlertData: vi.fn(() => ({
-    streamName: "test-stream",
-    sqlQuery: "SELECT *",
-    alertName: "Alert_test-stream_User",
-  })),
-}));
+// Partial mock: only the constant extraction is stubbed (tests drive it to
+// simulate usable / unusable patterns). The SQL builder and the pattern cap stay
+// real, so these tests exercise the query the user would actually get.
+vi.mock("./patternUtils", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    extractConstantsFromPattern: vi.fn(),
+    escapeForMatchAll: vi.fn((s: string) => s),
+  };
+});
 
 // -- Import after mocks --
 import { usePatternActions } from "./usePatternActions";
-import {
-  extractConstantsFromPattern,
-  buildPatternAlertData,
-} from "./patternUtils";
+import { extractConstantsFromPattern } from "./patternUtils";
 
 describe("usePatternActions", () => {
   beforeEach(() => {
@@ -113,15 +112,17 @@ describe("usePatternActions", () => {
     // Reset shared state between tests
     mockSearchObj.data.stream.addToFilter = "";
     mockSearchObj.meta.logsVisualizeToggle = "patterns";
-    const { selectedPattern, showPatternDetails } = usePatternActions();
+    const { selectedPattern, showPatternDetails, setActiveSeverities } = usePatternActions();
     selectedPattern.value = null;
     showPatternDetails.value = false;
+    // The severity filter is module-scoped (shared with the alert builder), so
+    // it must be reset between tests like any other singleton.
+    setActiveSeverities([]);
   });
 
   describe("openPatternDetails", () => {
     it("should set selectedPattern and showPatternDetails", () => {
-      const { openPatternDetails, selectedPattern, showPatternDetails } =
-        usePatternActions();
+      const { openPatternDetails, selectedPattern, showPatternDetails } = usePatternActions();
       const pattern = { template: "test", pattern_id: "p1" };
 
       openPatternDetails(pattern, 0);
@@ -133,8 +134,7 @@ describe("usePatternActions", () => {
 
   describe("navigatePatternDetail", () => {
     it("should navigate to next pattern", () => {
-      const { openPatternDetails, navigatePatternDetail, selectedPattern } =
-        usePatternActions();
+      const { openPatternDetails, navigatePatternDetail, selectedPattern } = usePatternActions();
       openPatternDetails({ template: "first", pattern_id: "p1" }, 0);
 
       navigatePatternDetail(true, false);
@@ -144,8 +144,7 @@ describe("usePatternActions", () => {
     });
 
     it("should navigate to previous pattern", () => {
-      const { openPatternDetails, navigatePatternDetail, selectedPattern } =
-        usePatternActions();
+      const { openPatternDetails, navigatePatternDetail, selectedPattern } = usePatternActions();
       openPatternDetails({ template: "first", pattern_id: "p1" }, 1);
 
       navigatePatternDetail(false, true);
@@ -154,8 +153,7 @@ describe("usePatternActions", () => {
     });
 
     it("should not navigate beyond the first pattern when going prev", () => {
-      const { openPatternDetails, navigatePatternDetail, selectedPattern } =
-        usePatternActions();
+      const { openPatternDetails, navigatePatternDetail, selectedPattern } = usePatternActions();
       openPatternDetails({ template: "first", pattern_id: "p1" }, 0);
 
       navigatePatternDetail(false, true);
@@ -164,8 +162,7 @@ describe("usePatternActions", () => {
     });
 
     it("should not navigate beyond the last pattern when going next", () => {
-      const { openPatternDetails, navigatePatternDetail, selectedPattern } =
-        usePatternActions();
+      const { openPatternDetails, navigatePatternDetail, selectedPattern } = usePatternActions();
       openPatternDetails({ template: "second", pattern_id: "p2" }, 1);
 
       navigatePatternDetail(true, false);
@@ -207,10 +204,7 @@ describe("usePatternActions", () => {
 
   describe("addPatternToSearch", () => {
     it("should build filter from constants and set addToFilter", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([
-        "User logged in",
-        "from address",
-      ]);
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in", "from address"]);
       const { addPatternToSearch } = usePatternActions();
 
       addPatternToSearch({ template: "User <*> from <:IP>" }, "include");
@@ -222,23 +216,16 @@ describe("usePatternActions", () => {
     });
 
     it("should wrap with NOT for exclude action", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([
-        "User logged in",
-      ]);
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in"]);
       const { addPatternToSearch } = usePatternActions();
 
       addPatternToSearch({ template: "User <*> from <:IP>" }, "exclude");
 
-      expect(mockSearchObj.data.stream.addToFilter).toBe(
-        "NOT match_all('User logged in')",
-      );
+      expect(mockSearchObj.data.stream.addToFilter).toBe("NOT match_all('User logged in')");
     });
 
     it("should wrap multiple clauses with NOT (...) for exclude action", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([
-        "User logged in",
-        "from address",
-      ]);
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in", "from address"]);
       const { addPatternToSearch } = usePatternActions();
 
       addPatternToSearch({ template: "User <*> from <:IP>" }, "exclude");
@@ -254,9 +241,7 @@ describe("usePatternActions", () => {
 
       addPatternToSearch({ template: "<*>" }, "include");
 
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(mockSearchObj.data.stream.addToFilter).toBe("");
     });
   });
@@ -267,9 +252,7 @@ describe("usePatternActions", () => {
 
       addWildcardValueToSearch("192.168.1.1", "include");
 
-      expect(mockSearchObj.data.stream.addToFilter).toBe(
-        "match_all('192.168.1.1')",
-      );
+      expect(mockSearchObj.data.stream.addToFilter).toBe("match_all('192.168.1.1')");
       expect(mockSearchObj.meta.logsVisualizeToggle).toBe("logs");
     });
 
@@ -278,83 +261,95 @@ describe("usePatternActions", () => {
 
       addWildcardValueToSearch("error_message", "exclude");
 
-      expect(mockSearchObj.data.stream.addToFilter).toBe(
-        "NOT match_all('error_message')",
-      );
+      expect(mockSearchObj.data.stream.addToFilter).toBe("NOT match_all('error_message')");
     });
   });
 
-  describe("createAlertFromPattern", () => {
+  describe("severity filter (shared with the alert builder)", () => {
+    it("is module-scoped so the list and the builder cannot disagree", () => {
+      const a = usePatternActions();
+      const b = usePatternActions();
+
+      a.setActiveSeverities(["error"]);
+      expect(b.activeSeverities.value).toEqual(["error"]);
+    });
+  });
+
+  describe("buildPatternsAlertPrefill", () => {
+    // Templates whose constants survive the real extractConstantsFromPattern,
+    // which the SQL builder calls internally.
+    const ERR = "Connection refused to upstream <*>";
+    const PROBE = "Health probe succeeded for endpoint <*>";
+
     beforeEach(() => {
-      // Provide constants so alert creation proceeds
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([
-        "User logged in",
-      ]);
-      // Re-set buildPatternAlertData return value (cleared by outer beforeEach vi.clearAllMocks)
-      vi.mocked(buildPatternAlertData).mockReturnValue({
-        streamName: "test-stream",
-        sqlQuery: "SELECT *",
-        alertName: "Alert_test-stream_User",
-      });
-      // Ensure stream is selected (previous tests may have cleared it)
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["Connection refused to upstream"]);
       mockSearchObj.data.stream.selectedStream = ["test-stream"];
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.query = "";
+      mockPatternsState.value.patterns.patterns = [
+        { pattern_id: "p1", template: ERR, level: "error" },
+        { pattern_id: "p2", template: PROBE, level: "info" },
+      ];
+      usePatternActions().setActiveSeverities([]);
     });
 
-    it("should navigate to addAlert with pattern data", () => {
-      const { createAlertFromPattern } = usePatternActions();
+    it("folds every visible pattern into the filter, excluding by default", () => {
+      const prefill = usePatternActions().buildPatternsAlertPrefill();
 
-      createAlertFromPattern({
-        template: "User <*> logged in",
+      expect(prefill.source).toBe("patterns");
+      expect(prefill.streamName).toBe("test-stream");
+      expect(prefill.patternFilter?.mode).toBe("exclude");
+      expect(prefill.patternFilter?.visibleCount).toBe(2);
+      expect(prefill.patternFilter?.totalCount).toBe(2);
+      expect(prefill.sql).toContain("NOT (");
+    });
+
+    it("honours the mode the dialog asks for", () => {
+      const prefill = usePatternActions().buildPatternsAlertPrefill({ patternMode: "include" });
+
+      expect(prefill.patternFilter?.mode).toBe("include");
+      expect(prefill.sql).not.toContain("NOT (");
+    });
+
+    it("uses only the patterns the severity filter leaves visible", () => {
+      const api = usePatternActions();
+      api.setActiveSeverities(["error"]);
+
+      const prefill = api.buildPatternsAlertPrefill();
+
+      expect(prefill.patternFilter?.visibleCount).toBe(1);
+      expect(prefill.patternFilter?.totalCount).toBe(2);
+      expect(prefill.patternFilter?.filtered).toBe(true);
+    });
+
+    it("reports an unfiltered list as such", () => {
+      expect(usePatternActions().buildPatternsAlertPrefill().patternFilter?.filtered).toBe(false);
+    });
+
+    it("ANDs the current search filter in front of the pattern terms", () => {
+      mockSearchObj.data.query = "code = 500";
+      expect(usePatternActions().buildPatternsAlertPrefill().sql).toContain("(code = 500)");
+    });
+
+    it("says so when a SQL-mode query cannot be spliced in", () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.query = 'SELECT * FROM "test-stream"';
+
+      const prefill = usePatternActions().buildPatternsAlertPrefill();
+
+      expect(prefill.warnings.map((w: any) => w.key)).toContain("sqlModeFilterDropped");
+      expect(prefill.sql).not.toContain('SELECT * FROM "test-stream")');
+    });
+
+    it("builds a single-pattern prefill for the detail drawer", () => {
+      const prefill = usePatternActions().buildSinglePatternAlertPrefill({
+        template: ERR,
         pattern_id: "p1",
-        frequency: 100,
-        percentage: 50,
       });
 
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "addAlert",
-          query: expect.objectContaining({ fromPattern: "true" }),
-        }),
-      );
-    });
-
-    it("should warn when no stream is selected", () => {
-      mockSearchObj.data.stream.selectedStream = [];
-      const { createAlertFromPattern } = usePatternActions();
-
-      createAlertFromPattern({ template: "User <*> logged in" });
-
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
-      expect(mockRouterPush).not.toHaveBeenCalled();
-    });
-
-    it("should warn when pattern has no long constants", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([]);
-      const { createAlertFromPattern } = usePatternActions();
-
-      createAlertFromPattern({ template: "<*>" });
-
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
-      expect(mockRouterPush).not.toHaveBeenCalled();
-    });
-
-    it("should store patternData in sessionStorage", () => {
-      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
-      const { createAlertFromPattern } = usePatternActions();
-
-      createAlertFromPattern({
-        template: "User <*> logged in",
-        pattern_id: "p1",
-      });
-
-      expect(setItemSpy).toHaveBeenCalledWith(
-        "patternData",
-        expect.any(String),
-      );
+      expect(prefill.source).toBe("patterns");
+      expect(prefill.patternFilter?.mode).toBe("include");
+      expect(prefill.meta?.appliedPatterns).toEqual([ERR]);
     });
   });
 });

@@ -291,6 +291,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_apostrophe_/,            // e2e_apostrophe_* (Bug #9475 apostrophe test streams from logs-regression.spec.js)
         /^e2e_highlighting_test$/,     // e2e_highlighting_test (Bug #9754 logs highlighting test stream from logs-9754.spec.js)
         /^e2e_streamcreation_/,        // e2e_streamcreation_* (Stream creation UI test streams)
+        /^e2e_qp_more_stream_/,        // e2e_qp_more_stream_* (logsQuickPick.spec.js more-footer seed streams)
         /^e2e_MyUpperStream/i,         // e2e_MyUpperStream* (Stream name casing test streams)
         /^e2e_mylowerstream/i,         // e2e_mylowerstream* (Stream name casing test streams)
         /^[a-z]{8,9}$/,                // Random 8-9 char lowercase strings
@@ -305,7 +306,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_universal_(src|dest)_\d+$/,     // Test 9: Universal condition test streams
         /^e2e_4level_(src|dest)_\d+$/,        // Test 10: 4-level nested test streams
         /^stream\d{13}$/,                     // stream1765164273471, etc. (timestamp-based test streams)
-        /^e2e_http_patterns$/,                // Pattern tests stream (searchPatterns.spec.js)
+        /^e2e_http_patterns/,                 // Pattern tests stream (searchPatterns.spec.js) — prefix covers the unique per-run e2e_http_patterns_<token> names
         /^e2e_stream_(a|b)_\d+$/,             // Regression test streams (e2e_stream_a_*, e2e_stream_b_*)
         /^join_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams (join_<testId>_requests, etc.)
         /^join_[a-z0-9]+_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams with extra segment (join_<id1>_<id2>_requests, etc.)

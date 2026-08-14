@@ -30,6 +30,7 @@ import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
 import PrometheusConfig from "@/components/ingestion/metrics/PrometheusConfig.vue";
 import VMagentConfig from "@/components/ingestion/metrics/VMagentConfig.vue";
 import NightingaleConfig from "@/components/ingestion/metrics/NightingaleConfig.vue";
+import CategrafConfig from "@/components/ingestion/metrics/CategrafConfig.vue";
 import OtelCollector from "@/components/ingestion/metrics/OtelCollector.vue";
 import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
 import CloudWatchMetricConfig from "@/components/ingestion/metrics/CloudWatchMetrics.vue";
@@ -268,6 +269,14 @@ const useIngestionRoutes = () => {
                   },
                 },
                 {
+                  path: "categraf",
+                  name: "categraf",
+                  component: CategrafConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
                   path: "otelcollector",
                   name: "otelCollector",
                   component: OtelCollector,
@@ -401,22 +410,17 @@ const useIngestionRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
-            // Discoverability pointer → the MCP setup home in IAM. Enterprise/
-            // Cloud only (matches where the tab is shown in Recommended.vue and
-            // where the target "mcpServer" route exists), so an OSS deep-link
-            // can't land here and push to a route that doesn't exist.
-            ...(config.isEnterprise == "true" || config.isCloud == "true"
-              ? [
-                  {
-                    path: "mcp",
-                    name: "recommendedMcp",
-                    component: McpCrossLink,
-                    beforeEnter(to: any, from: any, next: any) {
-                      routeGuard(to, from, next);
-                    },
-                  },
-                ]
-              : []),
+            // Discoverability pointer → the MCP setup home in IAM. Registered on
+            // every edition, matching both the tab in Recommended.vue and the
+            // target "mcpServer" route, which are no longer build-gated.
+            {
+              path: "mcp",
+              name: "recommendedMcp",
+              component: McpCrossLink,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
           ],
         },
         {

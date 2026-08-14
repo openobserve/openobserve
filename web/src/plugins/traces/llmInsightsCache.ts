@@ -53,12 +53,7 @@ export interface KpiSnapshot {
  * identity per selection. (The KPI strip also calls this directly with the same
  * name/placeholder.)
  */
-export function selectionKey(
-  stream: string,
-  agent: string,
-  start: number,
-  end: number,
-): string {
+export function selectionKey(stream: string, agent: string, start: number, end: number): string {
   return `${stream}::${agent}::${start}-${end}`;
 }
 

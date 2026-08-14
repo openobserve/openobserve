@@ -163,7 +163,7 @@ describe("SyntheticsLocationForm", () => {
         id: "aws-us-east-1",
         provider: "aws",
         region: "us-east-1",
-        name: "AWS US East",
+        label: "AWS US East",
         enabled: false,
       },
     });
@@ -189,19 +189,19 @@ describe("SyntheticsLocationForm", () => {
     wrapper = createWrapper({
       isEdit: true,
       data: {
-        id: "datadog-us-west-1",
-        provider: "datadog",
+        id: "acme-us-west-1",
+        provider: "acme",
         region: "us-west-1",
-        name: "Datadog US West",
+        label: "Acme US West",
         enabled: true,
       },
     });
 
     expect(wrapper.vm.locationFormDefaults).toEqual({
       provider: "custom",
-      customProvider: "datadog",
+      customProvider: "acme",
       region: "us-west-1",
-      label: "Datadog US West",
+      label: "Acme US West",
       enabled: true,
     });
   });
@@ -224,15 +224,13 @@ describe("SyntheticsLocationForm", () => {
     // providerValue to "custom", which conditionally renders the input.
     wrapper = createWrapper({
       isEdit: true,
-      data: { provider: "datadog", region: "us-east-1", name: "Test" },
+      data: { provider: "acme", region: "us-east-1", label: "Test" },
     });
 
     // providerValue is initialized from locationFormDefaults.provider = "custom"
     expect(wrapper.vm.providerValue).toBe("custom");
 
-    const customInput = wrapper.find(
-      '[data-test="synthetics-location-custom-provider-input"]',
-    );
+    const customInput = wrapper.find('[data-test="synthetics-location-custom-provider-input"]');
     expect(customInput.exists()).toBe(true);
   });
 
@@ -243,22 +241,18 @@ describe("SyntheticsLocationForm", () => {
     wrapper = createWrapper({ isEdit: false });
     expect(wrapper.vm.providerValue).toBe("aws");
 
-    const customInput = wrapper.find(
-      '[data-test="synthetics-location-custom-provider-input"]',
-    );
+    const customInput = wrapper.find('[data-test="synthetics-location-custom-provider-input"]');
     expect(customInput.exists()).toBe(false);
   });
 
   it("hides customProvider when editing a known provider (aws)", () => {
     wrapper = createWrapper({
       isEdit: true,
-      data: { provider: "aws", region: "us-east-1", name: "Test" },
+      data: { provider: "aws", region: "us-east-1", label: "Test" },
     });
     expect(wrapper.vm.providerValue).toBe("aws");
 
-    const customInput = wrapper.find(
-      '[data-test="synthetics-location-custom-provider-input"]',
-    );
+    const customInput = wrapper.find('[data-test="synthetics-location-custom-provider-input"]');
     expect(customInput.exists()).toBe(false);
   });
 
@@ -328,17 +322,17 @@ describe("SyntheticsLocationForm", () => {
 
     await wrapper.vm.saveLocation({
       provider: "custom",
-      customProvider: "datadog",
+      customProvider: "acme",
       region: "us-west-1",
-      label: "Datadog US West",
+      label: "Acme US West",
       enabled: true,
     });
 
     expect(createLocMock).toHaveBeenCalledWith(
       "default",
       expect.objectContaining({
-        provider: "datadog",
-        id: "datadog-us-west-1",
+        provider: "acme",
+        id: "acme-us-west-1",
       }),
     );
   });
@@ -355,7 +349,7 @@ describe("SyntheticsLocationForm", () => {
         id: "azure-eastus",
         provider: "azure",
         region: "eastus",
-        name: "Azure East US",
+        label: "Azure East US",
         enabled: true,
       },
     });
@@ -414,7 +408,7 @@ describe("SyntheticsLocationForm", () => {
 
     wrapper = createWrapper({
       isEdit: true,
-      data: { id: "aws-us-east-1", provider: "aws", region: "us-east-1", name: "Test" },
+      data: { id: "aws-us-east-1", provider: "aws", region: "us-east-1", label: "Test" },
     });
 
     await wrapper.vm.saveLocation({
@@ -441,7 +435,7 @@ describe("SyntheticsLocationForm", () => {
   it("renders the location ID label and container", () => {
     wrapper = createWrapper({
       isEdit: true,
-      data: { provider: "gcp", region: "us-central1", name: "GCP Central" },
+      data: { provider: "gcp", region: "us-central1", label: "GCP Central" },
     });
     // The "Location ID" label and the derived-id container are present.
     expect(wrapper.text()).toContain("Location ID");
@@ -457,25 +451,15 @@ describe("SyntheticsLocationForm", () => {
   it("renders all expected data-test attributes", () => {
     wrapper = createWrapper();
 
-    expect(
-      wrapper.find('[data-test="synthetics-location-form-drawer"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="synthetics-location-provider-select"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-location-form-drawer"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-location-provider-select"]').exists()).toBe(true);
     // customProvider is hidden for non-custom provider
-    expect(
-      wrapper.find('[data-test="synthetics-location-custom-provider-input"]').exists(),
-    ).toBe(false);
-    expect(
-      wrapper.find('[data-test="synthetics-location-region-input"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="synthetics-location-label-input"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="synthetics-location-enabled-toggle"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-location-custom-provider-input"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="synthetics-location-region-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-location-label-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-location-enabled-toggle"]').exists()).toBe(true);
   });
 
   // ── Provider options ───────────────────────────────────────────────────────

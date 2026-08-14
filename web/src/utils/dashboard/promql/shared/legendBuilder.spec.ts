@@ -29,9 +29,7 @@ describe("legendBuilder", () => {
       const metric = { job: "node_exporter", instance: "server1:9100" };
       const label = "{job} on {instance}";
 
-      expect(getPromqlLegendName(metric, label)).toBe(
-        "node_exporter on server1:9100",
-      );
+      expect(getPromqlLegendName(metric, label)).toBe("node_exporter on server1:9100");
     });
 
     it("should handle complex template with text and multiple placeholders", () => {
@@ -51,36 +49,28 @@ describe("legendBuilder", () => {
       const metric = { job: "prometheus" };
       const label = "{job} - {nonexistent}";
 
-      expect(getPromqlLegendName(metric, label)).toBe(
-        "prometheus - {nonexistent}",
-      );
+      expect(getPromqlLegendName(metric, label)).toBe("prometheus - {nonexistent}");
     });
 
     it("should leave placeholder unchanged if metric value is undefined", () => {
       const metric = { job: "prometheus", instance: undefined };
       const label = "{job} - {instance}";
 
-      expect(getPromqlLegendName(metric, label)).toBe(
-        "prometheus - {instance}",
-      );
+      expect(getPromqlLegendName(metric, label)).toBe("prometheus - {instance}");
     });
 
     it("should leave placeholder unchanged if metric value is null", () => {
       const metric = { job: "prometheus", instance: null };
       const label = "{job} - {instance}";
 
-      expect(getPromqlLegendName(metric, label)).toBe(
-        "prometheus - {instance}",
-      );
+      expect(getPromqlLegendName(metric, label)).toBe("prometheus - {instance}");
     });
 
     it("should leave placeholder unchanged if metric value is empty string", () => {
       const metric = { job: "prometheus", instance: "" };
       const label = "{job} - {instance}";
 
-      expect(getPromqlLegendName(metric, label)).toBe(
-        "prometheus - {instance}",
-      );
+      expect(getPromqlLegendName(metric, label)).toBe("prometheus - {instance}");
     });
 
     it("should handle template with no placeholders", () => {
@@ -94,18 +84,14 @@ describe("legendBuilder", () => {
       const metric = { job: "api-server", instance: "host.example.com:8080" };
       const label = "{job}@{instance}";
 
-      expect(getPromqlLegendName(metric, label)).toBe(
-        "api-server@host.example.com:8080",
-      );
+      expect(getPromqlLegendName(metric, label)).toBe("api-server@host.example.com:8080");
     });
 
     it("should handle repeated placeholders", () => {
       const metric = { job: "prometheus" };
       const label = "{job} and {job} again";
 
-      expect(getPromqlLegendName(metric, label)).toBe(
-        "prometheus and prometheus again",
-      );
+      expect(getPromqlLegendName(metric, label)).toBe("prometheus and prometheus again");
     });
 
     it("should handle adjacent placeholders", () => {
@@ -247,5 +233,30 @@ describe("legendBuilder", () => {
     it("should handle special characters", () => {
       expect(getLegendPosition("@#$%")).toBe("horizontal");
     });
+  });
+});
+
+describe("getPromqlLegendName — empty label sets", () => {
+  it("names a label-less series from the fallback instead of '{}'", () => {
+    // An aggregating query (count/sum/avg) strips every label, so the legend
+    // used to read "{}" — which names nothing.
+    expect(getPromqlLegendName({}, "", "Errors")).toBe("Errors");
+  });
+
+  it("keeps real labels when the series has them", () => {
+    expect(getPromqlLegendName({ job: "api" }, "", "Errors")).toBe('{"job":"api"}');
+  });
+
+  it("still prefers an explicit legend template over the fallback", () => {
+    expect(getPromqlLegendName({ job: "api" }, "{job}", "Errors")).toBe("api");
+  });
+
+  it("preserves the previous output when no fallback is supplied", () => {
+    // Dashboards that pass nothing must behave exactly as before.
+    expect(getPromqlLegendName({}, "")).toBe("{}");
+  });
+
+  it("ignores an empty fallback string", () => {
+    expect(getPromqlLegendName({}, "", "")).toBe("{}");
   });
 });

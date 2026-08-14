@@ -20,10 +20,7 @@ import { createI18n } from "vue-i18n";
 import { ref } from "vue";
 import SqlServer from "./SqlServer.vue";
 import sqlServerCard from "@/components/ingestion/setupCard/content/sqlServer";
-import {
-  getDataSourceCard,
-  hasDataSourceCard,
-} from "@/components/ingestion/setupCard/registry";
+import { getDataSourceCard, hasDataSourceCard } from "@/components/ingestion/setupCard/registry";
 
 // Mock useIngestion so the endpoint is deterministic (no network / URL lookup).
 const mockEndpoint = ref({
@@ -71,9 +68,7 @@ describe("sqlServerCard builder", () => {
     expect(card.provider.name).toBe("SQL Server");
     // Non-AI metrics card → replaces the "Cost & Tokens Captured" hero badge.
     expect(card.provider.metaBadges).toEqual(["Metrics"]);
-    expect(card.docUrl).toBe(
-      "https://openobserve.ai/blog/monitor-sql-server-with-otel/",
-    );
+    expect(card.docUrl).toBe("https://openobserve.ai/blog/monitor-sql-server-with-otel/");
     // The blog's flow: prepare → install → configure → run → verify.
     expect(card.steps.map((s) => s.id)).toEqual([
       "prepare",
@@ -119,19 +114,13 @@ describe("sqlServerCard builder", () => {
   it("offers method tabs for applying the grants (sqlcmd / docker / GUI)", () => {
     const prepare = sqlServerCard(SUBS).steps.find((s) => s.id === "prepare")!;
     expect(prepare.code).toBeUndefined();
-    expect(prepare.variants?.map((v) => v.id)).toEqual([
-      "sqlcmd",
-      "docker",
-      "sql-client",
-    ]);
+    expect(prepare.variants?.map((v) => v.id)).toEqual(["sqlcmd", "docker", "sql-client"]);
     // sqlcmd/docker are runnable commands that pipe the SQL via -Q.
     const sqlcmd = prepare.variants!.find((v) => v.id === "sqlcmd")!.code;
     expect(sqlcmd.raw).toContain("sqlcmd");
     expect(sqlcmd.raw).toContain('-Q "');
     expect(sqlcmd.raw).toContain("CREATE LOGIN otel");
-    expect(prepare.variants!.find((v) => v.id === "docker")!.code.raw).toContain(
-      "docker exec",
-    );
+    expect(prepare.variants!.find((v) => v.id === "docker")!.code.raw).toContain("docker exec");
     // The GUI tab is the raw SQL to paste into a client.
     const gui = prepare.variants!.find((v) => v.id === "sql-client")!.code;
     expect(gui.lang).toBe("sql");
@@ -146,9 +135,9 @@ describe("sqlServerCard builder", () => {
     const prepare = card.steps.find((s) => s.id === "prepare")!;
     // No extra input fields to decide on — credentials are edited inline.
     expect(prepare.inputs).toBeUndefined();
-    const config = card.steps.find((s) => s.id === "configure")!.variants!.find(
-      (v) => v.id === "linux-amd64",
-    )!.code.raw;
+    const config = card.steps
+      .find((s) => s.id === "configure")!
+      .variants!.find((v) => v.id === "linux-amd64")!.code.raw;
     expect(config).toContain("username: otel");
     expect(config).toContain('password: "YourStrong@Passw0rd"');
   });
@@ -175,9 +164,7 @@ describe("sqlServerCard builder", () => {
 describe("data-source card registry", () => {
   it("resolves the sqlServer slug", () => {
     expect(hasDataSourceCard("sqlServer")).toBe(true);
-    expect(getDataSourceCard("sqlServer", SUBS)?.provider.name).toBe(
-      "SQL Server",
-    );
+    expect(getDataSourceCard("sqlServer", SUBS)?.provider.name).toBe("SQL Server");
   });
 
   it("returns undefined for an unregistered slug", () => {
@@ -201,13 +188,9 @@ describe("SqlServer.vue", () => {
 
   it("renders the shared setup card for the sqlServer slug", () => {
     wrapper = createWrapper();
-    expect(
-      wrapper.findComponent({ name: "SetupCardRenderer" }).exists(),
-    ).toBe(true);
+    expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
     // Wrapper tags the card with its own data-test (falls through onto the root).
-    expect(
-      wrapper.find('[data-test="data-source-setup-card"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="data-source-setup-card"]').exists()).toBe(true);
   });
 
   it("passes the per-org substitutions and SQL Server content to the card", () => {

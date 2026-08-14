@@ -16,11 +16,7 @@
 import { describe, expect, it } from "vitest";
 import { promqlRenderer } from "./queryModeller";
 import { buildPromqlStepCatalog } from "./index";
-import {
-  PromqlBuilderQuery,
-  PromqlStepId,
-  PromqlStepGroup,
-} from "../types";
+import { PromqlBuilderQuery, PromqlStepId, PromqlStepGroup } from "../types";
 
 describe("QueryModeller", () => {
   describe("Label Rendering", () => {
@@ -76,7 +72,7 @@ describe("QueryModeller", () => {
     });
 
     it("should escape backslashes in values", () => {
-      const labels = [{ label: "path", op: "=", value: 'C:\\Users\\test' }];
+      const labels = [{ label: "path", op: "=", value: "C:\\Users\\test" }];
 
       const result = promqlRenderer.renderLabels(labels);
 
@@ -159,9 +155,7 @@ describe("QueryModeller", () => {
       const query: PromqlBuilderQuery = {
         metric: "response_time",
         labels: [],
-        operations: [
-          { id: PromqlStepId.QuantileOverTime, params: [0.95, "5m"] },
-        ],
+        operations: [{ id: PromqlStepId.QuantileOverTime, params: [0.95, "5m"] }],
       };
 
       const result = promqlRenderer.renderQuery(query);
@@ -200,9 +194,7 @@ describe("QueryModeller", () => {
       const query: PromqlBuilderQuery = {
         metric: "http_requests_total",
         labels: [],
-        operations: [
-          { id: PromqlStepId.Sum, params: [["method", "status"]] },
-        ],
+        operations: [{ id: PromqlStepId.Sum, params: [["method", "status"]] }],
       };
 
       const result = promqlRenderer.renderQuery(query);
@@ -415,9 +407,7 @@ describe("QueryModeller", () => {
 
       const result = promqlRenderer.renderQuery(query);
 
-      expect(result).toBe(
-        "histogram_quantile(0.95, http_request_duration_seconds_bucket{})",
-      );
+      expect(result).toBe("histogram_quantile(0.95, http_request_duration_seconds_bucket{})");
     });
   });
 
@@ -487,9 +477,7 @@ describe("QueryModeller", () => {
 
       const result = promqlRenderer.renderQuery(query);
 
-      expect(result).toBe(
-        'sum by (status) (rate(http_requests_total{method="GET"}[5m]))',
-      );
+      expect(result).toBe('sum by (status) (rate(http_requests_total{method="GET"}[5m]))');
     });
 
     it("should render complex multi-operation query", () => {
@@ -551,9 +539,7 @@ describe("QueryModeller", () => {
     });
 
     it("should get operations by category", () => {
-      const ops = promqlRenderer.getStepsForGroup(
-        PromqlStepGroup.RateAndRange,
-      );
+      const ops = promqlRenderer.getStepsForGroup(PromqlStepGroup.RateAndRange);
 
       expect(ops.length).toBeGreaterThan(0);
       expect(ops.some((op) => op.id === PromqlStepId.Rate)).toBe(true);
@@ -562,12 +548,8 @@ describe("QueryModeller", () => {
     it("should get all categories", () => {
       const categories = promqlRenderer.getGroups();
 
-      expect(categories).toContain(
-        PromqlStepGroup.RateAndRange,
-      );
-      expect(categories).toContain(
-        PromqlStepGroup.Aggregation,
-      );
+      expect(categories).toContain(PromqlStepGroup.RateAndRange);
+      expect(categories).toContain(PromqlStepGroup.Aggregation);
       expect(categories).toContain(PromqlStepGroup.Math);
     });
 
@@ -600,9 +582,7 @@ describe("QueryModeller", () => {
       const query: PromqlBuilderQuery = {
         metric: "http_requests_total",
         labels: [],
-        operations: [
-          { id: PromqlStepId.Sum, params: ["method,status"] as any },
-        ],
+        operations: [{ id: PromqlStepId.Sum, params: ["method,status"] as any }],
       };
 
       const result = promqlRenderer.renderQuery(query);
@@ -683,9 +663,7 @@ describe("QueryModeller", () => {
         operations: [{ id: legacyId, params: [2] }],
       };
 
-      expect(promqlRenderer.renderQuery(query)).toBe(
-        `http_requests_total{} ${operator} 2`,
-      );
+      expect(promqlRenderer.renderQuery(query)).toBe(`http_requests_total{} ${operator} 2`);
     });
 
     it("resolves a stored id to the same spec as its current id", () => {

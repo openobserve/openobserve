@@ -1,8 +1,20 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, ref } from 'vue'
-import { synthetics } from '@/constants/config'
-import { mapWireSteps } from '@/utils/synthetics/mapRecordedStep'
+import { reactive, ref } from "vue";
+import { mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import type {
   BrowserStep,
   RecorderCommand,
@@ -15,8 +27,9 @@ import type {
   ReplayPhase,
   StepReplayResult,
   WireStep,
-} from '@/types/synthetics'
-import { substituteVariables } from '@/utils/synthetics/mapRecordedStep'
+} from "@/types/synthetics";
+import { substituteVariables } from "@/utils/synthetics/mapRecordedStep";
+import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 
 /**
  * Encapsulates all communication with the OpenObserve Extension (playwright-crx)
@@ -30,28 +43,46 @@ const useSyntheticsRecorder = () => {
   // Works on any origin: cloud, self-hosted, localhost. No externally_connectable needed.
   // The content script (content.js) on the OO page acts as a relay: postMessage ↔ internal Port ↔ SW.
 
-  const isSupported = ref(typeof window !== 'undefined')
-  const isInstalled = ref(false)
-  const isRecording = ref(false)
-  const liveSteps = ref<BrowserStep[]>([])
-  const currentUrl = ref('')
-  const mode = ref<RecorderMode>('recording')
-  const error = ref('')
-  const isReplaying = ref(false)
-  const replayResult = ref<ReplayResponse | null>(null)
-  const replayPhase = ref<ReplayPhase>('idle')
-  const stepResults = reactive<Map<string, StepReplayResult>>(new Map())
-  const activeStepId = ref<string | null>(null)
+  const isSupported = ref(typeof window !== "undefined");
+  const isInstalled = ref(false);
+  const isRecording = ref(false);
+  const liveSteps = ref<BrowserStep[]>([]);
+  const currentUrl = ref("");
+  const mode = ref<RecorderMode>("recording");
+  const error = ref("");
+  const isReplaying = ref(false);
+  const replayResult = ref<ReplayResponse | null>(null);
+  const replayPhase = ref<ReplayPhase>("idle");
+  const stepResults = reactive<Map<string, StepReplayResult>>(new Map());
+  const activeStepId = ref<string | null>(null);
 
   // Synchronous callback invoked when recording stops externally (user closes the extension
   // window without clicking "Stop"). BrowserJourney sets this to commit the steps immediately,
   // avoiding the timing race inherent in watching a reactive ref across async boundaries.
-  let onExternalStop: ((steps: BrowserStep[]) => void) | null = null
+  let onExternalStop: ((steps: BrowserStep[]) => void) | null = null;
 
   // ---- Bridge transport ----
 
-  const BRIDGE_CHANNEL = 'oo-bridge';
+  const BRIDGE_CHANNEL = "oo-bridge";
   const COMMAND_TIMEOUT_MS = 4000;
+
+  // `replay` is the one command the extension answers only when the whole
+  // journey has finished — the service worker resolves it from handleReplay,
+  // after the last step. Racing it against COMMAND_TIMEOUT_MS made the UI fall
+  // back to "idle" four seconds in while the extension kept replaying in its
+  // own window. A single step alone may legitimately take 60 s (the flat
+  // preview timeout, P1.R.1), so this is not a journey bound — it is a
+  // last-resort watchdog for a bridge that died without answering. Sized to
+  // LEASE_SECS = 900 (D-9), the outer bound one attempt is ever contained in;
+  // anything shorter would make the preview stricter than production (X-8.1).
+  // See docs/synthetics/reliability/synthetics-recorded-test-reliability-spec.md.
+  const REPLAY_TIMEOUT_MS = 15 * 60 * 1000;
+
+  // Bumped on every replay start and on every stop. `replay()` captures the value it
+  // started with and refuses to touch phase state once it no longer matches — otherwise a
+  // Stop followed quickly by Re-run lets the OLD replay's response land on the NEW run and
+  // knock `running` back to `stopped`. Latent until stopping became fast enough to hit.
+  let replayGeneration = 0;
 
   let nonceCounter = 0;
   function nextNonce(): string {
@@ -69,25 +100,27 @@ const useSyntheticsRecorder = () => {
   let onAutoDetected: (() => void) | null = null;
 
   // Global message listener — processes all bridge messages from the content script.
-  window.addEventListener('message', (event: MessageEvent) => {
+  window.addEventListener("message", (event: MessageEvent) => {
     if (event.source !== window) return;
 
     // Content script announces itself when injected on demand (toolbar icon
     // click after mid-session install). Auto-trigger detection.
-    if (event.data?.ch === 'oo-bridge-ready') {
-      detectExtension().then((installed: boolean) => {
-        if (installed) onAutoDetected?.();
-      }).catch(() => {});
+    if (event.data?.ch === "oo-bridge-ready") {
+      detectExtension()
+        .then((installed: boolean) => {
+          if (installed) onAutoDetected?.();
+        })
+        .catch(() => {});
       return;
     }
 
     if (event.data?.ch !== BRIDGE_CHANNEL) return;
-    if (event.data?.dir !== 'to-page') return;
+    if (event.data?.dir !== "to-page") return;
 
     const { nonce, msg } = event.data;
 
     // Bridge disconnection notification
-    if (msg?.type === 'bridge-disconnected') {
+    if (msg?.type === "bridge-disconnected") {
       bridgeDisconnectHandler?.();
       return;
     }
@@ -104,7 +137,7 @@ const useSyntheticsRecorder = () => {
     }
 
     // Also resolve if msg is a synthetics-response with its own nonce
-    if (msg?.type === 'synthetics-response' && msg.nonce && pendingCommands.has(msg.nonce)) {
+    if (msg?.type === "synthetics-response" && msg.nonce && pendingCommands.has(msg.nonce)) {
       const resolve = pendingCommands.get(msg.nonce)!;
       pendingCommands.delete(msg.nonce);
       resolve(msg.response);
@@ -115,23 +148,36 @@ const useSyntheticsRecorder = () => {
     bridgeDataHandler?.(msg);
   });
 
-  /** One-shot command via postMessage. Resolves `null` when the extension is unreachable. */
-  function sendCommand<T>(command: RecorderCommand): Promise<T | null> {
+  /**
+   * One-shot command via postMessage. Resolves `null` when the extension is
+   * unreachable. `timeoutMs` is how long to wait for the ack — long-running
+   * commands (`replay`) pass their own window.
+   */
+  function sendCommand<T>(
+    command: RecorderCommand,
+    timeoutMs: number = COMMAND_TIMEOUT_MS,
+  ): Promise<T | null> {
     const nonce = nextNonce();
 
-    const timeout = new Promise<null>(resolve =>
-      setTimeout(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(() => {
         pendingCommands.delete(nonce);
         resolve(null);
-      }, COMMAND_TIMEOUT_MS),
-    );
+      }, timeoutMs);
+    });
 
-    const promise = new Promise<T | null>(resolve => {
-      pendingCommands.set(nonce, resolve);
+    const promise = new Promise<T | null>((resolve) => {
+      pendingCommands.set(nonce, (response) => {
+        // Release the watchdog — a replay's is 15 minutes long, and leaving one
+        // armed per replay would keep the timer alive well past the answer.
+        clearTimeout(timer);
+        resolve(response);
+      });
     });
     window.postMessage(
-      { ch: BRIDGE_CHANNEL, dir: 'to-ext', nonce, msg: { type: 'synthetics-command', command } },
-      '*',
+      { ch: BRIDGE_CHANNEL, dir: "to-ext", nonce, msg: { type: "synthetics-command", command } },
+      "*",
     );
 
     return Promise.race([promise, timeout]);
@@ -146,18 +192,18 @@ const useSyntheticsRecorder = () => {
     // Wake the content script's bridge. The content script defaults to
     // overlay mode on all pages — this probe tells it to open a bridge
     // port to the service worker so we can send commands.
-    window.postMessage({ ch: 'oo-bridge-probe' }, '*');
+    window.postMessage({ ch: "oo-bridge-probe" }, "*");
     // Give the content script time to open the port before sending the
     // first command. 150ms is generous for a local postMessage round-trip
     // and chrome.runtime.connect call.
     // 500ms settle — if the SW just restarted (incognito toggle), it needs
     // time to initialise. chrome.runtime.connect queues messages internally.
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 500));
 
-    const status = await sendCommand<RecorderStatus>({ action: 'getStatus' })
-    isInstalled.value = status !== null
-    if (status?.isRecording) isRecording.value = true
-    return isInstalled.value
+    const status = await sendCommand<RecorderStatus>({ action: "getStatus" });
+    isInstalled.value = status !== null;
+    if (status?.isRecording) isRecording.value = true;
+    return isInstalled.value;
   }
 
   // The extension pushes `{ type:'synthetics-recorder', recordingId, payload }`
@@ -166,41 +212,56 @@ const useSyntheticsRecorder = () => {
   // by sendCommand's nonce-based promise.
   function handleBridgeData(message: unknown) {
     const msg = message as RecorderPortInbound;
-    if (msg.type !== 'synthetics-recorder') return
-    const { payload } = msg
+    if (msg.type !== "synthetics-recorder") return;
+    const { payload } = msg;
     switch (payload.method) {
-      case 'setActions':
-        liveSteps.value = mapWireSteps(payload.browserSteps)
-        break
-      case 'recordingStarted':
-        currentUrl.value = payload.url
-        isRecording.value = true
-        break
-      case 'recordingStopped':
+      case "setActions":
+        // Live capture: keep the extension's own step for replay fidelity. These
+        // wires carry fields the v2 schema cannot store (options, modifiers,
+        // button, position, framePath).
+        liveSteps.value = mapWireSteps(payload.browserSteps, { preserveWire: true });
+        break;
+      case "recordingStarted":
+        currentUrl.value = payload.url;
+        isRecording.value = true;
+        break;
+      case "recordingStopped":
         // Commit steps synchronously if a listener is registered (external stop).
         // For explicit stopRecording(), the listener is temporarily nulled, so this is a no-op.
         if (onExternalStop) {
-          onExternalStop([...liveSteps.value])
+          onExternalStop([...liveSteps.value]);
         }
-        isRecording.value = false
-        break
-      case 'setMode':
-        mode.value = payload.mode
-        break
-      case 'stepReplayResult':
+        isRecording.value = false;
+        break;
+      case "setMode":
+        mode.value = payload.mode;
+        break;
+      case "stepReplayResult":
+        // A result already in flight when Stop was pressed is real evidence — the step
+        // did run — so it still counts toward "completed X of N" while `stopping`. Once
+        // the replay is over, late arrivals belong to a run nobody is looking at.
+        if (replayPhase.value !== "running" && replayPhase.value !== "stopping") break;
         stepResults.set(payload.stepId, {
           stepId: payload.stepId,
-          stepName: payload.stepName ?? '',
+          stepName: payload.stepName ?? "",
           passed: payload.passed,
           durationMs: payload.duration_ms,
           error: payload.error,
           structuredError: payload.structuredError,
-        })
-        activeStepId.value = null
-        break
-      case 'stepReplayStarted':
-        activeStepId.value = payload.stepId
-        break
+          // X-8.2: the player reports what it could not reproduce. Dropping this
+          // made every such divergence silent — including a skipped step that
+          // would otherwise read as a pass.
+          fidelity: payload.fidelity,
+        });
+        activeStepId.value = null;
+        break;
+      case "stepReplayStarted":
+        // Only a running replay may light a step up. A `stepStarted` that arrives after
+        // Stop describes a step that will never report a result, and honouring it is what
+        // left the journey with a step spinning forever.
+        if (replayPhase.value !== "running") break;
+        activeStepId.value = payload.stepId;
+        break;
       // setSources / elementPicked: not consumed yet
     }
   }
@@ -215,7 +276,7 @@ const useSyntheticsRecorder = () => {
     bridgeDataHandler = null;
     bridgeDisconnectHandler = null;
     // Reject all pending commands
-    pendingCommands.forEach(resolve => resolve(null));
+    pendingCommands.forEach((resolve) => resolve(null));
     pendingCommands.clear();
   }
 
@@ -225,34 +286,44 @@ const useSyntheticsRecorder = () => {
    * `targetUrl` is kept only for the local recording banner — the extension
    * command itself takes no URL.
    */
-  async function startRecording(targetUrl: string): Promise<void> {
-    error.value = ''
-    liveSteps.value = []
-    currentUrl.value = targetUrl
-    mode.value = 'recording'
+  async function startRecording(targetUrl: string, testIdAttr?: string): Promise<void> {
+    error.value = "";
+    liveSteps.value = [];
+    currentUrl.value = targetUrl;
+    mode.value = "recording";
 
     // Ensure bridge is alive — the port may have died since detectExtension()
     // ran (SW suspend, tab backgrounding, etc.). Sending the probe re-activates
     // the bridge before we send the startRecording command.
-    window.postMessage({ ch: 'oo-bridge-probe' }, '*');
-    await new Promise(r => setTimeout(r, 500));
+    window.postMessage({ ch: "oo-bridge-probe" }, "*");
+    await new Promise((r) => setTimeout(r, 500));
 
-    bridgeConnect()
+    bridgeConnect();
     bridgeDisconnectHandler = () => {
       if (onExternalStop && isRecording.value) {
-        onExternalStop([...liveSteps.value])
+        onExternalStop([...liveSteps.value]);
       }
-      isRecording.value = false
-    }
+      isRecording.value = false;
+    };
 
-    const res = await sendCommand<RecorderStartResponse>({ action: 'startRecording', targetUrl })
+    // The extension defaults to Playwright's `data-testid` when this is absent,
+    // and it was absent on every recording ever made — the field existed on the
+    // command type but nothing populated it. O2 markup uses `data-test`, which
+    // only produced test-attribute candidates because upstream's generator
+    // happens to carry a hardcoded fallback list containing it. An app on
+    // `data-qa` or `data-cy` got none at all, silently.
+    const res = await sendCommand<RecorderStartResponse>({
+      action: "startRecording",
+      targetUrl,
+      testIdAttr: testIdAttr || DEFAULT_TEST_ID_ATTR,
+    });
     if (!res?.success) {
       console.debug("Disconnect ---", res);
-      error.value = res?.error || 'Failed to start recording.'
-      bridgeDisconnect()
-      return
+      error.value = res?.error || "Failed to start recording.";
+      bridgeDisconnect();
+      return;
     }
-    isRecording.value = true
+    isRecording.value = true;
   }
 
   /**
@@ -263,41 +334,41 @@ const useSyntheticsRecorder = () => {
   async function stopRecording(): Promise<BrowserStep[]> {
     // Null the external-stop callback so recordingStopped arriving during the await
     // doesn't commit via the callback path — we handle the commit explicitly below.
-    const savedOnExternalStop = onExternalStop
-    onExternalStop = null
-    await sendCommand<RecorderStopResponse>({ action: 'stopRecording' })
-    const steps = [...liveSteps.value]
-    isRecording.value = false // set before disconnect so onDisconnect's guard sees isRecording=false
-    bridgeDisconnect()
-    liveSteps.value = []
-    onExternalStop = savedOnExternalStop
-    return steps
+    const savedOnExternalStop = onExternalStop;
+    onExternalStop = null;
+    await sendCommand<RecorderStopResponse>({ action: "stopRecording" });
+    const steps = [...liveSteps.value];
+    isRecording.value = false; // set before disconnect so onDisconnect's guard sees isRecording=false
+    bridgeDisconnect();
+    liveSteps.value = [];
+    onExternalStop = savedOnExternalStop;
+    return steps;
   }
 
   /** Synchronous fire-and-forget stop. Captures current steps, sends the stop
    *  command without awaiting the response, and cleans up locally. Safe to call
    *  from onBeforeUnmount / beforeunload where awaiting is not possible. */
   function stopAndForget(): BrowserStep[] {
-    const steps = [...liveSteps.value]
-    sendCommand({ action: 'stopRecording' }) // fire-and-forget
-    isRecording.value = false
-    bridgeDisconnect()
-    liveSteps.value = []
-    return steps
+    const steps = [...liveSteps.value];
+    sendCommand({ action: "stopRecording" }); // fire-and-forget
+    isRecording.value = false;
+    bridgeDisconnect();
+    liveSteps.value = [];
+    return steps;
   }
 
   /** Synchronous fire-and-forget stop for replay. Safe for lifecycle hooks. */
   function stopReplayAndForget(): void {
-    sendCommand({ action: 'stopReplay' }) // fire-and-forget
+    sendCommand({ action: "stopReplay" }); // fire-and-forget
   }
 
   /** Abandon the current recording without persisting any steps. */
   function cancelRecording() {
     // Null the callback so onDisconnect doesn't commit discarded steps.
-    onExternalStop = null
-    bridgeDisconnect()
-    liveSteps.value = []
-    isRecording.value = false
+    onExternalStop = null;
+    bridgeDisconnect();
+    liveSteps.value = [];
+    isRecording.value = false;
   }
 
   /**
@@ -309,75 +380,104 @@ const useSyntheticsRecorder = () => {
     steps: WireStep[],
     targetUrl?: string,
     variables?: { name: string; value: string }[],
-    auth?: { type: 'basic'; username: string; password: string },
-    headers?: { key: string; value: string }[],
-    cookies?: { name: string; value: string; domain: string }[],
+    _auth?: { type: "basic"; username: string; password: string },
+    _headers?: { key: string; value: string }[],
+    _cookies?: { name: string; value: string; domain: string }[],
   ): Promise<ReplayResponse | null> {
     if (steps.length === 0) {
-      error.value = 'No replayable steps in this journey.'
-      return null
+      error.value = "No replayable steps in this journey.";
+      return null;
     }
-    error.value = ''
-    replayResult.value = null
-    stepResults.clear()
-    activeStepId.value = null
-    replayPhase.value = 'running'
-    isReplaying.value = true
+    error.value = "";
+    replayResult.value = null;
+    stepResults.clear();
+    activeStepId.value = null;
+    replayPhase.value = "running";
+    isReplaying.value = true;
+    const generation = ++replayGeneration;
 
     // // Substitute {{ VAR_NAME }} placeholders in wire step fields with actual variable values.
-    const vars = Object.fromEntries((variables ?? []).map(v => [v.name, v.value]))
-    const resolvedSteps = vars && Object.keys(vars).length > 0
-      ? steps.map(s => substituteVariables(s, vars))
-      : steps
+    const vars = Object.fromEntries((variables ?? []).map((v) => [v.name, v.value]));
+    const resolvedSteps =
+      vars && Object.keys(vars).length > 0 ? steps.map((s) => substituteVariables(s, vars)) : steps;
 
     // Wake the content script bridge if it went idle. The port may have
     // died between stopRecording and replay (bfcache, SW suspend, etc.).
     // The probe re-activates the bridge before we send the replay command.
-    window.postMessage({ ch: 'oo-bridge-probe' }, '*');
-    await new Promise(r => setTimeout(r, 500));
+    window.postMessage({ ch: "oo-bridge-probe" }, "*");
+    await new Promise((r) => setTimeout(r, 500));
 
-    bridgeDisconnect() // discard any previous session
-    bridgeConnect()
+    bridgeDisconnect(); // discard any previous session
+    bridgeConnect();
     bridgeDisconnectHandler = () => {
-      isRecording.value = false
-    }
+      isRecording.value = false;
+    };
 
     // Unwrap Vue reactive proxies before structured clone. Vue Proxy traps
     // intercept property access — postMessage structured clone sees the proxy,
     // not the underlying object, and silently drops all fields.
-    const plainSteps = JSON.parse(JSON.stringify(resolvedSteps)) as WireStep[]
-    const res = await sendCommand<ReplayResponse>({ action: 'replay', steps: plainSteps, targetUrl })
-    isReplaying.value = false
-    replayResult.value = res
+    const plainSteps = JSON.parse(JSON.stringify(resolvedSteps)) as WireStep[];
+    const res = await sendCommand<ReplayResponse>(
+      {
+        action: "replay",
+        steps: plainSteps,
+        targetUrl,
+      },
+      REPLAY_TIMEOUT_MS,
+    );
+    // Superseded — this response belongs to a replay the user has already stopped or
+    // re-run past. Reporting it would overwrite the state of the run now on screen.
+    if (generation !== replayGeneration) return res;
+    isReplaying.value = false;
+    replayResult.value = res;
     if (res) {
-      if (res.stopped) replayPhase.value = 'stopped'
-      else if (res.passed) replayPhase.value = 'passed'
-      else if (stepResults.size === 0) replayPhase.value = 'idle' // pre-flight failure (e.g. incognito)
-      else replayPhase.value = 'failed'
+      if (res.stopped) replayPhase.value = "stopped";
+      else if (res.passed) replayPhase.value = "passed";
+      // Nothing streamed back, so no step ran: a pre-flight failure, not a
+      // journey that failed on the page. Stay `idle` rather than `failed` —
+      // the caller classifies the cause from `res.error` (see
+      // CreateBrowserTest's `blockedReason`) and must not assume incognito.
+      else if (stepResults.size === 0) replayPhase.value = "idle";
+      else replayPhase.value = "failed";
     } else {
-      replayPhase.value = 'idle'
+      replayPhase.value = "idle";
     }
-    return res
+    return res;
   }
 
-  /** Cancel an in-flight replay; the pending `replay` promise resolves with `stopped`. */
-  function stopReplay(): Promise<unknown> {
-    return sendCommand({ action: 'stopReplay' })
+  /**
+   * Cancel an in-flight replay, holding the UI in `stopping` until the extension has
+   * confirmed. The wait is what makes the Stop button honest — the run is not over the
+   * instant the button is clicked — and `sendCommand` resolves `null` at
+   * COMMAND_TIMEOUT_MS, so `stopping` is bounded and cannot strand the journey.
+   */
+  async function stopReplay(): Promise<void> {
+    if (replayPhase.value !== "running") return;
+    replayPhase.value = "stopping";
+    await sendCommand({ action: "stopReplay" });
+    // Orphan the in-flight `replay` promise: its response describes a run the user has
+    // already abandoned, and it would otherwise re-report a phase behind this one.
+    replayGeneration++;
+    // The step that was mid-flight never produced a result, so nothing else will ever
+    // clear this. Left set, it renders as a step stuck in progress.
+    activeStepId.value = null;
+    isReplaying.value = false;
+    replayPhase.value = "stopped";
   }
 
   function setMode(next: RecorderMode): Promise<unknown> {
-    mode.value = next
-    return sendCommand({ action: 'setMode', mode: next })
+    mode.value = next;
+    return sendCommand({ action: "setMode", mode: next });
   }
 
   /** Register a callback for when recording stops externally (extension window closed). */
   function setOnExternalStop(cb: ((steps: BrowserStep[]) => void) | null) {
-    onExternalStop = cb
+    onExternalStop = cb;
   }
 
   /** Release the port; call from the host component's onUnmounted. */
   function cleanup() {
-    bridgeDisconnect()
+    bridgeDisconnect();
   }
 
   return {
@@ -393,7 +493,9 @@ const useSyntheticsRecorder = () => {
     replayPhase,
     stepResults,
     activeStepId,
-    registerAutoDetect: (cb: (() => void) | null) => { onAutoDetected = cb; },
+    registerAutoDetect: (cb: (() => void) | null) => {
+      onAutoDetected = cb;
+    },
     detectExtension,
     startRecording,
     stopRecording,
@@ -405,7 +507,7 @@ const useSyntheticsRecorder = () => {
     stopReplay,
     setMode,
     cleanup,
-  }
-}
+  };
+};
 
-export default useSyntheticsRecorder
+export default useSyntheticsRecorder;

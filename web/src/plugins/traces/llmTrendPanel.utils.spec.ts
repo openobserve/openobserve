@@ -70,12 +70,12 @@ describe("formatCompact", () => {
     [1_000_000, "1.0M"],
     [12_345, "12.3K"],
     [1_000, "1.0K"],
-    [999, "999"],          // ≥ 100, no decimal
+    [999, "999"], // ≥ 100, no decimal
     [100, "100"],
-    [99.5, "99.5"],         // ≥ 1, 1 decimal
+    [99.5, "99.5"], // ≥ 1, 1 decimal
     [1.5, "1.5"],
     [1, "1.0"],
-    [0.5, "0.5"],           // < 1, raw toString()
+    [0.5, "0.5"], // < 1, raw toString()
     [0, "0"],
   ])("formats %d as %s", (input, expected) => {
     expect(formatCompact(input)).toBe(expected);
@@ -92,7 +92,7 @@ describe("formatLatencyMs", () => {
     [0, "0ms"],
     [1, "1ms"],
     [123, "123ms"],
-    [123.7, "124ms"],   // rounded
+    [123.7, "124ms"], // rounded
     [999, "999ms"],
     [999.4, "999ms"],
   ])("formats %d as %s (sub-second)", (input, expected) => {
@@ -150,9 +150,7 @@ describe("formatTimeCell", () => {
 
   // ISO 8601 strings parse natively.
   it("parses ISO 8601 strings", () => {
-    expect(formatTimeCell("2026-05-08T12:30:45Z")).toMatch(
-      /^\d{2}:\d{2}:\d{2}$/,
-    );
+    expect(formatTimeCell("2026-05-08T12:30:45Z")).toMatch(/^\d{2}:\d{2}:\d{2}$/);
   });
 
   // Unparseable strings → returned as-is so the cell never shows
@@ -165,9 +163,7 @@ describe("formatTimeCell", () => {
   // Asia/Kolkata is UTC+5:30 with no DST → deterministic.
   it("renders a UTC string in the selected timezone", () => {
     expect(formatTimeCell("2026-05-08T06:00:00Z", "UTC")).toBe("06:00:00");
-    expect(formatTimeCell("2026-05-08T06:00:00Z", "Asia/Kolkata")).toBe(
-      "11:30:00",
-    );
+    expect(formatTimeCell("2026-05-08T06:00:00Z", "Asia/Kolkata")).toBe("11:30:00");
   });
 
   it("converts a microsecond epoch into the selected timezone", () => {
@@ -185,13 +181,13 @@ describe("formatCostCell", () => {
   // Each branch of the precision ladder.
   it.each([
     [{ cost: 0 }, "$0"],
-    [{ cost: -1 }, "$0"],            // negative treated as zero
-    [{ cost: 12.34 }, "$12.34"],     // ≥ 1 → 2 decimals
+    [{ cost: -1 }, "$0"], // negative treated as zero
+    [{ cost: 12.34 }, "$12.34"], // ≥ 1 → 2 decimals
     [{ cost: 1.5 }, "$1.50"],
-    [{ cost: 0.5 }, "$0.500"],       // 0.01 ≤ x < 1 → 3 decimals
+    [{ cost: 0.5 }, "$0.500"], // 0.01 ≤ x < 1 → 3 decimals
     [{ cost: 0.05 }, "$0.050"],
     [{ cost: 0.01 }, "$0.010"],
-    [{ cost: 0.001 }, "$0.0010"],   // < 0.01 → 4 decimals
+    [{ cost: 0.001 }, "$0.0010"], // < 0.01 → 4 decimals
     [{ cost: 0.0001 }, "$0.0001"],
   ])("formats %j as %s", (row, expected) => {
     expect(formatCostCell(row)).toBe(expected);
@@ -201,10 +197,10 @@ describe("formatCostCell", () => {
   // to 0 in JS, so `{ cost: null }` falls through to the "$0" branch
   // instead of "—" — that's the documented behaviour.
   it.each([
-    [{}],                          // missing cost → Number(undefined)=NaN
+    [{}], // missing cost → Number(undefined)=NaN
     [{ cost: undefined }],
-    [{ cost: "abc" }],             // non-numeric string → NaN
-    [null],                        // null row → optional chain → undefined → NaN
+    [{ cost: "abc" }], // non-numeric string → NaN
+    [null], // null row → optional chain → undefined → NaN
     [undefined],
   ])('returns "—" for missing / non-numeric cost: %j', (row) => {
     expect(formatCostCell(row)).toBe("—");
@@ -237,8 +233,14 @@ describe("chipColor", () => {
   // Picks from a known palette of 8 colors.
   it("returns a color from the documented palette", () => {
     const palette = [
-      "#6366f1", "#10b981", "#f97316", "#ec4899",
-      "#0ea5e9", "#a855f7", "#eab308", "#14b8a6",
+      "#6366f1",
+      "#10b981",
+      "#f97316",
+      "#ec4899",
+      "#0ea5e9",
+      "#a855f7",
+      "#eab308",
+      "#14b8a6",
     ];
     expect(palette).toContain(chipColor("anything"));
   });
@@ -258,8 +260,14 @@ describe("chipColor", () => {
   // undefined or a runtime error).
   it("returns a color for null / undefined / empty", () => {
     const palette = [
-      "#6366f1", "#10b981", "#f97316", "#ec4899",
-      "#0ea5e9", "#a855f7", "#eab308", "#14b8a6",
+      "#6366f1",
+      "#10b981",
+      "#f97316",
+      "#ec4899",
+      "#0ea5e9",
+      "#a855f7",
+      "#eab308",
+      "#14b8a6",
     ];
     expect(palette).toContain(chipColor(null));
     expect(palette).toContain(chipColor(undefined));
@@ -269,8 +277,14 @@ describe("chipColor", () => {
   // Stringifies non-string inputs (numbers, booleans).
   it("stringifies non-string inputs", () => {
     const palette = [
-      "#6366f1", "#10b981", "#f97316", "#ec4899",
-      "#0ea5e9", "#a855f7", "#eab308", "#14b8a6",
+      "#6366f1",
+      "#10b981",
+      "#f97316",
+      "#ec4899",
+      "#0ea5e9",
+      "#a855f7",
+      "#eab308",
+      "#14b8a6",
     ];
     expect(palette).toContain(chipColor(42));
     expect(palette).toContain(chipColor(true));
@@ -310,9 +324,7 @@ describe("formatTimeLabel", () => {
   // always echo UTC regardless of the user's timezone selection.
   it("renders the bucket in the selected timezone", () => {
     expect(formatTimeLabel("2026-05-08T06:00:00", "UTC")).toBe("06:00");
-    expect(formatTimeLabel("2026-05-08T06:00:00", "Asia/Kolkata")).toBe(
-      "11:30",
-    );
+    expect(formatTimeLabel("2026-05-08T06:00:00", "Asia/Kolkata")).toBe("11:30");
   });
 
   it("defaults to UTC when no timezone is given", () => {
@@ -326,12 +338,8 @@ describe("formatTimeLabel", () => {
 
 describe("formatBucketTooltip", () => {
   it("formats the tooltip header in the selected timezone", () => {
-    expect(formatBucketTooltip("2026-05-08T06:00:00", "UTC")).toBe(
-      "May 8, 06:00",
-    );
-    expect(formatBucketTooltip("2026-05-08T06:00:00", "Asia/Kolkata")).toBe(
-      "May 8, 11:30",
-    );
+    expect(formatBucketTooltip("2026-05-08T06:00:00", "UTC")).toBe("May 8, 06:00");
+    expect(formatBucketTooltip("2026-05-08T06:00:00", "Asia/Kolkata")).toBe("May 8, 11:30");
   });
 
   it("falls back to the raw input when parsing fails", () => {

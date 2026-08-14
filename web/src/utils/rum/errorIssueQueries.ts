@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  escapeSqlString,
-  histogramKeyToMicros,
-  issueKey,
-} from "@/utils/rum/errorIssueUtils";
+import { escapeSqlString, histogramKeyToMicros, issueKey } from "@/utils/rum/errorIssueUtils";
 
 /** Max issue rows fetched per run (applied via the search payload size). */
 export const ISSUES_LIMIT = 200;
@@ -41,9 +37,7 @@ export interface IssueQueryContext {
  * Distinct-user counting falls back through identity fields, so orgs
  * without user tracking still get a meaningful "affected" count.
  */
-export const pickUserField = (
-  schema: Record<string, boolean>,
-): string | null => {
+export const pickUserField = (schema: Record<string, boolean>): string | null => {
   if (schema["usr_id"]) return "usr_id";
   if (schema["usr_email"]) return "usr_email";
   if (schema["session_id"]) return "session_id";
@@ -57,9 +51,7 @@ const userClause = (ctx: IssueQueryContext): string =>
   ctx.userQuery.trim().length ? ` AND (${ctx.userQuery.trim()})` : "";
 
 const groupFields = (ctx: IssueQueryContext): string[] =>
-  ["error_type", "error_message", "error_handling"].filter(
-    (field) => ctx.schema[field],
-  );
+  ["error_type", "error_message", "error_handling"].filter((field) => ctx.schema[field]);
 
 /** `error_stack` may live in either column depending on SDK version. */
 const stackSelect = (ctx: IssueQueryContext): string | null => {
@@ -85,6 +77,7 @@ const stackSelect = (ctx: IssueQueryContext): string | null => {
 export const buildIssuesSql = (ctx: IssueQueryContext): string => {
   const ts = ctx.timestampColumn;
   const userField = pickUserField(ctx.schema);
+  const groups = groupFields(ctx);
   const select = [
     `max(${ts}) AS zo_sql_timestamp`,
     `min(${ts}) AS first_seen`,
@@ -94,11 +87,9 @@ export const buildIssuesSql = (ctx: IssueQueryContext): string => {
   if (ctx.schema["session_id"]) {
     select.push("COUNT(DISTINCT session_id) AS sessions_affected");
   }
-  select.push(...groupFields(ctx));
+  select.push(...groups);
   if (ctx.schema["error_id"]) {
-    select.push(
-      `FIRST_VALUE(error_id ORDER BY ${ts} DESC) AS latest_error_id`,
-    );
+    select.push(`FIRST_VALUE(error_id ORDER BY ${ts} DESC) AS latest_error_id`);
   }
   const stack = stackSelect(ctx);
   if (stack) select.push(stack);
@@ -107,22 +98,36 @@ export const buildIssuesSql = (ctx: IssueQueryContext): string => {
   if (ctx.schema["session_id"]) select.push("max(session_id) AS session_id");
 
   const orderBy = userField ? "users_affected" : "events";
+  // Omit GROUP BY entirely when the stream carries none of the error-signature
+  // columns: a dangling `GROUP BY` is a parser error, whereas no clause yields a
+  // valid single-row aggregate over all error rows (every SELECT item is an aggregate).
+  const groupByClause = groups.length ? ` GROUP BY ${groups.join(", ")}` : "";
   return (
     `SELECT ${select.join(", ")} FROM "${ctx.streamName}"` +
     ` WHERE type='error'${userClause(ctx)}${serviceClause(ctx)}` +
-    ` GROUP BY ${groupFields(ctx).join(", ")}` +
+    groupByClause +
     ` ORDER BY ${orderBy} DESC`
   );
 };
 
-/** Q2 — errors over time, stacked by handled/unhandled. */
-export const buildErrorsHistogramSql = (
-  ctx: IssueQueryContext,
-  interval: string,
-): string =>
-  `SELECT histogram(${ctx.timestampColumn}, '${interval}') AS ts, error_handling, COUNT(*) AS events` +
-  ` FROM "${ctx.streamName}" WHERE type='error'${userClause(ctx)}${serviceClause(ctx)}` +
-  ` GROUP BY ts, error_handling ORDER BY ts`;
+/**
+ * Q2 — errors over time, stacked by handled/unhandled.
+ * `error_handling` is only referenced when the stream actually has it: naming an
+ * absent column fails the whole query. Without it every bucket is treated as
+ * unhandled by the pivot, which is the correct degradation.
+ */
+export const buildErrorsHistogramSql = (ctx: IssueQueryContext, interval: string): string => {
+  const hasHandling = ctx.schema["error_handling"];
+  const select = hasHandling
+    ? `histogram(${ctx.timestampColumn}, '${interval}') AS ts, error_handling, COUNT(*) AS events`
+    : `histogram(${ctx.timestampColumn}, '${interval}') AS ts, COUNT(*) AS events`;
+  const groupBy = hasHandling ? "ts, error_handling" : "ts";
+  return (
+    `SELECT ${select}` +
+    ` FROM "${ctx.streamName}" WHERE type='error'${userClause(ctx)}${serviceClause(ctx)}` +
+    ` GROUP BY ${groupBy} ORDER BY ts`
+  );
+};
 
 /** Q3 — per-issue histogram for the top issues' trend sparklines. */
 export const buildTrendsSql = (
@@ -130,14 +135,13 @@ export const buildTrendsSql = (
   interval: string,
   messages: string[],
 ): string | null => {
-  const usable = messages.filter(
-    (message) => message.length <= MAX_TREND_MESSAGE_LEN,
-  );
+  const usable = messages.filter((message) => message.length <= MAX_TREND_MESSAGE_LEN);
   if (!usable.length) return null;
-  const inList = usable
-    .map((message) => `'${escapeSqlString(message)}'`)
-    .join(", ");
   const fields = groupFields(ctx);
+  // No signature columns -> no per-issue trend to compute (and grouping by an empty
+  // field list would emit a dangling `GROUP BY ts,`).
+  if (!fields.length) return null;
+  const inList = usable.map((message) => `'${escapeSqlString(message)}'`).join(", ");
   return (
     `SELECT histogram(${ctx.timestampColumn}, '${interval}') AS ts, ${fields.join(", ")}, COUNT(*) AS events` +
     ` FROM "${ctx.streamName}" WHERE type='error'${userClause(ctx)}${serviceClause(ctx)}` +
@@ -187,10 +191,7 @@ export const buildDeploysSql = (ctx: IssueQueryContext): string =>
  * window; any hit means the version predates it (its in-window MIN was
  * just sparse traffic, not a deploy) and no marker should be shown.
  */
-export const buildDeployLookbackSql = (
-  ctx: IssueQueryContext,
-  version: string,
-): string =>
+export const buildDeployLookbackSql = (ctx: IssueQueryContext, version: string): string =>
   `SELECT COUNT(*) AS prior_events FROM "${ctx.streamName}"` +
   ` WHERE version='${escapeSqlString(version)}'${serviceClause(ctx)}`;
 
@@ -206,17 +207,8 @@ export interface StackedBucket {
 const alignedStart = (windowStart: number, intervalMicros: number): number =>
   Math.floor(windowStart / intervalMicros) * intervalMicros;
 
-const bucketCount = (
-  windowStart: number,
-  windowEnd: number,
-  intervalMicros: number,
-): number =>
-  Math.max(
-    1,
-    Math.ceil(
-      (windowEnd - alignedStart(windowStart, intervalMicros)) / intervalMicros,
-    ),
-  );
+const bucketCount = (windowStart: number, windowEnd: number, intervalMicros: number): number =>
+  Math.max(1, Math.ceil((windowEnd - alignedStart(windowStart, intervalMicros)) / intervalMicros));
 
 /** Pivot Q2 hits into a zero-filled stacked series across the window. */
 export const pivotStackedHistogram = (
@@ -233,9 +225,7 @@ export const pivotStackedHistogram = (
     unhandled: 0,
   }));
   for (const hit of hits) {
-    const index = Math.floor(
-      (histogramKeyToMicros(hit.ts) - start) / intervalMicros,
-    );
+    const index = Math.floor((histogramKeyToMicros(hit.ts) - start) / intervalMicros);
     if (index < 0 || index >= count) continue;
     // Anything not explicitly "handled" (including null) counts as unhandled.
     if (hit.error_handling === "handled") {
@@ -243,6 +233,27 @@ export const pivotStackedHistogram = (
     } else {
       buckets[index].unhandled += Number(hit.events) || 0;
     }
+  }
+  return buckets;
+};
+
+/** Pivot a single-series histogram into a zero-filled `{ts, events}` array. */
+export const pivotCounts = (
+  hits: Array<{ ts: string | number; events: number }>,
+  windowStart: number,
+  windowEnd: number,
+  intervalMicros: number,
+): Array<{ ts: number; events: number }> => {
+  const start = alignedStart(windowStart, intervalMicros);
+  const count = bucketCount(windowStart, windowEnd, intervalMicros);
+  const buckets = Array.from({ length: count }, (_, i) => ({
+    ts: start + i * intervalMicros,
+    events: 0,
+  }));
+  for (const hit of hits) {
+    const index = Math.floor((histogramKeyToMicros(hit.ts) - start) / intervalMicros);
+    if (index < 0 || index >= count) continue;
+    buckets[index].events += Number(hit.events) || 0;
   }
   return buckets;
 };
@@ -264,9 +275,7 @@ export const pivotTrends = (
   const count = bucketCount(windowStart, windowEnd, intervalMicros);
   const trends: Record<string, number[]> = {};
   for (const hit of hits) {
-    const index = Math.floor(
-      (histogramKeyToMicros(hit.ts) - start) / intervalMicros,
-    );
+    const index = Math.floor((histogramKeyToMicros(hit.ts) - start) / intervalMicros);
     if (index < 0 || index >= count) continue;
     const key = issueKey(hit);
     if (!trends[key]) trends[key] = new Array(count).fill(0);

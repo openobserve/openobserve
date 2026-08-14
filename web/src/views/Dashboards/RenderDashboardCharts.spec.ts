@@ -21,7 +21,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-
 // Stub ODialog so tests are deterministic (no Portal/Teleport) and so we
 // can drive open/close + button click emits without touching the real
 // dialog implementation.
@@ -220,7 +219,7 @@ describe("RenderDashboardCharts", () => {
     });
 
     it("should handle props validation", () => {
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
       wrapper = createWrapper({
         viewOnly: "invalid", // Wrong type
         forceLoad: "invalid", // Wrong type
@@ -290,11 +289,11 @@ describe("RenderDashboardCharts", () => {
       mockGridStackInstance.init.mockImplementation(() => {
         throw new Error("GridStack initialization failed");
       });
-      
+
       expect(() => {
         wrapper = createWrapper();
       }).not.toThrow();
-      
+
       mockGridStackInstance.init.mockRestore();
     });
 

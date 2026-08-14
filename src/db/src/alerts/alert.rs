@@ -27,6 +27,8 @@ use config::{
     },
     utils::time::now_micros,
 };
+#[cfg(feature = "enterprise")]
+use infra::table::workflows::WorkflowTriggerEntity;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     table::alerts as table,
@@ -34,7 +36,9 @@ use infra::{
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
-use crate as db;
+#[cfg(feature = "enterprise")]
+use crate::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
+use crate::{self as db};
 
 /// Gets the alert and its parent folder.
 pub async fn get_by_id<C: ConnectionTrait>(
@@ -207,6 +211,21 @@ pub async fn create<C: TransactionTrait>(
         e
     });
 
+    #[cfg(feature = "enterprise")]
+    if let Some(ref id) = alert.id {
+        let alert_id = id.to_string();
+        for w in &alert.workflows {
+            db::workflows::associate_workflow(
+                org_id,
+                w,
+                &alert_id,
+                WorkflowTriggerEntity::Alert.to_string(),
+                WorkflowTriggerType::AlertFired.to_string(),
+            )
+            .await?;
+        }
+    }
+
     Ok(alert)
 }
 
@@ -277,6 +296,13 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     };
     let alert_id_str = alert_id.to_string();
 
+    #[cfg(feature = "enterprise")]
+    db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
+        org_id: org_id.to_string(),
+        entity_id: alert_id_str.clone(),
+    })
+    .await?;
+
     table::delete_by_id(conn, org_id, alert_id).await?;
     infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
     #[cfg(feature = "enterprise")]
@@ -313,6 +339,13 @@ pub async fn delete_by_name(
         return Ok(());
     };
     let alert_id_str = alert_id.to_string();
+
+    #[cfg(feature = "enterprise")]
+    db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
+        org_id: org_id.to_string(),
+        entity_id: alert_id_str.clone(),
+    })
+    .await?;
 
     table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
     infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
@@ -474,6 +507,66 @@ pub async fn get_alert_from_cache(org_id: &str, alert_id: &str) -> Option<(Folde
     alerts_cacher
         .get(&cache_alert_key(org_id, alert_id))
         .cloned()
+}
+
+/// Resolve a tag filter to the set of alert IDs carrying **every** tag (PT-8).
+///
+/// Lives here because this module owns the `ALERTS` cache; the infra layer
+/// that builds the SQL cannot reach it. Returns IDs, which the caller pushes
+/// into the query as a chunked predicate so pagination and sorting stay
+/// SQL-side and correct.
+///
+/// **Consistency is eventual (D24).** The cache is updated asynchronously from
+/// coordinator watch events, so a filter issued immediately after a create or
+/// retag can miss the new row until the next cycle. Accepted for a list
+/// filter; do NOT reuse this for anything requiring read-after-write.
+pub async fn resolve_alert_ids_by_tags(org_id: &str, filter_tags: &[String]) -> Vec<String> {
+    if filter_tags.is_empty() {
+        return vec![];
+    }
+    let prefix = format!("{org_id}/");
+    let alerts_cacher = ALERTS.read().await;
+    alerts_cacher
+        .iter()
+        .filter(|(key, _)| key.starts_with(&prefix))
+        .filter(|(_, (_, alert))| {
+            config::meta::alerts::tags::matches_all_tags(&alert.tags, filter_tags)
+        })
+        .filter_map(|(_, (_, alert))| alert.id.map(|id| id.to_string()))
+        .collect()
+}
+
+/// Distinct tags in an org with occurrence counts, for the facet endpoint
+/// (PT-8b).
+///
+/// Returns unsorted, unfiltered pairs. **The caller MUST apply permission
+/// filtering** before exposing these: tag values leak service, environment,
+/// team and customer names, so an org-wide scan is not a safe response on its
+/// own (D23). `visible_alert_ids` is the caller's already-authorized set.
+pub async fn tag_counts_for_alerts(
+    org_id: &str,
+    visible_alert_ids: &[String],
+) -> Vec<(String, u64)> {
+    let prefix = format!("{org_id}/");
+    let visible: std::collections::HashSet<&str> =
+        visible_alert_ids.iter().map(|s| s.as_str()).collect();
+    let alerts_cacher = ALERTS.read().await;
+    let mut counts: hashbrown::HashMap<String, u64> = hashbrown::HashMap::new();
+    for (key, (_, alert)) in alerts_cacher.iter() {
+        if !key.starts_with(&prefix) {
+            continue;
+        }
+        let Some(id) = alert.id.map(|i| i.to_string()) else {
+            continue;
+        };
+        if !visible.contains(id.as_str()) {
+            continue;
+        }
+        for tag in &alert.tags {
+            *counts.entry(tag.clone()).or_insert(0) += 1;
+        }
+    }
+    counts.into_iter().collect()
 }
 
 /// Returns the key used to store stream (real-time) alerts in the in-memory cache, grouped by

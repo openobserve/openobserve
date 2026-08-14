@@ -63,18 +63,12 @@ describe("gcpCard builder", () => {
     const card = gcpCard(SUBS);
     expect(card.provider.name).toBe("Google Cloud");
     expect(card.provider.metaBadges).toEqual(["Logs"]);
-    expect(card.steps.map((s) => s.id)).toEqual([
-      "sink",
-      "subscription",
-      "verify",
-    ]);
+    expect(card.steps.map((s) => s.id)).toEqual(["sink", "subscription", "verify"]);
   });
 
   it("builds the Pub/Sub push endpoint with org and key", () => {
     const sub = gcpCard(SUBS).steps.find((s) => s.id === "subscription")!;
-    expect(sub.code!.raw).toBe(
-      `${SUBS.url}/gcp/${SUBS.org}/{stream}/_sub?API-Key=${SUBS.token}`,
-    );
+    expect(sub.code!.raw).toBe(`${SUBS.url}/gcp/${SUBS.org}/{stream}/_sub?API-Key=${SUBS.token}`);
     // The key is masked on screen and only revealed/copied deliberately.
     expect(sub.code!.masked).not.toContain(SUBS.token);
   });

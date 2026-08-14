@@ -17,16 +17,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="m-3 mt-1 max-w-4xl">
     <!-- Header -->
-    <div class="flex items-start gap-4 mb-6">
+    <div class="mb-6 flex items-start gap-4">
       <OIcon name="cloud" size="xl" class="flex-shrink-0" />
       <div>
         <div
           data-test="azure-config-page-title"
-          class="text-sm font-medium m-0 mb-1 text-text-heading"
+          class="text-text-heading m-0 mb-1 text-sm font-medium"
         >
           {{ t("ingestion.azureSetup.activityLogsTitle") }}
         </div>
-        <div class="text-sm m-0 text-text-secondary">
+        <div class="text-text-secondary m-0 text-sm">
           {{ t("ingestion.azureSetup.activityLogsDescription") }}
         </div>
       </div>
@@ -34,17 +34,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 1 -->
     <div
-      class="mb-4 p-4 rounded-default border-l-4 border-l-solid bg-surface-subtle border-l-border-strong"
+      class="rounded-default border-l-solid bg-surface-subtle border-l-border-strong mb-4 border-l-4 p-4"
     >
-      <div class="flex gap-3 items-start">
-        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text">1</div>
+      <div class="flex items-start gap-3">
+        <div
+          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+        >
+          {{ t("ingestion.azureSetup.step1Number") }}
+        </div>
         <div>
-          <div class="font-semibold mb-1 text-text-heading">
-            Deploy ARM Template
+          <div class="text-text-heading mb-1 font-semibold">
+            {{ t("ingestion.azureSetup.step1Title") }}
           </div>
-          <div class="text-sm m-0 mb-3 text-text-secondary">
-            Creates an Event Hub namespace, Event Hub, and all required
-            resources in your Azure subscription.
+          <div class="text-text-secondary m-0 mb-3 text-sm">
+            {{ t("ingestion.azureSetup.step1Description") }}
           </div>
           <OButton
             variant="primary"
@@ -52,10 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleDeploy"
             data-test="azure-activity-logs-deploy-btn"
           >
-            <template #icon-left
-              ><OIcon name="rocket-launch" size="sm"
-            /></template>
-            Deploy to Azure
+            <template #icon-left><OIcon name="rocket-launch" size="sm" /></template>
+            {{ t("ingestion.azureSetup.deployToAzure") }}
           </OButton>
         </div>
       </div>
@@ -63,49 +64,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 2 -->
     <div
-      class="mb-4 p-4 rounded-default border-l-4 border-l-solid bg-surface-subtle border-l-border-strong"
+      class="rounded-default border-l-solid bg-surface-subtle border-l-border-strong mb-4 border-l-4 p-4"
     >
-      <div class="flex gap-3 items-start">
-        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text">2</div>
+      <div class="flex items-start gap-3">
+        <div
+          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+        >
+          {{ t("ingestion.azureSetup.step2Number") }}
+        </div>
         <div>
-          <div class="font-semibold mb-1 text-text-heading">
-            Configure Diagnostic Settings
+          <div class="text-text-heading mb-1 font-semibold">
+            {{ t("ingestion.azureSetup.step2Title") }}
           </div>
-          <div class="text-sm mb-3 text-text-secondary">
-            After the ARM deployment completes, route Activity Logs to the Event
-            Hub that was created.
+          <div class="text-text-secondary mb-3 text-sm">
+            {{ t("ingestion.azureSetup.step2Description") }}
           </div>
 
           <!-- Portal / CLI toggle -->
           <OToggleGroup v-model="step2Mode" class="mb-4">
-            <OToggleGroupItem value="portal">Azure Portal</OToggleGroupItem>
-            <OToggleGroupItem value="cli">Azure CLI</OToggleGroupItem>
+            <OToggleGroupItem value="portal">{{
+              t("ingestion.azureSetup.azurePortalTab")
+            }}</OToggleGroupItem>
+            <OToggleGroupItem value="cli">{{
+              t("ingestion.azureSetup.azureCliTab")
+            }}</OToggleGroupItem>
           </OToggleGroup>
 
           <!-- Portal instructions -->
           <div v-if="step2Mode === 'portal'">
-            <ol class="text-sm pl-4 space-y-1 text-text-secondary">
+            <ol class="text-text-secondary space-y-1 pl-4 text-sm">
               <li>
-                Go to
-                <strong
-                  >Azure Portal → Subscriptions → your subscription</strong
-                >
-              </li>
-              <li>Click <strong>Activity log</strong> in the left menu</li>
-              <li>
-                Click <strong>Export Activity Logs</strong> (or
-                <strong>Diagnostic settings → + Add diagnostic setting</strong>)
-              </li>
-              <li>Enter a name, check the log categories you want to enable</li>
-              <li>
-                Under <strong>Destination details</strong>, choose
-                <strong>Stream to an event hub</strong>
+                {{ t("ingestion.azureSetup.goTo") }}
+                <strong>{{ t("ingestion.azureSetup.portalSubscriptionPath") }}</strong>
               </li>
               <li>
-                Select the Event Hub namespace and Event Hub created in Step 1
-                (prefix: <code>o2-activity</code>)
+                {{ t("ingestion.azureSetup.clickPrefix") }}
+                <strong>{{ t("ingestion.azureSetup.activityLogMenuItem") }}</strong>
+                {{ t("ingestion.azureSetup.inLeftMenu") }}
               </li>
-              <li>Click <strong>Save</strong></li>
+              <li>
+                {{ t("ingestion.azureSetup.clickPrefix") }}
+                <strong>{{ t("ingestion.azureSetup.exportActivityLogs") }}</strong>
+                {{ t("ingestion.azureSetup.orOpenParen") }}
+                <strong>{{ t("ingestion.azureSetup.diagnosticSettingsPath") }}</strong
+                >)
+              </li>
+              <li>{{ t("ingestion.azureSetup.enterNameCheckCategories") }}</li>
+              <li>
+                {{ t("ingestion.azureSetup.underPrefix") }}
+                <strong>{{ t("ingestion.azureSetup.destinationDetails") }}</strong
+                >{{ t("ingestion.azureSetup.chooseSuffix") }}
+                <strong>{{ t("ingestion.azureSetup.streamToEventHub") }}</strong>
+              </li>
+              <li>
+                {{ t("ingestion.azureSetup.selectEventHubPrefix") }}
+                <code>{{ raw("o2-activity") }}</code
+                >)
+              </li>
+              <li>
+                {{ t("ingestion.azureSetup.clickPrefix") }} <strong>{{ t("common.save") }}</strong>
+              </li>
             </ol>
           </div>
 
@@ -113,77 +131,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else>
             <!-- Categories -->
             <div class="mb-4">
-              <div class="flex items-center justify-between mb-2">
-                <div class="text-xs font-semibold text-text-heading">
-                  Log categories to enable
+              <div class="mb-2 flex items-center justify-between">
+                <div class="text-text-heading text-xs font-semibold">
+                  {{ t("ingestion.azureSetup.logCategoriesToEnable") }}
                 </div>
                 <div class="flex gap-2">
                   <OButton
                     variant="ghost-primary"
                     size="xs"
-                    @click="
-                      enabledCategories = LOG_CATEGORIES.map((c) => c.value)
-                    "
-                    >Select all</OButton
+                    @click="enabledCategories = LOG_CATEGORIES.map((c) => c.value)"
+                    >{{ t("ingestion.azureSetup.selectAllCategories") }}</OButton
                   >
-                  <OButton
-                    variant="ghost-primary"
-                    size="xs"
-                    @click="enabledCategories = []"
-                    >Clear</OButton
-                  >
+                  <OButton variant="ghost-primary" size="xs" @click="enabledCategories = []">{{
+                    t("ingestion.azureSetup.clearCategories")
+                  }}</OButton>
                 </div>
               </div>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-1 w-full">
+              <div class="grid w-full grid-cols-2 gap-1 sm:grid-cols-4">
                 <OCheckbox
                   v-for="cat in LOG_CATEGORIES"
                   :key="cat.value"
                   v-model="enabledCategories"
                   :val="cat.value"
-                  :label="cat.label"
+                  :label="raw(cat.label)"
                 />
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <div class="text-xs mb-1 text-text-heading">
-                  Resource Group
+                <div class="text-text-heading mb-1 text-xs">
+                  {{ t("ingestion.azureSetup.resourceGroupLabel") }}
                 </div>
                 <OInput
+                  :placeholder="raw('rg-openobserve-activity-logs')"
                   v-model="resourceGroup"
-                  placeholder="rg-openobserve-activity-logs"
                   autocomplete="off"
                   data-test="azure-resource-group-input"
                 />
               </div>
               <div>
-                <div class="text-xs mb-1 text-text-heading">
-                  Deployment Name
+                <div class="text-text-heading mb-1 text-xs">
+                  {{ t("ingestion.azureSetup.deploymentNameLabel") }}
                 </div>
                 <OInput
+                  :placeholder="raw('o2-activity-20260420')"
                   v-model="deploymentName"
-                  placeholder="o2-activity-20260420"
                   autocomplete="off"
                   data-test="azure-deployment-name-input"
                 />
               </div>
             </div>
 
-            <div
-              v-if="enabledCategories.length === 0"
-              class="text-sm text-status-error-text mb-3"
-            >
-              Select at least one log category above.
+            <div v-if="enabledCategories.length === 0" class="text-status-error-text mb-3 text-sm">
+              {{ t("ingestion.azureSetup.selectAtLeastOneCategory") }}
             </div>
             <div v-else>
-              <div class="text-xs mb-2 text-text-secondary">
-                Run this command after your ARM deployment completes:
+              <div class="text-text-secondary mb-2 text-xs">
+                {{ t("ingestion.azureSetup.runCommandAfterDeployment") }}
               </div>
-              <CopyContent
-                :content="curlCommand"
-                data-test="azure-curl-command"
-              />
+              <CopyContent :content="raw(curlCommand)" data-test="azure-curl-command" />
             </div>
           </div>
         </div>
@@ -192,17 +199,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Manual Configuration -->
     <div class="mt-6">
-      <div class="font-semibold text-sm mb-2 text-text-heading">
+      <div class="text-text-heading mb-2 text-sm font-semibold">
         {{ t("ingestion.azureSetup.manualTitle") }}
       </div>
-      <CopyContent :content="manualContent" />
+      <CopyContent :content="raw(manualContent)" />
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -211,10 +218,7 @@ import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
-import {
-  generateARMTemplateURL,
-  azureIntegrations,
-} from "@/utils/azureIntegrations";
+import { generateARMTemplateURL, azureIntegrations } from "@/utils/azureIntegrations";
 import CopyContent from "@/components/CopyContent.vue";
 import segment from "@/services/segment_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -233,18 +237,21 @@ const LOG_CATEGORIES = [
   { value: "ResourceHealth", label: "Resource Health" },
 ];
 
-const activityLogsIntegration = azureIntegrations.find(
-  (i) => i.id === "activity-logs",
-)!;
+const activityLogsIntegration = azureIntegrations.find((i) => i.id === "activity-logs")!;
 
 export default defineComponent({
   name: "AzureConfig",
   components: {
-    CopyContent, OToggleGroup, OToggleGroupItem, OButton, OCheckbox, OInput,
+    CopyContent,
+    OToggleGroup,
+    OToggleGroupItem,
+    OButton,
+    OCheckbox,
+    OInput,
     OIcon,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     let endpoint: any = null;
@@ -279,7 +286,7 @@ export default defineComponent({
       if (!endpoint?.url) {
         toast({
           variant: "error",
-          message: "Invalid ingestion endpoint. Please check configuration.",
+          message: t("toastMessages.recommended.invalidIngestionEndpointPleaseCheckConfiguration"),
         });
         return;
       }
@@ -291,7 +298,7 @@ export default defineComponent({
       if (!organizationId || !email || !passcode) {
         toast({
           variant: "error",
-          message: "Missing organization credentials. Please refresh the page.",
+          message: t("toastMessages.recommended.missingOrganizationCredentialsPleaseRefreshThe"),
         });
         return;
       }
@@ -299,11 +306,7 @@ export default defineComponent({
       const accessKey = btoa(`${email}:${passcode}`);
       const endpointUrl = `${endpoint.url}/azure/${organizationId}/default/_event_hub`;
 
-      const url = generateARMTemplateURL(
-        activityLogsIntegration,
-        endpointUrl,
-        accessKey,
-      );
+      const url = generateARMTemplateURL(activityLogsIntegration, endpointUrl, accessKey);
       window.open(url, "_blank", "noopener,noreferrer");
 
       segment.track("Azure Activity Logs Deploy Started", {
@@ -312,11 +315,12 @@ export default defineComponent({
 
       toast({
         variant: "info",
-        message: "Opening Azure portal to deploy Activity Logs infrastructure",
+        message: t("toastMessages.recommended.openingAzurePortalToDeployActivity"),
       });
     };
 
     return {
+      raw,
       t,
       store,
       LOG_CATEGORIES,

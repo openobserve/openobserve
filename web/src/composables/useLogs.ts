@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, onBeforeMount, nextTick } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -38,42 +39,28 @@ import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useStreamingSearch from "@/composables/useStreamingSearch";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw } from "@/types/i18n";
 
-const useLogs = () => {
+const useLogs = (t: TranslateFn) => {
   const store = useStore();
 
-  let {
-    searchObj,
-    initialQueryPayload,
-    resetFunctions,
-    notificationMsg,
-  } = searchState();
+  let { searchObj, initialQueryPayload, resetFunctions, notificationMsg } = searchState();
 
-  const { getHistogramTitle } = useHistogram();
+  const { getHistogramTitle, getHistogramTitleParts } = useHistogram();
 
   const { getPaginatedData } = usePagination();
 
-  const { buildSearch } = useSearchStream();
+  const { buildSearch } = useSearchStream(t);
 
-  const { getFunctions, getActions, getQueryData } = useSearchBar();
+  const { getFunctions, getActions, getQueryData } = useSearchBar(t);
 
-  const {
-    fnParsedSQL,
-    fnUnparsedSQL,
-    addTransformToQuery,
-    isActionsEnabled,
-  } = logsUtils();
+  const { fnParsedSQL, fnUnparsedSQL, addTransformToQuery, isActionsEnabled } = logsUtils();
 
-  const {
-    updateFieldValues,
-    extractFields,
-    updateGridColumns,
-    filterHitsColumns,
-    getStreamList,
-  } = useStreamFields();
+  const { updateFieldValues, extractFields, updateGridColumns, filterHitsColumns, getStreamList } =
+    useStreamFields();
 
   const { showErrorNotification } = useNotifications();
-  const { getStreams } = useStreams();
+  const { getStreams } = useStreams(t);
   const { cancelStreamQueryBasedOnRequestId } = useStreamingSearch();
 
   const router = useRouter();
@@ -86,9 +73,7 @@ const useLogs = () => {
   });
 
   const clearSearchObj = () => {
-    searchObj = reactive(
-      Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_LOGS_CONFIG))),
-    );
+    searchObj = reactive(Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_LOGS_CONFIG))));
   };
 
   const getJobData = async (isPagination = false) => {
@@ -107,10 +92,7 @@ const useLogs = () => {
 
       if (queryReq != null) {
         // in case of live refresh, reset from to 0
-        if (
-          searchObj.meta.refreshInterval > 0 &&
-          router.currentRoute.value.name == "logs"
-        ) {
+        if (searchObj.meta.refreshInterval > 0 && router.currentRoute.value.name == "logs") {
           queryReq.query.from = 0;
           searchObj.meta.refreshHistogram = true;
         }
@@ -126,15 +108,10 @@ const useLogs = () => {
             if (
               searchObj.meta.refreshInterval == 0 &&
               router.currentRoute.value.name == "logs" &&
-              Object.prototype.hasOwnProperty.call(
-                searchObj.data.queryResults,
-                "hits",
-              )
+              Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "hits")
             ) {
-              const start_time: number =
-                initialQueryPayload.value?.query?.start_time || 0;
-              const end_time: number =
-                initialQueryPayload.value?.query?.end_time || 0;
+              const start_time: number = initialQueryPayload.value?.query?.start_time || 0;
+              const end_time: number = initialQueryPayload.value?.query?.end_time || 0;
               queryReq.query.start_time = start_time;
               queryReq.query.end_time = end_time;
             }
@@ -156,9 +133,9 @@ const useLogs = () => {
           .then(() => {
             toast({
               variant: "success",
-              message: "Job added successfully",
+              message: t("toastMessages.composables.jobAddedSuccessfully"),
               action: {
-                label: "Go To Job Scheduler",
+                label: t("toastMessages.composables.goToJobScheduler"),
                 handler: () => routeToSearchSchedule(),
               },
             });
@@ -168,11 +145,14 @@ const useLogs = () => {
       }
       if (searchObj.meta.jobId == "") {
         searchObj.data.histogram.chartParams.title = getHistogramTitle();
+        searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
       }
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
-        notificationMsg.value || "Error occurred during the search operation.",
+        raw(
+          notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+        ),
       );
       throw e;
       // notificationMsg.value = "";
@@ -190,15 +170,14 @@ const useLogs = () => {
 
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const routeToSearchSchedule = () => {
+    // Search Scheduler is now its own route (was an `action=search_scheduler` overlay).
     router.push({
-      query: {
-        action: "search_scheduler",
-        org_identifier: searchObj.organizationIdentifier,
-        type: "search_scheduler_list",
-      },
+      name: "searchScheduler",
+      query: { org_identifier: searchObj.organizationIdentifier },
     });
   };
 
@@ -227,7 +206,9 @@ const useLogs = () => {
         if (searchObj.meta.logsVisualizeToggle == "logs") {
           toast({
             variant: "info",
-            message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
+            message: t("toastMessages.composables.liveModeIsEnabledOnlyTop", {
+              count: searchObj.meta.resultGrid.rowsPerPage,
+            }),
           });
         }
       } else {
@@ -275,8 +256,7 @@ const useLogs = () => {
       // in-progress and user select stream from dropdown in that case it loads data but it should wait for
       // additional details from the user like filter conditions and time range selection before load data
       // it should work in case of page refresh, navigate user from streams page or short url
-      let initialStreamSelected: boolean =
-        searchObj.data.stream.selectedStream.length > 0;
+      let initialStreamSelected: boolean = searchObj.data.stream.selectedStream.length > 0;
 
       await getStreamList();
       await getFunctions();
@@ -394,6 +374,15 @@ const useLogs = () => {
       const decodedQuery = b64DecodeUnicode(queryParams.query)!;
       searchObj.data.editorValue = decodedQuery;
       searchObj.data.query = decodedQuery;
+      // The Monaco query editor is lazy-loaded and, while it mounts, fires its
+      // change callback with an empty "" BEFORE this restored value is applied.
+      // Flag the restore as pending so updateQueryValue() ignores that transient
+      // empty emission instead of wiping the query (and flipping SQL mode off) —
+      // the intermittent "shared SQL link opens an empty editor" bug. The flag is
+      // cleared the moment the real (non-empty) value lands in the editor.
+      if (decodedQuery.trim() !== "") {
+        searchObj.meta.pendingUrlQueryRestore = true;
+      }
     }
 
     if (
@@ -403,25 +392,18 @@ const useLogs = () => {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
     }
 
-    if (
-      queryParams.refresh &&
-      enableRefreshInterval(parseInt(queryParams.refresh))
-    ) {
+    if (queryParams.refresh && enableRefreshInterval(parseInt(queryParams.refresh))) {
       searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
     }
 
-    if (
-      queryParams.refresh &&
-      !enableRefreshInterval(parseInt(queryParams.refresh))
-    ) {
+    if (queryParams.refresh && !enableRefreshInterval(parseInt(queryParams.refresh))) {
       delete queryParams.refresh;
     }
 
     useLocalTimezone(queryParams.timezone);
 
     if (queryParams.functionContent) {
-      searchObj.data.tempFunctionContent =
-        b64DecodeUnicode(queryParams.functionContent) || "";
+      searchObj.data.tempFunctionContent = b64DecodeUnicode(queryParams.functionContent) || "";
       searchObj.meta.functionEditorPlaceholderFlag = false;
       searchObj.data.transformType = "function";
     }
@@ -442,15 +424,11 @@ const useLogs = () => {
     }
 
     if (queryParams.show_histogram) {
-      searchObj.meta.showHistogram =
-        queryParams.show_histogram == "true" ? true : false;
+      searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
     }
 
     searchObj.shouldIgnoreWatcher = false;
-    if (
-      Object.hasOwn(queryParams, "type") &&
-      queryParams.type == "search_history_re_apply"
-    ) {
+    if (Object.hasOwn(queryParams, "type") && queryParams.type == "search_history_re_apply") {
       delete queryParams.type;
     }
 
@@ -463,10 +441,7 @@ const useLogs = () => {
     }
 
     if (
-      Object.prototype.hasOwnProperty.call(
-        queryParams,
-        "logs_visualize_toggle",
-      ) &&
+      Object.prototype.hasOwnProperty.call(queryParams, "logs_visualize_toggle") &&
       queryParams.logs_visualize_toggle != ""
     ) {
       searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
@@ -474,8 +449,7 @@ const useLogs = () => {
 
     //here we restore the fn editor state from the url query params
     if (queryParams.fn_editor) {
-      searchObj.meta.showTransformEditor =
-        queryParams.fn_editor == "true" ? true : false;
+      searchObj.meta.showTransformEditor = queryParams.fn_editor == "true" ? true : false;
     }
 
     // TODO OK : Replace push with replace and test all scenarios
@@ -489,9 +463,7 @@ const useLogs = () => {
   };
 
   const enableRefreshInterval = (value: number) => {
-    return (
-      value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) || 0)
-    );
+    return value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) || 0);
   };
 
   const updateStreams = async () => {
@@ -514,10 +486,7 @@ const useLogs = () => {
     }
   };
 
-  const reorderArrayByReference = (
-    arr1: string[],
-    arr2: string[],
-  ): string[] => {
+  const reorderArrayByReference = (arr1: string[], arr2: string[]): string[] => {
     return [...arr1].sort((a, b) => {
       const indexA = arr2.indexOf(a);
       const indexB = arr2.indexOf(b);
@@ -531,16 +500,27 @@ const useLogs = () => {
 
   const reorderSelectedFields = () => {
     const selectedFields = [...searchObj.data.stream.selectedFields].filter(
-      (_field) =>
-        _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+      (_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
     );
 
-    // selectedStream array is coerced to its comma-joined string form as key
-    let colOrder = searchObj.data.resultGrid.colOrder[
-      searchObj.data.stream.selectedStream.join(",")
-    ].filter(
-      (_field) =>
-        _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+    // selectedStream array is coerced to its comma-joined string form as key.
+    // Two shapes have to be tolerated:
+    //  • missing — the table only reports an order once the user reorders, so
+    //    "no entry" means "no order".
+    //  • object — a saved view round-trips this array through the API and comes
+    //    back as `{0:"a",1:"b"}`. Calling `.filter` on that throws, and because
+    //    closeColumn()/add-field both start here, EVERY column add/remove then
+    //    dies silently.
+    const storedColOrder =
+      searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream.join(",")];
+    const colOrderList: string[] = Array.isArray(storedColOrder)
+      ? storedColOrder
+      : storedColOrder && typeof storedColOrder === "object"
+        ? (Object.values(storedColOrder) as string[])
+        : [];
+
+    let colOrder = colOrderList.filter(
+      (_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
     );
 
     // Skip reordering when colOrder is empty to prevent unstable sort in Firefox
@@ -566,15 +546,11 @@ const useLogs = () => {
 
       const getStreamFieldTypes = (stream: any) => {
         if (!stream.schema) return {};
-        return Object.fromEntries(
-          stream.schema.map((schema: any) => [schema.name, schema.type]),
-        );
+        return Object.fromEntries(stream.schema.map((schema: any) => [schema.name, schema.type]));
       };
 
       const fieldTypeList = searchObj.data.streamResults.list
-        .filter((stream: any) =>
-          searchObj.data.stream.selectedStream.includes(stream.name),
-        )
+        .filter((stream: any) => searchObj.data.stream.selectedStream.includes(stream.name))
         .reduce(
           (acc: any, stream: any) => ({
             ...acc,
@@ -587,25 +563,18 @@ const useLogs = () => {
         fieldType = fieldTypeList[field];
       }
 
-      if (
-        field_value === "null" ||
-        field_value === "" ||
-        field_value === null
-      ) {
+      if (field_value === "null" || field_value === "" || field_value === null) {
         operator = action == "include" ? "is" : "is not";
         field_value = "null";
       }
       const quotedField =
-        searchObj.meta.sqlMode === true
-          ? quoteSqlIdentifierIfNeeded(String(field))
-          : field;
+        searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(String(field)) : field;
       let expression =
         field_value == "null"
           ? `${quotedField} ${operator} ${field_value}`
           : `${quotedField} ${operator} '${field_value}'`;
 
-      const isNumericType = (type: string) =>
-        ["int64", "float64"].includes(type.toLowerCase());
+      const isNumericType = (type: string) => ["int64", "float64"].includes(type.toLowerCase());
       const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
 
       if (isNumericType(fieldType)) {
@@ -619,9 +588,7 @@ const useLogs = () => {
     } catch (e: any) {
       console.log("Error while getting filter expression by field type", e);
       const quotedField =
-        searchObj.meta.sqlMode === true
-          ? quoteSqlIdentifierIfNeeded(String(field))
-          : field;
+        searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(String(field)) : field;
       return `${quotedField} ${operator} '${field_value}'`;
     }
   };
@@ -670,11 +637,7 @@ const useLogs = () => {
 
         query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
         const tableName = parsedSQL.from[0]?.table;
-        if (tableName)
-          outputQueries[tableName] = query.replace(
-            "INDEX_NAME",
-            "[INDEX_NAME]",
-          );
+        if (tableName) outputQueries[tableName] = query.replace("INDEX_NAME", "[INDEX_NAME]");
       } else {
         // parse join queries & union queries
         if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 1) {
@@ -696,15 +659,10 @@ const useLogs = () => {
 
             query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
             const tableName = parsedSQL.from[0]?.table;
-            if (tableName)
-              outputQueries[tableName] = query.replace(
-                "INDEX_NAME",
-                "[INDEX_NAME]",
-              );
+            if (tableName) outputQueries[tableName] = query.replace("INDEX_NAME", "[INDEX_NAME]");
           }
 
-          let nextTable: ExtendedParsedSQLResult | null | undefined =
-            parsedSQL._next;
+          let nextTable: ExtendedParsedSQLResult | null | undefined = parsedSQL._next;
           let depth = 0;
           const MAX_DEPTH = 100;
           while (nextTable && depth++ < MAX_DEPTH) {
@@ -717,11 +675,7 @@ const useLogs = () => {
 
               query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
               const tableName = nextTable.from[0]?.table;
-              if (tableName)
-                outputQueries[tableName] = query.replace(
-                  "INDEX_NAME",
-                  "[INDEX_NAME]",
-                );
+              if (tableName) outputQueries[tableName] = query.replace("INDEX_NAME", "[INDEX_NAME]");
             }
             nextTable = nextTable._next;
           }
@@ -767,10 +721,7 @@ const useLogs = () => {
         return {
           type: "column_ref",
           table: node.table || null,
-          column:
-            node.column && node.column.expr
-              ? node.column.expr.value
-              : node.column,
+          column: node.column && node.column.expr ? node.column.expr.value : node.column,
         };
 
       case "single_quote_string":
@@ -810,11 +761,12 @@ const useLogs = () => {
     loadVisualizeData,
     loadPatternsData,
     getHistogramTitle,
+    getHistogramTitleParts,
   };
 };
 
 // Priority order for FTS field selection as default columns
-const FTS_PRIORITY = ['body', 'body_msg', 'message', 'log', 'msg'];
+const FTS_PRIORITY = ["body", "body_msg", "message", "log", "msg"];
 
 export const resolveDefaultColumns = (
   streamFields: Array<{ name: string; ftsKey: boolean }>,
@@ -822,9 +774,7 @@ export const resolveDefaultColumns = (
   hits?: Record<string, unknown>[],
 ): string[] => {
   const streamFieldNames = new Set(streamFields.map((f) => f.name));
-  const streamFtsNames = streamFields
-    .filter((f) => f.ftsKey)
-    .map((f) => f.name);
+  const streamFtsNames = streamFields.filter((f) => f.ftsKey).map((f) => f.name);
 
   // Only include global FTS keys that actually exist in this stream's fields
   const globalFtsInStream = globalFtsKeys.filter((k) => streamFieldNames.has(k));
@@ -841,11 +791,11 @@ export const resolveDefaultColumns = (
   // Break ties using FTS_PRIORITY so the more meaningful body field wins when
   // multiple candidates are equally populated (e.g. body beats log).
   if (hits && hits.length > 0) {
-    let bestField = '';
+    let bestField = "";
     let bestCount = -1;
     for (const field of candidates) {
       const count = hits.filter(
-        (h) => h[field] !== undefined && h[field] !== null && h[field] !== '',
+        (h) => h[field] !== undefined && h[field] !== null && h[field] !== "",
       ).length;
       if (
         count > bestCount ||

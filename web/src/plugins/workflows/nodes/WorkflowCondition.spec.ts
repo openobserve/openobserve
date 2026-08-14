@@ -46,7 +46,16 @@ vi.mock("@/components/flow/forms/ConditionBuilder.vue", () => ({
 
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { ALERT_PAYLOAD_FIELDS } from "@/plugins/workflows/alertFields";
+import { INCIDENT_PAYLOAD_FIELDS } from "@/plugins/workflows/incidentFields";
 import WorkflowCondition from "./WorkflowCondition.vue";
+
+// The condition's field options come from the CURRENT trigger's kind, so seed a
+// trigger node in the graph. Default = alert; individual tests override it.
+const seedTrigger = (kind = "alert_fired") => {
+  workflowObj.currentSelectedWorkflow.nodes = [
+    { id: "t1", data: { node_type: "workflow_trigger", trigger_kind: kind } },
+  ];
+};
 
 function createWrapper() {
   return mount(WorkflowCondition, {
@@ -62,40 +71,49 @@ function createWrapper() {
 describe("WorkflowCondition", () => {
   beforeEach(() => {
     workflowObj.currentSelectedNodeData = null;
+    seedTrigger();
     builderSubmit.mockReset();
   });
   afterEach(() => {
     workflowObj.currentSelectedNodeData = null;
+    workflowObj.currentSelectedWorkflow.nodes = [];
     vi.clearAllMocks();
   });
 
   describe("props passed to the shared ConditionBuilder", () => {
     it("renders the body and the shared builder", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="workflow-condition-body"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.findComponent({ name: "ConditionBuilder" }).exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-condition-body"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "ConditionBuilder" }).exists()).toBe(true);
     });
 
-    it("passes the fired-alert payload fields (ALERT_PAYLOAD_FIELDS) as `fields`", () => {
+    it("passes the fired-alert payload fields (ALERT_PAYLOAD_FIELDS) for an alert trigger", () => {
+      seedTrigger("alert_fired");
       const wrapper = createWrapper();
-      const fields = wrapper
-        .findComponent({ name: "ConditionBuilder" })
-        .props("fields");
+      const fields = wrapper.findComponent({ name: "ConditionBuilder" }).props("fields");
       expect(fields).toEqual(ALERT_PAYLOAD_FIELDS);
       // sanity: these are the flattened `meta_*` columns, not stream fields
       expect(fields.map((f: any) => f.value)).toContain("meta_alert_name");
     });
 
+    it("passes the incident payload fields for an incident trigger", () => {
+      seedTrigger("incident_event");
+      const wrapper = createWrapper();
+      const fields = wrapper.findComponent({ name: "ConditionBuilder" }).props("fields");
+      expect(fields).toEqual(INCIDENT_PAYLOAD_FIELDS);
+      expect(fields.map((f: any) => f.value)).toContain("meta_event_type");
+    });
+
+    it("passes no fields when the workflow has no trigger", () => {
+      workflowObj.currentSelectedWorkflow.nodes = [];
+      const wrapper = createWrapper();
+      expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("fields")).toEqual([]);
+    });
+
     it("passes null initial-conditions when there is no selected node data", () => {
       const wrapper = createWrapper();
       expect(
-        wrapper
-          .findComponent({ name: "ConditionBuilder" })
-          .props("initialConditions"),
+        wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
       ).toBeNull();
     });
 
@@ -106,9 +124,7 @@ describe("WorkflowCondition", () => {
       } as any;
       const wrapper = createWrapper();
       expect(
-        wrapper
-          .findComponent({ name: "ConditionBuilder" })
-          .props("initialConditions"),
+        wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
       ).toBeNull();
     });
 
@@ -131,9 +147,7 @@ describe("WorkflowCondition", () => {
       } as any;
       const wrapper = createWrapper();
       expect(
-        wrapper
-          .findComponent({ name: "ConditionBuilder" })
-          .props("initialConditions"),
+        wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
       ).toEqual(saved);
     });
   });

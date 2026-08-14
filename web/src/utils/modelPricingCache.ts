@@ -47,14 +47,14 @@ export class ModelPricingCache {
       // Check if expired
       if (now - cached.timestamp > cached.ttl) {
         console.debug(
-          `[ModelPricingCache] Cache expired for org: ${orgId} (age: ${Math.round((now - cached.timestamp) / 1000)}s)`
+          `[ModelPricingCache] Cache expired for org: ${orgId} (age: ${Math.round((now - cached.timestamp) / 1000)}s)`,
         );
         this.clear(orgId);
         return null;
       }
 
       console.debug(
-        `[ModelPricingCache] Cache hit for org: ${orgId} (age: ${Math.round((now - cached.timestamp) / 1000)}s)`
+        `[ModelPricingCache] Cache hit for org: ${orgId} (age: ${Math.round((now - cached.timestamp) / 1000)}s)`,
       );
       return cached.data;
     } catch (error) {
@@ -76,9 +76,7 @@ export class ModelPricingCache {
       };
 
       sessionStorage.setItem(cacheKey, JSON.stringify(cached));
-      console.debug(
-        `[ModelPricingCache] Cached data for org: ${orgId} (TTL: ${ttl / 1000}s)`
-      );
+      console.debug(`[ModelPricingCache] Cached data for org: ${orgId} (TTL: ${ttl / 1000}s)`);
     } catch (error) {
       console.error("[ModelPricingCache] Error writing cache:", error);
       // Don't fail the request if caching fails (e.g., quota exceeded)

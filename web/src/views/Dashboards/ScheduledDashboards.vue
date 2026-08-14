@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="scheduled-dashboards-drawer"
+  <ODrawer
+    data-test="scheduled-dashboards-drawer"
     bleed
     :open="open"
     :width="60"
@@ -43,80 +44,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="alert-list-add-alert-btn"
           @click="createScheduledReport"
-        >{{ t("dashboard.newReport") }}</OButton
+          >{{ t("dashboard.newReport") }}</OButton
         >
       </div>
     </template>
 
-    <div
-      data-test="scheduled-dashboards-container"
-      class="scheduled-dashboards h-fit"
-    >
-    <OTable class="w-full"
-      data-test="scheduled-dashboard-table"
-      :data="displayReports"
-      :columns="columns"
-      row-key="id"
-      pagination="client"
-      :page-size="selectedPerPage"
-      :page-size-options="perPageOptionsList"
-      :show-global-filter="false"
-      :default-columns="false"
-      show-index
-      :loading="loading"
-    >
-      <template #cell-name="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
-      </template>
+    <div data-test="scheduled-dashboards-container" class="scheduled-dashboards h-fit">
+      <OTable
+        class="w-full"
+        data-test="scheduled-dashboard-table"
+        :data="displayReports"
+        :columns="columns"
+        row-key="id"
+        pagination="client"
+        :page-size="selectedPerPage"
+        :page-size-options="perPageOptionsList"
+        :show-global-filter="false"
+        :default-columns="false"
+        show-index
+        :loading="loading"
+      >
+        <template #cell-name="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
+        </template>
 
-      <template #cell-tab="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.tab }}</span>
-      </template>
+        <template #cell-tab="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">{{ row.tab }}</span>
+        </template>
 
-      <template #cell-time_range="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.time_range }}</span>
-      </template>
+        <template #cell-time_range="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">{{ row.time_range }}</span>
+        </template>
 
-      <template #cell-frequency="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
-      </template>
+        <template #cell-frequency="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
+        </template>
 
-      <template #cell-last_triggered_at="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">
-          <OTimeCell
-            :value="row.last_triggered_at_raw"
-            unit="us"
-            mode="absolute"
-            :timezone="store.state.timezone"
-            :empty-label="t('dashboard.scheduledDashboardsPage.never')"
-          />
-        </span>
-      </template>
+        <template #cell-last_triggered_at="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">
+            <OTimeCell
+              :value="row.last_triggered_at_raw"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              :empty-label="t('dashboard.scheduledDashboardsPage.never')"
+            />
+          </span>
+        </template>
 
-      <template #cell-created_at="{ row }">
-        <span class="cursor-pointer" @click="openReport(row)">
-          <OTimeCell
-            :value="row.created_at_raw"
-            unit="us"
-            :timezone="store.state.timezone"
-          />
-        </span>
-      </template>
+        <template #cell-created_at="{ row }">
+          <span class="cursor-pointer" @click="openReport(row)">
+            <OTimeCell :value="row.created_at_raw" unit="us" :timezone="store.state.timezone" />
+          </span>
+        </template>
 
-      <template #empty>
-        <NoData
-          :filtered="!!scheduledFilterQuery"
-          @action="scheduledFilterQuery = ''"
-        />
-      </template>
-    </OTable>
+        <template #empty>
+          <NoData :filtered="!!scheduledFilterQuery" @action="scheduledFilterQuery = ''" />
+        </template>
+      </OTable>
     </div>
   </ODrawer>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -166,7 +158,7 @@ const emit = defineEmits<{
   "update:open": [value: boolean];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const router = useRouter();
 
@@ -196,9 +188,7 @@ type ScheduledReportRow = Omit<ScheduledDashboardReport, "#"> & {
   created_at_raw: number | null;
 };
 
-const scheduledReports = ref<ScheduledReportRow[]>(
-  props.reports as ScheduledReportRow[],
-);
+const scheduledReports = ref<ScheduledReportRow[]>(props.reports as ScheduledReportRow[]);
 
 const formattedReports = ref<ScheduledReportRow[]>([]);
 
@@ -214,12 +204,9 @@ watch(
   },
 );
 
-watch(
-  scheduledActiveTab,
-  () => {
-    filterReports();
-  },
-);
+watch(scheduledActiveTab, () => {
+  filterReports();
+});
 //this makes sure that reports are formatted when the component is mounted
 //because sometimes watcher might not be triggered if the props are already set
 onMounted(() => {
@@ -227,23 +214,20 @@ onMounted(() => {
 });
 
 const formatReports = () => {
-  props.reports.length > 0 &&
-    props.reports.forEach((report: any) => {
-      scheduledReports.value.push({
-        name: report.name,
-        tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
-        time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
-        frequency: getFrequencyValue(report.frequency),
-        last_triggered_at_raw: report.last_triggered_at || null,
-        last_triggered_at: report.last_triggered_at
-          ? convertUnixToDateFormat(report.last_triggered_at)
-          : "-",
-        created_at_raw: report.created_at || null,
-        created_at: convertUnixToDateFormat(report.created_at),
-        orgId: report.org_id,
-        isCached: !report?.destinations?.length,
-      });
-    });
+  scheduledReports.value = props.reports.map((report: any) => ({
+    name: report.name,
+    tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
+    time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
+    frequency: getFrequencyValue(report.frequency),
+    last_triggered_at_raw: report.last_triggered_at || null,
+    last_triggered_at: report.last_triggered_at
+      ? convertUnixToDateFormat(report.last_triggered_at)
+      : "-",
+    created_at_raw: report.created_at || null,
+    created_at: convertUnixToDateFormat(report.created_at),
+    orgId: report.org_id,
+    isCached: !report?.destinations?.length,
+  }));
 
   filterReports();
 };
@@ -257,13 +241,9 @@ const filterReports = () => {
   // filter reports based on the selected tab
   // If reports are cached, show only cached reports
   if (scheduledActiveTab.value === "cached") {
-    formattedReports.value = scheduledReports.value.filter(
-      (report) => report.isCached,
-    );
+    formattedReports.value = scheduledReports.value.filter((report) => report.isCached);
   } else {
-    formattedReports.value = scheduledReports.value.filter(
-      (report) => !report.isCached,
-    );
+    formattedReports.value = scheduledReports.value.filter((report) => !report.isCached);
   }
 };
 
@@ -327,9 +307,7 @@ const displayReports = computed(() => {
   if (scheduledFilterQuery.value) {
     const query = scheduledFilterQuery.value.toLowerCase();
     reports = reports.filter((row: any) =>
-      Object.values(row).some((v) =>
-        String(v).toLowerCase().includes(query),
-      ),
+      Object.values(row).some((v) => String(v).toLowerCase().includes(query)),
     );
   }
   return reports;
@@ -403,6 +381,7 @@ const getTimeRangeValue = (dateTime: any) => {
 }
 
 .scheduled-dashboards :deep(.rum-tabs) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the tab-group outline is a 1-device-pixel border and must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   height: fit-content;
   border-radius: 0.25rem;

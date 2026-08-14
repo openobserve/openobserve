@@ -95,9 +95,13 @@ describe("OFormInput", () => {
         // The #error slot OWNS the message — the consumer renders it (here in a
         // sibling); the built-in inline error is suppressed.
         default: () =>
-          h(OFormInput, { name: "name" }, {
-            error: () => h("div", { class: "external-error" }, "custom error"),
-          }),
+          h(
+            OFormInput,
+            { name: "name" },
+            {
+              error: () => h("div", { class: "external-error" }, "custom error"),
+            },
+          ),
       },
       global: { components: { OFormInput } },
     });

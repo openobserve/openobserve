@@ -39,9 +39,10 @@ export interface PaletteColor {
 }
 
 /** The shared dashboard series ramp, paired light/dark by index. */
-export const CARD_PALETTE: PaletteColor[] = classicColorPaletteDarkTheme.map(
-  (dark, i) => ({ dark, light: classicColorPaletteLightTheme[i] }),
-);
+export const CARD_PALETTE: PaletteColor[] = classicColorPaletteDarkTheme.map((dark, i) => ({
+  dark,
+  light: classicColorPaletteLightTheme[i],
+}));
 
 /** Area fill under a card's line: a wash, readable but never rivalling the line. */
 export const CARD_AREA_FILL_OPACITY = 0.1;
@@ -51,7 +52,7 @@ export const CARD_AREA_FILL_OPACITY = 0.1;
  */
 export function cardColorForIndex(index: number, isDark: boolean): string {
   const size = CARD_PALETTE.length;
-  const color = CARD_PALETTE[(((index % size) + size) % size)];
+  const color = CARD_PALETTE[((index % size) + size) % size];
   return isDark ? color.dark : color.light;
 }
 

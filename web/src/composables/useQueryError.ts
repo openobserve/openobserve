@@ -33,15 +33,9 @@
  */
 
 import DOMPurify from "dompurify";
-import {
-  computed,
-  ref,
-  type ComputedRef,
-  type Ref,
-  type MaybeRefOrGetter,
-  toValue,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, ref, type ComputedRef, type Ref, type MaybeRefOrGetter, toValue } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+import type { I18nKey } from "@/types/i18n";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -96,7 +90,7 @@ export interface QueryErrorResult {
 export const QUERY_ERROR_CODES = new Set([20001, 20004, 20005, 20007, 20008]);
 
 /** Per-code i18n keys. Falls back to generic keys for unknown codes. */
-const ERROR_META: Record<number, { titleKey: string; descKey: string }> = {
+const ERROR_META: Record<number, { titleKey: I18nKey; descKey: I18nKey }> = {
   20001: {
     titleKey: "queryError.sqlError",
     descKey: "queryError.sqlErrorDesc",
@@ -138,7 +132,7 @@ const ERROR_META: Record<number, { titleKey: string; descKey: string }> = {
 // ── Composable ─────────────────────────────────────────────────────────────
 
 export function useQueryError(input: QueryErrorInput): QueryErrorResult {
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const showDetail = ref(false);
 
   // ── Input normalization ────────────────────────────────────────────────
@@ -197,17 +191,14 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
   const detailBody = computed<string>(() => {
     const msg = cleanMessage.value;
     const dotIdx = msg.indexOf(". ");
-    const remainder =
-      dotIdx > 0 && dotIdx < 160 ? msg.slice(dotIdx + 2).trim() : "";
+    const remainder = dotIdx > 0 && dotIdx < 160 ? msg.slice(dotIdx + 2).trim() : "";
     const parts = [remainder, rawDetail.value].filter(Boolean);
     return parts.join("\n\n");
   });
 
   const hasDetail = computed(() => detailBody.value.length > 0);
 
-  const hasAnyContent = computed(
-    () => !!(cleanMessage.value || rawDetail.value || traceId.value),
-  );
+  const hasAnyContent = computed(() => !!(cleanMessage.value || rawDetail.value || traceId.value));
 
   // ── Classification ─────────────────────────────────────────────────────
 

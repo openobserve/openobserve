@@ -8,11 +8,11 @@ import Office365 from "@/components/ingestion/security/Office365.vue";
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: { office365: "https://docs.example.com/office365" },
   })),
 }));
-
 
 describe("Office365.vue", () => {
   let store: any;
@@ -24,7 +24,12 @@ describe("Office365.vue", () => {
     return mount(Office365, {
       global: {
         plugins: [store],
-        stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
+        stubs: {
+          CopyContent: {
+            template: '<div data-test="copy-content-stub">{{ content }}</div>',
+            props: ["content"],
+          },
+        },
       },
     });
   };

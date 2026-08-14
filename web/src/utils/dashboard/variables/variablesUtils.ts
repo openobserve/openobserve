@@ -179,14 +179,8 @@ const resolveVariablesWithPrecedence = (
         // Old format: value is array of {panelId, value}
         const panelVarOld = variables.find((v: any) => v.scope === "panels");
         if (panelVarOld && Array.isArray(panelVarOld.value)) {
-          const panelValue = panelVarOld.value.find(
-            (pv: any) => pv.panelId === context.panelId,
-          );
-          if (
-            panelValue &&
-            panelValue.value !== null &&
-            panelValue.value !== undefined
-          ) {
+          const panelValue = panelVarOld.value.find((pv: any) => pv.panelId === context.panelId);
+          if (panelValue && panelValue.value !== null && panelValue.value !== undefined) {
             effectiveValue = panelValue.value;
             found = true;
           }
@@ -197,9 +191,7 @@ const resolveVariablesWithPrecedence = (
     // 2. Check tab-level next
     if (!found && context.tabId) {
       // New format: variable has tabId property directly
-      const tabVar = variables.find(
-        (v: any) => v.scope === "tabs" && v.tabId === context.tabId,
-      );
+      const tabVar = variables.find((v: any) => v.scope === "tabs" && v.tabId === context.tabId);
       if (tabVar && tabVar.value !== null && tabVar.value !== undefined) {
         effectiveValue = tabVar.value;
         found = true;
@@ -207,14 +199,8 @@ const resolveVariablesWithPrecedence = (
         // Old format: value is array of {tabId, value}
         const tabVarOld = variables.find((v: any) => v.scope === "tabs");
         if (tabVarOld && Array.isArray(tabVarOld.value)) {
-          const tabValue = tabVarOld.value.find(
-            (tv: any) => tv.tabId === context.tabId,
-          );
-          if (
-            tabValue &&
-            tabValue.value !== null &&
-            tabValue.value !== undefined
-          ) {
+          const tabValue = tabVarOld.value.find((tv: any) => tv.tabId === context.tabId);
+          if (tabValue && tabValue.value !== null && tabValue.value !== undefined) {
             effectiveValue = tabValue.value;
             found = true;
           }
@@ -224,14 +210,8 @@ const resolveVariablesWithPrecedence = (
 
     // 3. Fall back to global
     if (!found) {
-      const globalVar = variables.find(
-        (v: any) => v.scope === "global" || !v.scope,
-      );
-      if (
-        globalVar &&
-        globalVar.value !== null &&
-        globalVar.value !== undefined
-      ) {
+      const globalVar = variables.find((v: any) => v.scope === "global" || !v.scope);
+      if (globalVar && globalVar.value !== null && globalVar.value !== undefined) {
         effectiveValue = globalVar.value;
         found = true;
       }
@@ -249,14 +229,12 @@ const resolveVariablesWithPrecedence = (
  */
 export const normalizeVariableSyntax = (str: string): string => {
   // Normalize mustache: {{ varName }} or {{ varName : format }}
-  str = str.replace(
-    /\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*([a-zA-Z]+)\s*)?\}\}/g,
-    (_, name, format) => (format ? `{{${name}:${format}}}` : `{{${name}}}`),
+  str = str.replace(/\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*([a-zA-Z]+)\s*)?\}\}/g, (_, name, format) =>
+    format ? `{{${name}:${format}}}` : `{{${name}}}`,
   );
   // Normalize dollar-brace: ${ varName } or ${ varName : format }
-  str = str.replace(
-    /\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*([a-zA-Z]+)\s*)?\}/g,
-    (_, name, format) => (format ? `\${${name}:${format}}` : `\${${name}}`),
+  str = str.replace(/\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*([a-zA-Z]+)\s*)?\}/g, (_, name, format) =>
+    format ? `\${${name}:${format}}` : `\${${name}}`,
   );
   return str;
 };
@@ -273,10 +251,7 @@ export const processVariableContent = (
   }
 
   // Build a map of resolved variable values with scope precedence
-  const resolvedVariables = resolveVariablesWithPrecedence(
-    variablesData,
-    context,
-  );
+  const resolvedVariables = resolveVariablesWithPrecedence(variablesData, context);
 
   // Process each variable for replacement
   variablesData.values.forEach((variable: any) => {
@@ -284,8 +259,7 @@ export const processVariableContent = (
 
     // Get effective value based on context or use direct value
     let effectiveValue =
-      context &&
-      Object.prototype.hasOwnProperty.call(resolvedVariables, variable.name)
+      context && Object.prototype.hasOwnProperty.call(resolvedVariables, variable.name)
         ? resolvedVariables[variable.name]
         : variable.value;
 

@@ -1,7 +1,8 @@
 <template>
+  <!-- Flow content: OTable's hover-action toolbar owns the surface and the
+       positioning, so this is just the button row. -->
   <div
-    class="field_overlay absolute right-0 top-[50%] table-cell-actions translate-y-[-50%] h-full! flex! items-center justify-center rounded-default max-h-10! px-2"
-    :class="backgroundClass"
+    class="field_overlay table-cell-actions flex items-center"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
   >
@@ -19,13 +20,11 @@
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="
-          addSearchTerm(column.id, row[column.id], 'include')
-        "
+        @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
         :data-test="`log-details-include-field-${row[column.id]}`"
         :title="t('logs.cellActions.includeTerm')"
       >
-        <OIcon name="" style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 0.5rem; width: 0.5rem">
           <EqualIcon class="size-full" />
         </OIcon>
       </OButton>
@@ -34,13 +33,11 @@
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="
-          addSearchTerm(column.id, row[column.id], 'exclude')
-        "
+        @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
         :title="t('logs.cellActions.excludeTerm')"
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
-        <OIcon name="" style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 0.5rem; width: 0.5rem">
           <NotEqualIcon class="size-full" />
         </OIcon>
       </OButton>
@@ -50,10 +47,9 @@
     <O2AIContextAddBtn
       v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
-      class="border border-solid border-white"
-      :size="'6px'"
-      :imageHeight="'16px'"
-      :imageWidth="'16px'"
+      class="size-6! border border-solid border-white"
+      :imageHeight="'14'"
+      :imageWidth="'14'"
     />
   </div>
 </template>
@@ -61,7 +57,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -92,35 +88,23 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-const emit = defineEmits([
-  "copy",
-  "addSearchTerm",
-  "addFieldToTable",
-  "sendToAiChat",
-]);
+const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
 
 const copyLogToClipboard = (value: any) => {
   emit("copy", value);
 };
-const addSearchTerm = (
-  field: string,
-  field_value: string | number | boolean,
-  action: string,
-) => {
+const addSearchTerm = (field: string, field_value: string | number | boolean, action: string) => {
   emit("addSearchTerm", field, field_value, action);
 };
 
-const backgroundClass = "bg-surface-base";
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };
 
 const isStreamField = computed(() => {
-  const field: any = props.selectedStreamFields?.find(
-    (item: any) => item.name === props.column.id,
-  );
+  const field: any = props.selectedStreamFields?.find((item: any) => item.name === props.column.id);
   return field?.isSchemaField ?? false;
 });
 </script>

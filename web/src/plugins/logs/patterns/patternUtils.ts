@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  extractStatusFromTemplate,
-  extractStatusFromLog,
-} from "@/utils/logs/statusParser";
+import { extractStatusFromTemplate, extractStatusFromLog } from "@/utils/logs/statusParser";
+import type { I18nKey } from "@/types/i18n";
 
 /**
  * Extract constant (non-variable) string segments from a pattern template.
@@ -44,12 +42,7 @@ export const extractConstantsFromPattern = (template: string): string[] => {
   return constants;
 };
 
-export type PatternSeverityKey =
-  | "error"
-  | "warning"
-  | "info"
-  | "debug"
-  | "uncategorized";
+export type PatternSeverityKey = "error" | "warning" | "info" | "debug" | "uncategorized";
 
 /**
  * Single source of truth for the log-level keywords the pattern feature
@@ -120,8 +113,7 @@ const SEVERITY_TEXT_CLASS: Record<PatternSeverityKey, string> = {
   uncategorized: "text-text-secondary",
 };
 
-export const severityTextClass = (key: PatternSeverityKey): string =>
-  SEVERITY_TEXT_CLASS[key];
+export const severityTextClass = (key: PatternSeverityKey): string => SEVERITY_TEXT_CLASS[key];
 
 /**
  * Severity text-color class for a single level keyword found inside template
@@ -152,9 +144,7 @@ const DROP_FACTOR = 0.5;
  * trend instead of silently showing nothing. For >= 5 buckets this is identical
  * to a fixed last-4/rest split.
  */
-export const patternTrendBadge = (
-  buckets?: number[] | null,
-): PatternTrendKind | null => {
+export const patternTrendBadge = (buckets?: number[] | null): PatternTrendKind | null => {
   if (!buckets || buckets.length < 2) return null;
   const recentCount = Math.min(4, buckets.length - 1); // baseline always >= 1
   const recent = buckets.slice(-recentCount);
@@ -170,9 +160,9 @@ export const patternTrendBadge = (
 
 export interface PatternBadgeDef {
   /** i18n key for the short badge label (as shown on the row chip). */
-  labelKey: string;
+  labelKey: I18nKey;
   /** i18n key for the one-line legend description. */
-  descKey: string;
+  descKey: I18nKey;
   /** Token-utility classes for the chip (color pair). */
   class: string;
 }
@@ -223,8 +213,7 @@ export const formatBucketDuration = (
   t: (key: string, named: Record<string, unknown>) => string,
 ): string => {
   const s = Math.max(1, Math.round(seconds));
-  if (s % 86400 === 0)
-    return t("logs.patternList.durationDays", { n: s / 86400 });
+  if (s % 86400 === 0) return t("logs.patternList.durationDays", { n: s / 86400 });
   if (s % 3600 === 0) return t("logs.patternList.durationHours", { n: s / 3600 });
   if (s % 60 === 0) return t("logs.patternList.durationMinutes", { n: s / 60 });
   return t("logs.patternList.durationSeconds", { n: s });
@@ -256,23 +245,86 @@ export const escapeForMatchAll = (str: string): string => {
 };
 
 /**
- * Build a SQL query for a pattern against a given stream.
- * Returns a SELECT * with match_all() WHERE clauses for each constant segment.
+ * One pattern's clause: every invariant constant must be present, so the
+ * constants are ANDed. A pattern with no constants has nothing that identifies
+ * it (its wildcards are per-log samples, not invariants) and yields null.
  */
-export const buildPatternSqlQuery = (
-  template: string,
-  streamName: string,
-): string => {
+const patternClause = (template: string): string | null => {
   const constants = extractConstantsFromPattern(template);
-  let sql = `SELECT * FROM '${streamName}'`;
-  if (constants.length > 0) {
-    const conditions = constants.map(
-      (c) => `match_all('${escapeForMatchAll(c)}')`,
-    );
-    sql += ` WHERE ${conditions.join(" AND ")}`;
+  if (!constants.length) return null;
+
+  return constants.map((c) => `match_all('${escapeForMatchAll(c)}')`).join(" AND ");
+};
+
+/**
+ * Parenthesise only where precedence demands it. A lone pattern sits among ANDs,
+ * which are associative, so wrapping it would just add noise to a query the user
+ * reads in the confirm dialog. Once patterns are ORed together, each needs its
+ * own group or the AND inside one would bind across the OR.
+ */
+const joinAlternatives = (clauses: string[]): string =>
+  clauses.length > 1 ? clauses.map((c) => `(${c})`).join(" OR ") : clauses[0];
+
+export interface PatternSetSqlOptions {
+  streamName: string;
+  /** Templates the alert should match. */
+  includes?: string[];
+  /** Templates the alert should ignore. */
+  excludes?: string[];
+  /** The current search's WHERE fragment, ANDed in front of the pattern terms. */
+  baseFilter?: string;
+  /** "count" emits `count(*) AS cnt` for threshold-on-number alerts. */
+  select?: "rows" | "count";
+}
+
+/**
+ * Build the alert query for a SET of patterns, with include/exclude semantics.
+ *
+ *   SELECT … FROM '<stream>'
+ *   WHERE  <base filter>              -- the user's current search
+ *     AND  ( P1 OR P2 )               -- any of the included patterns
+ *     AND  NOT ( Q1 OR Q2 )           -- none of the excluded ones
+ *
+ * The operators follow what the UI says: constants within a pattern are ANDed
+ * (all must appear), includes are ORed ("any of these"), and excludes are
+ * negated as a group ("none of these" — NOT(A OR B) ≡ NOT A AND NOT B, written
+ * in the OR form because it mirrors the selection).
+ */
+export const buildPatternSetSqlQuery = (options: PatternSetSqlOptions): string => {
+  const { streamName, includes = [], excludes = [], baseFilter, select = "rows" } = options;
+
+  const projection = select === "count" ? "count(*) AS cnt" : "*";
+  const includeClauses = includes.map(patternClause).filter(Boolean) as string[];
+  const excludeClauses = excludes.map(patternClause).filter(Boolean) as string[];
+
+  const terms: string[] = [];
+
+  const trimmedBase = baseFilter?.trim();
+  if (trimmedBase) terms.push(`(${trimmedBase})`);
+
+  if (includeClauses.length) {
+    const joined = joinAlternatives(includeClauses);
+    // The OR group must be bracketed against the surrounding ANDs; a single
+    // include is already safe among them.
+    terms.push(includeClauses.length > 1 ? `(${joined})` : joined);
   }
+
+  if (excludeClauses.length) {
+    terms.push(`NOT (${joinAlternatives(excludeClauses)})`);
+  }
+
+  let sql = `SELECT ${projection} FROM '${streamName}'`;
+  if (terms.length) sql += ` WHERE ${terms.join(" AND ")}`;
   return sql;
 };
+
+/**
+ * Single-pattern query — the one-include case of buildPatternSetSqlQuery.
+ * Kept as its own name because that is how the rest of the pattern UI refers to
+ * it, but there is only one code path underneath.
+ */
+export const buildPatternSqlQuery = (template: string, streamName: string): string =>
+  buildPatternSetSqlQuery({ streamName, includes: [template] });
 
 /**
  * Derive a human-readable alert name from a pattern template and stream name.

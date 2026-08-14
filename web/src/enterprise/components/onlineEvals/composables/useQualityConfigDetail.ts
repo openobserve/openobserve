@@ -15,10 +15,7 @@ import {
 import { latestScoresFromSql } from "../utils/latestScoreSql";
 import { qualityScopeWhere, type QualityScope } from "../utils/qualityScope";
 import { escapeSqlString, thresholdForConfig } from "../utils/scoreThreshold";
-import {
-  healthyBooleanValue,
-  healthyCategories,
-} from "../utils/qualitySummary";
+import { healthyBooleanValue, healthyCategories } from "../utils/qualitySummary";
 
 export interface DetailKpi {
   id: string;
@@ -60,11 +57,7 @@ function toNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function valueOf<T = any>(
-  row: any,
-  camel: string,
-  snake: string,
-): T | undefined {
+function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
@@ -135,12 +128,7 @@ export function useQualityConfigDetail(
     volumeAgg.value = null;
   }
 
-  async function runQuery<T>(
-    sqlText: string,
-    label: string,
-    startUs: number,
-    endUs: number,
-  ) {
+  async function runQuery<T>(sqlText: string, label: string, startUs: number, endUs: number) {
     try {
       const hits = await executeQuery(sqlText, startUs, endUs, "logs");
       console.debug(`[QualityDetail:${label}]`, { hitCount: hits.length });
@@ -174,12 +162,7 @@ export function useQualityConfigDetail(
       )!;
       const type = dataTypeOf(cfg);
       const threshold = thresholdForConfig(cfg);
-      const volumePromise = runQuery<VolumeAggRow>(
-        volumeSql(where),
-        "volume",
-        startUs,
-        endUs,
-      );
+      const volumePromise = runQuery<VolumeAggRow>(volumeSql(where), "volume", startUs, endUs);
 
       if (type === "numeric") {
         const [volumeHits, hits] = await Promise.all([
@@ -205,12 +188,7 @@ export function useQualityConfigDetail(
       } else if (type === "categorical") {
         const [volumeHits, hits] = await Promise.all([
           volumePromise,
-          runQuery<CategoricalAggRow>(
-            categoricalSql(where),
-            "categorical",
-            startUs,
-            endUs,
-          ),
+          runQuery<CategoricalAggRow>(categoricalSql(where), "categorical", startUs, endUs),
         ]);
         if (generation !== refreshGeneration) return;
         volumeAgg.value = volumeHits[0] ?? null;
@@ -233,14 +211,12 @@ export function useQualityConfigDetail(
     },
   );
 
-  const dataType = computed<"numeric" | "boolean" | "categorical" | "unknown">(
-    () => {
-      if (!selectedConfig.value) return "unknown";
-      const t = dataTypeOf(selectedConfig.value);
-      if (t === "numeric" || t === "boolean" || t === "categorical") return t;
-      return "unknown";
-    },
-  );
+  const dataType = computed<"numeric" | "boolean" | "categorical" | "unknown">(() => {
+    if (!selectedConfig.value) return "unknown";
+    const t = dataTypeOf(selectedConfig.value);
+    if (t === "numeric" || t === "boolean" || t === "categorical") return t;
+    return "unknown";
+  });
 
   const kpis = computed<DetailKpi[]>(() => {
     const cfg = selectedConfig.value;
@@ -262,9 +238,7 @@ export function useQualityConfigDetail(
       const unhealthy = toNumber(agg?.unhealthy);
       const range = valueOf<any>(cfg, "numericRange", "numeric_range");
       const rangeText =
-        range && range.min != null && range.max != null
-          ? `Range ${range.min}–${range.max}`
-          : "";
+        range && range.min != null && range.max != null ? `Range ${range.min}–${range.max}` : "";
       const cards: DetailKpi[] = [
         {
           id: "avg",
@@ -292,8 +266,7 @@ export function useQualityConfigDetail(
         cards.push({
           id: "unhealthy",
           titleKey: "unhealthy",
-          value:
-            total > 0 && unhealthy != null ? (unhealthy / total) * 100 : null,
+          value: total > 0 && unhealthy != null ? (unhealthy / total) * 100 : null,
           context: threshold.label ? `Healthy ${threshold.label}` : "",
           format: "percent",
         });
@@ -349,10 +322,7 @@ export function useQualityConfigDetail(
     }
 
     if (dataType.value === "categorical") {
-      const total = categoricalRows.value.reduce(
-        (s, r) => s + (toNumber(r.c) ?? 0),
-        0,
-      );
+      const total = categoricalRows.value.reduce((s, r) => s + (toNumber(r.c) ?? 0), 0);
       const healthyCats = healthyCategories(cfg);
       let healthyCount = 0;
       let unhealthyCount = 0;
@@ -394,17 +364,14 @@ export function useQualityConfigDetail(
   // the detail panel's empty state so a freshly-created (but never-scored)
   // config reads as "waiting for scores" instead of a wall of dashes.
   const hasScores = computed<boolean>(() => {
-    if (dataType.value === "numeric")
-      return (toNumber(numericAgg.value?.numeric_values) ?? 0) > 0;
+    if (dataType.value === "numeric") return (toNumber(numericAgg.value?.numeric_values) ?? 0) > 0;
     if (dataType.value === "boolean") {
       const trues = toNumber(booleanAgg.value?.trues) ?? 0;
       const falses = toNumber(booleanAgg.value?.falses) ?? 0;
       return trues + falses > 0;
     }
     if (dataType.value === "categorical")
-      return (
-        categoricalRows.value.reduce((s, r) => s + (toNumber(r.c) ?? 0), 0) > 0
-      );
+      return categoricalRows.value.reduce((s, r) => s + (toNumber(r.c) ?? 0), 0) > 0;
     return false;
   });
 

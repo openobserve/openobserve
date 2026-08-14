@@ -22,9 +22,7 @@ const listeners = ref<Set<AiDashboardEventHandler>>(new Set());
  * Maps SRE agent tool names to dashboard event types.
  * Returns null if the tool is not a dashboard-mutating tool.
  */
-export const getDashboardEventType = (
-  toolName: string
-): AiDashboardEventType | null => {
+export const getDashboardEventType = (toolName: string): AiDashboardEventType | null => {
   const normalized = toolName.toLowerCase();
 
   if (normalized.includes("createdashboard")) return "dashboard_created";

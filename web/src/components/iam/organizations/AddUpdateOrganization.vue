@@ -15,10 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="add-update-organization-dialog"
+  <ODialog
+    data-test="add-update-organization-dialog"
     :open="open"
     size="sm"
-    :title="beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')"
+    :title="
+      beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')
+    "
     :primaryButtonLabel="t('organization.save')"
     :secondaryButtonLabel="t('organization.cancel')"
     form-id="add-update-organization-form"
@@ -59,14 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="org-make-billed-member"
         />
 
-        <div class="flex justify-center mt-4" v-if="proPlanRequired">
+        <div class="mt-4 flex justify-center" v-if="proPlanRequired">
           <OButton
             variant="secondary"
             size="md"
             class="mb-4 ml-4"
             @click="completeSubscriptionProcess"
           >
-            {{ t('organization.proceed_subscription') }}
+            {{ t("organization.proceed_subscription") }}
           </OButton>
         </div>
       </OForm>
@@ -82,7 +85,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import organizationService from "@/services/organizations";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -124,7 +127,7 @@ export default defineComponent({
   setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { track } = useReo();
 
     const addUpdateOrganizationSchema = makeAddUpdateOrganizationSchema(t);
@@ -136,13 +139,11 @@ export default defineComponent({
     // The OForm owns id/name/makeBilledMember. This typed computed seeds them each
     // time the dialog body mounts (edit → id + name from modelValue, create →
     // blank); makeBilledMember always starts unchecked.
-    const addUpdateOrganizationDefaults = computed(
-      (): AddUpdateOrganizationForm => ({
-        id: props.modelValue?.id ?? "",
-        name: props.modelValue?.name ?? "",
-        makeBilledMember: false,
-      }),
-    );
+    const addUpdateOrganizationDefaults = computed((): AddUpdateOrganizationForm => ({
+      id: props.modelValue?.id ?? "",
+      name: props.modelValue?.name ?? "",
+      makeBilledMember: false,
+    }));
 
     const currentOrgName = computed(
       () =>
@@ -180,9 +181,7 @@ export default defineComponent({
 
   methods: {
     completeSubscriptionProcess() {
-      this.router.push(
-        `/billings/plans?org_identifier=${this.newOrgIdentifier}`,
-      );
+      this.router.push(`/billings/plans?org_identifier=${this.newOrgIdentifier}`);
     },
     // Plain async @submit handler — fires only after the schema passes (name
     // required + regex). Awaited by OForm, so the footer Save spinner spans the
@@ -196,15 +195,11 @@ export default defineComponent({
       if (!organizationId) {
         const payload: any = { name };
         if (value.makeBilledMember && config.isCloud == "true") {
-          payload.make_billed_member_of =
-            this.store.state.selectedOrganization.identifier;
+          payload.make_billed_member_of = this.store.state.selectedOrganization.identifier;
         }
         callOrganization = organizationService.create(payload);
       } else {
-        callOrganization = organizationService.rename_organization(
-          organizationId,
-          name,
-        );
+        callOrganization = organizationService.rename_organization(organizationId, name);
       }
 
       try {
@@ -229,11 +224,13 @@ export default defineComponent({
       } catch (err: any) {
         toast({
           variant: "error",
-          message: JSON.stringify(
-            err?.response?.data["message"] ||
-              (organizationId
-                ? this.t("iam.addUpdateOrganization.updateFailed")
-                : this.t("iam.addUpdateOrganization.createFailed")),
+          message: raw(
+            JSON.stringify(
+              err?.response?.data["message"] ||
+                (organizationId
+                  ? this.t("iam.addUpdateOrganization.updateFailed")
+                  : this.t("iam.addUpdateOrganization.createFailed")),
+            ),
           ),
         });
       }

@@ -22,41 +22,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
+    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
     data-test="monitor-status-timeline"
   >
-    <div
-      class="flex items-center gap-2 px-3.5 pt-2.5 pb-2"
-    >
-      <span class="font-bold text-xs text-text-heading"> {{ t('synthetics.timeline.title') }} </span>
+    <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
+      <span class="text-text-heading text-xs font-bold">
+        {{ t("synthetics.timeline.title") }}
+      </span>
       <span class="flex-1" />
-      <span
-        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
-      >
+      <span class="text-text-secondary inline-flex items-center gap-1.5 text-xs">
         <span
-          class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-error-solid-bg)]"
+          class="h-[0.4375rem] w-[0.4375rem] rounded-full bg-[var(--color-badge-error-solid-bg)]"
         />
-        {{ failCount }} {{ t('synthetics.timeline.failed') }}
+        {{ failCount }} {{ t("synthetics.timeline.failed") }}
       </span>
-      <span
-        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
-      >
+      <span class="text-text-secondary inline-flex items-center gap-1.5 text-xs">
         <span
-          class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-orange-solid-bg)]"
+          class="h-[0.4375rem] w-[0.4375rem] rounded-full bg-[var(--color-badge-orange-solid-bg)]"
         />
-        {{ mixedCount }} {{ t('synthetics.timeline.warning') }}
+        {{ mixedCount }} {{ t("synthetics.timeline.warning") }}
       </span>
-      <span
-        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
-      >
+      <span class="text-text-secondary inline-flex items-center gap-1.5 text-xs">
         <span
-          class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-success-solid-bg)]"
+          class="h-[0.4375rem] w-[0.4375rem] rounded-full bg-[var(--color-badge-success-solid-bg)]"
         />
-        {{ passCount }} {{ t('synthetics.timeline.passed') }}
+        {{ passCount }} {{ t("synthetics.timeline.passed") }}
       </span>
     </div>
-    <div class="border-t border-border-default" />
-    <div class="flex flex-col gap-1 py-2 px-3.5">
+    <div class="border-border-default border-t" />
+    <div class="flex flex-col gap-1 px-3.5 py-2">
       <div class="flex items-center gap-1">
         <OButton
           variant="ghost"
@@ -70,51 +64,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <div
           ref="scrollRef"
-          class="flex-1 overflow-hidden flex rounded-default h-6.5 gap-0.5"
+          class="rounded-default flex h-6.5 flex-1 gap-0.5 overflow-hidden"
           @scroll="onScroll"
         >
           <div
             v-for="seg in segments"
             :key="seg.runId"
-            class="shrink-0 h-full min-w-[0.1875rem] cursor-pointer transition-all duration-100 hover:scale-y-[1.35]"
+            class="h-full min-w-[0.1875rem] shrink-0 cursor-pointer transition-all duration-100 hover:scale-y-[1.35]"
             :style="{ width: segmentWidthPct }"
             :class="seg.color"
           >
             <OTooltip side="top" :delay="0" :max-width="'auto'">
               <template #content>
-                <div class="py-0.5 min-w-50">
+                <div class="min-w-50 py-0.5">
+                  <!-- Passed · Warning · Failed always sum to the execution
+                       count. `error` aggregates into failed rather than falling
+                       out of both buckets, which is what used to make a run of
+                       [pass, fail, error] read as "1 passed · 1 failed". -->
                   <div
-                    class="px-1 font-semibold text-text-secondary mb-1.5 text-xs flex items-center gap-1.5 flex-wrap border-b pb-1"
+                    class="text-text-secondary mb-1.5 flex flex-wrap items-center gap-1.5 border-b px-1 pb-1 text-xs font-semibold"
                   >
                     <span
-                      class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-success-solid-bg)]"
+                      class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-success-solid-bg)]"
                     />
-                    <span class="text-text-secondary"
-                      >{{ t('synthetics.timeline.tooltipPassed', { count: passCountLocal(seg.executions) }) }}</span
-                    >
-                    <span
-                      class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-error-solid-bg)]"
-                    />
-                    <span class="text-text-secondary"
-                      >{{ t('synthetics.timeline.tooltipFailed', { count: failCountLocal(seg.executions) }) }}</span
-                    >
-                  </div>
-                  <template
-                    v-for="(group, gIdx) in groupedByLocation(seg.executions)"
-                    :key="gIdx"
-                  >
-                    <div
-                      class="px-1 flex items-center gap-1.5 mb-0.5 mt-1 first:mt-0"
-                    >
+                    <span class="text-text-secondary">{{
+                      t("synthetics.timeline.tooltipPassed", { count: seg.tally.passed })
+                    }}</span>
+                    <template v-if="seg.tally.warning > 0">
                       <span
-                        class="w-2 h-2 rounded-full shrink-0"
+                        class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-warning-solid-bg)]"
+                      />
+                      <span class="text-text-secondary">{{
+                        t("synthetics.timeline.tooltipWarning", { count: seg.tally.warning })
+                      }}</span>
+                    </template>
+                    <span
+                      class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-error-solid-bg)]"
+                    />
+                    <span class="text-text-secondary">{{
+                      t("synthetics.timeline.tooltipFailed", { count: seg.tally.failed })
+                    }}</span>
+                  </div>
+                  <template v-for="(group, gIdx) in groupedByLocation(seg.executions)" :key="gIdx">
+                    <div class="mt-1 mb-0.5 flex items-center gap-1.5 px-1 first:mt-0">
+                      <span
+                        class="h-2 w-2 shrink-0 rounded-full"
                         :class="{
-                          'bg-[var(--color-badge-success-solid-bg)]':
-                            group.status === 'all-pass',
+                          'bg-[var(--color-badge-success-solid-bg)]': group.status === 'all-pass',
                           'bg-[var(--color-badge-warning-solid-bg)]':
                             group.status === 'mixed' || group.status === 'all-warning',
-                          'bg-[var(--color-badge-error-solid-bg)]':
-                            group.status === 'all-fail',
+                          'bg-[var(--color-badge-error-solid-bg)]': group.status === 'all-fail',
                         }"
                       />
                       <span class="text-text-secondary text-xs font-semibold">
@@ -134,12 +133,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="flex items-center gap-1.5 py-0.5 pl-4"
                       >
                         <span
-                          class="w-2 h-2 rounded-full shrink-0"
+                          class="h-2 w-2 shrink-0 rounded-full"
                           :class="{
-                            'bg-[var(--color-badge-success-solid-bg)]':
-                              exec.status === 'pass',
-                            'bg-[var(--color-badge-warning-solid-bg)]':
-                              exec.status === 'warning',
+                            'bg-[var(--color-badge-success-solid-bg)]': exec.status === 'pass',
+                            'bg-[var(--color-badge-warning-solid-bg)]': exec.status === 'warning',
                             'bg-[var(--color-badge-error-solid-bg)]':
                               exec.status === 'fail' || exec.status === 'error',
                           }"
@@ -147,12 +144,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <img
                           v-if="browserIconUrl(exec.browserEngine)"
                           :src="browserIconUrl(exec.browserEngine)"
-                          class="w-3.5 h-3.5"
+                          class="h-3.5 w-3.5"
                           alt=""
                         />
-                        <span class="text-text-secondary text-xs">{{
-                          exec.device
-                        }}</span>
+                        <span class="text-text-secondary text-xs">{{ exec.device }}</span>
                       </div>
                     </template>
                   </template>
@@ -172,9 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="xs" />
         </OButton>
       </div>
-      <div
-        class="flex justify-between text-3xs font-mono tabular-nums text-text-secondary"
-      >
+      <div class="text-3xs text-text-secondary flex justify-between font-mono tabular-nums">
         <span>{{ endLabel }}</span>
         <span>{{ rangeLabel }}</span>
         <span>{{ startLabel }}</span>
@@ -185,17 +178,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
+import {
+  rollUpStatus,
+  type AggregateStatus,
+  type ExecutionStatus,
+  type StatusTally,
+} from "@/utils/synthetics/rollUpStatus";
 
 defineOptions({ name: "MonitorStatusTimeline" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const MAX_VISIBLE = 30;
 
@@ -210,18 +209,21 @@ interface TimelineExecution {
   location: string;
   browserEngine: string;
   device: string;
-  status: "pass" | "warning" | "fail" | "error";
+  status: ExecutionStatus;
   errorSnippet: string | null;
 }
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
+  status: AggregateStatus;
   color: string;
-  title: string;
+  title: I18nText;
   /** Epoch ms of the first execution in this logical run. */
   timestampMs: number;
   executions: TimelineExecution[];
+  /** Bucket counts, computed by the parent alongside `title` so the tooltip
+   * header and the segment title cannot report the same run differently. */
+  tally: StatusTally;
 }
 
 interface Props {
@@ -232,9 +234,13 @@ interface Props {
   startLabel: string;
   endLabel: string;
   isBrowser?: boolean;
+  /** The runs query hit its row cap, so these segments are the most recent
+   * slice of the window rather than all of it. */
+  truncated?: boolean;
 }
 const props = withDefaults(defineProps<Props>(), {
   isBrowser: true,
+  truncated: false,
 });
 
 const browserIconUrl = (name: string): string => {
@@ -252,15 +258,8 @@ const browserIconUrl = (name: string): string => {
 
 interface ExecGroup {
   location: string;
-  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
+  status: AggregateStatus;
   executions: TimelineExecution[];
-}
-
-function passCountLocal(execs: TimelineExecution[]): number {
-  return execs.filter((e) => e.status === "pass" || e.status === "warning").length;
-}
-function failCountLocal(execs: TimelineExecution[]): number {
-  return execs.filter((e) => e.status === "fail").length;
 }
 
 function groupedByLocation(execs: TimelineExecution[]): ExecGroup[] {
@@ -270,23 +269,13 @@ function groupedByLocation(execs: TimelineExecution[]): ExecGroup[] {
     if (list) list.push(exec);
     else map.set(exec.location, [exec]);
   }
-  return Array.from(map, ([location, executions]) => {
-    const allPass = executions.every(
-      (e) => e.status === "pass" || e.status === "warning",
-    );
-    const allFail = executions.every(
-      (e) => e.status === "fail" || e.status === "error",
-    );
-    const allWarning = executions.every((e) => e.status === "warning");
-    const status = allPass
-      ? allWarning
-        ? "all-warning"
-        : "all-pass"
-      : allFail
-        ? "all-fail"
-        : "mixed";
-    return { location, status, executions };
-  });
+  return Array.from(map, ([location, executions]) => ({
+    location,
+    // Same roll-up as the segment above it. Inlining a second copy here is what
+    // let the location dot stay green on a location that warned.
+    status: rollUpStatus(executions.map((e) => e.status)),
+    executions,
+  }));
 }
 
 // ── Scroll state ────────────────────────────────────────────────────────
@@ -302,12 +291,14 @@ const canScrollRight = computed(() => {
 
 const rangeLabel = computed(() => {
   const total = props.segments.length;
-  const page = Math.round(
-    scrollLeft.value / (scrollRef.value?.clientWidth ?? 1),
-  );
+  const page = Math.round(scrollLeft.value / (scrollRef.value?.clientWidth ?? 1));
   const start = page * MAX_VISIBLE + 1;
   const end = Math.min((page + 1) * MAX_VISIBLE, total);
-  return t('synthetics.timeline.rangeLabel', { start, end, total });
+  const range = t("synthetics.timeline.rangeLabel", { start, end, total });
+  // The KPI cards above aggregate the whole window; these segments come from a
+  // capped list query. Say so, rather than letting a truncated set read as the
+  // complete picture and leave the two silently disagreeing.
+  return props.truncated ? `${range} · ${t("synthetics.timeline.mostRecent")}` : range;
 });
 
 function scrollTimeline(direction: "left" | "right") {

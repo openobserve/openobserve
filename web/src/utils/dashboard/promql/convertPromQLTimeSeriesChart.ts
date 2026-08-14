@@ -18,6 +18,7 @@ import { fillMissingTimestamps } from "./shared/dataProcessor";
 import { buildXAxis, buildYAxis, buildTooltip } from "./shared/axisBuilder";
 import { buildDynamicGrid } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
+import { chartColor } from "@/utils/chartTheme";
 
 /**
  * Converter for time-series charts (line, area, bar, scatter, area-stacked)
@@ -42,9 +43,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
 
     processedData.forEach((queryData) => {
       queryData.series.forEach((seriesData) => {
-        const numericValues = seriesData.values.map(([, val]) =>
-          parseFloat(val),
-        );
+        const numericValues = seriesData.values.map(([, val]) => parseFloat(val));
         const seriesMin = Math.min(...numericValues);
         const seriesMax = Math.max(...numericValues);
 
@@ -54,19 +53,13 @@ export class TimeSeriesConverter implements PromQLChartConverter {
     });
 
     // Get series props based on chart type
-    const seriesProps = this.getSeriesPropsBasedOnChartType(
-      chartType,
-      panelSchema,
-    );
+    const seriesProps = this.getSeriesPropsBasedOnChartType(chartType, panelSchema);
 
     // Build series for each query
     processedData.forEach((queryData) => {
       queryData.series.forEach((seriesData) => {
         // Fill data with null for missing timestamps
-        const data = fillMissingTimestamps(
-          seriesData.data,
-          queryData.timestamps,
-        );
+        const data = fillMissingTimestamps(seriesData.data, queryData.timestamps);
 
         // Get color for series
         let seriesColor;
@@ -101,12 +94,8 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           },
 
           // Line interpolation
-          smooth:
-            config?.line_interpolation === "smooth" ||
-            config?.line_interpolation == null,
-          step: ["step-start", "step-end", "step-middle"].includes(
-            config?.line_interpolation,
-          )
+          smooth: config?.line_interpolation === "smooth" || config?.line_interpolation == null,
+          step: ["step-start", "step-end", "step-middle"].includes(config?.line_interpolation)
             ? config.line_interpolation.replace("step-", "")
             : false,
 
@@ -128,9 +117,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             data: this.getMarkLineData(panelSchema),
             zlevel: 2,
             lineStyle: {
-              shadowColor: store.state.theme === "light"
-                ? "rgba(255, 255, 255, 0.7)"
-                : "rgba(0, 0, 0, 0.7)",
+              shadowColor: chartColor("--color-chart-markline-shadow"),
               shadowBlur: 2,
               width: 2,
             },
@@ -172,10 +159,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
   /**
    * Get chart-type-specific series properties
    */
-  private getSeriesPropsBasedOnChartType(
-    chartType: string,
-    panelSchema: any,
-  ): any {
+  private getSeriesPropsBasedOnChartType(chartType: string, panelSchema: any): any {
     const config = panelSchema.config || {};
 
     switch (chartType) {
@@ -245,6 +229,9 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             xAxis: markLine.type === "xAxis" ? markLine.value : null,
             yAxis: markLine.type === "yAxis" ? markLine.value : null,
             label: {
+              // The alert preview passes show_label:false — its lines are
+              // colour-coded, and a text label clips at the chart top.
+              show: markLine.show_label !== false,
               formatter: markLine.name ? "{b}:{c}" : "{c}",
               position: "insideEndTop",
             },

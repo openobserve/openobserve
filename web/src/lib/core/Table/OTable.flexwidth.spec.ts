@@ -13,11 +13,21 @@ import OTable from "./OTable.vue";
 import type { OTableColumnDef } from "./OTable.types";
 
 const columns: OTableColumnDef[] = [
-  { id: "name", header: "Name", accessorKey: "name", size: 200, minSize: 160, meta: { align: "left", flex: true } },
+  {
+    id: "name",
+    header: "Name",
+    accessorKey: "name",
+    size: 200,
+    minSize: 160,
+    meta: { align: "left", flex: true },
+  },
   { id: "type", header: "Type", accessorKey: "type", size: 100 },
   { id: "actions", header: "Actions", isAction: true, size: 80 },
 ];
-const data = [{ name: "a", type: "logs" }, { name: "b", type: "logs" }];
+const data = [
+  { name: "a", type: "logs" },
+  { name: "b", type: "logs" },
+];
 
 function tableWidth(wrapper: any): number {
   const style = wrapper.find('[data-test="o2-table"]').attributes("style") || "";
@@ -49,7 +59,8 @@ describe("OTable flex column width", () => {
   it("fills initially, then grows + holds the flex column on resize", async () => {
     const wrapper = mount(OTable, {
       props: {
-        data, columns,
+        data,
+        columns,
         selection: "multiple",
         showIndex: true,
         enableColumnResize: true,
@@ -105,7 +116,8 @@ describe("OTable flex column width", () => {
   it("fill state: flex column has explicit fill width and spacer is 0", async () => {
     const wrapper = mount(OTable, {
       props: {
-        data, columns,
+        data,
+        columns,
         selection: "multiple",
         showIndex: true,
         enableColumnResize: true,
@@ -131,7 +143,8 @@ describe("OTable flex column width", () => {
   it("fill state: enables horizontal scroll when columns overflow the container", async () => {
     const wrapper = mount(OTable, {
       props: {
-        data, columns,
+        data,
+        columns,
         selection: "multiple",
         showIndex: true,
         enableColumnResize: true,

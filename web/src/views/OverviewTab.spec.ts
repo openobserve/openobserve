@@ -44,13 +44,7 @@ vi.mock("@/services/service_graph", () => ({
 vi.mock("@/components/DateTime.vue", () => ({
   default: {
     name: "DateTime",
-    props: [
-      "autoApply",
-      "menuAlign",
-      "defaultType",
-      "defaultAbsoluteTime",
-      "defaultRelativeTime",
-    ],
+    props: ["autoApply", "menuAlign", "defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
     emits: ["on:date-change"],
     template: '<div data-test="overview-date-time-stub" />',
   },
@@ -60,8 +54,7 @@ vi.mock("@/lib/core/RefreshButton/ORefreshButton.vue", () => ({
     name: "ORefreshButton",
     props: ["lastRunAt", "loading", "disabled"],
     emits: ["click"],
-    template:
-      '<button data-test="overview-refresh-btn-stub" @click="$emit(\'click\')" />',
+    template: '<button data-test="overview-refresh-btn-stub" @click="$emit(\'click\')" />',
   },
 }));
 vi.mock("@/plugins/traces/ServiceGraphNodeSidePanel.vue", () => ({
@@ -140,8 +133,7 @@ describe("OverviewTab", () => {
   const SERVICES = '[data-test="overview-services-section"]';
   const REFRESH_BTN = '[data-test="overview-refresh-btn-stub"]';
 
-  const skeletonOf = (section: SectionKey) =>
-    `[data-test="overview-skeleton-${section}"]`;
+  const skeletonOf = (section: SectionKey) => `[data-test="overview-skeleton-${section}"]`;
 
   /**
    * Every skeleton currently on screen, by section. Asserted against an exact
@@ -484,9 +476,7 @@ describe("OverviewTab", () => {
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
 
       // Phase 2 — refreshing with data: still content only.
-      vi.mocked(alertsService.getHistory).mockReturnValue(
-        pending.promise as never,
-      );
+      vi.mocked(alertsService.getHistory).mockReturnValue(pending.promise as never);
       await wrapper.find(REFRESH_BTN).trigger("click");
       await nextTick();
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
@@ -516,17 +506,13 @@ describe("OverviewTab", () => {
 
       expect(internals(wrapper).hasAnyData).toBe(true);
       expect(wrapper.find(ANOMALIES).exists()).toBe(true);
-      expect(wrapper.find(ANOMALIES).text()).toContain(
-        "Checkout latency anomaly",
-      );
+      expect(wrapper.find(ANOMALIES).text()).toContain("Checkout latency anomaly");
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
       expect(visibleSkeletons()).toEqual([]);
     });
 
     it("should not count a failed alert history fetch as data", async () => {
-      vi.mocked(alertsService.getHistory).mockRejectedValue(
-        new Error("history unavailable"),
-      );
+      vi.mocked(alertsService.getHistory).mockRejectedValue(new Error("history unavailable"));
 
       wrapper = mountOverviewTab();
       await flushPromises();
@@ -566,9 +552,7 @@ describe("OverviewTab", () => {
 
       expect(internals(wrapper).hasAnyData).toBe(true);
       expect(wrapper.find(INCIDENTS).exists()).toBe(true);
-      expect(wrapper.find(INCIDENTS).text()).toContain(
-        "Checkout service degraded",
-      );
+      expect(wrapper.find(INCIDENTS).text()).toContain("Checkout service degraded");
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
       expect(visibleSkeletons()).toEqual([]);
     });
@@ -608,9 +592,7 @@ describe("OverviewTab", () => {
 
     it("should render only the services skeleton when the topology alone is in flight", async () => {
       const pending = deferred<{ data: { nodes: unknown[]; edges: unknown[] } }>();
-      vi.mocked(serviceGraphService.getCurrentTopology).mockReturnValue(
-        pending.promise as never,
-      );
+      vi.mocked(serviceGraphService.getCurrentTopology).mockReturnValue(pending.promise as never);
       vi.mocked(incidentsService.list).mockResolvedValue({
         data: mockOverview.buildIncidentList(),
       } as never);

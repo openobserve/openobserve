@@ -29,6 +29,8 @@
  * Only panel types present in `TYPE_MAP` are convertible.
  */
 
+import { raw, type I18nText } from "@/types/i18n";
+
 import type { LLMPanelDef } from "./config/llmInsightsPanels";
 
 /** Our internal panel type → dashboard chart type id (see ChartSelection.vue). */
@@ -47,11 +49,12 @@ interface AxisField {
   alias: string;
   column: string;
   color: string | null;
-  label: string;
+  label: I18nText;
 }
 
+// Axis labels are column aliases and series names (`p50`, `errors`) — identifiers, not prose.
 function axisField(name: string, label: string): AxisField {
-  return { alias: name, column: name, color: null, label };
+  return { alias: name, column: name, color: null, label: raw(label) };
 }
 
 export function buildLLMPanelSchema(opts: {
@@ -62,8 +65,7 @@ export function buildLLMPanelSchema(opts: {
   streamType?: string;
 }): any {
   const { panel, sql, stream, streamType = "traces" } = opts;
-  const { timeField, seriesField, valueField, valueFormat, seriesLabel } =
-    panel.query;
+  const { timeField, seriesField, valueField, valueFormat, seriesLabel } = panel.query;
 
   // Single-series panels (no breakdown) use the non-stacked "area" variant.
   // An "area-stacked" panel with no breakdown renders its legend as "(empty)"
@@ -162,16 +164,7 @@ export function buildLLMPanelSchema(opts: {
           // it, a grouped bar's legend overlaps the value-axis ticks — exactly
           // the difference vs. the dashboards page, which always has a name.
           x: xFieldName
-            ? [
-                axisField(
-                  xFieldName,
-                  isHBar
-                    ? panel.series?.length
-                      ? xFieldName
-                      : ""
-                    : "Time",
-                ),
-              ]
+            ? [axisField(xFieldName, isHBar ? (panel.series?.length ? xFieldName : "") : "Time")]
             : [],
           // Grouped-bar panels declare multiple value series (p50/p90/p95/p99)
           // → one Y field each. Otherwise a single Y field; with no breakdown
@@ -183,9 +176,7 @@ export function buildLLMPanelSchema(opts: {
               ? [axisField(valueField, seriesLabel ?? valueField)]
               : [],
           z: [],
-          breakdown: breakdownName
-            ? [axisField(breakdownName, breakdownName)]
-            : [],
+          breakdown: breakdownName ? [axisField(breakdownName, breakdownName)] : [],
           filter: {
             filterType: "group",
             logicalOperator: "AND",

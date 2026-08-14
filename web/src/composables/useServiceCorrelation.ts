@@ -23,13 +23,21 @@ import type {
   CorrelationResponse,
   StreamInfo,
 } from "@/services/service_streams";
-import type { TelemetryContext, TelemetryType, CorrelationResult } from "@/utils/telemetryCorrelation";
+import type {
+  TelemetryContext,
+  TelemetryType,
+  CorrelationResult,
+} from "@/utils/telemetryCorrelation";
 import {
   extractSemanticDimensions,
   generateCorrelationQueries,
   filterDimensionsForCorrelation,
 } from "@/utils/telemetryCorrelation";
-import { loadIdentityConfig, clearIdentityConfigCache, clearAllIdentityConfigCache } from "@/utils/identityConfig";
+import {
+  loadIdentityConfig,
+  clearIdentityConfigCache,
+  clearAllIdentityConfigCache,
+} from "@/utils/identityConfig";
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 
 // Cache TTL in milliseconds (5 minutes)
@@ -78,7 +86,6 @@ const pendingKeyFieldsRequests = new Map<string, Promise<KeyFieldsConfig>>();
 const fieldGroupingGlobalCache = new Map<string, FieldGroupingCacheEntry>();
 const pendingFieldGroupingRequests = new Map<string, Promise<FieldGroupingConfig>>();
 
-
 /**
  * Composable for telemetry correlation using service_streams
  *
@@ -90,6 +97,10 @@ export function useServiceCorrelation() {
   const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
 
   const error = ref<string | null>(null);
+  // True when the last correlation call completed successfully but matched no
+  // service (backend 200-null). Distinct from `error` so callers can render an
+  // informational empty state instead of a failure (F28).
+  const noMatch = ref(false);
 
   /**
    * Load semantic field groups with TTL-based caching
@@ -123,7 +134,7 @@ export function useServiceCorrelation() {
         const response = await serviceStreamsApi.getSemanticGroups(org);
         const cacheEntry: SemanticGroupsCacheEntry = {
           data: response.data,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         };
         semanticGroupsGlobalCache.set(org, cacheEntry);
         return response.data;
@@ -143,7 +154,6 @@ export function useServiceCorrelation() {
     return await requestPromise;
   }
 
-
   /**
    * Find related telemetry for a given context using the new _correlate API
    *
@@ -159,9 +169,10 @@ export function useServiceCorrelation() {
     context: TelemetryContext,
     sourceType: TelemetryType,
     timeWindowMinutes: number = 5,
-    currentStream?: string
+    currentStream?: string,
   ): Promise<CorrelationResult | null> {
     error.value = null;
+    noMatch.value = false;
 
     try {
       // Validate inputs
@@ -173,7 +184,7 @@ export function useServiceCorrelation() {
       // Load semantic groups and identity config
       const [semanticGroups, identityConfig] = await Promise.all([
         loadSemanticGroups(),
-        loadIdentityConfig(orgIdentifier.value)
+        loadIdentityConfig(orgIdentifier.value),
       ]);
 
       if (semanticGroups.length === 0) {
@@ -188,15 +199,15 @@ export function useServiceCorrelation() {
 
       if (Object.keys(allDimensions).length === 0) {
         error.value = "No recognizable dimensions found in context for correlation";
-        console.error("[useServiceCorrelation] No dimensions extracted. Check semantic groups configuration.");
+        console.error(
+          "[useServiceCorrelation] No dimensions extracted. Check semantic groups configuration.",
+        );
         return null;
       }
 
       // Filter dimensions to only include fields that are used for disambiguation
       // This matches the backend logic and reduces unnecessary data sent to API
       const dimensions = filterDimensionsForCorrelation(allDimensions, identityConfig);
-
-
 
       // Call the new _correlate API
       const correlationRequest = {
@@ -209,13 +220,16 @@ export function useServiceCorrelation() {
 
       const correlationData: CorrelationResponse | null = response.data;
 
-      // Check if API returned null (no matching service found)
+      // API returned 200-null: a successful call with no matching service.
+      // This is NOT an error — flag it separately so callers show an
+      // informational empty state rather than a failure/retry UI (F28).
       if (!correlationData) {
-        error.value = "No matching service found for this stream with the provided dimensions.";
-        console.warn("[useServiceCorrelation] Correlation API returned null - no matching service found");
+        noMatch.value = true;
+        console.warn(
+          "[useServiceCorrelation] Correlation API returned null - no matching service found",
+        );
         return null;
       }
-
 
       // Convert correlation response to the format expected by the UI
       // Create a "virtual" ServiceMetadata from the correlation result
@@ -241,7 +255,7 @@ export function useServiceCorrelation() {
         sourceType,
         semanticGroups,
         timeWindowMinutes,
-        correlationData
+        correlationData,
       );
 
       return {
@@ -255,7 +269,10 @@ export function useServiceCorrelation() {
       if (err.response?.status === 403) {
         error.value = "Service Discovery is not enabled. This is an enterprise feature.";
       } else if (err.response?.status === 404) {
-        error.value = "No matching service found for this stream with the provided dimensions.";
+        // The backend signals "no match" with 200-null, never 404 — a genuine
+        // 404 means the endpoint/org is wrong and must not be presented as
+        // "no matching service" (F28).
+        error.value = "Correlation service not found. The server may not support this feature.";
       } else if (err.message?.includes("host") || err.code === "ERR_NETWORK") {
         error.value = "Unable to connect to server. Please check if the application is running.";
       } else if (!error.value) {
@@ -375,6 +392,7 @@ export function useServiceCorrelation() {
   return {
     // State
     error,
+    noMatch,
     semanticGroups: computed(() => {
       const cached = semanticGroupsGlobalCache.get(orgIdentifier.value);
       return cached?.data || [];
@@ -406,8 +424,12 @@ export function clearSemanticGroupsCaches() {
  * Get semantic groups cache status for debugging purposes
  * Returns information about cached entries and their ages
  */
-export function getSemanticGroupsCacheStatus(): Record<string, { age_seconds: number; expired: boolean; groups_count: number }> {
-  const status: Record<string, { age_seconds: number; expired: boolean; groups_count: number }> = {};
+export function getSemanticGroupsCacheStatus(): Record<
+  string,
+  { age_seconds: number; expired: boolean; groups_count: number }
+> {
+  const status: Record<string, { age_seconds: number; expired: boolean; groups_count: number }> =
+    {};
   const now = Date.now();
 
   for (const [orgIdentifier, entry] of semanticGroupsGlobalCache.entries()) {
@@ -415,7 +437,7 @@ export function getSemanticGroupsCacheStatus(): Record<string, { age_seconds: nu
     status[orgIdentifier] = {
       age_seconds: Math.round(age / 1000),
       expired: age >= SEMANTIC_GROUPS_CACHE_TTL_MS,
-      groups_count: entry.data.length
+      groups_count: entry.data.length,
     };
   }
 

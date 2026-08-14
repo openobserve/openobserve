@@ -1395,7 +1395,7 @@ mod tests {
 
         let ser_condition: alerts_table_ser::Condition = meta_condition.into();
         assert_eq!(ser_condition.column, "status");
-        assert_eq!(ser_condition.ignore_case, true);
+        assert!(ser_condition.ignore_case);
 
         let value_str = ser_condition.value.as_str().unwrap();
         assert_eq!(value_str, "active");
@@ -1419,7 +1419,7 @@ mod tests {
         let ser_agg: alerts_table_ser::Aggregation = meta_agg.into();
         assert_eq!(ser_agg.group_by.as_ref().unwrap().len(), 2);
         assert_eq!(ser_agg.having.column, "count");
-        assert_eq!(ser_agg.having.ignore_case, false);
+        assert!(!ser_agg.having.ignore_case);
     }
 
     #[test]

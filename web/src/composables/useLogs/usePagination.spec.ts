@@ -20,18 +20,17 @@ import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import { usePagination } from "./usePagination";
 
-
 // Create i18n instance
 const i18n = createI18n({
   legacy: false,
-  locale: 'en',
+  locale: "en",
   messages: {
     en: {
       search: {
-        queryRangeRestrictionMsg: 'Query range restricted to {range}'
-      }
-    }
-  }
+        queryRangeRestrictionMsg: "Query range restricted to {range}",
+      },
+    },
+  },
 });
 
 // Create test wrapper component
@@ -39,13 +38,13 @@ const TestComponent = defineComponent({
   setup() {
     const pagination = usePagination();
     return {
-      ...pagination
+      ...pagination,
     };
   },
-  template: '<div></div>'
+  template: "<div></div>",
 });
 
-describe('usePagination Composable', () => {
+describe("usePagination Composable", () => {
   let wrapper: any;
 
   beforeEach(() => {
@@ -60,18 +59,18 @@ describe('usePagination Composable', () => {
     vi.clearAllMocks();
   });
 
-  describe('Pagination Functions', () => {
-    it('should have refreshPartitionPagination function', () => {
-      expect(typeof wrapper.vm.refreshPartitionPagination).toBe('function');
+  describe("Pagination Functions", () => {
+    it("should have refreshPartitionPagination function", () => {
+      expect(typeof wrapper.vm.refreshPartitionPagination).toBe("function");
     });
 
-    it('should have getPaginatedData function', () => {
-      expect(typeof wrapper.vm.getPaginatedData).toBe('function');
+    it("should have getPaginatedData function", () => {
+      expect(typeof wrapper.vm.getPaginatedData).toBe("function");
     });
   });
 
-  describe('refreshPartitionPagination', () => {
-    it('should correctly generate paginations for given partitions and calculate total', () => {
+  describe("refreshPartitionPagination", () => {
+    it("should correctly generate paginations for given partitions and calculate total", () => {
       const { refreshPartitionPagination } = wrapper.vm;
       refreshPartitionPagination(true);
       expect(refreshPartitionPagination).toHaveBeenCalled;

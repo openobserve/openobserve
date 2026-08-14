@@ -16,7 +16,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -44,22 +44,15 @@ export default defineComponent({
   components: { OSelect },
 
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 
-    const { getStream } = useStreams();
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { getStream } = useStreams(t);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Raw loaded groups: { label, streamRef, children: [{name, ...}] }
-    const groups = ref<{ label: string; streamRef: any; children: any[] }[]>(
-      [],
-    );
+    const groups = ref<{ label: string; streamRef: any; children: any[] }[]>([]);
 
     // valueMap: composite key -> { field, streamAlias }
     const valueMap = new Map<string, { field: string; streamAlias?: string }>();
@@ -112,9 +105,8 @@ export default defineComponent({
       try {
         return await getStream(
           streamName,
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream_type ?? "logs",
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream_type ?? "logs",
           true,
         );
       } catch {

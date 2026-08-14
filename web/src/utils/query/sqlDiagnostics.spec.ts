@@ -75,16 +75,24 @@ function parseError(sql: string): any | null {
 }
 
 const ALL_QUERY_FILES = [
-  basicSelect, aggregation, combined, cteSubquery, dateTime,
-  fullTextSearch, histogram, mathFunctions, pagination,
-  stringFunctions, union, windowQueries, crossStream,
+  basicSelect,
+  aggregation,
+  combined,
+  cteSubquery,
+  dateTime,
+  fullTextSearch,
+  histogram,
+  mathFunctions,
+  pagination,
+  stringFunctions,
+  union,
+  windowQueries,
+  crossStream,
 ];
 
 function allValidSqls(): string[] {
   return ALL_QUERY_FILES.flatMap((f: any) =>
-    (f.queries ?? []).map((q: any) =>
-      q.sql.replace(/\{stream\}/g, "default")
-    )
+    (f.queries ?? []).map((q: any) => q.sql.replace(/\{stream\}/g, "default")),
   );
 }
 
@@ -267,50 +275,50 @@ function generateBrokenQueries() {
 describe("buildContextualSqlMessage", () => {
   const cases: [string, string, string][] = [
     // [label, broken_sql, expected_fragment_in_message]
-    ["AND incomplete",     "SELECT * FROM t WHERE x = 1 AND",                "AND"],
-    ["OR incomplete",      "SELECT * FROM t WHERE x = 1 OR",                 "OR"],
-    ["LIKE incomplete",    "SELECT * FROM t WHERE x LIKE",                   "LIKE"],
-    ["IN incomplete",      "SELECT * FROM t WHERE x IN",                     "IN"],
-    ["BETWEEN incomplete", "SELECT * FROM t WHERE x BETWEEN",                "BETWEEN"],
-    ["IS incomplete",      "SELECT * FROM t WHERE x IS",                     "IS"],
-    ["ORDER incomplete",   "SELECT * FROM t ORDER",                          "ORDER"],
-    ["GROUP incomplete",   "SELECT * FROM t GROUP",                          "GROUP"],
-    ["ORDER BY needs col", "SELECT * FROM t ORDER BY",                       "ORDER BY"],
-    ["GROUP BY needs col", "SELECT * FROM t GROUP BY",                       "GROUP BY"],
-    ["HAVING incomplete",  "SELECT * FROM t HAVING",                         "HAVING"],
-    ["WHERE incomplete",   "SELECT * FROM t WHERE",                          "WHERE"],
-    ["FROM incomplete",    "SELECT * FROM",                                   "FROM"],
-    ["SELECT incomplete",  "SELECT",                                          "SELECT"],
-    ["= incomplete",       "SELECT * FROM t WHERE x =",                      "="],
-    ["> incomplete",       "SELECT * FROM t WHERE x >",                      ">"],
-    ["LIMIT incomplete",   "SELECT * FROM t LIMIT",                          "LIMIT"],
-    ["OFFSET incomplete",  "SELECT * FROM t LIMIT 10 OFFSET",                "OFFSET"],
-    ["open paren",         "SELECT * FROM t WHERE (",                        "parenthesis"],
-    ["missing WHERE",      "SELECT * FROM default service_name='payment'",   "WHERE"],
-    ["missing AND/OR",     "SELECT * FROM t WHERE x=1 AND y=2 z=3",         "operator"],
-    ["bad LIKE %",         "SELECT * FROM t WHERE x LIKE %foo%",             "LIKE"],
-    ["unmatched )",        "SELECT * FROM t WHERE (x = 1))",                 "parenthesis"],
+    ["AND incomplete", "SELECT * FROM t WHERE x = 1 AND", "AND"],
+    ["OR incomplete", "SELECT * FROM t WHERE x = 1 OR", "OR"],
+    ["LIKE incomplete", "SELECT * FROM t WHERE x LIKE", "LIKE"],
+    ["IN incomplete", "SELECT * FROM t WHERE x IN", "IN"],
+    ["BETWEEN incomplete", "SELECT * FROM t WHERE x BETWEEN", "BETWEEN"],
+    ["IS incomplete", "SELECT * FROM t WHERE x IS", "IS"],
+    ["ORDER incomplete", "SELECT * FROM t ORDER", "ORDER"],
+    ["GROUP incomplete", "SELECT * FROM t GROUP", "GROUP"],
+    ["ORDER BY needs col", "SELECT * FROM t ORDER BY", "ORDER BY"],
+    ["GROUP BY needs col", "SELECT * FROM t GROUP BY", "GROUP BY"],
+    ["HAVING incomplete", "SELECT * FROM t HAVING", "HAVING"],
+    ["WHERE incomplete", "SELECT * FROM t WHERE", "WHERE"],
+    ["FROM incomplete", "SELECT * FROM", "FROM"],
+    ["SELECT incomplete", "SELECT", "SELECT"],
+    ["= incomplete", "SELECT * FROM t WHERE x =", "="],
+    ["> incomplete", "SELECT * FROM t WHERE x >", ">"],
+    ["LIMIT incomplete", "SELECT * FROM t LIMIT", "LIMIT"],
+    ["OFFSET incomplete", "SELECT * FROM t LIMIT 10 OFFSET", "OFFSET"],
+    ["open paren", "SELECT * FROM t WHERE (", "parenthesis"],
+    ["missing WHERE", "SELECT * FROM default service_name='payment'", "WHERE"],
+    ["missing AND/OR", "SELECT * FROM t WHERE x=1 AND y=2 z=3", "operator"],
+    ["bad LIKE %", "SELECT * FROM t WHERE x LIKE %foo%", "LIKE"],
+    ["unmatched )", "SELECT * FROM t WHERE (x = 1))", "parenthesis"],
 
     // CASE / COALESCE / nested constructs
-    ["CASE missing WHEN",          "SELECT CASE",                                                 "CASE"],
-    ["CASE WHEN no THEN",          "SELECT CASE WHEN x > 1",                                     "THEN"],
-    ["CASE WHEN needs expr",       "SELECT * FROM t WHERE x = 1 AND CASE WHEN",                  "CASE"],
-    ["CASE THEN needs END",        "SELECT CASE WHEN x > 1 THEN 'a'",                            "END"],
-    ["CASE ELSE needs END",        "SELECT CASE WHEN x > 1 THEN 'a' ELSE 'b'",                   "END"],
-    ["COALESCE trailing comma",    "SELECT COALESCE(a,",                                          "COALESCE"],
-    ["COALESCE nested truncated",  "SELECT COALESCE(CASE WHEN x > 1 THEN 'a'",                   "CASE"],
-    ["NULLIF truncated",           "SELECT NULLIF(a,",                                            "NULLIF"],
-    ["OVER clause truncated",      "SELECT SUM(x) OVER (PARTITION BY",                           "PARTITION BY"],
-    ["OVER no partition/order",    "SELECT ROW_NUMBER() OVER (",                                  "OVER"],
-    ["subquery truncated",         "SELECT * FROM (SELECT a FROM t",                              "subquery"],
-    ["CTE body truncated",         "WITH cte AS (SELECT a FROM t",                                "CTE"],
-    ["UNION needs SELECT",         "SELECT * FROM t UNION",                                       "UNION"],
-    ["UNION ALL needs SELECT",     "SELECT * FROM t UNION ALL",                                   "UNION"],
-    ["JOIN ON incomplete",         "SELECT * FROM t JOIN s ON",                                   "JOIN"],
-    ["NOT incomplete",             "SELECT * FROM t WHERE NOT",                                   "NOT"],
-    ["DISTINCT incomplete",        "SELECT DISTINCT",                                              "DISTINCT"],
-    ["BETWEEN fn AND no rhs",      "SELECT * FROM t WHERE x BETWEEN ABS(a) AND",                 "AND"],
-    ["nested CASE in subquery",    "SELECT * FROM t WHERE x IN (SELECT CASE WHEN",               "CASE"],
+    ["CASE missing WHEN", "SELECT CASE", "CASE"],
+    ["CASE WHEN no THEN", "SELECT CASE WHEN x > 1", "THEN"],
+    ["CASE WHEN needs expr", "SELECT * FROM t WHERE x = 1 AND CASE WHEN", "CASE"],
+    ["CASE THEN needs END", "SELECT CASE WHEN x > 1 THEN 'a'", "END"],
+    ["CASE ELSE needs END", "SELECT CASE WHEN x > 1 THEN 'a' ELSE 'b'", "END"],
+    ["COALESCE trailing comma", "SELECT COALESCE(a,", "COALESCE"],
+    ["COALESCE nested truncated", "SELECT COALESCE(CASE WHEN x > 1 THEN 'a'", "CASE"],
+    ["NULLIF truncated", "SELECT NULLIF(a,", "NULLIF"],
+    ["OVER clause truncated", "SELECT SUM(x) OVER (PARTITION BY", "PARTITION BY"],
+    ["OVER no partition/order", "SELECT ROW_NUMBER() OVER (", "OVER"],
+    ["subquery truncated", "SELECT * FROM (SELECT a FROM t", "subquery"],
+    ["CTE body truncated", "WITH cte AS (SELECT a FROM t", "CTE"],
+    ["UNION needs SELECT", "SELECT * FROM t UNION", "UNION"],
+    ["UNION ALL needs SELECT", "SELECT * FROM t UNION ALL", "UNION"],
+    ["JOIN ON incomplete", "SELECT * FROM t JOIN s ON", "JOIN"],
+    ["NOT incomplete", "SELECT * FROM t WHERE NOT", "NOT"],
+    ["DISTINCT incomplete", "SELECT DISTINCT", "DISTINCT"],
+    ["BETWEEN fn AND no rhs", "SELECT * FROM t WHERE x BETWEEN ABS(a) AND", "AND"],
+    ["nested CASE in subquery", "SELECT * FROM t WHERE x IN (SELECT CASE WHEN", "CASE"],
   ];
 
   for (const [label, sql, fragment] of cases) {
@@ -341,10 +349,10 @@ describe("validateSql — no false positives on valid queries", () => {
 
 describe("validateSql — grammar-gap suppression (no false positives)", () => {
   const gapCases: [string, string][] = [
-    ["EXCEPT SELECT",      "SELECT a FROM default EXCEPT SELECT a FROM default"],
-    ["GROUPING SETS",      "SELECT a, COUNT(*) FROM default GROUP BY GROUPING SETS ((a), ())"],
-    ["array literal",      "SELECT [1, 2, 3] FROM default"],
-    ["AT TIME ZONE",       "SELECT _timestamp AT TIME ZONE 'UTC' FROM default"],
+    ["EXCEPT SELECT", "SELECT a FROM default EXCEPT SELECT a FROM default"],
+    ["GROUPING SETS", "SELECT a, COUNT(*) FROM default GROUP BY GROUPING SETS ((a), ())"],
+    ["array literal", "SELECT [1, 2, 3] FROM default"],
+    ["AT TIME ZONE", "SELECT _timestamp AT TIME ZONE 'UTC' FROM default"],
   ];
 
   for (const [label, sql] of gapCases) {
@@ -400,41 +408,64 @@ describe("validateSql — mutation detection on broken queries", () => {
   // added lower-detection complex-construct mutations to the pool.
   const SPECIFIC_MSG_THRESHOLD = 0.92; // ≥92% of broken queries get a specific message
 
-  it(`detects ≥ ${SPECIFIC_MSG_THRESHOLD * 100}% of broken queries with a specific message`, { timeout: 30000 }, async () => {
-    const broken = generateBrokenQueries();
-    const results = await Promise.all(broken.map(({ broken: sql }) => validateSql(sql)));
+  it(
+    `detects ≥ ${SPECIFIC_MSG_THRESHOLD * 100}% of broken queries with a specific message`,
+    { timeout: 30000 },
+    async () => {
+      const broken = generateBrokenQueries();
+      const results = await Promise.all(broken.map(({ broken: sql }) => validateSql(sql)));
 
-    let specific = 0;
-    for (const r of results) {
-      if (r !== null && isSpecificMessage(r.error)) specific++;
-    }
+      let specific = 0;
+      for (const r of results) {
+        if (r !== null && isSpecificMessage(r.error)) specific++;
+      }
 
-    const rate = specific / broken.length;
-    expect(rate).toBeGreaterThanOrEqual(SPECIFIC_MSG_THRESHOLD);
-  });
+      const rate = specific / broken.length;
+      expect(rate).toBeGreaterThanOrEqual(SPECIFIC_MSG_THRESHOLD);
+    },
+  );
 
-  // Per-mutation thresholds
-  const perMutationThresholds: Record<string, number> = {
-    truncate_after_AND:          0.85,
-    truncate_after_OR:           0.99,
-    truncate_after_WHERE:        0.95,
-    truncate_after_ORDER:        0.80,
-    truncate_after_GROUP:        0.99,
-    truncate_after_HAVING:       0.99,
-    truncate_after_LIMIT:        0.97,
-    remove_WHERE_keyword:        0.80, // tightened missingWhere guard: ambiguous patterns suppressed; expanded query set lowers rate
-    unquote_like_pattern:        0.50, // small sample, parser handles some cases
-    drop_AND_between_conditions: 0.90,
+  // Per-mutation expectations. A `rate` is the share of that mutation's queries
+  // that must get a specific message; a `minSpecific` is an absolute floor, for
+  // mutations whose detectable share is a property of the corpus rather than of
+  // the diagnostics (see unquote_like_pattern).
+  type Expectation = { rate: number } | { minSpecific: number };
+
+  const perMutationExpectations: Record<string, Expectation> = {
+    truncate_after_AND: { rate: 0.85 },
+    truncate_after_OR: { rate: 0.99 },
+    truncate_after_WHERE: { rate: 0.95 },
+    truncate_after_ORDER: { rate: 0.8 },
+    truncate_after_GROUP: { rate: 0.99 },
+    truncate_after_HAVING: { rate: 0.99 },
+    truncate_after_LIMIT: { rate: 0.97 },
+    // tightened missingWhere guard: ambiguous patterns suppressed; expanded query set lowers rate
+    remove_WHERE_keyword: { rate: 0.8 },
+    // Counted, not rated. Only one shape is localizable: the parser must report
+    // `found === "%"`. An unquoted pattern that lexes as valid SQL — LIKE E00%,
+    // LIKE /api/%, LIKE Android% — puts the error somewhere unrelated, and
+    // `col LIKE other_col` is itself valid SQL, so these cannot be flagged from
+    // the source text without squiggling correct queries. The corpus lives in
+    // tests/test-data/query-agent/ and grows with backend PRs, so every added
+    // LIKE query dilutes a ratio without the diagnostics changing at all: this
+    // was 6/12 = 0.50, then 6/13 after #13808, then 6/14 after #13810.
+    unquote_like_pattern: { minSpecific: 6 },
+    drop_AND_between_conditions: { rate: 0.9 },
     // Complex-construct mutations
-    truncate_inside_case_when:   0.90,
-    truncate_inside_coalesce:    0.85,
-    truncate_after_UNION:        0.90,
-    truncate_after_OVER_paren:   0.80,
-    truncate_inside_cte:         0.80,
+    truncate_inside_case_when: { rate: 0.9 },
+    truncate_inside_coalesce: { rate: 0.85 },
+    truncate_after_UNION: { rate: 0.9 },
+    truncate_after_OVER_paren: { rate: 0.8 },
+    truncate_inside_cte: { rate: 0.8 },
   };
 
-  for (const [mutName, threshold] of Object.entries(perMutationThresholds)) {
-    it(`${mutName}: ≥ ${Math.round(threshold * 100)}% specific messages`, async () => {
+  for (const [mutName, expectation] of Object.entries(perMutationExpectations)) {
+    const label =
+      "rate" in expectation
+        ? `≥ ${Math.round(expectation.rate * 100)}% specific messages`
+        : `≥ ${expectation.minSpecific} specific messages`;
+
+    it(`${mutName}: ${label}`, async () => {
       const broken = generateBrokenQueries().filter((b) => b.mutation === mutName);
       if (broken.length === 0) return; // mutation didn't apply to any query
 
@@ -444,8 +475,13 @@ describe("validateSql — mutation detection on broken queries", () => {
         if (r !== null && isSpecificMessage(r.error)) specific++;
       }
 
-      const rate = specific / broken.length;
-      expect(rate).toBeGreaterThanOrEqual(threshold);
+      // Report the counts, so a corpus change is diagnosable from the failure alone.
+      const detail = `${specific}/${broken.length} specific`;
+      if ("rate" in expectation) {
+        expect(specific / broken.length, detail).toBeGreaterThanOrEqual(expectation.rate);
+      } else {
+        expect(specific, detail).toBeGreaterThanOrEqual(expectation.minSpecific);
+      }
     });
   }
 });
@@ -480,13 +516,17 @@ describe("isParserLimitation", () => {
 
   it("Guard 3: found ) without ) or AND/OR in small expected is POSITION()-style limitation", () => {
     const expected = Array.from({ length: 10 }, (_, i) => ({
-      type: "literal", text: `tok${i}`,
+      type: "literal",
+      text: `tok${i}`,
     }));
     expect(isParserLimitation({ found: ")", expected })).toBe(true);
   });
 
   it("Guard 3: found ) but ) is in expected — not a limitation", () => {
-    const expected = [{ type: "literal", text: ")" }, { type: "literal", text: "AND" }];
+    const expected = [
+      { type: "literal", text: ")" },
+      { type: "literal", text: "AND" },
+    ];
     expect(isParserLimitation({ found: ")", expected })).toBe(false);
   });
 
@@ -524,7 +564,11 @@ describe("isParserLimitation", () => {
   it("Guard 5: EXCEPT SELECT is a limitation", () => {
     const sql = "SELECT a FROM t EXCEPT SELECT a FROM s";
     const expected = Array.from({ length: 30 }, (_, i) => ({ type: "literal", text: `tok${i}` }));
-    const err = { found: "S", expected, location: { start: { offset: sql.indexOf("SELECT", 20) } } };
+    const err = {
+      found: "S",
+      expected,
+      location: { start: { offset: sql.indexOf("SELECT", 20) } },
+    };
     expect(isParserLimitation(err, sql)).toBe(true);
   });
 
@@ -609,9 +653,7 @@ describe("locateIdentifier", () => {
 
 describe("rangesFromServerError — semantic errors", () => {
   const tokenAt = (query: string, r: SqlErrorRange) =>
-    query
-      .split("\n")[r.startLine - 1]
-      .slice((r.column ?? 1) - 1, (r.endColumn ?? 1) - 1);
+    query.split("\n")[r.startLine - 1].slice((r.column ?? 1) - 1, (r.endColumn ?? 1) - 1);
 
   interface Case {
     name: string;
@@ -679,7 +721,8 @@ describe("rangesFromServerError — semantic errors", () => {
     },
     {
       name: "GROUP BY (must appear phrasing)",
-      errorDetail: "column code must appear in the GROUP BY clause or be used in an aggregate function",
+      errorDetail:
+        "column code must appear in the GROUP BY clause or be used in an aggregate function",
       query: "SELECT code, count(*) FROM t",
       token: "code",
       msgIncludes: "GROUP BY",

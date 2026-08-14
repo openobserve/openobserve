@@ -15,20 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="iam-roles-selection-section" class="flex flex-col h-full p-0" >
-    <div
-      class="flex justify-start px-3 py-2 bg-card-glass-bg shrink-0"
-    >
+  <div data-test="iam-roles-selection-section" class="flex h-full flex-col p-0">
+    <div class="bg-card-glass-bg flex shrink-0 justify-start px-3 py-2">
       <div class="mr-3">
-        <div
-          data-test="iam-roles-selection-show-toggle"
-          class="flex items-center"
-        >
-          <span
-            data-test="iam-roles-selection-show-text"
-            style="font-size: var(--text-sm)"
-          >
-            {{ t('iam.groupRoles.show') }}
+        <div data-test="iam-roles-selection-show-toggle" class="flex items-center">
+          <span data-test="iam-roles-selection-show-text" style="font-size: var(--text-sm)">
+            {{ t("iam.groupRoles.show") }}
           </span>
           <OToggleGroup
             class="ml-1"
@@ -47,10 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </div>
       </div>
-      <div
-        data-test="iam-roles-selection-search-input"
-        class="mr-3"
-      >
+      <div data-test="iam-roles-selection-search-input" class="mr-3">
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
@@ -59,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" class="flex-1 min-h-0 bg-card-glass-bg">
+    <div data-test="iam-roles-selection-table" class="bg-card-glass-bg min-h-0 flex-1">
       <OTable
         :data="rows"
         :columns="columns"
@@ -110,7 +99,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
 import { ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -153,7 +142,7 @@ const userSearchKey = ref("");
 
 const usersDisplay = ref("selected");
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const usersDisplayOptions = [
   {
@@ -175,7 +164,7 @@ const groupUsersMap = ref(new Set());
 const columns: OTableColumnDef[] = [
   {
     id: "select",
-    header: "",
+    header: raw(""),
     accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
     size: TABLE_CHECKBOX_COL_SIZE,
@@ -209,7 +198,7 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 const updateUserTable = async (value: string) => {
@@ -229,9 +218,7 @@ const updateUserTable = async (value: string) => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  const data: any = await getRoles(
-    store.state.selectedOrganization.identifier
-  );
+  const data: any = await getRoles(store.state.selectedOrganization.identifier);
 
   users.value = cloneDeep(data.data).map((role: any) => {
     return {
@@ -265,5 +252,4 @@ const toggleUserSelection = (user: any) => {
     }
   }
 };
-
 </script>

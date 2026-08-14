@@ -81,7 +81,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-
 const mountOptionsBase = () => ({
   attachTo: "#app",
   global: {
@@ -133,16 +132,12 @@ describe("ColorBySeries", () => {
   });
 
   it("should show info tooltip button", () => {
-    const infoBtn = wrapper.find(
-      "[data-test='dashboard-addpanel-config-color-by-series']",
-    );
+    const infoBtn = wrapper.find("[data-test='dashboard-addpanel-config-color-by-series']");
     expect(infoBtn.exists()).toBeTruthy();
   });
 
   it("should show 'Apply color by series' button when no colors are set", () => {
-    const btn = wrapper.find(
-      "[data-test='dashboard-addpanel-config-colorBySeries-add-btn']",
-    );
+    const btn = wrapper.find("[data-test='dashboard-addpanel-config-colorBySeries-add-btn']");
     expect(btn.text()).toContain("Apply color by series");
   });
 
@@ -168,24 +163,18 @@ describe("ColorBySeries", () => {
   });
 
   it("should open color by series popup when button is clicked", async () => {
-    const btn = wrapper.find(
-      "[data-test='dashboard-addpanel-config-colorBySeries-add-btn']",
-    );
+    const btn = wrapper.find("[data-test='dashboard-addpanel-config-colorBySeries-add-btn']");
     await btn.trigger("click");
 
     expect(wrapper.vm.showColorBySeriesPopUp).toBe(true);
 
     // Stub reflects the open prop being passed through.
-    const popupStub = wrapper.find(
-      "[data-test='color-by-series-popup-stub']",
-    );
+    const popupStub = wrapper.find("[data-test='color-by-series-popup-stub']");
     expect(popupStub.attributes("data-open")).toBe("true");
   });
 
   it("should pass open=false to popup by default", () => {
-    const popupStub = wrapper.find(
-      "[data-test='color-by-series-popup-stub']",
-    );
+    const popupStub = wrapper.find("[data-test='color-by-series-popup-stub']");
     expect(popupStub.exists()).toBe(true);
     expect(popupStub.attributes("data-open")).toBe("false");
   });
@@ -220,16 +209,12 @@ describe("ColorBySeries", () => {
     popup.vm.$emit("save", newConfig);
     await flushPromises();
 
-    expect(
-      wrapper.vm.dashboardPanelData.data.config.color.colorBySeries,
-    ).toEqual(newConfig);
+    expect(wrapper.vm.dashboardPanelData.data.config.color.colorBySeries).toEqual(newConfig);
     expect(wrapper.vm.showColorBySeriesPopUp).toBe(false);
   });
 
   it("should initialize empty colorBySeries array if not present", () => {
-    expect(
-      wrapper.vm.dashboardPanelData.data.config.color.colorBySeries,
-    ).toEqual([]);
+    expect(wrapper.vm.dashboardPanelData.data.config.color.colorBySeries).toEqual([]);
   });
 
   it("should save color by series configuration via exposed method", async () => {
@@ -241,9 +226,7 @@ describe("ColorBySeries", () => {
     wrapper.vm.saveColorBySeriesconfig(newConfig);
     await flushPromises();
 
-    expect(
-      wrapper.vm.dashboardPanelData.data.config.color.colorBySeries,
-    ).toEqual(newConfig);
+    expect(wrapper.vm.dashboardPanelData.data.config.color.colorBySeries).toEqual(newConfig);
     expect(wrapper.vm.showColorBySeriesPopUp).toBe(false);
   });
 

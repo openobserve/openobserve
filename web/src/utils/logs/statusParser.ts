@@ -47,15 +47,15 @@ export interface StatusInfo {
  * Keys must stay aligned with SEMANTIC_COLORS_LIGHT / SEMANTIC_COLORS_DARK in convertLogData.ts.
  */
 export const STATUS_COLORS = {
-  emergency: '#E53935', // aligned with convertLogData fatal/emergency
-  alert:     '#ea580c',
-  critical:  '#F4511E', // aligned with convertLogData critical
-  error:     '#EF5350', // aligned with convertLogData error
-  warning:   '#FB8C00', // aligned with convertLogData warn/warning
-  notice:    '#16a34a',
-  info:      '#1E88E5', // aligned with convertLogData info
-  debug:     '#00ACC1', // aligned with convertLogData debug
-  ok:        '#43A047', // aligned with convertLogData success/ok
+  emergency: "#E53935", // aligned with convertLogData fatal/emergency
+  alert: "#ea580c",
+  critical: "#F4511E", // aligned with convertLogData critical
+  error: "#EF5350", // aligned with convertLogData error
+  warning: "#FB8C00", // aligned with convertLogData warn/warning
+  notice: "#16a34a",
+  info: "#1E88E5", // aligned with convertLogData info
+  debug: "#00ACC1", // aligned with convertLogData debug
+  ok: "#43A047", // aligned with convertLogData success/ok
 } as const;
 
 /**
@@ -63,26 +63,27 @@ export const STATUS_COLORS = {
  * Categories without a convertLogData dark equivalent (alert, notice) fall back to STATUS_COLORS.
  */
 export const STATUS_COLORS_DARK: Partial<Record<keyof typeof STATUS_COLORS, string>> = {
-  emergency: '#E07070',
-  critical:  '#DC6030',
-  error:     '#D95C5C',
-  warning:   '#D4944A',
-  info:      '#4D8FD4',
-  debug:     '#3DAAB8',
-  ok:        '#4DAD55',
+  emergency: "#E07070",
+  critical: "#DC6030",
+  error: "#D95C5C",
+  warning: "#D4944A",
+  info: "#4D8FD4",
+  debug: "#3DAAB8",
+  ok: "#4DAD55",
 };
 
 /**
  * Standard field names to search for status information
  * Ordered by preference - first match will be used
  */
-const STATUS_FIELDS = ['severity', 'level', 'log_level', 'syslog.severity', 'status'] as const;
+const STATUS_FIELDS = ["severity", "level", "log_level", "syslog.severity", "status"] as const;
 
 /**
  * Regex to find a standalone log-level keyword in a template or log message string.
  * Matches common syslog / OTEL levels at word boundaries (e.g. "INFO", "ERROR").
  */
-const TEMPLATE_LEVEL_RE = /\b(emergency|emerg|fatal|alert|critical|crit|error|err|warning|warn|notice|info|information|debug|trace|verbose|ok|success)\b/i;
+const TEMPLATE_LEVEL_RE =
+  /\b(emergency|emerg|fatal|alert|critical|crit|error|err|warning|warn|notice|info|information|debug|trace|verbose|ok|success)\b/i;
 
 /**
  * Extract status color from a pattern template or example log message string.
@@ -95,7 +96,7 @@ const TEMPLATE_LEVEL_RE = /\b(emergency|emerg|fatal|alert|critical|crit|error|er
  * @returns StatusInfo with level, color, and priority (defaults to info)
  */
 export function extractStatusFromTemplate(text: string, isDark = false): StatusInfo {
-  if (!text || typeof text !== 'string') {
+  if (!text || typeof text !== "string") {
     return extractStatusFromLog(null, isDark);
   }
   const match = text.match(TEMPLATE_LEVEL_RE);
@@ -113,8 +114,12 @@ export function extractStatusFromTemplate(text: string, isDark = false): StatusI
  * @returns StatusInfo with level, color, and priority
  */
 export function extractStatusFromLog(logEntry: any, isDark = false): StatusInfo {
-  if (!logEntry || typeof logEntry !== 'object') {
-    return { level: 'info', color: isDark ? (STATUS_COLORS_DARK.info ?? STATUS_COLORS.info) : STATUS_COLORS.info, priority: 6 };
+  if (!logEntry || typeof logEntry !== "object") {
+    return {
+      level: "info",
+      color: isDark ? (STATUS_COLORS_DARK.info ?? STATUS_COLORS.info) : STATUS_COLORS.info,
+      priority: 6,
+    };
   }
 
   // Search through predefined status fields in order of preference.
@@ -123,7 +128,7 @@ export function extractStatusFromLog(logEntry: any, isDark = false): StatusInfo 
 
     if (statusValue !== undefined && statusValue !== null) {
       // Skip empty/whitespace-only strings to avoid incorrect conversion to 0.
-      if (typeof statusValue === 'string' && statusValue.trim() === '') {
+      if (typeof statusValue === "string" && statusValue.trim() === "") {
         continue;
       }
 
@@ -134,7 +139,7 @@ export function extractStatusFromLog(logEntry: any, isDark = false): StatusInfo 
   }
 
   // No status field found - default to info level.
-  return applyDarkColor({ level: 'info', color: STATUS_COLORS.info, priority: 6 }, isDark);
+  return applyDarkColor({ level: "info", color: STATUS_COLORS.info, priority: 6 }, isDark);
 }
 
 function applyDarkColor(info: StatusInfo, isDark: boolean): StatusInfo {
@@ -152,17 +157,17 @@ function applyDarkColor(info: StatusInfo, isDark: boolean): StatusInfo {
  */
 function parseStatusValue(value: any): StatusInfo {
   // Numeric syslog severity levels (0-7).
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     return mapNumericStatus(value);
   }
 
   // String status levels (case-insensitive).
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return mapStringStatus(value);
   }
 
   // Unexpected data types (boolean, object, etc.) default to info.
-  return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+  return { level: "info", color: STATUS_COLORS.info, priority: 6 };
 }
 
 /**
@@ -178,39 +183,39 @@ function mapNumericStatus(value: number): StatusInfo {
   switch (value) {
     // OTEL UNSPECIFIED (0) - treat as info
     case 0:
-      return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+      return { level: "info", color: STATUS_COLORS.info, priority: 6 };
 
     // Action must be taken immediately
     case 1:
-      return { level: 'alert', color: STATUS_COLORS.alert, priority: 1 };
+      return { level: "alert", color: STATUS_COLORS.alert, priority: 1 };
 
     // Critical conditions
     case 2:
-      return { level: 'critical', color: STATUS_COLORS.critical, priority: 2 };
+      return { level: "critical", color: STATUS_COLORS.critical, priority: 2 };
 
     // Error conditions
     case 3:
-      return { level: 'error', color: STATUS_COLORS.error, priority: 3 };
+      return { level: "error", color: STATUS_COLORS.error, priority: 3 };
 
     // Warning conditions
     case 4:
-      return { level: 'warning', color: STATUS_COLORS.warning, priority: 4 };
+      return { level: "warning", color: STATUS_COLORS.warning, priority: 4 };
 
     // Normal but significant condition
     case 5:
-      return { level: 'notice', color: STATUS_COLORS.notice, priority: 5 };
+      return { level: "notice", color: STATUS_COLORS.notice, priority: 5 };
 
     // Informational messages
     case 6:
-      return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+      return { level: "info", color: STATUS_COLORS.info, priority: 6 };
 
     // Debug-level messages
     case 7:
-      return { level: 'debug', color: STATUS_COLORS.debug, priority: 7 };
+      return { level: "debug", color: STATUS_COLORS.debug, priority: 7 };
 
     // Unexpected numeric values (negative, >7, etc.)
     default:
-      return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+      return { level: "info", color: STATUS_COLORS.info, priority: 6 };
   }
 }
 
@@ -225,50 +230,50 @@ function mapStringStatus(value: string): StatusInfo {
   const lowerValue = value.toLowerCase().trim();
 
   // Emergency/Fatal - system unusable
-  if (lowerValue === 'emergency' || lowerValue === 'emerg' || lowerValue === 'fatal') {
-    return { level: 'emergency', color: STATUS_COLORS.emergency, priority: 0 };
+  if (lowerValue === "emergency" || lowerValue === "emerg" || lowerValue === "fatal") {
+    return { level: "emergency", color: STATUS_COLORS.emergency, priority: 0 };
   }
 
   // Alert - immediate action required
-  if (lowerValue === 'alert') {
-    return { level: 'alert', color: STATUS_COLORS.alert, priority: 1 };
+  if (lowerValue === "alert") {
+    return { level: "alert", color: STATUS_COLORS.alert, priority: 1 };
   }
 
   // Critical conditions
-  if (lowerValue === 'critical' || lowerValue === 'crit') {
-    return { level: 'critical', color: STATUS_COLORS.critical, priority: 2 };
+  if (lowerValue === "critical" || lowerValue === "crit") {
+    return { level: "critical", color: STATUS_COLORS.critical, priority: 2 };
   }
 
   // Error conditions
-  if (lowerValue === 'error' || lowerValue === 'err') {
-    return { level: 'error', color: STATUS_COLORS.error, priority: 3 };
+  if (lowerValue === "error" || lowerValue === "err") {
+    return { level: "error", color: STATUS_COLORS.error, priority: 3 };
   }
 
   // Warning conditions
-  if (lowerValue === 'warning' || lowerValue === 'warn') {
-    return { level: 'warning', color: STATUS_COLORS.warning, priority: 4 };
+  if (lowerValue === "warning" || lowerValue === "warn") {
+    return { level: "warning", color: STATUS_COLORS.warning, priority: 4 };
   }
 
   // Notice - significant but normal condition
-  if (lowerValue === 'notice') {
-    return { level: 'notice', color: STATUS_COLORS.notice, priority: 5 };
+  if (lowerValue === "notice") {
+    return { level: "notice", color: STATUS_COLORS.notice, priority: 5 };
   }
 
   // Informational messages
-  if (lowerValue === 'info' || lowerValue === 'information') {
-    return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+  if (lowerValue === "info" || lowerValue === "information") {
+    return { level: "info", color: STATUS_COLORS.info, priority: 6 };
   }
 
   // Debug messages and detailed logging
-  if (lowerValue === 'debug' || lowerValue === 'trace' || lowerValue === 'verbose') {
-    return { level: 'debug', color: STATUS_COLORS.debug, priority: 7 };
+  if (lowerValue === "debug" || lowerValue === "trace" || lowerValue === "verbose") {
+    return { level: "debug", color: STATUS_COLORS.debug, priority: 7 };
   }
 
   // Success/OK - positive status indicators
-  if (lowerValue === 'ok' || lowerValue === 'success') {
-    return { level: 'ok', color: STATUS_COLORS.ok, priority: 8 };
+  if (lowerValue === "ok" || lowerValue === "success") {
+    return { level: "ok", color: STATUS_COLORS.ok, priority: 8 };
   }
 
   // Fallback for unrecognized string values
-  return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+  return { level: "info", color: STATUS_COLORS.info, priority: 6 };
 }

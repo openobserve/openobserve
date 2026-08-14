@@ -1,6 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
 
-
 export const b64EncodeUnicode = (str: string) => {
   try {
     return btoa(
@@ -21,12 +20,9 @@ export const b64DecodeUnicode = (str: string) => {
   try {
     return decodeURIComponent(
       Array.prototype.map
-        .call(
-          atob(str.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "=")),
-          function (c) {
-            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-          },
-        )
+        .call(atob(str.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "=")), function (c) {
+          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+        })
         .join(""),
     );
   } catch (e) {
@@ -55,9 +51,7 @@ const isBase64Encoded = (str: string): boolean => {
   }
 };
 
-export const smartDecodeVrlFunction = (
-  vrlFunction: string | null | undefined,
-): string => {
+export const smartDecodeVrlFunction = (vrlFunction: string | null | undefined): string => {
   if (!vrlFunction) return "";
 
   try {
@@ -80,12 +74,9 @@ export const smartDecodeVrlFunction = (
 export const b64EncodeStandard = (str: string) => {
   try {
     return btoa(
-      encodeURIComponent(str).replace(
-        /%([0-9A-F]{2})/g,
-        function (match, p1: any) {
-          return String.fromCharCode(parseInt(`0x${p1}`));
-        },
-      ),
+      encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function (match, p1: any) {
+        return String.fromCharCode(parseInt(`0x${p1}`));
+      }),
     );
   } catch (e) {
     console.log("Error: getBase64Encode: error while encoding.");
@@ -132,6 +123,25 @@ export const formatLargeNumber = (number: number) => {
   } else {
     return number.toString();
   }
+};
+
+/**
+ * Compact record/event count, as shown on the Home → Usage tiles: exact below
+ * 100 000, then K/M/B/T with one decimal ("2.9B"). Shared so every surface that
+ * prints an event count prints the SAME string — Home and the Streams page must
+ * not disagree about the size of the same number.
+ */
+export const formatEventCount = (num: number): string => {
+  if (!Number.isFinite(num)) return "";
+  if (num < 100000) return num.toString();
+
+  const units = ["", "K", "M", "B", "T"];
+  let tier = Math.floor(Math.log10(num) / 3);
+
+  if (tier >= units.length) tier = units.length - 1;
+
+  const scaled = num / Math.pow(10, tier * 3);
+  return scaled.toFixed(1).replace(/\.0$/, "") + units[tier];
 };
 
 export const formatSizeFromMB = (sizeInMB: string | number) => {
@@ -229,9 +239,7 @@ export const durationFormatter = (durationInSeconds: number): string => {
     const seconds = durationInSeconds % 60;
     formattedDuration = `${days > 0 ? `${days}d ` : ""}${
       hours > 0 ? `${hours}h ` : ""
-    }${minutes > 0 ? `${minutes}m ` : ""}${
-      seconds > 0 ? `${seconds}s` : ""
-    }`.trim();
+    }${minutes > 0 ? `${minutes}m ` : ""}${seconds > 0 ? `${seconds}s` : ""}`.trim();
   }
 
   return formattedDuration;

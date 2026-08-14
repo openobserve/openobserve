@@ -48,7 +48,7 @@ describe("getAnnotationsData", () => {
   // Test 2: Edge cases - null/undefined/missing annotations
   it("should handle null annotations", () => {
     const result = getAnnotationsData(null, "UTC");
-    
+
     expect(result).toEqual({
       markLines: [],
       markAreas: [],
@@ -57,7 +57,7 @@ describe("getAnnotationsData", () => {
 
   it("should handle undefined annotations", () => {
     const result = getAnnotationsData(undefined, "UTC");
-    
+
     expect(result).toEqual({
       markLines: [],
       markAreas: [],
@@ -67,7 +67,7 @@ describe("getAnnotationsData", () => {
   it("should handle annotations without value property", () => {
     const annotations = {};
     const result = getAnnotationsData(annotations, "UTC");
-    
+
     expect(result).toEqual({
       markLines: [],
       markAreas: [],
@@ -77,7 +77,7 @@ describe("getAnnotationsData", () => {
   it("should handle annotations with null value property", () => {
     const annotations = { value: null };
     const result = getAnnotationsData(annotations, "UTC");
-    
+
     expect(result).toEqual({
       markLines: [],
       markAreas: [],
@@ -91,10 +91,10 @@ describe("getAnnotationsData", () => {
         {
           title: "Test Area Annotation",
           start_time: 1640995200000000, // 2022-01-01 00:00:00 in microseconds
-          end_time: 1641081600000000,   // 2022-01-02 00:00:00 in microseconds
-          description: "Test description"
-        }
-      ]
+          end_time: 1641081600000000, // 2022-01-02 00:00:00 in microseconds
+          description: "Test description",
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -102,7 +102,7 @@ describe("getAnnotationsData", () => {
     expect(result.markLines).toEqual([]);
     expect(result.markAreas).toHaveLength(1);
     expect(result.markAreas[0]).toHaveLength(2);
-    
+
     // First element of markArea (start)
     expect(result.markAreas[0][0]).toEqual({
       name: "Test Area Annotation",
@@ -110,7 +110,7 @@ describe("getAnnotationsData", () => {
       xAxis: expect.any(Date),
       annotationDetails: annotations.value[0],
     });
-    
+
     // Second element of markArea (end)
     expect(result.markAreas[0][1]).toEqual({
       xAxis: expect.any(Date),
@@ -127,11 +127,11 @@ describe("getAnnotationsData", () => {
           end_time: 1641081600000000,
         },
         {
-          title: "Second Area", 
+          title: "Second Area",
           start_time: 1641168000000000,
           end_time: 1641254400000000,
-        }
-      ]
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -149,9 +149,9 @@ describe("getAnnotationsData", () => {
         {
           title: "Test Line Annotation",
           start_time: 1640995200000000, // 2022-01-01 00:00:00 in microseconds
-          description: "Test line description"
-        }
-      ]
+          description: "Test line description",
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -178,8 +178,8 @@ describe("getAnnotationsData", () => {
         {
           title: "Second Line",
           start_time: 1641081600000000,
-        }
-      ]
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -197,8 +197,8 @@ describe("getAnnotationsData", () => {
           title: "Line with undefined end_time",
           start_time: 1640995200000000,
           end_time: undefined,
-        }
-      ]
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -220,8 +220,8 @@ describe("getAnnotationsData", () => {
         {
           title: "Line Annotation",
           start_time: 1641168000000000,
-        }
-      ]
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -238,9 +238,9 @@ describe("getAnnotationsData", () => {
       value: [
         {
           title: "No Time Annotation",
-          description: "This annotation has no time"
-        }
-      ]
+          description: "This annotation has no time",
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -256,8 +256,8 @@ describe("getAnnotationsData", () => {
           title: "Null Start Time",
           start_time: null,
           end_time: 1641081600000000,
-        }
-      ]
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -273,8 +273,8 @@ describe("getAnnotationsData", () => {
           title: "Null End Time",
           start_time: 1640995200000000,
           end_time: null,
-        }
-      ]
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -291,8 +291,8 @@ describe("getAnnotationsData", () => {
           title: "Zero Start Time",
           start_time: 0,
           end_time: 1640995200000000,
-        }
-      ]
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -309,8 +309,8 @@ describe("getAnnotationsData", () => {
           title: "Zero End Time",
           start_time: 1640995200000000,
           end_time: 0,
-        }
-      ]
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "UTC");
@@ -328,8 +328,8 @@ describe("getAnnotationsData", () => {
         {
           title: "PST Annotation",
           start_time: 1640995200000000,
-        }
-      ]
+        },
+      ],
     };
 
     const result = getAnnotationsData(annotations, "America/Los_Angeles");
@@ -342,7 +342,7 @@ describe("getAnnotationsData", () => {
   it("should handle empty value array", () => {
     const annotations = { value: [] };
     const result = getAnnotationsData(annotations, "UTC");
-    
+
     expect(result).toEqual({
       markLines: [],
       markAreas: [],

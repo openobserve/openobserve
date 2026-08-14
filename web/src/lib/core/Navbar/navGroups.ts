@@ -13,12 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type {
-  NavItem,
-  RailEntry,
-  SubnavChild,
-  NavGateContext,
-} from "./ONavbar.types";
+import type { NavItem, RailEntry, SubnavChild, NavGateContext } from "./ONavbar.types";
+import { raw, type I18nKey, type TranslateFn } from "@/types/i18n";
 
 /**
  * Visibility gates — each predicate mirrors the EXACT `visible` condition the
@@ -30,16 +26,13 @@ import type {
  * enterprise only — hence the separate `isEnterprise`/`isCloud` flags rather
  * than one combined flag.
  */
-export const GATE_PREDICATES: Record<
-  string,
-  (c: NavGateContext) => boolean
-> = {
+export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // Settings (isEnt = enterprise only)
   enterprise: (c) => c.isEnterprise,
   enterpriseMeta: (c) => c.isEnterprise && c.isMeta,
   cloudMeta: (c) => c.isCloud && c.isMeta,
   storage: (c) => c.isEnterprise && (!c.isCloud || c.orgStorage),
-  modelPricing: (c) => c.modelPricing,
+  modelPricing: (c) => (c.isEnterprise || c.isCloud) && c.modelPricing,
   correlation: (c) => c.isEnterprise && c.serviceStreams,
   llmProviders: (c) => (c.isEnterprise || c.isCloud) && c.onlineEvals,
   // IAM (isEnt = enterprise OR cloud)
@@ -58,11 +51,11 @@ export const GATE_PREDICATES: Record<
  * their own sub-pages on hover.
  *
  * Three shapes (see `RailEntry`):
- *   • plain link    — most items (Home, Logs, Metrics, Traces, RUM, Alerts,
- *     Incidents, Actions, Billings, AI, IAM, Management).
+ *   • plain link    — most items (Home, Logs, Metrics, Traces, Actions,
+ *     Billings, AI, IAM, Management).
  *   • link + subnav — a tile that navigates to a main page on click AND surfaces
- *     a section nav on hover. Produced by NAV_GROUPS (Data → /streams,
- *     Dashboards → /dashboards) and by any NAV_SUBNAV entry.
+ *     a section nav on hover. Produced by NAV_GROUPS (Reliability → /alerts,
+ *     Data → /streams, Dashboards → /dashboards) and by any NAV_SUBNAV entry.
  *   • pure group    — a flyout with no page of its own (click toggles it).
  *     Supported by the renderer but not emitted by any current entry.
  *
@@ -82,7 +75,7 @@ export const GATE_PREDICATES: Record<
 export interface NavGroupDef {
   key: string;
   /** i18n key for the group tile's label (resolved with t() at render). */
-  titleKey: string;
+  titleKey: I18nKey;
   icon: string;
   /** Where clicking the tile navigates (its first item). */
   parentLink: string;
@@ -90,7 +83,8 @@ export interface NavGroupDef {
   /** Top-level `name`s this group replaces (removed from the rail). */
   absorbs: string[];
   /**
-   * Emit the group's tile immediately AFTER this top-level item (when present).
+   * Emit the group's tile immediately AFTER this anchor — either a top-level
+   * item `name` or another group's `key` (when that anchor is present/active).
    * Defaults to the position of the group's first absorbed item.
    */
   placeAfter?: string;
@@ -99,19 +93,93 @@ export interface NavGroupDef {
 
 export const NAV_GROUPS: NavGroupDef[] = [
   {
+    key: "reliability",
+    titleKey: "menu.reliability",
+    icon: "shield",
+    parentLink: "/alerts",
+    absorbs: ["alertList", "sloList", "incidentList"],
+    children: [
+      {
+        titleKey: "menu.alerts",
+        icon: "shield-alert-outline",
+        name: "alertList",
+        requires: "alertList",
+      },
+      // An SLO is what an SLO alert burns against, and an incident is what an
+      // alert escalates into — one reliability workflow, one tile. Every child
+      // carries `requires` so that hiding any of them (`custom_hide_menus`, or
+      // Incidents being enterprise-gated) shrinks the group, and dropping to a
+      // single survivor collapses it back to a plain link rather than leaving a
+      // one-item flyout.
+      { titleKey: "menu.slos", icon: "target", name: "sloList", requires: "sloList" },
+      {
+        titleKey: "menu.incidents",
+        icon: "notifications-active",
+        name: "incidentList",
+        requires: "incidentList",
+      },
+      // Where an alert is delivered, and the message it delivers. These moved
+      // out of Settings: they are alerting configuration, not deployment
+      // configuration. They have no rail entry of their own, so they ride on
+      // Alerts being present — hiding `alertList` via custom_hide_menus takes
+      // its plumbing with it.
+      {
+        titleKey: "alert_destinations.header",
+        icon: "location-on",
+        name: "alertDestinations",
+        requires: "alertList",
+      },
+      {
+        titleKey: "alert_templates.header",
+        icon: "description",
+        name: "alertTemplates",
+        requires: "alertList",
+      },
+      // Where external alerts (Grafana, Alertmanager, etc.) feed Incidents.
+      // Gated on incidentList, not alertList: this only makes sense where
+      // Incidents is enabled, matching the enterprise/cloud + incidents_enabled
+      // visibility check it already carried as a Settings tab.
+      {
+        titleKey: "alert_sources.header",
+        icon: "webhook",
+        name: "alertSources",
+        requires: "incidentList",
+      },
+    ],
+  },
+  {
     key: "data",
     titleKey: "menu.data",
     icon: "database",
     parentLink: "/streams",
     absorbs: ["streams", "pipeline", "ingestion"],
-    placeAfter: "incidentList",
+    // Data follows the Reliability tile. This is load-bearing: without it Data
+    // lands at its own first absorbed item (pipeline/streams), near the TOP of
+    // the rail, ahead of Experience and Dashboards.
+    placeAfter: "reliability",
     children: [
       { titleKey: "menu.index", icon: "window", name: "logstreams", requires: "streams" },
       // Pipeline expands into its own tabbed sub-pages (same visibility rules).
-      { titleKey: "function.streamPipeline", icon: "lan", name: "pipelines", requires: "pipeline", gate: "streamPipelines" },
+      {
+        titleKey: "function.streamPipeline",
+        icon: "lan",
+        name: "pipelines",
+        requires: "pipeline",
+        gate: "streamPipelines",
+      },
       { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
-      { titleKey: "function.enrichmentTables", icon: "dataset", name: "enrichmentTables", requires: "pipeline" },
-      { titleKey: "menu.ingestion", icon: "data-plus-line", name: "ingestion", requires: "ingestion" },
+      {
+        titleKey: "function.enrichmentTables",
+        icon: "dataset",
+        name: "enrichmentTables",
+        requires: "pipeline",
+      },
+      {
+        titleKey: "menu.ingestion",
+        icon: "data-plus-line",
+        name: "ingestion",
+        requires: "ingestion",
+      },
     ],
   },
   {
@@ -125,18 +193,55 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { titleKey: "menu.report", icon: "description", name: "reports", requires: "reports" },
     ],
   },
+  {
+    key: "experience",
+    titleKey: "menu.experience",
+    icon: "devices",
+    // RUM's route always exists; Synthetics is feature-gated, so land on RUM.
+    parentLink: "/rum",
+    absorbs: ["rum", "synthetics"],
+    children: [
+      { titleKey: "menu.rum", icon: "devices", name: "RUM", requires: "rum" },
+      { titleKey: "menu.synthetic", icon: "radar", name: "synthetics", requires: "synthetics" },
+    ],
+  },
 ];
 
 /**
  * Top-level links that ALSO reveal their own in-page section nav on hover,
  * keyed by the top-level item's `name`.
  *
- * Currently empty: AI / IAM / Management are intentionally plain links (no rail
- * submenu) — their in-page SectionRail is the place to switch sections. Re-add
- * an entry here (mirroring the page's SectionRail) to restore a hover flyout.
- * The `gate` machinery (GATE_PREDICATES) remains available for any future entry.
+ * AI / IAM / Management are intentionally plain links (no rail submenu) — their
+ * in-page SectionRail is the place to switch sections. Re-add an entry here
+ * (mirroring the page's SectionRail) to restore a hover flyout.
+ *
+ * Traces: each flyout child is its own standalone route. The Traces page also
+ * offers Service Graph / Services Catalog as toolbar tabs (SearchBar.vue) that
+ * switch views in-page (`?tab=`) — dual access paths with different semantics.
+ * Spans is deliberately absent — it is
+ * a view-granularity toggle inside the Traces search page (it shares the
+ * query/stream/time context), not a destination. Service Graph carries the
+ * `enterprise` gate its route guard applies, so the rail never offers a link
+ * that would redirect straight back to Traces.
  */
-export const NAV_SUBNAV: Record<string, SubnavChild[]> = {};
+export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
+  traces: [
+    { titleKey: "menu.traces", icon: "account-tree", name: "traces" },
+    {
+      titleKey: "menu.serviceGraph",
+      icon: "share",
+      name: "serviceGraph",
+      gate: "enterprise",
+      activeOnTab: { name: "traces", tab: "service-graph" },
+    },
+    {
+      titleKey: "menu.services",
+      icon: "menu-book",
+      name: "servicesCatalog",
+      activeOnTab: { name: "traces", tab: "services-catalog" },
+    },
+  ],
+};
 
 /**
  * Transform the flat `linksList` into rail entries, PRESERVING the input order
@@ -146,7 +251,8 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {};
  */
 export function groupNavLinks(
   links: NavItem[],
-  t: (key: string) => string = (k) => k,
+  // `raw` brands the key unchanged — the identity fallback for callers with no translator.
+  t: TranslateFn = raw,
 ): RailEntry[] {
   const presentNames = new Set(links.map((l) => l.name));
 
@@ -156,9 +262,7 @@ export function groupNavLinks(
   const groupChildren = new Map<string, SubnavChild[]>();
   const absorbedToGroup = new Map<string, NavGroupDef>();
   for (const def of NAV_GROUPS) {
-    const children = def.children.filter(
-      (c) => !c.requires || presentNames.has(c.requires),
-    );
+    const children = def.children.filter((c) => !c.requires || presentNames.has(c.requires));
     const hasAbsorbed = def.absorbs.some((n) => presentNames.has(n));
     // A single-child "group" is pointless (the flyout would duplicate the tile),
     // so only collapse into a group when ≥2 children remain after filtering.
@@ -175,13 +279,16 @@ export function groupNavLinks(
     return { type: "link", item };
   };
 
-  // A group is emitted either AFTER a named item (`placeAfter`, when that item is
-  // present) or in place of its first absorbed item (default). Map the anchor
-  // item name → group keys to emit right after it.
+  // A group is emitted either AFTER its `placeAfter` anchor or in place of its
+  // first absorbed item (default). Map anchor → group keys to emit right after
+  // it. The anchor is a top-level item `name` or another group's `key`; it only
+  // counts when that item is present / that group is active, so a group whose
+  // anchor never materialises falls back to default placement.
+  const anchorExists = (anchor: string) => presentNames.has(anchor) || groupChildren.has(anchor);
   const emitAfter = new Map<string, string[]>();
   for (const def of absorbedToGroup.values()) {
     if (!groupChildren.has(def.key)) continue;
-    if (def.placeAfter && presentNames.has(def.placeAfter)) {
+    if (def.placeAfter && anchorExists(def.placeAfter)) {
       const list = emitAfter.get(def.placeAfter) ?? [];
       if (!list.includes(def.key)) list.push(def.key);
       emitAfter.set(def.placeAfter, list);
@@ -203,6 +310,13 @@ export function groupNavLinks(
       },
       children: groupChildren.get(def.key)!,
     });
+    // Groups anchored after THIS group (e.g. Data follows Reliability).
+    emitAnchored(def.key);
+  };
+  const emitAnchored = (anchor: string) => {
+    for (const key of emitAfter.get(anchor) ?? []) {
+      emitGroup(NAV_GROUPS.find((d) => d.key === key)!);
+    }
   };
 
   for (const item of links) {
@@ -210,17 +324,12 @@ export function groupNavLinks(
     if (group) {
       // Absorbed item — drop it. Emit the group here only when it has no
       // (present) `placeAfter` anchor (default first-absorbed placement).
-      const usesPlaceAfter =
-        group.placeAfter && presentNames.has(group.placeAfter);
+      const usesPlaceAfter = group.placeAfter && anchorExists(group.placeAfter);
       if (!usesPlaceAfter) emitGroup(group);
       continue;
     }
     result.push(entryFor(item));
-    // Emit any groups anchored after this item.
-    for (const key of emitAfter.get(item.name) ?? []) {
-      const def = NAV_GROUPS.find((d) => d.key === key)!;
-      emitGroup(def);
-    }
+    emitAnchored(item.name);
   }
 
   // Safety net: append any active group not yet placed.

@@ -1146,14 +1146,17 @@ test.describe("Logs Regression Bugs", () => {
   });
 
   /**
-   * Bug #9724: Log detail sidebar should open with JSON tab selected by default
+   * Log detail sidebar default tab (originally Bug #9724).
    * https://github.com/openobserve/openobserve/issues/9724
-   * PR #9703 fixed the sidebar consistency issue by adding initialTab prop
+   *
+   * The sidebar opens on JSON — the first tab in the bar. PR #13368 briefly made
+   * Table the default; that was reverted back to the JSON default this test asserts,
+   * while still confirming both tabs render and Table stays reachable by switching.
    */
-  test("Log detail sidebar opens with JSON tab by default (Bug #9724)", {
+  test("Log detail sidebar opens with JSON tab by default", {
     tag: ['@regressionBugs', '@logDetail', '@sidebar', '@bug9724', '@P1', '@logs']
   }, async ({ page }) => {
-    testLogger.info('Test: Log detail sidebar default tab verification (Bug #9724)');
+    testLogger.info('Test: Log detail sidebar default tab verification');
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
@@ -1177,7 +1180,7 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Step 2: Verifying sidebar is visible');
     await pm.logsPage.expectLogDetailSidebarVisible();
 
-    // Step 3: Verify JSON tab is selected by default (Bug #9724 core verification)
+    // Step 3: Verify JSON tab is selected by default (core verification)
     testLogger.info('Step 3: Verifying JSON tab is selected by default');
     await pm.logsPage.verifyJsonTabSelectedByDefault();
 
@@ -1193,6 +1196,7 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Step 6: Switching to Table tab');
     await pm.logsPage.clickLogDetailTableTab();
     await pm.logsPage.verifyTableTabSelected();
+    // Wrap toggle is only rendered on the Table tab
     await pm.logsPage.verifyWrapToggleVisibleInTableTab();
 
     // Step 7: Click back to JSON tab and verify switch
@@ -1212,7 +1216,7 @@ test.describe("Logs Regression Bugs", () => {
     // Close sidebar
     await pm.logsPage.closeLogDetailSidebar();
 
-    testLogger.info('✓ Bug #9724 verification complete: Log detail sidebar opens with JSON tab by default');
+    testLogger.info('✓ Verification complete: Log detail sidebar opens with JSON tab by default');
   });
 
   // ============================================================================

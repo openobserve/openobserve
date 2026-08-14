@@ -14,14 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import {
-  buildDefaultSqlFields,
-  SKIP_SEED_TYPES,
-} from "@/utils/dashboard/defaultFields";
-import {
-  applyPromqlSeed,
-  isAutoSeededSlot,
-} from "@/utils/dashboard/promqlSeed";
+import type { TranslateFn } from "@/types/i18n";
+import { buildDefaultSqlFields, SKIP_SEED_TYPES } from "@/utils/dashboard/defaultFields";
+import { applyPromqlSeed, isAutoSeededSlot } from "@/utils/dashboard/promqlSeed";
 
 /**
  * Shared default-field seeding for the Add Panel and Metrics pages (both render
@@ -33,14 +28,14 @@ import {
  * SQL metrics -> avg(value) if the stream has a "value" column, else
  * count(_timestamp).
  */
-const useDefaultPanelFields = (pageKey: string = "dashboard") => {
+const useDefaultPanelFields = (pageKey: string = "dashboard", t: TranslateFn) => {
   const {
     dashboardPanelData,
     updateGroupedFields,
     makeAutoSQLQuery,
     isAddXAxisNotAllowed,
     isAddYAxisNotAllowed,
-  } = useDashboardPanelData(pageKey);
+  } = useDashboardPanelData(pageKey, t);
 
   const applyDefaultPanelFields = async () => {
     const idx = dashboardPanelData.layout.currentQueryIndex;

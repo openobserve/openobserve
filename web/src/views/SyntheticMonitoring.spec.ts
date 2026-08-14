@@ -45,8 +45,11 @@ const {
   mockServiceGet: vi.fn().mockResolvedValue({ data: {} }),
   mockServiceCreate: vi.fn().mockResolvedValue({ data: { id: "new-1" } }),
   mockServiceGetLocations: vi.fn().mockResolvedValue({ data: { locations: [] } }),
-  mockServiceGetAgentSetup: vi.fn().mockResolvedValue({ data: { install: "curl ...", token: "abc123" } }),
-  mockRouterPush: vi.fn(),
+  mockServiceGetAgentSetup: vi
+    .fn()
+    .mockResolvedValue({ data: { install: "curl ...", token: "abc123" } }),
+  // router.push returns a Promise in vue-router; callers here chain .catch() on it.
+  mockRouterPush: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────
@@ -90,10 +93,17 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 vi.mock("@/utils/synthetics/buildPayload", () => ({
   mapResponseToBrowserCheck: vi.fn((data: any) => data),
-  buildCreateBrowserTestPayload: vi.fn((data: any) => data),
+  buildCreateBrowserTestPayload: vi.fn((data: any) => ({ ...data, type: "browser" })),
+  mapResponseToProtocolCheck: vi.fn((data: any) => ({ ...data, checkType: data.type })),
+  buildCreateProtocolCheckPayload: vi.fn((data: any) => ({ ...data, type: data.checkType })),
 }));
 
 import SyntheticMonitoring from "./SyntheticMonitoring.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  buildCreateBrowserTestPayload,
+  buildCreateProtocolCheckPayload,
+} from "@/utils/synthetics/buildPayload";
 
 // ── Test helpers ─────────────────────────────────────────────────────────
 
@@ -128,6 +138,12 @@ const baseStubs = {
     template: '<div data-test="synthetic-monitoring-move-dialog" />',
     props: ["type", "moduleId", "activeFolderId", "open"],
   },
+  SelectFolderDropDown: {
+    name: "SelectFolderDropDown",
+    template: "<div />",
+    props: ["type", "activeFolderId", "disableDropdown"],
+    emits: ["folder-selected"],
+  },
   ODropdown: {
     template:
       '<div><div data-test="odropdown-trigger"><slot name="trigger" /></div><div v-if="true"><slot /></div></div>',
@@ -138,7 +154,7 @@ const baseStubs = {
     props: ["iconLeft", "dataTest"],
   },
   OIcon: {
-    template: '<span />',
+    template: "<span />",
     props: ["name", "size", "class"],
   },
   ODialog: {
@@ -162,7 +178,7 @@ const baseStubs = {
     inheritAttrs: true,
   },
   OSelect: {
-    template: '<select :data-test="$attrs[\'data-test\']" />',
+    template: "<select :data-test=\"$attrs['data-test']\" />",
     props: ["modelValue", "options", "size"],
   },
   OInput: {
@@ -172,12 +188,11 @@ const baseStubs = {
     emits: ["update:modelValue"],
   },
   OToggleGroup: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["modelValue"],
   },
   OToggleGroupItem: {
-    template:
-      '<button :data-test="$attrs[\'data-test\']"><slot /></button>',
+    template: "<button :data-test=\"$attrs['data-test']\"><slot /></button>",
     props: ["value", "size", "iconLeft"],
     inheritAttrs: true,
   },
@@ -192,7 +207,7 @@ const baseStubs = {
     props: ["value", "name", "label", "icon", "disable", "tooltip"],
   },
   OText: {
-    template: '<span><slot /></span>',
+    template: "<span><slot /></span>",
     props: ["variant"],
   },
   // ── Stubs for Private Locations functionality ────────────────────────
@@ -205,6 +220,9 @@ const baseStubs = {
     template: '<div data-test="synthetic-monitoring-agent-setup-drawer-stub" />',
     props: ["open", "install", "locationName", "locationId", "token", "org", "o2Url", "scriptUrl"],
     emits: ["update:open"],
+  },
+  BetaBadge: {
+    template: '<span data-test="beta-badge">BETA</span>',
   },
 };
 
@@ -233,23 +251,22 @@ describe("SyntheticMonitoring", () => {
     it("should render the page shell with the new check button", () => {
       wrapper = mountPage();
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists()).toBe(true);
     });
 
     it("should render the sidebar folder list", () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists()).toBe(true);
     });
 
     it("should render the MonitorTable", () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(true);
+    });
+
+    it("should render the Beta badge in the page title", () => {
+      wrapper = mountPage();
+      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
   });
 
@@ -368,12 +385,10 @@ describe("SyntheticMonitoring", () => {
   describe("conditional header action button", () => {
     it("shows New Check button when on Checks tab and hides Setup agent button", () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').exists()).toBe(
+        false,
+      );
     });
 
     it("shows Setup an agent button when on Private tab and hides New Check button", async () => {
@@ -381,21 +396,17 @@ describe("SyntheticMonitoring", () => {
       (wrapper.vm as any).activeSection = "private";
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("clicking New Check button sets showTypePicker to true", async () => {
       wrapper = mountPage();
       expect((wrapper.vm as any).showTypePicker).toBe(false);
 
-      await wrapper
-        .find('[data-test="synthetic-monitoring-new-check-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').trigger("click");
 
       expect((wrapper.vm as any).showTypePicker).toBe(true);
     });
@@ -405,9 +416,7 @@ describe("SyntheticMonitoring", () => {
       (wrapper.vm as any).activeSection = "private";
       await nextTick();
 
-      await wrapper
-        .find('[data-test="synthetic-monitoring-setup-agent-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').trigger("click");
 
       // openSetupDrawer sets showSetupDrawer synchronously before any async call
       expect((wrapper.vm as any).showSetupDrawer).toBe(true);
@@ -422,30 +431,24 @@ describe("SyntheticMonitoring", () => {
   describe("sidebar and main content visibility", () => {
     it("shows sidebar folder list only on Checks tab", async () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists()).toBe(true);
 
       (wrapper.vm as any).activeSection = "private";
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists()).toBe(false);
     });
 
     it("shows MonitorTable only on Checks tab", async () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(true);
 
       (wrapper.vm as any).activeSection = "private";
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(
+        false,
+      );
     });
 
     it("renders PrivateLocations on Private Locations tab", async () => {
@@ -469,12 +472,8 @@ describe("SyntheticMonitoring", () => {
       (wrapper.vm as any).activeSection = "checks";
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(true);
       expect(
         wrapper.find('[data-test="synthetic-monitoring-private-locations-stub"]').exists(),
       ).toBe(false);
@@ -517,6 +516,316 @@ describe("SyntheticMonitoring", () => {
       await nextTick();
 
       expect((wrapper.vm as any).showSetupDrawer).toBe(false);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Duplicate Check dialog — folder picker, folder-scoped requests
+  // ═══════════════════════════════════════════════════════════════════════
+  describe("duplicate check dialog", () => {
+    const row = { id: "m-1", name: "Checkout flow", folderId: "f-2" };
+
+    const findTable = () =>
+      wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+    const findDialog = () =>
+      wrapper.findComponent('[data-test="synthetic-monitoring-duplicate-dialog"]');
+    const findFolderSelect = () => wrapper.findComponent({ name: "SelectFolderDropDown" });
+
+    /** Opens the dialog for a row and waits for the source fetch to settle. */
+    const openDuplicate = async (monitor: any = row) => {
+      findTable().vm.$emit("duplicate", monitor);
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      mockServiceGet.mockResolvedValue({
+        data: { id: "m-1", name: "Checkout flow", target: "https://example.com" },
+      });
+      mockServiceCreate.mockResolvedValue({ data: { id: "m-2" } });
+    });
+
+    it("prefills the folder dropdown with the row's own folder", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate();
+
+      expect(findDialog().exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="synthetic-monitoring-duplicate-folder-select"]').exists(),
+      ).toBe(true);
+      expect(findFolderSelect().props("activeFolderId")).toBe("f-2");
+      expect(findFolderSelect().props("type")).toBe("synthetics");
+    });
+
+    it("falls back to the active folder when the row carries no folderId", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate({ id: "m-9", name: "No folder" });
+
+      expect(findFolderSelect().props("activeFolderId")).toBe("default");
+    });
+
+    it("fetches the source check scoped to the row's folder when opened", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate();
+
+      expect(mockServiceGet).toHaveBeenCalledTimes(1);
+      const [, id, folderId] = mockServiceGet.mock.calls[0];
+      expect(id).toBe("m-1");
+      expect(folderId).toBe("f-2");
+    });
+
+    it("closes the dialog and does not create when the source fetch fails", async () => {
+      mockServiceGet.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate();
+
+      expect(findDialog().exists()).toBe(false);
+      expect(mockServiceCreate).not.toHaveBeenCalled();
+    });
+
+    it("creates the copy in the folder chosen in the dropdown", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate();
+
+      findFolderSelect().vm.$emit("folder-selected", { label: "Ops", value: "f-9" });
+      await nextTick();
+
+      findDialog().vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(mockServiceCreate).toHaveBeenCalledTimes(1);
+      const [, payload, folderId] = mockServiceCreate.mock.calls[0];
+      // The payload folder and the ?folder= RBAC scope must agree.
+      expect((payload as any).folder).toBe("f-9");
+      expect(folderId).toBe("f-9");
+      expect((payload as any).id).toBeUndefined();
+    });
+
+    it("follows the copy into its destination folder with a single reload", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      const listCallsAfterMount = mockServiceList.mock.calls.length;
+
+      await openDuplicate();
+      findFolderSelect().vm.$emit("folder-selected", { label: "Ops", value: "f-9" });
+      await nextTick();
+      findDialog().vm.$emit("click:primary");
+      await flushPromises();
+
+      expect((wrapper.vm as any).activeFolderId).toBe("f-9");
+      expect(mockServiceList.mock.calls.length - listCallsAfterMount).toBe(1);
+    });
+
+    // buildCreateBrowserTestPayload hardcodes type: "browser", so a protocol
+    // check run through it would come back as a browser check.
+    describe("check type", () => {
+      const duplicateWithType = async (type: string) => {
+        mockServiceGet.mockResolvedValue({
+          data: { id: "m-1", name: "API health", type, schedule: {} },
+        });
+        wrapper = mountPage();
+        await flushPromises();
+        await openDuplicate();
+        findDialog().vm.$emit("click:primary");
+        await flushPromises();
+        return mockServiceCreate.mock.calls[0][1] as any;
+      };
+
+      it.each(["http", "tcp", "tls", "ssh"])("preserves a %s check's type", async (type) => {
+        const payload = await duplicateWithType(type);
+
+        expect(payload.type).toBe(type);
+        expect(vi.mocked(buildCreateProtocolCheckPayload)).toHaveBeenCalled();
+        expect(vi.mocked(buildCreateBrowserTestPayload)).not.toHaveBeenCalled();
+      });
+
+      it("uses the browser builder for a browser check", async () => {
+        const payload = await duplicateWithType("browser");
+
+        expect(payload.type).toBe("browser");
+        expect(vi.mocked(buildCreateBrowserTestPayload)).toHaveBeenCalled();
+        expect(vi.mocked(buildCreateProtocolCheckPayload)).not.toHaveBeenCalled();
+      });
+    });
+
+    // The API rejects a start in the past, and mapFrequencyToSchedule reports
+    // every saved check as "Schedule Later" with the date it originally started.
+    describe("schedule start rebasing", () => {
+      const pastStart = 1_600_000_000_000_000; // µs — Sep 2020
+
+      it("resets a past start to 'Schedule Now'", async () => {
+        mockServiceGet.mockResolvedValue({
+          data: {
+            id: "m-1",
+            name: "Checkout flow",
+            start: pastStart,
+            schedule: { startType: "later", startDate: "2020-09-13", startTime: "12:26" },
+          },
+        });
+        wrapper = mountPage();
+        await flushPromises();
+        await openDuplicate();
+        findDialog().vm.$emit("click:primary");
+        await flushPromises();
+
+        const [, payload] = mockServiceCreate.mock.calls[0];
+        expect((payload as any).schedule.startType).toBe("now");
+        expect((payload as any).schedule.startDate).toBeUndefined();
+        expect((payload as any).schedule.startTime).toBeUndefined();
+      });
+
+      // buildPayload is mocked to identity above, so the tests around this one
+      // only prove the view sets startType. This one pins the contract the fix
+      // relies on, using the real builder.
+      it("real buildCreateBrowserTestPayload emits a current start for 'now' and replays a past one for 'later'", async () => {
+        const actual = await vi.importActual<typeof import("@/utils/synthetics/buildPayload")>(
+          "@/utils/synthetics/buildPayload",
+        );
+        const source = actual.mapResponseToBrowserCheck({
+          name: "Checkout flow",
+          target: "https://example.com",
+          folder_id: "f-2",
+          start: pastStart,
+          frequency: { type: "minutes", interval: 5, timezone: "UTC" },
+          config: { steps: [] },
+        });
+
+        // As read back from the API: "later", replaying the original start —
+        // in the past, which is what the server rejects. (Not exactly
+        // pastStart: the round-trip through HH:mm truncates to the minute.)
+        expect(source.schedule.startType).toBe("later");
+        const asIs = actual.buildCreateBrowserTestPayload({ ...source }) as any;
+        expect(asIs.start).toBeLessThan(Date.now() * 1000);
+        expect(asIs.start).toBeCloseTo(pastStart, -8); // same minute
+
+        // What saveDuplicate submits instead. computeStart truncates to the
+        // minute, so allow up to 60s of backdating.
+        const rebased = actual.buildCreateBrowserTestPayload({
+          ...source,
+          schedule: { ...source.schedule, startType: "now" },
+        } as any) as any;
+        expect(rebased.start).toBeGreaterThan((Date.now() - 60_000) * 1000);
+      });
+
+      it("preserves a start that is still in the future", async () => {
+        const futureStart = (Date.now() + 7 * 24 * 60 * 60 * 1000) * 1000;
+        mockServiceGet.mockResolvedValue({
+          data: {
+            id: "m-1",
+            name: "Checkout flow",
+            start: futureStart,
+            schedule: { startType: "later", startDate: "2099-01-01", startTime: "09:00" },
+          },
+        });
+        wrapper = mountPage();
+        await flushPromises();
+        await openDuplicate();
+        findDialog().vm.$emit("click:primary");
+        await flushPromises();
+
+        const [, payload] = mockServiceCreate.mock.calls[0];
+        expect((payload as any).schedule).toEqual({
+          startType: "later",
+          startDate: "2099-01-01",
+          startTime: "09:00",
+        });
+      });
+    });
+
+    it("closes the dialog without an extra error toast on a 403", async () => {
+      mockServiceCreate.mockRejectedValueOnce({ response: { status: 403 } });
+      wrapper = mountPage();
+      await flushPromises();
+      await openDuplicate();
+
+      findDialog().vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(findDialog().exists()).toBe(false);
+      expect(vi.mocked(toast)).not.toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error" }),
+      );
+    });
+  });
+
+  // Regression coverage for the routing audit: every hop out of this page must
+  // carry `org_identifier` (otherwise a refresh/share resolves against whatever
+  // org is in localStorage), and `?folder=` must carry the folder *ID* — the
+  // server documents it as "Current folder ID of the synthetic (for RBAC)" and
+  // this page used to send the display name, which is "—" before folders load.
+  describe("navigation out of the list", () => {
+    // Shaped like a row emitted by MonitorTable: `folderId` is the KSUID,
+    // `folder_name` the display string the page used to send by mistake.
+    const row = {
+      id: "mon-9",
+      name: "Checkout flow",
+      folderId: "f_ksuid_prod",
+      folder_name: "Production",
+      lastTriggeredAt: 1_700_000_000_000_000,
+      enabled: true,
+    };
+
+    const findTable = () =>
+      wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+
+    const mountReady = async () => {
+      wrapper = mountPage();
+      await flushPromises();
+    };
+
+    it("sends org_identifier and the folder ID when opening a monitor's results", async () => {
+      await mountReady();
+      findTable().vm.$emit("row-click", row);
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetic-monitor-results",
+        params: { id: "mon-9" },
+        query: {
+          org_identifier: "default",
+          folder: "f_ksuid_prod",
+          name: "Checkout flow",
+          last_triggered_at: "1700000000000000",
+        },
+      });
+    });
+
+    it("sends org_identifier and the folder ID when editing a monitor", async () => {
+      await mountReady();
+      findTable().vm.$emit("edit", row);
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics-edit",
+        params: { id: "mon-9" },
+        query: { org_identifier: "default", folder: "f_ksuid_prod" },
+      });
+    });
+
+    it("sends org_identifier and the active folder when creating a check", async () => {
+      await mountReady();
+      // The picker lives in a dialog, so it only renders once opened.
+      await wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').trigger("click");
+      await nextTick();
+      wrapper
+        .findComponent('[data-test="synthetic-monitoring-check-type-picker-modal"]')
+        .vm.$emit("select", "http");
+      await nextTick();
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics-add",
+        query: { org_identifier: "default", folder: "default", type: "http" },
+      });
+    });
+
+    it("passes the folder ID — not the display name — to per-check API calls", async () => {
+      await mountReady();
+      findTable().vm.$emit("run", row);
+      await flushPromises();
+
+      expect(mockServiceRun).toHaveBeenCalledWith("default", "mon-9", {}, "f_ksuid_prod");
     });
   });
 });

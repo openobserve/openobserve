@@ -33,26 +33,27 @@ describe("useTracePatternTree", () => {
       const treeData = getTreeData(patternTraceTrees.singleRoot);
 
       expect(treeData.length).toBe(1);
-      expect(treeData[0].name).toBe("alertmanager");
+      expect(treeData[0].name).toBe("scheduler");
       expect(treeData[0].children?.map((c) => c.name)).toEqual(["querier"]);
     });
 
     it("should build one tree per root service when root spans have distinct services", () => {
       const treeData = getTreeData(patternTraceTrees.multiRootDistinctServices);
 
-      expect(treeData.map((n) => n.name).sort()).toEqual([
-        "alertmanager",
-        "ingester",
+      expect(treeData.map((n) => n.name).sort()).toEqual(["ingester", "scheduler"]);
+      expect(treeData.find((n) => n.name === "scheduler")?.children?.map((c) => c.name)).toEqual([
+        "querier",
       ]);
-      expect(treeData.find((n) => n.name === "alertmanager")?.children?.map((c) => c.name)).toEqual(["querier"]);
-      expect(treeData.find((n) => n.name === "ingester")?.children?.map((c) => c.name)).toEqual(["compactor"]);
+      expect(treeData.find((n) => n.name === "ingester")?.children?.map((c) => c.name)).toEqual([
+        "compactor",
+      ]);
     });
 
     it("should render a service node when all root spans belong to the same service", () => {
       const treeData = getTreeData(patternTraceTrees.multiRootSameService);
 
       expect(treeData.length).toBe(1);
-      expect(treeData[0].name).toBe("alertmanager");
+      expect(treeData[0].name).toBe("scheduler");
       // Metrics come from the service's self-pattern (2 spans, avg 75ms)
       expect(treeData[0].metadata?.count).toBe(2);
       expect(treeData[0].metadata?.avg).toBe(75);
@@ -62,27 +63,25 @@ describe("useTracePatternTree", () => {
       const treeData = getTreeData(patternTraceTrees.singleServiceOnly);
 
       expect(treeData.length).toBe(1);
-      expect(treeData[0].name).toBe("alertmanager");
+      expect(treeData[0].name).toBe("scheduler");
       expect(treeData[0].metadata?.count).toBe(1);
     });
 
     it("should build a tree when root services call each other cyclically", () => {
       const treeData = getTreeData(patternTraceTrees.multiRootCyclicServices);
 
-      // Cycle alertmanager→querier / querier→alertmanager: no parentless
+      // Cycle scheduler→querier / querier→scheduler: no parentless
       // service exists, but both services must still be represented.
       expect(treeData.length).toBe(1);
-      expect(treeData[0].name).toBe("alertmanager");
+      expect(treeData[0].name).toBe("scheduler");
       expect(treeData[0].children?.map((c) => c.name)).toEqual(["querier"]);
     });
 
     it("should not promote a service to root when it already appears as a child of another root", () => {
-      const treeData = getTreeData(
-        patternTraceTrees.multiRootOrphanChildService,
-      );
+      const treeData = getTreeData(patternTraceTrees.multiRootOrphanChildService);
 
       expect(treeData.length).toBe(1);
-      expect(treeData[0].name).toBe("alertmanager");
+      expect(treeData[0].name).toBe("scheduler");
       expect(treeData[0].children?.map((c) => c.name)).toEqual(["querier"]);
     });
 

@@ -65,12 +65,7 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
 
   for (let i = 0; i < labels.length; i++) {
     const label = labels[i];
-    dummyQuery = await addLabelToSQlQuery(
-      dummyQuery,
-      label.name,
-      label.value,
-      label.operator,
-    );
+    dummyQuery = await addLabelToSQlQuery(dummyQuery, label.name, label.value, label.operator);
   }
 
   try {
@@ -199,10 +194,7 @@ export const addLabelToSQlQuery = async (
       case ">=":
         // If value starts and ends with quote, remove it
         value =
-          value &&
-          value.length > 1 &&
-          value.startsWith("'") &&
-          value.endsWith("'")
+          value && value.length > 1 && value.startsWith("'") && value.endsWith("'")
             ? value.substring(1, value.length - 1)
             : value;
         // escape single quotes by doubling them
@@ -234,10 +226,7 @@ export const addLabelToSQlQuery = async (
               column: label,
             },
             right: {
-              type:
-                operator === "IN" || operator === "NOT IN"
-                  ? "expr_list"
-                  : "string",
+              type: operator === "IN" || operator === "NOT IN" ? "expr_list" : "string",
               value: value,
             },
           };
@@ -298,10 +287,7 @@ export const getStreamFromQuery = async (query: any) => {
 // returns 'ASC' or 'DESC' if exist
 // return null if not exist
 
-export const isGivenFieldInOrderBy = async (
-  sqlQuery: string,
-  fieldAlias: string,
-) => {
+export const isGivenFieldInOrderBy = async (sqlQuery: string, fieldAlias: string) => {
   try {
     await importSqlParser();
     const ast: any = parser.astify(sqlQuery);
@@ -375,10 +361,8 @@ export function extractFields(parsedAst: any, timeField: string, sqlParser?: any
       field.streamAlias = column?.expr?.args?.expr?.table || null;
     } else if (column.expr.type === "function") {
       // histogram field
-      field.column =
-        column?.expr?.args?.value[0]?.column?.expr?.value ?? timeField;
-      field.aggregationFunction =
-        column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
+      field.column = column?.expr?.args?.value[0]?.column?.expr?.value ?? timeField;
+      field.aggregationFunction = column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
       // Extract table/streamAlias from function argument
       field.streamAlias = column?.expr?.args?.value?.[0]?.table || null;
     } else if (column.expr.type === "case" && sqlParser) {
@@ -565,9 +549,7 @@ function parseCondition(condition: any) {
       } else if (condition.operator == "NOT IN") {
         // create values array based on right side of condition
         // quote the values
-        const values =
-          condition?.right?.value?.map((value: any) => `'${value?.value}'`) ??
-          [];
+        const values = condition?.right?.value?.map((value: any) => `'${value?.value}'`) ?? [];
         const columnObj = {
           field: condition?.left?.column?.expr?.value ?? "",
           streamAlias: condition?.left?.table || null,
@@ -584,9 +566,7 @@ function parseCondition(condition: any) {
         };
       } else if (condition.operator == "IN") {
         // create values array based on right side of condition
-        const values = condition.right.value.map(
-          (value: any) => `${value?.value}`,
-        );
+        const values = condition.right.value.map((value: any) => `${value?.value}`);
         const columnObj = {
           field: condition?.left?.column?.expr?.value ?? "",
           streamAlias: condition?.left?.table || null,
@@ -690,9 +670,7 @@ function parseCondition(condition: any) {
       } else if (condition?.operator == "NOT LIKE") {
         // right value may have % at the beginning or end or both
         // so we need to remove it
-        const value = condition?.right?.value
-          ?.replace(/^%/, "")
-          .replace(/%$/, "");
+        const value = condition?.right?.value?.replace(/^%/, "").replace(/%$/, "");
         const columnObj = {
           field: condition?.left?.column?.expr?.value,
           streamAlias: condition?.left?.table || null,
@@ -804,10 +782,7 @@ function extractTableName(parsedAst: any) {
   return parsedAst.from[0].table ?? null;
 }
 
-export const getFieldsFromQuery = async (
-  query: any,
-  timeField: string = "_timestamp",
-) => {
+export const getFieldsFromQuery = async (query: any, timeField: string = "_timestamp") => {
   try {
     await importSqlParser();
 
@@ -862,11 +837,7 @@ export const getFieldsFromQuery = async (
   }
 };
 
-export const buildSqlQuery = (
-  tableName: string,
-  fields: any,
-  whereClause: string,
-) => {
+export const buildSqlQuery = (tableName: string, fields: any, whereClause: string) => {
   let query = "SELECT ";
 
   // If the fields array is empty, use *, otherwise join the fields with commas
@@ -887,10 +858,7 @@ export const buildSqlQuery = (
   // Return the constructed query
   return query;
 };
-export const changeHistogramInterval = async (
-  query: any,
-  histogramInterval: any,
-) => {
+export const changeHistogramInterval = async (query: any, histogramInterval: any) => {
   try {
     // if histogramInterval is null or query is null or query is empty, return query
     if (query === null || query === "") {
@@ -962,74 +930,74 @@ export const convertQueryIntoSingleLine = async (query: any) => {
 };
 
 export const getStreamNameFromQuery = async (query: any) => {
-  let streamName = null;
+  let streamName: string | null = null;
   try {
     await importSqlParser();
     try {
       if (query && query != "") {
         const parsedQuery = parser?.astify(query);
+
+        // Recursively find the first base table, descending into sub-queries in
+        // FROM / WHERE / SELECT. This resolves `FROM (SELECT ... FROM stream)` to
+        // `stream` instead of undefined. First table wins so a JOIN still reports
+        // its main (first) table.
+        const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
+        const visitedNodes = new WeakSet(); // Prevent circular references
+
+        const extractTablesFromNode = (node: any, depth: number = 0) => {
+          if (!node || depth > MAX_RECURSION_DEPTH) {
+            if (depth > MAX_RECURSION_DEPTH) {
+              console.warn("Maximum recursion depth reached while parsing SQL query");
+            }
+            return;
+          }
+
+          if (typeof node === "object" && node !== null) {
+            if (visitedNodes.has(node)) {
+              return; // Skip already visited nodes
+            }
+            visitedNodes.add(node);
+          }
+
+          // Check if current node has a from clause
+          if (node.from && Array.isArray(node.from)) {
+            node.from.forEach((stream: any) => {
+              if (stream.table && !streamName) {
+                streamName = stream.table;
+              }
+              // Handle subquery in FROM clause
+              if (stream.expr && stream.expr.ast) {
+                extractTablesFromNode(stream.expr.ast, depth + 1);
+              }
+            });
+          }
+
+          // Check for nested subqueries in WHERE clause
+          if (node.where && node.where.right && node.where.right.ast) {
+            extractTablesFromNode(node.where.right.ast, depth + 1);
+          }
+
+          // Check for nested subqueries in SELECT expressions
+          if (node.columns && Array.isArray(node.columns)) {
+            node.columns.forEach((col: any) => {
+              if (col.expr && col.expr.ast) {
+                extractTablesFromNode(col.expr.ast, depth + 1);
+              }
+            });
+          }
+        };
+
         if (parsedQuery?.with) {
           let withObj = parsedQuery.with;
           // Ensure withObj is an array before iterating
           if (!Array.isArray(withObj)) {
             withObj = [withObj];
           }
-          withObj.forEach((obj: any) => {
-            // Recursively extract table names from the WITH statement with depth protection
-            const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
-            const visitedNodes = new WeakSet(); // Prevent circular references - more efficient for objects
-
-            const extractTablesFromNode = (node: any, depth: number = 0) => {
-              if (!node || depth > MAX_RECURSION_DEPTH) {
-                if (depth > MAX_RECURSION_DEPTH) {
-                  console.warn(
-                    "Maximum recursion depth reached while parsing SQL query",
-                  );
-                }
-                return;
-              }
-
-              // Use WeakSet for efficient circular reference detection
-              if (typeof node === "object" && node !== null) {
-                if (visitedNodes.has(node)) {
-                  return; // Skip already visited nodes
-                }
-                visitedNodes.add(node);
-              }
-
-              // Check if current node has a from clause
-              if (node.from && Array.isArray(node.from)) {
-                node.from.forEach((stream: any) => {
-                  if (stream.table) {
-                    streamName = stream.table;
-                  }
-                  // Handle subquery in FROM clause
-                  if (stream.expr && stream.expr.ast) {
-                    extractTablesFromNode(stream.expr.ast, depth + 1);
-                  }
-                });
-              }
-
-              // Check for nested subqueries in WHERE clause
-              if (node.where && node.where.right && node.where.right.ast) {
-                extractTablesFromNode(node.where.right.ast, depth + 1);
-              }
-
-              // Check for nested subqueries in SELECT expressions
-              if (node.columns && Array.isArray(node.columns)) {
-                node.columns.forEach((col: any) => {
-                  if (col.expr && col.expr.ast) {
-                    extractTablesFromNode(col.expr.ast, depth + 1);
-                  }
-                });
-              }
-            };
-
-            // Start extraction from the WITH statement
-            extractTablesFromNode(obj?.stmt);
-          });
-        } else {
-          streamName = parsedQuery?.from?.[0]?.table;
+          // Extract the base table from each CTE body.
+          withObj.forEach((obj: any) => extractTablesFromNode(obj?.stmt));
+        } else if (parsedQuery) {
+          // Plain query — recurse so a sub-query in FROM resolves to its base table.
+          extractTablesFromNode(parsedQuery);
         }
       }
     } catch (error) {
@@ -1154,10 +1122,7 @@ function createBinaryExpr(condition: any) {
 }
 
 // Main function to build SQL query using AST
-export async function buildSQLQueryWithParser(
-  fields: any,
-  joins: any[],
-): Promise<string> {
+export async function buildSQLQueryWithParser(fields: any, joins: any[]): Promise<string> {
   // Import parser
   await importSqlParser();
 
@@ -1223,8 +1188,7 @@ export async function buildSQLQueryWithParser(
         groupByFields.push({
           type: "column_ref",
           table: null,
-          column:
-            breakdownField.alias || breakdownField.column || "unknown_column",
+          column: breakdownField.alias || breakdownField.column || "unknown_column",
         });
 
         // Handle ORDER BY for Breakdown
@@ -1233,13 +1197,9 @@ export async function buildSQLQueryWithParser(
             expr: {
               type: "column_ref",
               table: null,
-              column:
-                breakdownField.alias ||
-                breakdownField.column ||
-                "unknown_column",
+              column: breakdownField.alias || breakdownField.column || "unknown_column",
             },
-            type:
-              breakdownField.sortBy.toLowerCase() === "desc" ? "DESC" : "ASC",
+            type: breakdownField.sortBy.toLowerCase() === "desc" ? "DESC" : "ASC",
           });
         }
       }
@@ -1310,9 +1270,7 @@ export const parseWhereClauseToFilter = async (
 
   try {
     await importSqlParser();
-    const ast: any = parser.astify(
-      `SELECT * FROM "dummy" WHERE ${whereClauseText}`,
-    );
+    const ast: any = parser.astify(`SELECT * FROM "dummy" WHERE ${whereClauseText}`);
     if (!ast?.where) return defaultFilter;
 
     const filters = convertWhereToFilter(ast.where);
@@ -1342,9 +1300,7 @@ export const parseWhereClauseToFilter = async (
  * Returns just the condition text without the WHERE keyword, or empty string
  * if the query has no WHERE clause.
  */
-export const extractWhereClause = async (
-  sql: string,
-): Promise<string> => {
+export const extractWhereClause = async (sql: string): Promise<string> => {
   if (!sql?.trim()) return "";
 
   try {
@@ -1375,10 +1331,4 @@ export const extractWhereClause = async (
 };
 
 // Export internal functions for testing
-export {
-  formatValue,
-  parseCondition,
-  convertWhereToFilter,
-  extractFilters,
-  extractTableName,
-};
+export { formatValue, parseCondition, convertWhereToFilter, extractFilters, extractTableName };

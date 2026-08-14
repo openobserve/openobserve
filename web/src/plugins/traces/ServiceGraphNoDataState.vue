@@ -24,36 +24,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   with the traces search "no events" state.
 -->
 <template>
-  <OEmptyState
-    v-if="jumpTarget"
-    preset="no-service-graph"
-    size="hero"
-  >
+  <OEmptyState v-if="jumpTarget" preset="no-service-graph" size="hero">
     <template #actions>
       <EmptyStateActionCard
         icon="schedule"
         :label="t('traces.noEvents.jumpToData')"
-        :sublabel="jumpTargetSublabel"
+        :sublabel="raw(jumpTargetSublabel)"
         data-test="service-graph-no-data-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
       />
     </template>
   </OEmptyState>
-  <OEmptyState
-    v-else
-    preset="no-service-graph"
-    size="hero"
-    :hide-action="true"
-  />
+  <OEmptyState v-else preset="no-service-graph" size="hero" :hide-action="true" />
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import useJumpToLatestData from "@/composables/useJumpToLatestData";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { jumpTarget, jumpTargetSublabel } = useJumpToLatestData();
 
 const emit = defineEmits<{

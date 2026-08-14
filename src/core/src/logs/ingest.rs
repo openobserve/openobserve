@@ -21,7 +21,7 @@ use std::{
 use axum::http;
 use chrono::Utc;
 #[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_self_reporting_stream;
+use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
@@ -41,6 +41,11 @@ use infra::{
     errors::{Error, Result},
     schema::get_flatten_level,
 };
+use ingestion_common::{
+    AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
+    IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
+    IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
+};
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
@@ -49,20 +54,12 @@ use opentelemetry_proto::tonic::{
     metrics::v1::metric::Data,
 };
 use prost::Message;
+use schema::{get_future_discard_error, get_upto_discard_error};
 use serde_json::json;
 use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
-use crate::{
-    ingestion::check_ingestion_allowed,
-    ingestion_types::{
-        AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
-        IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
-        IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
-    },
-    schema::{get_future_discard_error, get_upto_discard_error},
-    service::get_formatted_stream_name,
-};
+use crate::{ingestion::check_ingestion_allowed, service::get_formatted_stream_name};
 
 type LogDataByStream = HashMap<String, (Vec<(i64, json::Map<String, json::Value>)>, Option<usize>)>;
 
@@ -110,14 +107,14 @@ pub async fn ingest(
         return Err(Error::IngestionError("Stream name is empty".to_string()));
     }
 
-    // Block user ingestion into reserved self-reporting streams
-    // (usage/stats/triggers/errors/...). The internal self-reporting job writes
+    // Block user ingestion into reserved internal streams
+    // (usage/stats/triggers/errors/slo_slices/...). The internal job writes
     // these via `IngestionRequest::Usage` (for which `should_report_usage()` is
     // false → `need_usage_report == false`), so it is exempt; any other request
     // targeting a reserved stream is a user write and is rejected. Cloud-only:
     // OSS / self-hosted may legitimately use these stream names.
     #[cfg(feature = "cloud")]
-    if need_usage_report && is_reserved_self_reporting_stream(&stream_name) {
+    if need_usage_report && is_reserved_internal_stream(&stream_name) {
         return Err(Error::IngestionError(format!(
             "stream '{stream_name}' is reserved and cannot be ingested into"
         )));
@@ -789,11 +786,13 @@ pub fn handle_timestamp(
     Ok(timestamp)
 }
 
-impl Iterator for IngestionDataIter {
+struct IngestionDataIterator(IngestionDataIter);
+
+impl Iterator for IngestionDataIterator {
     type Item = Result<json::Value, IngestionError>;
 
     fn next(&mut self) -> Option<Result<json::Value, IngestionError>> {
-        match self {
+        match &mut self.0 {
             IngestionDataIter::JSONIter(iter) => iter.next().map(Ok),
             IngestionDataIter::MultiIter(iter) => loop {
                 match iter.next() {
@@ -827,9 +826,13 @@ impl Iterator for IngestionDataIter {
     }
 }
 
-impl IngestionData {
-    pub fn iter(self) -> IngestionDataIter {
-        match self {
+trait IngestionDataExt {
+    fn iter(self) -> IngestionDataIterator;
+}
+
+impl IngestionDataExt for IngestionData {
+    fn iter(self) -> IngestionDataIterator {
+        let iter = match self {
             IngestionData::JSON(vec) => IngestionDataIter::JSONIter(vec.into_iter()),
             IngestionData::Multi(data) => {
                 let cursor = Cursor::new(data);
@@ -862,27 +865,27 @@ impl IngestionData {
                 for record in &request.records {
                     match decode_and_decompress_to_vec(&record.data) {
                         Err(err) => {
-                            return IngestionDataIter::KinesisFH(
+                            return IngestionDataIterator(IngestionDataIter::KinesisFH(
                                 events.into_iter(),
                                 Some(KinesisFHIngestionResponse {
                                     request_id: request_id.to_string(),
                                     error_message: Some(err.to_string()),
                                     timestamp: req_timestamp,
                                 }),
-                            );
+                            ));
                         }
                         Ok(decompressed_data) => {
                             match deserialize_aws_record_from_vec(decompressed_data, request_id) {
                                 Ok(parsed_events) => events.extend(parsed_events),
                                 Err(err) => {
-                                    return IngestionDataIter::KinesisFH(
+                                    return IngestionDataIterator(IngestionDataIter::KinesisFH(
                                         events.into_iter(),
                                         Some(KinesisFHIngestionResponse {
                                             request_id: request_id.to_string(),
                                             error_message: Some(err.to_string()),
                                             timestamp: req_timestamp,
                                         }),
-                                    );
+                                    ));
                                 }
                             }
                         }
@@ -890,7 +893,8 @@ impl IngestionData {
                 }
                 IngestionDataIter::KinesisFH(events.into_iter(), None)
             }
-        }
+        };
+        IngestionDataIterator(iter)
     }
 }
 

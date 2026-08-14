@@ -21,8 +21,7 @@
 export const getFieldFromExpression = (expression: string): string | null => {
   const cleaned = expression.trim().replace(/^\(\s*/, "");
   const match =
-    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
-    cleaned.match(/^(\w+)\s*(?:=|!=|is)/i);
+    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) || cleaned.match(/^(\w+)\s*(?:=|!=|is)/i);
   return match ? match[1] : null;
 };
 
@@ -34,19 +33,13 @@ export const getFieldFromExpression = (expression: string): string | null => {
  * "existing condition with same value → replace", which would otherwise both
  * produce an unchanged string from replaceExistingFieldCondition.
  */
-export const hasFieldCondition = (
-  queryStr: string,
-  fieldName: string,
-): boolean => {
+export const hasFieldCondition = (queryStr: string, fieldName: string): boolean => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
 
-  const multiRegex = new RegExp(
-    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
-    "gi",
-  );
+  const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
   if (multiRegex.test(queryStr)) return true;
 
   const singleRegex = new RegExp(condPat, "gi");
@@ -58,10 +51,7 @@ export const hasFieldCondition = (
  * Handles both single conditions and parenthesized multi-value groups.
  * Cleans up dangling AND connectors after removal.
  */
-export const removeFieldCondition = (
-  queryStr: string,
-  fieldName: string,
-): string => {
+export const removeFieldCondition = (queryStr: string, fieldName: string): string => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Match both comparison operators (=, !=, <, >) and IS / IS NOT (for null checks)
   const fieldPattern = new RegExp(`^"?${esc}"?\\s*(?:[=!<>]|is\\s)`, "i");
@@ -94,10 +84,7 @@ export const replaceExistingFieldCondition = (
   const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
-  const multiRegex = new RegExp(
-    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
-    "gi",
-  );
+  const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
   if (multiRegex.test(queryStr)) {
     return queryStr.replace(multiRegex, newExpression);
   }

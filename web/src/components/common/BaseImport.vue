@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="w-full h-full flex flex-col overflow-hidden min-h-0"
+    class="flex h-full min-h-0 w-full flex-col overflow-hidden"
     :class="[containerClass]"
     :style="containerStyle"
   >
@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageHeader
       v-if="!hideHeader"
       :title="title"
-      :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
-      class="shrink-0 border-b border-border-default"
+      :back="{ label: raw(''), onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
+      class="border-border-default shrink-0 border-b"
       :class="headerContainerClass"
     >
       <template #actions>
@@ -40,17 +40,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="cancelButtonClass"
           @click="handleCancel"
           :data-test="`${testPrefix}-import-cancel-btn`"
-        >{{ t('function.cancel') }}</OButton>
+          >{{ t("function.cancel") }}</OButton
+        >
         <OButton
           variant="primary"
           size="sm"
           type="submit"
           :class="importButtonClass"
           @click="handleImport"
-          :loading="isImporting || $props.isImporting"
-          :disabled="isImporting || $props.isImporting"
+          :loading="isImportingLocal || isImporting"
+          :disabled="isImportingLocal || isImporting"
           :data-test="`${testPrefix}-import-json-btn`"
-        >{{ t('dashboard.import') }}</OButton>
+          >{{ t("dashboard.import") }}</OButton
+        >
       </template>
     </OPageHeader>
 
@@ -58,25 +60,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          it aligns with the header back-button icon (which is inset one
          page-edge from the container). A page-edge on this wrapper too would
          double the inset and push the content past the header icon. -->
-    <div class="flex flex-1 min-h-0" :class="contentWrapperClass">
-      <div class="flex w-full min-h-0" :style="contentStyle">
+    <div class="flex min-h-0 flex-1" :class="contentWrapperClass">
+      <div class="flex min-h-0 w-full" :style="contentStyle">
         <OSplitter
           v-if="showSplitter"
-          class="logs-search-splitter w-full h-full min-h-0"
+          class="logs-search-splitter h-full min-h-0 w-full"
           v-model="splitterModel"
           :style="splitterStyle"
           :limits="[30, 60]"
           :horizontal="false"
         >
           <template #before>
-            <div class="w-full h-full flex flex-col border-r border-border-default">
+            <div class="border-border-default flex h-full w-full flex-col border-r">
               <!-- Tabs Section -->
-              <div class="bg-card-glass-bg py-2.5 px-page-edge mb-1 shrink-0">
+              <div class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5">
                 <div class="app-tabs-container h-9 w-fit">
-                  <app-tabs
+                  <AppTabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
-                    :tabs="tabs"
+                    :tabs="resolvedTabs"
                     v-model:active-tab="activeTab"
                     @update:active-tab="handleTabChange"
                   />
@@ -86,27 +88,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- URL Import Tab -->
               <div
                 v-if="activeTab === 'import_json_url'"
-                class="editor-container-url bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
+                class="editor-container-url bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
               >
-                <div class="mx-2 mt-1 pb-2 flex flex-col flex-1 min-h-0">
+                <div class="mx-2 mt-1 flex min-h-0 flex-1 flex-col pb-2">
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
-                    <div class="flex mb-3 shrink-0">
-                        <OInput
-                          :data-test="`${testPrefix}-import-url-input`"
-                          v-model="url"
-                          size="md"
-                          :placeholder="t('dashboard.addURL')"
-                        />
+                    <div class="mb-3 flex shrink-0">
+                      <OInput
+                        :data-test="`${testPrefix}-import-url-input`"
+                        v-model="url"
+                        size="md"
+                        :placeholder="t('dashboard.addURL')"
+                      />
                     </div>
                   </slot>
 
-                  <query-editor
+                  <QueryEditor
                     :key="`editor-${editorKey}`"
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-url-editor flex-1 min-h-0 border border-card-glass-border rounded-default overflow-hidden"
+                    class="import-url-editor border-card-glass-border rounded-default min-h-0 flex-1 overflow-hidden border"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -115,12 +117,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab === 'import_json_file'"
-                class="editor-container-json bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
+                class="editor-container-json bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
               >
-                <div class="mx-2 mt-1 pb-2 flex flex-col flex-1 min-h-0">
+                <div class="mx-2 mt-1 flex min-h-0 flex-1 flex-col pb-2">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div class="mb-1 flex shrink-0 w-full">
+                    <div class="mb-1 flex w-full shrink-0">
                       <div class="w-full">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
@@ -129,14 +131,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
-                          helpText=".json files only"
+                          :helpText="t('common.jsonFilesOnlyHint')"
                         >
                           <template v-slot:prepend>
                             <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
                           </template>
                           <template v-slot:append>
                             <OIcon
-                              name="close" size="sm"
+                              name="close"
+                              size="sm"
                               @click.stop.prevent="jsonFiles = null"
                               class="cursor-pointer"
                             />
@@ -146,12 +149,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </slot>
 
-                  <query-editor
+                  <QueryEditor
                     :key="`editor-${editorKey}`"
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-file-editor flex-1 min-h-0 border border-card-glass-border rounded-default overflow-hidden"
+                    class="import-file-editor border-card-glass-border rounded-default min-h-0 flex-1 overflow-hidden border"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -166,17 +169,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="bg-card-glass-bg w-full h-full flex flex-col min-h-0"
+              class="bg-card-glass-bg flex h-full min-h-0 w-full flex-col"
             >
               <!-- Slot for complete output section customization -->
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
+                  <div class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
+                    {{ t("dashboard.outputMessages") }}
+                  </div>
                   <OSeparator class="mt-1 shrink-0" />
-                  <div class="error-report-container flex-1 min-h-0 overflow-auto">
-                    <div class="text-center p-3 text-text-muted">
-                      No messages to display
+                  <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
+                    <div class="text-text-muted p-3 text-center">
+                      {{ t("dashboard.noMessagesToDisplay") }}
                     </div>
                   </div>
                 </slot>
@@ -202,7 +207,7 @@ import {
   onBeforeUnmount,
   type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -211,17 +216,15 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import OSplitter from '@/lib/core/Splitter/OSplitter.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   name: "BaseImport",
   components: {
     OSeparator,
     OSplitter,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     AppTabs,
     OPageHeader,
     OButton,
@@ -232,26 +235,17 @@ export default defineComponent({
   props: {
     // Title for the import page
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
-    // Tabs configuration (shape matches AppTabs' Tab interface)
+    // Tabs configuration (shape matches AppTabs' Tab interface).
+    // No `default` here on purpose: a prop default factory runs outside the i18n
+    // context and would freeze the labels at one locale — see `resolvedTabs`.
     tabs: {
       type: Array as PropType<
-        { label: string; value: string; icon?: string; disabled?: boolean }[]
+        { label: I18nText; value: string; icon?: string; disabled?: boolean }[]
       >,
-      default: () => [
-        {
-          label: "File Upload / JSON",
-          value: "import_json_file",
-          icon: "upload",
-        },
-        {
-          label: "URL Import",
-          value: "import_json_url",
-          icon: "link",
-        },
-      ],
+      required: false,
     },
     // Default active tab
     defaultActiveTab: {
@@ -283,9 +277,13 @@ export default defineComponent({
     editorHeights: {
       type: Object,
       default: () => ({
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         urlEditor: "calc(100vh - 286px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         fileEditor: "calc(100vh - 290px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         outputContainer: "calc(100vh - 130px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         errorReport: "calc(100vh - 192px)", // Default for management pages
       }),
     },
@@ -324,16 +322,9 @@ export default defineComponent({
       default: "",
     },
   },
-  emits: [
-    "back",
-    "cancel",
-    "import",
-    "update:jsonStr",
-    "update:jsonArray",
-    "update:activeTab",
-  ],
+  emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // State
     const jsonStr = ref<any>("");
@@ -343,7 +334,7 @@ export default defineComponent({
     const activeTab = ref(props.defaultActiveTab);
     const splitterModel = ref(60);
     const editorKey = ref(0); // Force editor to re-render when changes
-    const isImporting = ref(false); // Track if import is in progress
+    const isImportingLocal = ref(false); // Track if import is in progress
 
     // Expose methods to allow parent to update jsonStr
     const updateJsonStr = (newJsonStr: string) => {
@@ -353,10 +344,18 @@ export default defineComponent({
     const updateJsonArray = (newJsonArray: any[], skipEditorUpdate = false) => {
       jsonArrayOfObj.value = newJsonArray;
       jsonStr.value = JSON.stringify(newJsonArray, null, 2);
-      if (!skipEditorUpdate && !isImporting.value) {
+      if (!skipEditorUpdate && !isImportingLocal.value) {
         editorKey.value++; // Force editor to update only if not importing
       }
     };
+
+    const resolvedTabs = computed(
+      () =>
+        props.tabs ?? [
+          { label: t("common.fileUploadJsonTab"), value: "import_json_file", icon: "upload" },
+          { label: t("common.urlImportTab"), value: "import_json_url", icon: "link" },
+        ],
+    );
 
     // Computed styles
     const contentStyle = computed(() => {
@@ -380,7 +379,7 @@ export default defineComponent({
     };
 
     const handleImport = () => {
-      isImporting.value = true;
+      isImportingLocal.value = true;
       emit("import", {
         jsonStr: jsonStr.value,
         jsonArray: jsonArrayOfObj.value,
@@ -417,13 +416,13 @@ export default defineComponent({
                 try {
                   const parsedJson = JSON.parse(e.target.result);
                   // Convert to array if it's a single object
-                  const jsonArray = Array.isArray(parsedJson)
-                    ? parsedJson
-                    : [parsedJson];
+                  const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
                   resolve(jsonArray);
                 } catch (error) {
                   toast({
-                    message: `Error parsing JSON from file ${file.name}`,
+                    message: t("toastMessages.common.errorParsingJsonFromFile", {
+                      fileName: file.name,
+                    }),
                     variant: "error",
                   });
                   resolve([]);
@@ -451,35 +450,31 @@ export default defineComponent({
       try {
         if (newVal) {
           const response = await axios.get(newVal);
+          const contentType = response.headers["content-type"] as string | undefined;
 
           // Check if the response body is valid JSON
           try {
-            if (
-              response.headers["content-type"]?.includes("application/json") ||
-              response.headers["content-type"]?.includes("text/plain")
-            ) {
+            if (contentType?.includes("application/json") || contentType?.includes("text/plain")) {
               jsonStr.value = JSON.stringify(response.data, null, 2);
-              jsonArrayOfObj.value = Array.isArray(response.data)
-                ? response.data
-                : [response.data];
+              jsonArrayOfObj.value = Array.isArray(response.data) ? response.data : [response.data];
               emit("update:jsonStr", jsonStr.value);
               emit("update:jsonArray", jsonArrayOfObj.value);
             } else {
               toast({
-                message: "Invalid JSON format in the URL",
+                message: t("toastMessages.common.invalidJsonFormatInTheUrl"),
                 variant: "error",
               });
             }
           } catch (parseError) {
             toast({
-              message: "Invalid JSON format",
+              message: t("toastMessages.common.invalidJsonFormat"),
               variant: "error",
             });
           }
         }
       } catch (error) {
         toast({
-          message: "Error fetching data",
+          message: t("toastMessages.common.errorFetchingData"),
           variant: "error",
         });
       }
@@ -510,27 +505,29 @@ export default defineComponent({
           emit("update:jsonArray", newVal);
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Cleanup before component unmounts to prevent Monaco editor errors
     onBeforeUnmount(() => {
       // Stop any pending updates
-      isImporting.value = true;
+      isImportingLocal.value = true;
       // Clear the jsonStr to prevent Monaco from trying to update
       jsonStr.value = "";
     });
 
     return {
+      raw,
       t,
       jsonStr,
       jsonFiles,
       url,
       jsonArrayOfObj,
       activeTab,
+      resolvedTabs,
       splitterModel,
       editorKey,
-      isImporting,
+      isImportingLocal,
       handleBack,
       handleCancel,
       handleImport,
@@ -546,13 +543,14 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* keep(scrollbar): cross-file shared scroll container. .error-report-container
-   supplies overflow scrolling to BaseImport, ImportAlert.vue and
-   ImportPipeline.vue (those two carry no local overflow utility), so the rule
-   must stay an unscoped global rather than be inlined here. */
-.error-report-container {
-  overflow: auto;
+<style scoped>
+/* keep(lib-override:monaco): fixed Monaco height for the URL import editor.
+   Previously inherited from ImportDashboard.vue's global .editor-container-url
+   rule; now owned locally (via :deep to Monaco's DOM), same value/props, so the
+   editor no longer depends on that view having been mounted first. */
+.editor-container-url :deep(.monaco-editor) {
+  height: calc(100vh - 17.8125rem) !important;
+  overflow: hidden;
   resize: none;
 }
 </style>

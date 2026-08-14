@@ -51,23 +51,10 @@ const alerts = {
     }
     return http().get(url);
   },
-  create: (
-    org_identifier: string,
-    stream_name: string,
-    stream_type: string,
-    data: any,
-  ) => {
-    return http().post(
-      `/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`,
-      data,
-    );
+  create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
+    return http().post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data);
   },
-  update: (
-    org_identifier: string,
-    stream_name: string,
-    stream_type: string,
-    data: any,
-  ) => {
+  update: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http().put(
       `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
         data.name,
@@ -75,26 +62,13 @@ const alerts = {
       data,
     );
   },
-  get_with_name: (
-    org_identifier: string,
-    stream_name: string,
-    alert_name: string,
-  ) => {
+  get_with_name: (org_identifier: string, stream_name: string, alert_name: string) => {
     return http().get(
-      `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
-        alert_name,
-      )}`,
+      `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(alert_name)}`,
     );
   },
-  delete: (
-    org_identifier: string,
-    stream_name: string,
-    alert_name: string,
-    type: string,
-  ) => {
-    let url = `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
-      alert_name,
-    )}`;
+  delete: (org_identifier: string, stream_name: string, alert_name: string, type: string) => {
+    let url = `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(alert_name)}`;
     if (type != "") {
       url += "?type=" + type;
     }
@@ -138,11 +112,7 @@ const alerts = {
     }
     return http().put(url, data);
   },
-  delete_by_alert_id: (
-    org_identifier: string,
-    alert_id: string,
-    folder_id?: any,
-  ) => {
+  delete_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
@@ -175,11 +145,25 @@ const alerts = {
     }
     return http().delete(url, { data });
   },
-  get_by_alert_id: (
-    org_identifier: string,
-    alert_id: string,
-    folder_id?: any,
-  ) => {
+  /** Every alert attached to one SLO (Feature 5). Filters on the indexed
+   *  `slo_id` column server-side, and unlike the burn-pair lookup it includes
+   *  DISABLED alerts — the SLO page must show them so they can be re-enabled.
+   *
+   *  `alert_type=slo` is not redundant with `slo_id`. Omitted, the filter
+   *  defaults to `all`, and on enterprise builds `list_alerts` then APPENDS
+   *  every anomaly-detection config in the org to the response — those rows are
+   *  merged in after the SQL WHERE clause and so never saw the `slo_id`
+   *  predicate at all. Callers use this list to say how many alerts an SLO
+   *  delete destroys, and to show what is attached to an SLO; both would be
+   *  wrong. `AlertTypeFilter::Slo` is a real SQL predicate
+   *  (`SloId.is_not_null()`), and it also excludes the anomaly merge, which
+   *  only runs for `all` and `anomaly_detection`. */
+  list_by_slo: (org_identifier: string, slo_id: string) => {
+    return http().get(
+      `/api/v2/${org_identifier}/alerts?slo_id=${encodeURIComponent(slo_id)}&alert_type=slo`,
+    );
+  },
+  get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
@@ -187,11 +171,7 @@ const alerts = {
     return http().get(url);
   },
   //this endpoint is not used as we are using the common service to move the alerts across folders
-  move_to_another_folder: (
-    org_identifier: string,
-    data: any,
-    folder_id?: any,
-  ) => {
+  move_to_another_folder: (org_identifier: string, data: any, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/move`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
@@ -227,30 +207,23 @@ const alerts = {
     return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`);
   },
   previewSemanticGroupsDiff: (org_identifier: string, groups: any[]) => {
-    return http().post(`/api/${org_identifier}/alerts/deduplication/semantic-groups/preview-diff`, groups);
+    return http().post(
+      `/api/${org_identifier}/alerts/deduplication/semantic-groups/preview-diff`,
+      groups,
+    );
   },
   saveSemanticGroups: (org_identifier: string, groups: any[]) => {
     return http().put(`/api/${org_identifier}/alerts/deduplication/semantic-groups`, groups);
   },
-  trigger_alert: (
-    org_identifier: string,
-    alert_id: string,
-    folder_id?: string,
-  ) => {
+  trigger_alert: (org_identifier: string, alert_id: string, folder_id?: string) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}/trigger`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
     return http().patch(url);
   },
-  generate_sql: (
-    org_identifier: string,
-    data: any,
-  ) => {
-    return http().post(
-      `/api/v2/${org_identifier}/alerts/generate_sql`,
-      data,
-    );
+  generate_sql: (org_identifier: string, data: any) => {
+    return http().post(`/api/v2/${org_identifier}/alerts/generate_sql`, data);
   },
   // POST /api/v2/{org}/alerts/{id}/clone — clones regular alert or anomaly config
   clone_by_id: (
@@ -272,6 +245,28 @@ const alerts = {
   // PATCH /api/v2/{org}/alerts/{id}/retrain — triggers model retrain (anomaly configs only)
   retrain_by_id: (org_identifier: string, alert_id: string) => {
     return http().patch(`/api/v2/${org_identifier}/alerts/${alert_id}/retrain`);
+  },
+  // GET /api/v2/{org}/alerts/{id}/groups — per-group states of a multi-alert,
+  // most severe first, plus the PRE-cap counts the "N of M firing" chip needs.
+  // Empty list for alerts that have not opted in to per-group evaluation.
+  list_groups: (org_identifier: string, alert_id: string) => {
+    return http().get(`/api/v2/${org_identifier}/alerts/${alert_id}/groups`);
+  },
+  // GET /api/v2/{org}/alerts/{id}/groups/transitions — per-group level history
+  // (M-8). Reads the durable transitions table, not the triggers stream, so
+  // history survives a group being reaped. Omit group_key for every group.
+  list_group_transitions: (
+    org_identifier: string,
+    alert_id: string,
+    group_key?: string,
+    limit = 100,
+  ) => {
+    const params = new URLSearchParams();
+    if (group_key) params.append("group_key", group_key);
+    params.append("limit", String(limit));
+    return http().get(
+      `/api/v2/${org_identifier}/alerts/${alert_id}/groups/transitions?${params.toString()}`,
+    );
   },
 };
 

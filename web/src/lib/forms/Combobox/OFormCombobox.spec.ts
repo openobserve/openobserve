@@ -13,9 +13,7 @@ const items = [
 ];
 
 const driveSubmit = async (w: VueWrapper) => {
-  await (
-    w.vm as unknown as { form: { handleSubmit: () => Promise<unknown> } }
-  ).form.handleSubmit();
+  await (w.vm as unknown as { form: { handleSubmit: () => Promise<unknown> } }).form.handleSubmit();
   await flushPromises();
 };
 

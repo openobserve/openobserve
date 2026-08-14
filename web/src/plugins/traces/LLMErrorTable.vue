@@ -28,30 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   same stream query the trend panels use — with the agent filter applied.
 -->
 <template>
-  <div
-    ref="rootEl"
-    class="bg-card-glass-bg llm-trend-panel rounded-default flex flex-col overflow-hidden border border-border-default"
-  >
-    <!-- Padding lives on the header only, so the table spans edge-to-edge
-         (no left/right/bottom inset) and sits flush within the card. -->
-    <div
-      class="flex items-baseline justify-between mb-2 px-4 pt-4"
-    >
-      <div>
-        <div
-          class="text-sm font-semibold text-text-heading"
-        >
-          {{ displayTitle }}
-        </div>
-        <div
-          v-if="displaySubtitle"
-          class="text-2xs leading-normal mt-[0.1rem]"
-        >
-          {{ displaySubtitle }}
-        </div>
-      </div>
-    </div>
-
+  <!-- The table spans the card edge-to-edge (LLMPanelCard's body has no inset). -->
+  <LLMPanelCard ref="cardRef" :title="displayTitle" :subtitle="displaySubtitle || undefined">
     <OTable
       :data="rows"
       :columns="columns"
@@ -64,7 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       table-id="llm-recent-errors"
       show-index
       pagination="none"
-      :empty-message="panel.emptyStateText || t('traces.lLMErrorTable.noData')"
+      :empty-message="
+        panel.emptyStateKey ? t(panel.emptyStateKey) : t('traces.lLMErrorTable.noData')
+      "
       @row-click="onRowClick"
       data-test="llm-recent-errors-table"
       class="w-full"
@@ -87,20 +67,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span :title="value">{{ value }}</span>
       </template>
     </OTable>
-  </div>
+  </LLMPanelCard>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import LLMPanelCard from "./LLMPanelCard.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import {
-  type LLMPanelDef,
-  renderPanelSql,
-  panelI18nKey,
-} from "./config/llmInsightsPanels";
+import { type LLMPanelDef, renderPanelSql } from "./config/llmInsightsPanels";
 import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 // Shared in-memory cache (module singleton) — survives this table's remount on
@@ -129,13 +106,11 @@ const emit = defineEmits<{
   (e: "view-trace", traceId: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-// Title/subtitle come from the en.json `aiObservability.panels.<id>` copy.
-const displayTitle = computed(() => t(`${panelI18nKey(props.panel.id)}.title`));
-const displaySubtitle = computed(() =>
-  t(`${panelI18nKey(props.panel.id)}.subtitle`),
-);
+// Panel defs are a plain config module with no i18n context, so they carry keys.
+const displayTitle = computed(() => t(props.panel.titleKey));
+const displaySubtitle = computed(() => (props.panel.subtitleKey ? t(props.panel.subtitleKey) : ""));
 
 const store = useStore();
 const { executeQuery } = useLLMStreamQuery();
@@ -231,7 +206,8 @@ async function loadErrors() {
 // Defer the query until it scrolls into view, then refetch on input changes.
 // `needsReload` guards against refetching every time the panel re-enters the
 // viewport (scrolling back and forth) — only an input change re-arms it.
-const rootEl = ref<HTMLElement | null>(null);
+// Ref to the shared card so the lazy-load observer can watch its root element.
+const cardRef = ref<InstanceType<typeof LLMPanelCard> | null>(null);
 const isVisible = ref(false);
 const needsReload = ref(true);
 let observer: IntersectionObserver | null = null;
@@ -253,10 +229,12 @@ onMounted(() => {
     (entries) => {
       isVisible.value = entries[0].isIntersecting;
     },
+    // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
     { root: null, rootMargin: "200px", threshold: 0 },
   );
   setTimeout(() => {
-    if (rootEl.value) observer?.observe(rootEl.value);
+    const el = cardRef.value?.getRootEl();
+    if (el) observer?.observe(el);
   }, 0);
 });
 

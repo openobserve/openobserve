@@ -49,10 +49,10 @@ const createMockRouter = (routeName = "message-queues") => {
       { path: "/nats", name: "nats", component: { template: "<div/>" } },
     ],
   });
-  
+
   // Mock the push method
   router.push = vi.fn();
-  
+
   // Set current route
   router.currentRoute.value = {
     name: routeName,
@@ -65,7 +65,7 @@ const createMockRouter = (routeName = "message-queues") => {
     meta: {},
     redirectedFrom: undefined,
   };
-  
+
   return router;
 };
 
@@ -82,14 +82,13 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-
 describe("MessageQueues.vue", () => {
   let wrapper: any;
   let router: any;
 
   const createWrapper = (props = {}, routeName = "message-queues") => {
     router = createMockRouter(routeName);
-    
+
     return mount(MessageQueues, {
       props: {
         currOrgIdentifier: "test-org",
@@ -101,7 +100,7 @@ describe("MessageQueues.vue", () => {
           $t: (key: string) => key,
         },
         stubs: {
-          "OIcon": true,
+          OIcon: true,
           "router-view": true,
         },
       },
@@ -157,7 +156,7 @@ describe("MessageQueues.vue", () => {
   it("should redirect to rabbitmq route on beforeMount when current route is message-queues", async () => {
     wrapper = createWrapper({}, "message-queues");
     await flushPromises();
-    
+
     expect(router.push).toHaveBeenCalledWith({
       name: "rabbitmq",
       query: {
@@ -170,7 +169,7 @@ describe("MessageQueues.vue", () => {
   it("should not redirect on beforeMount when current route is not message-queues", async () => {
     wrapper = createWrapper({}, "rabbitmq");
     await flushPromises();
-    
+
     expect(router.push).not.toHaveBeenCalled();
   });
 
@@ -179,12 +178,12 @@ describe("MessageQueues.vue", () => {
     wrapper = createWrapper({}, "other-route");
     await flushPromises();
     vi.clearAllMocks();
-    
+
     // Simulate component update by forcing re-render with message-queues route
     wrapper.unmount();
     wrapper = createWrapper({}, "message-queues");
     await flushPromises();
-    
+
     expect(router.push).toHaveBeenCalledWith({
       name: "rabbitmq",
       query: {
@@ -209,20 +208,20 @@ describe("MessageQueues.vue", () => {
   // Test 17: ingestTabType reactivity
   it("should allow ingestTabType to be modified", async () => {
     wrapper = createWrapper();
-    
+
     wrapper.vm.ingestTabType = "kafka";
     await nextTick();
-    
+
     expect(wrapper.vm.ingestTabType).toBe("kafka");
   });
 
   // Test 18: Store selectedOrganization changes update currentOrgIdentifier
   it("should update currentOrgIdentifier when store selectedOrganization changes", async () => {
     wrapper = createWrapper();
-    
+
     store.state.selectedOrganization.identifier = "new-org";
     await nextTick();
-    
+
     // The ref should still hold the original value since it's initialized once
     expect(wrapper.vm.currentOrgIdentifier).toBe("test-org");
   });
@@ -269,10 +268,10 @@ describe("MessageQueues.vue", () => {
   // Test 26: tabs ref reactivity
   it("should allow tabs ref to be modified", async () => {
     wrapper = createWrapper();
-    
+
     wrapper.vm.tabs = "test-tabs";
     await nextTick();
-    
+
     expect(wrapper.vm.tabs).toBe("test-tabs");
   });
 
@@ -294,7 +293,7 @@ describe("MessageQueues.vue", () => {
     store.state.selectedOrganization.identifier = "query-test-org";
     wrapper = createWrapper({}, "message-queues");
     await flushPromises();
-    
+
     expect(router.push).toHaveBeenCalledWith({
       name: "rabbitmq",
       query: {
@@ -307,9 +306,9 @@ describe("MessageQueues.vue", () => {
   it("should maintain consistency with store state", () => {
     const testIdentifier = "consistency-test";
     store.state.selectedOrganization.identifier = testIdentifier;
-    
+
     wrapper = createWrapper();
-    
+
     // The currentOrgIdentifier ref should be initialized with store value
     expect(wrapper.vm.currentOrgIdentifier).toBe(testIdentifier);
   });
@@ -317,14 +316,14 @@ describe("MessageQueues.vue", () => {
   // Test 34: Navigation prevention for non-message-queues routes
   it("should not navigate when current route is not message-queues", async () => {
     const testRoutes = ["rabbitmq", "kafka", "nats", "dashboard", "logs"];
-    
+
     for (const routeName of testRoutes) {
       vi.clearAllMocks();
       wrapper = createWrapper({}, routeName);
       await flushPromises();
-      
+
       expect(router.push).not.toHaveBeenCalled();
-      
+
       if (wrapper) {
         wrapper.unmount();
       }
@@ -336,7 +335,7 @@ describe("MessageQueues.vue", () => {
     const { getImageURL } = await import("@/utils/zincutils");
     wrapper = createWrapper();
     await flushPromises();
-    
+
     expect(getImageURL).toHaveBeenCalledWith("images/ingestion/rabbitmq.svg");
     expect(getImageURL).toHaveBeenCalledWith("images/ingestion/kafka.svg");
     expect(getImageURL).toHaveBeenCalledWith("images/ingestion/nats.svg");

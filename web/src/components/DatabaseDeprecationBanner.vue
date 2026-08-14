@@ -19,23 +19,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="feature-card mb-3"
     v-if="showDeprecationWarning"
     role="region"
-    aria-label="MySQL deprecation warning"
+    :aria-label="t('components.databaseDeprecationBanner.ariaLabel')"
     data-test="database-deprecation-banner-message"
   >
     <div class="flex items-center">
       <div class="flex flex-col">
         <span
-          class="text-base font-semibold leading-6 text-text-heading"
+          class="text-text-heading text-base leading-6 font-semibold"
           data-test="database-deprecation-banner-title"
         >
-          ⚠️ MySQL support is DEPRECATED and will be removed in future.
+          {{ t("components.databaseDeprecationBanner.title") }}
         </span>
         <br />
         <span
-          class="text-sm font-normal leading-5 text-text-secondary"
+          class="text-text-secondary text-sm leading-5 font-normal"
           data-test="database-deprecation-banner-subtitle"
         >
-          Please migrate to PostgreSQL to ensure continued support.
+          {{ t("components.databaseDeprecationBanner.description") }}
         </span>
       </div>
       <div class="col-auto ml-2">
@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 
@@ -57,6 +58,7 @@ export default defineComponent({
   name: "DatabaseDeprecationBanner",
   components: { OButton },
   setup() {
+    const { t } = useI18nTyped();
     const store = useStore();
     const showDeprecationWarning = ref(false);
 
@@ -75,7 +77,7 @@ export default defineComponent({
           const dismissedDate = new Date(timestamp);
           const currentDate = new Date();
           const daysSinceDismissal = Math.floor(
-            (currentDate.getTime() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24)
+            (currentDate.getTime() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24),
           );
 
           // Show again if more than DISMISS_DURATION_DAYS have passed
@@ -104,6 +106,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       showDeprecationWarning,
       dismissWarning,
@@ -111,4 +114,3 @@ export default defineComponent({
   },
 });
 </script>
-

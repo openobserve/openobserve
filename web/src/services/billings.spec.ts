@@ -33,19 +33,17 @@ describe("Billings Service", () => {
         data: {
           threshold: 1000000,
           current_usage: 750000,
-          percentage_used: 75
-        }
+          percentage_used: 75,
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockQuotaThreshold)
+        get: vi.fn().mockResolvedValue(mockQuotaThreshold),
       } as any);
 
       const result = await billings.get_quota_threshold(mockOrgId);
 
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/quota_threshold`
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billings/quota_threshold`);
       expect(result).toEqual(mockQuotaThreshold);
     });
 
@@ -53,11 +51,11 @@ describe("Billings Service", () => {
       const mockError = new Error("Failed to fetch quota threshold");
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockRejectedValue(mockError)
+        get: vi.fn().mockRejectedValue(mockError),
       } as any);
 
       await expect(billings.get_quota_threshold(mockOrgId)).rejects.toThrow(
-        "Failed to fetch quota threshold"
+        "Failed to fetch quota threshold",
       );
     });
   });
@@ -67,26 +65,26 @@ describe("Billings Service", () => {
       const paymentData = {
         payment_method_id: "pm_123456",
         plan_id: "pro_plan",
-        customer_email: "test@example.com"
+        customer_email: "test@example.com",
       };
 
       const mockResponse = {
         data: {
           subscription_id: "sub_123456",
           status: "active",
-          current_period_end: "2024-12-31"
-        }
+          current_period_end: "2024-12-31",
+        },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockResolvedValue(mockResponse)
+        post: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.create_payment_subscribe(mockOrgId, paymentData);
 
       expect(mockHttp().post).toHaveBeenCalledWith(
         `/api/${mockOrgId}/billings/payment_source`,
-        paymentData
+        paymentData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -96,11 +94,11 @@ describe("Billings Service", () => {
       const mockError = new Error("Invalid payment method");
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockRejectedValue(mockError)
+        post: vi.fn().mockRejectedValue(mockError),
       } as any);
 
       await expect(billings.create_payment_subscribe(mockOrgId, paymentData)).rejects.toThrow(
-        "Invalid payment method"
+        "Invalid payment method",
       );
     });
   });
@@ -110,19 +108,17 @@ describe("Billings Service", () => {
       const mockResponse = {
         data: {
           message: "Successfully unsubscribed",
-          effective_date: "2024-01-31"
-        }
+          effective_date: "2024-01-31",
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.unsubscribe(mockOrgId);
 
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/unsubscribe`
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billings/unsubscribe`);
       expect(result).toEqual(mockResponse);
     });
   });
@@ -135,20 +131,18 @@ describe("Billings Service", () => {
             id: "sub_123",
             plan_name: "Pro Plan",
             status: "active",
-            current_period_end: "2024-12-31"
-          }
-        ]
+            current_period_end: "2024-12-31",
+          },
+        ],
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockSubscriptions)
+        get: vi.fn().mockResolvedValue(mockSubscriptions),
       } as any);
 
       const result = await billings.list_subscription(mockOrgId);
 
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/list_subscription`
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billings/list_subscription`);
       expect(result).toEqual(mockSubscriptions);
     });
   });
@@ -163,20 +157,18 @@ describe("Billings Service", () => {
             brand: "visa",
             last4: "4242",
             exp_month: 12,
-            exp_year: 2024
-          }
-        ]
+            exp_year: 2024,
+          },
+        ],
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockPaymentSources)
+        get: vi.fn().mockResolvedValue(mockPaymentSources),
       } as any);
 
       const result = await billings.list_paymentsources(mockOrgId);
 
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/list_paymentsource`
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billings/list_paymentsource`);
       expect(result).toEqual(mockPaymentSources);
     });
   });
@@ -187,19 +179,17 @@ describe("Billings Service", () => {
         data: {
           message: "Subscription resumed successfully",
           status: "active",
-          next_billing_date: "2024-02-01"
-        }
+          next_billing_date: "2024-02-01",
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.resume_subscription(mockOrgId);
 
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/resume_subscription`
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billings/resume_subscription`);
       expect(result).toEqual(mockResponse);
     });
   });
@@ -210,18 +200,18 @@ describe("Billings Service", () => {
       const mockResponse = {
         data: {
           hosted_url: "https://billing.example.com/subscribe/123",
-          expires_at: "2024-01-31T23:59:59Z"
-        }
+          expires_at: "2024-01-31T23:59:59Z",
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.get_hosted_url(mockOrgId, planName);
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/hosted_subscription_url?plan=${planName}`
+        `/api/${mockOrgId}/billings/hosted_subscription_url?plan=${planName}`,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -231,13 +221,13 @@ describe("Billings Service", () => {
       const encodedPlanName = "pro plan with spaces";
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: {} })
+        get: vi.fn().mockResolvedValue({ data: {} }),
       } as any);
 
       await billings.get_hosted_url(mockOrgId, planName);
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/hosted_subscription_url?plan=${encodedPlanName}`
+        `/api/${mockOrgId}/billings/hosted_subscription_url?plan=${encodedPlanName}`,
       );
     });
   });
@@ -248,18 +238,18 @@ describe("Billings Service", () => {
       const mockResponse = {
         data: {
           session_url: "https://billing.example.com/portal/session/123",
-          return_url: "https://app.example.com/billing"
-        }
+          return_url: "https://app.example.com/billing",
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.get_session_url(mockOrgId, customerId);
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/billing_portal?customer_id=${customerId}`
+        `/api/${mockOrgId}/billings/billing_portal?customer_id=${customerId}`,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -272,18 +262,18 @@ describe("Billings Service", () => {
         data: {
           id: hostedPageId,
           status: "completed",
-          subscription_id: "sub_123456"
-        }
+          subscription_id: "sub_123456",
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.retrieve_hosted_page(mockOrgId, hostedPageId);
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/hosted_page_status/${hostedPageId}`
+        `/api/${mockOrgId}/billings/hosted_page_status/${hostedPageId}`,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -295,18 +285,18 @@ describe("Billings Service", () => {
       const mockResponse = {
         data: {
           hosted_url: "https://billing.example.com/update-payment/123",
-          expires_at: "2024-01-31T23:59:59Z"
-        }
+          expires_at: "2024-01-31T23:59:59Z",
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.change_payment_detail(mockOrgId, hostedPageId);
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/change_payment_detail/${hostedPageId}`
+        `/api/${mockOrgId}/billings/change_payment_detail/${hostedPageId}`,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -322,20 +312,18 @@ describe("Billings Service", () => {
             currency: "usd",
             status: "paid",
             created_at: "2024-01-01T00:00:00Z",
-            pdf_url: "https://billing.example.com/invoices/inv_123.pdf"
-          }
-        ]
+            pdf_url: "https://billing.example.com/invoices/inv_123.pdf",
+          },
+        ],
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockInvoices)
+        get: vi.fn().mockResolvedValue(mockInvoices),
       } as any);
 
       const result = await billings.list_invoice_history(mockOrgId);
 
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/invoices`
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billings/invoices`);
       expect(result).toEqual(mockInvoices);
     });
   });
@@ -350,18 +338,18 @@ describe("Billings Service", () => {
           data_type: dataType,
           usage_bytes: 1024000000,
           usage_readable: "1.02 GB",
-          cost: 0.15
-        }
+          cost: 0.15,
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockUsage)
+        get: vi.fn().mockResolvedValue(mockUsage),
       } as any);
 
       const result = await billings.get_data_usage(mockOrgId, usageDate, dataType);
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`
+        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`,
       );
       expect(result).toEqual(mockUsage);
     });
@@ -371,14 +359,14 @@ describe("Billings Service", () => {
       const dataTypes = ["logs", "metrics", "traces"];
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: {} })
+        get: vi.fn().mockResolvedValue({ data: {} }),
       } as any);
 
       for (const dataType of dataTypes) {
         await billings.get_data_usage(mockOrgId, usageDate, dataType);
 
         expect(mockHttp().get).toHaveBeenCalledWith(
-          `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`
+          `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`,
         );
       }
 
@@ -391,13 +379,13 @@ describe("Billings Service", () => {
       const member = "child-org";
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: {} })
+        get: vi.fn().mockResolvedValue({ data: {} }),
       } as any);
 
       await billings.get_data_usage(mockOrgId, usageDate, dataType, member);
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}&member=${member}`
+        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}&member=${member}`,
       );
     });
 
@@ -406,13 +394,13 @@ describe("Billings Service", () => {
       const dataType = "gb";
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue({ data: {} })
+        get: vi.fn().mockResolvedValue({ data: {} }),
       } as any);
 
       await billings.get_data_usage(mockOrgId, usageDate, dataType, "");
 
       expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`
+        `/api/${mockOrgId}/billings/data_usage/${usageDate}?data_type=${dataType}`,
       );
     });
   });
@@ -421,82 +409,75 @@ describe("Billings Service", () => {
     it("list_billing_group_members should GET the members endpoint", async () => {
       const mockResponse = { data: [{ member_org_id: "child-1" }] };
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.list_billing_group_members(mockOrgId);
 
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billing_group/members`
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billing_group/members`);
       expect(result).toEqual(mockResponse);
     });
 
     it("get_billing_group_membership should GET the membership endpoint", async () => {
       const mockResponse = { data: { membership: null } };
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.get_billing_group_membership(mockOrgId);
 
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billing_group/membership`
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billing_group/membership`);
       expect(result).toEqual(mockResponse);
     });
 
     it("list_billing_group_invites should GET the invites endpoint", async () => {
       const mockResponse = { data: [] };
       mockHttp.mockReturnValue({
-        get: vi.fn().mockResolvedValue(mockResponse)
+        get: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.list_billing_group_invites(mockOrgId);
 
-      expect(mockHttp().get).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billing_group/invites`
-      );
+      expect(mockHttp().get).toHaveBeenCalledWith(`/api/${mockOrgId}/billing_group/invites`);
       expect(result).toEqual(mockResponse);
     });
 
     it("send_billing_group_invite should POST the invitee org id in the body", async () => {
       const inviteeOrgId = "invitee-org";
       mockHttp.mockReturnValue({
-        post: vi.fn().mockResolvedValue({ data: "successfully invited" })
+        post: vi.fn().mockResolvedValue({ data: "successfully invited" }),
       } as any);
 
       await billings.send_billing_group_invite(mockOrgId, inviteeOrgId);
 
-      expect(mockHttp().post).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billing_group/invites`,
-        { org_id: inviteeOrgId }
-      );
+      expect(mockHttp().post).toHaveBeenCalledWith(`/api/${mockOrgId}/billing_group/invites`, {
+        org_id: inviteeOrgId,
+      });
     });
 
     it("accept_billing_group_invite should POST to the accept endpoint with the token", async () => {
       const token = "invite-token-123";
       mockHttp.mockReturnValue({
-        post: vi.fn().mockResolvedValue({ data: "accepted" })
+        post: vi.fn().mockResolvedValue({ data: "accepted" }),
       } as any);
 
       await billings.accept_billing_group_invite(mockOrgId, token);
 
       expect(mockHttp().post).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billing_group/invites/${token}/accept`
+        `/api/${mockOrgId}/billing_group/invites/${token}/accept`,
       );
     });
 
     it("reject_billing_group_invite should DELETE the reject endpoint with the token", async () => {
       const token = "invite-token-456";
       mockHttp.mockReturnValue({
-        delete: vi.fn().mockResolvedValue({ data: "rejected" })
+        delete: vi.fn().mockResolvedValue({ data: "rejected" }),
       } as any);
 
       await billings.reject_billing_group_invite(mockOrgId, token);
 
       expect(mockHttp().delete).toHaveBeenCalledWith(
-        `/api/${mockOrgId}/billing_group/invites/${token}/reject`
+        `/api/${mockOrgId}/billing_group/invites/${token}/reject`,
       );
     });
   });
@@ -508,24 +489,24 @@ describe("Billings Service", () => {
         utm_medium: "cpc",
         utm_campaign: "winter_sale",
         referrer: "https://google.com",
-        user_agent: "Mozilla/5.0..."
+        user_agent: "Mozilla/5.0...",
       };
 
       const mockResponse = {
         data: {
-          message: "User attribution info saved successfully"
-        }
+          message: "User attribution info saved successfully",
+        },
       };
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockResolvedValue(mockResponse)
+        post: vi.fn().mockResolvedValue(mockResponse),
       } as any);
 
       const result = await billings.submit_new_user_info(mockOrgId, userInfoPayload);
 
       expect(mockHttp().post).toHaveBeenCalledWith(
         `/api/${mockOrgId}/billings/new_user_attribution`,
-        userInfoPayload
+        userInfoPayload,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -535,11 +516,11 @@ describe("Billings Service", () => {
       const mockError = new Error("Invalid attribution data");
 
       mockHttp.mockReturnValue({
-        post: vi.fn().mockRejectedValue(mockError)
+        post: vi.fn().mockRejectedValue(mockError),
       } as any);
 
       await expect(billings.submit_new_user_info(mockOrgId, userInfoPayload)).rejects.toThrow(
-        "Invalid attribution data"
+        "Invalid attribution data",
       );
     });
   });
@@ -547,27 +528,33 @@ describe("Billings Service", () => {
   describe("Error Handling", () => {
     it("should handle network errors across all methods", async () => {
       const networkError = new Error("Network connection failed");
-      
+
       mockHttp.mockReturnValue({
         get: vi.fn().mockRejectedValue(networkError),
-        post: vi.fn().mockRejectedValue(networkError)
+        post: vi.fn().mockRejectedValue(networkError),
       } as any);
 
-      await expect(billings.get_quota_threshold(mockOrgId)).rejects.toThrow("Network connection failed");
-      await expect(billings.list_subscription(mockOrgId)).rejects.toThrow("Network connection failed");
-      await expect(billings.create_payment_subscribe(mockOrgId, {})).rejects.toThrow("Network connection failed");
+      await expect(billings.get_quota_threshold(mockOrgId)).rejects.toThrow(
+        "Network connection failed",
+      );
+      await expect(billings.list_subscription(mockOrgId)).rejects.toThrow(
+        "Network connection failed",
+      );
+      await expect(billings.create_payment_subscribe(mockOrgId, {})).rejects.toThrow(
+        "Network connection failed",
+      );
     });
 
     it("should handle HTTP error responses", async () => {
       const httpError = {
         response: {
           status: 402,
-          data: { message: "Payment required" }
-        }
+          data: { message: "Payment required" },
+        },
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn().mockRejectedValue(httpError)
+        get: vi.fn().mockRejectedValue(httpError),
       } as any);
 
       await expect(billings.get_quota_threshold(mockOrgId)).rejects.toEqual(httpError);
@@ -577,13 +564,13 @@ describe("Billings Service", () => {
       const serviceError = {
         response: {
           status: 503,
-          data: { message: "Billing service temporarily unavailable" }
-        }
+          data: { message: "Billing service temporarily unavailable" },
+        },
       };
 
       mockHttp.mockReturnValue({
         get: vi.fn().mockRejectedValue(serviceError),
-        post: vi.fn().mockRejectedValue(serviceError)
+        post: vi.fn().mockRejectedValue(serviceError),
       } as any);
 
       await expect(billings.list_subscription(mockOrgId)).rejects.toEqual(serviceError);
@@ -595,16 +582,17 @@ describe("Billings Service", () => {
     it("should handle complete billing workflow", async () => {
       const paymentData = {
         payment_method_id: "pm_123456",
-        plan_id: "pro_plan"
+        plan_id: "pro_plan",
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn()
+        get: vi
+          .fn()
           .mockResolvedValueOnce({ data: { threshold: 1000000 } }) // get_quota_threshold
           .mockResolvedValueOnce({ data: [] }) // list_subscription
           .mockResolvedValueOnce({ data: "https://billing.example.com" }) // get_hosted_url
           .mockResolvedValueOnce({ data: [{ id: "inv_123" }] }), // list_invoice_history
-        post: vi.fn().mockResolvedValue({ data: { subscription_id: "sub_123" } }) // create_payment_subscribe
+        post: vi.fn().mockResolvedValue({ data: { subscription_id: "sub_123" } }), // create_payment_subscribe
       } as any);
 
       // Check quota threshold
@@ -632,21 +620,22 @@ describe("Billings Service", () => {
       const usageDate = "2024-01-01";
       const userInfo = {
         utm_source: "organic",
-        utm_medium: "search"
+        utm_medium: "search",
       };
 
       mockHttp.mockReturnValue({
-        get: vi.fn()
+        get: vi
+          .fn()
           .mockResolvedValueOnce({ data: { usage_bytes: 500000000 } }) // get_data_usage logs
           .mockResolvedValueOnce({ data: { usage_bytes: 100000000 } }) // get_data_usage metrics
           .mockResolvedValueOnce({ data: { threshold: 1000000000, current_usage: 600000000 } }), // get_quota_threshold
-        post: vi.fn().mockResolvedValue({ data: { message: "Attribution saved" } }) // submit_new_user_info
+        post: vi.fn().mockResolvedValue({ data: { message: "Attribution saved" } }), // submit_new_user_info
       } as any);
 
       // Get usage for different data types
       const logsUsage = await billings.get_data_usage(mockOrgId, usageDate, "logs");
       const metricsUsage = await billings.get_data_usage(mockOrgId, usageDate, "metrics");
-      
+
       expect(logsUsage.data.usage_bytes).toBe(500000000);
       expect(metricsUsage.data.usage_bytes).toBe(100000000);
 

@@ -15,29 +15,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Copy/paste setup for connecting an MCP client to OpenObserve's INBOUND
-  (Enterprise-only) MCP server at /api/{org}/mcp.
+  Copy/paste setup for connecting an MCP client to OpenObserve's INBOUND MCP
+  server at /api/{org}/mcp, which every edition serves.
 
   Two authentication paths:
    • OAuth (default) — the client signs in via the browser (Dex). The snippet is
      just the URL, no header; the server's OAuth discovery drives the login.
+     Enterprise/Cloud only: the discovery endpoints are compiled out of the OSS
+     build (they 404), so the tab is hidden there and token mode is the default.
    • Access token — Basic auth. Defaults to the user's own credentials
      ([BASIC_PASSCODE], masked by CopyContent) as a quick start; a one-click
      "Generate" creates a scoped, read-only service account and injects its
-     show-once token into every snippet.
+     show-once token into every snippet. The generate button additionally needs
+     rbac + service accounts (see useMcpCredential), so on OSS the quick-start
+     passcode is the only path — which works, and the snippets are identical.
 
   Each client's config is produced by a single build(endpoint, auth) function so
   the OAuth (auth=null → no header) and token variants can never drift.
 -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import CopyContent from "@/components/CopyContent.vue";
 import type { CardSubstitutions } from "./content/renderMarkdown";
 import { safeHttpUrl } from "./content/renderMarkdown";
 import { b64EncodeStandard } from "@/utils/zincutils";
+import config from "@/aws-exports";
 import { useMcpCredential } from "@/composables/useMcpCredential";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -49,18 +54,20 @@ const props = defineProps<{
   docUrl?: string;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
-const { generate, generating, error: genError, credential, canGenerate } =
-  useMcpCredential();
+const { generate, generating, error: genError, credential, canGenerate } = useMcpCredential();
 
-const endpoint = computed(
-  () => `${props.subs.url}/api/${props.subs.org}/mcp`,
-);
+const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
 
-// "oauth" (default, recommended) | "token".
-const authMode = ref<"oauth" | "token">("oauth");
+// OAuth discovery (/.well-known/…) is compiled out of the OSS build, so the
+// browser sign-in flow can only work on enterprise/cloud. Elsewhere the tab is
+// hidden and token mode is the only — and default — path.
+const oauthAvailable = config.isEnterprise == "true" || config.isCloud == "true";
+
+// "oauth" (default, recommended where available) | "token".
+const authMode = ref<"oauth" | "token">(oauthAvailable ? "oauth" : "token");
 
 // The Authorization header VALUE injected into token-mode snippets:
 //  • generated credential → real base64(email:token), shown once;
@@ -69,22 +76,16 @@ const authMode = ref<"oauth" | "token">("oauth");
 // OAuth mode passes null so build() omits the header entirely.
 const tokenAuthValue = computed(() => {
   if (credential.value) {
-    return `Basic ${b64EncodeStandard(
-      `${credential.value.email}:${credential.value.token}`,
-    )}`;
+    return `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`;
   }
   return "Basic [BASIC_PASSCODE]";
 });
-const authValue = computed(() =>
-  authMode.value === "oauth" ? null : tokenAuthValue.value,
-);
+const authValue = computed(() => (authMode.value === "oauth" ? null : tokenAuthValue.value));
 
 // The `Basic <base64>` line for the generated credential's reveal + download.
 const credentialHeader = computed(() =>
   credential.value
-    ? `Basic ${b64EncodeStandard(
-        `${credential.value.email}:${credential.value.token}`,
-      )}`
+    ? `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`
     : "",
 );
 
@@ -103,13 +104,13 @@ const mcpServersUrl = (ep: string, auth: string | null) => `{
   "mcpServers": {
     "openobserve": {
       "url": "${ep}"${
-  auth
-    ? `,
+        auth
+          ? `,
       "headers": {
         "Authorization": "${auth}"
       }`
-    : ``
-}
+          : ``
+      }
     }
   }
 }`;
@@ -161,13 +162,13 @@ http_headers = { "Authorization" = "${auth}" }`
     "openobserve": {
       "type": "http",
       "url": "${ep}"${
-      auth
-        ? `,
+        auth
+          ? `,
       "headers": {
         "Authorization": "${auth}"
       }`
-        : ``
-    }
+          : ``
+      }
     }
   }
 }`,
@@ -199,13 +200,13 @@ Authentication: OAuth (sign in when prompted)`,
   "mcpServers": {
     "openobserve": {
       "serverUrl": "${ep}"${
-      auth
-        ? `,
+        auth
+          ? `,
       "headers": {
         "Authorization": "${auth}"
       }`
-        : ``
-    }
+          : ``
+      }
     }
   }
 }`,
@@ -269,9 +270,7 @@ const selectedClient = ref("claudeCode");
 const activeClient = computed(
   () => CLIENTS.find((c) => c.id === selectedClient.value) ?? CLIENTS[0],
 );
-const activeConfig = computed(() =>
-  activeClient.value.build(endpoint.value, authValue.value),
-);
+const activeConfig = computed(() => activeClient.value.build(endpoint.value, authValue.value));
 const activeDeepLink = computed(
   () => activeClient.value.deepLink?.(endpoint.value, authValue.value) ?? null,
 );
@@ -320,22 +319,19 @@ const openDocs = () => {
     <div class="flex flex-col gap-1">
       <h2 class="text-lg font-semibold">{{ t("ingestion.mcp.name") }}</h2>
       <p class="text-text-secondary">{{ t("ingestion.mcp.tagline") }}</p>
-      <div class="flex items-center gap-1 text-text-secondary">
-        <OIcon name="workspace-premium" size="sm" />
-        <span>{{ t("ingestion.mcp.enterpriseNote") }}</span>
-      </div>
     </div>
 
     <!-- Endpoint -->
     <div class="flex flex-col gap-2">
       <div class="font-semibold">{{ t("ingestion.mcp.endpointLabel") }}</div>
-      <CopyContent :content="endpoint" />
+      <CopyContent :content="raw(endpoint)" />
     </div>
 
     <!-- Authentication method -->
     <div class="flex flex-col gap-2">
       <div class="font-semibold">{{ t("ingestion.mcp.authLabel") }}</div>
-      <OTabs v-model="authMode" dense>
+      <!-- Without OAuth there is only one method, so the picker is just noise. -->
+      <OTabs v-if="oauthAvailable" v-model="authMode" dense>
         <OTab
           name="oauth"
           :label="t('ingestion.mcp.auth.oauth')"
@@ -355,7 +351,7 @@ const openDocs = () => {
     <!-- Token mode: credential management -->
     <div
       v-if="authMode === 'token'"
-      class="rounded-surface border border-border-default bg-surface-panel p-3 flex flex-col gap-3"
+      class="rounded-surface border-border-default bg-surface-panel flex flex-col gap-3 border p-3"
       data-test="ai-integrations-mcp-credential"
     >
       <!-- Before generation: quick-start note + generate button -->
@@ -396,7 +392,7 @@ const openDocs = () => {
         <p class="text-text-secondary">
           {{ t("ingestion.mcp.credential.shownOnce", { email: credential.email }) }}
         </p>
-        <CopyContent :content="credentialHeader" />
+        <CopyContent :content="raw(credentialHeader)" />
         <div class="flex gap-2">
           <OButton
             variant="outline"
@@ -462,13 +458,13 @@ const openDocs = () => {
           }}
         </OButton>
       </div>
-      <CopyContent :content="activeConfig" />
+      <CopyContent :content="raw(activeConfig)" />
     </div>
 
     <!-- Security note (token mode only) -->
     <div
       v-if="authMode === 'token'"
-      class="rounded-surface border border-border-default bg-surface-panel p-3 flex gap-2"
+      class="rounded-surface border-border-default bg-surface-panel flex gap-2 border p-3"
       data-test="ai-integrations-mcp-security"
     >
       <OIcon name="shield" size="sm" class="mt-0.5 shrink-0" />

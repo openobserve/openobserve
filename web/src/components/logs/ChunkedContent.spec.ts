@@ -21,7 +21,6 @@ import ChunkedContent from "./ChunkedContent.vue";
 // Component uses useI18n(); provide the app i18n plugin for all mounts.
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
-
 const {
   mockInitializeChunk,
   mockGetVisibleContent,
@@ -92,11 +91,7 @@ describe("ChunkedContent", () => {
       });
 
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="logs-chunked-content-container"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="logs-chunked-content-container"]').exists()).toBe(true);
     });
 
     it("should render LogsHighLighting stub", async () => {

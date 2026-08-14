@@ -68,6 +68,22 @@ const stub = (name: string, props: string[] = []) => ({
   template: `<div class="${name}" />`,
 });
 
+// The real DateTime picker emits `on:date-change` on mount with the initial range —
+// the panel's FIRST fetch rides on that emit (NOT an immediate watch, which would
+// double-fetch). Mirror it so the mount-fetch fires in tests.
+const DateTimeStub = {
+  name: "DateTime",
+  emits: ["on:date-change"],
+  template: `<div class="DateTime" />`,
+  mounted() {
+    (this as any).$emit("on:date-change", {
+      startTime: 1000,
+      endTime: 2000,
+      relativeTimePeriod: "15m",
+    });
+  },
+};
+
 import { describe, it, expect, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
@@ -82,7 +98,7 @@ const globalCfg = {
     OBadge: stub("OBadge", ["variant", "size"]),
     OButton: stub("OButton", ["variant", "size", "iconLeft", "loading"]),
     OTooltip: stub("OTooltip", ["side", "content"]),
-    DateTime: stub("DateTime"),
+    DateTime: DateTimeStub,
     WorkflowExecutionTimeline: stub("WorkflowExecutionTimeline", [
       "history",
       "firingLabel",
@@ -111,6 +127,14 @@ describe("WorkflowRunsPanel", () => {
     expect(wrapper.findComponent(OTableStub as any).exists()).toBe(true);
   });
 
+  it("fetches history EXACTLY ONCE on mount (no immediate-watch double-fetch)", async () => {
+    mockList.mockResolvedValue({ data: [] });
+    mountPanel();
+    await flushPromises();
+    // Only the DateTime picker's on-mount emit fetches — not a second immediate watch.
+    expect(mockList).toHaveBeenCalledTimes(1);
+  });
+
   it("emits select-run with the clicked run's id", async () => {
     const wrapper = mountPanel();
     await flushPromises();
@@ -123,9 +147,9 @@ describe("WorkflowRunsPanel", () => {
   it("highlights the selected run row via rowClass", async () => {
     const wrapper = mountPanel({ selectedRunId: "run-2" });
     await flushPromises();
-    const rowClass = wrapper
-      .findComponent(OTableStub as any)
-      .props("rowClass") as (row: any) => string;
+    const rowClass = wrapper.findComponent(OTableStub as any).props("rowClass") as (
+      row: any,
+    ) => string;
 
     expect(rowClass({ run_id: "run-2" })).toBe("bg-select-item-hover-bg!");
     expect(rowClass({ run_id: "run-9" })).toBe("");

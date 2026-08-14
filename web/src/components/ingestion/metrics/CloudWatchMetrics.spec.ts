@@ -18,14 +18,13 @@ import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import CloudWatchMetrics from "@/components/ingestion/metrics/CloudWatchMetrics.vue";
 
-
 // Mock CopyContent component
 vi.mock("@/components/CopyContent.vue", () => ({
   default: {
     name: "CopyContent",
     props: ["content"],
-    template: "<div class='copy-content-mock'>{{ content }}</div>"
-  }
+    template: "<div class='copy-content-mock'>{{ content }}</div>",
+  },
 }));
 
 // Mock the utility functions
@@ -49,16 +48,16 @@ vi.mock("../../../aws-exports", () => ({
 }));
 
 const mockStore = createStore({
-  state: {  
+  state: {
     organizationPasscode: 11,
     API_ENDPOINT: "http://localhost:5080",
     selectedOrganization: {
       identifier: "test_org_123",
-      name: "Test Organization"
+      name: "Test Organization",
     },
     zoConfig: {
-      ingestion_url: ""
-    }
+      ingestion_url: "",
+    },
   },
 });
 
@@ -75,8 +74,8 @@ describe("CloudWatchMetrics", () => {
       global: {
         plugins: [customStore],
         mocks: {
-          $store: customStore
-        }
+          $store: customStore,
+        },
       },
     });
   };
@@ -98,21 +97,21 @@ describe("CloudWatchMetrics", () => {
 
     it("should render CopyContent component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.find('.copy-content-mock');
+      const copyContent = wrapper.find(".copy-content-mock");
       expect(copyContent.exists()).toBe(true);
     });
 
     it("should have correct component structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.p-3').exists()).toBe(true);
-      expect(wrapper.find('.copy-content-container-cls').exists()).toBe(true);
+      expect(wrapper.find(".p-3").exists()).toBe(true);
+      expect(wrapper.find(".copy-content-container-cls").exists()).toBe(true);
     });
 
     it("should render AWS documentation link", () => {
       wrapper = createWrapper();
       const link = wrapper.find('a[href*="aws.amazon.com"]');
       expect(link.exists()).toBe(true);
-      expect(link.attributes('target')).toBe('_blank');
+      expect(link.attributes("target")).toBe("_blank");
     });
   });
 
@@ -140,9 +139,9 @@ describe("CloudWatchMetrics", () => {
     });
 
     it("should handle empty string props", () => {
-      wrapper = createWrapper({ 
+      wrapper = createWrapper({
         currOrgIdentifier: "",
-        currUserEmail: ""
+        currUserEmail: "",
       });
       expect(wrapper.props().currOrgIdentifier).toBe("");
       expect(wrapper.props().currUserEmail).toBe("");
@@ -160,10 +159,10 @@ describe("CloudWatchMetrics", () => {
     it("should validate prop types", () => {
       wrapper = createWrapper({
         currOrgIdentifier: "test_org",
-        currUserEmail: "test@example.com"
+        currUserEmail: "test@example.com",
       });
-      expect(typeof wrapper.props().currOrgIdentifier).toBe('string');
-      expect(typeof wrapper.props().currUserEmail).toBe('string');
+      expect(typeof wrapper.props().currOrgIdentifier).toBe("string");
+      expect(typeof wrapper.props().currUserEmail).toBe("string");
     });
   });
 
@@ -192,7 +191,7 @@ describe("CloudWatchMetrics", () => {
           selectedOrganization: { identifier: "fallback_org" },
         },
       });
-      
+
       wrapper = createWrapper({}, storeWithoutOrg);
       expect(wrapper.exists()).toBe(true);
     });
@@ -217,11 +216,11 @@ describe("CloudWatchMetrics", () => {
     it("should have correct endpoint structure", () => {
       wrapper = createWrapper();
       const endpoint = wrapper.vm.endpoint;
-      expect(endpoint).toHaveProperty('url');
-      expect(endpoint).toHaveProperty('host');
-      expect(endpoint).toHaveProperty('port');
-      expect(endpoint).toHaveProperty('protocol');
-      expect(endpoint).toHaveProperty('tls');
+      expect(endpoint).toHaveProperty("url");
+      expect(endpoint).toHaveProperty("host");
+      expect(endpoint).toHaveProperty("port");
+      expect(endpoint).toHaveProperty("protocol");
+      expect(endpoint).toHaveProperty("tls");
     });
 
     it("should handle different endpoint configurations", () => {
@@ -237,18 +236,18 @@ describe("CloudWatchMetrics", () => {
     it("should validate endpoint host", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.endpoint.host).toBeTruthy();
-      expect(typeof wrapper.vm.endpoint.host).toBe('string');
+      expect(typeof wrapper.vm.endpoint.host).toBe("string");
     });
 
     it("should validate endpoint port", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.endpoint.port).toBeTruthy();
-      expect(typeof wrapper.vm.endpoint.port).toBe('string');
+      expect(typeof wrapper.vm.endpoint.port).toBe("string");
     });
 
     it("should validate endpoint protocol", () => {
       wrapper = createWrapper();
-      expect(['http', 'https']).toContain(wrapper.vm.endpoint.protocol);
+      expect(["http", "https"]).toContain(wrapper.vm.endpoint.protocol);
     });
   });
 
@@ -272,22 +271,22 @@ describe("CloudWatchMetrics", () => {
 
     it("should include cloudwatch_metrics path", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.content).toContain('cloudwatch_metrics');
+      expect(wrapper.vm.content).toContain("cloudwatch_metrics");
     });
 
     it("should include kinesis_firehose path", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.content).toContain('_kinesis_firehose');
+      expect(wrapper.vm.content).toContain("_kinesis_firehose");
     });
 
     it("should include AWS path prefix", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.content).toContain('/aws/');
+      expect(wrapper.vm.content).toContain("/aws/");
     });
 
     it("should include access key placeholder", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.content).toContain('[BASIC_PASSCODE]');
+      expect(wrapper.vm.content).toContain("[BASIC_PASSCODE]");
     });
 
     it("should format content correctly", () => {
@@ -301,10 +300,10 @@ describe("CloudWatchMetrics", () => {
       const storeWithDifferentOrg = createStore({
         state: {
           selectedOrganization: { identifier: "different_org_456" },
-          API_ENDPOINT: "http://localhost:5080"
+          API_ENDPOINT: "http://localhost:5080",
         },
       });
-      
+
       wrapper = createWrapper({}, storeWithDifferentOrg);
       expect(wrapper.vm.content).toContain("/different_org_456/");
     });
@@ -314,7 +313,7 @@ describe("CloudWatchMetrics", () => {
     it("should expose getImageURL function", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.getImageURL).toBeDefined();
-      expect(typeof wrapper.vm.getImageURL).toBe('function');
+      expect(typeof wrapper.vm.getImageURL).toBe("function");
     });
 
     it("should call getImageURL function correctly", () => {
@@ -334,9 +333,9 @@ describe("CloudWatchMetrics", () => {
       wrapper = createWrapper();
       // getEndPoint should be called during component setup
       expect(wrapper.vm.endpoint).toBeDefined();
-      expect(wrapper.vm.endpoint).toHaveProperty('url');
-      expect(wrapper.vm.endpoint).toHaveProperty('host');
-      expect(wrapper.vm.endpoint).toHaveProperty('port');
+      expect(wrapper.vm.endpoint).toHaveProperty("url");
+      expect(wrapper.vm.endpoint).toHaveProperty("host");
+      expect(wrapper.vm.endpoint).toHaveProperty("port");
     });
   });
 
@@ -353,27 +352,27 @@ describe("CloudWatchMetrics", () => {
 
     it("should validate config structure", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.config).toHaveProperty('aws_project_region');
-      expect(wrapper.vm.config).toHaveProperty('aws_appsync_graphqlEndpoint');
+      expect(wrapper.vm.config).toHaveProperty("aws_project_region");
+      expect(wrapper.vm.config).toHaveProperty("aws_appsync_graphqlEndpoint");
     });
   });
 
   describe("CopyContent Component Integration", () => {
     it("should pass content to CopyContent component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.find('.copy-content-mock');
+      const copyContent = wrapper.find(".copy-content-mock");
       expect(copyContent.text()).toContain("HTTP Endpoint:");
     });
 
     it("should render CopyContent with correct classes", () => {
       wrapper = createWrapper();
-      const copyContentContainer = wrapper.find('.copy-content-container-cls');
+      const copyContentContainer = wrapper.find(".copy-content-container-cls");
       expect(copyContentContainer.exists()).toBe(true);
     });
 
     it("should pass correct content format to CopyContent", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.find('.copy-content-mock');
+      const copyContent = wrapper.find(".copy-content-mock");
       expect(copyContent.text()).toMatch(/HTTP Endpoint: .+/);
       expect(copyContent.text()).toMatch(/Access Key: .+/);
     });
@@ -398,41 +397,41 @@ describe("CloudWatchMetrics", () => {
   describe("Template Rendering", () => {
     it("should render main container with correct classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('.p-3');
+      const container = wrapper.find(".p-3");
       expect(container.exists()).toBe(true);
     });
 
     it("should render only one CopyContent component", () => {
       wrapper = createWrapper();
-      const copyComponents = wrapper.findAll('.copy-content-mock');
+      const copyComponents = wrapper.findAll(".copy-content-mock");
       expect(copyComponents).toHaveLength(1);
     });
 
     it("should render AWS documentation link with correct attributes", () => {
       wrapper = createWrapper();
       const link = wrapper.find('a[href*="aws.amazon.com"]');
-      expect(link.attributes('target')).toBe('_blank');
-      expect(link.attributes('class')).toContain('text-text-link');
-      expect(link.attributes('class')).toContain('underline');
+      expect(link.attributes("target")).toBe("_blank");
+      expect(link.attributes("class")).toContain("text-text-link");
+      expect(link.attributes("class")).toContain("underline");
     });
 
     it("should render documentation link text", () => {
       wrapper = createWrapper();
       const link = wrapper.find('a[href*="aws.amazon.com"]');
-      expect(link.text()).toContain('here');
-      expect(wrapper.text()).toContain('Click');
+      expect(link.text()).toContain("here");
+      expect(wrapper.text()).toContain("Click");
     });
 
     it("should render instructional text", () => {
       wrapper = createWrapper();
-      expect(wrapper.text()).toContain('to explore the process of setting up');
-      expect(wrapper.text()).toContain('CloudWatch custom metric stream');
-      expect(wrapper.text()).toContain('Data Firehose to OpenObserve');
+      expect(wrapper.text()).toContain("to explore the process of setting up");
+      expect(wrapper.text()).toContain("CloudWatch custom metric stream");
+      expect(wrapper.text()).toContain("Data Firehose to OpenObserve");
     });
 
     it("should render note about output availability", () => {
       wrapper = createWrapper();
-      const note = wrapper.find('.italic');
+      const note = wrapper.find(".italic");
       expect(note.exists()).toBe(true);
       expect(note.text()).toContain("Note: Output is available under Logs");
       expect(note.text()).toContain("cloudwatch_metrics");
@@ -443,7 +442,9 @@ describe("CloudWatchMetrics", () => {
     it("should have correct endpoint URL structure", () => {
       wrapper = createWrapper();
       const content = wrapper.vm.content;
-      expect(content).toMatch(/HTTP Endpoint: https?:\/\/.+\/aws\/.+\/cloudwatch_metrics\/_kinesis_firehose/);
+      expect(content).toMatch(
+        /HTTP Endpoint: https?:\/\/.+\/aws\/.+\/cloudwatch_metrics\/_kinesis_firehose/,
+      );
     });
 
     it("should include proper AWS path structure", () => {
@@ -481,10 +482,10 @@ describe("CloudWatchMetrics", () => {
       const storeWithEmptyOrg = createStore({
         state: {
           selectedOrganization: { identifier: "" },
-          API_ENDPOINT: "http://localhost:5080"
+          API_ENDPOINT: "http://localhost:5080",
         },
       });
-      
+
       wrapper = createWrapper({}, storeWithEmptyOrg);
       expect(wrapper.exists()).toBe(true);
     });
@@ -493,10 +494,10 @@ describe("CloudWatchMetrics", () => {
       const storeWithoutIdentifier = createStore({
         state: {
           selectedOrganization: {},
-          API_ENDPOINT: "http://localhost:5080"
+          API_ENDPOINT: "http://localhost:5080",
         },
       });
-      
+
       wrapper = createWrapper({}, storeWithoutIdentifier);
       expect(wrapper.exists()).toBe(true);
     });
@@ -519,12 +520,12 @@ describe("CloudWatchMetrics", () => {
 
     it("should expose endpoint property", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.endpoint).toHaveProperty('url');
+      expect(wrapper.vm.endpoint).toHaveProperty("url");
     });
 
     it("should expose content property", () => {
       wrapper = createWrapper();
-      expect(typeof wrapper.vm.content).toBe('string');
+      expect(typeof wrapper.vm.content).toBe("string");
     });
   });
 
@@ -534,7 +535,7 @@ describe("CloudWatchMetrics", () => {
       const storeWithLongOrg = createStore({
         state: {
           selectedOrganization: { identifier: longOrgId },
-          API_ENDPOINT: "http://localhost:5080"
+          API_ENDPOINT: "http://localhost:5080",
         },
       });
       wrapper = createWrapper({ currOrgIdentifier: longOrgId }, storeWithLongOrg);
@@ -547,7 +548,7 @@ describe("CloudWatchMetrics", () => {
       const storeWithSpecialOrg = createStore({
         state: {
           selectedOrganization: { identifier: specialOrgId },
-          API_ENDPOINT: "http://localhost:5080"
+          API_ENDPOINT: "http://localhost:5080",
         },
       });
       wrapper = createWrapper({ currOrgIdentifier: specialOrgId }, storeWithSpecialOrg);
@@ -558,7 +559,7 @@ describe("CloudWatchMetrics", () => {
     it("should handle special characters in props", () => {
       wrapper = createWrapper({
         currOrgIdentifier: "org-with-special_chars@123",
-        currUserEmail: "user+test@example-domain.co.uk"
+        currUserEmail: "user+test@example-domain.co.uk",
       });
       expect(wrapper.exists()).toBe(true);
     });
@@ -568,7 +569,7 @@ describe("CloudWatchMetrics", () => {
       const storeWithNumericOrg = createStore({
         state: {
           selectedOrganization: { identifier: numericOrgId },
-          API_ENDPOINT: "http://localhost:5080"
+          API_ENDPOINT: "http://localhost:5080",
         },
       });
       wrapper = createWrapper({ currOrgIdentifier: numericOrgId }, storeWithNumericOrg);
@@ -580,7 +581,7 @@ describe("CloudWatchMetrics", () => {
       const storeWithMixedCase = createStore({
         state: {
           selectedOrganization: { identifier: mixedCaseOrgId },
-          API_ENDPOINT: "http://localhost:5080"
+          API_ENDPOINT: "http://localhost:5080",
         },
       });
       wrapper = createWrapper({ currOrgIdentifier: mixedCaseOrgId }, storeWithMixedCase);
@@ -600,7 +601,7 @@ describe("CloudWatchMetrics", () => {
       wrapper = createWrapper();
       const initialContent = wrapper.vm.content;
       const initialEndpoint = wrapper.vm.endpoint;
-      
+
       expect(wrapper.vm.content).toBe(initialContent);
       expect(wrapper.vm.endpoint).toBe(initialEndpoint);
     });

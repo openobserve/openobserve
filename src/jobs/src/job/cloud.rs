@@ -24,13 +24,11 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::table::org_users::get_admin;
+use stream::get_streams;
 
 use crate::{
     common::{infra::config::ORGANIZATIONS, meta::telemetry},
-    service::{
-        organization::is_org_in_free_trial_period, self_reporting::search::get_usage,
-        stream::get_streams,
-    },
+    service::{organization::is_org_in_free_trial_period, self_reporting::search::get_usage},
 };
 
 /// This file has all odd-jobs that are specific to cloud installation,
@@ -63,7 +61,7 @@ pub fn start() {
 }
 
 /// Start trial quota background jobs (flush + cluster sync).
-/// Must run on ALL nodes, not just alert_manager.
+/// Must run on ALL nodes, not just scheduler.
 pub fn start_trial_quota_jobs() {
     tokio::spawn(async move { run_trial_quota_flush().await });
     tokio::spawn(async move {
@@ -240,7 +238,13 @@ async fn check_all_orgs_ai_quota() {
             recipients: vec![admin.email.clone()],
         };
 
-        match openobserve_core::alerts::alert::send_email_notification(&subject, &email, body).await
+        match openobserve_core::alerts::alert::send_email_notification(
+            &subject,
+            &email,
+            body.clone(),
+            body,
+        )
+        .await
         {
             Ok(_) => {
                 log::info!(
@@ -466,7 +470,13 @@ async fn check_external_contract_expiry() {
             recipients: vec![admin.email.clone()],
         };
 
-        match openobserve_core::alerts::alert::send_email_notification(&subject, &email, body).await
+        match openobserve_core::alerts::alert::send_email_notification(
+            &subject,
+            &email,
+            body.clone(),
+            body,
+        )
+        .await
         {
             Ok(_) => {
                 log::info!(

@@ -9,11 +9,7 @@ import { z } from "zod";
 
 export const makeLoginSchema = (t: (_key: string) => string) =>
   z.object({
-    name: z
-      .string()
-      .trim()
-      .min(1, t("login.emailRequired"))
-      .email(t("login.emailInvalid")),
+    name: z.string().trim().min(1, t("login.emailRequired")).email(t("login.emailInvalid")),
     password: z.string().min(1, t("login.passwordRequired")),
   });
 

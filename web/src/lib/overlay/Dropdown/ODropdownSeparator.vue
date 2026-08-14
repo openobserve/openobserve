@@ -3,5 +3,5 @@ import { DropdownMenuSeparator } from "reka-ui";
 </script>
 
 <template>
-  <DropdownMenuSeparator class="my-1 h-px bg-dropdown-separator" />
+  <DropdownMenuSeparator class="bg-dropdown-separator my-1 h-px" />
 </template>

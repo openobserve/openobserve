@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login v-if="user.email == '' && !showInvitations" />
+  <Login v-if="user.email == '' && !showInvitations" />
   <div v-if="showInvitations && config.isCloud == 'true'">
-    <div class="flex relative-position px-3 pt-2">
+    <div class="relative-position flex px-3 pt-2">
       <img
-        class="w-auto max-w-50 h-10 max-h-10 cursor-pointer"
+        class="h-10 max-h-10 w-auto max-w-50 cursor-pointer"
         loading="lazy"
         :src="
           isDark
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       />
     </div>
-    <invitation-list
+    <InvitationList
       v-if="showInvitations"
       :user-email="user.email"
       @invitations-processed="handleInvitationsProcessed"
@@ -45,11 +45,7 @@ import config from "@/aws-exports";
 import configService from "@/services/config";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import {
-  getUserInfo,
-  getDecodedUserInfo,
-  checkCallBackValues,
-} from "@/utils/zincutils";
+import { getUserInfo, getDecodedUserInfo, checkCallBackValues } from "@/utils/zincutils";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import {
@@ -61,6 +57,8 @@ import {
 } from "@/utils/zincutils";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
+import { isSameOriginRedirect } from "@/utils/safeUrl";
 
 export default defineComponent({
   name: "LoginPage",
@@ -70,6 +68,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const { t } = useI18nTyped();
     const { isDark } = useTheme();
     let orgOptions = ref([{ label: Number, value: String }]);
     const selectedOrg = ref({});
@@ -108,10 +107,7 @@ export default defineComponent({
           const localOrg: any = useLocalOrganization();
           let tempDefaultOrg = {};
           let localOrgFlag = false;
-          if (
-            localOrg.value != null &&
-            localOrg.value.user_email !== store.state.userInfo.email
-          ) {
+          if (localOrg.value != null && localOrg.value.user_email !== store.state.userInfo.email) {
             localOrg.value = null;
             useLocalOrganization("");
           }
@@ -119,13 +115,7 @@ export default defineComponent({
           store.dispatch("setOrganizations", res.data.data);
 
           orgOptions.value = res.data.data.map(
-            (data: {
-              id: any;
-              name: any;
-              type: any;
-              identifier: any;
-              UserObj: any;
-            }) => {
+            (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
               let optiondata: any = {
                 label: data.name,
                 id: data.id,
@@ -147,9 +137,7 @@ export default defineComponent({
                 res.data.data.length == 1
               ) {
                 localOrgFlag = true;
-                selectedOrg.value = localOrg.value
-                  ? localOrg.value
-                  : optiondata;
+                selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
                 useLocalOrganization(selectedOrg.value);
                 store.dispatch("setSelectedOrganization", selectedOrg.value);
               }
@@ -170,10 +158,7 @@ export default defineComponent({
           //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
           if (
             config.isCloud == "true" &&
-            checkCallBackValues(
-              router.currentRoute.value.hash,
-              "new_user_login",
-            ) == "true"
+            checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true"
           ) {
             localStorage.setItem("isFirstTimeLogin", "true");
           }
@@ -225,7 +210,7 @@ export default defineComponent({
      * Helper to get cookie value by name
      */
     const getCookie = (name: string): string | null => {
-      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
       return match ? decodeURIComponent(match[2]) : null;
     };
 
@@ -240,7 +225,7 @@ export default defineComponent({
         router.push({ path: "/marketplace/aws/setup" });
         return;
       }
-       // Check for Azure Marketplace token - redirect to setup if present
+      // Check for Azure Marketplace token - redirect to setup if present
       const azureMarketplaceToken = window.sessionStorage.getItem("azure_marketplace_token");
       if (azureMarketplaceToken) {
         router.push({ path: "/marketplace/azure/register" });
@@ -249,11 +234,14 @@ export default defineComponent({
 
       const redirectURI = window.sessionStorage.getItem("redirectURI");
       window.sessionStorage.removeItem("redirectURI");
-      if (redirectURI != null && redirectURI != "") {
-        if (redirectURI.includes("http")) {
-          window.location.href = redirectURI;
-        } else {
+      // Same-origin only: `redirectURI` originates from the `?short_url=`
+      // query param, so an off-origin value here is a post-auth open redirect
+      // (see utils/common.ts redirectUser for the twin of this check).
+      if (redirectURI != null && redirectURI != "" && isSameOriginRedirect(redirectURI)) {
+        if (redirectURI.startsWith("/")) {
           router.push({ path: redirectURI });
+        } else {
+          window.location.href = redirectURI;
         }
       } else {
         router.push({ path: "/" });
@@ -274,6 +262,7 @@ export default defineComponent({
 
     return {
       store,
+      t,
       isDark,
       config,
       router,
@@ -324,10 +313,7 @@ export default defineComponent({
             this.user.last_name = token.family_name ? token.family_name : "";
           }
           const sessionUserInfo = getDecodedUserInfo();
-          this.userInfo =
-            sessionUserInfo !== null
-              ? JSON.parse(sessionUserInfo as string)
-              : null;
+          this.userInfo = sessionUserInfo !== null ? JSON.parse(sessionUserInfo as string) : null;
 
           if (
             (this.userInfo !== null &&
@@ -366,9 +352,9 @@ export default defineComponent({
           if (res.data.data.id == 0) {
             const dismiss = toast({
               variant: "loading",
-              message: "Please wait while creating new user...",
-                          timeout: 0,
-});
+              message: this.t("toastMessages.views.pleaseWaitWhileCreatingNewUser"),
+              timeout: 0,
+            });
 
             usersService.addNewUser(this.user).then((_res) => {
               this.store.dispatch("login", {
@@ -393,13 +379,12 @@ export default defineComponent({
         .catch((error) => {
           toast({
             variant: "loading",
-            message: "Error while verifying user...",
-                      timeout: 0,
-});
+            message: this.t("toastMessages.views.errorWhileVerifyingUser"),
+            timeout: 0,
+          });
           if (error.status === 403) this.signout();
         });
     },
   },
 });
 </script>
-

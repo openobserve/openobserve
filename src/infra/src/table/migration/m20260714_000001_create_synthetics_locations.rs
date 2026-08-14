@@ -89,6 +89,7 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
+                    .if_not_exists()
                     .table(SyntheticsLocations::Table)
                     .name("idx_synthetics_locations_org_id")
                     .col(SyntheticsLocations::OrgId)

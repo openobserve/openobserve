@@ -23,13 +23,7 @@ import { type SQLContext } from "../shared/types";
  * Mutates `ctx.options` in place.
  */
 export function applyHStackedChart(ctx: SQLContext): void {
-  const {
-    options,
-    xAxisKeys,
-    dynamicXAxisNameGap,
-    getSeries,
-    getAxisDataFromKey,
-  } = ctx;
+  const { options, xAxisKeys, dynamicXAxisNameGap, getSeries, getAxisDataFromKey } = ctx;
 
   options.xAxis[0].data = Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
 
@@ -49,8 +43,7 @@ export function applyHStackedChart(ctx: SQLContext): void {
   }, 0);
 
   options.yAxis.map((it: any) => {
-    it.nameGap =
-      Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) + 10;
+    it.nameGap = Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) + 10;
   });
 
   // For h-stacked, xAxis is actually the original yAxis (bottom axis after swap)

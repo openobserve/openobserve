@@ -47,14 +47,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 // (form.handleSubmit) so the schema runs deterministically.
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "formId",
-  ],
+  props: ["open", "size", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-form-id="formId">
@@ -128,9 +121,9 @@ describe("AddGroup", () => {
 
     it("wires the OForm to the dialog via form-id", () => {
       expect(getForm(wrapper).exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id"),
-      ).toBe("add-group-form");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id")).toBe(
+        "add-group-form",
+      );
     });
 
     it("passes a Zod schema to OForm (no per-field validators / disabled gate)", () => {

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nKey } from "@/types/i18n";
+
 import type { StreamInfo } from "@/services/service_streams";
 import { NETWORK_PATTERNS } from "@/utils/metrics/metricGrouping";
 import { resolveSetId } from "@/composables/useMetricSubjectButtons";
@@ -29,27 +31,21 @@ import { resolveSetId } from "@/composables/useMetricSubjectButtons";
  * applied to the stream pool *before* an intent filter is applied.
  */
 
-export type IntentId =
-  | "essentials"
-  | "compute"
-  | "memory"
-  | "storage"
-  | "network"
-  | "all";
+export type IntentId = "essentials" | "compute" | "memory" | "storage" | "network" | "all";
 
 export interface IntentDefinition {
   id: IntentId;
-  label: string;
+  labelKey: I18nKey;
   icon?: string;
 }
 
 export const INTENT_DEFINITIONS: IntentDefinition[] = [
-  { id: "essentials", label: "Essentials", icon: "star" },
-  { id: "compute",    label: "Compute",    icon: "memory" },
-  { id: "memory",     label: "Memory",     icon: "dns" },
-  { id: "storage",    label: "Storage",    icon: "storage" },
-  { id: "network",    label: "Network",    icon: "wifi" },
-  { id: "all",        label: "All",        icon: "apps" },
+  { id: "essentials", labelKey: "metrics.groups.essentials", icon: "star" },
+  { id: "compute", labelKey: "metrics.groups.compute", icon: "memory" },
+  { id: "memory", labelKey: "metrics.groups.memory", icon: "dns" },
+  { id: "storage", labelKey: "metrics.groups.storage", icon: "storage" },
+  { id: "network", labelKey: "metrics.groups.network", icon: "wifi" },
+  { id: "all", labelKey: "metrics.groups.all", icon: "apps" },
 ];
 
 /**
@@ -57,17 +53,8 @@ export const INTENT_DEFINITIONS: IntentDefinition[] = [
  * first match wins when used in a "primary intent" context (not used today —
  * pills are independent filters, a stream can satisfy multiple).
  */
-const INTENT_PATTERNS: Record<
-  Exclude<IntentId, "essentials" | "all">,
-  RegExp[]
-> = {
-  compute: [
-    /cpu/i,
-    /\bprocess\b/i,
-    /\bruntime\b/i,
-    /thread/i,
-    /goroutine/i,
-  ],
+const INTENT_PATTERNS: Record<Exclude<IntentId, "essentials" | "all">, RegExp[]> = {
+  compute: [/cpu/i, /\bprocess\b/i, /\bruntime\b/i, /thread/i, /goroutine/i],
   memory: [
     /memory/i,
     /\bmem_/i,
@@ -78,15 +65,7 @@ const INTENT_PATTERNS: Record<
     /\boom\b/i,
     /alloc/i,
   ],
-  storage: [
-    /disk/i,
-    /filesystem/i,
-    /\bfs_/i,
-    /volume/i,
-    /inode/i,
-    /\bio_/i,
-    /storage/i,
-  ],
+  storage: [/disk/i, /filesystem/i, /\bfs_/i, /volume/i, /inode/i, /\bio_/i, /storage/i],
   // Reuse the canonical Network pattern list from metricGrouping so the two
   // taxonomies stay in lockstep when the list evolves.
   network: NETWORK_PATTERNS,
@@ -142,10 +121,7 @@ export const ESSENTIALS_BY_WORKLOAD_SUBJECT: Record<string, string[]> = {
   ],
 };
 
-function curatedFor(
-  matchedSetId: string | undefined | null,
-  subjectId?: string | null,
-): string[] {
+function curatedFor(matchedSetId: string | undefined | null, subjectId?: string | null): string[] {
   if (!matchedSetId) return [];
   const canonical = resolveSetId(matchedSetId) ?? matchedSetId;
   if (subjectId) {
@@ -232,7 +208,6 @@ export function pickDefaultIntent(
   subjectId?: string | null,
 ): IntentId {
   if (hasEssentials(streams, matchedSetId, subjectId)) return "essentials";
-  if (filterByIntent(streams, "compute", matchedSetId, subjectId).length > 0)
-    return "compute";
+  if (filterByIntent(streams, "compute", matchedSetId, subjectId).length > 0) return "compute";
   return "all";
 }

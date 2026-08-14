@@ -38,6 +38,16 @@ pub enum TriggerModule {
     QueryRecommendations,
     Backfill,
     AnomalyDetection,
+    // APPEND ONLY. The implicit discriminant is the value stored in
+    // `scheduled_jobs.module` (this enum is persisted via `sqlx::Type` +
+    // `#[repr(i32)]`, not by name), so inserting a variant above this line
+    // silently remaps every existing row to a different module.
+    /// SLI ingest — one job per enabled SLO, cadence = its slice interval.
+    Slo,
+    /// Bulk historical fill. Its own lane, because a bulk scan sharing a
+    /// concurrency budget with latency-sensitive incremental passes would
+    /// starve them (§6b.9).
+    SloBackfill,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -49,6 +59,8 @@ impl std::fmt::Display for TriggerModule {
             Self::QueryRecommendations => write!(f, "query_recommendations"),
             Self::Backfill => write!(f, "backfill"),
             Self::AnomalyDetection => write!(f, "anomaly_detection"),
+            Self::Slo => write!(f, "slo"),
+            Self::SloBackfill => write!(f, "slo_backfill"),
         }
     }
 }
@@ -99,6 +111,39 @@ pub struct ScheduledTriggerData {
     pub last_satisfied_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backfill_job: Option<BackfillJob>,
+    // ── Multi-level silence (alerts_2.md §7.1) ──────────────────────────────
+    // For alerts WITH a warning threshold, silence stops suppressing
+    // *evaluation* and suppresses only *delivery* — otherwise a
+    // Warning→Critical escalation during a silence window can never be
+    // observed. Single-level alerts keep the legacy behaviour (next_run_at is
+    // pushed forward) and never set these.
+    /// Deliver nothing until this timestamp, unless the level escalates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_silenced_until: Option<i64>,
+    /// Severity of the last DELIVERED notification (`AlertLevel::to_i32`).
+    /// Escalation is measured against this, not against the previous
+    /// evaluation — otherwise a flap down and back up would re-notify.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_notified_level: Option<i32>,
+    // ── Per-destination retry ledger (templates-v2 §6.1) ────────────────────
+    /// Destinations already delivered for the in-flight notification cycle.
+    /// A retry re-sends ONLY to destinations not listed here; cleared when the
+    /// notification cycle completes (full success or max-retries), so it can
+    /// never outlive its cycle and suppress the NEXT firing.
+    ///
+    /// `serde(default)` is load-bearing: during a rolling upgrade a
+    /// pre-upgrade node may have written a `trigger.data` row without this
+    /// field while a retry is in flight.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notified_destinations: Vec<String>,
+    /// Phase-2: rendered chart id, reused across destinations and retries.
+    ///
+    /// RESERVED AND INTENTIONALLY UNUSED — no reader and no writer exists yet;
+    /// it is added now so a Phase-2 upgrade does not have to migrate rows
+    /// written by Phase-1a nodes. Do not delete as dead code: Phase 2 (chart
+    /// rendering) is its only consumer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chart_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -136,6 +181,11 @@ impl ScheduledTriggerData {
     pub fn reset(&mut self) {
         self.period_end_time = None;
         self.tolerance = 0;
+        // Every `reset()` call site is a cycle-terminating path (max retries
+        // reached, or the run abandoned). Clearing the ledger here is what
+        // guarantees it cannot outlive its notification cycle and suppress
+        // delivery on the NEXT firing.
+        self.notified_destinations.clear();
     }
 
     pub fn to_json_string(&self) -> String {
@@ -165,6 +215,23 @@ mod tests {
             TriggerModule::AnomalyDetection.to_string(),
             "anomaly_detection"
         );
+        assert_eq!(TriggerModule::Slo.to_string(), "slo");
+        assert_eq!(TriggerModule::SloBackfill.to_string(), "slo_backfill");
+    }
+
+    /// The discriminant IS the stored value. A variant inserted above an
+    /// existing one would remap every `scheduled_jobs` row to a different
+    /// module — silently, with no migration to catch it.
+    #[test]
+    fn trigger_module_discriminants_are_pinned() {
+        assert_eq!(TriggerModule::Report as i32, 0);
+        assert_eq!(TriggerModule::Alert as i32, 1);
+        assert_eq!(TriggerModule::DerivedStream as i32, 2);
+        assert_eq!(TriggerModule::QueryRecommendations as i32, 3);
+        assert_eq!(TriggerModule::Backfill as i32, 4);
+        assert_eq!(TriggerModule::AnomalyDetection as i32, 5);
+        assert_eq!(TriggerModule::Slo as i32, 6);
+        assert_eq!(TriggerModule::SloBackfill as i32, 7);
     }
 
     #[test]
@@ -174,12 +241,54 @@ mod tests {
             tolerance: 42,
             last_satisfied_at: Some(999),
             backfill_job: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
+            notified_destinations: vec![],
+            chart_id: None,
         };
         data.reset();
         assert!(data.period_end_time.is_none());
         assert_eq!(data.tolerance, 0);
         // reset must NOT clear last_satisfied_at
         assert_eq!(data.last_satisfied_at, Some(999));
+    }
+
+    /// The ledger must not survive a cycle-terminating reset: if it did, the
+    /// NEXT firing would skip every destination listed here and silently
+    /// deliver nothing to them.
+    #[test]
+    fn reset_clears_notified_destinations_ledger() {
+        let mut data = ScheduledTriggerData {
+            notified_destinations: vec!["slack-oncall".into(), "pagerduty".into()],
+            ..Default::default()
+        };
+        data.reset();
+        assert!(
+            data.notified_destinations.is_empty(),
+            "ledger outlived its notification cycle"
+        );
+    }
+
+    #[test]
+    fn scheduled_trigger_data_ledger_roundtrip_and_tolerance() {
+        // Old JSON without the new fields must parse (retry across upgrade).
+        let old: ScheduledTriggerData = serde_json::from_str(r#"{"tolerance":0}"#).unwrap();
+        assert!(old.notified_destinations.is_empty());
+        assert!(old.chart_id.is_none());
+
+        let with = ScheduledTriggerData {
+            notified_destinations: vec!["slack-oncall".into()],
+            ..Default::default()
+        };
+        let s = serde_json::to_string(&with).unwrap();
+        let back: ScheduledTriggerData = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.notified_destinations, vec!["slack-oncall"]);
+
+        // An empty ledger stays out of the serialized payload entirely, so
+        // pre-upgrade nodes reading the row are unaffected.
+        let empty = ScheduledTriggerData::default().to_json_string();
+        assert!(!empty.contains("notified_destinations"));
+        assert!(!empty.contains("chart_id"));
     }
 
     #[test]
@@ -197,6 +306,10 @@ mod tests {
             tolerance: 10,
             last_satisfied_at: Some(9_999_999),
             backfill_job: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
+            notified_destinations: vec![],
+            chart_id: None,
         };
         let json = data.to_json_string();
         let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
@@ -357,6 +470,10 @@ mod tests {
             period_end_time: Some(500),
             tolerance: 5,
             last_satisfied_at: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
+            notified_destinations: vec![],
+            chart_id: None,
             backfill_job: Some(BackfillJob {
                 current_position: 42,
                 deletion_status: DeletionStatus::Pending,

@@ -3,6 +3,7 @@ const {
   expect,
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -12,7 +13,10 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
 import PageManager from "../../pages/page-manager";
 import { waitForStreamComplete, waitForTableWithData } from "../utils/streaming-helpers.js";
 
-const randomDashboardName =
+// Each test runs in parallel (mode: "parallel" below), so the name must be
+// generated fresh per test — a single shared name caused cross-test races
+// where one test's create/delete collided with another's mid-flight.
+const generateDashboardName = () =>
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
@@ -20,7 +24,8 @@ test.describe.configure({ mode: "parallel" });
 // Refactored test cases using Page Object Model
 
 test.describe("dashboard UI testcases", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
 
@@ -30,6 +35,7 @@ test.describe("dashboard UI testcases", () => {
   });
   test("should add and delete the dashboard", async ({ page }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Navigate to the dashboard list
     await pm.dashboardList.menuItem("dashboards-item");
@@ -41,9 +47,7 @@ test.describe("dashboard UI testcases", () => {
 
     await pm.dashboardCreate.backToDashboardList();
 
-    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardCreate.waitForDefaultFolderTabVisible();
 
     await deleteDashboard(page, randomDashboardName);
   });
@@ -51,6 +55,7 @@ test.describe("dashboard UI testcases", () => {
   test("should create a duplicate of the dashboard", async ({ page }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     //navigate to the dashboard list
     await pm.dashboardList.menuItem("dashboards-item");
@@ -60,9 +65,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
     // Toast is already validated inside createDashboard() and auto-dismisses before we get here
     await pm.dashboardCreate.backToDashboardList();
-    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardCreate.waitForDefaultFolderTabVisible();
 
     // Search for the created dashboard
     await pm.dashboardCreate.searchDashboard(randomDashboardName);
@@ -84,6 +87,7 @@ test.describe("dashboard UI testcases", () => {
   test("should create a dashboard and add the breakdown", async ({ page }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -97,9 +101,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Wait for dashboard tab to be visible
-    await page.locator('[data-test="dashboard-tab-default"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardCreate.waitForDefaultDashboardTabVisible();
 
     // Add a new panel
     await pm.dashboardCreate.addPanel();
@@ -133,6 +135,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize only the used Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -179,6 +182,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate unique panel name
     const panelName =
@@ -197,6 +201,11 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.setCustomSQL(
       'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
     );
+
+    // Wait for the SQL parser to extract fields and render them in the field
+    // list before adding them — on alpha1 this parse can take longer than the
+    // 10s default in searchAndAddField's own waitFor, causing a race.
+    await pm.chartTypeSelector.waitForFieldListRow("y_axis_1", 20000);
 
     // Map query results to chart axes
     await pm.chartTypeSelector.searchAndAddField("y_axis_1", "y");
@@ -217,6 +226,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -263,6 +273,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -320,6 +331,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -349,23 +361,10 @@ test.describe("dashboard UI testcases", () => {
 
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await page
-      .locator('[data-test="dashboard-variable-adhoc-add-selector"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-variable-adhoc-name-selector"] input')
-      .click();
-    await page
-      .locator('[data-test="dashboard-variable-adhoc-name-selector"] input')
-      .fill("kubernetes_container_hash");
-    await page
-      .locator('[data-test="dashboard-variable-adhoc-value-selector"] input')
-      .click();
-    await page
-      .locator('[data-test="dashboard-variable-adhoc-value-selector"] input')
-      .fill(
-        "058694856476.dkr.ecr.us-west-2.amazonaws.com/zinc-cp@sha256:56e216b3d61bd282846e3f6d1bd9cb82f83b90b7e401ad0afc0052aa3f15715c"
-      );
+    await pm.dashboardVariables.addAdhocVariable(
+      "kubernetes_container_hash",
+      "058694856476.dkr.ecr.us-west-2.amazonaws.com/zinc-cp@sha256:56e216b3d61bd282846e3f6d1bd9cb82f83b90b7e401ad0afc0052aa3f15715c"
+    );
     await pm.dashboardTimeRefresh.setRelative("3", "h");
 
     await pm.dashboardPanelActions.savePanel();
@@ -385,6 +384,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
     // const dateTimeHelper = new DateTimeHelper(page);
@@ -438,6 +438,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -485,10 +486,11 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test("should display an error message when some fields are missing or incorrect", async ({
+  test("should auto-populate the panel name and save the panel", async ({
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -517,15 +519,16 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    // Attempt to save the panel without a name. The name field is now an
-    // OForm field with a required-schema rule, so an empty name is blocked at
-    // the form layer with an inline field error (no error toast is produced).
-    await pm.dashboardPanelActions.savePanel();
+    // The panel title auto-generates from the configured stream/fields, so it is
+    // never empty — a name is always present without the user typing one. Assert
+    // it is NOT the empty-state placeholder ("Untitled panel"), which the value
+    // span would fall back to if auto-naming produced nothing.
+    await expect(pm.dashboardPanelActions.getPanelNameValue()).toBeVisible();
     await expect(
-      pm.dashboardPanelActions.getPanelNameError().first()
-    ).toBeVisible();
+      pm.dashboardPanelActions.getPanelNameValue()
+    ).not.toHaveText("Untitled panel");
 
-    // Add a panel name and save again
+    // Set an explicit name and save again
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
@@ -543,6 +546,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -615,6 +619,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize only the necessary Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -660,6 +665,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
     // Navigate to dashboards
@@ -690,7 +696,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Verify the gauge chart is visible
     await pm.dashboardPanelActions.waitForChartToRender();
-    await page.locator('[data-test="dashboard-panel-discard"]').click();
+    await pm.dashboardPanelActions.discardPanel();
 
     // Listen for the dialog and assert its message
     page.once("dialog", async (dialog) => {
@@ -702,6 +708,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -723,6 +730,11 @@ test.describe("dashboard UI testcases", () => {
       'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
     );
 
+    // Wait for the SQL parser to extract fields and render them in the field
+    // list before adding them — avoids a race on alpha1 where parsing takes
+    // longer than searchAndAddField's own 10s waitFor.
+    await pm.chartTypeSelector.waitForFieldListRow("xAxis1", 20000);
+
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -733,14 +745,14 @@ test.describe("dashboard UI testcases", () => {
       timeout: 10000,
     });
 
-    // TanStack table rows use data-test="dashboard-data-row" / "dashboard-data-row-cell"
+    // Rows use data-test="o2-table-row-<index>" / "o2-table-cell-<columnId>"
     const dataRows = pm.dashboardPanelActions.getTableDataRows();
     await dataRows.first().waitFor({ state: "visible", timeout: 15000 });
 
     expect(await dataRows.count()).toBeGreaterThan(0);
     await expect(pm.dashboardPanelActions.firstRowNthCell(0)).not.toHaveText("");
     await expect(pm.dashboardPanelActions.firstRowNthCell(1)).not.toHaveText("");
-    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+    await expect(pm.dashboardPanelActions.getNoDataLocator()).not.toBeVisible();
 
     // Save panel and cleanup
     await pm.dashboardPanelActions.savePanel();
@@ -751,6 +763,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("line-panel-test");
 
@@ -768,6 +781,11 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.setCustomSQL(
       'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
     );
+
+    // Wait for the SQL parser to extract fields and render them in the field
+    // list before adding them — avoids a race on alpha1 where parsing takes
+    // longer than searchAndAddField's own 10s waitFor.
+    await pm.chartTypeSelector.waitForFieldListRow("xAxis1", 20000);
 
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
@@ -802,10 +820,10 @@ test.describe("dashboard UI testcases", () => {
     });
 
     // Validate chart is properly rendered
-    const chartContainer = page.locator('[data-test="chart-renderer"]');
+    const chartContainer = pm.dashboardPanelActions.getChartRendererCanvas();
     const boundingBox = await chartContainer.boundingBox();
-    const canvasCount = await page
-      .locator('[data-test="chart-renderer"] canvas')
+    const canvasCount = await pm.dashboardPanelActions
+      .getChartRendererCanvasElement()
       .count();
 
     // Enhanced validation: Check for meaningful data rendering
@@ -813,7 +831,7 @@ test.describe("dashboard UI testcases", () => {
     expect(canvasCount).toBeGreaterThanOrEqual(1); // Should have at least 1 canvas element
     expect(boundingBox.width).toBeGreaterThan(100); // Reasonable width
     expect(boundingBox.height).toBeGreaterThan(50); // Reasonable height (not the tiny 38px no-data case)
-    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+    await expect(pm.dashboardPanelActions.getNoDataLocator()).not.toBeVisible();
 
     // Verify canvas has visual content
     const canvasHasContent = await page.evaluate(() => {
@@ -843,6 +861,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("complex-case-panel-test");
 

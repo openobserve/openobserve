@@ -1,5 +1,5 @@
 ﻿<template>
-  <div data-test="llm-providers-settings" class="flex flex-col h-full min-h-0">
+  <div data-test="llm-providers-settings" class="flex h-full min-h-0 flex-col">
     <ProviderFormPage
       v-if="formPage"
       :org-id="orgId"
@@ -16,28 +16,20 @@
       bleed
       :scroll="false"
     >
-        <template #title>
-          <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
-        </template>
-        <template #actions>
-          <OButton
-            data-test="llm-providers-add-btn"
-            variant="primary"
-            size="sm"
-            @click="openCreate"
-          >
-            {{ t("llmProviders.newButton") }}
-          </OButton>
-        </template>
+      <template #title>
+        <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
+      </template>
+      <template #actions>
+        <OButton data-test="llm-providers-add-btn" variant="primary" size="sm" @click="openCreate">
+          {{ t("llmProviders.newButton") }}
+        </OButton>
+      </template>
 
       <div v-if="isLoading" class="flex flex-1 items-center justify-center">
         <OSpinner size="md" />
       </div>
 
-      <div
-        v-else-if="!providers.length"
-        class="flex flex-1 items-center justify-center"
-      >
+      <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
         <!-- First-run state — uses the same `no-llm-providers` preset the
              OTable's #empty slot uses for the filtered case, so the empty
              surface in this page reads consistently with the rest of the
@@ -52,7 +44,7 @@
         />
       </div>
 
-      <div v-else class="flex-1 min-h-0">
+      <div v-else class="min-h-0 flex-1">
         <OTable
           data-test="llm-providers-table"
           :data="filteredProviders"
@@ -70,7 +62,7 @@
           :page-size="20"
           :page-size-options="[20, 50, 100]"
           width="100%"
-          class="w-full h-full"
+          class="h-full w-full"
           @row-click="(row: any) => openEdit(row)"
         >
           <template #toolbar>
@@ -79,7 +71,7 @@
               class="flex-1"
               :placeholder="t('llmProviders.searchPlaceholder')"
               data-test="llm-providers-search-input"
-              />
+            />
           </template>
           <template #toolbar-trailing>
             <OButton
@@ -90,7 +82,11 @@
               data-test="llm-providers-list-refresh-btn"
               @click="loadProviders"
             >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="llmProvidersRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="llmProvidersRefresh"
+              />
             </OButton>
           </template>
           <template #empty>
@@ -114,17 +110,8 @@
             <span class="font-mono text-xs">{{ defaultModelOf(row) || "—" }}</span>
           </template>
 
-          <template #cell-isDefault="{ row }">
-            <OTag
-              v-if="booleanOf(row, 'isDefault', 'is_default')"
-              type="providerDefaultFlag"
-              value="default"
-            />
-            <span v-else class="text-text-body">—</span>
-          </template>
-
           <template #cell-actions="{ row }">
-            <div class="flex items-center actions-container">
+            <div class="actions-container flex items-center">
               <OButton
                 :data-test="`llm-providers-${row.name}-edit-btn`"
                 data-row-action="edit"
@@ -161,7 +148,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeMount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -171,11 +158,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, {
-  type Provider,
-} from "@/services/online-evals.service";
+import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import {
-  booleanOf,
   defaultModelOf,
   providerTypeOf,
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
@@ -188,7 +172,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -243,16 +227,6 @@ const columns = computed(() => [
     resizable: true,
     hideable: true,
     size: COL.defaultModel,
-    meta: { align: "left" },
-  },
-  {
-    id: "isDefault",
-    header: t("llmProviders.columns.default"),
-    accessorFn: (row: Provider) => booleanOf(row, "isDefault", "is_default"),
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    size: COL.toggle,
     meta: { align: "left" },
   },
   {
@@ -383,13 +357,21 @@ async function performDelete() {
     });
     await loadProviders();
   } catch (err: any) {
-    showError(err, t("onlineEvals.deleteError", { label: t("onlineEvals.singular.providers").toLowerCase() }));
+    showError(
+      err,
+      t("onlineEvals.deleteError", { label: t("onlineEvals.singular.providers").toLowerCase() }),
+    );
   } finally {
     pendingDeleteRow.value = null;
   }
 }
 
 useShortcuts([
-  { id: "llmProvidersRefresh", handler: () => { if (!isInputFocused()) loadProviders(); } },
+  {
+    id: "llmProvidersRefresh",
+    handler: () => {
+      if (!isInputFocused()) loadProviders();
+    },
+  },
 ]);
 </script>

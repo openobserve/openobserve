@@ -14,7 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <ODialog data-test="add-role-dialog"
+  <ODialog
+    data-test="add-role-dialog"
     :open="open"
     size="sm"
     :title="t('iam.addRole')"
@@ -68,13 +69,13 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddRoleSchema, type AddRoleForm } from "./AddRole.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const props = defineProps({
   open: {
     type: Boolean,

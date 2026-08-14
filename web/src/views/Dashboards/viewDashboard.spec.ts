@@ -51,9 +51,7 @@ vi.mock("@/services/reports", () => ({
 
 vi.mock("@/services/short_url", () => ({
   default: {
-    create: vi
-      .fn()
-      .mockResolvedValue({ data: { short_url: "http://short.url" } }),
+    create: vi.fn().mockResolvedValue({ data: { short_url: "http://short.url" } }),
   },
 }));
 
@@ -98,6 +96,10 @@ vi.mock("@/constants/config", () => ({
 // Global router mock instance
 const mockRouterPush = vi.fn().mockResolvedValue(undefined);
 const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
+const mockRouterBack = vi.fn();
+// Mutable so a test can say what the previous history entry was; the back
+// button prefers real history over rebuilding the folder-scoped list route.
+const mockHistoryState: { back: string | null } = { back: null };
 
 // Comprehensive Vue composable mocks
 vi.mock("vue-router", () => ({
@@ -105,8 +107,9 @@ vi.mock("vue-router", () => ({
     push: mockRouterPush,
     replace: mockRouterReplace,
     go: vi.fn(),
-    back: vi.fn(),
+    back: mockRouterBack,
     forward: vi.fn(),
+    options: { history: { state: mockHistoryState } },
     resolve: vi.fn().mockReturnValue({ href: "/test" }),
     currentRoute: {
       value: {
@@ -129,6 +132,8 @@ vi.mock("vue-router", () => ({
 // Export router mocks for use in tests
 global.mockRouterPush = mockRouterPush;
 global.mockRouterReplace = mockRouterReplace;
+global.mockRouterBack = mockRouterBack;
+global.mockHistoryState = mockHistoryState;
 
 // Global store mock instances
 const mockStoreCommit = vi.fn();
@@ -190,8 +195,7 @@ vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showPositiveNotification: mockShowPositiveNotification,
     showErrorNotification: mockShowErrorNotification,
-    showConfictErrorNotificationWithRefreshBtn:
-      mockShowConflictErrorNotificationWithRefreshBtn,
+    showConfictErrorNotificationWithRefreshBtn: mockShowConflictErrorNotificationWithRefreshBtn,
   }),
 }));
 
@@ -230,7 +234,6 @@ import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 describe("ViewDashboard", () => {
   let wrapper: any;
 
@@ -257,6 +260,8 @@ describe("ViewDashboard", () => {
     // Clear global mock spies
     global.mockRouterPush.mockClear();
     global.mockRouterReplace.mockClear();
+    global.mockRouterBack.mockClear();
+    global.mockHistoryState.back = null;
     global.mockStoreCommit.mockClear();
     global.mockStoreDispatch.mockClear();
     global.mockShowPositiveNotification.mockClear();
@@ -521,6 +526,38 @@ describe("ViewDashboard", () => {
       });
     });
 
+    it("should go back through history when the previous entry is the dashboards list", async () => {
+      // Opened from the Favorites pseudo-folder: the URL carries the folder the
+      // dashboard *lives in*, so only history can return the user to Favorites.
+      global.mockHistoryState.back = "/dashboards?folder=__favorites__&org_identifier=test-org";
+      wrapper = createWrapper();
+      await flushPromises();
+
+      await wrapper.vm.goBackToDashboardList();
+
+      expect(global.mockRouterBack).toHaveBeenCalled();
+      expect(global.mockRouterPush).not.toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/dashboards" }),
+      );
+    });
+
+    it("should not go back through history when the previous entry is not the dashboards list", async () => {
+      global.mockHistoryState.back = "/dashboards/add_panel?dashboard=test-dashboard-1";
+      wrapper = createWrapper();
+      await flushPromises();
+
+      await wrapper.vm.goBackToDashboardList();
+
+      expect(global.mockRouterBack).not.toHaveBeenCalled();
+      expect(global.mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards",
+        query: {
+          folder: "default",
+          org_identifier: "test-org",
+        },
+      });
+    });
+
     it("should navigate to add panel when addPanelData is called", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -584,10 +621,7 @@ describe("ViewDashboard", () => {
 
       await wrapper.vm.printDashboard();
 
-      expect(global.mockStoreDispatch).toHaveBeenCalledWith(
-        "setPrintMode",
-        !initialPrintMode,
-      );
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", !initialPrintMode);
       // Check that router replace was called (query parameters are handled by the component)
       expect(global.mockRouterReplace).toHaveBeenCalled();
     });
@@ -601,10 +635,7 @@ describe("ViewDashboard", () => {
 
       // Manually trigger the method to test print mode functionality
       await wrapper.vm.printDashboard();
-      expect(global.mockStoreDispatch).toHaveBeenCalledWith(
-        "setPrintMode",
-        true,
-      );
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", true);
     });
 
     it("should show correct print button icon based on print mode", async () => {
@@ -970,9 +1001,7 @@ describe("ViewDashboard", () => {
 
       const settingsStub = wrapper.findComponent({ name: "DashboardSettings" });
       if (settingsStub.exists()) {
-        const loadSpy = vi
-          .spyOn(wrapper.vm, "loadDashboard")
-          .mockResolvedValue(undefined);
+        const loadSpy = vi.spyOn(wrapper.vm, "loadDashboard").mockResolvedValue(undefined);
 
         await settingsStub.vm.$emit("refresh");
         await flushPromises();
@@ -1340,9 +1369,7 @@ describe("ViewDashboard", () => {
       await wrapper.vm.$nextTick();
 
       // Check if title is set in component data
-      expect(wrapper.vm.currentDashboardData.data.title).toBe(
-        "Test Dashboard Title",
-      );
+      expect(wrapper.vm.currentDashboardData.data.title).toBe("Test Dashboard Title");
     });
 
     it("should show correct folder name", async () => {

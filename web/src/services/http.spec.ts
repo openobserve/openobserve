@@ -89,27 +89,21 @@ describe("attemptTokenRefresh", () => {
   // ---------------------------------------------------------------------------
 
   it("should reject immediately for dex_login URL", async () => {
-    await expect(
-      attemptTokenRefresh("http://localhost:5080/config/dex_login"),
-    ).rejects.toThrow();
+    await expect(attemptTokenRefresh("http://localhost:5080/config/dex_login")).rejects.toThrow();
 
     expect(store.dispatch).not.toHaveBeenCalled();
     expect(reloadMock).not.toHaveBeenCalled();
   });
 
   it("should reject immediately for dex_refresh URL", async () => {
-    await expect(
-      attemptTokenRefresh("http://localhost:5080/config/dex_refresh"),
-    ).rejects.toThrow();
+    await expect(attemptTokenRefresh("http://localhost:5080/config/dex_refresh")).rejects.toThrow();
 
     expect(store.dispatch).not.toHaveBeenCalled();
     expect(reloadMock).not.toHaveBeenCalled();
   });
 
   it("should reject immediately for auth/login URL", async () => {
-    await expect(
-      attemptTokenRefresh("http://localhost:5080/auth/login"),
-    ).rejects.toThrow();
+    await expect(attemptTokenRefresh("http://localhost:5080/auth/login")).rejects.toThrow();
 
     expect(store.dispatch).not.toHaveBeenCalled();
     expect(reloadMock).not.toHaveBeenCalled();
@@ -122,9 +116,7 @@ describe("attemptTokenRefresh", () => {
   it("should dispatch logout and reject for cloud environment", async () => {
     (config as any).isCloud = "true";
 
-    await expect(
-      attemptTokenRefresh("http://localhost:5080/api/org/_search"),
-    ).rejects.toThrow();
+    await expect(attemptTokenRefresh("http://localhost:5080/api/org/_search")).rejects.toThrow();
 
     expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith("logout");
     expect(reloadMock).toHaveBeenCalled();
@@ -166,9 +158,7 @@ describe("attemptTokenRefresh", () => {
     };
     vi.mocked(axios.create).mockReturnValue(mockInstance as any);
 
-    await expect(
-      attemptTokenRefresh("http://localhost:5080/api/org/_search"),
-    ).rejects.toThrow();
+    await expect(attemptTokenRefresh("http://localhost:5080/api/org/_search")).rejects.toThrow();
 
     expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith("logout");
     expect(reloadMock).toHaveBeenCalled();
@@ -180,9 +170,7 @@ describe("attemptTokenRefresh", () => {
 
   it("should dispatch logout and reject when neither cloud nor enterprise SSO", async () => {
     // Both flags are already "false" from beforeEach
-    await expect(
-      attemptTokenRefresh("http://localhost:5080/api/org/_search"),
-    ).rejects.toThrow();
+    await expect(attemptTokenRefresh("http://localhost:5080/api/org/_search")).rejects.toThrow();
 
     expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith("logout");
     expect(reloadMock).toHaveBeenCalled();

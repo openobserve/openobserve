@@ -14,18 +14,12 @@ const props = defineProps<FormCheckboxGroupProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormCheckboxGroup] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormCheckboxGroup] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div class="flex flex-col gap-1">
         <OCheckboxGroup
@@ -36,12 +30,7 @@ if (import.meta.env.DEV && !form) {
         >
           <slot />
         </OCheckboxGroup>
-        <div
-          v-if="
-            field.state.meta.errors.length > 0
-          "
-          class="text-xs text-input-error-text"
-        >
+        <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text text-xs">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

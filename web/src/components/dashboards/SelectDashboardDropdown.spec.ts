@@ -19,7 +19,6 @@ import SelectDashboardDropdown from "./SelectDashboardDropdown.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 
-
 // Mock the utils functions
 vi.mock("@/utils/commons", () => ({
   getAllDashboardsByFolderId: vi.fn().mockResolvedValue([
@@ -145,26 +144,20 @@ describe("SelectDashboardDropdown", () => {
 
   it("should render dashboard dropdown", () => {
     const wrapper = mountComponent({}, store);
-    const dropdown = wrapper.find(
-      '[data-test="dashboard-dropdown-dashboard-selection"]',
-    );
+    const dropdown = wrapper.find('[data-test="dashboard-dropdown-dashboard-selection"]');
     expect(dropdown.exists()).toBe(true);
   });
 
   it("should render add button", () => {
     const wrapper = mountComponent({}, store);
-    const addButton = wrapper.find(
-      '[data-test="dashboard-dashboard-new-add"]',
-    );
+    const addButton = wrapper.find('[data-test="dashboard-dashboard-new-add"]');
     expect(addButton.exists()).toBe(true);
   });
 
   it("should open add dashboard dialog when add button is clicked", async () => {
     const wrapper = mountComponent({}, store);
 
-    const addButton = wrapper.find(
-      '[data-test="dashboard-dashboard-new-add"]',
-    );
+    const addButton = wrapper.find('[data-test="dashboard-dashboard-new-add"]');
     await addButton.trigger("click");
 
     expect(wrapper.vm.showAddDashboardDialog).toBe(true);
@@ -214,9 +207,7 @@ describe("SelectDashboardDropdown", () => {
     it("should forward open=true to ODrawer once add button is clicked", async () => {
       const wrapper = mountComponent({}, store);
 
-      const addButton = wrapper.find(
-        '[data-test="dashboard-dashboard-new-add"]',
-      );
+      const addButton = wrapper.find('[data-test="dashboard-dashboard-new-add"]');
       await addButton.trigger("click");
       await wrapper.vm.$nextTick();
 
@@ -252,9 +243,7 @@ describe("SelectDashboardDropdown", () => {
       const wrapper = mountComponent({}, store);
       // data-test is passed through as an attribute on ODrawer
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.attributes("data-test")).toBe(
-        "dashboard-dashboard-add-dialog",
-      );
+      expect(drawer.attributes("data-test")).toBe("dashboard-dashboard-add-dialog");
     });
   });
 
@@ -362,10 +351,7 @@ describe("SelectDashboardDropdown", () => {
       await wrapper.setProps({ folderId: "default" });
       await flushPromises();
 
-      expect(commons.getAllDashboardsByFolderId).toHaveBeenCalledWith(
-        expect.anything(),
-        "default",
-      );
+      expect(commons.getAllDashboardsByFolderId).toHaveBeenCalledWith(expect.anything(), "default");
     });
   });
 });

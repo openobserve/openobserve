@@ -16,16 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions w-full rounded-default mx-auto bg-surface-overlay border border-border-default"
+    class="step-alert-conditions rounded-default bg-surface-overlay border-border-default mx-auto w-full border"
   >
     <!-- Section header -->
-    <div
-      class="flex items-center py-2.5 px-3 border-b border-border-default"
-    >
-      <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
-      <span
-        class="text-compact font-semibold tracking-[0.01em] text-text-heading"
-      >{{
+    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+      <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+      <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
     </div>
@@ -39,18 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true'">
           <!-- Silence Notification (Cooldown) -->
-          <div class="flex justify-start items-start pb-3 mb-4">
-            <div
-              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-            >
+          <div class="mb-4 flex items-start justify-start pb-3">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.cooldownTooltip')"
-                side="right"
-              />
+              <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
             </div>
-            <div class="flex flex-col gap-1 mr-2 w-fit">
+            <div class="mr-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
@@ -64,14 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <div
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
+                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
                 v-if="silenceError"
-                class="text-xs text-input-error-text whitespace-nowrap"
+                class="text-input-error-text text-xs whitespace-nowrap"
                 data-test="alert-settings-silence-error"
                 role="alert"
               >
@@ -80,62 +71,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Destinations -->
-          <div class="flex items-start pb-4 mb-4">
-            <div
-              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-            >
-              {{ t("alerts.destination") + " *" }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.destinationsTooltip')"
-                side="right"
-              />
-            </div>
-            <!-- Combined destinations + (enterprise) workflows picker. It owns its
-                 refresh / add buttons and keeps the original data-test hooks; the
-                 label above and the error below stay here. Deliberately NOT
-                 name=-bound: one control writes two form fields, so both go up
-                 through the parent's setFieldValue via the events below. -->
-            <div class="flex flex-col">
-              <AlertTargetsSelect
-                :destinations="destinations"
-                :workflows="workflows"
-                :destination-options="formattedDestinations"
-                :workflow-options="workflowOptions"
-                :workflows-enabled="workflowsEnabled"
-                :error="!!destinationsError"
-                @update:destinations="$emit('update:destinations', $event)"
-                @update:workflows="$emit('update:workflows', $event)"
-                @refresh="refreshTargets"
-                @create-destination="routeToCreateDestination"
-                @create-workflow="routeToCreateWorkflow"
-              />
-              <div
-                v-if="destinationsError"
-                class="text-red-8 pt-1 text-2xs leading-3"
-              >
-                {{ destinationsError }}
-              </div>
-            </div>
-          </div>
+          <!-- Destinations. Deliberately NOT name=-bound: one control writes two
+               form fields, so both go up through the parent's setFieldValue via
+               the events below. -->
+          <AlertDestinationsField
+            class="mb-4 pb-4"
+            :destinations="destinations"
+            :workflows="workflows"
+            :destination-options="formattedDestinations"
+            :error="destinationsError"
+            @update:destinations="$emit('update:destinations', $event)"
+            @update:workflows="$emit('update:workflows', $event)"
+            @refresh="$emit('refresh:destinations')"
+          />
         </template>
 
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div ref="periodFieldRef" class="flex items-start mr-2 mb-4!">
-            <div
-              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-            >
+          <div ref="periodFieldRef" class="mr-2 mb-4! flex items-start">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.period") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.periodTooltip')"
-                side="right"
-              />
+              <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
             </div>
-            <div class="flex flex-col gap-1 mr-2 w-fit">
+            <div class="mr-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
@@ -151,14 +111,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <div
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
+                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
                 v-if="periodError"
-                class="text-xs text-input-error-text whitespace-nowrap"
+                class="text-input-error-text text-xs whitespace-nowrap"
                 data-test="alert-settings-period-error"
                 role="alert"
               >
@@ -168,18 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div ref="silenceFieldRef" class="flex items-start mr-2 mb-4!">
-            <div
-              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-            >
+          <div ref="silenceFieldRef" class="mr-2 mb-4! flex items-start">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.cooldownTooltip')"
-                side="right"
-              />
+              <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
             </div>
-            <div class="flex flex-col gap-1 mr-2 w-fit">
+            <div class="mr-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
@@ -194,14 +149,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <div
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
+                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
                 v-if="silenceError"
-                class="text-xs text-input-error-text whitespace-nowrap"
+                class="text-input-error-text text-xs whitespace-nowrap"
                 data-test="alert-settings-silence-error"
                 role="alert"
               >
@@ -210,63 +165,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Destinations -->
-          <div ref="destinationsFieldRef" class="flex items-start mr-2 mb-4!">
-            <div
-              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-            >
-              {{ t("alerts.destination") + " *" }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.destinationsTooltip')"
-                side="right"
-              />
-            </div>
-            <!-- Combined destinations + (enterprise) workflows picker. It owns its
-                 refresh / add buttons and keeps the original data-test hooks; the
-                 label above and the error below stay here. Deliberately NOT
-                 name=-bound: one control writes two form fields, so both go up
-                 through the parent's setFieldValue via the events below. -->
-            <div class="flex flex-col">
-              <AlertTargetsSelect
-                :destinations="destinations"
-                :workflows="workflows"
-                :destination-options="formattedDestinations"
-                :workflow-options="workflowOptions"
-                :workflows-enabled="workflowsEnabled"
-                :error="!!destinationsError"
-                @update:destinations="$emit('update:destinations', $event)"
-                @update:workflows="$emit('update:workflows', $event)"
-                @refresh="refreshTargets"
-                @create-destination="routeToCreateDestination"
-                @create-workflow="routeToCreateWorkflow"
-              />
-              <div
-                v-if="destinationsError"
-                class="text-red-8 pt-1 text-2xs leading-3"
-              >
-                {{ destinationsError }}
-              </div>
-            </div>
-          </div>
+          <!-- Destinations. Deliberately NOT name=-bound: one control writes two
+               form fields, so both go up through the parent's setFieldValue via
+               the events below. The focus manager resolves a component ref via
+               $el, so the ref moves onto the field unchanged. -->
+          <AlertDestinationsField
+            ref="destinationsFieldRef"
+            class="mr-2 mb-4!"
+            :destinations="destinations"
+            :workflows="workflows"
+            :destination-options="formattedDestinations"
+            :error="destinationsError"
+            @update:destinations="$emit('update:destinations', $event)"
+            @update:workflows="$emit('update:workflows', $event)"
+            @refresh="$emit('refresh:destinations')"
+          />
         </template>
 
         <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="flex items-start mb-4!">
-          <div
-            class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-          >
+        <div class="mb-4! flex items-start">
+          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
             {{ t("alerts.alertSettings.createsIncident") }}
             <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-            <OTooltip
-              :content="t('alerts.alertSettings.createsIncidentTooltip')"
-              side="right"
-            />
+            <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
           </div>
-          <OFormSwitch
-            name="creates_incident"
-            data-test="alert-creates-incident-toggle"
-          />
+          <OFormSwitch name="creates_incident" data-test="alert-creates-incident-toggle" />
         </div>
       </div>
     </div>
@@ -274,24 +197,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineComponent,
-  inject,
-  onMounted,
-  ref,
-  type PropType,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, inject, ref, type PropType } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
-import workflowService from "@/services/workflows";
-import config from "@/aws-exports";
+import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { convertMinutesToCron } from "@/utils/zincutils";
@@ -303,7 +216,7 @@ export default defineComponent({
     OFormSwitch,
     OTooltip,
     OIcon,
-    AlertTargetsSelect,
+    AlertDestinationsField,
   },
   props: {
     formData: {
@@ -349,9 +262,8 @@ export default defineComponent({
     "update:promqlCondition",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const router = useRouter();
 
     // Field refs consumed by the parent's AlertFocusManager (registered off the
     // step ref). Scheduled-only.
@@ -369,70 +281,18 @@ export default defineComponent({
     const form: any = inject(FORM_CONTEXT_KEY, null);
     const fieldError = (path: string) =>
       form
-        ? form.useStore((s: any) =>
-            firstFieldError(s.fieldMeta?.[path]?.errors ?? []),
-          )
+        ? form.useStore((s: any) => firstFieldError(s.fieldMeta?.[path]?.errors ?? []))
         : computed(() => undefined);
     const periodError = fieldError("trigger_condition.period");
     const silenceError = fieldError("trigger_condition.silence");
-    // Destinations is NOT an OFormSelect any more (AlertTargetsSelect below is a
-    // plain controlled component covering destinations + workflows), so its
+    // Destinations is NOT an OFormSelect any more (AlertDestinationsField below
+    // is a plain controlled component covering destinations + workflows), so its
     // schema error has no wrapper to render it — surface it the same way period
     // and silence do. The rule is "at least one destination OR workflow" and is
     // keyed on `destinations` in AddAlert.schema.ts, so it lands on this path.
     const destinationsError = fieldError("destinations");
 
     // ── Workflows (enterprise/cloud only) ────────────────────────────────────
-    // Options are self-fetched here rather than threaded down the whole alert-form
-    // chain like destinations. In OSS the group is never built, no list is
-    // fetched, and — since `workflows` stays [] — the "destination OR workflow"
-    // rule reduces to the original "destination required".
-    // "Are workflows available here" — the only thing this flag has ever gated
-    // in this component (the picker's Workflows group + the list fetch below).
-    // It was build-only; it now also respects the backend /config flag
-    // `workflows_enabled`, via the same shared gate the sidebar and routes use.
-    // Renamed from `workflowsEnabled` because it no longer means "enterprise build":
-    // on an enterprise deployment with workflows switched off this is false.
-    const workflowsEnabled = computed(
-      () =>
-        (config.isEnterprise === "true" || config.isCloud === "true") &&
-        store.state.zoConfig?.workflows_enabled === true,
-    );
-    const workflowOptions = ref<{ label: string; value: string }[]>([]);
-    const fetchWorkflows = async () => {
-      if (!workflowsEnabled.value) return;
-      try {
-        const res = await workflowService.listWorkflows(
-          store.state.selectedOrganization.identifier,
-        );
-        const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
-        workflowOptions.value = list.map((wf: any) => ({
-          label: wf.name,
-          value: wf.id,
-        }));
-      } catch {
-        workflowOptions.value = [];
-      }
-    };
-    onMounted(fetchWorkflows);
-
-    // The combined field's single refresh reloads both lists.
-    const refreshTargets = () => {
-      emit("refresh:destinations");
-      fetchWorkflows();
-    };
-
-    const routeToCreateWorkflow = () => {
-      const url = router.resolve({
-        name: "createWorkflow",
-        query: {
-          trigger: "alert_fired",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      }).href;
-      window.open(url, "_blank");
-    };
-
     const getBrowserTimezone = (): string => {
       try {
         return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -457,15 +317,13 @@ export default defineComponent({
       // round-trips a pre-write snapshot and silently clobbers any field written
       // earlier in the same tick.
       const currentTrigger =
-        form?.getFieldValue?.("trigger_condition") ??
-        props.formData.trigger_condition;
+        form?.getFieldValue?.("trigger_condition") ?? props.formData.trigger_condition;
       const nextTrigger: Record<string, any> = {
         ...currentTrigger,
         period: val,
       };
       if (periodValue && periodValue > 0) {
-        const minFrequency =
-          Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
+        const minFrequency = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
         if (periodValue >= minFrequency) nextTrigger.frequency = periodValue;
         nextTrigger.cron = convertMinutesToCron(periodValue);
         if (!nextTrigger.timezone) nextTrigger.timezone = getBrowserTimezone();
@@ -474,22 +332,10 @@ export default defineComponent({
       emit("update:trigger", nextTrigger);
     };
 
-    const routeToCreateDestination = () => {
-      const url = router.resolve({
-        name: "alertDestinations",
-        query: {
-          action: "add",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      }).href;
-      window.open(url, "_blank");
-    };
-
     return {
       t,
       store,
       handlePeriodChange,
-      routeToCreateDestination,
       // Field refs for the parent focus manager
       periodFieldRef,
       silenceFieldRef,
@@ -497,11 +343,6 @@ export default defineComponent({
       periodError,
       silenceError,
       destinationsError,
-      workflowsEnabled,
-      workflowOptions,
-      fetchWorkflows,
-      refreshTargets,
-      routeToCreateWorkflow,
     };
   },
 });

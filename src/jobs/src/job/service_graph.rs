@@ -19,11 +19,11 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 pub async fn run() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
-        // Only alert_manager nodes run the service graph job.
+        // Only scheduler nodes run the service graph job.
         // (Ingester/querier/compactor/router nodes exit here.)
-        if !LOCAL_NODE.is_alert_manager() {
+        if !LOCAL_NODE.is_scheduler() {
             log::info!(
-                "[SERVICE_GRAPH::JOB] Service graph processor disabled on non-alert-manager node (role: {:?})",
+                "[SERVICE_GRAPH::JOB] Service graph processor disabled on non-scheduler node (role: {:?})",
                 LOCAL_NODE.role
             );
             return Ok(());

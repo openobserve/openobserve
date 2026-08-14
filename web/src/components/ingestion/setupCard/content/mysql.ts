@@ -16,13 +16,11 @@
 // MySQL data-source setup card. Follows the OpenObserve guide:
 // https://openobserve.ai/blog/monitor-mysql-metrics-otel (requires MySQL 8.0+).
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
-import {
-  collectorInstallStep,
-  writeConfigVariants,
-  sharedToolIcons,
-} from "./otelShared";
+import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 
 const USER_SQL = `CREATE USER 'otel'@'localhost' IDENTIFIED BY 'yourpassword';
 GRANT SELECT, PROCESS, REPLICATION CLIENT ON *.* TO 'otel'@'localhost';
@@ -67,31 +65,29 @@ export default function mysqlCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "MySQL",
-      tagline:
-        "Collect MySQL metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.mysqlTagline"),
       logo: getImageURL("images/ingestion/mysql.svg"),
       tone: "#00758F",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       {
         id: "prepare",
-        title: "Prepare MySQL",
-        description:
-          "Create the monitoring user — run it in a SQL client, **not** your shell.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.prepareMysqlTitle",
+        descriptionKey: "ingestion.setupCard.prepareMysqlDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         completeOn: "copy",
         variants: [
           {
             id: "mysql",
-            label: "mysql",
+            label: raw("mysql"),
             icon: tool.terminal,
             code: { lang: "bash", raw: applyUser("mysql -h localhost -u root -p") },
             note: "Run as a MySQL admin (it prompts for the password).",
           },
           {
             id: "docker",
-            label: "Docker",
+            label: raw("Docker"),
             icon: tool.docker,
             code: {
               lang: "bash",
@@ -100,7 +96,7 @@ export default function mysqlCard(subs: CardSubstitutions): RichCardContent {
           },
           {
             id: "sql-client",
-            label: "SQL Client (GUI)",
+            labelKey: "ingestion.setupCard.sqlClientGuiVariant",
             icon: getImageURL("images/ingestion/mysql.svg"),
             code: { lang: "sql", raw: USER_SQL },
           },
@@ -109,24 +105,35 @@ export default function mysqlCard(subs: CardSubstitutions): RichCardContent {
       collectorInstallStep(),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variantGroup: "os",
         variantToggle: false,
         inputs: [
-          { id: "host", label: "MySQL Host", default: "localhost", placeholder: "localhost" },
-          { id: "port", label: "Port", default: "3306", placeholder: "3306", width: "sm" },
+          {
+            id: "host",
+            labelKey: "ingestion.setupCard.mysqlHostLabel",
+            default: "localhost",
+            placeholder: raw("localhost"),
+          },
+          {
+            id: "port",
+            labelKey: "ingestion.setupCard.portLabel",
+            default: "3306",
+            placeholder: raw("3306"),
+            width: "sm",
+          },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector (the user's password via env var).",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorMysqlDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: {
           lang: "bash",
@@ -135,13 +142,20 @@ export default function mysqlCard(subs: CardSubstitutions): RichCardContent {
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `mysql_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyMysqlMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Buffer Pool", "Operations", "Threads", "Row Locks", "Handlers"],
+        // mysql receiver metric names (mysql.buffer_pool.*, mysql.operations, …) —
+        // they land verbatim in the data, so the pills stay untranslated.
+        pills: [
+          raw("Buffer Pool"),
+          raw("Operations"),
+          raw("Threads"),
+          raw("Row Locks"),
+          raw("Handlers"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mysql", filter: "" },

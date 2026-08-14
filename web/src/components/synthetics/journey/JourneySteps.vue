@@ -1,4 +1,18 @@
-<!-- Copyright 2026 OpenObserve Inc. -->
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
 
 <!--
   JourneySteps — Thin OTable wrapper for synthetic monitoring step lists.
@@ -21,7 +35,7 @@ export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -30,9 +44,9 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
-import { ACTION_LABELS, ACTION_ICONS } from "@/constants/synthetics";
+import { ACTION_LABEL_KEYS, ACTION_ICONS } from "@/constants/synthetics";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ── Props ──────────────────────────────────────────────────────────
 const props = withDefaults(
@@ -68,11 +82,17 @@ const props = withDefaults(
     /** Expanded row ids (v-model). */
     expandedIds?: string[];
     /** Per-step replay results for error cards. */
-    getReplayResult?: (row: TData) =>
-      | { passed: boolean; durationMs: number; error?: string; structuredError?: any }
-      | undefined;
+    getReplayResult?: (
+      row: TData,
+    ) => { passed: boolean; durationMs: number; error?: string; structuredError?: any } | undefined;
     /** Returns a CSS color for the 4px left status bar per row (e.g. validation errors). */
     getRowStatusColor?: (row: TData) => string | undefined;
+    /**
+     * Total run duration in ms — the scale every timeline bar is drawn against
+     * (results mode). Supplies the column header's window and the denominator
+     * for each bar, so the row data carries only its own offset and duration.
+     */
+    totalDurationMs?: number;
   }>(),
   {
     actionKey: "action",
@@ -84,6 +104,7 @@ const props = withDefaults(
     locked: false,
     readonly: false,
     selectionEnabled: false,
+    totalDurationMs: 0,
   },
 );
 
@@ -93,9 +114,9 @@ const emit = defineEmits<{
   "update:expanded-ids": [ids: string[]];
   "row-click": [row: TData, event: MouseEvent];
   // Row actions emitted for parent handling
-  "expand": [row: TData];
-  "delete": [row: TData];
-  "duplicate": [row: TData];
+  expand: [row: TData];
+  delete: [row: TData];
+  duplicate: [row: TData];
   "insert-below": [row: TData];
   "retry-replay": [];
 }>();
@@ -119,7 +140,7 @@ function actionIcon(row: TData): string {
 function actionLabel(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
   return isStepAction(action)
-    ? ACTION_LABELS[action]
+    ? t(ACTION_LABEL_KEYS[action])
     : action.charAt(0).toUpperCase() + action.slice(1);
 }
 
@@ -157,20 +178,55 @@ function getDotState(row: TData): StepDotState | undefined {
 // ── Column definitions ─────────────────────────────────────────────
 const isEditor = computed(() => props.mode === "editor");
 
+/**
+ * The scale every timeline bar shares, never zero.
+ *
+ * A run with no recorded duration would otherwise divide by zero and paint
+ * every bar full-width, which reads as "everything took the whole run".
+ */
+const timelineTotal = computed(() => Math.max(props.totalDurationMs || 0, 1));
+
+const fmtSeconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+
+/**
+ * "Timeline · 0 – 35.8s".
+ *
+ * The window belongs in the header rather than on each row: it is the one fact
+ * that makes a bar's position mean anything, and repeating it per row would say
+ * it once per step.
+ */
+const timelineHeader = computed(() =>
+  props.totalDurationMs
+    ? t("synthetics.journey.timelineHeaderWindow", { end: fmtSeconds(props.totalDurationMs) })
+    : t("synthetics.journey.timelineHeader"),
+);
+
 const columns = computed<OTableColumnDef<TData>[]>(() => {
   if (isEditor.value) {
     return [
-      { id: "details", header: t('synthetics.journey.stepHeader'), size: 200, meta: { autoWidth: true } },
-      { id: "actions", header: "", size: 128, isAction: true },
+      {
+        id: "details",
+        header: t("synthetics.journey.stepHeader"),
+        size: 200,
+        meta: { autoWidth: true },
+      },
+      { id: "actions", header: raw(""), size: 128, isAction: true },
     ];
   }
-  // Results mode
+  // Results mode. Headers are named here because results mode renders them —
+  // the run's steps are a table an engineer reads down, and an unlabelled
+  // timeline column cannot say what its bars are drawn against.
   return [
-    { id: "step", header: "", size: 44 },
-    { id: "screenshot", header: "", size: 90 },
-    { id: "details", header: t('synthetics.journey.stepHeader'), size: 200, meta: { autoWidth: true } },
-    { id: "progress", header: "", size: 100 },
-    { id: "duration", header: t('synthetics.journey.durationHeader'), size: 80 },
+    { id: "step", header: raw(""), size: 44 },
+    { id: "screenshot", header: t("synthetics.journey.shotHeader"), size: 90 },
+    {
+      id: "details",
+      header: t("synthetics.journey.stepHeader"),
+      size: 200,
+      meta: { autoWidth: true },
+    },
+    { id: "progress", header: timelineHeader.value, size: 260 },
+    { id: "duration", header: t("synthetics.journey.timeHeader"), size: 80 },
   ];
 });
 
@@ -194,11 +250,11 @@ function handleUpdateExpanded(ids: string[]) {
 
 <template>
   <OTable
-    class="border-t border-table-row-divider"
+    class="border-table-row-divider border-t"
     :data="data"
     :columns="columns"
     row-key="id"
-    :show-header="false"
+    :show-header="mode === 'results'"
     :selection="selectionEnabled ? 'multiple' : 'none'"
     :selected-ids="selectedIds"
     :expansion="'multiple'"
@@ -232,7 +288,7 @@ function handleUpdateExpanded(ids: string[]) {
     <!-- ── cell-screenshot: Thumbnail (results mode) ───────────── -->
     <template v-if="mode === 'results'" #cell-screenshot="{ row }">
       <div
-        class="w-18 h-12 shrink-0 rounded-default border border-border-default bg-surface-subtle flex items-center justify-center overflow-hidden"
+        class="rounded-default border-border-default bg-surface-subtle flex h-12 w-18 shrink-0 items-center justify-center overflow-hidden border"
       >
         <slot name="screenshot-thumb" :row="row">
           <OIcon name="image" size="xs" class="text-text-secondary" />
@@ -242,21 +298,21 @@ function handleUpdateExpanded(ids: string[]) {
 
     <!-- ── cell-details: Step content (both modes) ─────────────── -->
     <template #cell-details="{ row }">
-      <div class="flex items-center gap-2 min-w-0">
+      <div class="flex min-w-0 items-center gap-2">
         <!-- Step number (editor mode — circle during replay, plain text otherwise) -->
         <span
           v-if="mode === 'editor'"
           :class="[
             getDotState(row) ? dotClass(getDotState(row)) : '',
             'shrink-0 tabular-nums',
-            getDotState(row) ? '' : 'text-sm text-text-muted w-6 text-center',
+            getDotState(row) ? '' : 'text-text-muted w-6 text-center text-sm',
           ]"
         >
           <OSpinner
             v-if="getDotState(row) === 'active'"
             variant="ring"
             size="xs"
-            class="text-primary-500"
+            class="text-accent"
           />
           <template v-else>{{ (data as any[]).indexOf(row) + 1 }}</template>
         </span>
@@ -264,60 +320,60 @@ function handleUpdateExpanded(ids: string[]) {
         <!-- Selection is handled by OTable's built-in checkbox column when selection="multiple" -->
 
         <!-- Action icon chip -->
-        <span
-          class="bg-primary-50 rounded-default p-1 shrink-0 flex items-center"
-        >
+        <span class="bg-tabs-active-bg rounded-default flex shrink-0 items-center p-1">
           <OIcon
             :name="actionIcon(row)"
             size="sm"
-            class="text-primary-500"
+            class="text-tabs-active-text"
             aria-hidden="true"
           />
         </span>
 
         <!-- Action label badge -->
         <div class="w-24!">
-            <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
+          <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
         </div>
 
         <!-- Step display name -->
-        <span class="text-sm text-text-body flex-1 truncate min-w-0">
+        <span class="text-text-body min-w-0 flex-1 truncate text-sm">
           {{ stepName(row) }}
         </span>
 
         <!-- Selector/value preview (editor mode only) -->
         <span
           v-if="mode === 'editor' && stepDetail(row)"
-          class="font-mono text-xs text-text-secondary truncate max-w-[25%] shrink-0"
+          class="text-text-secondary max-w-[25%] shrink-0 truncate font-mono text-xs"
         >
           {{ stepDetail(row) }}
         </span>
       </div>
     </template>
 
-    <!-- ── cell-progress: Progress bar (results mode) ──────────── -->
+    <!-- ── cell-progress: Timeline segment (results mode) ──────── -->
+    <!-- A segment, not a fill: the bar starts where the step started within the
+         run, so reading down the column shows where the time went rather than
+         six bars all anchored to the same left edge. -->
     <template v-if="mode === 'results'" #cell-progress="{ row }">
       <OProgressBar
-        :value="((row as any).duration ?? 0) / Math.max((row as any)._totalDuration ?? 1, 1)"
+        :start="((row as any).offsetMs ?? 0) / timelineTotal"
+        :value="(((row as any).offsetMs ?? 0) + ((row as any).duration ?? 0)) / timelineTotal"
         :variant="(row as any).status === 'fail' ? 'danger' : 'default'"
         size="xs"
-        class="w-20! shrink-0 h-2!"
+        class="w-full"
+        data-test="synthetics-journey-step-timeline-bar"
       />
     </template>
 
     <!-- ── cell-duration: Duration text (results mode) ─────────── -->
     <template v-if="mode === 'results'" #cell-duration="{ row }">
-      <span class="text-xs text-text-secondary shrink-0 font-mono tabular-nums">
+      <span class="text-text-secondary shrink-0 font-mono text-xs tabular-nums">
         {{ (row as any).durStr ?? "" }}
       </span>
     </template>
 
     <!-- ── cell-actions: Row action buttons (editor mode) ──────── -->
     <template v-if="mode === 'editor'" #cell-actions="{ row }">
-      <div
-        class="flex items-center gap-0.5 shrink-0"
-        :class="{ invisible: isLocked }"
-      >
+      <div class="flex shrink-0 items-center gap-0.5" :class="{ invisible: isLocked }">
         <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
 
         <OButton

@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 
-
 // Mock getImageURL
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `/mocked/${path}`),

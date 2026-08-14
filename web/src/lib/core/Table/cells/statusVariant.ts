@@ -9,6 +9,8 @@
 //   const { variant, label, dot } = statusVariant("paused", "pipeline");
 //   <OBadge :variant="variant" :dot="dot">{{ label }}</OBadge>
 
+import { raw, type I18nText } from "@/types/i18n";
+
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 /** Semantic tone — the calm, low-chroma "soft" badge family reads best at
@@ -50,7 +52,7 @@ const BASE_TONE: Record<string, StatusTone> = {
   resolved: "success",
   done: "success",
   live: "success",
-  "true": "success",
+  true: "success",
 
   // warning / transient / attention
   paused: "warning",
@@ -85,7 +87,7 @@ const BASE_TONE: Record<string, StatusTone> = {
   rejected: "error",
   expired: "error",
   blocked: "error",
-  "false": "error",
+  false: "error",
 
   // info / running / scheduled
   running: "info",
@@ -119,7 +121,7 @@ const BASE_TONE: Record<string, StatusTone> = {
  */
 const DOMAIN_TONE: Record<string, Record<string, StatusTone>> = {
   // Invoices: an "open" invoice is normal/info, not a warning.
-  invoice: { open: "info", uncollectible: "error", "void": "neutral" },
+  invoice: { open: "info", uncollectible: "error", void: "neutral" },
   // Services / nodes catalog: "warning" sits between degraded and critical.
   service: { warning: "warning", degraded: "warning", critical: "error" },
   node: { warning: "warning" },
@@ -131,7 +133,7 @@ const DOMAIN_TONE: Record<string, Record<string, StatusTone>> = {
 export interface StatusVariantResult {
   variant: BadgeVariant;
   tone: StatusTone;
-  label: string;
+  label: I18nText;
   dot: boolean;
 }
 
@@ -149,13 +151,9 @@ export function humanizeStatus(value: string): string {
  * @param value  raw status string (case-insensitive) — also accepts booleans.
  * @param domain optional feature key for overrides ("invoice"|"eval"|"service"|"node"|…).
  */
-export function statusVariant(
-  value: unknown,
-  domain?: string,
-): StatusVariantResult {
-  const raw =
-    typeof value === "boolean" ? String(value) : String(value ?? "").trim();
-  const key = raw.toLowerCase();
+export function statusVariant(value: unknown, domain?: string): StatusVariantResult {
+  const rawValue = typeof value === "boolean" ? String(value) : String(value ?? "").trim();
+  const key = rawValue.toLowerCase();
 
   let tone: StatusTone | undefined;
 
@@ -178,7 +176,7 @@ export function statusVariant(
   return {
     variant: TONE_VARIANT[tone],
     tone,
-    label: raw ? humanizeStatus(raw) : "—",
+    label: raw(rawValue ? humanizeStatus(rawValue) : "—"),
     dot: true,
   };
 }

@@ -46,8 +46,7 @@ const workflowsRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
-const IdentityAccessManagement = () =>
-  import("@/views/IdentityAccessManagement.vue");
+const IdentityAccessManagement = () => import("@/views/IdentityAccessManagement.vue");
 
 const AppGroups = () => import("@/components/iam/groups/AppGroups.vue");
 
@@ -59,11 +58,9 @@ const EditGroup = () => import("@/components/iam/groups/EditGroup.vue");
 
 const Quota = () => import("@/components/iam/quota/Quota.vue");
 
-const Organizations = () =>
-  import("@/components/iam/organizations/AppOrganizations.vue");
+const Organizations = () => import("@/components/iam/organizations/AppOrganizations.vue");
 
-const ActionScripts = () =>
-  import("@/components/actionScripts/ActionScripts.vue");
+const ActionScripts = () => import("@/components/actionScripts/ActionScripts.vue");
 
 const Invitations = () => import("@/views/Invitations.vue");
 
@@ -71,14 +68,11 @@ import Users from "@/views/User.vue";
 
 const IncidentList = () => import("@/components/alerts/IncidentList.vue");
 
-const WorkflowsList = () =>
-  import("@/components/workflows/WorkflowsList.vue");
+const WorkflowsList = () => import("@/components/workflows/WorkflowsList.vue");
 
-const WorkflowEditor = () =>
-  import("@/components/workflows/WorkflowEditor.vue");
+const WorkflowEditor = () => import("@/components/workflows/WorkflowEditor.vue");
 
-const WorkflowRuns = () =>
-  import("@/components/workflows/WorkflowRuns.vue");
+const WorkflowRuns = () => import("@/components/workflows/WorkflowRuns.vue");
 
 const useEnterpriseRoutes = () => {
   const routes: any = [
@@ -107,10 +101,20 @@ const useEnterpriseRoutes = () => {
           meta: {
             title: "Ingestion Tokens",
           },
-          component: () =>
-            import("@/components/iam/IngestionTokens.vue"),
+          component: () => import("@/components/iam/IngestionTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "syntheticsTokens",
+          name: "syntheticsTokens",
+          meta: {
+            title: "Synthetics Tokens",
+          },
+          component: () => import("@/components/iam/SyntheticsTokens.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            syntheticsRouteGuard(to, from, next);
           },
         },
         {
@@ -146,6 +150,21 @@ const useEnterpriseRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        // Inbound MCP server setup — lives under IAM as a credentialed-access
+        // surface, alongside Service Accounts / Ingestion Tokens. Available on
+        // every edition: the backend registers `/{org}/mcp` and initialises the
+        // MCP tools for all builds (only the OAuth *discovery* endpoints are
+        // enterprise-only, which the card handles by hiding that auth mode).
+        // So there is no build or runtime gate here or on the IAM tab.
+        {
+          path: "mcpServer",
+          name: "mcpServer",
+          meta: { title: "MCP Server" },
+          component: () => import("@/components/iam/McpServer.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
       ],
     },
   ];
@@ -153,23 +172,6 @@ const useEnterpriseRoutes = () => {
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
-    // Inbound MCP server setup — lives under IAM as a credentialed-access
-    // surface, alongside Service Accounts / Ingestion Tokens. MCP is an AI
-    // feature, gated on ai_enabled like the rest of the app — but that gate is
-    // enforced by the sidebar item's reactive `visible` (isEnterprise &&
-    // ai_enabled), NOT here: `window.store` is unset at runtime, so a guard read
-    // is unreliable and must never fail-closed (it would bounce every click to
-    // Users). The route itself is already limited to the enterprise/cloud build.
-    routes[0].children.push({
-      path: "mcpServer",
-      name: "mcpServer",
-      meta: { title: "MCP Server" },
-      component: () => import("@/components/iam/McpServer.vue"),
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    });
-
     routes.push({
       path: "synthetics",
       name: "synthetics",
@@ -225,7 +227,7 @@ const useEnterpriseRoutes = () => {
         beforeEnter(to: any, from: any, next: any) {
           syntheticsRouteGuard(to, from, next);
         },
-      }
+      },
     );
 
     routes.push(

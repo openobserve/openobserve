@@ -35,6 +35,7 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use schema::get_schema_changes;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tokio::sync::{RwLock, mpsc};
@@ -43,7 +44,6 @@ use crate::{
     common::meta::stream::SchemaRecords,
     ingestion::{self, get_thread_id},
     metadata::{Metadata, MetadataItem},
-    schema::get_schema_changes,
 };
 
 const CHANNEL_SIZE: usize = 10240;
@@ -164,13 +164,12 @@ impl Metadata for DistinctValues {
     async fn write(&self, org_id: &str, data: Vec<MetadataItem>) -> Result<()> {
         let mut group_items: FxIndexMap<DvItem, u32> = FxIndexMap::default();
         for item in data {
-            if let MetadataItem::DistinctValues(mut item) = item {
-                // these two are reserved, so we remove them if present
-                item.value.remove("count");
-                item.value.remove(TIMESTAMP_COL_NAME);
-                let count = group_items.entry(item).or_default();
-                *count += 1;
-            }
+            let MetadataItem::DistinctValues(mut item) = item;
+            // these two are reserved, so we remove them if present
+            item.value.remove("count");
+            item.value.remove(TIMESTAMP_COL_NAME);
+            let count = group_items.entry(item).or_default();
+            *count += 1;
         }
         for (item, count) in group_items {
             self.channel
@@ -235,18 +234,19 @@ impl Metadata for DistinctValues {
                 };
 
                 if let Some(ret) =
-                    super::super::stream::get_stream_retention(&org_id, stream_type, &stream_name)
-                        .await
+                    stream::get_stream_retention(&org_id, stream_type, &stream_name).await
                 {
+                    // local editable copy; persisted via save_stream_settings below
                     let mut new_settings = infra::schema::get_settings(
                         &org_id,
                         &distinct_stream_name,
                         StreamType::Metadata,
                     )
                     .await
+                    .map(|s| (*s).clone())
                     .unwrap_or_default();
                     new_settings.data_retention = ret;
-                    if let Err(e) = super::super::stream::save_stream_settings(
+                    if let Err(e) = stream::save_stream_settings(
                         &org_id,
                         &distinct_stream_name,
                         StreamType::Metadata,

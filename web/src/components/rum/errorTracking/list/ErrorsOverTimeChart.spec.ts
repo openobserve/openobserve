@@ -71,9 +71,7 @@ const deployOutsideBuckets = {
   firstSeen: makeTs(-100_000),
 };
 
-function mountChart(
-  props: Record<string, unknown> = {},
-): VueWrapper {
+function mountChart(props: Record<string, unknown> = {}): VueWrapper {
   return mount(ErrorsOverTimeChart, {
     props: {
       buckets: nonZeroBuckets,
@@ -117,9 +115,7 @@ describe("ErrorsOverTimeChart", () => {
 
   describe("rendering", () => {
     it("renders the root section element", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-over-time-chart"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-over-time-chart"]').exists()).toBe(true);
     });
 
     it("renders the section heading text", () => {
@@ -139,9 +135,7 @@ describe("ErrorsOverTimeChart", () => {
     it("shows the loading skeleton when loading is true", () => {
       const w = mountChart({ loading: true });
 
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-loading"]').exists(),
-      ).toBe(true);
+      expect(w.find('[data-test="rum-errors-over-time-chart-loading"]').exists()).toBe(true);
 
       w.unmount();
     });
@@ -157,17 +151,13 @@ describe("ErrorsOverTimeChart", () => {
     it("does not show the empty state when loading is true", () => {
       const w = mountChart({ loading: true, buckets: allZeroBuckets });
 
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-empty"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-errors-over-time-chart-empty"]').exists()).toBe(false);
 
       w.unmount();
     });
 
     it("hides the loading element when loading is false", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-over-time-chart-loading"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-errors-over-time-chart-loading"]').exists()).toBe(false);
     });
   });
 
@@ -179,9 +169,7 @@ describe("ErrorsOverTimeChart", () => {
     it("shows the empty message when all buckets have zero errors", () => {
       const w = mountChart({ buckets: allZeroBuckets });
 
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-empty"]').exists(),
-      ).toBe(true);
+      expect(w.find('[data-test="rum-errors-over-time-chart-empty"]').exists()).toBe(true);
 
       w.unmount();
     });
@@ -189,9 +177,9 @@ describe("ErrorsOverTimeChart", () => {
     it("shows the correct empty text", () => {
       const w = mountChart({ buckets: allZeroBuckets });
 
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-empty"]').text(),
-      ).toContain("No errors in the selected time range");
+      expect(w.find('[data-test="rum-errors-over-time-chart-empty"]').text()).toContain(
+        "No errors in the selected time range",
+      );
 
       w.unmount();
     });
@@ -199,9 +187,7 @@ describe("ErrorsOverTimeChart", () => {
     it("shows empty state when buckets array is empty", () => {
       const w = mountChart({ buckets: [] });
 
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-empty"]').exists(),
-      ).toBe(true);
+      expect(w.find('[data-test="rum-errors-over-time-chart-empty"]').exists()).toBe(true);
 
       w.unmount();
     });
@@ -215,9 +201,7 @@ describe("ErrorsOverTimeChart", () => {
     });
 
     it("does not show empty state when at least one bucket has non-zero errors", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-over-time-chart-empty"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-errors-over-time-chart-empty"]').exists()).toBe(false);
     });
   });
 
@@ -227,9 +211,7 @@ describe("ErrorsOverTimeChart", () => {
 
   describe("data state", () => {
     it("renders the ChartRenderer stub when there is data", () => {
-      expect(wrapper.find('[data-test="chart-renderer-stub"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="chart-renderer-stub"]').exists()).toBe(true);
     });
 
     it("passes a data prop to ChartRenderer with options object", () => {
@@ -269,9 +251,7 @@ describe("ErrorsOverTimeChart", () => {
       };
 
       const unhandledSeries = options.series.find((s) => s.name === "Unhandled");
-      expect(unhandledSeries!.data).toEqual(
-        nonZeroBuckets.map((b) => b.unhandled),
-      );
+      expect(unhandledSeries!.data).toEqual(nonZeroBuckets.map((b) => b.unhandled));
     });
 
     it("populates Handled series data from buckets.handled", () => {
@@ -281,9 +261,7 @@ describe("ErrorsOverTimeChart", () => {
       };
 
       const handledSeries = options.series.find((s) => s.name === "Handled");
-      expect(handledSeries!.data).toEqual(
-        nonZeroBuckets.map((b) => b.handled),
-      );
+      expect(handledSeries!.data).toEqual(nonZeroBuckets.map((b) => b.handled));
     });
 
     it("generates x-axis category labels from bucket timestamps", () => {
@@ -458,9 +436,7 @@ describe("ErrorsOverTimeChart", () => {
         spikeFactor: 3.6,
       });
 
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').exists(),
-      ).toBe(true);
+      expect(w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').exists()).toBe(true);
 
       w.unmount();
     });
@@ -471,9 +447,7 @@ describe("ErrorsOverTimeChart", () => {
         spikeFactor: 3.6,
       });
 
-      const caption = w
-        .find('[data-test="rum-errors-over-time-chart-spike-caption"]')
-        .text();
+      const caption = w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').text();
 
       expect(caption).toContain("3.6×");
       expect(caption).toContain("v1.0.6");
@@ -487,9 +461,7 @@ describe("ErrorsOverTimeChart", () => {
         spikeFactor: 2.1,
       });
 
-      const caption = w
-        .find('[data-test="rum-errors-over-time-chart-spike-caption"]')
-        .text();
+      const caption = w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').text();
 
       expect(caption).toContain("spike right after the");
 
@@ -502,9 +474,7 @@ describe("ErrorsOverTimeChart", () => {
         spikeFactor: null,
       });
 
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -515,20 +485,16 @@ describe("ErrorsOverTimeChart", () => {
         spikeFactor: 4.0,
       });
 
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').exists()).toBe(false);
 
       w.unmount();
     });
 
     it("does not show spike caption when both deploy and spikeFactor are null", () => {
       // Default mount: both are null
-      expect(
-        wrapper
-          .find('[data-test="rum-errors-over-time-chart-spike-caption"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-errors-over-time-chart-spike-caption"]').exists()).toBe(
+        false,
+      );
     });
 
     it("formats spikeFactor to one decimal place in caption", () => {
@@ -537,11 +503,9 @@ describe("ErrorsOverTimeChart", () => {
         spikeFactor: 5,
       });
 
-      expect(
-        w
-          .find('[data-test="rum-errors-over-time-chart-spike-caption"]')
-          .text(),
-      ).toContain("5.0×");
+      expect(w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').text()).toContain(
+        "5.0×",
+      );
 
       w.unmount();
     });
@@ -554,37 +518,27 @@ describe("ErrorsOverTimeChart", () => {
   describe("props reactivity", () => {
     it("switches from data to empty state when buckets become all zero", async () => {
       // Arrange — start with data
-      expect(wrapper.find('[data-test="chart-renderer-stub"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="chart-renderer-stub"]').exists()).toBe(true);
 
       // Act
       await wrapper.setProps({ buckets: allZeroBuckets });
 
       // Assert — chart gone, empty shown
-      expect(wrapper.find('[data-test="chart-renderer-stub"]').exists()).toBe(
-        false,
-      );
-      expect(
-        wrapper.find('[data-test="rum-errors-over-time-chart-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="chart-renderer-stub"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-errors-over-time-chart-empty"]').exists()).toBe(true);
     });
 
     it("switches from empty to data state when buckets gain non-zero values", async () => {
       // Arrange — start with empty buckets
       const w = mountChart({ buckets: allZeroBuckets });
 
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-empty"]').exists(),
-      ).toBe(true);
+      expect(w.find('[data-test="rum-errors-over-time-chart-empty"]').exists()).toBe(true);
 
       // Act
       await w.setProps({ buckets: nonZeroBuckets });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-empty"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-errors-over-time-chart-empty"]').exists()).toBe(false);
       expect(w.find('[data-test="chart-renderer-stub"]').exists()).toBe(true);
 
       w.unmount();
@@ -614,11 +568,7 @@ describe("ErrorsOverTimeChart", () => {
       await wrapper.setProps({ loading: true });
 
       // Assert
-      expect(
-        wrapper
-          .find('[data-test="rum-errors-over-time-chart-loading"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-over-time-chart-loading"]').exists()).toBe(true);
     });
   });
 
@@ -663,12 +613,10 @@ describe("ErrorsOverTimeChart", () => {
         spikeFactor: 1.5,
       });
 
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').exists(),
-      ).toBe(true);
-      expect(
-        w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').text(),
-      ).toContain("1.5×");
+      expect(w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').exists()).toBe(true);
+      expect(w.find('[data-test="rum-errors-over-time-chart-spike-caption"]').text()).toContain(
+        "1.5×",
+      );
 
       w.unmount();
     });

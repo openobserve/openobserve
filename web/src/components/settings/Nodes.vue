@@ -24,15 +24,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OSplitter
       :model-value="splitterModel"
-      @update:model-value="(v: number) => splitterModel = v"
+      @update:model-value="(v: number) => (splitterModel = v)"
       :limits="[0, 250]"
       unit="px"
-      class="flex-1 min-h-0 overflow-hidden"
+      class="min-h-0 flex-1 overflow-hidden"
     >
       <template #before>
-        <div class="flex flex-col border-r4 border-r border-border-default h-full">
-          <div class="sticky top-0 px-2 shrink-0">
-            <div class="flex items-center justify-between p-2 " style="font-size: var(--text-lg)">
+        <div class="border-r4 border-border-default flex h-full flex-col border-r">
+          <div class="sticky top-0 shrink-0 px-2">
+            <div class="flex items-center justify-between p-2 text-lg">
               <span class="flex items-center gap-1">
                 {{ t("nodes.filter_header") }}
                 <OIcon name="filter-list" size="sm" />
@@ -42,17 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 :class="filterApplied ? 'text-primary' : ''"
                 @click="clearAll()"
-              >{{ t("nodes.clear_all") }}</OButton>
+                >{{ t("nodes.clear_all") }}</OButton
+              >
             </div>
           </div>
 
-          <div class=" min-h-0 overflow-y-auto">
-            <div class="flex flex-col pb-2 px-2">
+          <div class="min-h-0 overflow-y-auto">
+            <div class="flex flex-col px-2 pb-2">
               <OCollapsible
-                v-if="
-                  regionRows.length > 0 &&
-                  store.state.zoConfig.super_cluster_enabled
-                "
+                v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled"
                 variant="sidebar"
                 :model-value="sectionOpen.region"
                 @update:model-value="(v) => (sectionOpen.region = v)"
@@ -65,450 +63,489 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     clearable
                     :debounce="1"
                     :placeholder="t('nodes.searchRegion')"
-                    class="w-full filter-input"
+                    class="filter-input w-full"
                   />
                   <OTable
-                      data-test="nodes-region-table"
-                      :data="visibleRegionRows"
-                      :columns="filterOTableColumns"
-                      row-key="name"
-                      :selected-ids="selectedRegionIds"
-                      selection="multiple"
-                      pagination="none"
-                      :show-global-filter="false"
-                      :default-columns="false"
-                      @update:selected-ids="handleSelectedRegionIdsUpdate"
-                    >
-                      <template #empty>
-                        <OEmptyState size="block" preset="no-nodes" />
-                      </template>
-                    </OTable>
-                  </div>
-                </OCollapsible>
-                <OSeparator v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled && sectionOpen.region" class="my-2" />
+                    data-test="nodes-region-table"
+                    :data="visibleRegionRows"
+                    :columns="filterOTableColumns"
+                    row-key="name"
+                    :selected-ids="selectedRegionIds"
+                    selection="multiple"
+                    pagination="none"
+                    :show-global-filter="false"
+                    :default-columns="false"
+                    @update:selected-ids="handleSelectedRegionIdsUpdate"
+                  >
+                    <template #empty>
+                      <OEmptyState size="block" preset="no-nodes" />
+                    </template>
+                  </OTable>
+                </div>
+              </OCollapsible>
+              <OSeparator
+                v-if="
+                  regionRows.length > 0 &&
+                  store.state.zoConfig.super_cluster_enabled &&
+                  sectionOpen.region
+                "
+                class="my-2"
+              />
 
-                <OCollapsible
-                  v-if="
-                    clusterRows.length > 0 &&
-                    store.state.zoConfig.super_cluster_enabled
-                  "
-                  variant="sidebar"
-                  :model-value="sectionOpen.cluster"
-                  @update:model-value="(v) => (sectionOpen.cluster = v)"
-                  :label="t('nodes.cluster')"
-                >
-                  <div class="p-0">
-                    <OSearchInput
-                      data-test="nodes-cluster-filter-search-input"
-                      v-model="filterClusterQuery"
-                      clearable
-                      :debounce="1"
-                      :placeholder="t('nodes.searchCluster')"
-                      class="w-full filter-input"
+              <OCollapsible
+                v-if="clusterRows.length > 0 && store.state.zoConfig.super_cluster_enabled"
+                variant="sidebar"
+                :model-value="sectionOpen.cluster"
+                @update:model-value="(v) => (sectionOpen.cluster = v)"
+                :label="t('nodes.cluster')"
+              >
+                <div class="p-0">
+                  <OSearchInput
+                    data-test="nodes-cluster-filter-search-input"
+                    v-model="filterClusterQuery"
+                    clearable
+                    :debounce="1"
+                    :placeholder="t('nodes.searchCluster')"
+                    class="filter-input w-full"
+                  />
+                  <OTable
+                    data-test="nodes-cluster-table"
+                    :data="visibleClusterRows"
+                    :columns="filterOTableColumns"
+                    row-key="name"
+                    :selected-ids="selectedClusterIds"
+                    selection="multiple"
+                    pagination="none"
+                    :show-global-filter="false"
+                    :default-columns="false"
+                    @update:selected-ids="handleSelectedClusterIdsUpdate"
+                  >
+                    <template #empty>
+                      <OEmptyState size="block" preset="no-nodes" />
+                    </template>
+                  </OTable>
+                </div>
+              </OCollapsible>
+              <OSeparator
+                v-if="
+                  clusterRows.length > 0 &&
+                  store.state.zoConfig.super_cluster_enabled &&
+                  sectionOpen.cluster
+                "
+                class="my-2"
+              />
+
+              <OCollapsible
+                v-if="nodetypeRows.length > 0"
+                variant="sidebar"
+                :model-value="sectionOpen.nodetype"
+                @update:model-value="(v) => (sectionOpen.nodetype = v)"
+                :label="t('nodes.nodetype')"
+              >
+                <div class="px-1">
+                  <OTable
+                    data-test="nodes-nodetype-table"
+                    :data="nodetypeRows"
+                    :columns="filterOTableColumns"
+                    row-key="name"
+                    :selected-ids="selectedNodetypeIds"
+                    selection="multiple"
+                    pagination="none"
+                    :show-global-filter="false"
+                    :default-columns="false"
+                    @update:selected-ids="handleSelectedNodetypeIdsUpdate"
+                  />
+                </div>
+              </OCollapsible>
+
+              <OCollapsible
+                v-if="statusesRows.length > 0"
+                variant="sidebar"
+                :model-value="sectionOpen.status"
+                @update:model-value="(v) => (sectionOpen.status = v)"
+                :label="t('nodes.status')"
+              >
+                <div class="px-1">
+                  <OTable
+                    data-test="nodes-status-table"
+                    :data="statusesRows"
+                    :columns="filterOTableColumns"
+                    row-key="name"
+                    :selected-ids="selectedStatusIds"
+                    selection="multiple"
+                    pagination="none"
+                    :show-global-filter="false"
+                    :default-columns="false"
+                    @update:selected-ids="handleSelectedStatusIdsUpdate"
+                  >
+                    <template #cell-name="{ row }">
+                      <span
+                        :class="`status-${row.name.toLowerCase()}`"
+                        class="mr-1 self-stretch"
+                      ></span
+                      >{{ row.name }}
+                    </template>
+                  </OTable>
+                </div>
+              </OCollapsible>
+
+              <OCollapsible
+                variant="sidebar"
+                :model-value="sectionOpen.cpu"
+                @update:model-value="(v) => (sectionOpen.cpu = v)"
+                :label="t('nodes.cpuusage')"
+              >
+                <div class="px-1 pb-2">
+                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                    <OInput
+                      data-test="nodes-filter-cpuusage-min"
+                      type="number"
+                      class="w-full min-w-0"
+                      min="0"
+                      max="100"
+                      v-model="cpuUsage.min"
                     />
-                    <OTable
-                      data-test="nodes-cluster-table"
-                      :data="visibleClusterRows"
-                      :columns="filterOTableColumns"
-                      row-key="name"
-                      :selected-ids="selectedClusterIds"
-                      selection="multiple"
-                      pagination="none"
-                      :show-global-filter="false"
-                      :default-columns="false"
-                      @update:selected-ids="handleSelectedClusterIdsUpdate"
-                    >
-                      <template #empty>
-                        <OEmptyState size="block" preset="no-nodes" />
-                      </template>
-                    </OTable>
-                  </div>
-                </OCollapsible>
-                <OSeparator v-if="clusterRows.length > 0 && store.state.zoConfig.super_cluster_enabled && sectionOpen.cluster" class="my-2" />
-
-                <OCollapsible
-                  v-if="nodetypeRows.length > 0"
-                  variant="sidebar"
-                  :model-value="sectionOpen.nodetype"
-                  @update:model-value="(v) => (sectionOpen.nodetype = v)"
-                  :label="t('nodes.nodetype')"
-                >
-                  <div class="px-1">
-                    <OTable
-                      data-test="nodes-nodetype-table"
-                      :data="nodetypeRows"
-                      :columns="filterOTableColumns"
-                      row-key="name"
-                      :selected-ids="selectedNodetypeIds"
-                      selection="multiple"
-                      pagination="none"
-                      :show-global-filter="false"
-                      :default-columns="false"
-                      @update:selected-ids="handleSelectedNodetypeIdsUpdate"
-                    />
-                  </div>
-                </OCollapsible>
-
-                <OCollapsible
-                  v-if="statusesRows.length > 0"
-                  variant="sidebar"
-                  :model-value="sectionOpen.status"
-                  @update:model-value="(v) => (sectionOpen.status = v)"
-                  :label="t('nodes.status')"
-                >
-                  <div class="px-1">
-                    <OTable
-                      data-test="nodes-status-table"
-                      :data="statusesRows"
-                      :columns="filterOTableColumns"
-                      row-key="name"
-                      :selected-ids="selectedStatusIds"
-                      selection="multiple"
-                      pagination="none"
-                      :show-global-filter="false"
-                      :default-columns="false"
-                      @update:selected-ids="handleSelectedStatusIdsUpdate"
-                    >
-                      <template #cell-name="{ row }">
-                        <span
-                          :class="`status-${row.name.toLowerCase()}`"
-                          class="self-stretch mr-1"
-                        ></span
-                        >{{ row.name }}
-                      </template>
-                    </OTable>
-                  </div>
-                </OCollapsible>
-
-                <OCollapsible
-                  variant="sidebar"
-                  :model-value="sectionOpen.cpu"
-                  @update:model-value="(v) => (sectionOpen.cpu = v)"
-                  :label="t('nodes.cpuusage')"
-                >
-                  <div class="px-1 pb-2">
-                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
-                      <OInput
-                        data-test="nodes-filter-cpuusage-min"
-                        type="number"
-                        class="w-full min-w-0"
-                        min="0"
-                        max="100"
-                        v-model="cpuUsage.min"
-                      />
-                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
-                      <OInput
-                        data-test="nodes-filter-cpuusage-max"
-                        type="number"
-                        class="w-full min-w-0"
-                        min="0"
-                        max="100"
-                        v-model="cpuUsage.max"
-                      />
-                    </div>
-                    <ORange
-                      data-test="nodes-filter-cpuusage-range-slider"
-                      :model-value="cpuUsage"
-                      @update:model-value="
-                        (val) => {
-                          cpuUsage = val;
-                        }
-                      "
-                      :min="0"
-                      :max="maxCPUUsage"
-                      class="w-[85%] mt-3 ml-3"
+                    <span class="px-1 text-center">{{ t("settings.nodesPage.to") }}</span>
+                    <OInput
+                      data-test="nodes-filter-cpuusage-max"
+                      type="number"
+                      class="w-full min-w-0"
+                      min="0"
+                      max="100"
+                      v-model="cpuUsage.max"
                     />
                   </div>
-                </OCollapsible>
-                <OSeparator v-if="sectionOpen.cpu" class="my-2" />
+                  <ORange
+                    data-test="nodes-filter-cpuusage-range-slider"
+                    :model-value="cpuUsage"
+                    @update:model-value="
+                      (val) => {
+                        cpuUsage = val;
+                      }
+                    "
+                    :min="0"
+                    :max="maxCPUUsage"
+                    class="mt-3 ml-3 w-[85%]"
+                  />
+                </div>
+              </OCollapsible>
+              <OSeparator v-if="sectionOpen.cpu" class="my-2" />
 
-                <OCollapsible
-                  variant="sidebar"
-                  :model-value="sectionOpen.memory"
-                  @update:model-value="(v) => (sectionOpen.memory = v)"
-                  :label="t('nodes.memoryusage')"
-                >
-                  <div class="px-1 pb-2">
-                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
-                      <OInput
-                        data-test="nodes-filter-memoryusage-min"
-                        type="number"
-                        class="w-full min-w-0"
-                        min="0"
-                        max="100"
-                        v-model="memoryUsage.min"
-                      />
-                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
-                      <OInput
-                        data-test="nodes-filter-memoryusage-max"
-                        type="number"
-                        class="w-full min-w-0"
-                        min="0"
-                        max="100"
-                        v-model="memoryUsage.max"
-                      />
-                    </div>
-                    <ORange
-                      data-test="nodes-filter-memoryusage-range-slider"
-                      :model-value="memoryUsage"
-                      @update:model-value="
-                        (val) => {
-                          memoryUsage = val;
-                        }
-                      "
-                      :min="0"
-                      :max="maxMemoryUsage"
-                      class="w-[85%] mt-3 ml-3"
+              <OCollapsible
+                variant="sidebar"
+                :model-value="sectionOpen.memory"
+                @update:model-value="(v) => (sectionOpen.memory = v)"
+                :label="t('nodes.memoryusage')"
+              >
+                <div class="px-1 pb-2">
+                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                    <OInput
+                      data-test="nodes-filter-memoryusage-min"
+                      type="number"
+                      class="w-full min-w-0"
+                      min="0"
+                      max="100"
+                      v-model="memoryUsage.min"
+                    />
+                    <span class="px-1 text-center">{{ t("settings.nodesPage.to") }}</span>
+                    <OInput
+                      data-test="nodes-filter-memoryusage-max"
+                      type="number"
+                      class="w-full min-w-0"
+                      min="0"
+                      max="100"
+                      v-model="memoryUsage.max"
                     />
                   </div>
-                </OCollapsible>
-                <OSeparator v-if="sectionOpen.memory" class="my-2" />
+                  <ORange
+                    data-test="nodes-filter-memoryusage-range-slider"
+                    :model-value="memoryUsage"
+                    @update:model-value="
+                      (val) => {
+                        memoryUsage = val;
+                      }
+                    "
+                    :min="0"
+                    :max="maxMemoryUsage"
+                    class="mt-3 ml-3 w-[85%]"
+                  />
+                </div>
+              </OCollapsible>
+              <OSeparator v-if="sectionOpen.memory" class="my-2" />
 
-                <OCollapsible
-                  variant="sidebar"
-                  :model-value="sectionOpen.tcp"
-                  @update:model-value="(v) => (sectionOpen.tcp = v)"
-                  :label="t('nodes.tcpusage')"
-                >
-                  <div class="px-1 pb-2">
-                    <OCheckbox
-                      type="checkbox"
-                      v-model="establishedToggle"
-                      :label="t('nodes.establishedLabel')"
-                    />
-                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
-                      <OInput
-                        :disable="!establishedToggle"
-                        data-test="nodes-filter-established-min"
-                        type="number"
-                        class="w-full min-w-0"
-                        min="0"
-                        :max="maxEstablished"
-                        v-model="establishedUsage.min"
-                      />
-                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
-                      <OInput
-                        :disable="!establishedToggle"
-                        data-test="nodes-filter-established-max"
-                        type="number"
-                        class="w-full min-w-0"
-                        min="0"
-                        :max="maxEstablished"
-                        v-model="establishedUsage.max"
-                      />
-                    </div>
-                    <ORange
-                      :disabled="!establishedToggle"
-                      data-test="nodes-filter-tcp-established-range-slider"
-                      :model-value="establishedUsage"
-                      @update:model-value="
-                        (val) => {
-                          establishedUsage = val;
-                        }
-                      "
-                      :min="0"
+              <OCollapsible
+                variant="sidebar"
+                :model-value="sectionOpen.tcp"
+                @update:model-value="(v) => (sectionOpen.tcp = v)"
+                :label="t('nodes.tcpusage')"
+              >
+                <div class="px-1 pb-2">
+                  <OCheckbox
+                    type="checkbox"
+                    v-model="establishedToggle"
+                    :label="t('nodes.establishedLabel')"
+                  />
+                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                    <OInput
+                      :disable="!establishedToggle"
+                      data-test="nodes-filter-established-min"
+                      type="number"
+                      class="w-full min-w-0"
+                      min="0"
                       :max="maxEstablished"
-                      class="w-[85%] mt-3 ml-3"
+                      v-model="establishedUsage.min"
                     />
-
-                    <OCheckbox
-                      type="checkbox"
-                      class="mt-6"
-                      v-model="closewaitToggle"
-                      :label="t('nodes.closewaitLabel')"
-                    />
-                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
-                      <OInput
-                        :disable="!closewaitToggle"
-                        data-test="nodes-filter-closewait-min"
-                        type="number"
-                        class="w-full min-w-0"
-                        min="0"
-                        :max="maxClosewait"
-                        v-model="closewaitUsage.min"
-                      />
-                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
-                      <OInput
-                        :disable="!closewaitToggle"
-                        data-test="nodes-filter-closewait-max"
-                        type="number"
-                        class="w-full min-w-0"
-                        min="0"
-                        :max="maxClosewait"
-                        v-model="closewaitUsage.max"
-                      />
-                    </div>
-                    <ORange
-                      :disabled="!closewaitToggle"
-                      data-test="nodes-filter-tcp-closewait-range-slider"
-                      :model-value="closewaitUsage"
-                      @update:model-value="
-                        (val) => {
-                          closewaitUsage = val;
-                        }
-                      "
-                      :min="0"
-                      :max="maxClosewait"
-                      class="w-[85%] mt-3 ml-3"
-                    />
-
-                    <OCheckbox
-                      type="checkbox"
-                      class="mt-6"
-                      v-model="waittimeToggle"
-                      :label="t('nodes.waittimeLabel')"
-                    />
-                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
-                      <OInput
-                        :disable="!waittimeToggle"
-                        data-test="nodes-filter-waittime-min"
-                        type="number"
-                        class="w-full min-w-0"
-                        min="0"
-                        :max="maxWaittime"
-                        v-model="waittimeUsage.min"
-                      />
-                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
-                      <OInput
-                        :disable="!waittimeToggle"
-                        data-test="nodes-filter-waittime-max"
-                        type="number"
-                        class="w-full min-w-0"
-                        min="0"
-                        :max="maxWaittime"
-                        v-model="waittimeUsage.max"
-                      />
-                    </div>
-                    <ORange
-                      :disabled="!waittimeToggle"
-                      data-test="nodes-filter-tcp-waittime-range-slider"
-                      :model-value="waittimeUsage"
-                      @update:model-value="
-                        (val) => {
-                          waittimeUsage = val;
-                        }
-                      "
-                      :min="0"
-                      :max="maxWaittime"
-                      class="w-[85%] mt-3 ml-3"
+                    <span class="px-1 text-center">{{ t("settings.nodesPage.to") }}</span>
+                    <OInput
+                      :disable="!establishedToggle"
+                      data-test="nodes-filter-established-max"
+                      type="number"
+                      class="w-full min-w-0"
+                      min="0"
+                      :max="maxEstablished"
+                      v-model="establishedUsage.max"
                     />
                   </div>
-                </OCollapsible>
+                  <ORange
+                    :disabled="!establishedToggle"
+                    data-test="nodes-filter-tcp-established-range-slider"
+                    :model-value="establishedUsage"
+                    @update:model-value="
+                      (val) => {
+                        establishedUsage = val;
+                      }
+                    "
+                    :min="0"
+                    :max="maxEstablished"
+                    class="mt-3 ml-3 w-[85%]"
+                  />
 
+                  <OCheckbox
+                    type="checkbox"
+                    class="mt-6"
+                    v-model="closewaitToggle"
+                    :label="t('nodes.closewaitLabel')"
+                  />
+                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                    <OInput
+                      :disable="!closewaitToggle"
+                      data-test="nodes-filter-closewait-min"
+                      type="number"
+                      class="w-full min-w-0"
+                      min="0"
+                      :max="maxClosewait"
+                      v-model="closewaitUsage.min"
+                    />
+                    <span class="px-1 text-center">{{ t("settings.nodesPage.to") }}</span>
+                    <OInput
+                      :disable="!closewaitToggle"
+                      data-test="nodes-filter-closewait-max"
+                      type="number"
+                      class="w-full min-w-0"
+                      min="0"
+                      :max="maxClosewait"
+                      v-model="closewaitUsage.max"
+                    />
+                  </div>
+                  <ORange
+                    :disabled="!closewaitToggle"
+                    data-test="nodes-filter-tcp-closewait-range-slider"
+                    :model-value="closewaitUsage"
+                    @update:model-value="
+                      (val) => {
+                        closewaitUsage = val;
+                      }
+                    "
+                    :min="0"
+                    :max="maxClosewait"
+                    class="mt-3 ml-3 w-[85%]"
+                  />
+
+                  <OCheckbox
+                    type="checkbox"
+                    class="mt-6"
+                    v-model="waittimeToggle"
+                    :label="t('nodes.waittimeLabel')"
+                  />
+                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                    <OInput
+                      :disable="!waittimeToggle"
+                      data-test="nodes-filter-waittime-min"
+                      type="number"
+                      class="w-full min-w-0"
+                      min="0"
+                      :max="maxWaittime"
+                      v-model="waittimeUsage.min"
+                    />
+                    <span class="px-1 text-center">{{ t("settings.nodesPage.to") }}</span>
+                    <OInput
+                      :disable="!waittimeToggle"
+                      data-test="nodes-filter-waittime-max"
+                      type="number"
+                      class="w-full min-w-0"
+                      min="0"
+                      :max="maxWaittime"
+                      v-model="waittimeUsage.max"
+                    />
+                  </div>
+                  <ORange
+                    :disabled="!waittimeToggle"
+                    data-test="nodes-filter-tcp-waittime-range-slider"
+                    :model-value="waittimeUsage"
+                    @update:model-value="
+                      (val) => {
+                        waittimeUsage = val;
+                      }
+                    "
+                    :min="0"
+                    :max="maxWaittime"
+                    class="mt-3 ml-3 w-[85%]"
+                  />
+                </div>
+              </OCollapsible>
             </div>
           </div>
-          <div class="flex justify-end px-2 py-2 shrink-0 border-t">
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="applyFilter()"
-            >
+          <div class="flex shrink-0 justify-end border-t px-2 py-2">
+            <OButton variant="primary" size="sm-action" @click="applyFilter()">
               {{ t("nodes.applyFilter") }}
             </OButton>
           </div>
         </div>
       </template>
       <template #after>
-        <div class="flex flex-col h-full min-h-0">
-        <OTable
-          class="flex-1 min-h-0"
-          ref="qTable"
-          data-test="nodes-main-table"
-          :data="visibleRows"
-          :columns="computedOTableColumns"
-          row-key="name"
-          pagination="client"
-          :page-size="20"
-          :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('nodes.header')"
-          :row-class="(row) => `status-row status-${row.status?.toLowerCase()}`"
-          sorting="client"
-          filter-mode="client"
-          :default-columns="false"
-          :enable-column-resize="true"
-          :persist-columns="true"
-          table-id="settings-nodes"
-          :show-global-filter="false"
-          :loading="loading"
-        >
-          <template #toolbar>
-            <OSearchInput
-              data-test="nodes-search-input"
-              v-model="filterQuery"
-              class="flex-1"
-              :placeholder="t('nodes.search')"
-            />
-          </template>
-          <template #toolbar-trailing>
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
-              data-test="nodes-list-refresh-btn"
-              @click="() => getData(true)"
-            >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="nodesRefresh" />
-            </OButton>
-          </template>
-          <template #empty>
-            <OEmptyState
-              size="hero"
-              preset="no-nodes"
-              :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
-            />
-          </template>
-
-          <template #cell-id="{ row }">
-            {{ row.id }}
-          </template>
-
-          <template #cell-name="{ row }">
-            {{ row.name }}
-          </template>
-
-          <template
-            v-if="store.state.zoConfig.super_cluster_enabled"
-            #cell-region="{ row }"
+        <div class="flex h-full min-h-0 flex-col">
+          <OTable
+            class="min-h-0 flex-1"
+            ref="qTable"
+            data-test="nodes-main-table"
+            :data="displayedRows"
+            :columns="computedOTableColumns"
+            row-key="name"
+            show-index
+            pagination="client"
+            :page-size="20"
+            :page-size-options="[20, 50, 100, 250, 500]"
+            :footer-title="t('nodes.header')"
+            :row-class="nodeRowClass"
+            :get-row-style="nodeRowStyle"
+            sorting="client"
+            filter-mode="client"
+            :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="settings-nodes"
+            :show-global-filter="false"
+            :loading="loading"
           >
-            <OTag type="fieldTag" class="badge-region mr-1"
-              >{{ row.region }}
-              <OTooltip :content="t('nodes.region')" />
-            </OTag>
-            <OTag type="fieldTag" class="badge-cluster"
-              >{{ row.cluster }}
-              <OTooltip :content="t('nodes.cluster')" />
-            </OTag>
-          </template>
+            <!-- Health strip: node counts by status, doubling as the status facet.
+                 Attention-first — offline, then starting, then online, Total last. -->
+            <template #subheader>
+              <div
+                class="px-page-edge border-table-row-divider border-b py-1.5"
+                data-test="nodes-summary"
+              >
+                <OStatStrip
+                  :items="summaryStats"
+                  :loading="loading"
+                  selectable
+                  :selected-key="statusFilter"
+                  @select="onStatSelect"
+                />
+              </div>
+            </template>
 
-          <template #cell-tcp="{ row }">
-            {{ row.tcp_conns }} (E:{{ row.tcp_conns_established }}, C:{{
-              row.tcp_conns_close_wait
-            }}, T:{{ row.tcp_conns_time_wait }})
-          </template>
+            <template #toolbar>
+              <OSearchInput
+                data-test="nodes-search-input"
+                v-model="filterQuery"
+                class="flex-1"
+                :placeholder="t('nodes.search')"
+              />
+            </template>
+            <template #toolbar-trailing>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                icon-left="refresh"
+                :loading="loading"
+                data-test="nodes-list-refresh-btn"
+                @click="() => getData(true)"
+              >
+                <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="nodesRefresh" />
+              </OButton>
+            </template>
+            <template #empty>
+              <OEmptyState
+                size="hero"
+                preset="no-nodes"
+                :filtered="!!(filterQuery || statusFilter)"
+                :hide-action="!(filterQuery || statusFilter)"
+                @action="
+                  (id) => id === 'clear-filters' && ((filterQuery = ''), (statusFilter = null))
+                "
+              />
+            </template>
 
-          <template #cell-cpu="{ row }">
-            <OProgressBar
-              size="sm"
-              class="bg-[lightgrey] w-[80%]! max-w-[80%] inline-block"
-              :value="row.cpu_usage / 100"
-              :variant="row.cpu_usage > 85 ? 'danger' : 'default'"
-            />
-            {{ row.cpu_usage }}%
-          </template>
+            <template #cell-name="{ row }">
+              {{ row.name }}
+            </template>
 
-          <template #cell-memory="{ row }">
-            <OProgressBar
-              size="sm"
-              class="bg-[lightgrey] w-[80%]! max-w-[80%] inline-block"
-              :value="row.percentage_memory_usage / 100"
-              :variant="row.percentage_memory_usage > 85 ? 'danger' : 'default'"
-            />
-            {{ row.percentage_memory_usage }}%
-          </template>
-        </OTable>
+            <template #cell-status="{ row }">
+              <OTag type="serviceStatus" :value="row.status" size="sm" />
+            </template>
+
+            <!-- Roles are a category, so they get stable per-role colours from the
+                 nodeRole badge group rather than a severity tone. -->
+            <template #cell-role="{ row }">
+              <span class="flex min-w-0 flex-wrap items-center gap-1">
+                <OTag v-for="r in row.role || []" :key="r" type="nodeRole" :value="r" size="sm" />
+              </span>
+            </template>
+
+            <template v-if="store.state.zoConfig.super_cluster_enabled" #cell-region="{ row }">
+              <OTag type="fieldTag" class="badge-region mr-1"
+                >{{ row.region }}
+                <OTooltip :content="t('nodes.region')" />
+              </OTag>
+              <OTag type="fieldTag" class="badge-cluster"
+                >{{ row.cluster }}
+                <OTooltip :content="t('nodes.cluster')" />
+              </OTag>
+            </template>
+
+            <template #cell-tcp="{ row }">
+              {{ row.tcp_conns }}{{ t("nodes.tcpEstablishedPrefix") }}{{ row.tcp_conns_established
+              }}{{ t("nodes.tcpCloseWaitPrefix") }}{{ row.tcp_conns_close_wait
+              }}{{ t("nodes.tcpTimeWaitPrefix") }}{{ row.tcp_conns_time_wait }})
+            </template>
+
+            <!-- Utilisation: a token-backed proportion bar that turns amber at 70%
+                 and red at 85%, so a saturated node is visible without reading the
+                 number. The track is always drawn, so rows never shift. -->
+            <template #cell-cpu="{ row }">
+              <div class="flex w-full min-w-0 items-center justify-end gap-2">
+                <OProgressBar
+                  size="sm"
+                  class="min-w-0 flex-1"
+                  :value="row.cpu_usage / 100"
+                  :variant="usageVariant(row.cpu_usage)"
+                />
+                <span class="shrink-0 tabular-nums">{{ row.cpu_usage }}%</span>
+              </div>
+            </template>
+
+            <template #cell-memory="{ row }">
+              <div class="flex w-full min-w-0 items-center justify-end gap-2">
+                <OProgressBar
+                  size="sm"
+                  class="min-w-0 flex-1"
+                  :value="row.percentage_memory_usage / 100"
+                  :variant="usageVariant(row.percentage_memory_usage)"
+                />
+                <span class="shrink-0 tabular-nums">{{ row.percentage_memory_usage }}%</span>
+              </div>
+            </template>
+          </OTable>
         </div>
       </template>
     </OSplitter>
@@ -516,15 +553,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  reactive,
-  ref,
-  computed,
-} from "vue";
+import { defineComponent, reactive, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -536,7 +568,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORange from "@/lib/forms/Range/ORange.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -566,11 +601,12 @@ export default defineComponent({
     OSeparator,
     OSplitter,
     OTable,
+    OStatStrip,
   },
   setup() {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const sectionOpen = reactive({
       region: false,
@@ -598,8 +634,11 @@ export default defineComponent({
     ];
 
     const computedOTableColumns = computed(() => {
+      // No hand-rolled "#" column — OTable's `show-index` renders the row index as
+      // a fixed, non-resizable, non-hideable gutter. A data column pretending to be
+      // an index is draggable/resizable and stops matching the visible row order the
+      // moment the table is sorted or filtered.
       const columns: OTableColumnDef[] = [
-        { id: "id", header: "#", accessorKey: "id", size: 67, meta: { align: "center" } },
         {
           id: "name",
           header: t("nodes.name"),
@@ -608,7 +647,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           minSize: 160,
-          meta: { align: "left" , flex: true },
+          meta: { align: "left", flex: true },
         },
         {
           id: "region",
@@ -617,6 +656,28 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 50,
+          meta: { align: "left" },
+        },
+        {
+          id: "status",
+          header: t("nodes.status"),
+          accessorKey: "status",
+          sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.status,
+          minSize: 96,
+          meta: { align: "left" },
+        },
+        {
+          id: "role",
+          header: t("nodes.nodetype"),
+          // Sorts by the joined role list so same-role nodes group together.
+          accessorFn: (row: any) => (row.role || []).join(", "),
+          sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.role,
           meta: { align: "left" },
         },
         {
@@ -659,8 +720,10 @@ export default defineComponent({
           meta: { align: "right" },
         },
       ];
+      // Region/cluster only mean something in a super-cluster. Filter by id rather
+      // than by position so adding a column can't silently drop the wrong one.
       if (!store.state.zoConfig.super_cluster_enabled) {
-        columns.splice(2, 1);
+        return columns.filter((col) => col.id !== "region");
       }
       return columns;
     });
@@ -680,18 +743,10 @@ export default defineComponent({
     const selectedStatuses: any = ref([]);
 
     // Selection ID computeds for sidebar filter tables
-    const selectedRegionIds = computed(() =>
-      selectedRegions.value.map((r: any) => r.name),
-    );
-    const selectedClusterIds = computed(() =>
-      selectedClusters.value.map((c: any) => c.name),
-    );
-    const selectedNodetypeIds = computed(() =>
-      selectedNodetypes.value.map((n: any) => n.name),
-    );
-    const selectedStatusIds = computed(() =>
-      selectedStatuses.value.map((s: any) => s.name),
-    );
+    const selectedRegionIds = computed(() => selectedRegions.value.map((r: any) => r.name));
+    const selectedClusterIds = computed(() => selectedClusters.value.map((c: any) => c.name));
+    const selectedNodetypeIds = computed(() => selectedNodetypes.value.map((n: any) => n.name));
+    const selectedStatusIds = computed(() => selectedStatuses.value.map((s: any) => s.name));
 
     const handleSelectedRegionIdsUpdate = (ids: string[]) => {
       const map = new Map(regionRows.value.map((r: any) => [r.name, r]));
@@ -699,21 +754,15 @@ export default defineComponent({
     };
     const handleSelectedClusterIdsUpdate = (ids: string[]) => {
       const map = new Map(clusterRows.value.map((c: any) => [c.name, c]));
-      selectedClusters.value = ids
-        .map((id: any) => map.get(id))
-        .filter(Boolean);
+      selectedClusters.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
     const handleSelectedNodetypeIdsUpdate = (ids: string[]) => {
       const map = new Map(nodetypeRows.value.map((n: any) => [n.name, n]));
-      selectedNodetypes.value = ids
-        .map((id: any) => map.get(id))
-        .filter(Boolean);
+      selectedNodetypes.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
     const handleSelectedStatusIdsUpdate = (ids: string[]) => {
       const map = new Map(statusesRows.value.map((s: any) => [s.name, s]));
-      selectedStatuses.value = ids
-        .map((id: any) => map.get(id))
-        .filter(Boolean);
+      selectedStatuses.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
 
     const cpuUsage = ref({
@@ -779,10 +828,7 @@ export default defineComponent({
           data[region][cluster].forEach((node: any) => {
             const percentageMemoryUsage =
               node.metrics.memory_usage > 0
-                ? Math.round(
-                    (node.metrics.memory_usage / node.metrics.memory_total) *
-                      100,
-                  )
+                ? Math.round((node.metrics.memory_usage / node.metrics.memory_total) * 100)
                 : 0;
 
             const cpuUsageVal = Math.round(node.metrics.cpu_usage);
@@ -807,10 +853,7 @@ export default defineComponent({
               maxValues.percentageMemoryUsage.value,
               percentageMemoryUsage,
             );
-            maxValues.cpuUsage.value = Math.max(
-              maxValues.cpuUsage.value,
-              cpuUsageVal,
-            );
+            maxValues.cpuUsage.value = Math.max(maxValues.cpuUsage.value, cpuUsageVal);
             node.id = globalIndex < 10 ? `0${globalIndex}` : globalIndex;
             globalIndex++;
 
@@ -845,14 +888,13 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("settings.nodesPage.loadingData"),
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
       CommonService.list_nodes(store.state.selectedOrganization.identifier)
         .then((response) => {
           const responseData = response.data;
-          const { flattenedData, uniqueValues, maxValues } =
-            flattenObject(responseData);
+          const { flattenedData, uniqueValues, maxValues } = flattenObject(responseData);
           regionRows.value = uniqueValues.regions.map((name) => ({ name }));
           clusterRows.value = uniqueValues.clusters.map((name) => ({ name }));
           nodetypeRows.value = uniqueValues.nodeTypes.map((name) => ({ name }));
@@ -862,14 +904,10 @@ export default defineComponent({
           resultTotal.value = flattenedData.length;
           loading.value = false;
           maxCPUUsage.value = cpuUsage.value.max = maxValues.cpuUsage.value;
-          maxMemoryUsage.value = memoryUsage.value.max =
-            maxValues.percentageMemoryUsage.value;
-          maxEstablished.value = establishedUsage.value.max =
-            maxValues.tcpConnsEstablished.value;
-          maxClosewait.value = closewaitUsage.value.max =
-            maxValues.tcpConnsCloseWait.value;
-          maxWaittime.value = waittimeUsage.value.max =
-            maxValues.tcpConnsTimeWait.value;
+          maxMemoryUsage.value = memoryUsage.value.max = maxValues.percentageMemoryUsage.value;
+          maxEstablished.value = establishedUsage.value.max = maxValues.tcpConnsEstablished.value;
+          maxClosewait.value = closewaitUsage.value.max = maxValues.tcpConnsCloseWait.value;
+          maxWaittime.value = waittimeUsage.value.max = maxValues.tcpConnsTimeWait.value;
           if (filterFlag) {
             applyFilter();
           }
@@ -881,9 +919,7 @@ export default defineComponent({
           if (error.status != 403) {
             toast({
               variant: "error",
-              message:
-                error.response?.data?.message ||
-                t("settings.nodesPage.fetchFailed"),
+              message: error.response?.data?.message || t("settings.nodesPage.fetchFailed"),
               timeout: 5000,
             });
           }
@@ -900,27 +936,18 @@ export default defineComponent({
         const matchesSearch = row.name.toLowerCase().includes(terms);
         const matchesRegion =
           selectedRegions.value.length === 0 ||
-          selectedRegions.value.some(
-            (region: any) => region.name === row.region,
-          );
+          selectedRegions.value.some((region: any) => region.name === row.region);
         const matchesCluster =
           selectedClusters.value.length === 0 ||
-          selectedClusters.value.some(
-            (cluster: any) => cluster.name === row.cluster,
-          );
+          selectedClusters.value.some((cluster: any) => cluster.name === row.cluster);
         const matchesNodeType =
           selectedNodetypes.value.length === 0 ||
-          row.role.some((r: any) =>
-            selectedNodetypes.value.some((nt: any) => nt.name === r),
-          );
+          row.role.some((r: any) => selectedNodetypes.value.some((nt: any) => nt.name === r));
         const matchesStatus =
           selectedStatuses.value.length === 0 ||
-          selectedStatuses.value.some(
-            (status: any) => status.name === row.status,
-          );
+          selectedStatuses.value.some((status: any) => status.name === row.status);
         const matchesCPU =
-          row.cpu_usage >= cpuUsage.value.min &&
-          row.cpu_usage <= cpuUsage.value.max;
+          row.cpu_usage >= cpuUsage.value.min && row.cpu_usage <= cpuUsage.value.max;
         const matchesMemory =
           row.percentage_memory_usage >= memoryUsage.value.min &&
           row.percentage_memory_usage <= memoryUsage.value.max;
@@ -953,6 +980,7 @@ export default defineComponent({
 
     const clearAll = () => {
       filterQuery.value = "";
+      statusFilter.value = null;
       selectedRegions.value = [];
       selectedClusters.value = [];
       selectedNodetypes.value = [];
@@ -995,6 +1023,132 @@ export default defineComponent({
       return filterData(tabledata.value || [], filterQuery.value);
     });
 
+    // ── Node health — the page's primary signal ──────────────────────────────
+    // The API reports Prepare | Online | Offline; "prepare" is a node that is
+    // starting up and not yet serving traffic.
+    const nodeHealth = (row: any): "offline" | "prepare" | "online" => {
+      const status = String(row?.status ?? "").toLowerCase();
+      if (status === "offline") return "offline";
+      if (status === "prepare") return "prepare";
+      return "online";
+    };
+
+    // Full-row wash for the EXCEPTIONS only — an offline node is a light red, a
+    // starting one amber; healthy nodes stay clean and read from the green rail.
+    const nodeRowClass = (row: any): string => {
+      const h = nodeHealth(row);
+      return h === "offline"
+        ? "!bg-status-error-bg"
+        : h === "prepare"
+          ? "!bg-status-warning-bg"
+          : "";
+    };
+
+    // Extreme-left health rail — inset box-shadow so it paints regardless of
+    // border-collapse; rem width + token colour keep it theme-aware.
+    const nodeRowStyle = (row: any): Record<string, string> => {
+      const h = nodeHealth(row);
+      const color =
+        h === "offline"
+          ? "var(--color-error-500)"
+          : h === "prepare"
+            ? "var(--color-warning-500)"
+            : "var(--color-success-500)";
+      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+    };
+
+    // Utilisation tiers shared by the CPU and memory bars: amber from 70%, red
+    // from 85%, so a saturated node stands out before it is a problem.
+    const usageVariant = (usage: unknown): ProgressBarVariant => {
+      const n = Number(usage);
+      if (!Number.isFinite(n)) return "default";
+      if (n > 85) return "danger";
+      if (n > 70) return "warning";
+      return "default";
+    };
+
+    // ── Health facet + summary strip ─────────────────────────────────────────
+    // Counts run over the search-filtered rows (not the facet-filtered ones) so
+    // the tiles keep their totals while a facet is active.
+    const statusFilter = ref<"offline" | "prepare" | "online" | null>(null);
+
+    const displayedRows = computed(() => {
+      const rows = visibleRows.value || [];
+      const f = statusFilter.value;
+      if (!f) return rows;
+      return rows.filter((row: any) => nodeHealth(row) === f);
+    });
+
+    const onStatSelect = (key: string) => {
+      if (key === "total") {
+        statusFilter.value = null;
+        return;
+      }
+      statusFilter.value =
+        statusFilter.value === key ? null : (key as "offline" | "prepare" | "online");
+    };
+
+    const healthCounts = computed(() => {
+      const rows = visibleRows.value || [];
+      let offline = 0;
+      let prepare = 0;
+      let online = 0;
+      for (const row of rows) {
+        const h = nodeHealth(row);
+        if (h === "offline") offline += 1;
+        else if (h === "prepare") prepare += 1;
+        else online += 1;
+      }
+      return { offline, prepare, online, total: rows.length };
+    });
+
+    const summaryStats = computed<StatItem[]>(() => {
+      const c = healthCounts.value;
+      const hasData = c.total > 0;
+      const v = (n: number): string | number => (hasData ? n : "—");
+      const share = hasData ? c.total : undefined;
+      return [
+        {
+          key: "offline",
+          label: t("nodes.summaryOffline"),
+          value: v(c.offline),
+          icon: "error-outline",
+          tone: "error",
+          max: share,
+          dataTest: "nodes-summary-offline",
+        },
+        {
+          key: "prepare",
+          label: t("nodes.summaryStarting"),
+          value: v(c.prepare),
+          icon: "hourglass-empty",
+          tone: "warning",
+          max: share,
+          dataTest: "nodes-summary-prepare",
+        },
+        {
+          key: "online",
+          label: t("nodes.summaryOnline"),
+          value: v(c.online),
+          icon: "check-circle",
+          tone: "success",
+          max: share,
+          dataTest: "nodes-summary-online",
+        },
+        {
+          key: "total",
+          label: t("nodes.summaryTotal"),
+          value: v(c.total),
+          icon: "hub",
+          tone: "primary",
+          // Clickable (it CLEARS the status facet) but never shows the ring — the
+          // selected key is only ever a real status, never "total". No bar: its
+          // share of itself is always 100%.
+          dataTest: "nodes-summary-total",
+        },
+      ];
+    });
+
     // Pre-filter for sidebar region table
     const filterRegionQuery = ref("");
     const filterRegionData = (rows: string | any[], terms: string) => {
@@ -1026,14 +1180,16 @@ export default defineComponent({
     };
     const visibleClusterRows = computed(() => {
       if (!filterClusterQuery.value) return clusterRows.value || [];
-      return filterClusterData(
-        clusterRows.value || [],
-        filterClusterQuery.value,
-      );
+      return filterClusterData(clusterRows.value || [], filterClusterQuery.value);
     });
 
     useShortcuts([
-      { id: "nodesRefresh", handler: () => { if (!isInputFocused()) getData(true); } },
+      {
+        id: "nodesRefresh",
+        handler: () => {
+          if (!isInputFocused()) getData(true);
+        },
+      },
     ]);
 
     return {
@@ -1043,6 +1199,14 @@ export default defineComponent({
       loading,
       tabledata,
       computedOTableColumns,
+      nodeHealth,
+      nodeRowClass,
+      nodeRowStyle,
+      usageVariant,
+      statusFilter,
+      displayedRows,
+      onStatSelect,
+      summaryStats,
       splitterModel,
       getData,
       resultTotal,

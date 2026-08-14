@@ -616,7 +616,7 @@ mod tests {
     fn test_infer_json_schema_from_values_non_object_returns_error() {
         use serde_json::Value;
         // Passing a non-Object value (Array) should hit the `_` branch → error
-        let vals = vec![Value::Array(vec![Value::from(1), Value::from(2)])];
+        let vals = [Value::Array(vec![Value::from(1), Value::from(2)])];
         let result = infer_json_schema_from_values("test_stream", StreamType::Logs, vals.iter());
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
@@ -629,7 +629,7 @@ mod tests {
         // An object containing an array field hits `_` in infer_json_schema_from_object
         let mut obj = Map::new();
         obj.insert("items".to_string(), Value::Array(vec![Value::from(1)]));
-        let vals = vec![Value::Object(obj)];
+        let vals = [Value::Object(obj)];
         let result = infer_json_schema_from_values("test_stream", StreamType::Logs, vals.iter());
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();

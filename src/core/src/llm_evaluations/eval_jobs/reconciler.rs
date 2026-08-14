@@ -41,7 +41,7 @@ use config::{
 };
 use infra::table::online_eval_jobs::OnlineEvalJob;
 
-use crate::pipeline::store::PipelineError;
+use crate::pipeline::db::PipelineError;
 
 /// Errors raised by the reconciler.
 #[derive(Debug, thiserror::Error)]
@@ -143,7 +143,7 @@ async fn ensure_pipeline(
         }
         Some(pipeline_id) => {
             // Pipeline should already exist. Fetch and compare.
-            let existing = match crate::pipeline::store::get_by_id(pipeline_id).await {
+            let existing = match crate::pipeline::db::get_by_id(pipeline_id).await {
                 Ok(p) => p,
                 Err(PipelineError::NotFound(_)) => {
                     // Drift: job thinks a pipeline exists but it's gone. Recreate

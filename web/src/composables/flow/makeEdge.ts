@@ -26,11 +26,7 @@ import { MarkerType } from "@vue-flow/core";
 // stroke (CustomNode.updateEdgeColors) so all edges look uniform.
 const EDGE_COLOR = "var(--color-grey-500)";
 
-export const makeEdge = (
-  source: string,
-  target: string,
-  sourceHandle?: string,
-) => ({
+export const makeEdge = (source: string, target: string, sourceHandle?: string) => ({
   id: `e${source}-${target}${sourceHandle ? `-${sourceHandle}` : ""}`,
   source,
   target,

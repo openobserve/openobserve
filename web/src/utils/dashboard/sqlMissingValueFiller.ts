@@ -20,8 +20,7 @@ import { isTimeSeries } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 import { detectChunkingDirection } from "./chunkingDirection";
 
-const formatUtc = (date: Date) =>
-  format(toZonedTime(date, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
+const formatUtc = (date: Date) => format(toZonedTime(date, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
 
 /**
  * Fills in missing time-series data points between the start and end time
@@ -53,16 +52,12 @@ export const fillMissingValues = (
   loading?: any,
 ): any[] => {
   // Get the interval in minutes
-  const interval = resultMetaData?.map(
-    (it: any) => it?.histogram_interval,
-  )?.[0];
+  const interval = resultMetaData?.map((it: any) => it?.histogram_interval)?.[0];
 
   if (
     !interval ||
     !metadata.queries ||
-    !["area-stacked", "line", "area", "bar", "stacked", "scatter"].includes(
-      panelSchema.type,
-    )
+    !["area-stacked", "line", "area", "bar", "stacked", "scatter"].includes(panelSchema.type)
   ) {
     return JSON.parse(JSON.stringify(processedData));
   }
@@ -91,16 +86,11 @@ export const fillMissingValues = (
   // this is not a time series chart — skip missing value filling.
   // Filling would re-expand limited breakdown values into all time slots,
   // defeating the series limit and causing performance issues.
-  if (
-    breakDownKeys.includes(timeBasedKey) &&
-    !xAxisKeys.includes(timeBasedKey)
-  ) {
+  if (breakDownKeys.includes(timeBasedKey) && !xAxisKeys.includes(timeBasedKey)) {
     return JSON.parse(JSON.stringify(processedData));
   }
 
-  const xAxisKeysWithoutTimeStamp = xAxisKeys.filter(
-    (key: any) => key !== timeBasedKey,
-  );
+  const xAxisKeysWithoutTimeStamp = xAxisKeys.filter((key: any) => key !== timeBasedKey);
   const breakdownAxisKeysWithoutTimeStamp = breakDownKeys.filter(
     (key: any) => key !== timeBasedKey,
   );
@@ -112,9 +102,7 @@ export const fillMissingValues = (
       : breakdownAxisKeysWithoutTimeStamp[0];
 
   // Create a set of unique xAxis values
-  const uniqueXAxisValues = new Set(
-    processedData.map((d: any) => getDataValue(d, uniqueKey)),
-  );
+  const uniqueXAxisValues = new Set(processedData.map((d: any) => getDataValue(d, uniqueKey)));
 
   const intervalMillis = interval * 1000;
 
@@ -144,17 +132,13 @@ export const fillMissingValues = (
     binnedFillStart = binnedDate;
     const lastChunkEndTime =
       resultMetaData?.[resultMetaData.length - 1]?.time_offset?.end_time ?? 0;
-    const fillEndTime = lastChunkEndTime
-      ? new Date(lastChunkEndTime / 1000)
-      : endTime;
+    const fillEndTime = lastChunkEndTime ? new Date(lastChunkEndTime / 1000) : endTime;
     endTimeForFill = formatUtc(fillEndTime);
   } else {
     // RTL streaming: fill from earliest chunk's start to user's end
     const resultMetaStartTime =
       resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time ?? 0;
-    const fillStartTime = resultMetaStartTime
-      ? new Date(resultMetaStartTime / 1000)
-      : binnedDate;
+    const fillStartTime = resultMetaStartTime ? new Date(resultMetaStartTime / 1000) : binnedDate;
     binnedFillStart = dateBin(interval, fillStartTime, origin);
     endTimeForFill = formattedUserEnd;
   }
@@ -162,8 +146,7 @@ export const fillMissingValues = (
   // Build map from processedData for O(1) lookup, and track actual data
   // time range so we only fill gaps between real data points.
   const hasBreakdown =
-    xAxisKeysWithoutTimeStamp.length > 0 ||
-    breakdownAxisKeysWithoutTimeStamp.length > 0;
+    xAxisKeysWithoutTimeStamp.length > 0 || breakdownAxisKeysWithoutTimeStamp.length > 0;
   const searchDataMap = new Map();
   let actualMinTime: string | null = null;
   let actualMaxTime: string | null = null;
@@ -171,9 +154,7 @@ export const fillMissingValues = (
   // in this scope and keeps their declared string|null type at reads below.
   for (const d of processedData ?? []) {
     const timeVal = `${getDataValue(d, timeKey)}`;
-    const key = hasBreakdown
-      ? `${timeVal}-${getDataValue(d, uniqueKey)}`
-      : timeVal;
+    const key = hasBreakdown ? `${timeVal}-${getDataValue(d, uniqueKey)}` : timeVal;
     searchDataMap.set(key, d);
     if (actualMinTime === null || timeVal < actualMinTime) actualMinTime = timeVal;
     if (actualMaxTime === null || timeVal > actualMaxTime) actualMaxTime = timeVal;
@@ -193,7 +174,6 @@ export const fillMissingValues = (
         endTimeForFill = actualMaxTime;
       }
     }
-
   }
 
   const filledData: any = [];

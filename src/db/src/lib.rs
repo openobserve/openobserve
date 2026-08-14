@@ -43,8 +43,6 @@ pub mod model_pricing;
 pub mod ofga;
 pub mod org_ingestion_tokens;
 pub mod org_status;
-#[cfg(feature = "enterprise")]
-pub mod org_storage_providers;
 pub mod org_users;
 pub mod organization;
 pub mod pipeline_errors;

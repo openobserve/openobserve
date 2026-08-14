@@ -14,11 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { toZonedTime } from "date-fns-tz";
-import {
-  PromQLResponse,
-  ProcessedPromQLData,
-  AggregationFunction,
-} from "./types";
+import { PromQLResponse, ProcessedPromQLData, AggregationFunction } from "./types";
 import { getPromqlLegendName } from "./legendBuilder";
 
 /**
@@ -44,10 +40,7 @@ export async function processPromQLData(
   const allTimestamps = collectAllTimestamps(limitedData);
 
   // Format timestamps with timezone
-  const formattedTimestamps = formatTimestamps(
-    allTimestamps,
-    store.state.timezone,
-  );
+  const formattedTimestamps = formatTimestamps(allTimestamps, store.state.timezone);
 
   // Process each query
   limitedData.forEach((queryData, index) => {
@@ -148,10 +141,7 @@ function formatTimestamps(
  * @param limit - Maximum number of series to keep per query
  * @returns Limited data array
  */
-function applySeriesLimit(
-  data: PromQLResponse[],
-  limit: number,
-): PromQLResponse[] {
+function applySeriesLimit(data: PromQLResponse[], limit: number): PromQLResponse[] {
   return data.map((queryData) => {
     // Handle both standard PromQL format and OpenObserve format
     if (queryData?.data?.result) {
@@ -199,10 +189,7 @@ export function fillMissingTimestamps(
   dataObj: Record<number, string>,
   timestamps: Array<[number, Date | string]>,
 ): Array<[Date | string, string | null]> {
-  return timestamps.map(([ts, formattedTs]) => [
-    formattedTs,
-    dataObj[ts] ?? null,
-  ]);
+  return timestamps.map(([ts, formattedTs]) => [formattedTs, dataObj[ts] ?? null]);
 }
 
 /**

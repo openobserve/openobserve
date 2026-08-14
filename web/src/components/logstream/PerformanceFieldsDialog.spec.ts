@@ -75,12 +75,7 @@ const ODialogStub = {
     "secondaryButtonLoading",
     "neutralButtonLoading",
   ],
-  emits: [
-    "update:open",
-    "click:primary",
-    "click:secondary",
-    "click:neutral",
-  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
 
 describe("PerformanceFieldsDialog", () => {
@@ -108,11 +103,7 @@ describe("PerformanceFieldsDialog", () => {
     }
   });
 
-  const mountDialog = (
-    missingFields: any[] = [],
-    modelValue = true,
-    customStore: any = store,
-  ) => {
+  const mountDialog = (missingFields: any[] = [], modelValue = true, customStore: any = store) => {
     wrapper = mount(PerformanceFieldsDialog, {
       props: { modelValue, missingFields },
       global: {
@@ -141,9 +132,7 @@ describe("PerformanceFieldsDialog", () => {
     it("should pass size='md' to ODialog", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-size"),
-      ).toBe("md");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-size")).toBe("md");
     });
 
     it("should render Skip as the secondary button label", async () => {
@@ -298,9 +287,7 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
 
-      await wrapper
-        .find('[data-test="o-dialog-secondary"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o-dialog-secondary"]').trigger("click");
 
       expect(wrapper.emitted("skip")).toBeTruthy();
       expect(wrapper.emitted("skip")!.length).toBe(1);
@@ -310,9 +297,7 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
 
-      await wrapper
-        .find('[data-test="o-dialog-primary"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o-dialog-primary"]').trigger("click");
 
       expect(wrapper.emitted("add-fields")).toBeTruthy();
       expect(wrapper.emitted("add-fields")!.length).toBe(1);
@@ -322,9 +307,7 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
 
-      await wrapper
-        .find('[data-test="o-dialog-close"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o-dialog-close"]').trigger("click");
 
       const events = wrapper.emitted("update:modelValue");
       expect(events).toBeTruthy();

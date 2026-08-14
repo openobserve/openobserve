@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, Utc};
-use config::{
-    meta::stream::{ALL_STREAM_TYPES, StreamType},
-    utils::json,
-};
+use config::{meta::stream::StreamType, utils::json};
 use db;
 use infra::schema::unwrap_stream_settings;
 
@@ -32,9 +29,9 @@ pub async fn reset_index_updated_at(stream: &str, time: Option<i64>) -> Result<(
         // load the schema cache so we can enumerate all streams from it
         db::schema::cache().await?;
         let mut all = Vec::new();
-        for org_id in db::schema::list_organizations_from_cache().await {
-            for stream_type in ALL_STREAM_TYPES {
-                for stream_name in db::schema::list_streams_from_cache(&org_id, stream_type).await {
+        for (org_id, stream_types) in db::schema::list_all_streams_grouped().await {
+            for (stream_type, stream_names) in stream_types {
+                for stream_name in stream_names {
                     all.push((org_id.clone(), stream_type, stream_name));
                 }
             }

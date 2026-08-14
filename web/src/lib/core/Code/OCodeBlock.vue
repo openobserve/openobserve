@@ -23,24 +23,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   For inline / simple code chips without highlighting, use OCode.
 -->
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import hljs from "highlight.js";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type {
-  CodeBlockProps,
-  CodeBlockEmits,
-  CodeBlockSlots,
-} from "./OCodeBlock.types";
+import { useI18nTyped } from "@/types/i18n";
+import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBlock.types";
+
+const { t } = useI18nTyped();
+
+/**
+ * Single source of truth for the code line-height: the stylesheet reads it via
+ * the custom property below, and the max-height maths multiplies it. Declaring
+ * it twice would let the visible line count drift from the actual leading.
+ */
+const CODE_LINE_HEIGHT = 1.55;
 
 const props = withDefaults(defineProps<CodeBlockProps>(), {
+  wrap: false,
   copyable: true,
-  copyMessage: "Copied to clipboard!",
-  revealTooltip: "Reveal",
-  hideTooltip: "Hide",
   dataTest: "code-block",
+});
+
+// Not `withDefaults` defaults: those are evaluated once at module scope, which
+// would freeze these tooltips in the boot locale.
+const revealTooltipText = computed(() => props.revealTooltip ?? t("common.reveal"));
+const hideTooltipText = computed(() => props.hideTooltip ?? t("common.hide"));
+
+/**
+ * The line-height is published as a custom property so the stylesheet and the
+ * max-height maths below share one number, and the cap is expressed in `em` so
+ * it tracks the code font size rather than assuming a pixel value.
+ */
+const preStyle = computed(() => {
+  // Record<string, string> widens CSSProperties enough to carry the custom
+  // property, which Vue's typing does not model.
+  const style: CSSProperties & Record<string, string> = {
+    "--code-line-height": String(CODE_LINE_HEIGHT),
+  };
+
+  if (props.maxLines) {
+    style.maxHeight = `calc(${props.maxLines} * ${CODE_LINE_HEIGHT}em)`;
+    style.overflowY = "auto";
+  }
+
+  return style;
 });
 
 const emit = defineEmits<CodeBlockEmits>();
@@ -68,10 +97,7 @@ const highlightOne = (code: string, lang?: string): string => {
         ? hljs.highlight(code, { language: lang }).value
         : hljs.highlightAuto(code).value;
   } catch {
-    out = code
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    out = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
   highlightCache.set(key, out);
   return out;
@@ -80,9 +106,9 @@ const highlightOne = (code: string, lang?: string): string => {
 const highlighted = computed(() => highlightOne(displayCode.value, props.lang));
 
 const onCopy = () => {
-  copyToClipboard(props.code, {
-    successMessage: props.copyMessage,
-    errorMessage: "Error while copying content.",
+  copyToClipboard(props.code, t, {
+    successMessage: props.copyMessage ?? t("common.copySuccess"),
+    errorMessage: t("common.copyContentError"),
   });
   emit("copy");
 };
@@ -90,25 +116,25 @@ const onCopy = () => {
 
 <template>
   <div
-    class="o2-code-block my-3 overflow-hidden rounded-default border border-border-default"
+    class="o2-code-block rounded-default border-border-default my-3 overflow-hidden border"
     :class="chrome ? `o2-chrome-${chrome}` : ''"
     :data-test="dataTest"
   >
     <div
-      class="o2-code-toolbar flex items-center justify-between border-b border-border-default py-1 pl-3 pr-1.5"
+      class="o2-code-toolbar border-border-default flex items-center justify-between border-b py-1 pr-1.5 pl-3"
     >
       <span
         v-if="chrome === 'terminal'"
         class="o2-code-head inline-flex min-w-0 items-center gap-2"
       >
         <span class="inline-flex gap-1.5" aria-hidden="true">
-          <i class="block size-2.5 rounded-full bg-status-negative" />
-          <i class="block size-2.5 rounded-full bg-warning" />
-          <i class="block size-2.5 rounded-full bg-status-positive" />
+          <i class="bg-status-negative block size-2.5 rounded-full" />
+          <i class="bg-warning block size-2.5 rounded-full" />
+          <i class="bg-status-positive block size-2.5 rounded-full" />
         </span>
-        <span class="o2-code-lang font-mono text-2xs uppercase tracking-wider opacity-55"
-          >Terminal</span
-        >
+        <span class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
+          t("components.codeBlock.terminal")
+        }}</span>
       </span>
       <span
         v-else-if="chrome === 'editor'"
@@ -116,11 +142,11 @@ const onCopy = () => {
       >
         <OIcon name="code" size="xs" class="opacity-60" />
         <span class="font-mono text-xs font-semibold tracking-[0.01em] opacity-75">{{
-          filename || lang || "text"
+          filename || lang || t("common.plainText")
         }}</span>
       </span>
-      <span v-else class="o2-code-lang font-mono text-2xs uppercase tracking-wider opacity-55">{{
-        lang || "text"
+      <span v-else class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
+        lang || t("common.plainText")
       }}</span>
       <div class="flex items-center gap-1">
         <OButton
@@ -131,7 +157,7 @@ const onCopy = () => {
           @click="revealed = !revealed"
         >
           <OIcon :name="revealed ? 'visibility-off' : 'visibility'" size="sm" />
-          <OTooltip :content="revealed ? hideTooltip : revealTooltip" side="top" />
+          <OTooltip :content="revealed ? hideTooltipText : revealTooltipText" side="top" />
         </OButton>
         <!-- Extra toolbar actions (e.g. a download button) -->
         <slot name="actions" />
@@ -143,15 +169,19 @@ const onCopy = () => {
           @click="onCopy"
         >
           <OIcon name="content-copy" size="sm" />
-          <OTooltip content="Copy" side="top" />
+          <OTooltip :content="t('common.copy')" side="top" />
         </OButton>
       </div>
     </div>
-    <pre class="o2-code-pre"><code class="hljs" v-html="highlighted"></code></pre>
+    <pre
+      class="o2-code-pre"
+      :class="wrap ? 'o2-code-pre--wrap' : ''"
+      :style="preStyle"
+    ><code class="hljs" v-html="highlighted"></code></pre>
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): the `:deep(.hljs-*)` rules below colour highlight.js
    markup injected via v-html — those class names never appear in this template,
    so Tailwind cannot see them and no utility can reach them. The few non-:deep
@@ -186,15 +216,30 @@ const onCopy = () => {
   margin: 0;
   overflow-x: auto;
   background: transparent;
+  /* Font size lives here as well as on `code` so an em-based max-height set on
+     this element resolves against the code's own type size. */
+  font-size: var(--text-compact);
+  line-height: var(--code-line-height, 1.55);
 }
 
 .o2-code-pre code {
   background: transparent;
   white-space: pre;
-  font-size: var(--text-compact);
-  line-height: 1.55;
+  font-size: inherit;
+  line-height: inherit;
   padding: 0;
   color: var(--color-syntax-text);
+}
+
+/* Wrapped mode: break anywhere, because a long SQL string can be one
+   unbroken token and would otherwise still overflow sideways. */
+.o2-code-pre--wrap {
+  overflow-x: hidden;
+}
+
+.o2-code-pre--wrap code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* ============ CODE THEME (token-driven; tokens flip via dark.css,

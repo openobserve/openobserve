@@ -317,7 +317,7 @@ test.describe("Metrics Alert Notification Chain", () => {
         await pm.alertsPage.searchAlert(ALERT_NAME);
         // Use getByText instead of verifyAlertCreated's getByRole('cell') —
         // The table cells are unreliable with ARIA role matching.
-        await expect(page.getByText(ALERT_NAME).first()).toBeVisible({ timeout: 15000 });
+        await expect(pm.alertsPage.getAlertRowByText(ALERT_NAME).first()).toBeVisible({ timeout: 15000 });
         testLogger.info('Alert found in list', { name: ALERT_NAME });
 
         testLogger.info('=== PHASE 2: Poll for alert to trigger ===');
@@ -336,8 +336,21 @@ test.describe("Metrics Alert Notification Chain", () => {
         const historyVisible = await pm.alertsPage.expectAlertDetailsHistorySectionVisible();
         expect(historyVisible, 'Alert history section should be visible').toBeTruthy();
 
-        const historyRows = page.locator(pm.alertsPage.locators.alertDetailsHistoryTable + ' tbody tr');
-        const rowCount = await historyRows.count();
+        const historyRows = pm.alertsPage.getAlertHistoryRowsLocator();
+        // Trigger history is written a few scheduler cycles AFTER the condition is first satisfied
+        // (Phase 2), so the table can still be empty at first dialog-open. Poll by reopening the
+        // details dialog until at least one history row appears (non-masking: still fails if
+        // history never populates within the budget).
+        let rowCount = await historyRows.count();
+        if (rowCount === 0) {
+            await expect(async () => {
+                await pm.alertsPage.closeAlertDetailsDialog().catch(() => {});
+                await pm.alertsPage.openAlertDetailsDialog(ALERT_NAME);
+                await pm.alertsPage.expectAlertDetailsHistorySectionVisible();
+                rowCount = await historyRows.count();
+                expect(rowCount).toBeGreaterThan(0);
+            }).toPass({ timeout: 120000 });
+        }
         expect(rowCount, 'Alert history should have at least one entry').toBeGreaterThan(0);
         testLogger.info('Alert history rows', { count: rowCount });
 
@@ -359,13 +372,13 @@ test.describe("Metrics Alert Notification Chain", () => {
 
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const org = getOrgIdentifier();
-        await page.goto(`${baseUrl}/web/settings/templates?org_identifier=${org}`);
+        await page.goto(`${baseUrl}/web/alert-templates?org_identifier=${org}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
         await pm.alertsPage.searchTemplate(TEMPLATE_NAME);
         await page.waitForTimeout(1000);
 
-        const templateRow = page.getByText(TEMPLATE_NAME);
+        const templateRow = pm.alertsPage.getTemplateRowByText(TEMPLATE_NAME);
         await expect(templateRow, 'Test template should be visible').toBeVisible({ timeout: 10000 });
 
         testLogger.info('=== PHASE 2: Open template editor and verify variables ===');
@@ -387,7 +400,7 @@ test.describe("Metrics Alert Notification Chain", () => {
 
         testLogger.info('=== PHASE 3: Navigate back to templates list ===');
 
-        await page.goto(`${baseUrl}/web/settings/templates?org_identifier=${org}`);
+        await page.goto(`${baseUrl}/web/alert-templates?org_identifier=${org}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
         testLogger.info('=== TEMPLATE VERIFICATION COMPLETE ===');
@@ -414,7 +427,7 @@ test.describe("Metrics Alert Notification Chain", () => {
         const historyVisible = await pm.alertsPage.expectAlertDetailsHistorySectionVisible();
         expect(historyVisible, 'Alert history section should be visible').toBeTruthy();
 
-        const historyRows = page.locator(pm.alertsPage.locators.alertDetailsHistoryTable + ' tbody tr');
+        const historyRows = pm.alertsPage.getAlertHistoryRowsLocator();
         const rowCount = await historyRows.count();
         expect(rowCount, 'Alert history should have a manual trigger entry').toBeGreaterThan(0);
         testLogger.info('Manual trigger history entry verified', { rowCount });
@@ -470,11 +483,11 @@ test.describe("Metrics Alert Notification Chain", () => {
                 'URL should be /web/metrics after redirect').toHaveURL(/\/web\/metrics/);
 
             // Verify the stream name is shown (query context loaded)
-            await expect(page.getByText(METRICS_STREAM_NAME).first(),
+            await expect(pm.metricsPage.getStreamNameLocator(METRICS_STREAM_NAME),
                 'Metrics page should show the stream name').toBeVisible({ timeout: 10000 });
 
             // Verify data loaded — the Run Query button is no longer in loading state
-            await expect(page.locator(pm.metricsPage.applyButton),
+            await expect(pm.metricsPage.getApplyButtonLocator(),
                 'Metrics page should have Run Query button').toBeVisible({ timeout: 10000 });
 
             testLogger.info('alert_url redirects to metrics page with data loaded');

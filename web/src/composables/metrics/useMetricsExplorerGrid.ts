@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
+import { type TranslateFn, I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import useHttpStreamingSearch from "@/composables/useStreamingSearch";
@@ -21,10 +22,7 @@ import { createPromQLChunkProcessor } from "@/composables/dashboard/promqlChunkP
 import { usePanelCache } from "@/composables/dashboard/usePanelCache";
 import { isEqual } from "lodash-es";
 import { generateTraceContext } from "@/utils/zincutils";
-import {
-  parseSearchError,
-  toSearchErrorObject,
-} from "@/utils/query/searchError";
+import { parseSearchError, toSearchErrorObject } from "@/utils/query/searchError";
 import StreamService from "@/services/stream";
 import metricsService from "@/services/metrics";
 import {
@@ -44,20 +42,18 @@ import {
 import {
   buildPresenceQuery,
   computeRateWindow,
+  computePercentileWindow,
   computeStepSeconds,
+  computeWidenedRateWindows,
   DEFAULT_SCRAPE_INTERVAL_SECONDS,
   getMetricDefaults,
   isRateBasedKind,
   resolveVariant,
 } from "@/utils/metrics/metricDefaults";
-import {
-  createPreviewQueue,
-  isCancelled,
-  PRIORITY,
-} from "./useMetricsPreviewQueue";
+import { createPreviewQueue, isCancelled, PRIORITY } from "./useMetricsPreviewQueue";
 
 export interface LabelFilter {
-  label: string;
+  label: I18nText;
   value: string;
   operator?: string;
 }
@@ -112,7 +108,9 @@ export interface CardPreview {
    * The metric HAS samples in the window, but its rate-based default query could
    * not produce a single point from them — `rate()` needs two samples inside its
    * window, and there are not two to be had (a one-off scrape, or a scrape
-   * interval longer than the window).
+   * interval longer than the window). Raised only after retrying with widened
+   * windows (see `computeWidenedRateWindows`) also produced nothing — or the
+   * retries failed, in which case sparse is still the best answer in hand.
    *
    * Emphatically NOT "no data": the card stays visible and says what is actually
    * wrong, instead of being hidden as empty and taking a real, ingested metric
@@ -120,6 +118,19 @@ export interface CardPreview {
    * decides emptiness too. See `buildPresenceQuery`.
    */
   sparse: boolean;
+  /**
+   * The rate window that actually charted this data, when the standard one
+   * could not — the widened-retry rung that succeeded (e.g. "4m"), else `null`.
+   *
+   * Carried for the drill-in: the editor normally receives `$__rate_interval`
+   * and re-derives the window from the org's scrape interval — the very value
+   * whose overstatement forced the widening — so it would resolve straight back
+   * to the window that just returned nothing. A card that needed widening hands
+   * the editor this concrete window instead. Survives the persisted cache for
+   * the same reason `nanGuardApplied` does: a restore fires no query, so it has
+   * no way to re-learn it.
+   */
+  widenedRateWindow: string | null;
   /**
    * When the data was actually fetched (ms). Survives the persisted cache, so a
    * card restored from it reports the true age of what it shows — the same
@@ -240,8 +251,7 @@ const HEATMAP_POINTS = 40;
 const LABEL_VALUE_FANOUT = 5;
 const LABEL_VALUE_CAP = 100;
 
-const storageKey = (kind: string, org: string) =>
-  `o2.metricsExplorer.${kind}.${org}`;
+const storageKey = (kind: string, org: string) => `o2.metricsExplorer.${kind}.${org}`;
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -261,15 +271,13 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
-export function useMetricsExplorerGrid() {
+export function useMetricsExplorerGrid(t: TranslateFn) {
   const store = useStore();
-  const { getStreams } = useStreams();
+  const { getStreams } = useStreams(t);
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
     useHttpStreamingSearch();
 
-  const org = computed(
-    () => store.state.selectedOrganization?.identifier ?? "",
-  );
+  const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
   /* ---------------------------------------------------------------- state */
 
@@ -378,9 +386,7 @@ export function useMetricsExplorerGrid() {
     for (const [name, ov] of Object.entries(overrides.value)) {
       if (known.has(name)) keptOverrides[name] = ov;
     }
-    if (
-      Object.keys(keptOverrides).length !== Object.keys(overrides.value).length
-    ) {
+    if (Object.keys(keptOverrides).length !== Object.keys(overrides.value).length) {
       overrides.value = keptOverrides;
       writeJson(storageKey("fnOverrides", id), keptOverrides);
     }
@@ -449,9 +455,7 @@ export function useMetricsExplorerGrid() {
     } catch (error: any) {
       if (generation !== orgGeneration || requestedOrg !== org.value) return;
       loadError.value =
-        error?.response?.data?.message ??
-        error?.message ??
-        "Failed to load metrics";
+        error?.response?.data?.message ?? error?.message ?? "Failed to load metrics";
       streams.value = [];
       cards.value = [];
     } finally {
@@ -541,9 +545,7 @@ export function useMetricsExplorerGrid() {
    * key array in it cost ~90ms per keystroke on a large org. `labelsByStream` is
    * a shallowRef, so this recomputes only when the map is actually replaced.
    */
-  const membershipKnown = computed(
-    () => Object.keys(labelsByStream.value).length > 0,
-  );
+  const membershipKnown = computed(() => Object.keys(labelsByStream.value).length > 0);
 
   /**
    * A card is eligible for a label filter only when EVERY stream its effective
@@ -636,11 +638,7 @@ export function useMetricsExplorerGrid() {
 
   /** Everything except one facet — for that facet's "how many more" counts. */
   const passesExcept = (card: MetricCard, except: string): boolean => {
-    if (
-      except !== "search" &&
-      !matchesSearch(card.name, card.help, searchTerm.value)
-    )
-      return false;
+    if (except !== "search" && !matchesSearch(card.name, card.help, searchTerm.value)) return false;
     const applyFacets = !showFavoritesOnly.value;
     if (
       applyFacets &&
@@ -665,13 +663,8 @@ export function useMetricsExplorerGrid() {
       return false;
     if (except !== "label" && !isLabelEligible(card)) return false;
     // The Workspace tab (showFavoritesOnly) narrows to the scratchpad's pins.
-    if (showFavoritesOnly.value && !favorites.value.includes(card.name))
-      return false;
-    if (
-      except !== "empty" &&
-      hideEmptyPanels.value &&
-      emptyMetrics.value.has(card.name)
-    )
+    if (showFavoritesOnly.value && !favorites.value.includes(card.name)) return false;
+    if (except !== "empty" && hideEmptyPanels.value && emptyMetrics.value.has(card.name))
       return false;
     return true;
   };
@@ -687,8 +680,7 @@ export function useMetricsExplorerGrid() {
   const emptyHiddenCount = computed(() => {
     if (!hideEmptyPanels.value || emptyMetrics.value.size === 0) return 0;
     return cards.value.filter(
-      (card) =>
-        emptyMetrics.value.has(card.name) && passesExcept(card, "empty"),
+      (card) => emptyMetrics.value.has(card.name) && passesExcept(card, "empty"),
     ).length;
   });
 
@@ -696,11 +688,13 @@ export function useMetricsExplorerGrid() {
   // the grouping module itself — re-deriving it here would let the rail's facet
   // counts drift out of step with what the grid actually filters.
   const prefixAssignment = computed(() =>
-    computePrefixAssignment(cards.value.map((c) => c.name)),
+    computePrefixAssignment(
+      cards.value.map((c) => c.name),
+      t,
+    ),
   );
 
-  const prefixOf = (name: string) =>
-    prefixAssignment.value.groupOf.get(name) ?? MISC_GROUP_ID;
+  const prefixOf = (name: string) => prefixAssignment.value.groupOf.get(name) ?? MISC_GROUP_ID;
   const suffixOf = (name: string) => {
     const parts = name.split("_");
     return parts.length > 1 ? parts[parts.length - 1] : "";
@@ -775,10 +769,7 @@ export function useMetricsExplorerGrid() {
     const eligible = cards.value.filter((c) => passesExcept(c, "type"));
     const counts = new Map<string, number>();
     for (const card of eligible) {
-      counts.set(
-        card.typeFilterBucket,
-        (counts.get(card.typeFilterBucket) ?? 0) + 1,
-      );
+      counts.set(card.typeFilterBucket, (counts.get(card.typeFilterBucket) ?? 0) + 1);
     }
     return ["counter", "gauge", "histogram", "summary", "other"].map((id) => ({
       id,
@@ -794,14 +785,10 @@ export function useMetricsExplorerGrid() {
    * The page's query budget: at most `pageSize` cards, chosen BEFORE the no-data
    * filter. Nothing outside this slice is ever rendered or queried.
    */
-  const pageSlice = computed(() =>
-    sortedCandidates.value.slice(0, pageSize.value),
-  );
+  const pageSlice = computed(() => sortedCandidates.value.slice(0, pageSize.value));
 
   /** The slice actually rendered. Colour index is position in this same order. */
-  const pagedCards = computed(() =>
-    pageSlice.value.filter((card) => !isHiddenAsEmpty(card)),
-  );
+  const pagedCards = computed(() => pageSlice.value.filter((card) => !isHiddenAsEmpty(card)));
 
   const hasMore = computed(() => sortedCandidates.value.length > pageSize.value);
   const remainingCount = computed(() =>
@@ -852,15 +839,9 @@ export function useMetricsExplorerGrid() {
         await Promise.all(
           cands
             .slice(cursor, next)
-            .map((card) =>
-              requestPreview(card, { priority: PRIORITY.PREFETCH }).catch(
-                () => {},
-              ),
-            ),
+            .map((card) => requestPreview(card, { priority: PRIORITY.PREFETCH }).catch(() => {})),
         );
-        revealed += cands
-          .slice(cursor, next)
-          .filter((c) => !emptyMetrics.value.has(c.name)).length;
+        revealed += cands.slice(cursor, next).filter((c) => !emptyMetrics.value.has(c.name)).length;
         cursor = next;
         batches++;
       }
@@ -916,15 +897,10 @@ export function useMetricsExplorerGrid() {
 
   /* -------------------------------------------------------- query context */
 
-  const streamNameSet = computed(
-    () => new Set(streams.value.map((s) => s.name)),
-  );
+  const streamNameSet = computed(() => new Set(streams.value.map((s) => s.name)));
 
   const rangeSeconds = computed(() =>
-    Math.max(
-      0,
-      (timeRange.value.end_time - timeRange.value.start_time) / 1_000_000,
-    ),
+    Math.max(0, (timeRange.value.end_time - timeRange.value.start_time) / 1_000_000),
   );
 
   /**
@@ -941,9 +917,7 @@ export function useMetricsExplorerGrid() {
       DEFAULT_SCRAPE_INTERVAL_SECONDS,
   );
 
-  const streamByName = computed(
-    () => new Map(streams.value.map((s) => [s.name, s])),
-  );
+  const streamByName = computed(() => new Map(streams.value.map((s) => [s.name, s])));
 
   /**
    * How many points a card's preview asks for. Heatmaps are coarser.
@@ -1005,14 +979,14 @@ export function useMetricsExplorerGrid() {
   const effectiveVariant = (
     card: MetricCard,
     points = pointsFor(card),
-    opts?: { applyNanGuard?: boolean; rateWindow?: string },
+    opts?: { applyNanGuard?: boolean; rateWindow?: string; percentileWindow?: string },
   ) => {
     const epoch = variantEpoch.value;
     if (epoch !== cachedEpoch) {
       variantCache.clear();
       cachedEpoch = epoch;
     }
-    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}`;
+    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}`;
     const hit = variantCache.get(cacheKey);
     if (hit) return hit;
 
@@ -1038,11 +1012,12 @@ export function useMetricsExplorerGrid() {
         // `$__rate_interval` instead, because a PANEL resolves that itself.
         rateWindow:
           opts?.rateWindow ??
-          computeRateWindow(
-            rangeSeconds.value,
-            points,
-            scrapeIntervalSeconds.value,
-          ),
+          computeRateWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
+        // Wider than the rate window on purpose — a quantile needs samples, not
+        // just two points. See `computePercentileWindow`.
+        percentileWindow:
+          opts?.percentileWindow ??
+          computePercentileWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
         labels: card.labels ?? labelsByStream.value[card.name],
         applyNanGuard: opts?.applyNanGuard,
       },
@@ -1085,10 +1060,7 @@ export function useMetricsExplorerGrid() {
    */
   const invalidatePreview = (name: string, alsoCancel: string[] = []) => {
     const card = cards.value.find((c) => c.name === name);
-    const keys = new Set([
-      ...alsoCancel,
-      ...(card ? previewKeysOf(card) : []),
-    ]);
+    const keys = new Set([...alsoCancel, ...(card ? previewKeysOf(card) : [])]);
     for (const key of keys) queue.cancel(key, name);
     delete previews.value[name];
   };
@@ -1155,10 +1127,7 @@ export function useMetricsExplorerGrid() {
         {
           data: (_payload: any, res: any) => {
             if (res?.type !== "promql_response") return;
-            accumulated = chunkProcessor.processChunk(
-              accumulated,
-              res?.content?.results,
-            );
+            accumulated = chunkProcessor.processChunk(accumulated, res?.content?.results);
           },
           error: (_payload: any, err: any) => {
             // Parsed HERE, not in the catch upstream: rejecting with a plain
@@ -1262,8 +1231,7 @@ export function useMetricsExplorerGrid() {
 
   /* -------------------------------------------------- persistent card cache */
 
-  const cacheFor = (card: MetricCard) =>
-    usePanelCache(EXPLORER_CACHE_FOLDER, org.value, card.name);
+  const cacheFor = (card: MetricCard) => usePanelCache(EXPLORER_CACHE_FOLDER, org.value, card.name);
 
   /**
    * What the cached result is a result OF. A mismatch means re-query.
@@ -1272,8 +1240,17 @@ export function useMetricsExplorerGrid() {
    * override and the rate window, so they are the whole identity — there is no
    * separate variables/schema object to compare, as there is for a dashboard
    * panel.
+   *
+   * `v` is the SHAPE version of the cached value, bumped when the preview
+   * grows a field a restore cannot reconstruct. v2: `widenedRateWindow` — a
+   * pre-v2 entry can hold results a widened retry fetched with no memory of
+   * the window that fetched them, and restoring it hands the drill-in
+   * `$__rate_interval`, which resolves back to the window that returned
+   * nothing: the card charts, the editor opens blank. Missing the cache once
+   * and re-learning the window live is the cheap way out.
    */
   const cacheIdentity = (queries: any[], step: number) => ({
+    v: 2,
     queries: queries.map((q: any) => q.expr),
     step,
     org: org.value,
@@ -1307,8 +1284,7 @@ export function useMetricsExplorerGrid() {
       return false;
     }
     if (!cached?.value) return false;
-    if (!isEqual(cached.key, cacheIdentity(resolved.queries, step)))
-      return false;
+    if (!isEqual(cached.key, cacheIdentity(resolved.queries, step))) return false;
     // IndexedDB answered after the grid moved on. Painting now would restore the
     // previous org's — or the previous window's — chart into a map that was
     // deliberately emptied.
@@ -1329,8 +1305,7 @@ export function useMetricsExplorerGrid() {
     // mount, so every restored card would wear a warning that told the user
     // nothing. The honest answer to drift is to draw the data on ITS OWN axis
     // (`cachedTimeRange` below) and let `lastTriggeredAt` say how old it is.
-    const differs =
-      window.end_time - window.start_time !== range.end_time - range.start_time;
+    const differs = window.end_time - window.start_time !== range.end_time - range.start_time;
 
     previews.value[card.name] = {
       status: "done",
@@ -1358,6 +1333,7 @@ export function useMetricsExplorerGrid() {
       // paint fine on the live path and then vanish from the grid on the next
       // visit, when the cache answered instead.
       sparse: !!cached.value.sparse,
+      widenedRateWindow: cached.value.widenedRateWindow ?? null,
       lastTriggeredAt: cached.value.lastTriggeredAt ?? cached.timestamp ?? null,
       cachedDataDiffersFromTimeRange: differs,
       footerLabel: resolved.footerLabel,
@@ -1370,12 +1346,7 @@ export function useMetricsExplorerGrid() {
     return true;
   };
 
-  const persistToCache = (
-    card: MetricCard,
-    preview: CardPreview,
-    queries: any[],
-    step: number,
-  ) => {
+  const persistToCache = (card: MetricCard, preview: CardPreview, queries: any[], step: number) => {
     void cacheFor(card)
       .savePanelCache(
         cacheIdentity(queries, step),
@@ -1383,6 +1354,7 @@ export function useMetricsExplorerGrid() {
           results: preview.results,
           nanGuardApplied: preview.nanGuardApplied,
           sparse: preview.sparse,
+          widenedRateWindow: preview.widenedRateWindow,
           lastTriggeredAt: preview.lastTriggeredAt,
         },
         {
@@ -1432,6 +1404,7 @@ export function useMetricsExplorerGrid() {
         stale: false,
         nanGuardApplied: false,
         sparse: false,
+        widenedRateWindow: null,
         lastTriggeredAt: null,
         cachedDataDiffersFromTimeRange: false,
         footerLabel: resolved.footerLabel,
@@ -1456,12 +1429,7 @@ export function useMetricsExplorerGrid() {
     // `skipCache` (refresh / time-range change / override) still forces a real
     // re-query, and an `error`/`loading` preview falls through to retry.
     const settled = previews.value[card.name];
-    if (
-      !opts?.skipCache &&
-      settled &&
-      settled.status !== "loading" &&
-      settled.status !== "error"
-    ) {
+    if (!opts?.skipCache && settled && settled.status !== "loading" && settled.status !== "error") {
       return;
     }
 
@@ -1494,6 +1462,10 @@ export function useMetricsExplorerGrid() {
       stale: false,
       nanGuardApplied: false,
       sparse: false,
+      // Carried like `results`: the old (possibly widened) chart stays on
+      // screen while the re-query runs, so a drill-in during that window must
+      // still hand the editor the window that chart is true of.
+      widenedRateWindow: existing?.widenedRateWindow ?? null,
       lastTriggeredAt: existing?.lastTriggeredAt ?? null,
       cachedDataDiffersFromTimeRange: false,
       // Carried with `results` above: a re-query keeps the OLD chart on screen
@@ -1517,11 +1489,7 @@ export function useMetricsExplorerGrid() {
       // underflowed on extremely small values. Re-run once with the selector
       // guarded against NaN samples rather than showing a blank chart (or
       // hiding the card as "no data", which would be a lie).
-      if (
-        defaults.supportsNanGuard &&
-        results.length > 0 &&
-        results.every(isAllNaN)
-      ) {
+      if (defaults.supportsNanGuard && results.length > 0 && results.every(isAllNaN)) {
         const guarded = effectiveVariant(card, points, {
           applyNanGuard: true,
         });
@@ -1545,11 +1513,54 @@ export function useMetricsExplorerGrid() {
       // calling it empty and hiding it. Gated on `card.hasData` so the long tail
       // of registered-but-never-written metrics — the ones the "With data" filter
       // is FOR — is settled from the stream list without a second query.
-      const sparse =
+      let sparse =
         !results.some(hasSamples) &&
         isRateBasedKind(defaults.cardKind) &&
         card.hasData &&
         (await hasSamplesInWindow(card, step, opts));
+
+      // The samples are THERE — the probe just said so — the window is merely
+      // too narrow to catch two of them, which means the org's configured
+      // scrape interval overstates how often this metric actually arrives.
+      // Before settling for the "too few samples" card, re-ask with wider
+      // windows and chart the data if any of them can. The step stays the
+      // same on purpose: the retry changes how far back each point may look,
+      // not which points the chart is made of.
+      let widenedRateWindow: string | null = null;
+      if (sparse) {
+        for (const rateWindow of computeWidenedRateWindows(
+          rangeSeconds.value,
+          points,
+          scrapeIntervalSeconds.value,
+        )) {
+          const widened = effectiveVariant(card, points, { rateWindow });
+          if (!widened.resolved?.queries.length) break;
+          let retried: any[];
+          try {
+            retried = await runQueries(
+              widened.resolved.queries,
+              step,
+              card.name,
+              opts?.priority ?? PRIORITY.VISIBLE,
+              !!opts?.skipCache,
+            );
+          } catch (error) {
+            // A cancel means the user left this state — abort like any other
+            // request. Any OTHER failure must not escape to the error handler:
+            // the card's own query already succeeded and its honest answer —
+            // sparse — is in hand, so a retry that merely tried to improve on
+            // it settles for it instead of repainting the card as an error.
+            if (isCancelled(error)) throw error;
+            break;
+          }
+          if (retried.some(hasSamples)) {
+            results = retried;
+            sparse = false;
+            widenedRateWindow = rateWindow;
+            break;
+          }
+        }
+      }
 
       // The response outlived the state that asked for it: a bulk clear empties
       // the map and cancels what is in flight, but a request that had ALREADY
@@ -1567,6 +1578,7 @@ export function useMetricsExplorerGrid() {
         stale: false,
         nanGuardApplied,
         sparse,
+        widenedRateWindow,
         // Stamped on the real fetch, and persisted — this is what lets a
         // cache-restored card tell the user how old its data actually is.
         lastTriggeredAt: Date.now(),
@@ -1620,9 +1632,9 @@ export function useMetricsExplorerGrid() {
         stale: previous.length > 0,
         nanGuardApplied: existing?.nanGuardApplied ?? false,
         sparse: existing?.sparse ?? false,
+        widenedRateWindow: existing?.widenedRateWindow ?? null,
         lastTriggeredAt: existing?.lastTriggeredAt ?? null,
-        cachedDataDiffersFromTimeRange:
-          existing?.cachedDataDiffersFromTimeRange ?? false,
+        cachedDataDiffersFromTimeRange: existing?.cachedDataDiffersFromTimeRange ?? false,
         // Carried with `results`: this path KEEPS the previous chart up, so it
         // must keep the window that chart is true of. Dropping it would pin the
         // surviving points to the selected window — the drift bug again, but only
@@ -1639,7 +1651,11 @@ export function useMetricsExplorerGrid() {
    * Includes the NaN-guarded rewrite: when the first query comes back all-NaN we
    * re-run a *different* query string, so its result lives under a different
    * key. Omitting it here would let a refresh re-serve the stale guarded
-   * response from cache and appear to do nothing.
+   * response from cache and appear to do nothing. The widened-window retries
+   * (see `computeWidenedRateWindows`) are extra query strings for the same
+   * reason, and omitting THEM would be worse than a no-op refresh: the standard
+   * window re-runs live, comes back empty as ever, and the retry then replays
+   * the stale widened response from cache — a refresh that lies.
    */
   const previewKeysOf = (card: MetricCard): string[] => {
     const points = pointsFor(card);
@@ -1650,6 +1666,16 @@ export function useMetricsExplorerGrid() {
       const { resolved } = effectiveVariant(card, points, {
         applyNanGuard: guarded,
       });
+      for (const q of (resolved?.queries ?? []) as any[]) {
+        keys.add(previewCacheKey(q.expr, step));
+      }
+    }
+    for (const rateWindow of computeWidenedRateWindows(
+      rangeSeconds.value,
+      points,
+      scrapeIntervalSeconds.value,
+    )) {
+      const { resolved } = effectiveVariant(card, points, { rateWindow });
       for (const q of (resolved?.queries ?? []) as any[]) {
         keys.add(previewCacheKey(q.expr, step));
       }
@@ -1801,8 +1827,7 @@ export function useMetricsExplorerGrid() {
           // Those are not labels and filtering on them is meaningless, so they are
           // kept out of the picker.
           names = (response?.data?.data ?? []).filter(
-            (l: string) =>
-              l && !l.startsWith("__") && !INTERNAL_LABEL_FIELDS.has(l),
+            (l: string) => l && !l.startsWith("__") && !INTERNAL_LABEL_FIELDS.has(l),
           );
         } catch {
           if (generation !== labelNamesGeneration) return;
@@ -1957,9 +1982,7 @@ export function useMetricsExplorerGrid() {
   /** By identity, not by label — several filters can share a label. */
   const removeLabelFilter = (filter: LabelFilter) => {
     const key = labelFilterKey(filter);
-    labelFilters.value = labelFilters.value.filter(
-      (f) => labelFilterKey(f) !== key,
-    );
+    labelFilters.value = labelFilters.value.filter((f) => labelFilterKey(f) !== key);
     invalidateAll();
   };
 

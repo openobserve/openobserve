@@ -17,7 +17,7 @@
 // `ColumnOverrideUI` shape and (de)serializes to/from the persisted
 // `config.override_config` array on load/save.
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
 import { OVERRIDE_CONFIG_TYPES } from "@/utils/dashboard/tableConfigUtils";
 
 // null means "not set" → renderer falls back to the panel-level default.
@@ -67,7 +67,6 @@ export const BG_SWATCHES = [
   "#f3f4f6",
   "#ffffff",
 ];
-
 
 export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
   field,
@@ -129,9 +128,7 @@ export const loadAllFromRaw = (raw: any[] | undefined): ColumnOverrideUI[] => {
 };
 
 /** Serialize a UI row to a persisted entry, or null if it has no formatting. */
-export const serializeColumnOverride = (
-  c: ColumnOverrideUI,
-): any | null => {
+export const serializeColumnOverride = (c: ColumnOverrideUI): any | null => {
   if (!c.field) return null;
   const config: any[] = [];
 
@@ -142,10 +139,8 @@ export const serializeColumnOverride = (
       type: OVERRIDE_CONFIG_TYPES.UNIT,
       value: { unit: c.unit, customUnit: c.customUnit },
     });
-  if (c.alignment)
-    config.push({ type: OVERRIDE_CONFIG_TYPES.ALIGNMENT, value: c.alignment });
-  if (c.textColor)
-    config.push({ type: OVERRIDE_CONFIG_TYPES.TEXT_COLOR, value: c.textColor });
+  if (c.alignment) config.push({ type: OVERRIDE_CONFIG_TYPES.ALIGNMENT, value: c.alignment });
+  if (c.textColor) config.push({ type: OVERRIDE_CONFIG_TYPES.TEXT_COLOR, value: c.textColor });
   if (c.bgColor)
     config.push({
       type: OVERRIDE_CONFIG_TYPES.BACKGROUND_COLOR,
@@ -158,10 +153,7 @@ export const serializeColumnOverride = (
     });
 
   const validConditions = c.conditions.filter(
-    (r) =>
-      r.operator &&
-      r.threshold !== "" &&
-      !Number.isNaN(parseFloat(r.threshold)),
+    (r) => r.operator && r.threshold !== "" && !Number.isNaN(parseFloat(r.threshold)),
   );
   if (validConditions.length) {
     config.push({
@@ -186,8 +178,8 @@ export const serializeOverrides = (cols: ColumnOverrideUI[]): any[] =>
 
 /** Canonical unit dropdown options shared by panel config and the dialog. */
 export const getUnitOptions = (
-  t: (key: string) => string,
-): Array<{ label: string; value: string | null }> => [
+  t: TranslateFn,
+): Array<{ label: I18nText; value: string | null }> => [
   { label: t("dashboard.default"), value: null },
   { label: t("dashboard.numbers"), value: "numbers" },
   { label: t("dashboard.localeFormat"), value: "locale" },
@@ -211,7 +203,7 @@ export const getUnitOptions = (
 
 /** i18n-bound option lists for the formatting controls. */
 export const useColumnFormattingOptions = () => {
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
 
   const unitOptions = getUnitOptions(t);
 

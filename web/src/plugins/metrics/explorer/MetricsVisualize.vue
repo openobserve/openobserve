@@ -60,6 +60,7 @@ import {
   watch,
   type PropType,
 } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useNotifications from "@/composables/useNotifications";
@@ -67,6 +68,7 @@ import { restoreMetricsStream } from "@/utils/streamPersist";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import AddToDashboard from "../AddToDashboard.vue";
+import { raw } from "@/types/i18n";
 
 export default defineComponent({
   name: "MetricsVisualize",
@@ -102,8 +104,11 @@ export default defineComponent({
 
     const store = useStore();
     const { showErrorNotification } = useNotifications();
-    const { dashboardPanelData, resetDashboardPanelData, validatePanel } =
-      useDashboardPanelData("metrics");
+    const { t } = useI18nTyped();
+    const { dashboardPanelData, resetDashboardPanelData, validatePanel } = useDashboardPanelData(
+      "metrics",
+      t,
+    );
 
     const panelEditorRef = ref<any>(null);
     const showAddToDashboardDialog = ref(false);
@@ -114,27 +119,13 @@ export default defineComponent({
       values: [],
     };
 
-    // A metrics-appropriate subset — the chart types that make sense for a
-    // PromQL time series. Mirrors the logs visualize constraint.
-    const allowedChartTypes = [
-      "area",
-      "area-stacked",
-      "bar",
-      "h-bar",
-      "line",
-      "scatter",
-      "table",
-    ];
-
     // Same defaults the metrics editor route applies: a line chart driven by a
     // promql query, with the query bar shown so the user can type PromQL.
     const applyMetricsDefaults = () => {
       resetDashboardPanelData();
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
       if (store.state.zoConfig?.auto_query_enabled) {
-        const persisted = restoreMetricsStream(
-          store.state.selectedOrganization?.identifier,
-        );
+        const persisted = restoreMetricsStream(store.state.selectedOrganization?.identifier);
         if (persisted) {
           dashboardPanelData.data.queries[0].fields.stream = persisted;
         }
@@ -191,7 +182,7 @@ export default defineComponent({
       const errors: string[] = [];
       validatePanel(errors, true);
       if (errors.length) {
-        showErrorNotification(errors[0]);
+        showErrorNotification(raw(errors[0]));
         return;
       }
       showAddToDashboardDialog.value = true;

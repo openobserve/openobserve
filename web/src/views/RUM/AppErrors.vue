@@ -15,36 +15,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
+  <div class="sessions_page flex min-h-0 flex-1 flex-col overflow-hidden">
     <div>
-      <div class="bg-card-glass-bg border-b border-border-default py-1.5 px-page-edge">
+      <div class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5">
         <div class="flex items-start gap-1">
           <!-- Query editor (flex-grow to fill available space) -->
-          <div class="flex-1 min-w-0 relative">
-            <query-editor
+          <div class="relative min-w-0 flex-1">
+            <QueryEditor
               ref="errorQueryEditorRef"
               editor-id="rum-errors-query-editor"
-              :class="['border', 'solid', 'border-card-glass-border', 'p-1', 'rounded-default', 'overflow-y-auto', errorEditorHeight]"
+              :class="[
+                'border',
+                'solid',
+                'border-card-glass-border',
+                'p-1',
+                'rounded-default',
+                'overflow-y-auto',
+                errorEditorHeight,
+              ]"
               v-model:query="errorTrackingState.data.editorValue"
               :debounce-time="300"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               @focus="onQueryEditorFocus"
               @blur="onQueryEditorBlur"
               @update:query="updateAutoComplete"
             />
             <div
               v-if="!errorTrackingState.data.editorValue && !editorFocused"
-              class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start py-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
+              class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start py-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
             >
               <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
             </div>
           </div>
 
           <!-- Controls on the right -->
-          <div class="flex items-start gap-1 shrink-0">
-            <syntax-guide />
-            <date-time
+          <div class="flex shrink-0 items-start gap-1">
+            <SyntaxGuide />
+            <DateTime
               auto-apply
               menu-align="end"
               :default-type="errorTrackingState.data.datetime?.valueType"
@@ -52,9 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 startTime: errorTrackingState.data.datetime.startTime,
                 endTime: errorTrackingState.data.datetime.endTime,
               }"
-              :default-relative-time="
-                errorTrackingState.data.datetime.relativeTimePeriod
-              "
+              :default-relative-time="errorTrackingState.data.datetime.relativeTimePeriod"
               data-test="logs-search-bar-date-time-dropdown"
               @on:date-change="updateDateChange"
             />
@@ -68,25 +75,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="shrink-0"
             >
               {{ t("metrics.runQuery") }}
-              <OTooltip side="bottom" :content="t('metrics.runQuery')" shortcut-id="rumErrorsRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('metrics.runQuery')"
+                shortcut-id="rumErrorsRefresh"
+              />
             </OButton>
             <OTableColumnToggle
               :columns="tableColumns"
               :column-visibility="columnVisibility"
               @update:column-visibility="setColumnVisibility"
             />
-          </div><!-- end controls -->
-        </div><!-- end flex row -->
-      </div><!-- end bg-card-glass-bg -->
-    </div><!-- end toolbar wrapper -->
+          </div>
+          <!-- end controls -->
+        </div>
+        <!-- end flex row -->
+      </div>
+      <!-- end bg-card-glass-bg -->
+    </div>
+    <!-- end toolbar wrapper -->
     <OSplitter
-      class="logs-horizontal-splitter flex-1 min-h-0"
+      class="logs-horizontal-splitter min-h-0 flex-1"
       v-model="splitterModel"
       unit="px"
       :horizontal="false"
     >
       <template #before>
-        <div class="bg-surface-panel py-1 h-full overflow-auto border-r border-border-default">
+        <div class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1">
           <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
@@ -97,16 +112,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             stream-type="logs"
             :enable-grouping="true"
             :query="errorTrackingState.data.editorValue"
+            :base-filter="fieldListBaseFilter"
             @event-emitted="handleSidebarEvent"
           />
         </div>
       </template>
       <template #after>
-        <div class="h-full flex flex-col min-h-0">
+        <div class="flex h-full min-h-0 flex-col">
           <!-- Errors-over-time chart + KPI summary -->
-          <div
-            class="grid grid-cols-1 lg:grid-cols-5 gap-2 px-page-edge pt-1.5 h-44 shrink-0"
-          >
+          <div class="px-page-edge grid h-44 shrink-0 grid-cols-1 gap-2 pt-1.5 lg:grid-cols-5">
             <ErrorsOverTimeChart
               class="lg:col-span-3"
               :buckets="chartSeries"
@@ -115,11 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :focus="typeFilter"
               :loading="isLoadingChart"
             />
-            <ErrorsKpiCards
-              class="lg:col-span-2"
-              :kpis="kpis"
-              :loading="isLoadingKpis"
-            />
+            <ErrorsKpiCards class="lg:col-span-2" :kpis="kpis" :loading="isLoadingKpis" />
           </div>
 
           <!-- Status / type / service filters -->
@@ -136,85 +146,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
-          <OTable
-            :data="visibleIssues"
-            :columns="tableColumns"
-            :default-columns="false"
-            :column-visibility="columnVisibility"
-            :loading="!!isLoading.length || isLoadingIssues"
-            row-key="_rowKey"
-            pagination="none"
-            virtual-scroll
-            :dense="false"
-            :row-height="60"
-            :show-global-filter="false"
-            class="h-full"
-            data-test="rum-app-errors-table"
-            row-class="cursor-pointer"
-            @row-click="handleRowClick"
-          >
-            <template #empty>
-              <NoData />
-            </template>
-            <template #cell-issue="{ row }">
-              <ErrorIssueCell :issue="row" />
-            </template>
-            <template #cell-trend="{ row }">
-              <ErrorTrendCell
-                :buckets="trendBuckets[issueKey(row)] ?? null"
-                :status="row.status"
-                :handling="row.error_handling"
-                @visible="fetchTrend(row)"
-              />
-            </template>
-            <template #cell-events="{ row }">
-              <div class="flex flex-col items-end">
-                <span
-                  class="font-semibold tabular-nums"
-                  data-test="rum-app-errors-events-count"
-                >{{ addCommasToNumber(row.events) }}</span>
-                <small>{{ t("rum.eventsUnit") }}</small>
-              </div>
-            </template>
-            <template #cell-users="{ row }">
-              <span
-                class="tabular-nums"
-                data-test="rum-app-errors-users-count"
-              >{{
-                row.users_affected != null
-                  ? addCommasToNumber(row.users_affected)
-                  : "—"
-              }}</span>
-            </template>
-            <template #cell-seen="{ row }">
-              <div class="flex flex-col">
-                <span data-test="rum-app-errors-last-seen">{{
-                  formatRelativeTime(row.zo_sql_timestamp)
+          <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
+            <OTable
+              :data="visibleIssues"
+              :columns="tableColumns"
+              :default-columns="false"
+              :column-visibility="columnVisibility"
+              :loading="!!isLoading.length || isLoadingIssues"
+              row-key="_rowKey"
+              pagination="none"
+              virtual-scroll
+              :dense="false"
+              :row-height="60"
+              :show-global-filter="false"
+              class="h-full"
+              data-test="rum-app-errors-table"
+              row-class="cursor-pointer"
+              @row-click="handleRowClick"
+            >
+              <template #empty>
+                <NoData />
+              </template>
+              <template #cell-issue="{ row }">
+                <ErrorIssueCell :issue="row" />
+              </template>
+              <template #cell-trend="{ row }">
+                <ErrorTrendCell
+                  :buckets="trendBuckets[issueKey(row)] ?? null"
+                  :status="row.status"
+                  :handling="row.error_handling"
+                  @visible="fetchTrend(row)"
+                />
+              </template>
+              <template #cell-events="{ row }">
+                <div class="flex flex-col items-end">
+                  <span
+                    class="font-semibold tabular-nums"
+                    data-test="rum-app-errors-events-count"
+                    >{{ addCommasToNumber(row.events) }}</span
+                  >
+                  <small>{{ t("rum.eventsUnit") }}</small>
+                </div>
+              </template>
+              <template #cell-users="{ row }">
+                <span class="tabular-nums" data-test="rum-app-errors-users-count">{{
+                  row.users_affected != null ? addCommasToNumber(row.users_affected) : "—"
                 }}</span>
-                <small data-test="rum-app-errors-first-seen">{{
-                  t("rum.firstSeenAgo", {
-                    time: formatRelativeTime(row.first_seen),
-                  })
-                }}</small>
-              </div>
-            </template>
-            <template #cell-status="{ row }">
-              <OTag
-                :label="
-                  row.status === 'new'
-                    ? t('rum.statusNew')
-                    : t('rum.statusOngoing')
-                "
-                :variant="row.status === 'new' ? 'error' : 'error-outline'"
-                size="sm"
-                :title="
-                  row.status === 'new' ? t('rum.statusNewTooltip') : undefined
-                "
-                data-test="rum-app-errors-status-badge"
-              />
-            </template>
-          </OTable>
+              </template>
+              <template #cell-seen="{ row }">
+                <div class="flex flex-col">
+                  <span data-test="rum-app-errors-last-seen">{{
+                    formatRelativeTime(row.zo_sql_timestamp)
+                  }}</span>
+                  <small data-test="rum-app-errors-first-seen">{{
+                    t("rum.firstSeenAgo", {
+                      time: formatRelativeTime(row.first_seen),
+                    })
+                  }}</small>
+                </div>
+              </template>
+              <template #cell-status="{ row }">
+                <OTag
+                  :label="row.status === 'new' ? t('rum.statusNew') : t('rum.statusOngoing')"
+                  :variant="row.status === 'new' ? 'error' : 'error-outline'"
+                  size="sm"
+                  :title="row.status === 'new' ? t('rum.statusNewTooltip') : undefined"
+                  data-test="rum-app-errors-status-badge"
+                />
+              </template>
+            </OTable>
           </div>
         </div>
       </template>
@@ -223,20 +223,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in RealUserMonitoring.vue matches this
+// view. Without it the name is inferred from the FILENAME, so renaming the file
+// would silently drop it from the cache and bring back the refetch-on-return.
+defineOptions({ name: "AppErrors" });
+
 import {
   computed,
   nextTick,
   onBeforeMount,
   onMounted,
+  onBeforeUnmount,
+  onActivated,
+  onDeactivated,
   ref,
   type Ref,
   defineAsyncComponent,
   watch,
 } from "vue";
-import {
-  rangesFromServerError,
-  type SqlErrorRange,
-} from "@/utils/query/sqlDiagnostics";
+import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
@@ -258,29 +263,24 @@ import ErrorsFilterBar, {
 import OTag from "@/lib/core/Badge/OTag.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
 import useErrorIssuesData from "@/composables/rum/useErrorIssuesData";
-import { issueKey, formatRelativeTime } from "@/utils/rum/errorIssueUtils";
+import { issueKey, formatRelativeTime, escapeSqlString } from "@/utils/rum/errorIssueUtils";
 import { addCommasToNumber } from "@/utils/formatters";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
-import {
-  applyFilterTerm,
-  removeFieldCondition,
-} from "@/utils/traces/filterUtils";
+import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import NoData from "@/components/shared/grid/NoData.vue";
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
-const { t } = useI18n();
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+const { t } = useI18nTyped();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
@@ -295,14 +295,17 @@ const errorQueryEditorRef = ref<any>(null);
 // Server-error highlight ranges, forwarded to the filter editor by the composable.
 const sqlErrorRanges = ref<SqlErrorRange[]>([]);
 
-const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
-  useSqlEditorDiagnostics({
-    queryEditorRef: errorQueryEditorRef,
-    sqlMode: computed(() => false),
-    query: computed(() => errorTrackingState.data.editorValue ?? ""),
-    streamName: computed(() => errorTrackingState.data.stream.errorStream),
-    externalErrors: sqlErrorRanges,
-  });
+const {
+  onFocus: _sqlOnFocus,
+  onBlur: _sqlOnBlur,
+  onQueryChange: _sqlOnQueryChange,
+} = useSqlEditorDiagnostics({
+  queryEditorRef: errorQueryEditorRef,
+  sqlMode: computed(() => false),
+  query: computed(() => errorTrackingState.data.editorValue ?? ""),
+  streamName: computed(() => errorTrackingState.data.stream.errorStream),
+  externalErrors: sqlErrorRanges,
+});
 
 const onQueryEditorFocus = () => {
   editorFocused.value = true;
@@ -320,6 +323,7 @@ const {
   effectiveSuggestions,
   getSuggestions,
   updateFieldKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 const updateAutoComplete = (value: string) => {
@@ -354,9 +358,10 @@ const {
   isLoadingChart,
   isLoadingKpis,
   fetchAll,
+  cancelAll,
   fetchTrend,
   lastQueryError,
-} = useErrorIssuesData();
+} = useErrorIssuesData(t);
 
 // Turn the last issues-search server error into editor squiggles (filter mode).
 watch(lastQueryError, async (err) => {
@@ -376,7 +381,7 @@ watch(lastQueryError, async (err) => {
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
 
 const tableErrors = computed(() =>
@@ -410,8 +415,7 @@ const visibleIssues = computed(() =>
       return false;
     }
     if (typeFilter.value !== "all") {
-      const handling =
-        issue.error_handling === "handled" ? "handled" : "unhandled";
+      const handling = issue.error_handling === "handled" ? "handled" : "unhandled";
       if (handling !== typeFilter.value) return false;
     }
     return true;
@@ -441,17 +445,29 @@ const onServiceFilterChange = (value: string) => {
   runQuery();
 };
 
+// The sidebar shares `_rumdata` with sessions/views/actions, so without these
+// its value counts are whole-stream counts and dwarf the issue table's. Mirror
+// the non-editable part of the issues query (buildIssuesSql) — `type='error'`
+// plus the service chip. The status/type chips are excluded on purpose: they
+// filter the grouped result set client-side, not the underlying rows.
+const fieldListBaseFilter = computed(() => {
+  const clauses = ["type='error'"];
+  if (serviceFilter.value) {
+    clauses.push(`service='${escapeSqlString(serviceFilter.value)}'`);
+  }
+  return clauses.join(" AND ");
+});
+
 // Dynamic editor height based on content lines
 const errorEditorHeight = computed(() => {
   const lines = (errorTrackingState.data.editorValue.match(/\n/g) || []).length + 1;
-  if (lines === 1) return 'h-8!';
-  if (lines === 2) return 'h-14!';
-  return 'h-20!'; // 3+ lines, capped at 5rem (approx 3 lines)
+  if (lines === 1) return "h-8!";
+  if (lines === 2) return "h-14!";
+  return "h-20!"; // 3+ lines, capped at 5rem (approx 3 lines)
 });
 
-const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
-  "rum-error-tracking-list",
-);
+const { columnVisibility, setColumnVisibility } =
+  useExternalColumnToggle("rum-error-tracking-list");
 
 const tableColumns = [
   {
@@ -561,7 +577,6 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
-
 onBeforeMount(() => {
   restoreUrlQueryParams();
 });
@@ -572,6 +587,31 @@ onMounted(async () => {
   runQuery();
 });
 
+// Leaving the tab frees the searches it started. Error tracking fans out 5 concurrent
+// searches per load plus a trend fetch per visible row; abandoning them leaves the
+// server's per-user work-group queue full, so the next tab's queries queue behind them
+// and come back cancelled as HTTP 429.
+onBeforeUnmount(() => {
+  cancelAll();
+});
+
+// This view is kept alive, so leaving it DEACTIVATES rather than unmounts —
+// onBeforeUnmount does not fire and its searches would keep holding work-group slots.
+onDeactivated(() => {
+  cancelAll();
+});
+
+// Returning from an error detail page shows the issues already fetched instead of
+// re-running the five-query chain. onActivated also fires on the first mount, where
+// onMounted already owns the initial load, so that first call is skipped.
+let activatedBefore = false;
+onActivated(() => {
+  if (!activatedBefore) {
+    activatedBefore = true;
+    return;
+  }
+  if (!issues.value?.length) runQuery();
+});
 
 const handleSidebarEvent = (event: string, value: any) => {
   if (event === "add-field") {
@@ -657,14 +697,6 @@ const handleRowClick = (row: any) => {
   handleErrorTypeClick({ row });
 };
 
-// Severity spine flush against the row's left edge — same mechanism and
-// colors as the sessions table, for cross-page consistency.
-const getIssueStatusColor = (row: any) => {
-  if (row.error_handling === "handled")
-    return "var(--color-severity-warning-color)";
-  return "var(--color-severity-error-color)";
-};
-
 function restoreUrlQueryParams() {
   const queryParams = router.currentRoute.value.query;
 
@@ -680,20 +712,13 @@ function restoreUrlQueryParams() {
   }
 
   if (queryParams.query) {
-    errorTrackingState.data.editorValue =
-      b64DecodeUnicode(queryParams.query as string) || "";
+    errorTrackingState.data.editorValue = b64DecodeUnicode(queryParams.query as string) || "";
   }
 
-  if (
-    queryParams.status === "new" ||
-    queryParams.status === "ongoing"
-  ) {
+  if (queryParams.status === "new" || queryParams.status === "ongoing") {
     statusFilter.value = queryParams.status;
   }
-  if (
-    queryParams.type === "unhandled" ||
-    queryParams.type === "handled"
-  ) {
+  if (queryParams.type === "unhandled" || queryParams.type === "handled") {
     typeFilter.value = queryParams.type;
   }
   if (typeof queryParams.service === "string" && queryParams.service) {
@@ -725,6 +750,11 @@ function updateUrlQueryParams() {
 }
 
 useShortcuts([
-  { id: "rumErrorsRefresh", handler: () => { if (!isInputFocused()) runQuery(); } },
+  {
+    id: "rumErrorsRefresh",
+    handler: () => {
+      if (!isInputFocused()) runQuery();
+    },
+  },
 ]);
 </script>

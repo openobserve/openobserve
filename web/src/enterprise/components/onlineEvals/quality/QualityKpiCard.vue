@@ -1,43 +1,48 @@
 <template>
   <div
-    class="bg-card-glass-bg rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 border border-border-default transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+    :class="[
+      'bg-card-glass-bg rounded-default border-border-default flex flex-col gap-0.5 overflow-hidden border px-3 pt-1.5 pb-1.5 transition-shadow duration-200 ease-in-out hover:shadow-sm',
+      clickable &&
+        'hover:border-accent focus-visible:ring-accent cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
+    ]"
     :data-test="`quality-kpi-${kpi.id}`"
+    :role="clickable ? 'button' : undefined"
+    :tabindex="clickable ? 0 : undefined"
+    @click="activate"
+    @keydown.enter.prevent="activate"
+    @keydown.space.prevent="activate"
   >
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-0.5">
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
            as LLM Insights / Session Detail so every card reads the same. -->
-      <div class="flex items-center justify-between gap-2 mb-1">
-        <div class="kpi-label text-2xs font-semibold leading-normal text-text-secondary min-w-0 truncate">
+      <div class="flex items-center justify-between gap-2">
+        <div
+          class="kpi-label text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
+        >
           {{ t(`onlineEvals.quality.kpis.${kpi.id}.title`) }}
         </div>
         <span
-          class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-default bg-surface-subtle text-text-secondary"
+          class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
         >
           <OIcon :name="cardIcon" size="sm" />
         </span>
       </div>
       <div class="flex items-baseline gap-[0.2rem]">
         <template v-if="kpi.value != null">
-          <span class="text-2xl font-bold leading-none text-text-secondary">
+          <span class="text-text-secondary text-2xl leading-none font-bold">
             {{ bigNumber }}
           </span>
-          <span
-            v-if="unitLabel"
-            class="text-compact font-semibold text-text-secondary "
-          >
+          <span v-if="unitLabel" class="text-compact text-text-secondary font-semibold">
             {{ unitLabel }}
           </span>
         </template>
-        <span
-          v-else
-          class="text-base font-medium leading-none text-text-muted"
-        >
+        <span v-else class="text-text-muted text-base leading-none font-medium">
           {{ t("onlineEvals.quality.kpis.noData") }}
         </span>
       </div>
       <div
         v-if="kpi.id === 'scoreResults' && kpi.scopeCounts"
-        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs font-medium text-text-tertiary"
+        class="text-3xs text-text-tertiary flex flex-wrap items-center gap-x-2 gap-y-0.5 font-medium"
         data-test="quality-kpi-scope-breakdown"
       >
         <span
@@ -47,7 +52,7 @@
           :data-test="`quality-kpi-scope-${scope}`"
         >
           <span>{{ t(`onlineEvals.quality.scopes.${scope}`) }}</span>
-          <span class="font-semibold text-text-secondary">
+          <span class="text-text-secondary font-semibold">
             {{ compactCount(kpi.scopeCounts[scope]) }}
           </span>
         </span>
@@ -59,7 +64,7 @@
            short history) rather than zero. -->
       <div
         v-if="kpi.value != null"
-        class="text-3xs font-medium flex items-center gap-1"
+        class="text-3xs flex items-center gap-1 font-medium"
         :class="{
           'text-status-success-text': (delta != null ? trendSentiment : 'neutral') === 'good',
           'text-error-600': (delta != null ? trendSentiment : 'neutral') === 'bad',
@@ -68,9 +73,7 @@
       >
         <template v-if="delta != null">
           <span class="kpi-trend-arrow">{{ trendArrow }}</span>
-          <span>
-            {{ deltaText }} {{ t("onlineEvals.quality.kpis.vsPrev") }}
-          </span>
+          <span> {{ deltaText }} {{ t("onlineEvals.quality.kpis.vsPrev") }} </span>
         </template>
         <template v-else>
           <span class="kpi-trend-arrow">–</span>
@@ -82,15 +85,15 @@
       v-if="kpi.sparkline && kpi.sparkline.length > 1"
       :data="kpi.sparkline"
       :color="sparkColor"
-      :height="32"
-      class="mt-auto"
+      :height="20"
+      class="-mx-3 mt-auto -mb-1.5"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import KpiSparkline from "@/plugins/traces/KpiSparkline.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { KpiCard } from "../composables/useQualityData";
@@ -98,11 +101,20 @@ import type { KpiCard } from "../composables/useQualityData";
 const props = defineProps<{
   kpi: KpiCard;
   delta: number | null;
+  clickable?: boolean;
 }>();
 
-const { t } = useI18n();
+const emit = defineEmits<{
+  (event: "activate"): void;
+}>();
+
+const { t } = useI18nTyped();
 
 const scopes = ["span", "trace", "session"] as const;
+
+function activate() {
+  if (props.clickable) emit("activate");
+}
 
 const ICONS: Record<KpiCard["id"], string> = {
   scoreResults: "fact-check",
@@ -114,11 +126,7 @@ const ICONS: Record<KpiCard["id"], string> = {
 const cardIcon = computed(() => ICONS[props.kpi.id]);
 
 const trendSentiment = computed<"good" | "bad" | "neutral">(() => {
-  if (
-    props.delta == null ||
-    props.kpi.healthyDirection === "neutral" ||
-    props.delta === 0
-  ) {
+  if (props.delta == null || props.kpi.healthyDirection === "neutral" || props.delta === 0) {
     return "neutral";
   }
   const movedUp = props.delta > 0;

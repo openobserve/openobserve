@@ -16,36 +16,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="bg-surface-panel relative h-full min-h-0 flex flex-col"
+    class="bg-surface-panel relative flex h-full min-h-0 flex-col"
     :class="isOpen ? 'w-75' : 'w-12.5'"
     data-test="panel-sidebar-root"
   >
     <div
       v-if="!isOpen"
-      class="flex flex-col items-center justify-start w-12.5 h-full overflow-y-auto cursor-pointer"
+      class="flex h-full w-12.5 cursor-pointer flex-col items-center justify-start overflow-y-auto"
       data-test="panel-sidebar-header-collapsed"
       @click="toggleSidebar"
     >
       <!-- <div class="mt-2.5 text-xl">+</div> -->
       <OIcon
-        name="expand-all" size="sm"
-        class="mt-2.5 text-xl rotate-90"
+        name="expand-all"
+        size="sm"
+        class="mt-2.5 rotate-90 text-xl"
         data-test="dashboard-sidebar"
       />
       <div
-        class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold"
+        class="font-bold [text-orientation:mixed] [writing-mode:vertical-rl]"
         data-test="panel-sidebar-collapsed-title"
-      >{{ title }}</div>
+      >
+        {{ title }}
+      </div>
     </div>
     <div
       v-else
-      class="flex items-center justify-between h-11 px-3 shrink-0"
+      class="flex h-11 shrink-0 items-center justify-between px-3"
       data-test="panel-sidebar-header-expanded"
     >
-      <div
-        class="text-sm font-semibold text-text-heading"
-        data-test="panel-sidebar-expanded-title"
-      >{{ title }}</div>
+      <div class="text-text-heading text-sm font-semibold" data-test="panel-sidebar-expanded-title">
+        {{ title }}
+      </div>
       <OButton
         variant="outline"
         size="icon-xs-sq"
@@ -69,18 +71,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, provide } from "vue";
+import { type I18nText } from "@/types/i18n";
+import { defineComponent, ref, watch, provide, type PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
-  components: { OSeparator, OButton,
-    OIcon,
-},
+  components: { OSeparator, OButton, OIcon },
   props: {
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     modelValue: {
@@ -92,7 +93,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const isOpen = ref(props.modelValue);
     const sidebarScrollTick = ref(0);
-    provide('sidebarScrollTick', sidebarScrollTick);
+    provide("sidebarScrollTick", sidebarScrollTick);
 
     const toggleSidebar = () => {
       isOpen.value = !isOpen.value;
@@ -118,4 +119,3 @@ export default defineComponent({
   },
 });
 </script>
-

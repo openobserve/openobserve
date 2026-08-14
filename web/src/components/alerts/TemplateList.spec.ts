@@ -67,9 +67,7 @@ describe("Alert List", async () => {
   });
 
   it("Should reder table with templates", () => {
-    expect(
-      wrapper.find('[data-test="alert-templates-list-table"]').exists()
-    ).toBeTruthy();
+    expect(wrapper.find('[data-test="alert-templates-list-table"]').exists()).toBeTruthy();
   });
 
   it("Should display table column headers", async () => {
@@ -108,8 +106,8 @@ describe("Alert List", async () => {
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates/${template_name}`,
           () => {
             return HttpResponse.json({ code: 200 });
-          }
-        )
+          },
+        ),
       );
       // Override the templates list to return only Template3 after deletion.
       // The service returns res.data which axios maps to the raw response body,
@@ -125,23 +123,19 @@ describe("Alert List", async () => {
                 isDefault: true,
               },
             ]);
-          }
-        )
+          },
+        ),
       );
 
       // Click the delete button — only visible once skeleton is cleared (done in outer beforeEach).
       await wrapper
-        .find(
-          `[data-test="alert-template-list-${template_name}-delete-template"]`
-        )
+        .find(`[data-test="alert-template-list-${template_name}-delete-template"]`)
         .trigger("click");
       await flushPromises();
 
       // Confirm the deletion in the dialog.
       const mainWrapper = new DOMWrapper(document.body);
-      await mainWrapper
-        .find('[data-test="o-dialog-primary-btn"]')
-        .trigger("click");
+      await mainWrapper.find('[data-test="o-dialog-primary-btn"]').trigger("click");
       await flushPromises();
 
       // Advance past the skeleton hold timer triggered by the refetch.
@@ -163,4 +157,3 @@ describe("Alert List", async () => {
     });
   });
 });
-

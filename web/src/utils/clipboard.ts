@@ -1,10 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
 export interface CopyToClipboardOptions {
   successMessage?: string;
-  errorMessage?: string;
+  errorMessage?: I18nText;
   timeout?: number;
   silent?: boolean;
 }
@@ -28,13 +29,11 @@ async function writeClipboard(text: string): Promise<void> {
   // focus back and clear the selection, causing Chrome to return true for an
   // empty-selection copy and the success toast to be shown incorrectly.
   const activeEl = document.activeElement as HTMLElement | null;
-  const container: HTMLElement =
-    activeEl?.closest<HTMLElement>('[role="dialog"]') ?? document.body;
+  const container: HTMLElement = activeEl?.closest<HTMLElement>('[role="dialog"]') ?? document.body;
 
   const textarea = document.createElement("textarea");
   textarea.value = text;
-  textarea.style.cssText =
-    "position:fixed;top:0;left:0;opacity:0;pointer-events:none;";
+  textarea.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none;";
   textarea.setAttribute("readonly", "");
   container.appendChild(textarea);
   textarea.focus();
@@ -53,17 +52,17 @@ async function writeClipboard(text: string): Promise<void> {
 
 export async function copyToClipboard(
   text: string,
+  t: TranslateFn,
   options: CopyToClipboardOptions = {},
 ): Promise<boolean> {
-  const { successMessage, errorMessage, timeout = 2000, silent = false } =
-    options;
+  const { successMessage, errorMessage, timeout = 2000, silent = false } = options;
 
   try {
     await writeClipboard(text);
     if (!silent) {
       toast({
         variant: "success",
-        message: successMessage || "Copied to clipboard!",
+        message: raw(successMessage || t("common.copySuccess")),
         timeout,
       });
     }
@@ -72,7 +71,7 @@ export async function copyToClipboard(
     if (!silent) {
       toast({
         variant: "error",
-        message: errorMessage || "Failed to copy to clipboard",
+        message: raw(errorMessage || t("common.copyError")),
         timeout,
       });
     }

@@ -22,9 +22,10 @@ use datafusion::{
     physical_plan::{ExecutionPlan, aggregates::AggregateExec},
 };
 use datafusion_proto::{physical_plan::AsExecutionPlan, protobuf::PhysicalPlanNode};
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec::exec::StreamingAggsExec;
 use prost::Message;
 use proto::cluster_rpc;
+
+use crate::datafusion::distributed_plan::streaming_aggs_exec::exec::StreamingAggsExec;
 
 pub fn try_decode(
     node: cluster_rpc::StreamingAggsExecNode,
@@ -116,7 +117,6 @@ mod tests {
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
     };
-    use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec::exec::StreamingAggsExec;
 
     use super::*;
     use crate::datafusion::udf::str_match_udf::STR_MATCH_UDF;

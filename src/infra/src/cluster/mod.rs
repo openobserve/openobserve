@@ -37,6 +37,7 @@ use crate::{
     errors::*,
 };
 
+pub mod ai_sessions;
 mod scheduler;
 
 pub use scheduler::select_best_node;

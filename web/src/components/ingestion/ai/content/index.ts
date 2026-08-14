@@ -68,10 +68,7 @@ for (const [path, url] of Object.entries(logoModules)) {
  * - bare filename / relative path → the bundled asset from generated/<slug>/
  * - missing / not found → "" (caller falls back to the monogram)
  */
-export function resolveAICardLogo(
-  slug: string | undefined,
-  logo: string | undefined,
-): string {
+export function resolveAICardLogo(slug: string | undefined, logo: string | undefined): string {
   if (!logo) return "";
   if (/^https?:\/\//i.test(logo)) return logo;
   if (!slug) return "";

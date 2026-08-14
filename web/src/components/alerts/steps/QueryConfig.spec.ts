@@ -29,17 +29,13 @@ import i18n from "@/locales";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import {
-  makeAddAlertSchema,
-  defaultAddAlertMeta,
-} from "@/components/alerts/AddAlert.schema";
+import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 
 // The composed orchestrator schema — messages resolve through the real locale.
 const t = (key: string, named?: Record<string, unknown>): string =>
   (i18n.global.t as any)(key, named);
 const addAlertSchema = makeAddAlertSchema(t);
 const FIELD_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
-
 
 // Mock store
 const createMockStore = (overrides = {}) => ({
@@ -52,9 +48,7 @@ const createMockStore = (overrides = {}) => ({
       identifier: "test-org",
     },
     organizationData: {
-      functions: [
-        { name: "test_func", function: "// test function" },
-      ],
+      functions: [{ name: "test_func", function: "// test function" }],
     },
     userInfo: {
       email: "test@example.com",
@@ -90,8 +84,27 @@ vi.mock("@/components/alerts/QueryEditorDialog.vue", () => ({
   default: {
     name: "QueryEditorDialog",
     template: "<div data-test='mock-query-editor-dialog'></div>",
-    props: ["modelValue", "tab", "sqlQuery", "promqlQuery", "vrlFunction", "streamName", "streamType", "columns", "period", "multiTimeRange", "savedFunctions", "sqlQueryErrorMsg"],
-    emits: ["update:modelValue", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql"],
+    props: [
+      "modelValue",
+      "tab",
+      "sqlQuery",
+      "promqlQuery",
+      "vrlFunction",
+      "streamName",
+      "streamType",
+      "columns",
+      "period",
+      "multiTimeRange",
+      "savedFunctions",
+      "sqlQueryErrorMsg",
+    ],
+    emits: [
+      "update:modelValue",
+      "update:sqlQuery",
+      "update:promqlQuery",
+      "update:vrlFunction",
+      "validate-sql",
+    ],
   },
 }));
 
@@ -118,15 +131,37 @@ vi.mock("vuex", async () => {
 let mockStoreInstance: any;
 
 // Mock useSuggestions composable
-vi.mock("@/composables/useSuggestions", () => ({
-  default: vi.fn(() => ({
-    autoCompleteData: { value: { query: "", cursorIndex: 0, org: "", streamType: "", streamName: "", popup: { open: null } } },
-    autoCompleteIsSuggesting: { value: false },
-    updateFieldValues: vi.fn(),
-    updateFieldKeywords: vi.fn(),
-    getSuggestions: vi.fn().mockResolvedValue([]),
-  })),
-}));
+vi.mock("@/composables/useSuggestions", async () => {
+  // Real refs, so the template unwraps them exactly as it does in production.
+  // Plain { value } objects are NOT unwrapped by Vue and would reach the child
+  // component as the wrapper object itself.
+  const { ref: vueRef } = await vi.importActual<typeof import("vue")>("vue");
+  return {
+    default: vi.fn(() => ({
+      autoCompleteData: {
+        value: {
+          query: "",
+          cursorIndex: 0,
+          org: "",
+          streamType: "",
+          streamName: "",
+          popup: { open: null },
+        },
+      },
+      autoCompleteIsSuggesting: { value: false },
+      // Deliberately DISTINCT arrays: a test can then tell whether the template
+      // binds the base list or the context-aware view (tmp/code.md N1).
+      autoCompleteKeywords: vueRef([{ label: "BASE_FIELD", kind: "Field" }]),
+      autoCompleteSuggestions: vueRef([{ label: "BASE_FN", kind: "Function" }]),
+      effectiveKeywords: vueRef([{ label: "CONTEXT_VALUE", kind: "Value" }]),
+      effectiveSuggestions: vueRef([]),
+      updateFieldValues: vi.fn(),
+      updateFieldKeywords: vi.fn(),
+      updateStreamKeywords: vi.fn(),
+      getSuggestions: vi.fn().mockResolvedValue([]),
+    })),
+  };
+});
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
@@ -140,6 +175,13 @@ vi.mock("@/utils/zincutils", () => ({
   }),
   isAboveMinRefreshInterval: vi.fn(() => true),
   describeCron: vi.fn((cron: string) => `Every ${cron}`),
+  resolveBrowserTimezone: vi.fn((tz: string) => {
+    if (typeof tz === "string" && tz.toLowerCase().startsWith("browser time")) {
+      const inner = tz.match(/\(([^)]+)\)/)?.[1]?.trim();
+      return inner || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    }
+    return tz;
+  }),
 }));
 
 describe("QueryConfig.vue", () => {
@@ -249,8 +291,7 @@ describe("QueryConfig.vue", () => {
   }
 
   /** The host form (the ONE form the step binds into). */
-  const hostForm = () =>
-    (host.findComponent({ name: "OForm" }).vm as any).form;
+  const hostForm = () => (host.findComponent({ name: "OForm" }).vm as any).form;
 
   /** Reactive stand-in for the old wrapper.setProps (the step is no longer the
    *  mount root). */
@@ -282,6 +323,33 @@ describe("QueryConfig.vue", () => {
     if (host) {
       host.unmount();
     }
+  });
+
+  describe("Timezone Options", () => {
+    it("lists 'Browser Time' and 'UTC' shortcuts at the top of the options", () => {
+      const options = wrapper.vm.filteredTimezones;
+      expect(options[0].startsWith("Browser Time (")).toBe(true);
+      expect(options[1]).toBe("UTC");
+      expect(options.length).toBeGreaterThan(2);
+    });
+
+    it("onCronTimezoneChange stores 'UTC' unchanged", async () => {
+      wrapper.vm.onCronTimezoneChange("UTC");
+      await nextTick();
+      expect(wrapper.vm.cronTimezone).toBe("UTC");
+    });
+
+    it("onCronTimezoneChange passes a raw IANA zone through unchanged", async () => {
+      wrapper.vm.onCronTimezoneChange("Asia/Kolkata");
+      await nextTick();
+      expect(wrapper.vm.cronTimezone).toBe("Asia/Kolkata");
+    });
+
+    it("onCronTimezoneChange resolves a 'Browser Time (<zone>)' pick to the inner IANA zone", async () => {
+      wrapper.vm.onCronTimezoneChange("Browser Time (America/Los_Angeles)");
+      await nextTick();
+      expect(wrapper.vm.cronTimezone).toBe("America/Los_Angeles");
+    });
   });
 
   describe("Initialization", () => {
@@ -354,7 +422,7 @@ describe("QueryConfig.vue", () => {
     });
 
     it("should handle VRL function prop", async () => {
-      const vrlFunction = ".field = \"value\"";
+      const vrlFunction = '.field = "value"';
       await setQCProps({ vrlFunction });
       expect(wrapper.props().vrlFunction).toBe(vrlFunction);
     });
@@ -445,8 +513,7 @@ describe("QueryConfig.vue", () => {
       wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
     };
 
-    const formConditions = () =>
-      hostForm().state.values.query_condition.conditions.conditions;
+    const formConditions = () => hostForm().state.values.query_condition.conditions.conditions;
 
     it("EMPTIES the form's conditions when switching to custom with one blank condition", async () => {
       mountWithConditions([emptyCondition()]);
@@ -757,9 +824,7 @@ describe("QueryConfig.vue", () => {
       hostForm().setFieldValue("query_condition.conditions", {
         filterType: "group",
         logicalOperator: "AND",
-        conditions: [
-          { filterType: "condition", column: "", operator: "=", value: "" },
-        ],
+        conditions: [{ filterType: "condition", column: "", operator: "=", value: "" }],
       });
       await flushPromises();
 
@@ -1102,11 +1167,7 @@ describe("QueryConfig.vue", () => {
         organizationData: { functions: [] },
       });
       mockStoreInstance = emptyStore;
-      const { h } = mountHost(
-        { columns: [], streamFieldsMap: {} },
-        {},
-        emptyStore,
-      );
+      const { h } = mountHost({ columns: [], streamFieldsMap: {} }, {}, emptyStore);
       const emptyWrapper = h.findComponent(QueryConfig);
 
       expect((emptyWrapper.vm as any).functionsList).toEqual([]);
@@ -1603,8 +1664,7 @@ describe("QueryConfig.vue", () => {
           frequency_type,
           timezone: "UTC",
         };
-        const isHours =
-          frequency_type !== "cron" && mins >= 60 && mins % 60 === 0;
+        const isHours = frequency_type !== "cron" && mins >= 60 && mins % 60 === 0;
         const { h, props } = mountHost(
           { triggerCondition: tc },
           {
@@ -1661,9 +1721,7 @@ describe("QueryConfig.vue", () => {
         expect(Number(display(form))).toBe(3);
         expect(Number(stored(form))).toBe(180);
         // frequency_type stays 'minutes' — "hours" is display-only.
-        expect(form.getFieldValue("trigger_condition.frequency_type")).toBe(
-          "minutes",
-        );
+        expect(form.getFieldValue("trigger_condition.frequency_type")).toBe("minutes");
       });
 
       // #3 — minutes mode writes through unchanged.
@@ -1783,9 +1841,7 @@ describe("QueryConfig.vue", () => {
       form.setFieldValue("query_condition.conditions", {
         filterType: "group",
         logicalOperator: "AND",
-        conditions: [
-          { filterType: "condition", column: "", operator: "=", value: "" },
-        ],
+        conditions: [{ filterType: "condition", column: "", operator: "=", value: "" }],
       });
       await flushPromises();
       await form.handleSubmit();
@@ -1823,9 +1879,11 @@ describe("QueryConfig.vue", () => {
       // 3 rendered rows, values in order.
       let rows = namesFor();
       expect(rows.length).toBe(3);
-      expect(
-        rows.map((c: any) => c.findComponent(OSelect).props("modelValue")),
-      ).toEqual(["field1", "field2", "field3"]);
+      expect(rows.map((c: any) => c.findComponent(OSelect).props("modelValue"))).toEqual([
+        "field1",
+        "field2",
+        "field3",
+      ]);
 
       // Delete the MIDDLE (non-last) row.
       wrapper.vm.deleteLogGroupByColumn(1);
@@ -1835,9 +1893,10 @@ describe("QueryConfig.vue", () => {
       rows = namesFor();
       expect(rows.length).toBe(2);
       // The RENDERED inputs (not just form.state.values) must be ["field1","field3"].
-      expect(
-        rows.map((c: any) => c.findComponent(OSelect).props("modelValue")),
-      ).toEqual(["field1", "field3"]);
+      expect(rows.map((c: any) => c.findComponent(OSelect).props("modelValue"))).toEqual([
+        "field1",
+        "field3",
+      ]);
     });
   });
 
@@ -2012,4 +2071,97 @@ describe("QueryConfig.vue", () => {
       h.unmount();
     });
   });
+  // ─── Phase 1 (tmp/code.md N1) ─────────────────────────────────────────────
+  // QueryConfig wires the full autocomplete pipeline in handleInlineQueryUpdate
+  // (query, cursorIndex, org/stream context, popup.open, getSuggestions) but binds
+  // :keywords="autoCompleteKeywords" — the BASE list — instead of effectiveKeywords.
+  //
+  // Asserting "editor.props(keywords) === vm.effectiveKeywords" is NOT enough:
+  // effectiveKeywords returns autoCompleteKeywords verbatim whenever no context is
+  // active, so such a test passes with the bug still present. The only honest probe
+  // is to drive a real VALUE context and require Value-kind items to reach the editor.
+
+  describe("QueryConfig — N1 context keywords reach the inline editor", () => {
+    let host: any;
+    let editorStub: any;
+
+    const inlineEditorStub = {
+      name: "UnifiedQueryEditor",
+      template: '<div class="stub-inline-editor" />',
+      props: ["query", "keywords", "suggestions", "dataTestPrefix"],
+      emits: ["update:query", "focus", "blur"],
+      methods: {
+        // handleInlineQueryUpdate reads these off the ref.
+        getCursorIndex() {
+          return 9999; // past end-of-query => analyse the whole string
+        },
+        triggerAutoComplete() {},
+      },
+    };
+
+    beforeEach(async () => {
+      mockStore = createMockStore();
+      mockStoreInstance = mockStore;
+      const props = reactive({ ...baseQCProps(), tab: "sql" });
+      const Host = defineComponent({
+        components: { OForm, QueryConfig },
+        setup: () => ({
+          schema: addAlertSchema,
+          defaultValues: hostDefaults({}),
+          qcProps: props,
+        }),
+        template: `
+          <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+            <QueryConfig v-bind="qcProps" />
+          </OForm>
+        `,
+      });
+      host = mount(Host, {
+        global: {
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+          plugins: [i18n],
+          stubs: { UnifiedQueryEditor: inlineEditorStub },
+        },
+      });
+      // Two UnifiedQueryEditors render here (inline SQL and inline VRL); only
+      // the SQL one carries the autocomplete bindings.
+      editorStub = host
+        .findAllComponents({ name: "UnifiedQueryEditor" })
+        .find((c: any) => c.props("dataTestPrefix") === "alert-inline-sql");
+    });
+
+    afterEach(() => host?.unmount());
+
+    it("renders the inline sql editor on the sql tab", () => {
+      expect(editorStub).toBeDefined();
+      expect(editorStub.exists()).toBe(true);
+    });
+
+    // NOTE: this spec mocks @/composables/useSuggestions wholesale, so the real
+    // value-context pipeline cannot run here — QueryEditorDialog.spec.ts covers
+    // that end to end against the real composable. What IS provable here, and
+    // what N1 actually is, is WHICH list the template binds. The mock returns
+    // distinct arrays for the base and context-aware views.
+
+    it("binds the context-aware keyword view, not the base list", () => {
+      const delivered = editorStub.props("keywords") as any[];
+      expect(delivered).toBeDefined();
+      expect(delivered.map((k) => k.label)).toEqual(["CONTEXT_VALUE"]);
+      expect(delivered.map((k) => k.label)).not.toContain("BASE_FIELD");
+    });
+
+    it("binds the context-aware suggestion view, not the base list", () => {
+      const delivered = editorStub.props("suggestions") as any[];
+      expect(delivered).toBeDefined();
+      // effectiveSuggestions is [] in value context; the base list is not.
+      expect(delivered).toEqual([]);
+    });
+  });
 });
+
+// Stored field values for the N1 value-context probe above. Only useSuggestions
+// consumes this module, so mocking it does not affect the rest of the suite.
+vi.mock("@/composables/fieldValueStore", () => ({
+  getFieldValuesForSuggestion: vi.fn().mockResolvedValue(["error", "warn"]),
+}));

@@ -4,6 +4,7 @@ import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
+import enUS from "@/locales/languages/en-US.json";
 
 import SourceMaps from "./SourceMaps.vue";
 
@@ -52,11 +53,13 @@ const createMockRouter = () =>
     ],
   });
 
+// Real en-US messages: this spec asserts rendered copy (dialog labels, the
+// delete confirmation), so an empty message set would silently pass on raw keys.
 const createMockI18n = () =>
   createI18n({
     legacy: false,
     locale: "en",
-    messages: { en: {} },
+    messages: { en: enUS },
   });
 
 const notifyMock = vi.fn();
@@ -210,25 +213,14 @@ describe("SourceMaps.vue", () => {
     it("populates filter options from API response", async () => {
       wrapper = await mountComponent();
 
-      expect((wrapper.vm as any).filteredVersionOptions).toEqual([
-        "1.0.0",
-        "2.0.0",
-      ]);
-      expect((wrapper.vm as any).filteredServiceOptions).toEqual([
-        "svc-a",
-        "svc-b",
-      ]);
-      expect((wrapper.vm as any).filteredEnvironmentOptions).toEqual([
-        "prod",
-        "dev",
-      ]);
+      expect((wrapper.vm as any).filteredVersionOptions).toEqual(["1.0.0", "2.0.0"]);
+      expect((wrapper.vm as any).filteredServiceOptions).toEqual(["svc-a", "svc-b"]);
+      expect((wrapper.vm as any).filteredEnvironmentOptions).toEqual(["prod", "dev"]);
     });
 
     it("handles getSourceMapsValues failure by leaving filter options empty", async () => {
       getSourceMapsValuesMock.mockRejectedValueOnce(new Error("boom"));
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       wrapper = await mountComponent();
 
@@ -240,9 +232,7 @@ describe("SourceMaps.vue", () => {
 
     it("handles listSourceMaps failure by clearing source maps", async () => {
       listSourceMapsMock.mockRejectedValueOnce(new Error("network"));
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       wrapper = await mountComponent();
 
@@ -262,24 +252,18 @@ describe("SourceMaps.vue", () => {
       const grouped = (wrapper.vm as any).groupedSourceMaps;
       expect(grouped).toHaveLength(2);
 
-      const groupA = grouped.find(
-        (g: any) => g.service === "svc-a" && g.version === "1.0.0",
-      );
+      const groupA = grouped.find((g: any) => g.service === "svc-a" && g.version === "1.0.0");
       expect(groupA.fileCount).toBe(2);
       expect(groupA.files).toHaveLength(2);
 
-      const groupB = grouped.find(
-        (g: any) => g.service === "svc-b" && g.version === "2.0.0",
-      );
+      const groupB = grouped.find((g: any) => g.service === "svc-b" && g.version === "2.0.0");
       expect(groupB.fileCount).toBe(1);
     });
 
     it("retains the most recent created_at as uploaded_at for a group", async () => {
       wrapper = await mountComponent();
 
-      const groupA = (wrapper.vm as any).groupedSourceMaps.find(
-        (g: any) => g.service === "svc-a",
-      );
+      const groupA = (wrapper.vm as any).groupedSourceMaps.find((g: any) => g.service === "svc-a");
       expect(groupA.uploaded_at).toBe(1700000001000000);
     });
 
@@ -342,10 +326,10 @@ describe("SourceMaps.vue", () => {
       wrapper = await mountComponent();
 
       // OTable is always rendered; when data is empty it renders #empty slot with OEmptyState.
-      // The i18n keys are not translated in the test environment, so we verify the
-      // empty state component is rendered rather than checking for translated text.
       expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain("emptyState");
+      expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain(
+        "No source maps uploaded",
+      );
     });
 
     it("shows OTable when grouped source maps exist", async () => {
@@ -398,9 +382,7 @@ describe("SourceMaps.vue", () => {
     it("grouped rows have composite id field used as row key", async () => {
       wrapper = await mountComponent();
 
-      const groupA = (wrapper.vm as any).groupedSourceMaps.find(
-        (g: any) => g.service === "svc-a",
-      );
+      const groupA = (wrapper.vm as any).groupedSourceMaps.find((g: any) => g.service === "svc-a");
       expect(groupA.id).toBe("svc-a-1.0.0-prod");
     });
 
@@ -455,8 +437,8 @@ describe("SourceMaps.vue", () => {
       expect(dialog.exists()).toBe(true);
       expect(dialog.props("open")).toBe(false);
       expect(dialog.props("size")).toBe("xs");
-      expect(dialog.props("primaryButtonLabel")).toBe("common.ok");
-      expect(dialog.props("secondaryButtonLabel")).toBe("common.cancel");
+      expect(dialog.props("primaryButtonLabel")).toBe("OK");
+      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
     });
 
     it("confirmDeleteSourceMap opens dialog and populates title/message/data", async () => {
@@ -478,7 +460,7 @@ describe("SourceMaps.vue", () => {
       expect((wrapper.vm as any).deleteDialog.message).toContain("svc-a");
       expect((wrapper.vm as any).deleteDialog.message).toContain("1.0.0");
       expect((wrapper.vm as any).deleteDialog.message).toContain("prod");
-      expect((wrapper.vm as any).deleteDialog.message).toContain("2 file(s)");
+      expect((wrapper.vm as any).deleteDialog.message).toContain("2 files");
       expect((wrapper.vm as any).deleteDialog.data).toEqual(row);
     });
 
@@ -529,9 +511,7 @@ describe("SourceMaps.vue", () => {
 
       expect((wrapper.vm as any).groupedSourceMaps).toHaveLength(2);
 
-      const target = (wrapper.vm as any).groupedSourceMaps.find(
-        (g: any) => g.service === "svc-a",
-      );
+      const target = (wrapper.vm as any).groupedSourceMaps.find((g: any) => g.service === "svc-a");
       (wrapper.vm as any).confirmDeleteSourceMap(target);
       await nextTick();
 
@@ -540,9 +520,7 @@ describe("SourceMaps.vue", () => {
 
       expect((wrapper.vm as any).groupedSourceMaps).toHaveLength(1);
       expect(
-        (wrapper.vm as any).groupedSourceMaps.find(
-          (g: any) => g.service === "svc-a",
-        ),
+        (wrapper.vm as any).groupedSourceMaps.find((g: any) => g.service === "svc-a"),
       ).toBeUndefined();
     });
 
@@ -556,9 +534,7 @@ describe("SourceMaps.vue", () => {
       await (wrapper.vm as any).deleteSourceMap();
       await flushPromises();
 
-      expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("fires an error toast with server message on delete failure", async () => {
@@ -567,9 +543,7 @@ describe("SourceMaps.vue", () => {
       deleteSourceMapsMock.mockRejectedValueOnce({
         response: { data: { message: "Server rejected" } },
       });
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const target = (wrapper.vm as any).groupedSourceMaps[0];
       (wrapper.vm as any).confirmDeleteSourceMap(target);
@@ -591,9 +565,7 @@ describe("SourceMaps.vue", () => {
       wrapper = await mountComponent();
 
       deleteSourceMapsMock.mockRejectedValueOnce(new Error("plain failure"));
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const target = (wrapper.vm as any).groupedSourceMaps[0];
       (wrapper.vm as any).confirmDeleteSourceMap(target);
@@ -616,9 +588,7 @@ describe("SourceMaps.vue", () => {
 
       // Reject with an object that has neither response nor message
       deleteSourceMapsMock.mockRejectedValueOnce({});
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const target = (wrapper.vm as any).groupedSourceMaps[0];
       (wrapper.vm as any).confirmDeleteSourceMap(target);

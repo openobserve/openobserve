@@ -191,4 +191,208 @@ describe("ONavGroup", () => {
     await flushPromises();
     expect(flyout().exists()).toBe(false);
   });
+
+  // Exactly one row may be active. Destinations/Templates are SIBLINGS of
+  // Alerts, not sub-pages, so their paths are top-level and flat — that is what
+  // keeps them unambiguous. The deepest-match rule below is the second line of
+  // defence for genuinely nested sections.
+  describe("active state across sibling sections", () => {
+    const reliabilityChildren: SubnavChild[] = [
+      { titleKey: "menu.alerts", icon: "shield-alert-outline", name: "alertList" },
+      { titleKey: "alert_destinations.header", icon: "location-on", name: "alertDestinations" },
+      { titleKey: "alert_templates.header", icon: "description", name: "alertTemplates" },
+    ];
+
+    function makeReliabilityRouter() {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/alerts", name: "alertList", component: { template: "<div />" } },
+          {
+            path: "/alert-destinations",
+            name: "alertDestinations",
+            component: { template: "<div />" },
+          },
+          {
+            path: "/alert-templates",
+            name: "alertTemplates",
+            component: { template: "<div />" },
+          },
+          // A real drill-down under Alerts — this one SHOULD mark Alerts.
+          {
+            path: "/alerts/detail/:id",
+            name: "alertDetail",
+            component: { template: "<div />" },
+          },
+        ],
+      });
+    }
+
+    async function mountAt(path: string, children = reliabilityChildren) {
+      const router = makeReliabilityRouter();
+      router.push(path);
+      await router.isReady();
+      const w = mount(ONavGroup, {
+        props: {
+          groupKey: "reliability",
+          title: "Reliability",
+          icon: "shield",
+          children,
+          parentItem: {
+            link: "/alerts",
+            title: "Reliability",
+            icon: "shield",
+            name: "alertList",
+          },
+        },
+        global: {
+          plugins: [router, store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await w.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return w;
+    }
+
+    function activeNames(w: VueWrapper): string[] {
+      return w
+        .findAll('[data-test^="nav-group-item-"]')
+        .filter((el) => el.attributes("aria-current") === "page")
+        .map((el) => el.attributes("data-test")!.replace("nav-group-item-", ""));
+    }
+
+    it("marks only Notification Destinations on /alert-destinations", async () => {
+      wrapper = await mountAt("/alert-destinations");
+      expect(activeNames(wrapper)).toEqual(["alertDestinations"]);
+    });
+
+    it("marks only Templates on /alert-templates", async () => {
+      wrapper = await mountAt("/alert-templates");
+      expect(activeNames(wrapper)).toEqual(["alertTemplates"]);
+    });
+
+    it("marks only Alerts on /alerts", async () => {
+      wrapper = await mountAt("/alerts");
+      expect(activeNames(wrapper)).toEqual(["alertList"]);
+    });
+
+    it("attributes an alert drill-down to Alerts", async () => {
+      wrapper = await mountAt("/alerts/detail/abc");
+      expect(activeNames(wrapper)).toEqual(["alertList"]);
+    });
+
+    // Guard for any future section that IS nested under a sibling: the deepest
+    // matching path wins, so the ancestor no longer lights up alongside it.
+    it("gives a nested section to itself, not to its ancestor", async () => {
+      wrapper = await mountAt("/alerts/detail/abc", [
+        { titleKey: "menu.alerts", icon: "shield-alert-outline", name: "alertList" },
+        { titleKey: "menu.alerts", icon: "shield-alert-outline", name: "alertDetail" },
+      ]);
+      expect(activeNames(wrapper)).toEqual(["alertDetail"]);
+    });
+  });
+
+  // Traces: Service Graph / Service Catalog are standalone routes, but the same
+  // views also render in-page on /traces?tab=… — `activeOnTab` makes the flyout
+  // highlight follow what the user is looking at on either path.
+  describe("tab-alias active state (activeOnTab)", () => {
+    const tracesChildren: SubnavChild[] = [
+      { titleKey: "menu.traces", icon: "account-tree", name: "traces" },
+      {
+        titleKey: "menu.serviceGraph",
+        icon: "share",
+        name: "serviceGraph",
+        activeOnTab: { name: "traces", tab: "service-graph" },
+      },
+      {
+        titleKey: "menu.services",
+        icon: "menu-book",
+        name: "servicesCatalog",
+        activeOnTab: { name: "traces", tab: "services-catalog" },
+      },
+    ];
+
+    function makeTracesRouter() {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/traces", name: "traces", component: { template: "<div />" } },
+          {
+            path: "/traces/service-graph",
+            name: "serviceGraph",
+            component: { template: "<div />" },
+          },
+          {
+            path: "/traces/services",
+            name: "servicesCatalog",
+            component: { template: "<div />" },
+          },
+        ],
+      });
+    }
+
+    async function mountAt(path: string) {
+      const router = makeTracesRouter();
+      router.push(path);
+      await router.isReady();
+      const w = mount(ONavGroup, {
+        props: {
+          groupKey: "traces",
+          title: "Traces",
+          icon: "account-tree",
+          children: tracesChildren,
+          parentItem: {
+            link: "/traces",
+            title: "Traces",
+            icon: "account-tree",
+            name: "traces",
+          },
+        },
+        global: {
+          plugins: [router, store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await w.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return w;
+    }
+
+    function activeNames(w: VueWrapper): string[] {
+      return w
+        .findAll('[data-test^="nav-group-item-"]')
+        .filter((el) => el.attributes("aria-current") === "page")
+        .map((el) => el.attributes("data-test")!.replace("nav-group-item-", ""));
+    }
+
+    it("marks Traces on plain /traces", async () => {
+      wrapper = await mountAt("/traces");
+      expect(activeNames(wrapper)).toEqual(["traces"]);
+    });
+
+    it("marks Service Graph, not Traces, on /traces?tab=service-graph", async () => {
+      wrapper = await mountAt("/traces?tab=service-graph");
+      expect(activeNames(wrapper)).toEqual(["serviceGraph"]);
+    });
+
+    it("marks Service Catalog, not Traces, on /traces?tab=services-catalog", async () => {
+      wrapper = await mountAt("/traces?tab=services-catalog");
+      expect(activeNames(wrapper)).toEqual(["servicesCatalog"]);
+    });
+
+    it("marks Traces on the in-page granularity tabs (?tab=spans)", async () => {
+      wrapper = await mountAt("/traces?tab=spans");
+      expect(activeNames(wrapper)).toEqual(["traces"]);
+    });
+
+    it("marks Service Graph on its standalone route", async () => {
+      wrapper = await mountAt("/traces/service-graph");
+      expect(activeNames(wrapper)).toEqual(["serviceGraph"]);
+    });
+  });
 });

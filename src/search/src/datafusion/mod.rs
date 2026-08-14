@@ -15,6 +15,7 @@
 
 use std::str::FromStr;
 
+pub mod aggregates;
 pub mod context;
 pub mod distributed_plan;
 pub mod exec;
@@ -28,6 +29,7 @@ pub mod storage;
 pub mod table_provider;
 pub mod udaf;
 pub mod udf;
+pub mod vortex;
 
 #[derive(PartialEq, Debug)]
 pub enum MemoryPoolType {

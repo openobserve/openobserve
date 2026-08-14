@@ -48,7 +48,24 @@ const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "test-org" } },
 });
 
-const scorers = [{ id: "s1", entityId: "s1", name: "Scorer 1" }];
+const scorers = [
+  {
+    id: "s1",
+    entityId: "s1",
+    name: "Scorer 1",
+    template: "Judge {{ input }}",
+    variables: ["input"],
+  },
+];
+const spansScorers = [
+  {
+    id: "s1",
+    entityId: "s1",
+    name: "Trace evidence scorer",
+    template: "Judge {{ input }} using {{ spans }}",
+    variables: ["input", "spans"],
+  },
+];
 
 const endSignal = {
   version: 2,
@@ -146,19 +163,13 @@ describe("JobFormPage", () => {
   it("renders the real OForm with the name + stream fields", () => {
     wrapper = createWrapper();
     expect(wrapper.findComponent({ name: "OForm" }).exists()).toBe(true);
-    expect(wrapper.find('[data-test="job-form-name-input"]').exists()).toBe(
-      true,
-    );
-    expect(wrapper.find('[data-test="job-form-stream-select"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="job-form-name-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="job-form-stream-select"]').exists()).toBe(true);
   });
 
   it("offers each target scope exactly once", () => {
     wrapper = createWrapper();
-    const scopeSelect = wrapper.findComponent(
-      '[data-test="job-form-target-scope-select"]',
-    );
+    const scopeSelect = wrapper.findComponent('[data-test="job-form-target-scope-select"]');
     const options = scopeSelect.props("options");
 
     expect(options).toEqual([
@@ -172,13 +183,9 @@ describe("JobFormPage", () => {
   it("excludes evaluator telemetry from source stream options", async () => {
     wrapper = createWrapper();
     await flushPromises();
-    const streamSelect = wrapper.findComponent(
-      '[data-test="job-form-stream-select"]',
-    );
+    const streamSelect = wrapper.findComponent('[data-test="job-form-stream-select"]');
 
-    expect(streamSelect.props("options")).toEqual([
-      { label: "default", value: "default" },
-    ]);
+    expect(streamSelect.props("options")).toEqual([{ label: "default", value: "default" }]);
   });
 
   it("keeps the create buttons enabled before first submit (R3)", () => {
@@ -234,9 +241,7 @@ describe("JobFormPage", () => {
     setField(wrapper, "samplingValue", "0.211");
     await wrapper.vm.$nextTick();
 
-    const help = wrapper
-      .find('[data-test="job-form-sampling-value-input"]')
-      .text();
+    const help = wrapper.find('[data-test="job-form-sampling-value-input"]').text();
     expect(help).toContain("21.1%");
     expect(help).not.toContain("Enter a rate");
   });
@@ -250,9 +255,7 @@ describe("JobFormPage", () => {
     setField(wrapper, "samplingValue", "");
     await wrapper.vm.$nextTick();
 
-    const help = wrapper
-      .find('[data-test="job-form-sampling-value-input"]')
-      .text();
+    const help = wrapper.find('[data-test="job-form-sampling-value-input"]').text();
     expect(help).toContain("Enter a rate between 0 and 1");
     expect(help).not.toContain("%");
   });
@@ -263,31 +266,30 @@ describe("JobFormPage", () => {
     wrapper = createWrapper();
 
     setField(wrapper, "targetScope", "trace");
+    // Let the scope watcher apply its defaults before overriding them, so the
+    // explicit values below are what the help text renders.
+    await wrapper.vm.$nextTick();
     setField(wrapper, "idleWindowSecs", 120);
     setField(wrapper, "maxAgeSecs", 1800);
     await wrapper.vm.$nextTick();
 
-    expect(
-      wrapper.find('[data-test="job-form-idle-window-input"]').text(),
-    ).toContain("2 min");
-    expect(
-      wrapper.find('[data-test="job-form-max-age-input"]').text(),
-    ).toContain("30 min");
+    expect(wrapper.find('[data-test="job-form-idle-window-input"]').text()).toContain("2 min");
+    expect(wrapper.find('[data-test="job-form-max-age-input"]').text()).toContain("30 min");
   });
 
-  it("defaults trace and session idle windows to 120 seconds", async () => {
+  it("defaults idle windows per scope: 30s for traces, 30m for sessions", async () => {
     wrapper = createWrapper();
 
     setField(wrapper, "targetScope", "trace");
     await wrapper.vm.$nextTick();
-    expect(oform(wrapper).form.state.values.idleWindowSecs).toBe(120);
+    expect(oform(wrapper).form.state.values.idleWindowSecs).toBe(30);
 
     setField(wrapper, "targetScope", "session");
     await wrapper.vm.$nextTick();
-    expect(oform(wrapper).form.state.values.idleWindowSecs).toBe(120);
+    expect(oform(wrapper).form.state.values.idleWindowSecs).toBe(1800);
   });
 
-  it("rejects completion idle windows below 45 seconds", async () => {
+  it("rejects non-positive completion idle windows", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "trace-job");
     setField(wrapper, "stream", "default");
@@ -295,7 +297,24 @@ describe("JobFormPage", () => {
     await wrapper.vm.$nextTick();
     setField(wrapper, "scorerIds", ["s1"]);
     setField(wrapper, "samplingMode", "all");
-    setField(wrapper, "idleWindowSecs", 44);
+    setField(wrapper, "idleWindowSecs", 0);
+
+    await submit(wrapper);
+
+    expect(oform(wrapper).form.state.isValid).toBe(false);
+    expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects completion windows above the per-scope hard caps", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "trace-job");
+    setField(wrapper, "stream", "default");
+    setField(wrapper, "targetScope", "trace");
+    await wrapper.vm.$nextTick();
+    setField(wrapper, "scorerIds", ["s1"]);
+    setField(wrapper, "samplingMode", "all");
+    // A 1-hour trace idle window is beyond the 30-minute trace cap.
+    setField(wrapper, "idleWindowSecs", 60 * 60);
 
     await submit(wrapper);
 
@@ -313,8 +332,7 @@ describe("JobFormPage", () => {
 
     expect(oform(wrapper).form.state.isValid).toBe(true);
     expect(onlineEvalsService.jobs.create).toHaveBeenCalledTimes(1);
-    const [org, payload] = (onlineEvalsService.jobs.create as any).mock
-      .calls[0];
+    const [org, payload] = (onlineEvalsService.jobs.create as any).mock.calls[0];
     expect(org).toBe("test-org");
     // EXACT key set — catches any added / dropped / renamed / leaked key.
     expect(Object.keys(payload).sort()).toEqual([
@@ -349,7 +367,9 @@ describe("JobFormPage", () => {
     expect(payload.samplingValue).toBe(0.1);
     expect(typeof payload.samplingValue).toBe("number");
     expect(payload.filterCondition).toEqual({ type: "all" }); // empty filter
-    expect(payload.inputMapping).toBeNull(); // no template vars → no mapping
+    expect(payload.inputMapping).toEqual({
+      s1: { input: "{{gen_ai_input_messages}}" },
+    });
     // draft path → no activation
     expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
     expect(wrapper.emitted("saved")).toBeTruthy();
@@ -362,16 +382,11 @@ describe("JobFormPage", () => {
     setField(wrapper, "scorerIds", ["s1"]);
     // The activate button's @click sets the activate flag; drive the form's own
     // submit deterministically (jsdom doesn't auto-submit on button click).
-    await wrapper
-      .find('[data-test="job-form-save-activate-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="job-form-save-activate-btn"]').trigger("click");
     await submit(wrapper);
 
     expect(onlineEvalsService.jobs.create).toHaveBeenCalledTimes(1);
-    expect(onlineEvalsService.jobs.activate).toHaveBeenCalledWith(
-      "test-org",
-      "job-1",
-    );
+    expect(onlineEvalsService.jobs.activate).toHaveBeenCalledWith("test-org", "job-1");
   });
 
   it("allows an incomplete trace selector binding to be saved as a draft", async () => {
@@ -395,16 +410,29 @@ describe("JobFormPage", () => {
     expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
   });
 
-  it("blocks trace activation until every scorer has a selector binding", async () => {
+  it("activates a trace job without selectors when its scorers do not use spans", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "trace-active");
     setField(wrapper, "stream", "default");
     setField(wrapper, "targetScope", "trace");
     setField(wrapper, "scorerIds", ["s1"]);
     setField(wrapper, "samplingMode", "all");
-    await wrapper
-      .find('[data-test="job-form-save-activate-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="job-form-save-activate-btn"]').trigger("click");
+
+    await submit(wrapper);
+
+    expect(onlineEvalsService.jobs.create).toHaveBeenCalledTimes(1);
+    expect(onlineEvalsService.jobs.activate).toHaveBeenCalledWith("test-org", "job-1");
+  });
+
+  it("blocks trace activation when a scorer using spans has no selector", async () => {
+    wrapper = createWrapper({ scorers: spansScorers });
+    setField(wrapper, "name", "trace-active");
+    setField(wrapper, "stream", "default");
+    setField(wrapper, "targetScope", "trace");
+    setField(wrapper, "scorerIds", ["s1"]);
+    setField(wrapper, "samplingMode", "all");
+    await wrapper.find('[data-test="job-form-save-activate-btn"]').trigger("click");
 
     await submit(wrapper);
 
@@ -413,7 +441,7 @@ describe("JobFormPage", () => {
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({
         variant: "error",
-        message: "Select a Span Selector for every scorer.",
+        message: "Select a Span Selector for each scorer that uses trace spans.",
       }),
     );
   });
@@ -446,8 +474,7 @@ describe("JobFormPage", () => {
       expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
       expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
       expect(onlineEvalsService.jobs.update).toHaveBeenCalledTimes(1);
-      const [org, id, payload] = (onlineEvalsService.jobs.update as any).mock
-        .calls[0];
+      const [org, id, payload] = (onlineEvalsService.jobs.update as any).mock.calls[0];
       expect(org).toBe("test-org");
       expect(id).toBe("job-9");
       expect(payload.name).toBe("existing-job"); // name preserved (locked on edit)
@@ -458,12 +485,70 @@ describe("JobFormPage", () => {
       expect(wrapper.emitted("saved")).toBeTruthy();
     });
 
+    // A draft has never run, so editing one offers the same explicit choice as
+    // create: keep it a draft, or promote it. `editRow` has no status → draft.
+    it("offers the Save & Activate choice (both buttons) when editing a draft", () => {
+      wrapper = createWrapper({ mode: "edit", row: editRow });
+      expect(wrapper.find('[data-test="job-form-save-draft-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="job-form-save-activate-btn"]').exists()).toBe(true);
+      // The plain single Save is NOT shown for a draft.
+      expect(wrapper.find('[data-test="job-form-save-btn"]').exists()).toBe(false);
+    });
+
+    it("promotes a draft to active via Save & Activate (update THEN activate)", async () => {
+      wrapper = createWrapper({ mode: "edit", row: editRow });
+      setField(wrapper, "scorerIds", ["s1"]);
+      setField(wrapper, "samplingMode", "all");
+
+      // The activate button's @click sets the flag; the form drives the submit.
+      await wrapper.find('[data-test="job-form-save-activate-btn"]').trigger("click");
+      await submit(wrapper);
+
+      expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
+      expect(onlineEvalsService.jobs.update).toHaveBeenCalledTimes(1);
+      expect(onlineEvalsService.jobs.update).toHaveBeenCalledWith(
+        "test-org",
+        "job-9",
+        expect.any(Object),
+      );
+      // Promotion happens as a second explicit call, on the same job id.
+      expect(onlineEvalsService.jobs.activate).toHaveBeenCalledWith("test-org", "job-9");
+      expect(wrapper.emitted("saved")).toBeTruthy();
+    });
+
+    it("keeps a draft a draft via Save as Draft (update only, never activates)", async () => {
+      wrapper = createWrapper({ mode: "edit", row: editRow });
+      setField(wrapper, "scorerIds", ["s1"]);
+      setField(wrapper, "samplingMode", "all");
+
+      await wrapper.find('[data-test="job-form-save-draft-btn"]').trigger("click");
+      await submit(wrapper);
+
+      expect(onlineEvalsService.jobs.update).toHaveBeenCalledTimes(1);
+      expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
+    });
+
+    // A config edit must never silently flip enablement: an active/paused job
+    // shows a single Save that preserves its run state.
+    it("shows a single Save and never activates when editing a non-draft (active) job", async () => {
+      wrapper = createWrapper({ mode: "edit", row: { ...editRow, status: "active" } });
+
+      expect(wrapper.find('[data-test="job-form-save-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="job-form-save-activate-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="job-form-save-draft-btn"]').exists()).toBe(false);
+
+      setField(wrapper, "scorerIds", ["s1"]);
+      setField(wrapper, "samplingMode", "all");
+      await submit(wrapper);
+
+      expect(onlineEvalsService.jobs.update).toHaveBeenCalledTimes(1);
+      expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
+    });
+
     it("shows and preserves an existing trace End Signal when saving", async () => {
       wrapper = createWrapper({ mode: "edit", row: traceJob() });
 
-      expect(
-        wrapper.get('[data-test="job-form-completion-section"]').exists(),
-      ).toBe(true);
+      expect(wrapper.get('[data-test="job-form-completion-section"]').exists()).toBe(true);
 
       await submit(wrapper);
 

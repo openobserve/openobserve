@@ -47,9 +47,7 @@ vi.mock("@tanstack/vue-virtual", () => ({
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
-  getServiceIconDataUrl: vi
-    .fn()
-    .mockReturnValue("data:image/svg+xml;base64,ICON"),
+  getServiceIconDataUrl: vi.fn().mockReturnValue("data:image/svg+xml;base64,ICON"),
   getSpanTechIconDataUrl: vi.fn().mockReturnValue(null),
 }));
 
@@ -86,8 +84,8 @@ const mockSpans = [
   {
     spanId: "d9603ec7f76eb499",
     operationName: "service:alerts:evaluate_scheduled",
-    serviceName: "alertmanager",
-    resolvedIdentity: "alertmanager",
+    serviceName: "scheduler",
+    resolvedIdentity: "scheduler",
     spanStatus: "UNSET",
     spanKind: "Client",
     parentId: "6702b0494b2b6e57",
@@ -104,8 +102,8 @@ const mockSpans = [
   {
     spanId: "6702b0494b2b6e57",
     operationName: "service:alerts:process",
-    serviceName: "alertmanager",
-    resolvedIdentity: "alertmanager",
+    serviceName: "scheduler",
+    resolvedIdentity: "scheduler",
     spanStatus: "ERROR",
     spanKind: "Server",
     parentId: null,
@@ -129,7 +127,7 @@ const mockSpanMap = {
     duration: 321372,
     span_id: "d9603ec7f76eb499",
     operation_name: "service:alerts:evaluate_scheduled",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     span_status: "UNSET",
     span_kind: 2,
     parent_id: "6702b0494b2b6e57",
@@ -141,7 +139,7 @@ const mockSpanMap = {
     duration: 321372,
     span_id: "6702b0494b2b6e57",
     operation_name: "service:alerts:process",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     span_status: "ERROR",
     span_kind: 1,
     parent_id: null,
@@ -198,7 +196,7 @@ const mockSpanDimensions = {
 const mockSpanList = [
   {
     span_id: "d9603ec7f76eb499",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     operation_name: "service:alerts:evaluate_scheduled",
     duration: 321372,
     span_status: "UNSET",
@@ -219,7 +217,7 @@ const mockSpanList = [
   },
   {
     span_id: "6702b0494b2b6e57",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     operation_name: "service:alerts:process",
     duration: 321372,
     span_status: "ERROR",
@@ -227,10 +225,7 @@ const mockSpanList = [
   },
 ];
 
-function mountTraceTree(
-  extraProps: Record<string, unknown> = {},
-  storePlugin = mockStore,
-) {
+function mountTraceTree(extraProps: Record<string, unknown> = {}, storePlugin = mockStore) {
   return mount(TraceTree, {
     props: {
       spans: mockSpans,
@@ -271,15 +266,11 @@ describe("TraceTree", () => {
   });
 
   it("should render all spans", () => {
-    const spanElements = wrapper.findAll(
-      `[data-test^="trace-tree-span-container-"]`,
-    );
+    const spanElements = wrapper.findAll(`[data-test^="trace-tree-span-container-"]`);
     expect(spanElements.length).toBe(mockSpans.length);
 
     for (const span of mockSpans) {
-      const spanElement = wrapper.find(
-        `[data-test="trace-tree-span-container-${span.spanId}"]`,
-      );
+      const spanElement = wrapper.find(`[data-test="trace-tree-span-container-${span.spanId}"]`);
       expect(spanElement.exists()).toBe(true);
     }
   });
@@ -295,9 +286,7 @@ describe("TraceTree", () => {
   });
 
   it("should render service names", () => {
-    const serviceNameElements = wrapper.findAll(
-      '[data-test^="trace-tree-span-service-name-"]',
-    );
+    const serviceNameElements = wrapper.findAll('[data-test^="trace-tree-span-service-name-"]');
     expect(serviceNameElements.length).toBe(mockSpans.length);
 
     expect(serviceNameElements[0].text()).toBe(mockSpans[0].serviceName);
@@ -305,16 +294,12 @@ describe("TraceTree", () => {
   });
 
   it("should render error icon for error spans", () => {
-    const errorIcon = wrapper.find(
-      '[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]',
-    );
+    const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]');
     expect(errorIcon.exists()).toBe(true);
   });
 
   it("should not render error icon for non-error spans", () => {
-    const errorIcon = wrapper.find(
-      '[data-test="trace-tree-span-error-icon-d9603ec7f76eb499"]',
-    );
+    const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-d9603ec7f76eb499"]');
     expect(errorIcon.exists()).toBe(false);
   });
 
@@ -372,9 +357,7 @@ describe("TraceTree", () => {
       await collapseBtn.trigger("click");
 
       expect(wrapper.emitted("toggleCollapse")).toBeTruthy();
-      expect(wrapper.emitted("toggleCollapse")[0]).toEqual([
-        "d9603ec7f76eb499",
-      ]);
+      expect(wrapper.emitted("toggleCollapse")[0]).toEqual(["d9603ec7f76eb499"]);
     });
 
     it("should apply correct collapse icon rotation", async () => {
@@ -417,7 +400,7 @@ describe("TraceTree", () => {
   describe("Search functionality", () => {
     it("should highlight spans that match search query", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -430,7 +413,7 @@ describe("TraceTree", () => {
 
     it("should highlight current match", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -456,7 +439,7 @@ describe("TraceTree", () => {
 
     it("should find matches in service name", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -489,7 +472,7 @@ describe("TraceTree", () => {
 
     it("should handle case-insensitive search", async () => {
       await wrapper.setProps({
-        searchQuery: "ALERTMANAGER",
+        searchQuery: "SCHEDULER",
       });
 
       await flushPromises();
@@ -500,7 +483,7 @@ describe("TraceTree", () => {
 
     it("should emit search-result with correct count", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -511,7 +494,7 @@ describe("TraceTree", () => {
 
     it("should emit update-current-index when current index changes", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -523,26 +506,23 @@ describe("TraceTree", () => {
     describe("isHighlighted function", () => {
       beforeEach(async () => {
         await wrapper.setProps({
-          searchQuery: "alertmanager",
+          searchQuery: "scheduler",
         });
         await flushPromises();
       });
 
       it("should return true for array path that matches search results", () => {
         wrapper.vm.searchResults = [
-          ["service_name", "alertmanager"],
+          ["service_name", "scheduler"],
           ["operation_name", "evaluate_scheduled"],
         ];
 
-        const result = wrapper.vm.isHighlighted([
-          "service_name",
-          "alertmanager",
-        ]);
+        const result = wrapper.vm.isHighlighted(["service_name", "scheduler"]);
         expect(result).toBe(true);
       });
 
       it("should return false for array path that doesn't match search results", () => {
-        wrapper.vm.searchResults = [["service_name", "alertmanager"]];
+        wrapper.vm.searchResults = [["service_name", "scheduler"]];
 
         const result = wrapper.vm.isHighlighted(["operation_name", "process"]);
         expect(result).toBe(false);
@@ -573,7 +553,7 @@ describe("TraceTree", () => {
     describe("scrollToMatch function", () => {
       beforeEach(async () => {
         await wrapper.setProps({
-          searchQuery: "alertmanager",
+          searchQuery: "scheduler",
         });
         await flushPromises();
       });
@@ -663,7 +643,7 @@ describe("TraceTree", () => {
   describe("Navigation methods", () => {
     beforeEach(async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
       await flushPromises();
     });
@@ -786,9 +766,7 @@ describe("TraceTree", () => {
     it("should render span-block stubs for each span", () => {
       // span-block is stubbed; verify the component renders without error
       // and the expected number of span containers is present.
-      const spanContainers = wrapper.findAll(
-        '[data-test^="trace-tree-span-container-"]',
-      );
+      const spanContainers = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
       expect(spanContainers.length).toBe(mockSpans.length);
     });
 
@@ -870,13 +848,13 @@ describe("TraceTree", () => {
       const spanList = [
         {
           span_id: "span1",
-          service_name: "alertmanager",
+          service_name: "scheduler",
           operation_name: "process",
         },
         { span_id: "span2", service_name: "other", operation_name: "other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "alertmanager");
+      const results = wrapper.vm.findMatches(spanList, "scheduler");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
@@ -905,22 +883,22 @@ describe("TraceTree", () => {
 
     it("should handle case-insensitive search", () => {
       const spanList = [
-        { span_id: "span1", service_name: "AlertManager" },
+        { span_id: "span1", service_name: "Scheduler" },
         { span_id: "span2", service_name: "Other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "alertmanager");
+      const results = wrapper.vm.findMatches(spanList, "scheduler");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
 
     it("should handle trimmed search query", () => {
       const spanList = [
-        { span_id: "span1", service_name: "alertmanager" },
+        { span_id: "span1", service_name: "scheduler" },
         { span_id: "span2", service_name: "other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "  alertmanager  ");
+      const results = wrapper.vm.findMatches(spanList, "  scheduler  ");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
@@ -929,20 +907,20 @@ describe("TraceTree", () => {
       const spanList = [
         {
           span_id: "span1",
-          service_name: "alertmanager",
+          service_name: "scheduler",
           metadata: { key: "value" },
         },
         { span_id: "span2", service_name: "other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "alertmanager");
+      const results = wrapper.vm.findMatches(spanList, "scheduler");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
 
     it("should return empty array when no matches found", () => {
       const spanList = [
-        { span_id: "span1", service_name: "alertmanager" },
+        { span_id: "span1", service_name: "scheduler" },
         { span_id: "span2", service_name: "other" },
       ];
 
@@ -951,7 +929,7 @@ describe("TraceTree", () => {
     });
 
     it("should handle empty search query", () => {
-      const spanList = [{ span_id: "span1", service_name: "alertmanager" }];
+      const spanList = [{ span_id: "span1", service_name: "scheduler" }];
 
       const results = wrapper.vm.findMatches(spanList, "");
       expect(results).toEqual([]);
@@ -969,13 +947,13 @@ describe("TraceTree", () => {
 
     it("should update search results when search query exists", async () => {
       const localSpanList = [
-        { span_id: "span1", service_name: "alertmanager" },
+        { span_id: "span1", service_name: "scheduler" },
         { span_id: "span2", service_name: "other" },
       ];
 
       await wrapper.setProps({
         spanList: localSpanList,
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -986,7 +964,7 @@ describe("TraceTree", () => {
 
     it("should clear search results when search query is empty", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -1030,9 +1008,7 @@ describe("TraceTree", () => {
 
       await flushPromises();
 
-      const spanElements = wrapper.findAll(
-        '[data-test^="trace-tree-span-container-"]',
-      );
+      const spanElements = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
       expect(spanElements.length).toBe(100);
     });
 
@@ -1043,9 +1019,7 @@ describe("TraceTree", () => {
 
       await flushPromises();
 
-      const updatedSpans = wrapper.findAll(
-        '[data-test^="trace-tree-span-container-"]',
-      );
+      const updatedSpans = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
       expect(updatedSpans.length).toBe(1);
     });
   });
@@ -1093,9 +1067,7 @@ describe("TraceTree", () => {
       await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
       await flushPromises();
 
-      const row = wrapper.find(
-        '[data-test="trace-tree-span-container-d9603ec7f76eb499"]',
-      );
+      const row = wrapper.find('[data-test="trace-tree-span-container-d9603ec7f76eb499"]');
       expect(row.exists()).toBe(true);
       expect(row.classes()).toContain("span-row-selected");
     });
@@ -1104,9 +1076,7 @@ describe("TraceTree", () => {
       await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
       await flushPromises();
 
-      const row = wrapper.find(
-        '[data-test="trace-tree-span-container-6702b0494b2b6e57"]',
-      );
+      const row = wrapper.find('[data-test="trace-tree-span-container-6702b0494b2b6e57"]');
       expect(row.exists()).toBe(true);
       expect(row.classes()).not.toContain("span-row-selected");
     });
@@ -1117,9 +1087,7 @@ describe("TraceTree", () => {
       await wrapper.setProps({ selectedSpanId: "" });
       await flushPromises();
 
-      const row = wrapper.find(
-        '[data-test="trace-tree-span-container-d9603ec7f76eb499"]',
-      );
+      const row = wrapper.find('[data-test="trace-tree-span-container-d9603ec7f76eb499"]');
       expect(row.exists()).toBe(true);
       expect(row.classes()).not.toContain("span-row-selected");
     });
@@ -1359,16 +1327,12 @@ describe("TraceTree", () => {
     });
 
     it("should render vertical connector segments for spans with depth > 0", () => {
-      const verticalSegments = depthWrapper.findAll(
-        '[data-test="vertical-segment"]',
-      );
+      const verticalSegments = depthWrapper.findAll('[data-test="vertical-segment"]');
       expect(verticalSegments.length).toBeGreaterThan(0);
     });
 
     it("should render horizontal connector segments for spans with depth > 0", () => {
-      const horizontalSegment = depthWrapper.find(
-        '[data-test="horizontal-segment"]',
-      );
+      const horizontalSegment = depthWrapper.find('[data-test="horizontal-segment"]');
       expect(horizontalSegment.exists()).toBe(true);
     });
   });

@@ -1,6 +1,21 @@
-// Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
-  <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <OTable
       :data="filteredLocations"
       :columns="columns"
@@ -17,8 +32,8 @@
       @row-click="openDetail"
     >
       <template #toolbar>
-        <div class="flex items-center gap-2 flex-1 min-w-0">
-          <div class="flex-1 min-w-0">
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <div class="min-w-0 flex-1">
             <OInput
               v-model="search"
               :placeholder="t('synthetics.privateLocations.searchPlaceholder')"
@@ -51,16 +66,30 @@
 
       <!-- Label + pool subtext -->
       <template #cell-name="{ row }">
-        <div class="flex flex-col min-w-0">
+        <div class="flex min-w-0 flex-col">
           <span class="truncate font-medium">{{ (row as any).label }}</span>
-          <span class="truncate text-xs text-text-muted">{{ (row as any).pool }}</span>
+          <span class="text-text-muted truncate text-xs">{{ (row as any).pool }}</span>
         </div>
       </template>
 
-      <!-- Agents: name(s), live if any are online else the last known one.
-           Pool health (live/total) is on the detail page, not repeated here. -->
+      <!-- Agents: live/total count (a location is a pool of interchangeable
+           agents). Names/health are on the detail page; shown here on hover. -->
       <template #cell-agents="{ row }">
-        <span class="truncate">{{ agentSubtext(row as any) || "—" }}</span>
+        <div class="flex min-w-0 flex-col" :title="agentSubtext(row as any) || ''">
+          <span class="truncate"
+            >{{ (row as any).live_agents ?? 0
+            }}<span class="text-text-muted">/{{ (row as any).agents_total ?? 0 }}</span></span
+          >
+          <span v-if="(row as any).version" class="text-text-muted truncate text-xs"
+            >{{ t("synthetics.versionPrefix") }}{{ (row as any).version }}</span
+          >
+        </div>
+      </template>
+
+      <!-- Checks per minute -->
+      <template #cell-cmin="{ row }">
+        <span v-if="(row as any).checks_per_min != null">~{{ (row as any).checks_per_min }}</span>
+        <span v-else class="text-text-muted">—</span>
       </template>
 
       <!-- Capability type chips -->
@@ -81,7 +110,9 @@
 
       <!-- Last seen -->
       <template #cell-lastSeen="{ row }">
-        <span v-if="(row as any).last_seen_at">{{ formatTimeAgoUs((row as any).last_seen_at) }}</span>
+        <span v-if="(row as any).last_seen_at">{{
+          formatTimeAgoUs((row as any).last_seen_at)
+        }}</span>
         <span v-else class="text-text-muted">—</span>
       </template>
 
@@ -100,10 +131,12 @@
             variant="ghost-destructive"
             size="icon-sm"
             icon-left="delete"
-            :disabled="(row as any).monitors_count > 0"
+            :disabled="checksUsing(row) > 0"
             :title="
-              (row as any).monitors_count > 0
-                ? t('synthetics.privateLocations.deleteBlocked', { count: (row as any).monitors_count })
+              checksUsing(row) > 0
+                ? t('synthetics.privateLocations.deleteBlocked', {
+                    count: checksUsing(row),
+                  })
                 : t('synthetics.table.delete')
             "
             :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}`"
@@ -130,7 +163,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -140,6 +174,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { SyntheticLocation } from "@/types/synthetics";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
+import { syntheticsPrivateLocationRoute } from "@/utils/synthetics/routes";
 
 const props = defineProps<{
   locations: SyntheticLocation[];
@@ -151,8 +186,9 @@ const emit = defineEmits<{
   (e: "delete", row: SyntheticLocation): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
+const store = useStore();
 const search = ref("");
 
 const filteredLocations = computed(() => {
@@ -166,14 +202,29 @@ const filteredLocations = computed(() => {
   );
 });
 
+/**
+ * How many checks reference this location — the delete guard.
+ *
+ * The API field was renamed `monitors_count` -> `checks_count`; both are read so
+ * a bundle and a server on opposite sides of that rename still guard correctly.
+ *
+ * Falls back to 1, not 0, when neither field is present. This gate exists to stop
+ * deleting a location that checks still point at, so an unknown count must block
+ * the delete rather than allow it — reading a renamed field as `undefined` is
+ * exactly how it silently stopped guarding.
+ */
+const checksUsing = (row: unknown): number => {
+  const r = row as { checks_count?: number; monitors_count?: number };
+  return r.checks_count ?? r.monitors_count ?? 1;
+};
+
 const statusVariant = (status: string) =>
   status === "online" ? "success" : status === "offline" ? "error" : "default";
 
-/** Live agent name(s) when any are online; otherwise the last known agent's
- *  name (still visible offline) so a dead location doesn't hide who to
- *  recover, without opening the detail page. */
+/** Live agent name(s), shown on hover over the agent-count cell. Full agent
+ *  detail (incl. offline agents) lives on the location detail page. */
 const agentSubtext = (row: SyntheticLocation) =>
-  row.agent_names?.length ? row.agent_names.join(", ") : row.last_agent_name || null;
+  row.agent_names?.length ? row.agent_names.join(", ") : null;
 
 const columns = computed<OTableColumnDef[]>(() => [
   {
@@ -205,7 +256,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "agents",
     header: t("synthetics.privateLocations.table.agents"),
-    accessorKey: "last_agent_name",
+    accessorKey: "live_agents",
     size: 100,
     minSize: 80,
     sortable: true,
@@ -222,7 +273,17 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "monitors",
     header: t("synthetics.privateLocations.table.checks"),
-    accessorKey: "monitors_count",
+    accessorKey: "checks_count",
+    size: 90,
+    minSize: 70,
+    sortable: true,
+    meta: { align: "right" },
+    hideable: true,
+  },
+  {
+    id: "cmin",
+    header: t("synthetics.privateLocations.table.checksPerMin"),
+    accessorKey: "checks_per_min",
     size: 90,
     minSize: 70,
     sortable: true,
@@ -240,7 +301,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: "",
+    header: raw(""),
     accessorKey: "id",
     size: 90,
     minSize: 90,
@@ -250,7 +311,11 @@ const columns = computed<OTableColumnDef[]>(() => [
 ]);
 
 const openDetail = (row: SyntheticLocation) => {
-  router.push({ name: "synthetic-private-location", params: { id: row.id } });
+  router.push(
+    syntheticsPrivateLocationRoute(
+      { orgIdentifier: store.state.selectedOrganization?.identifier },
+      row.id,
+    ),
+  );
 };
-
 </script>

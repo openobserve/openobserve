@@ -159,6 +159,27 @@ describe("WorkflowTestDialog", () => {
       expect(editorVm(wrapper).props("query")).toBe(buildTestSampleText());
     });
 
+    it("seeds the INCIDENT sample when the trigger is an incident event", () => {
+      // The Test drawer must prefill the payload of the CURRENT trigger kind —
+      // an incident workflow should not seed an alert sample.
+      setWorkflow(
+        [
+          {
+            id: "t1",
+            data: { node_type: "workflow_trigger", trigger_kind: "incident_event" },
+          },
+          destNode,
+        ],
+        [{ source: "t1", target: "d1" }],
+      );
+      workflowObj.testRun.input = "";
+      mountDialog();
+      const [{ meta }] = JSON.parse(workflowObj.testRun.input);
+      expect(meta).toHaveProperty("incident_id");
+      expect(meta).toHaveProperty("event_type");
+      expect(meta).not.toHaveProperty("alert_name"); // not the alert sample
+    });
+
     it("keeps an existing input (persisted across opens) instead of reseeding", () => {
       workflowObj.testRun.input = VALID_INPUT;
       mountDialog();
@@ -168,9 +189,7 @@ describe("WorkflowTestDialog", () => {
     it('"Reset" restores the generated sample', async () => {
       workflowObj.testRun.input = "garbage";
       const wrapper = mountDialog();
-      await wrapper
-        .find('[data-test="workflow-test-reset-sample"]')
-        .trigger("click");
+      await wrapper.find('[data-test="workflow-test-reset-sample"]').trigger("click");
       expect(workflowObj.testRun.input).toBe(buildTestSampleText());
     });
 
@@ -211,9 +230,7 @@ describe("WorkflowTestDialog", () => {
       expect(opts[1].label).toBe(`${fnTitle} 1 · parse_json`);
       expect(opts[2].label).toBe(`${fnTitle} 2 · enrich`);
       // single destination -> no number
-      expect(opts[3].label).toBe(
-        `${i18n.global.t("workflow.node.sendToDestination")} · sink-a`,
-      );
+      expect(opts[3].label).toBe(`${i18n.global.t("workflow.node.sendToDestination")} · sink-a`);
     });
 
     it("omits the ' · detail' suffix when the node has no configured detail", () => {
@@ -244,16 +261,12 @@ describe("WorkflowTestDialog", () => {
       const wrapper = mountDialog();
       await nextTick();
       expect(selectVm(wrapper).props("modelValue")).toBe("f1");
-      expect(wrapper.text()).toContain(
-        i18n.global.t("workflow.test.runFromNote"),
-      );
+      expect(wrapper.text()).toContain(i18n.global.t("workflow.test.runFromNote"));
     });
 
     it("hides the partial-run note when running from the beginning", () => {
       const wrapper = mountDialog();
-      expect(wrapper.text()).not.toContain(
-        i18n.global.t("workflow.test.runFromNote"),
-      );
+      expect(wrapper.text()).not.toContain(i18n.global.t("workflow.test.runFromNote"));
     });
 
     it("writes a picked node id through to fromNode", async () => {
@@ -278,21 +291,15 @@ describe("WorkflowTestDialog", () => {
       const wrapper = mountDialog();
       await nextTick();
       expect(primary(wrapper).attributes("disabled")).toBeUndefined();
-      expect(wrapper.text()).toContain(
-        i18n.global.t("workflow.test.resultHint"),
-      );
-      expect(wrapper.text()).not.toContain(
-        i18n.global.t("workflow.test.invalidJson"),
-      );
+      expect(wrapper.text()).toContain(i18n.global.t("workflow.test.resultHint"));
+      expect(wrapper.text()).not.toContain(i18n.global.t("workflow.test.invalidJson"));
     });
 
     it("rejects malformed JSON — shows the error and disables Run", async () => {
       workflowObj.testRun.input = "{not json";
       const wrapper = mountDialog();
       await nextTick();
-      expect(wrapper.text()).toContain(
-        i18n.global.t("workflow.test.invalidJson"),
-      );
+      expect(wrapper.text()).toContain(i18n.global.t("workflow.test.invalidJson"));
       expect(primary(wrapper).attributes("disabled")).toBeDefined();
     });
 
@@ -300,9 +307,7 @@ describe("WorkflowTestDialog", () => {
       workflowObj.testRun.input = '{"a":1}';
       const wrapper = mountDialog();
       await nextTick();
-      expect(wrapper.text()).toContain(
-        i18n.global.t("workflow.test.invalidJson"),
-      );
+      expect(wrapper.text()).toContain(i18n.global.t("workflow.test.invalidJson"));
       expect(primary(wrapper).attributes("disabled")).toBeDefined();
     });
 
@@ -323,12 +328,19 @@ describe("WorkflowTestDialog", () => {
       await primary(wrapper).trigger("click");
       await flushPromises();
 
-      expect(mockTestWorkflow).toHaveBeenCalledWith({
-        org_identifier: "default",
-        id: "wf1",
-        inputs: JSON.parse(VALID_INPUT),
-        from_node: undefined,
-      });
+      // The whole in-memory graph is sent (test-without-saving), not just an id.
+      expect(mockTestWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          org_identifier: "default",
+          inputs: JSON.parse(VALID_INPUT),
+          from_node: undefined,
+          workflow: expect.objectContaining({
+            id: "wf1",
+            name: "wf",
+            nodes: expect.arrayContaining([expect.objectContaining({ id: "t1" })]),
+          }),
+        }),
+      );
       // success -> the popup closes and the result is stored for the canvas badges
       expect(workflowObj.testRun.show).toBe(false);
       expect(workflowObj.testRun.result).toMatchObject({ errors: {} });
@@ -433,9 +445,7 @@ describe("WorkflowTestDialog", () => {
       expect(wrapper.findComponent(ODrawerStub as any).props("open")).toBe(true);
       workflowObj.testRun.show = false;
       await nextTick();
-      expect(wrapper.findComponent(ODrawerStub as any).props("open")).toBe(
-        false,
-      );
+      expect(wrapper.findComponent(ODrawerStub as any).props("open")).toBe(false);
     });
   });
 });

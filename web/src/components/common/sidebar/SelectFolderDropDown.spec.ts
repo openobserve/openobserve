@@ -20,7 +20,6 @@ import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDo
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 vi.mock("vue-router", () => ({
@@ -127,7 +126,7 @@ const globalConfig = {
     AddFolder: AddFolderStub,
     ODrawer: ODrawerStub,
     OButton: OButtonStub,
-    "OSelect": {
+    OSelect: {
       template: `
         <div class="o-select-stub" :data-test="$attrs['data-test']" :data-disable="String(disabled)">
           <select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
@@ -137,7 +136,7 @@ const globalConfig = {
       props: ["modelValue", "options", "label", "disabled"],
       emits: ["update:modelValue"],
     },
-    "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },
+    OIcon: { template: '<i :class="name" />', props: ["name", "size"] },
   },
   mocks: { $store: store },
   provide: { store },
@@ -231,6 +230,52 @@ describe("SelectFolderDropDown.vue", () => {
       wrapper = createWrapper({ activeFolderId: "nonexistent-id" });
       const vm = wrapper.vm as any;
       expect(vm.selectedFolder).toBe("default");
+    });
+  });
+
+  // Opt-in, and only a destination picker opts in. A move dialog naming the
+  // active folder as the destination showed the same folder name twice and read
+  // as "move this to where it already is".
+  describe("excludeFolderId", () => {
+    it("is unset by default, and then offers every folder", () => {
+      wrapper = createWrapper();
+      expect(wrapper.props("excludeFolderId")).toBeUndefined();
+      const values = (wrapper.vm as any).folderOptions.map((o: any) => o.value);
+      expect(values).toEqual(["default", "folder-1", "folder-2"]);
+    });
+
+    it("drops the excluded folder from the options", () => {
+      wrapper = createWrapper({ excludeFolderId: "folder-1" });
+      const values = (wrapper.vm as any).folderOptions.map((o: any) => o.value);
+      expect(values).toEqual(["default", "folder-2"]);
+    });
+
+    // The whole point: it must not open pointing at a folder the list refuses to
+    // show, so there is nothing to select until the author chooses.
+    it("opens with no selection when it would have seeded the excluded folder", () => {
+      wrapper = createWrapper({ activeFolderId: "folder-1", excludeFolderId: "folder-1" });
+      expect((wrapper.vm as any).selectedFolder).toBe("");
+    });
+
+    it("still seeds normally when the active folder is not the excluded one", () => {
+      wrapper = createWrapper({ activeFolderId: "folder-2", excludeFolderId: "folder-1" });
+      expect((wrapper.vm as any).selectedFolder).toBe("folder-2");
+    });
+
+    // Creating a folder from the + button reaches this component as a store list
+    // change. The re-seed on that watcher would otherwise clear the folder that
+    // was just created and selected.
+    it("keeps a still-offerable choice when the folder list changes", async () => {
+      wrapper = createWrapper({ activeFolderId: "folder-1", excludeFolderId: "folder-1" });
+      const vm = wrapper.vm as any;
+
+      vm.selectedFolder = "folder-2";
+      await nextTick();
+
+      setStoreFolders("alerts", [...MOCK_FOLDERS, { folderId: "folder-3", name: "Staging" }]);
+      await nextTick();
+
+      expect(vm.selectedFolder).toBe("folder-2");
     });
   });
 
@@ -347,10 +392,7 @@ describe("SelectFolderDropDown.vue", () => {
     it("refreshes selectedFolder when foldersByType changes in the store", async () => {
       wrapper = createWrapper({ activeFolderId: "folder-1" });
       // Simulate store update
-      setStoreFolders("alerts", [
-        ...MOCK_FOLDERS,
-        { folderId: "folder-3", name: "Staging" },
-      ]);
+      setStoreFolders("alerts", [...MOCK_FOLDERS, { folderId: "folder-3", name: "Staging" }]);
       store.commit("setFoldersByType", store.state.organizationData.foldersByType);
       await nextTick();
       // selectedFolder should still resolve to folder-1

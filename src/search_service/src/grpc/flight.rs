@@ -19,7 +19,7 @@ use ::datafusion::{
     common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
-use arrow_schema::Schema;
+use arrow_schema::{DataType, Schema};
 use config::{
     cluster::LOCAL_NODE,
     datafusion::request::FlightSearchRequest,
@@ -91,6 +91,7 @@ pub async fn search(
     let mut ctx = DataFusionContextBuilder::new()
         .trace_id(&trace_id)
         .work_group(work_group.clone())
+        .stream_type(stream_type)
         .build(cfg.limit.cpu_num)
         .await?;
 
@@ -154,7 +155,15 @@ pub async fn search(
     let stream_created_at = unwrap_stream_created_at(&db_schema);
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
         .into_iter()
-        .filter(|v| latest_schema_map.contains_key(v))
+        .filter(|v| {
+            latest_schema_map
+                .get(v)
+                .map(|f| {
+                    [DataType::Utf8, DataType::Utf8View, DataType::LargeUtf8]
+                        .contains(f.data_type())
+                })
+                .unwrap_or_default()
+        })
         .collect_vec();
     let index_fields = get_stream_setting_index_fields(&stream_settings)
         .into_iter()
@@ -222,7 +231,7 @@ pub async fn search(
         time_range: (req.search_info.start_time, req.search_info.end_time),
         work_group: work_group.clone(),
         use_inverted_index: index_condition.is_some()
-            && cfg.common.inverted_index_enabled
+            && cfg.search.inverted_index_enabled
             && (!index_condition.as_ref().unwrap().is_condition_all()
                 || idx_optimize_rule.is_some()),
     });
@@ -564,7 +573,7 @@ fn apply_pushdowns_and_optimizations(
             e
         })?;
 
-    if cfg.common.feature_dynamic_pushdown_filter_enabled {
+    if cfg.search.feature_dynamic_pushdown_filter_enabled {
         let pushdown_filter = FilterPushdown::new_post_optimization();
         physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options()).map_err(|e| {
             log::error!("[trace_id {trace_id}] flight->search: pushdown filter post optimization error: {e}");
@@ -687,7 +696,7 @@ async fn get_file_list_by_ids(
     let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
         .unwrap_or_default();
-    let partition_keys = stream_settings.partition_keys;
+    let partition_keys = &stream_settings.partition_keys;
     let file_list =
         crate::file_list::query_by_ids(trace_id, org_id, stream_type, stream_name, time_range, ids)
             .await?;
@@ -700,7 +709,7 @@ async fn get_file_list_by_ids(
             stream_name,
             time_range,
             &file,
-            &partition_keys,
+            partition_keys,
             equal_items,
         )
         .await

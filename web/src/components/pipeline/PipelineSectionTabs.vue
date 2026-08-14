@@ -41,33 +41,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>{{ s.label }}</span>
       <span
         v-if="s.count != null"
-        class="text-2xs font-bold leading-none px-1.5 py-1 rounded-full"
+        class="text-2xs rounded-full px-1.5 py-1 leading-none font-bold"
         :class="
           s.key === activeSectionKey
-            ? 'bg-primary-100 text-primary-700'
+            ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
             : 'bg-surface-subtle text-text-secondary'
         "
-      >{{ s.count }}</span>
+        >{{ s.count }}</span
+      >
     </OTab>
   </OTabs>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
-const orgIdentifier = computed(
-  () => store.state.selectedOrganization?.identifier,
-);
+const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 
 // Route name → section key. Detail/sub routes resolve to their parent section
 // so the right tab stays highlighted on editor/history/add pages.
@@ -89,7 +88,7 @@ const activeSectionKey = computed(() => {
 
 interface Section {
   key: string;
-  label: string;
+  label: I18nText;
   icon: string;
   to: RouteLocationRaw;
   visible: boolean;
@@ -127,9 +126,7 @@ const sections = computed<Section[]>(() => {
   ];
 });
 
-const visibleSections = computed(() =>
-  sections.value.filter((s) => s.visible),
-);
+const visibleSections = computed(() => sections.value.filter((s) => s.visible));
 
 const navigateToSection = (key: string | number) => {
   if (key === activeSectionKey.value) return;

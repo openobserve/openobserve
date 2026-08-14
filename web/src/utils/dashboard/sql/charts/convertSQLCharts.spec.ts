@@ -45,7 +45,12 @@ vi.mock("@/utils/dashboard/legendConfiguration", () => ({
   getChartDimensions: vi.fn(() => ({ width: 800, height: 400 })),
   applyPieDonutChartAlignment: vi.fn(),
   applyPieDonutCenterAdjustment: vi.fn(),
-  calculatePieChartContainer: vi.fn(() => ({ left: "15%", right: "15%", top: "15%", bottom: "15%" })),
+  calculatePieChartContainer: vi.fn(() => ({
+    left: "15%",
+    right: "15%",
+    top: "15%",
+    bottom: "15%",
+  })),
 }));
 
 vi.mock("@/utils/dashboard/sql/shared/contextBuilder", () => ({
@@ -66,9 +71,7 @@ function makeMockContext(overrides: Partial<any> = {}): any {
     return map[key] ?? [];
   });
 
-  const getSeries = vi.fn(() => [
-    { name: "series1", data: [1, 2, 3] },
-  ]);
+  const getSeries = vi.fn(() => [{ name: "series1", data: [1, 2, 3] }]);
 
   const updateTrellisConfig = vi.fn();
 
@@ -192,7 +195,13 @@ describe("SQL Chart Converters", () => {
 
   describe("applyStackedChart", () => {
     it("sets series using getSeries", () => {
-      const ctx = makeMockContext({ panelSchema: { type: "stacked", config: { decimals: 2, trellis: { layout: null } }, queries: [{ fields: { y: [{ label: "Value" }] }, customQuery: false }] } });
+      const ctx = makeMockContext({
+        panelSchema: {
+          type: "stacked",
+          config: { decimals: 2, trellis: { layout: null } },
+          queries: [{ fields: { y: [{ label: "Value" }] }, customQuery: false }],
+        },
+      });
       applyStackedChart(ctx);
       expect(ctx.getSeries).toHaveBeenCalled();
       expect(Array.isArray(ctx.options.series)).toBe(true);
@@ -216,7 +225,11 @@ describe("SQL Chart Converters", () => {
 
     it("sets tooltip axisPointer label", () => {
       const ctx = makeMockContext();
-      ctx.panelSchema = { ...ctx.panelSchema, type: "stacked", config: { ...ctx.panelSchema.config, decimals: 2 } };
+      ctx.panelSchema = {
+        ...ctx.panelSchema,
+        type: "stacked",
+        config: { ...ctx.panelSchema.config, decimals: 2 },
+      };
       applyStackedChart(ctx);
       expect(ctx.options.tooltip.axisPointer.label).toBeDefined();
     });
@@ -272,7 +285,9 @@ describe("SQL Chart Converters", () => {
 
     it("sets xAxis name from query fields", () => {
       const ctx = makeMockContext();
-      ctx.options.xAxis = [{ data: ["A"], axisLabel: { width: 80, overflow: "" }, nameGap: 0, name: "" }];
+      ctx.options.xAxis = [
+        { data: ["A"], axisLabel: { width: 80, overflow: "" }, nameGap: 0, name: "" },
+      ];
       ctx.options.yAxis = [{ data: [], axisLabel: { width: 60 }, name: "" }];
       ctx.panelSchema = {
         ...ctx.panelSchema,
@@ -293,7 +308,12 @@ describe("SQL Chart Converters", () => {
         ...ctx.panelSchema,
         type: "area-stacked",
         config: { ...ctx.panelSchema.config, decimals: 2 },
-        queries: [{ fields: { x: [], y: [{ label: "Value" }], breakdown: [{ alias: "cat" }] }, customQuery: false }],
+        queries: [
+          {
+            fields: { x: [], y: [{ label: "Value" }], breakdown: [{ alias: "cat" }] },
+            customQuery: false,
+          },
+        ],
       };
       applyLineAreaScatterBarChart(ctx);
       expect(ctx.getSeries).toHaveBeenCalled();
@@ -304,7 +324,9 @@ describe("SQL Chart Converters", () => {
       ctx.panelSchema = {
         ...ctx.panelSchema,
         type: "line",
-        queries: [{ fields: { x: [], y: [{ label: "Value" }], breakdown: [] }, customQuery: false }],
+        queries: [
+          { fields: { x: [], y: [{ label: "Value" }], breakdown: [] }, customQuery: false },
+        ],
       };
       expect(() => applyLineAreaScatterBarChart(ctx)).not.toThrow();
     });

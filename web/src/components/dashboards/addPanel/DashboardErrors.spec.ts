@@ -17,12 +17,6 @@ import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import DashboardErrors from "./DashboardErrors.vue";
 
 // Mock vue-i18n
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: vi.fn((key: string) => key),
-  }),
-}));
-
 // Use vi.hoisted so the mock store is available when the hoisted vi.mock factory runs
 const { mockStore } = vi.hoisted(() => ({
   mockStore: {
@@ -124,9 +118,7 @@ describe("DashboardErrors", () => {
     it("renders the OSeparator", () => {
       wrapper = mountComponent(["Test error"]);
 
-      expect(
-        wrapper.find('[data-test="dashboard-error-separator"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-error-separator"]').exists()).toBe(true);
     });
 
     it("renders numeric and boolean error values as strings", () => {
@@ -310,7 +302,8 @@ describe("DashboardErrors", () => {
           stubs: {
             OSeparator: { template: '<hr data-test="dashboard-error-separator" />' },
             OIcon: {
-              template: '<span data-test="dashboard-error-icon" :data-name="name">{{ name }}</span>',
+              template:
+                '<span data-test="dashboard-error-icon" :data-name="name">{{ name }}</span>',
               props: ["name", "size"],
             },
           },

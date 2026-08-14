@@ -1,19 +1,14 @@
 import { ref } from "vue";
 import useHttpStreaming from "../useStreamingSearch";
 import { useStore } from "vuex";
-import {
-  generateTraceContext,
-} from "../../utils/zincutils";
+import { generateTraceContext } from "../../utils/zincutils";
 
 const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
 const useValuesWebSocket = () => {
   const store = useStore();
 
-  const {
-    fetchQueryDataWithHttpStream,
-    cancelStreamQueryBasedOnRequestId,
-  } = useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   // Utility functions
   const addTraceId = (field: string, traceId: string) => {
@@ -25,9 +20,7 @@ const useValuesWebSocket = () => {
 
   const removeTraceId = (field: string, traceId: string) => {
     if (traceIdMapper.value[field]) {
-      traceIdMapper.value[field] = traceIdMapper.value[field].filter(
-        (id) => id !== traceId,
-      );
+      traceIdMapper.value[field] = traceIdMapper.value[field].filter((id) => id !== traceId);
     }
   };
 
@@ -45,11 +38,7 @@ const useValuesWebSocket = () => {
     }
   };
 
-  const handleSearchClose = (
-    payload: any,
-    response: any,
-    variableObject: any,
-  ) => {
+  const handleSearchClose = (payload: any, response: any, variableObject: any) => {
     const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
     if (errorCodes.includes(response.code)) {
       handleSearchError(
@@ -78,21 +67,14 @@ const useValuesWebSocket = () => {
     cancelTraceId(data.name);
   };
 
-  const handleSearchResponse = (
-    payload: any,
-    response: any,
-    variableObject: any,
-  ) => {
+  const handleSearchResponse = (payload: any, response: any, variableObject: any) => {
     try {
       if (
         response.content?.results?.hits?.length &&
-        (response.type === "search_response" ||
-          response.type === "search_response_hits")
+        (response.type === "search_response" || response.type === "search_response_hits")
       ) {
         const hits = response.content.results.hits;
-        const fieldHit = hits.find(
-          (field: any) => field.field === variableObject.name,
-        );
+        const fieldHit = hits.find((field: any) => field.field === variableObject.name);
 
         if (!fieldHit) {
           return;
@@ -115,27 +97,22 @@ const useValuesWebSocket = () => {
         // Find existing entry for this column and stream
         const existingIndex = dashboardPanelData.meta.filterValue.findIndex(
           (item: any) =>
-            item.column === variableObject.name &&
-            item.stream === variableObject.stream,
+            item.column === variableObject.name && item.stream === variableObject.stream,
         );
 
         // Get existing values or initialize empty array
         let existingValues = [];
         if (existingIndex >= 0) {
-          existingValues =
-            dashboardPanelData.meta.filterValue[existingIndex].value || [];
+          existingValues = dashboardPanelData.meta.filterValue[existingIndex].value || [];
         }
 
         // Merge existing values with new values, removing duplicates
-        const mergedValues = Array.from(
-          new Set([...existingValues, ...newOptions]),
-        );
+        const mergedValues = Array.from(new Set([...existingValues, ...newOptions]));
 
         // Update or add the entry
         if (existingIndex >= 0) {
           // Update existing entry
-          dashboardPanelData.meta.filterValue[existingIndex].value =
-            mergedValues;
+          dashboardPanelData.meta.filterValue[existingIndex].value = mergedValues;
         } else {
           // Add new entry
           dashboardPanelData.meta.filterValue.push({
@@ -150,10 +127,7 @@ const useValuesWebSocket = () => {
     }
   };
 
-  const initializeStreamingConnection = (
-    payload: any,
-    variableObject: any,
-  ): any => {
+  const initializeStreamingConnection = (payload: any, variableObject: any): any => {
     fetchQueryDataWithHttpStream(payload, {
       data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
       error: (p: any, r: any) => handleSearchError(p, r, variableObject),
@@ -162,11 +136,7 @@ const useValuesWebSocket = () => {
     });
   };
 
-  const fetchFieldValues = async (
-    queryReq: any,
-    dashboardPanelData: any,
-    fieldObj: any,
-  ) => {
+  const fetchFieldValues = async (queryReq: any, dashboardPanelData: any, fieldObj: any) => {
     // Use HTTP2/streaming for all dashboard values requests
     const streamingPayload = {
       queryReq: {

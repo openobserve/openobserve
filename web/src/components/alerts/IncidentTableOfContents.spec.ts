@@ -17,7 +17,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 
-
 // ==================== TEST DATA FACTORIES ====================
 
 /**
@@ -106,10 +105,13 @@ function createDeeplyNestedToc(): TocItem[] {
  * Creates mock expanded sections object
  */
 function createExpandedSections(itemIds: string[]): Record<string, boolean> {
-  return itemIds.reduce((acc, id) => {
-    acc[id] = true;
-    return acc;
-  }, {} as Record<string, boolean>);
+  return itemIds.reduce(
+    (acc, id) => {
+      acc[id] = true;
+      return acc;
+    },
+    {} as Record<string, boolean>,
+  );
 }
 
 // ==================== HELPER FUNCTIONS ====================
@@ -152,7 +154,7 @@ async function clickExpandButton(wrapper: VueWrapper, level: number, itemId: str
 function mountComponent(
   tableOfContents: TocItem[] = [],
   expandedSections: Record<string, boolean> = {},
-  isDarkMode = false
+  isDarkMode = false,
 ) {
   return mount(IncidentTableOfContents, {
     props: {
@@ -496,7 +498,7 @@ describe("IncidentTableOfContents", () => {
 
       expect(wrapper.emitted("toggle-section")).toBeTruthy();
       expect(wrapper.emitted("toggle-section")?.[0][0]).toEqual(
-        expect.objectContaining({ id: "parent1" })
+        expect.objectContaining({ id: "parent1" }),
       );
     });
 
@@ -508,7 +510,7 @@ describe("IncidentTableOfContents", () => {
 
       expect(wrapper.emitted("toggle-section")).toBeTruthy();
       expect(wrapper.emitted("toggle-section")?.[0][0]).toEqual(
-        expect.objectContaining({ id: "l2" })
+        expect.objectContaining({ id: "l2" }),
       );
     });
   });
@@ -579,7 +581,7 @@ describe("IncidentTableOfContents", () => {
 
     it("should handle many level 1 items", () => {
       const toc = Array.from({ length: 20 }, (_, i) =>
-        createMockTocItem({ id: `item-${i}`, text: `Item ${i}` })
+        createMockTocItem({ id: `item-${i}`, text: `Item ${i}` }),
       );
       wrapper = mountComponent(toc);
 
@@ -721,7 +723,7 @@ describe("IncidentTableOfContents", () => {
 
       wrapper = mountComponent(
         toc,
-        createExpandedSections(["root1", "branch1-1", "branch1-2", "root2", "branch2-1"])
+        createExpandedSections(["root1", "branch1-1", "branch1-2", "root2", "branch2-1"]),
       );
 
       // Verify all branches are rendered

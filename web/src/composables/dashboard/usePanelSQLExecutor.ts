@@ -17,15 +17,9 @@ import { markRaw, toRaw, nextTick } from "vue";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
 import logsUtils from "@/composables/useLogs/logsUtils";
-import {
-  detectChunkingDirection,
-  shouldPrependChunk,
-} from "@/utils/dashboard/chunkingDirection";
+import { detectChunkingDirection, shouldPrependChunk } from "@/utils/dashboard/chunkingDirection";
 
-const adjustTimestampByTimeRangeGap = (
-  timestamp: number,
-  timeRangeGapSeconds: number,
-) => {
+const adjustTimestampByTimeRangeGap = (timestamp: number, timeRangeGapSeconds: number) => {
   return timestamp - timeRangeGapSeconds * 1000;
 };
 
@@ -212,6 +206,107 @@ export const usePanelSQLExecutor = (ctx: {
     }
   };
 
+  // Bumped by executeSQL on every run. A fire-and-forget sparkline stream captures
+  // the token at fire time and only writes if it still matches — so a slow stream
+  // from a previous range/variable can't overwrite the freshly-reset state.
+  let sparklineRunToken = 0;
+
+  // Isolated 2nd fetch: a UI histogram (is_ui_histogram=true) of the SAME query,
+  // used ONLY to draw the metric sparkline. Fully guarded and fire-and-forget —
+  // any failure leaves state.sparklineData empty and the metric shows value-only.
+  const fetchSparklineHistogram = (
+    query: string,
+    it: any,
+    startISOTimestamp: string,
+    endISOTimestamp: string,
+    pageType: string,
+    currentQueryIndex: number,
+    abortControllerRef: any,
+  ) => {
+    try {
+      if (abortControllerRef?.signal?.aborted) return;
+      // Snapshot the current run; a later run bumps this and invalidates our writes.
+      const runToken = sparklineRunToken;
+      const { traceId } = generateTraceContext();
+      const hits: any[] = [];
+      const payload: any = {
+        queryReq: {
+          query: {
+            sql: query,
+            query_fn: buildQueryFn(it),
+            start_time: startISOTimestamp,
+            end_time: endISOTimestamp,
+            size: -1,
+            histogram_interval: undefined,
+          },
+          ...getRegionClusterParams(),
+        },
+        type: "histogram",
+        isPagination: false,
+        traceId,
+        org_id: store?.state?.selectedOrganization?.identifier,
+        pageType,
+        searchType: searchType.value ?? "dashboards",
+        meta: {
+          currentQueryIndex,
+          panel_id: panelSchema.value.id,
+          panel_name: panelSchema.value.title,
+          is_ui_histogram: true,
+        },
+        clear_cache: false,
+      };
+      // Histogram is unavailable for CTE/DISTINCT/UNION/JOIN/LIMIT queries (API
+      // code 20013). Surface a non-blocking header warning; the metric value still
+      // renders. Other transient errors stay silent. The API delivers this either
+      // as a `data` event of type "error" or via the stream `error` callback.
+      const captureSparklineError = (content: any) => {
+        if (runToken !== sparklineRunToken) return;
+        if (content?.code === 20013) {
+          state.sparklineWarning = content?.error_detail || content?.message || "";
+        }
+      };
+      // Publish the hits accumulated so far. Called on every chunk so the trend
+      // streams in (the render watcher tracks sparklineData) instead of appearing
+      // once at the end. Dropped if a newer run already reset the state.
+      const commitHits = () => {
+        if (runToken !== sparklineRunToken) return;
+        // Reassign the whole array so the render watcher (shallow ref) fires.
+        const next = Array.isArray(state.sparklineData) ? state.sparklineData.slice() : [];
+        next[currentQueryIndex] = hits.slice();
+        state.sparklineData = next;
+      };
+      // Same contract as handleSearchResponse: (requestPayload, streamResponse).
+      // The response is the 2nd arg; the 1st is our own request (type "histogram").
+      fetchQueryDataWithHttpStream(payload, {
+        data: (_payload: any, response: any) => {
+          if (response?.type === "search_response_hits") {
+            const h = response?.content?.results?.hits;
+            if (Array.isArray(h)) {
+              hits.push(...h);
+              commitHits();
+            }
+          } else if (response?.type === "error") {
+            captureSparklineError(response?.content);
+          }
+        },
+        error: (_payload: any, wsError: any) => {
+          captureSparklineError(wsError?.content);
+          removeTraceId(traceId);
+        },
+        complete: () => {
+          commitHits();
+          removeTraceId(traceId);
+        },
+        reset: () => {
+          hits.length = 0;
+        },
+      });
+      addTraceId(traceId);
+    } catch {
+      // best-effort: never block the panel on the sparkline fetch
+    }
+  };
+
   const executeSQL = async (
     startISOTimestamp: any,
     endISOTimestamp: any,
@@ -224,6 +319,10 @@ export const usePanelSQLExecutor = (ctx: {
         queries: [],
       };
       state.resultMetaData = [];
+      // Invalidate any in-flight sparkline stream from a previous run before reset.
+      sparklineRunToken++;
+      state.sparklineData = [];
+      state.sparklineWarning = "";
       state.annotations = [];
       state.isOperationCancelled = false;
 
@@ -241,8 +340,8 @@ export const usePanelSQLExecutor = (ctx: {
 
         if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
           // convert time shift to milliseconds
-          const timeShiftInMilliSecondsArray = it.config?.time_shift?.map(
-            (it: any) => convertOffsetToSeconds(it.offSet, endISOTimestamp),
+          const timeShiftInMilliSecondsArray = it.config?.time_shift?.map((it: any) =>
+            convertOffsetToSeconds(it.offSet, endISOTimestamp),
           );
 
           // append 0 seconds to the timeShiftInMilliSecondsArray at 0th index
@@ -258,19 +357,15 @@ export const usePanelSQLExecutor = (ctx: {
             const timeRangeGap = timeShiftInMilliSecondsArray[i];
             const { query: query1, metadata: metadata1 } = replaceQueryValue(
               it.query,
-              adjustTimestampByTimeRangeGap(
-                startISOTimestamp,
-                timeRangeGap.seconds,
-              ),
-              adjustTimestampByTimeRangeGap(
-                endISOTimestamp,
-                timeRangeGap.seconds,
-              ),
+              adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+              adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
               panelSchema.value.queryType,
             );
 
-            const { query: query2, metadata: metadata2 } =
-              await applyDynamicVariables(query1, panelSchema.value.queryType);
+            const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
+              query1,
+              panelSchema.value.queryType,
+            );
             const query = query2;
 
             // Validate that timestamp column is not used as an alias for other fields
@@ -289,14 +384,8 @@ export const usePanelSQLExecutor = (ctx: {
             const metadata: any = {
               originalQuery: it.query,
               query: query,
-              startTime: adjustTimestampByTimeRangeGap(
-                startISOTimestamp,
-                timeRangeGap.seconds,
-              ),
-              endTime: adjustTimestampByTimeRangeGap(
-                endISOTimestamp,
-                timeRangeGap.seconds,
-              ),
+              startTime: adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+              endTime: adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
               timeRangeGap: timeRangeGap,
@@ -308,14 +397,8 @@ export const usePanelSQLExecutor = (ctx: {
               metadata,
               searchRequestObj: {
                 sql: query,
-                start_time: adjustTimestampByTimeRangeGap(
-                  startISOTimestamp,
-                  timeRangeGap.seconds,
-                ),
-                end_time: adjustTimestampByTimeRangeGap(
-                  endISOTimestamp,
-                  timeRangeGap.seconds,
-                ),
+                start_time: adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+                end_time: adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
                 query_fn: null,
               },
             });
@@ -328,10 +411,7 @@ export const usePanelSQLExecutor = (ctx: {
                 if (!shouldFetchAnnotations()) {
                   return [];
                 }
-                const annotationList = await refreshAnnotations(
-                  startISOTimestamp,
-                  endISOTimestamp,
-                );
+                const annotationList = await refreshAnnotations(startISOTimestamp, endISOTimestamp);
                 return annotationList || [];
               } catch (annotationError) {
                 console.error("Failed to fetch annotations:", annotationError);
@@ -340,9 +420,7 @@ export const usePanelSQLExecutor = (ctx: {
             })();
 
             // get search queries
-            const searchQueries = timeShiftQueries.map(
-              (it: any) => it.searchRequestObj,
-            );
+            const searchQueries = timeShiftQueries.map((it: any) => it.searchRequestObj);
 
             const { traceId } = generateTraceContext();
             addTraceId(traceId);
@@ -447,20 +525,17 @@ export const usePanelSQLExecutor = (ctx: {
 
                 if (response.type === "search_response_hits") {
                   // The hits come directly in response.content.hits or response.content.results.hits
-                  const hits =
-                    response?.content?.results?.hits ?? response?.content?.hits;
+                  const hits = response?.content?.results?.hits ?? response?.content?.hits;
                   // Get query_index from results metadata
                   const results = response?.content?.results;
 
                   // Use query_index from the event, or from the last metadata event, or find next empty
-                  let queryIndex =
-                    results?.query_index ?? currentQueryIndexInStream;
+                  let queryIndex = results?.query_index ?? currentQueryIndexInStream;
 
                   // If query_index is still not available, find the first query that doesn't have hits yet
                   if (queryIndex === undefined || queryIndex === null) {
                     queryIndex = state.resultMetaData.findIndex(
-                      (meta: any, idx: number) =>
-                        !state.data[idx] || state.data[idx].length === 0,
+                      (meta: any, idx: number) => !state.data[idx] || state.data[idx].length === 0,
                     );
                   }
 
@@ -472,8 +547,7 @@ export const usePanelSQLExecutor = (ctx: {
                   ) {
                     // Check if streaming_aggs is enabled
                     const streaming_aggs =
-                      state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ??
-                      false;
+                      state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
 
                     // If streaming_aggs, replace the data (aggregation query)
                     if (streaming_aggs) {
@@ -482,11 +556,8 @@ export const usePanelSQLExecutor = (ctx: {
                     // Otherwise, append/prepend based on chunking direction and order_by
                     else {
                       const orderAsc =
-                        state.resultMetaData[
-                          queryIndex
-                        ]?.order_by?.toLowerCase() === "asc";
-                      const isLTR =
-                        chunkingLeftToRight.get(queryIndex) ?? false;
+                        state.resultMetaData[queryIndex]?.order_by?.toLowerCase() === "asc";
+                      const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
                       const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
 
                       if (shouldPrepend) {
@@ -503,8 +574,7 @@ export const usePanelSQLExecutor = (ctx: {
                     }
 
                     if (state.resultMetaData[queryIndex]) {
-                      state.resultMetaData[queryIndex].hits =
-                        state.data[queryIndex];
+                      state.resultMetaData[queryIndex].hits = state.data[queryIndex];
                     }
                   }
                   state.errorDetail = { message: "", code: "" };
@@ -563,8 +633,10 @@ export const usePanelSQLExecutor = (ctx: {
             panelSchema.value.queryType,
           );
 
-          const { query: query2, metadata: metadata2 } =
-            await applyDynamicVariables(query1, panelSchema.value.queryType);
+          const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
+            query1,
+            panelSchema.value.queryType,
+          );
 
           const query = query2;
 
@@ -625,9 +697,7 @@ export const usePanelSQLExecutor = (ctx: {
 
             const currentQueryIndex = state.data.length - 1;
 
-            state.data[currentQueryIndex] = markRaw(
-              searchResponse.value.hits ?? [],
-            );
+            state.data[currentQueryIndex] = markRaw(searchResponse.value.hits ?? []);
             // In Logs→Visualize path, searchResponse is a single combined chunk
             // (not streaming). Override time_offset with the user's actual
             // selected range so fillMissingValues detects direction / builds
@@ -683,6 +753,19 @@ export const usePanelSQLExecutor = (ctx: {
             panelQueryIndex,
             abortControllerRef,
           );
+
+          // Best-effort 2nd fetch for the metric sparkline trend (isolated).
+          if (panelSchema.value.type === "metric" && panelSchema.value.config?.sparkline?.enabled) {
+            fetchSparklineHistogram(
+              query,
+              it,
+              startISOTimestamp,
+              endISOTimestamp,
+              pageType,
+              panelQueryIndex,
+              abortControllerRef,
+            );
+          }
 
           // Wait for annotations to complete if they were started
           if (annotationsPromise) {
@@ -743,9 +826,7 @@ export const usePanelSQLExecutor = (ctx: {
       state.metadata.queries.push({ panelQueryIndex: 0 });
 
       const currentQueryIndex = state.data.length - 1;
-      state.data[currentQueryIndex] = markRaw(
-        searchResponse.value.hits ?? [],
-      );
+      state.data[currentQueryIndex] = markRaw(searchResponse.value.hits ?? []);
       // Override time_offset with the user's actual selected range
       state.resultMetaData[currentQueryIndex] = [
         {
@@ -768,6 +849,10 @@ export const usePanelSQLExecutor = (ctx: {
       queries: [],
     };
     state.resultMetaData = [];
+    // Invalidate any in-flight sparkline stream from a previous run before reset.
+    sparklineRunToken++;
+    state.sparklineData = [];
+    state.sparklineWarning = "";
     state.annotations = [];
     state.isOperationCancelled = false;
 
@@ -785,8 +870,8 @@ export const usePanelSQLExecutor = (ctx: {
 
       if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
         // Expand time-shift query into N+1 entries (original + N shifts)
-        const timeShiftInMilliSecondsArray = it.config.time_shift.map(
-          (ts: any) => convertOffsetToSeconds(ts.offSet, endISOTimestamp),
+        const timeShiftInMilliSecondsArray = it.config.time_shift.map((ts: any) =>
+          convertOffsetToSeconds(ts.offSet, endISOTimestamp),
         );
         timeShiftInMilliSecondsArray.unshift({
           seconds: 0,
@@ -797,19 +882,15 @@ export const usePanelSQLExecutor = (ctx: {
           const timeRangeGap = timeShiftInMilliSecondsArray[i];
           const { query: query1, metadata: metadata1 } = replaceQueryValue(
             it.query,
-            adjustTimestampByTimeRangeGap(
-              startISOTimestamp,
-              timeRangeGap.seconds,
-            ),
-            adjustTimestampByTimeRangeGap(
-              endISOTimestamp,
-              timeRangeGap.seconds,
-            ),
+            adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+            adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
             panelSchema.value.queryType,
           );
 
-          const { query: query2, metadata: metadata2 } =
-            await applyDynamicVariables(query1, panelSchema.value.queryType);
+          const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
+            query1,
+            panelSchema.value.queryType,
+          );
           const query = query2;
 
           if (!checkTimestampAlias(query)) {
@@ -826,28 +907,16 @@ export const usePanelSQLExecutor = (ctx: {
 
           allSearchRequests.push({
             sql: query,
-            start_time: adjustTimestampByTimeRangeGap(
-              startISOTimestamp,
-              timeRangeGap.seconds,
-            ),
-            end_time: adjustTimestampByTimeRangeGap(
-              endISOTimestamp,
-              timeRangeGap.seconds,
-            ),
+            start_time: adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+            end_time: adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
             query_fn: buildQueryFn(it),
           });
 
           allMetadata.push({
             originalQuery: it.query,
             query: query,
-            startTime: adjustTimestampByTimeRangeGap(
-              startISOTimestamp,
-              timeRangeGap.seconds,
-            ),
-            endTime: adjustTimestampByTimeRangeGap(
-              endISOTimestamp,
-              timeRangeGap.seconds,
-            ),
+            startTime: adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+            endTime: adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
             queryType: panelSchema.value.queryType,
             variables: [...(metadata1 || []), ...(metadata2 || [])],
             timeRangeGap: timeRangeGap,
@@ -864,8 +933,10 @@ export const usePanelSQLExecutor = (ctx: {
           panelSchema.value.queryType,
         );
 
-        const { query: query2, metadata: metadata2 } =
-          await applyDynamicVariables(query1, panelSchema.value.queryType);
+        const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
+          query1,
+          panelSchema.value.queryType,
+        );
         const query = query2;
 
         if (!checkTimestampAlias(query)) {
@@ -917,6 +988,22 @@ export const usePanelSQLExecutor = (ctx: {
       state.resultMetaData.push([]);
     }
 
+    if (panelSchema.value.type === "metric" && panelSchema.value.config?.sparkline?.enabled) {
+      for (let i = 0; i < allSearchRequests.length; i++) {
+        const it = panelSchema.value.queries[allMetadata[i]?.panelQueryIndex];
+        if (!it) continue;
+        fetchSparklineHistogram(
+          allSearchRequests[i].sql,
+          it,
+          allSearchRequests[i].start_time,
+          allSearchRequests[i].end_time,
+          pageType,
+          i,
+          abortControllerRef,
+        );
+      }
+    }
+
     // Phase 3: Send single multi-stream call
     const { traceId } = generateTraceContext();
     addTraceId(traceId);
@@ -933,10 +1020,7 @@ export const usePanelSQLExecutor = (ctx: {
     const annotationsPromise = (async () => {
       try {
         if (!shouldFetchAnnotations()) return [];
-        const annotationList = await refreshAnnotations(
-          startISOTimestamp,
-          endISOTimestamp,
-        );
+        const annotationList = await refreshAnnotations(startISOTimestamp, endISOTimestamp);
         return annotationList || [];
       } catch (annotationError) {
         console.error("Failed to fetch annotations:", annotationError);
@@ -1021,17 +1105,14 @@ export const usePanelSQLExecutor = (ctx: {
         }
 
         if (response.type === "search_response_hits") {
-          const hits =
-            response?.content?.results?.hits ?? response?.content?.hits;
+          const hits = response?.content?.results?.hits ?? response?.content?.hits;
           const results = response?.content?.results;
 
-          let queryIndex =
-            results?.query_index ?? currentQueryIndexInStream;
+          let queryIndex = results?.query_index ?? currentQueryIndexInStream;
 
           if (queryIndex === undefined || queryIndex === null) {
             queryIndex = state.resultMetaData.findIndex(
-              (_meta: any, idx: number) =>
-                !state.data[idx] || state.data[idx].length === 0,
+              (_meta: any, idx: number) => !state.data[idx] || state.data[idx].length === 0,
             );
           }
 
@@ -1041,37 +1122,24 @@ export const usePanelSQLExecutor = (ctx: {
             Array.isArray(hits) &&
             hits.length > 0
           ) {
-            const streaming_aggs =
-              state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ??
-              false;
+            const streaming_aggs = state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
 
             if (streaming_aggs) {
               state.data[queryIndex] = markRaw([...hits]);
             } else {
-              const orderAsc =
-                state.resultMetaData[
-                  queryIndex
-                ]?.order_by?.toLowerCase() === "asc";
-              const isLTR =
-                chunkingLeftToRight.get(queryIndex) ?? false;
+              const orderAsc = state.resultMetaData[queryIndex]?.order_by?.toLowerCase() === "asc";
+              const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
               const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
 
               if (shouldPrepend) {
-                state.data[queryIndex] = markRaw([
-                  ...hits,
-                  ...toRaw(state.data[queryIndex] ?? []),
-                ]);
+                state.data[queryIndex] = markRaw([...hits, ...toRaw(state.data[queryIndex] ?? [])]);
               } else {
-                state.data[queryIndex] = markRaw([
-                  ...toRaw(state.data[queryIndex] ?? []),
-                  ...hits,
-                ]);
+                state.data[queryIndex] = markRaw([...toRaw(state.data[queryIndex] ?? []), ...hits]);
               }
             }
 
             if (state.resultMetaData[queryIndex]) {
-              state.resultMetaData[queryIndex].hits =
-                state.data[queryIndex];
+              state.resultMetaData[queryIndex].hits = state.data[queryIndex];
             }
           }
           state.errorDetail = { message: "", code: "" };

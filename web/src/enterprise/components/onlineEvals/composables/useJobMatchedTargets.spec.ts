@@ -9,13 +9,7 @@ describe("buildJobMatchedTargetsSql", () => {
   });
 
   it("counts distinct trace targets after applying the span filter", () => {
-    expect(
-      buildJobMatchedTargetsSql(
-        "default",
-        "\"service_name\" = 'checkout'",
-        "trace",
-      ),
-    ).toBe(
+    expect(buildJobMatchedTargetsSql("default", "\"service_name\" = 'checkout'", "trace")).toBe(
       'SELECT COUNT(DISTINCT "trace_id") AS cnt\nFROM "default"\nWHERE "service_name" = \'checkout\'',
     );
   });

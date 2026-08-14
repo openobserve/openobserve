@@ -1,12 +1,9 @@
 <template>
-  <OCard
-    class="flex flex-col h-full flex-nowrap"
-    style="min-width: 480px; max-width: 800px"
-  >
+  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 30rem; max-width: 50rem">
     <!-- Header -->
     <div class="px-2 py-3">
       <OCardSection role="header" class="w-full">
-        <div class="flex items-center justify-between w-full">
+        <div class="flex w-full items-center justify-between">
           <div class="text-base font-bold" data-test="queryList-title-text">
             {{ t("queries.queryList") }}
           </div>
@@ -37,16 +34,16 @@
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OTable from '@/lib/core/Table/OTable.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "QueryList",
@@ -57,7 +54,7 @@ export default defineComponent({
     metaData: Object,
   },
   setup(props: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const queryData = props.metaData?.queries || [];
     const store = useStore();
     const getRows = (query: any) => {
@@ -92,9 +89,7 @@ export default defineComponent({
 
       const getDuration = (createdAt: number) => {
         const currentTime = localTimeToMicroseconds();
-        const durationInSeconds = Math.floor(
-          (currentTime - createdAt) / 1000000,
-        );
+        const durationInSeconds = Math.floor((currentTime - createdAt) / 1000000);
 
         return durationFormatter(durationInSeconds);
       };
@@ -130,17 +125,10 @@ export default defineComponent({
         ["Query Range", queryRange(query?.start_time, query?.end_time)],
         ["Scan Records", query?.records],
         ["Files", query?.files],
-        [
-          "Original Size",
-          originalSize.value
-            ? `${originalSize.value} ${originalSize.unit}`
-            : "",
-        ],
+        ["Original Size", originalSize.value ? `${originalSize.value} ${originalSize.unit}` : ""],
         [
           "Compressed Size",
-          compressedSize.value
-            ? `${compressedSize.value} ${compressedSize.unit}`
-            : "",
+          compressedSize.value ? `${compressedSize.value} ${compressedSize.unit}` : "",
         ],
       ];
 
@@ -157,8 +145,22 @@ export default defineComponent({
     });
 
     const queryListColumns = [
-      { id: "key", header: "", accessorKey: "key", sortable: false, size: COL.owner, meta: { align: "left" as const } },
-      { id: "value", header: "", accessorKey: "value", sortable: false, size: COL.description, meta: { align: "left" as const, autoWidth: true } },
+      {
+        id: "key",
+        header: raw(""),
+        accessorKey: "key",
+        sortable: false,
+        size: COL.owner,
+        meta: { align: "left" as const },
+      },
+      {
+        id: "value",
+        header: raw(""),
+        accessorKey: "value",
+        sortable: false,
+        size: COL.description,
+        meta: { align: "left" as const, autoWidth: true },
+      },
     ];
 
     return {
@@ -171,4 +173,3 @@ export default defineComponent({
   },
 });
 </script>
-

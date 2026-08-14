@@ -69,17 +69,19 @@ describe("usePanelDrilldown", () => {
           config: {
             drilldown: [{ name: "Logs", type: "byUrl", data: { url: "https://example.com" } }],
           },
-          queries: [{
-            fields: {
-              stream: "default",
-              stream_type: "logs",
-              x: [],
-              y: [],
-              z: [],
-              breakdown: [],
+          queries: [
+            {
+              fields: {
+                stream: "default",
+                stream_type: "logs",
+                x: [],
+                y: [],
+                z: [],
+                breakdown: [],
+              },
+              query: "select * from logs",
             },
-            query: "select * from logs",
-          }],
+          ],
         },
       },
       variablesData: { value: { values: [] } },

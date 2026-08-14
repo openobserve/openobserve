@@ -51,14 +51,11 @@ describe("azureMarketplace service", () => {
         },
       });
 
-      await azureMarketplace.linkSubscription(
-        "test-org",
-        "azure-marketplace-token-xyz"
-      );
+      await azureMarketplace.linkSubscription("test-org", "azure-marketplace-token-xyz");
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/test-org/azure-marketplace/link-subscription",
-        { token: "azure-marketplace-token-xyz" }
+        { token: "azure-marketplace-token-xyz" },
       );
     });
 
@@ -71,7 +68,7 @@ describe("azureMarketplace service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/prod-org/azure-marketplace/link-subscription",
-        { token: "token-abc" }
+        { token: "token-abc" },
       );
     });
 
@@ -90,7 +87,7 @@ describe("azureMarketplace service", () => {
         await azureMarketplace.linkSubscription(org, token);
         expect(mockHttpInstance.post).toHaveBeenCalledWith(
           `/api/${org}/azure-marketplace/link-subscription`,
-          { token }
+          { token },
         );
       }
     });
@@ -103,10 +100,7 @@ describe("azureMarketplace service", () => {
       };
       mockHttpInstance.post.mockResolvedValue({ data: responseData });
 
-      const result = await azureMarketplace.linkSubscription(
-        "test-org",
-        "link-token"
-      );
+      const result = await azureMarketplace.linkSubscription("test-org", "link-token");
 
       expect(result).toEqual({ data: responseData });
     });
@@ -126,9 +120,9 @@ describe("azureMarketplace service", () => {
     it("should propagate errors from the POST request", async () => {
       mockHttpInstance.post.mockRejectedValue(new Error("Invalid Azure token"));
 
-      await expect(
-        azureMarketplace.linkSubscription("test-org", "bad-token")
-      ).rejects.toThrow("Invalid Azure token");
+      await expect(azureMarketplace.linkSubscription("test-org", "bad-token")).rejects.toThrow(
+        "Invalid Azure token",
+      );
     });
 
     it("should propagate HTTP 400 error responses", async () => {
@@ -140,9 +134,9 @@ describe("azureMarketplace service", () => {
       };
       mockHttpInstance.post.mockRejectedValue(httpError);
 
-      await expect(
-        azureMarketplace.linkSubscription("test-org", "used-token")
-      ).rejects.toEqual(httpError);
+      await expect(azureMarketplace.linkSubscription("test-org", "used-token")).rejects.toEqual(
+        httpError,
+      );
     });
 
     it("should propagate HTTP 401 unauthorized errors", async () => {
@@ -154,16 +148,16 @@ describe("azureMarketplace service", () => {
       };
       mockHttpInstance.post.mockRejectedValue(httpError);
 
-      await expect(
-        azureMarketplace.linkSubscription("test-org", "unauth-token")
-      ).rejects.toEqual(httpError);
+      await expect(azureMarketplace.linkSubscription("test-org", "unauth-token")).rejects.toEqual(
+        httpError,
+      );
     });
 
     it("should propagate network errors", async () => {
       mockHttpInstance.post.mockRejectedValue(new Error("Network error"));
 
       await expect(
-        azureMarketplace.linkSubscription("test-org", "net-error-token")
+        azureMarketplace.linkSubscription("test-org", "net-error-token"),
       ).rejects.toThrow("Network error");
     });
 
@@ -174,10 +168,7 @@ describe("azureMarketplace service", () => {
       };
       mockHttpInstance.post.mockResolvedValue({ data: responseData });
 
-      const result = await azureMarketplace.linkSubscription(
-        "test-org",
-        "valid-token"
-      );
+      const result = await azureMarketplace.linkSubscription("test-org", "valid-token");
 
       expect(result.data.success).toBe(true);
       expect(result.data.customer_identifier).toBe("cust-no-msg");
@@ -188,8 +179,7 @@ describe("azureMarketplace service", () => {
         data: { success: true, customer_identifier: "c" },
       });
 
-      const token =
-        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0";
+      const token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0";
 
       await azureMarketplace.linkSubscription("test-org", token);
 

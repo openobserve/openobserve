@@ -132,23 +132,16 @@ describe("applyGraphCollapse — collapse", () => {
         failed_requests: 0,
       })),
     };
-    const out = applyGraphCollapse(
-      g,
-      st({ threshold: 5, expandedKinds: new Set(["external"]) }),
-    );
+    const out = applyGraphCollapse(g, st({ threshold: 5, expandedKinds: new Set(["external"]) }));
     expect(out.nodes.some((n) => n.id === "external0")).toBe(true);
     const boundary = out.nodes.find((n) => n.id === "__group_external__svc");
     expect(boundary).toBeTruthy();
     expect(boundary!.is_group).toBe(true);
     // svc → boundary → member.
-    expect(
-      out.edges.some((e) => e.from === "svc" && e.to === "__group_external__svc"),
-    ).toBe(true);
-    expect(
-      out.edges.some(
-        (e) => e.from === "__group_external__svc" && e.to === "external0",
-      ),
-    ).toBe(true);
+    expect(out.edges.some((e) => e.from === "svc" && e.to === "__group_external__svc")).toBe(true);
+    expect(out.edges.some((e) => e.from === "__group_external__svc" && e.to === "external0")).toBe(
+      true,
+    );
   });
 
   it("expandedGroups expands ONLY the clicked caller's group, not the whole kind", () => {
@@ -183,21 +176,15 @@ describe("applyGraphCollapse — collapse", () => {
     // payment's group is a hub: its members are visible + boundary→member edges.
     expect(out.nodes.some((n) => n.id === "pe0")).toBe(true);
     expect(out.nodes.some((n) => n.id === "pe1")).toBe(true);
-    expect(
-      out.edges.some(
-        (e) => e.from === "__group_external__payment" && e.to === "pe0",
-      ),
-    ).toBe(true);
-    const paymentGrp = out.nodes.find(
-      (n) => n.id === "__group_external__payment",
-    )!;
+    expect(out.edges.some((e) => e.from === "__group_external__payment" && e.to === "pe0")).toBe(
+      true,
+    );
+    const paymentGrp = out.nodes.find((n) => n.id === "__group_external__payment")!;
     expect(paymentGrp.is_expanded).toBe(true);
     // product's group stays COLLAPSED: its members remain hidden.
     expect(out.nodes.some((n) => n.id === "qe0")).toBe(false);
     expect(out.nodes.some((n) => n.id === "qe1")).toBe(false);
-    const productGrp = out.nodes.find(
-      (n) => n.id === "__group_external__product",
-    )!;
+    const productGrp = out.nodes.find((n) => n.id === "__group_external__product")!;
     expect(productGrp.is_expanded).toBe(false);
   });
 
@@ -212,10 +199,7 @@ describe("applyGraphCollapse — collapse", () => {
         failed_requests: 0,
       })),
     };
-    const forced = applyGraphCollapse(
-      g,
-      st({ mode: "collapsed", threshold: 999 }),
-    );
+    const forced = applyGraphCollapse(g, st({ mode: "collapsed", threshold: 999 }));
     expect(forced.nodes.some((n) => n.id === "__group_external__svc")).toBe(true);
     const shown = applyGraphCollapse(g, st({ mode: "expanded", threshold: 1 }));
     expect(shown.nodes.some((n) => n.id === "external0")).toBe(true);

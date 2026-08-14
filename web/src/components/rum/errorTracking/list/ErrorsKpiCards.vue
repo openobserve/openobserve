@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="grid grid-cols-2 gap-2 h-full"
+    class="grid h-full grid-cols-2 gap-2"
     data-test="rum-errors-kpi-cards"
     :aria-label="t('rum.errorKpisAria')"
   >
     <article
       v-for="card in cards"
       :key="card.key"
-      class="bg-card-glass-bg flex flex-col items-start rounded-default border border-border-default px-2.5 py-1.5 min-w-0"
+      class="bg-card-glass-bg rounded-default border-border-default flex min-w-0 flex-col items-start border px-2.5 py-1.5"
       :data-test="`rum-errors-kpi-${card.key}-card`"
     >
       <span
-        class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-text-label"
+        class="text-text-label flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase"
       >
         {{ card.label }}
         <OTag
@@ -48,18 +48,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ card.value }}</span
       >
 
-      <small
-        v-if="!loading"
-        :data-test="`rum-errors-kpi-${card.key}-caption`"
-        >{{ card.caption }}</small
-      >
+      <small v-if="!loading" :data-test="`rum-errors-kpi-${card.key}-caption`">{{
+        card.caption
+      }}</small>
     </article>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { addCommasToNumber, formatLargeNumber } from "@/utils/formatters";
@@ -82,7 +80,7 @@ const props = defineProps<{
   loading?: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Session-health thresholds, in percent crash-free.
 const CRASH_FREE_FAIR_MIN = 95;
@@ -102,13 +100,9 @@ const crashFreeBadge = computed(() => {
 
 const cards = computed(() => {
   const kpis = props.kpis;
-  const uniqueIssues = `${addCommasToNumber(kpis.uniqueIssues)}${
-    kpis.issuesTruncated ? "+" : ""
-  }`;
+  const uniqueIssues = `${addCommasToNumber(kpis.uniqueIssues)}${kpis.issuesTruncated ? "+" : ""}`;
   const usersPct =
-    kpis.totalUsers > 0
-      ? Math.round((kpis.usersAffected / kpis.totalUsers) * 100)
-      : 0;
+    kpis.totalUsers > 0 ? Math.round((kpis.usersAffected / kpis.totalUsers) * 100) : 0;
   return [
     {
       key: "total-errors",
@@ -121,8 +115,7 @@ const cards = computed(() => {
     {
       key: "crash-free",
       label: t("rum.crashFreeSessions"),
-      value:
-        kpis.crashFreePct === null ? "—" : `${kpis.crashFreePct.toFixed(1)}%`,
+      value: kpis.crashFreePct === null ? "—" : `${kpis.crashFreePct.toFixed(1)}%`,
       valueClass:
         kpis.crashFreePct !== null && kpis.crashFreePct < CRASH_FREE_FAIR_MIN
           ? "text-severity-error-color"
@@ -148,8 +141,7 @@ const cards = computed(() => {
       key: "new-issues",
       label: t("rum.newIssues"),
       value: String(kpis.newIssues),
-      valueClass:
-        kpis.newIssues > 0 ? "text-severity-error-color" : "",
+      valueClass: kpis.newIssues > 0 ? "text-severity-error-color" : "",
       caption: kpis.deployVersion
         ? t("rum.firstSeenSinceDeploy", { version: kpis.deployVersion })
         : t("rum.firstSeenInWindow"),

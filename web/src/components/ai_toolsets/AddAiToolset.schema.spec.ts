@@ -6,10 +6,7 @@
 // ("4 blocks → 6 sub-rules").
 
 import { describe, it, expect } from "vitest";
-import {
-  makeAddAiToolsetSchema,
-  addAiToolsetDefaults,
-} from "./AddAiToolset.schema";
+import { makeAddAiToolsetSchema, addAiToolsetDefaults } from "./AddAiToolset.schema";
 
 // i18n passthrough — return the key so we can assert exact message keys survive.
 const t = (key: string) => key;
@@ -35,9 +32,7 @@ const errorPaths = (input: any): string[] => {
 const messagesFor = (input: any, path: string): string[] => {
   const res = schema.safeParse(input);
   if (res.success) return [];
-  return res.error.issues
-    .filter((i) => i.path.join(".") === path)
-    .map((i) => i.message);
+  return res.error.issues.filter((i) => i.path.join(".") === path).map((i) => i.message);
 };
 
 describe("AddAiToolset.schema", () => {
@@ -64,21 +59,17 @@ describe("AddAiToolset.schema", () => {
     });
 
     it("accepts alphanumeric + hyphen + underscore", () => {
-      expect(errorPaths({ ...base(), name: "valid_name-123" })).not.toContain(
-        "name",
-      );
+      expect(errorPaths({ ...base(), name: "valid_name-123" })).not.toContain("name");
     });
 
     it("rejects a name longer than 256 chars", () => {
-      expect(
-        messagesFor({ ...base(), name: "a".repeat(257) }, "name"),
-      ).toContain("aiToolset.nameTooLong");
+      expect(messagesFor({ ...base(), name: "a".repeat(257) }, "name")).toContain(
+        "aiToolset.nameTooLong",
+      );
     });
 
     it("accepts a name of exactly 256 chars", () => {
-      expect(errorPaths({ ...base(), name: "a".repeat(256) })).not.toContain(
-        "name",
-      );
+      expect(errorPaths({ ...base(), name: "a".repeat(256) })).not.toContain("name");
     });
   });
 
@@ -175,23 +166,20 @@ describe("AddAiToolset.schema", () => {
 
     it("treats whitespace-only content as missing", () => {
       expect(
-        messagesFor(
-          { ...base(), kind: "skill", skill: { content: "   " } },
-          "skill.content",
-        ),
+        messagesFor({ ...base(), kind: "skill", skill: { content: "   " } }, "skill.content"),
       ).toContain("aiToolset.skillContentRequired");
     });
 
     it("passes when content is provided", () => {
-      expect(
-        errorPaths({ ...base(), kind: "skill", skill: { content: "# Hi" } }),
-      ).not.toContain("skill.content");
+      expect(errorPaths({ ...base(), kind: "skill", skill: { content: "# Hi" } })).not.toContain(
+        "skill.content",
+      );
     });
 
     it("is NOT required when kind is mcp", () => {
-      expect(
-        errorPaths({ ...base(), kind: "mcp", skill: { content: "" } }),
-      ).not.toContain("skill.content");
+      expect(errorPaths({ ...base(), kind: "mcp", skill: { content: "" } })).not.toContain(
+        "skill.content",
+      );
     });
   });
 

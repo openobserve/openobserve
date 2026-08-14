@@ -17,7 +17,9 @@
 //! existing org. New orgs receive their token at creation time.
 
 use config::utils::rand::generate_random_string;
-use sea_orm::{EntityTrait, PaginatorTrait, QueryOrder, Set, TransactionTrait};
+use sea_orm::{
+    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+};
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -79,6 +81,7 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
+                    .if_not_exists()
                     .table(SyntheticsProbeTokens::Table)
                     .name("idx_synthetics_probe_tokens_org_id")
                     .col(SyntheticsProbeTokens::OrgId)
@@ -98,6 +101,18 @@ impl MigrationTrait for Migration {
             let mut new_tokens: Vec<synthetics_probe_tokens::ActiveModel> = vec![];
 
             for org in orgs {
+                // Idempotency: skip orgs that already have a probe token. The
+                // migration can legitimately re-run against a DB where a prior
+                // run committed this backfill but was not recorded, and we must
+                // not seed a second `system` token for the same org.
+                let existing = synthetics_probe_tokens::Entity::find()
+                    .filter(synthetics_probe_tokens::Column::OrgId.eq(org.identifier.clone()))
+                    .one(&txn)
+                    .await?;
+                if existing.is_some() {
+                    continue;
+                }
+
                 let now = chrono::Utc::now().timestamp_micros();
                 let token = format!(
                     "{}{}",

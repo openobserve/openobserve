@@ -89,10 +89,7 @@ function makeFormData(overrides: Record<string, any> = {}) {
 // AddAlert.schema.ts reuses the same fragments via createAlertSettingsSchema).
 const parentSchema = z.object({ ...makeAlertSettingsShape(t) });
 
-function makeDescendantHost(
-  isRealTime = "true",
-  defaultOverrides: Record<string, any> = {},
-) {
+function makeDescendantHost(isRealTime = "true", defaultOverrides: Record<string, any> = {}) {
   return defineComponent({
     components: { OForm, AlertSettings },
     setup() {
@@ -119,17 +116,13 @@ function makeDescendantHost(
   });
 }
 
-function mountDescendant(
-  isRealTime = "true",
-  defaultOverrides: Record<string, any> = {},
-) {
+function mountDescendant(isRealTime = "true", defaultOverrides: Record<string, any> = {}) {
   return mount(makeDescendantHost(isRealTime, defaultOverrides), {
     global: { plugins: [makeStore(), i18n] },
   });
 }
 
-const hostForm = (host: any) =>
-  (host.findComponent({ name: "OForm" }).vm as any).form;
+const hostForm = (host: any) => (host.findComponent({ name: "OForm" }).vm as any).form;
 
 describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => {
   it("does NOT render its own <OForm> — the fields bind into the parent", () => {
@@ -145,9 +138,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     const host = mountDescendant("true");
     const parentForm = hostForm(host);
 
-    await host
-      .find('[data-test="alert-settings-silence-duration-input"] input')
-      .setValue("7");
+    await host.find('[data-test="alert-settings-silence-duration-input"] input').setValue("7");
     await flushPromises();
 
     expect(parentForm.state.values.trigger_condition.silence).toBe("7");
@@ -166,6 +157,26 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(host.text()).toContain(DESTINATIONS_REQUIRED_MESSAGE);
   });
 
+  // Regression (#13156): AlertTargetsSelect replaced the name=-bound destinations
+  // select, so this error is hand-rendered — and it shipped WITHOUT role="alert".
+  // AddAlert's focusOnFirstError finds the tab that owns an invalid field by
+  // scanning [role="alert"] messages; without the marker, saving from the
+  // Advanced tab with no destination toasted "fix the highlighted fields" but
+  // never brought the Alert Rules tab forward. The cross-tab specs in
+  // AddAlert.spec.ts seed a synthetic message (steps are stubbed there), so the
+  // REAL markup's marker must be pinned here.
+  it("renders the destinations error as [role=alert] so focusOnFirstError can find its tab", async () => {
+    const host = mountDescendant("true");
+    await hostForm(host).handleSubmit();
+    await flushPromises();
+    await nextTick();
+
+    const error = host.find('[data-test="alert-settings-destinations-error"]');
+    expect(error.exists()).toBe(true);
+    expect(error.attributes("role")).toBe("alert");
+    expect(error.text()).toBe(DESTINATIONS_REQUIRED_MESSAGE);
+  });
+
   it("passes submit when valid — string number input coerces via the schema", async () => {
     // Rewritten from the old standalone "emits silence/period as NUMBERS" test:
     // the schema's z.coerce accepts the raw STRING the input holds; the payload
@@ -173,9 +184,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     const host = mountDescendant("true", { destinations: ["dest-a"] });
     const parentForm = hostForm(host);
 
-    await host
-      .find('[data-test="alert-settings-silence-duration-input"] input')
-      .setValue("5");
+    await host.find('[data-test="alert-settings-silence-duration-input"] input').setValue("5");
     await flushPromises();
 
     await parentForm.handleSubmit();
@@ -189,9 +198,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     const host = mountDescendant("true", { destinations: ["dest-a"] });
     const parentForm = hostForm(host);
 
-    await host
-      .find('[data-test="alert-settings-silence-duration-input"] input')
-      .setValue("-1");
+    await host.find('[data-test="alert-settings-silence-duration-input"] input').setValue("-1");
     await flushPromises();
 
     await parentForm.handleSubmit();
@@ -317,9 +324,9 @@ describe("AlertSettings.schema — silence blank-vs-zero (parseInt→null trap)"
       creates_incident: false,
     });
     expect(result.success).toBe(false);
-    expect(
-      result.success ? [] : result.error.issues.map((i: any) => i.message),
-    ).toContain(SILENCE_MESSAGE);
+    expect(result.success ? [] : result.error.issues.map((i: any) => i.message)).toContain(
+      SILENCE_MESSAGE,
+    );
   });
 });
 
@@ -334,9 +341,7 @@ describe("AlertSettings.schema — period rules unchanged by the silence fix", (
   it.each([[""], [0], [-1]])("REJECTS period %o", (value: any) => {
     const result = period.safeParse(value);
     expect(result.success).toBe(false);
-    expect(result.success ? "" : result.error.issues[0].message).toBe(
-      PERIOD_MESSAGE,
-    );
+    expect(result.success ? "" : result.error.issues[0].message).toBe(PERIOD_MESSAGE);
   });
 
   it("ACCEPTS period 1 and the string '10'", () => {
@@ -355,7 +360,6 @@ describe("AlertSettings.schema — period rules unchanged by the silence fix", (
     expect(result.success).toBe(true);
   });
 });
-
 
 // ── "destination OR workflow" (enterprise/cloud) ─────────────────────────────
 // Pre-migration this lived in the component's hand-rolled validate(); that method
@@ -379,9 +383,7 @@ describe("AlertSettings.schema — destination OR workflow", () => {
     it("REJECTS empty destinations with the ORIGINAL message", () => {
       const r = schema.safeParse({ ...base, destinations: [] });
       expect(r.success).toBe(false);
-      expect(
-        r.success ? [] : r.error.issues.map((i: any) => i.message),
-      ).toContain(DEST_ONLY);
+      expect(r.success ? [] : r.error.issues.map((i: any) => i.message)).toContain(DEST_ONLY);
     });
 
     it("does NOT accept a workflow as a substitute for a destination", () => {
@@ -395,9 +397,7 @@ describe("AlertSettings.schema — destination OR workflow", () => {
     });
 
     it("ACCEPTS a destination", () => {
-      expect(
-        schema.safeParse({ ...base, destinations: ["email"] }).success,
-      ).toBe(true);
+      expect(schema.safeParse({ ...base, destinations: ["email"] }).success).toBe(true);
     });
   });
 
@@ -437,9 +437,7 @@ describe("AlertSettings.schema — destination OR workflow", () => {
       const issues = r.success ? [] : r.error.issues;
       expect(issues.map((i: any) => i.message)).toContain(EITHER);
       // Path matters: AlertSettings reads fieldError("destinations") to render it.
-      expect(
-        issues.some((i: any) => i.path.join(".") === "destinations"),
-      ).toBe(true);
+      expect(issues.some((i: any) => i.path.join(".") === "destinations")).toBe(true);
     });
 
     it("REJECTS when both keys are absent entirely", () => {
@@ -447,7 +445,6 @@ describe("AlertSettings.schema — destination OR workflow", () => {
     });
   });
 });
-
 
 // ── Workflows target wiring (enterprise/cloud) ───────────────────────────────
 // The zod migration replaced the destinations control with a name=-bound
@@ -457,31 +454,20 @@ describe("AlertSettings.schema — destination OR workflow", () => {
 // AddAlert does the setFieldValue. These pin that wiring — it is exactly what the
 // merge had to reconstruct on top of main's rewrite.
 describe("AlertSettings — combined destinations + workflows target control", () => {
-  const findTargets = (host: any) =>
-    host.findComponent({ name: "AlertTargetsSelect" });
+  const findTargets = (host: any) => host.findComponent({ name: "AlertTargetsSelect" });
 
   it("renders AlertTargetsSelect instead of a name=-bound destinations select", () => {
     const host = mountDescendant();
     expect(findTargets(host).exists()).toBe(true);
     // The old control is gone — if it came back, both would write `destinations`.
-    expect(
-      host.findAll('[data-test="alert-destinations-select"]').length,
-    ).toBeGreaterThan(0);
+    expect(host.findAll('[data-test="alert-destinations-select"]').length).toBeGreaterThan(0);
   });
 
   it("keeps the original data-test hooks (e2e contract)", () => {
     const host = mountDescendant();
-    expect(host.find('[data-test="alert-destinations-select"]').exists()).toBe(
-      true,
-    );
-    expect(
-      host
-        .find('[data-test="alert-settings-refresh-destinations-btn"]')
-        .exists(),
-    ).toBe(true);
-    expect(host.find('[data-test="create-destination-btn"]').exists()).toBe(
-      true,
-    );
+    expect(host.find('[data-test="alert-destinations-select"]').exists()).toBe(true);
+    expect(host.find('[data-test="alert-settings-refresh-destinations-btn"]').exists()).toBe(true);
+    expect(host.find('[data-test="create-destination-btn"]').exists()).toBe(true);
   });
 
   it("forwards the destinations + workflows props down to the control", () => {
@@ -524,7 +510,7 @@ describe("AlertSettings — combined destinations + workflows target control", (
     await flushPromises();
 
     expect(step.emitted("refresh:destinations")).toBeTruthy();
-    if ((findTargets(host).props("workflowsEnabled") as boolean)) {
+    if (findTargets(host).props("workflowsEnabled") as boolean) {
       expect(listWorkflowsMock).toHaveBeenCalled();
     }
   });

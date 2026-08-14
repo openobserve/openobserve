@@ -50,30 +50,7 @@ pub async fn write_sql_aggregated_edges(
             serde_json::Value::Object(o) => Some(o),
             _ => None,
         })
-        .map(|mut obj| {
-            let mut record = config::utils::json::json!({
-                "_timestamp": obj.remove("end").unwrap_or(serde_json::json!(0)),
-                "org_id": org_id,
-                "trace_stream_name": stream_name,
-                "client_service": obj.remove("client").unwrap_or(serde_json::json!(null)),
-                "server_service": obj.remove("server").unwrap_or(serde_json::json!("")),
-                "total_requests": obj.remove("total_requests").unwrap_or(serde_json::json!(0)),
-                "failed_requests": obj.remove("errors").unwrap_or(serde_json::json!(0)),
-                "error_rate": obj.remove("error_rate").unwrap_or(serde_json::json!(0.0)),
-                "p50_latency_ns": obj.remove("p50").unwrap_or(serde_json::json!(0)),
-                "p95_latency_ns": obj.remove("p95").unwrap_or(serde_json::json!(0)),
-                "p99_latency_ns": obj.remove("p99").unwrap_or(serde_json::json!(0)),
-            });
-            // Inferred-dependency edges carry the inferred entity's type (database/
-            // queue/rpc/external); instrumented edges omit it so the column stays
-            // absent for them. Presence marks the edge/target node as inferred.
-            if let Some(ct) = obj.remove("connection_type")
-                && !ct.is_null()
-            {
-                record["connection_type"] = ct;
-            }
-            record
-        })
+        .map(|obj| map_edge_to_record(obj, org_id, stream_name))
         .collect();
 
     use proto::cluster_rpc;
@@ -101,6 +78,49 @@ pub async fn write_sql_aggregated_edges(
     Ok(())
 }
 
+/// Map one aggregated-edge JSON object to a `_o2_service_graph` storage record.
+///
+/// `connection_type` and `agent_env` are optional-when-absent: instrumented /
+/// non-agent edges omit the input key entirely, so the output record stays
+/// free of the column for them. Presence marks the edge as inferred /
+/// agent-scoped respectively.
+#[cfg(feature = "enterprise")]
+fn map_edge_to_record(
+    mut obj: serde_json::Map<String, serde_json::Value>,
+    org_id: &str,
+    stream_name: &str,
+) -> serde_json::Value {
+    let mut record = config::utils::json::json!({
+        "_timestamp": obj.remove("end").unwrap_or(serde_json::json!(0)),
+        "org_id": org_id,
+        "trace_stream_name": stream_name,
+        "client_service": obj.remove("client").unwrap_or(serde_json::json!(null)),
+        "server_service": obj.remove("server").unwrap_or(serde_json::json!("")),
+        "total_requests": obj.remove("total_requests").unwrap_or(serde_json::json!(0)),
+        "failed_requests": obj.remove("errors").unwrap_or(serde_json::json!(0)),
+        "error_rate": obj.remove("error_rate").unwrap_or(serde_json::json!(0.0)),
+        "p50_latency_ns": obj.remove("p50").unwrap_or(serde_json::json!(0)),
+        "p95_latency_ns": obj.remove("p95").unwrap_or(serde_json::json!(0)),
+        "p99_latency_ns": obj.remove("p99").unwrap_or(serde_json::json!(0)),
+    });
+    // Inferred-dependency edges carry the inferred entity's type (database/
+    // queue/rpc/external); instrumented edges omit it so the column stays
+    // absent for them. Presence marks the edge/target node as inferred.
+    if let Some(ct) = obj.remove("connection_type")
+        && !ct.is_null()
+    {
+        record["connection_type"] = ct;
+    }
+    // Agent-graph edges carry the agent's env (ENV ONLY — no version); non-agent
+    // edges omit it so the column stays absent for them.
+    if let Some(env) = obj.remove("agent_env")
+        && !env.is_null()
+    {
+        record["agent_env"] = env;
+    }
+    record
+}
+
 // Stub functions for non-enterprise builds
 #[cfg(not(feature = "enterprise"))]
 pub fn aggregate_edges(_edges: Vec<()>) -> Result<(), anyhow::Error> {
@@ -123,6 +143,43 @@ mod tests {
     #[cfg(not(feature = "enterprise"))]
     fn test_aggregate_edges_nonempty_returns_ok() {
         assert!(aggregate_edges(vec![(), ()]).is_ok());
+    }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn test_map_edge_to_record_with_agent_env() {
+        let obj = config::utils::json::json!({
+            "end": 123,
+            "client": "svc-a",
+            "server": "svc-b",
+            "agent_env": "prod",
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        let record = super::map_edge_to_record(obj, "org1", "traces");
+
+        assert_eq!(record["agent_env"], config::utils::json::json!("prod"));
+        assert!(record.get("agent_version").is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn test_map_edge_to_record_without_agent_env() {
+        let obj = config::utils::json::json!({
+            "end": 123,
+            "client": "svc-a",
+            "server": "svc-b",
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        let record = super::map_edge_to_record(obj, "org1", "traces");
+
+        assert!(record.get("agent_env").is_none());
+        assert!(record.get("agent_version").is_none());
     }
 }
 

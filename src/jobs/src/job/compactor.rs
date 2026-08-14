@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use compaction;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -22,7 +23,6 @@ use config::{
 use infra::cluster::get_node_by_uuid;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-use openobserve_core::compact;
 const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/compact/enrichment_table";
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -36,20 +36,20 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
     log::info!("[COMPACTOR::JOB] Compactor is enabled");
 
-    let mut worker = compact::worker::MergeWorker::new(cfg.limit.file_merge_thread_num);
+    let mut worker = compaction::worker::MergeWorker::new(cfg.limit.file_merge_thread_num);
     if let Err(e) = worker.run() {
         log::error!("[COMPACTOR::JOB] start merge worker error: {e}");
     }
 
     let mut scheduler =
-        compact::worker::JobScheduler::new(cfg.limit.file_merge_thread_num, worker.tx());
+        compaction::worker::JobScheduler::new(cfg.limit.file_merge_thread_num, worker.tx());
     if let Err(e) = scheduler.run() {
         log::error!("[COMPACTOR::JOB] start merge job scheduler error: {e}");
     }
 
     spawn_pausable_job!("run_generate_job", get_config().compact.interval, {
         log::debug!("[COMPACTOR::JOB] Running generate merge job");
-        if let Err(e) = compact::run_generate_job(CompactionJobType::Current).await {
+        if let Err(e) = compaction::run_generate_job(CompactionJobType::Current).await {
             log::error!("[COMPACTOR::JOB] run generate merge job error: {e}");
         }
     });
@@ -59,7 +59,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         get_config().compact.old_data_interval.saturating_add(1),
         {
             log::debug!("[COMPACTOR::JOB] Running generate merge job for old data");
-            if let Err(e) = compact::run_generate_job(CompactionJobType::Historical).await {
+            if let Err(e) = compaction::run_generate_job(CompactionJobType::Historical).await {
                 log::error!("[COMPACTOR::JOB] run generate merge job for old data error: {e}");
             }
         }
@@ -78,7 +78,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 continue;
             }
             log::debug!("[COMPACTOR::JOB] Running generate downsampling job");
-            if let Err(e) = compact::run_generate_downsampling_job().await {
+            if let Err(e) = compaction::run_generate_downsampling_job().await {
                 log::error!("[COMPACTOR::JOB] run generate downsampling job error: {e}");
             }
         }
@@ -86,7 +86,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     spawn_pausable_job!("run_merge", get_config().compact.interval + 2, {
         log::debug!("[COMPACTOR::JOB] Running data merge");
-        if let Err(e) = compact::run_merge(scheduler.tx().clone()).await {
+        if let Err(e) = compaction::run_merge(scheduler.tx().clone()).await {
             log::error!("[COMPACTOR::JOB] run data merge error: {e}");
         }
     });
@@ -96,7 +96,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         get_config().compact.data_retention_interval + 3,
         {
             log::debug!("[COMPACTOR::JOB] Running data retention");
-            if let Err(e) = compact::run_retention().await {
+            if let Err(e) = compaction::run_retention().await {
                 log::error!("[COMPACTOR::JOB] run data retention error: {e}");
             }
         }
@@ -104,7 +104,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     spawn_pausable_job!("run_delay_deletion", get_config().compact.interval + 4, {
         log::debug!("[COMPACTOR::JOB] Running data delay deletion");
-        if let Err(e) = compact::run_delay_deletion().await {
+        if let Err(e) = compaction::run_delay_deletion().await {
             log::error!("[COMPACTOR::JOB] run data delay deletion error: {e}");
         }
     });
@@ -260,6 +260,6 @@ async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
     if let Err(e) = infra::dist_lock::unlock(&locker).await {
         log::error!("[COMPACTOR::JOB] Failed to release lock for enrichment table merge: {e}");
     }
-    openobserve_core::enrichment::storage::remote::run_merge_job().await;
+    enrichment_data::enrichment::storage::remote::run_merge_job().await;
     Ok(())
 }

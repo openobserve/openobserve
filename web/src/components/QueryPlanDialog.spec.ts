@@ -72,7 +72,6 @@ vi.mock("@/utils/queryPlanParser", () => ({
 // Component import must come after all vi.mock() declarations.
 import QueryPlanDialog from "./QueryPlanDialog.vue";
 
-
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
 const oDialogStub = {
@@ -135,7 +134,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         OTabPanel: oTabPanelStub,
         QueryPlanTree: queryPlanTreeStub,
         MetricsSummaryCard: metricsSummaryCardStub,
-        "OIcon": true,
+        OIcon: true,
       },
     },
     props: {
@@ -433,9 +432,7 @@ describe("QueryPlanDialog", () => {
       await flushPromises();
       await nextTick();
 
-      expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(true);
     });
 
     it("should render OTabs for logical/physical when not in analyze mode", async () => {

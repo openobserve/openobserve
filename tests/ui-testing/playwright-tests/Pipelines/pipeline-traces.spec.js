@@ -135,11 +135,11 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     testLogger.info('Traces option found in stream type dropdown');
 
     // Close dialog by clicking outside
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
     await page.waitForTimeout(500);
 
     // Navigate back to pipelines list
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
 
     testLogger.info('Test completed: Traces stream type visibility check');
   });
@@ -158,8 +158,10 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await pageManager.pipelinesPage.addPipeline();
     await page.waitForTimeout(500);
 
-    // Verify dialog opened - check for pipeline name input using POM
-    await expect(pageManager.pipelinesPage.pipelineNameInput).toBeVisible();
+    // Verify the editor opened. The pipeline name is now an inline-edited title:
+    // in display mode it shows a trigger (the input only mounts once clicked), so
+    // the trigger is the correct "form is open" signal.
+    await expect(pageManager.pipelinesPage.pipelineNameTrigger).toBeVisible();
     testLogger.info('Pipeline name input is visible');
 
     // Enter a pipeline name using POM method
@@ -168,7 +170,7 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     testLogger.info(`Entered pipeline name: ${pipelineName}`);
 
     // Close dialog without saving
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
 
     testLogger.info('Test completed: Pipeline dialog opens correctly');
   });

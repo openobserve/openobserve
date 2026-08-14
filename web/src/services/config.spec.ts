@@ -120,7 +120,7 @@ describe("Config Service", () => {
               backup: true,
             },
             {
-              region: "eu-west-1", 
+              region: "eu-west-1",
               endpoint: "https://eu-west.api.example.com",
               backup: false,
             },

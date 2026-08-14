@@ -14,12 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import {
-  BADGE_LABELS,
-  CARD_PALETTE,
-  cardColorForIndex,
-  getBadgeStyle,
-} from "./metricPalette";
+import { BADGE_LABELS, CARD_PALETTE, cardColorForIndex, getBadgeStyle } from "./metricPalette";
 
 describe("getBadgeStyle", () => {
   /**
@@ -69,9 +64,7 @@ describe("getBadgeStyle", () => {
   });
 
   it("answers differently for light and dark", () => {
-    expect(getBadgeStyle("counter", true).color).not.toBe(
-      getBadgeStyle("counter", false).color,
-    );
+    expect(getBadgeStyle("counter", true).color).not.toBe(getBadgeStyle("counter", false).color);
   });
 
   it("tints the pill background from the same hue as its text", () => {

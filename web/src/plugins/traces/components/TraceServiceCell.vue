@@ -15,22 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex items-center flex-nowrap!" :data-test="dataTest || 'trace-row-service'">
+  <div class="flex flex-nowrap! items-center" :data-test="dataTest || 'trace-row-service'">
     <!-- Service type icon -->
     <img
       data-test="trace-row-service-icon"
       :src="serviceIconUrl"
-      class="mr-2 shrink-0 w-5 h-5"
+      class="mr-2 h-5 w-5 shrink-0"
       aria-hidden="true"
       alt=""
     />
 
     <!-- Service name + badge -->
-    <div class="flex items-center gap-[0.325rem] min-w-0 flex-nowrap!">
-      <span
-        data-test="trace-row-service-name"
-        class="truncate min-w-0 text-xs text-text-body"
-      >
+    <div class="flex min-w-0 flex-nowrap! items-center gap-[0.325rem]">
+      <span data-test="trace-row-service-name" class="text-text-body min-w-0 truncate text-xs">
         {{ item.service_name }}
         <OTooltip side="bottom" align="center">
           <template #content>{{ item.service_name }}</template>
@@ -56,16 +53,9 @@ const { isDark } = useTheme();
 
 const { getOrSetServiceColor } = useTraces();
 
-const rootColor = computed(
-  () => getOrSetServiceColor(props.item.service_name) ?? "#9e9e9e",
-);
+const rootColor = computed(() => getOrSetServiceColor(props.item.service_name) ?? "#9e9e9e");
 
 const serviceIconUrl = computed(() =>
-  getServiceIconDataUrl(
-    props.item.service_name,
-    isDark.value,
-    rootColor.value,
-  ),
+  getServiceIconDataUrl(props.item.service_name, isDark.value, rootColor.value),
 );
-
 </script>

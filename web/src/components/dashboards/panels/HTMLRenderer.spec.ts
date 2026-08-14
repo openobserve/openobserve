@@ -31,11 +31,11 @@ vi.mock("vuex", () => ({
 vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
   processVariableContent: vi.fn((content, variables) => {
     // Simple mock implementation that replaces {{variable}} patterns
-    if (!content || typeof content !== 'string') return content;
+    if (!content || typeof content !== "string") return content;
 
     let processedContent = content;
     for (const [key, value] of Object.entries(variables || {})) {
-      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
       processedContent = processedContent.replace(regex, String(value));
     }
     return processedContent;
@@ -52,7 +52,6 @@ const getAfterSanitizeAttributesHook = () => {
 
   return hookCall ? hookCall[1] : undefined;
 };
-
 
 describe("HTMLRenderer", () => {
   let wrapper: VueWrapper<any>;
@@ -86,41 +85,41 @@ describe("HTMLRenderer", () => {
   describe("Component Initialization", () => {
     it("should render correctly with default props", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find('[data-test="html-renderer"]').exists()).toBe(true);
     });
 
     it("should have correct component name", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.vm.$options.name).toBe("HTMLRenderer");
     });
 
     it("should initialize with default prop values", () => {
       wrapper = createWrapper();
-      
-      expect(wrapper.props('htmlContent')).toBe("");
-      expect(wrapper.props('variablesData')).toEqual({});
+
+      expect(wrapper.props("htmlContent")).toBe("");
+      expect(wrapper.props("variablesData")).toEqual({});
     });
 
     it("should accept custom prop values", () => {
       const customProps = {
         htmlContent: "<h1>Test Content</h1>",
-        variablesData: { title: "Test Title" }
+        variablesData: { title: "Test Title" },
       };
-      
+
       wrapper = createWrapper(customProps);
-      
-      expect(wrapper.props('htmlContent')).toBe("<h1>Test Content</h1>");
-      expect(wrapper.props('variablesData')).toEqual({ title: "Test Title" });
+
+      expect(wrapper.props("htmlContent")).toBe("<h1>Test Content</h1>");
+      expect(wrapper.props("variablesData")).toEqual({ title: "Test Title" });
     });
   });
 
   describe("HTML Content Rendering", () => {
     it("should render empty content by default", () => {
       wrapper = createWrapper();
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.exists()).toBe(true);
       expect(rendererElement.text()).toBe("");
@@ -128,9 +127,9 @@ describe("HTMLRenderer", () => {
 
     it("should render provided HTML content", () => {
       wrapper = createWrapper({
-        htmlContent: "<h1>Test Heading</h1><p>Test paragraph</p>"
+        htmlContent: "<h1>Test Heading</h1><p>Test paragraph</p>",
       });
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.html()).toContain("<h1>Test Heading</h1>");
       expect(rendererElement.html()).toContain("<p>Test paragraph</p>");
@@ -138,13 +137,13 @@ describe("HTMLRenderer", () => {
 
     it("should update content when htmlContent prop changes", async () => {
       wrapper = createWrapper({
-        htmlContent: "<p>Initial content</p>"
+        htmlContent: "<p>Initial content</p>",
       });
-      
+
       expect(wrapper.find('[data-test="html-renderer"]').html()).toContain("Initial content");
-      
+
       await wrapper.setProps({ htmlContent: "<p>Updated content</p>" });
-      
+
       expect(wrapper.find('[data-test="html-renderer"]').html()).toContain("Updated content");
     });
 
@@ -159,9 +158,9 @@ describe("HTMLRenderer", () => {
           <img src="test.jpg" alt="Test Image" />
         </div>
       `;
-      
+
       wrapper = createWrapper({ htmlContent: complexHtml });
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.html()).toContain('class="container"');
       expect(rendererElement.html()).toContain("<h1>Title</h1>");
@@ -171,7 +170,7 @@ describe("HTMLRenderer", () => {
 
     it("should handle empty or null HTML content", () => {
       wrapper = createWrapper({ htmlContent: null });
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.exists()).toBe(true);
       expect(rendererElement.text()).toBe("");
@@ -184,22 +183,22 @@ describe("HTMLRenderer", () => {
 
       wrapper = createWrapper({
         htmlContent: "<h1>{{title}}</h1><p>Welcome {{userName}}</p>",
-        variablesData: { title: "Dashboard", userName: "John" }
+        variablesData: { title: "Dashboard", userName: "John" },
       });
 
       expect(processVariableContent).toHaveBeenCalledWith(
         "<h1>{{title}}</h1><p>Welcome {{userName}}</p>",
         { title: "Dashboard", userName: "John" },
-        { panelId: undefined, tabId: undefined }
+        { panelId: undefined, tabId: undefined },
       );
     });
 
     it("should handle variables with no substitution data", () => {
       wrapper = createWrapper({
         htmlContent: "<p>Hello {{name}}</p>",
-        variablesData: {}
+        variablesData: {},
       });
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.html()).toContain("Hello {{name}}");
     });
@@ -207,14 +206,14 @@ describe("HTMLRenderer", () => {
     it("should update processed content when variables change", async () => {
       wrapper = createWrapper({
         htmlContent: "<h1>{{title}}</h1>",
-        variablesData: { title: "Original" }
+        variablesData: { title: "Original" },
       });
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.html()).toContain("Original");
-      
+
       await wrapper.setProps({ variablesData: { title: "Updated" } });
-      
+
       expect(rendererElement.html()).toContain("Updated");
     });
 
@@ -223,10 +222,10 @@ describe("HTMLRenderer", () => {
         htmlContent: "<div>{{user.name}} - {{user.email}} - {{count}}</div>",
         variablesData: {
           user: { name: "John", email: "john@test.com" },
-          count: 42
-        }
+          count: 42,
+        },
       });
-      
+
       // Variable processing is handled by the mocked function
       expect(wrapper.find('[data-test="html-renderer"]').exists()).toBe(true);
     });
@@ -234,9 +233,9 @@ describe("HTMLRenderer", () => {
     it("should handle undefined variables data", () => {
       wrapper = createWrapper({
         htmlContent: "<p>{{title}}</p>",
-        variablesData: undefined
+        variablesData: undefined,
       });
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.exists()).toBe(true);
     });
@@ -245,12 +244,12 @@ describe("HTMLRenderer", () => {
   describe("Theme Support", () => {
     it("should apply light theme classes by default", () => {
       wrapper = createWrapper();
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
-      expect(rendererElement.classes()).toContain('prose');
-      expect(rendererElement.classes()).toContain('prose-sm');
-      expect(rendererElement.classes()).toContain('max-w-none');
-      expect(rendererElement.classes()).not.toContain('prose-invert');
+      expect(rendererElement.classes()).toContain("prose");
+      expect(rendererElement.classes()).toContain("prose-sm");
+      expect(rendererElement.classes()).toContain("max-w-none");
+      expect(rendererElement.classes()).not.toContain("prose-invert");
     });
 
     it("should apply dark theme classes when theme is dark", () => {
@@ -260,17 +259,17 @@ describe("HTMLRenderer", () => {
       wrapper = createWrapper();
 
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
-      expect(rendererElement.classes()).toContain('prose');
-      expect(rendererElement.classes()).toContain('prose-invert');
+      expect(rendererElement.classes()).toContain("prose");
+      expect(rendererElement.classes()).toContain("prose-invert");
     });
 
     it("should toggle theme classes when theme changes", async () => {
       // Test light theme first
       wrapper = createWrapper();
-      
+
       let rendererElement = wrapper.find('[data-test="html-renderer"]');
-      expect(rendererElement.classes()).not.toContain('prose-invert');
-      
+      expect(rendererElement.classes()).not.toContain("prose-invert");
+
       // Unmount and recreate with dark theme to test the toggle effect
       wrapper.unmount();
 
@@ -278,7 +277,7 @@ describe("HTMLRenderer", () => {
       wrapper = createWrapper();
 
       rendererElement = wrapper.find('[data-test="html-renderer"]');
-      expect(rendererElement.classes()).toContain('prose-invert');
+      expect(rendererElement.classes()).toContain("prose-invert");
     });
 
     it("should maintain theme classes with content updates", async () => {
@@ -286,13 +285,13 @@ describe("HTMLRenderer", () => {
       // prose-invert class persists across the content change.
       mockStoreState.theme = "dark";
       wrapper = createWrapper({
-        htmlContent: "<p>Initial content</p>"
+        htmlContent: "<p>Initial content</p>",
       });
 
       await wrapper.setProps({ htmlContent: "<p>Updated content</p>" });
 
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
-      expect(rendererElement.classes()).toContain('prose-invert');
+      expect(rendererElement.classes()).toContain("prose-invert");
       expect(rendererElement.html()).toContain("Updated content");
     });
   });
@@ -300,7 +299,7 @@ describe("HTMLRenderer", () => {
   describe("DOMPurify Integration", () => {
     it("should sanitize HTML content using DOMPurify", async () => {
       wrapper = createWrapper({
-        htmlContent: "<script>alert('xss')</script><p>Safe content</p>"
+        htmlContent: "<script>alert('xss')</script><p>Safe content</p>",
       });
 
       expect(sanitizeSpy).toHaveBeenCalled();
@@ -308,11 +307,11 @@ describe("HTMLRenderer", () => {
 
     it("should sanitize content on every render", async () => {
       wrapper = createWrapper({
-        htmlContent: "<p>Initial</p>"
+        htmlContent: "<p>Initial</p>",
       });
 
       const initialCallCount = sanitizeSpy.mock.calls.length;
-      
+
       await wrapper.setProps({ htmlContent: "<p>Updated</p>" });
 
       expect(sanitizeSpy.mock.calls.length).toBeGreaterThan(initialCallCount);
@@ -321,7 +320,7 @@ describe("HTMLRenderer", () => {
     it("should handle DOMPurify sanitization of processed variables", async () => {
       wrapper = createWrapper({
         htmlContent: "<p>{{content}}</p>",
-        variablesData: { content: "<script>alert('test')</script>Safe text" }
+        variablesData: { content: "<script>alert('test')</script>Safe text" },
       });
 
       expect(sanitizeSpy).toHaveBeenCalled();
@@ -349,23 +348,22 @@ describe("HTMLRenderer", () => {
 
     it("should allow iframe tags and attributes through sanitizer", async () => {
       wrapper = createWrapper({
-        htmlContent: "<iframe src=\"https://example.com\" allowfullscreen></iframe>",
+        htmlContent: '<iframe src="https://example.com" allowfullscreen></iframe>',
       });
 
       expect(sanitizeSpy).toHaveBeenCalledWith(
-        "<iframe src=\"https://example.com\" allowfullscreen></iframe>",
+        '<iframe src="https://example.com" allowfullscreen></iframe>',
         expect.objectContaining({
           ADD_TAGS: ["iframe", "style"],
           ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "loading", "csp"],
           FORCE_BODY: true,
-        })
+        }),
       );
     });
 
     it("should preserve top-level <style> blocks so authors can style content", () => {
       wrapper = createWrapper({
-        htmlContent:
-          '<style>.big { color: red; }</style><div class="big">styled</div>',
+        htmlContent: '<style>.big { color: red; }</style><div class="big">styled</div>',
       });
 
       const html = wrapper.find('[data-test="html-renderer"]').element.innerHTML;
@@ -376,8 +374,7 @@ describe("HTMLRenderer", () => {
     it("should prefix author selectors with the panel id so CSS cannot leak outside", () => {
       wrapper = createWrapper({
         panelId: "p1",
-        htmlContent:
-          '<style>.big { color: red; }</style><div class="big">styled</div>',
+        htmlContent: '<style>.big { color: red; }</style><div class="big">styled</div>',
       });
 
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
@@ -394,15 +391,9 @@ describe("HTMLRenderer", () => {
           "<style>body { background: black; } html { font-size: 14px; }</style><p>content</p>",
       });
 
-      const style = wrapper
-        .find('[data-test="html-renderer"]')
-        .element.querySelector("style");
-      expect(style?.textContent).toContain(
-        "#o2-html-panel-p1 { background: black; }",
-      );
-      expect(style?.textContent).toContain(
-        "#o2-html-panel-p1 { font-size: 14px; }",
-      );
+      const style = wrapper.find('[data-test="html-renderer"]').element.querySelector("style");
+      expect(style?.textContent).toContain("#o2-html-panel-p1 { background: black; }");
+      expect(style?.textContent).toContain("#o2-html-panel-p1 { font-size: 14px; }");
       expect(style?.textContent).not.toMatch(/(^|\s)body\s*\{/);
     });
 
@@ -413,9 +404,7 @@ describe("HTMLRenderer", () => {
           "<style>@media (min-width: 100px) { .a { color: blue; } } @keyframes spin { from { opacity: 0; } to { opacity: 1; } }</style><p>content</p>",
       });
 
-      const style = wrapper
-        .find('[data-test="html-renderer"]')
-        .element.querySelector("style");
+      const style = wrapper.find('[data-test="html-renderer"]').element.querySelector("style");
       expect(style?.textContent).toContain("#o2-html-panel-p1 .a");
       expect(style?.textContent).toContain("from { opacity: 0; }");
       expect(style?.textContent).not.toContain("#o2-html-panel-p1 from");
@@ -423,8 +412,7 @@ describe("HTMLRenderer", () => {
 
     it("should still strip script tags when style tags are allowed", () => {
       wrapper = createWrapper({
-        htmlContent:
-          "<style>.a{}</style><script>alert(1)</scr" + "ipt><p>safe</p>",
+        htmlContent: "<style>.a{}</style><script>alert(1)</scr" + "ipt><p>safe</p>",
       });
 
       const html = wrapper.find('[data-test="html-renderer"]').element.innerHTML;
@@ -436,14 +424,12 @@ describe("HTMLRenderer", () => {
       wrapper = createWrapper();
 
       // Was inline `style="min-height:100%"`; now the `min-h-full` utility.
-      expect(
-        wrapper.find('[data-test="html-renderer"]').classes(),
-      ).toContain("min-h-full");
+      expect(wrapper.find('[data-test="html-renderer"]').classes()).toContain("min-h-full");
     });
 
     it("should enforce iframe hook restrictions", () => {
       wrapper = createWrapper({
-        htmlContent: "<iframe src=\"http://example.com\" srcdoc=\"<p>X</p>\"></iframe>",
+        htmlContent: '<iframe src="http://example.com" srcdoc="<p>X</p>"></iframe>',
       });
 
       const afterSanitizeAttributesHook = getAfterSanitizeAttributesHook();
@@ -463,7 +449,7 @@ describe("HTMLRenderer", () => {
 
     it("should preserve https iframe src", () => {
       wrapper = createWrapper({
-        htmlContent: "<iframe src=\"https://example.com\"></iframe>",
+        htmlContent: '<iframe src="https://example.com"></iframe>',
       });
 
       const afterSanitizeAttributesHook = getAfterSanitizeAttributesHook();
@@ -482,48 +468,48 @@ describe("HTMLRenderer", () => {
   describe("Layout and Styling", () => {
     it("should have correct container styling", () => {
       wrapper = createWrapper();
-      
+
       const container = wrapper.find('[data-test="html-renderer-scroll-container"]');
       expect(container.exists()).toBe(true);
       // Sizing/overflow moved from an inline style to Tailwind utilities.
-      expect(container.classes()).toContain('w-full');
-      expect(container.classes()).toContain('h-full');
-      expect(container.classes()).toContain('overflow-auto');
+      expect(container.classes()).toContain("w-full");
+      expect(container.classes()).toContain("h-full");
+      expect(container.classes()).toContain("overflow-auto");
     });
 
     it("should maintain responsive design classes", () => {
       wrapper = createWrapper();
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
-      expect(rendererElement.classes()).toContain('prose');
-      expect(rendererElement.classes()).toContain('prose-sm');
-      expect(rendererElement.classes()).toContain('max-w-none');
+      expect(rendererElement.classes()).toContain("prose");
+      expect(rendererElement.classes()).toContain("prose-sm");
+      expect(rendererElement.classes()).toContain("max-w-none");
     });
 
     it("should handle overflow content properly", () => {
       const longContent = "<p>".repeat(100) + "Long content</p>".repeat(100);
-      
+
       wrapper = createWrapper({ htmlContent: longContent });
-      
+
       const container = wrapper.find('[data-test="html-renderer-scroll-container"]');
-      expect(container.classes()).toContain('overflow-auto');
+      expect(container.classes()).toContain("overflow-auto");
     });
   });
 
   describe("Props Validation and Edge Cases", () => {
     it("should handle string htmlContent prop", () => {
       wrapper = createWrapper({
-        htmlContent: "<p>String content</p>"
+        htmlContent: "<p>String content</p>",
       });
-      
-      expect(wrapper.props('htmlContent')).toBe("<p>String content</p>");
+
+      expect(wrapper.props("htmlContent")).toBe("<p>String content</p>");
     });
 
     it("should handle empty string htmlContent", () => {
       wrapper = createWrapper({
-        htmlContent: ""
+        htmlContent: "",
       });
-      
+
       const rendererElement = wrapper.find('[data-test="html-renderer"]');
       expect(rendererElement.text()).toBe("");
     });
@@ -532,35 +518,35 @@ describe("HTMLRenderer", () => {
       const variablesData = {
         title: "Test",
         count: 123,
-        nested: { value: "deep" }
+        nested: { value: "deep" },
       };
-      
+
       wrapper = createWrapper({ variablesData });
-      
-      expect(wrapper.props('variablesData')).toEqual(variablesData);
+
+      expect(wrapper.props("variablesData")).toEqual(variablesData);
     });
 
     it("should handle empty variablesData object", () => {
       wrapper = createWrapper({
-        variablesData: {}
+        variablesData: {},
       });
-      
-      expect(wrapper.props('variablesData')).toEqual({});
+
+      expect(wrapper.props("variablesData")).toEqual({});
     });
 
     it("should handle rapid prop changes", async () => {
       wrapper = createWrapper({
         htmlContent: "<p>Initial</p>",
-        variablesData: { value: "initial" }
+        variablesData: { value: "initial" },
       });
-      
+
       for (let i = 0; i < 5; i++) {
         await wrapper.setProps({
           htmlContent: `<p>Content ${i}</p>`,
-          variablesData: { value: `value${i}` }
+          variablesData: { value: `value${i}` },
         });
       }
-      
+
       expect(wrapper.find('[data-test="html-renderer"]').html()).toContain("Content 4");
     });
   });
@@ -569,9 +555,9 @@ describe("HTMLRenderer", () => {
     it("should initialize computed properties correctly", () => {
       wrapper = createWrapper({
         htmlContent: "<p>{{test}}</p>",
-        variablesData: { test: "value" }
+        variablesData: { test: "value" },
       });
-      
+
       expect(wrapper.vm.processedContent).toBeDefined();
       expect(wrapper.vm.DOMPurify).toBeDefined();
       // Component now exposes useTheme()'s isDark instead of a raw store.
@@ -580,22 +566,22 @@ describe("HTMLRenderer", () => {
 
     it("should handle component unmounting cleanly", () => {
       wrapper = createWrapper();
-      
+
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
     it("should maintain reactivity for computed properties", async () => {
       wrapper = createWrapper({
         htmlContent: "<p>{{title}}</p>",
-        variablesData: { title: "Initial" }
+        variablesData: { title: "Initial" },
       });
-      
+
       const initialProcessed = wrapper.vm.processedContent;
-      
+
       await wrapper.setProps({
-        variablesData: { title: "Updated" }
+        variablesData: { title: "Updated" },
       });
-      
+
       expect(wrapper.vm.processedContent).not.toBe(initialProcessed);
     });
   });
@@ -603,11 +589,11 @@ describe("HTMLRenderer", () => {
   describe("Error Handling", () => {
     it("should handle malformed HTML gracefully", () => {
       const malformedHtml = "<div><p>Unclosed tags<div><span>";
-      
+
       expect(() => {
         wrapper = createWrapper({ htmlContent: malformedHtml });
       }).not.toThrow();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -615,28 +601,28 @@ describe("HTMLRenderer", () => {
       expect(() => {
         wrapper = createWrapper({
           htmlContent: null,
-          variablesData: null
+          variablesData: null,
         });
       }).not.toThrow();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should handle very large content", () => {
       const largeContent = "<p>Large content</p>".repeat(1000);
-      
+
       expect(() => {
         wrapper = createWrapper({ htmlContent: largeContent });
       }).not.toThrow();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should handle special characters in content", () => {
       const specialContent = "<p>Special characters: &amp; &lt; &gt;</p>";
-      
+
       wrapper = createWrapper({ htmlContent: specialContent });
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find('[data-test="html-renderer"]').exists()).toBe(true);
     });

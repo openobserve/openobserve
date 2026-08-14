@@ -48,9 +48,7 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
           stream: z.string().optional().default(""),
           field: z.string().optional().default(""),
           // number <input> emits string / null — keep loose, not validated.
-          max_record_size: z
-            .union([z.number(), z.string(), z.null()])
-            .optional(),
+          max_record_size: z.union([z.number(), z.string(), z.null()]).optional(),
           // form-owned filter rows; row rules enforced in superRefine below.
           filter: z.array(z.record(z.string(), z.any())).optional().default([]),
         })
@@ -69,10 +67,7 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
       multiSelect: z.boolean().optional().default(false),
       hideOnDashboard: z.boolean().optional().default(false),
       selectAllValueForMultiSelect: z.string().optional().default("first"),
-      customMultiSelectValue: z
-        .array(z.string())
-        .optional()
-        .default([]),
+      customMultiSelectValue: z.array(z.string()).optional().default([]),
       escapeSingleQuotes: z.boolean().optional().default(false),
     })
     .superRefine((val, ctx) => {
@@ -142,9 +137,7 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
               message: t("dashboard.operatorRequired"),
             });
           }
-          const needsValue = !FILTER_OPERATORS_WITHOUT_VALUE.includes(
-            String(row?.operator ?? ""),
-          );
+          const needsValue = !FILTER_OPERATORS_WITHOUT_VALUE.includes(String(row?.operator ?? ""));
           if (needsValue && String(row?.value ?? "").length === 0) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
@@ -176,6 +169,4 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
       }
     });
 
-export type AddSettingVariableForm = z.infer<
-  ReturnType<typeof makeAddSettingVariableSchema>
->;
+export type AddSettingVariableForm = z.infer<ReturnType<typeof makeAddSettingVariableSchema>>;

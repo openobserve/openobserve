@@ -36,26 +36,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onBeforeUnmount } from "vue";
 import FunctionPicker from "@/components/flow/forms/FunctionPicker.vue";
-import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
-import { buildTestSample } from "@/plugins/workflows/testSample";
+import { workflowObj, currentTriggerKind } from "@/plugins/workflows/useWorkflowCanvas";
+import { triggerDef } from "@/plugins/workflows/triggers";
 
 const savedData: any = workflowObj.currentSelectedNodeData?.data || {};
 const picker = ref<any>(null);
 
 // Seed code for a brand-new workflow function. Workflow functions are
-// JavaScript: the whole fired-alert event arrives as `row`; mutate it and
-// return it. The example (in comments) mirrors the sample payload fields.
-// Concise seed — kept lean because it's saved as part of the function. JS
-// functions mutate \`row\` in place (no return). Fuller guidance lives in the
-// "JavaScript Tip" info tooltip and the Events panel.
-const JS_DEFAULT_CODE = `// \`row\` is the fired-alert event: { meta: {...}, data: [ ...records ] }.
-// Mutate it in place — meta values are strings, so Number() before comparing.
-// e.g. row.meta.severity = Number(row.meta.alert_count) >= 100 ? "high" : "low";
+// JavaScript: the whole trigger event arrives as `row`; mutate it in place.
+// Kept trigger-agnostic (the event shape differs per kind — alert vs incident);
+// the concrete fields are visible in the Events panel below. Fuller guidance
+// lives in the "JavaScript Tip" info tooltip.
+const JS_DEFAULT_CODE = `// \`row\` is the trigger event: { meta: {...}, data: [ ...records ] }.
+// Mutate it in place — e.g. row.meta.processed = true;
 `;
 
-// Seed the inline function editor's "Events" panel with the same fired-alert
-// sample the Test drawer uses, so the VRL author sees the real payload shape.
-const sampleEvents = buildTestSample();
+// Seed the inline function editor's "Events" panel with the CURRENT trigger's
+// sample (alert vs incident), so the author sees the real payload shape. No
+// trigger (it was deleted) -> no sample.
+const kind = currentTriggerKind();
+const sampleEvents = kind ? triggerDef(kind).buildSample() : [];
 
 // Inline "Create New Function" widens the drawer + hides its footer (the
 // AddFunction toolbar owns save/cancel).

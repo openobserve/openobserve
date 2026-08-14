@@ -36,14 +36,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         required
         class="showLabelOnTop w-full"
       />
-      <OButton data-test="add-cipher-key-akeyless-access-id-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && accessId != ''" @click="isUpdateAccessID = false">{{ t('common.cancel') }}</OButton>
+      <OButton
+        data-test="add-cipher-key-akeyless-access-id-input-cancel"
+        variant="outline"
+        size="sm-action"
+        class="mt-2"
+        v-if="isUpdate && accessId != ''"
+        @click="isUpdateAccessID = false"
+        >{{ t("common.cancel") }}</OButton
+      >
     </div>
     <div v-else>
-      <label class="flex mb-3">
-        <b>{{ t('cipherKey.accessId') }}</b>
+      <label class="mb-3 flex">
+        <b>{{ t("cipherKey.accessId") }}</b>
       </label>
-      <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ accessId }}</pre>
-      <OButton data-test="add-cipher-key-akeyless-access-id-input-update" variant="primary" size="sm-action" @click="isUpdateAccessID = true">{{ t('common.update') }}</OButton>
+      <pre class="border-input-border mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
+        accessId
+      }}</pre>
+      <OButton
+        data-test="add-cipher-key-akeyless-access-id-input-update"
+        variant="primary"
+        size="sm-action"
+        @click="isUpdateAccessID = true"
+        >{{ t("common.update") }}</OButton
+      >
     </div>
     <OFormSelect
       data-test="add-cipher-key-auth-method-input"
@@ -56,12 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="p-3 w-full border border-[lightgray] rounded-default relative"
+      class="rounded-default relative w-full border border-[lightgray] p-3"
       v-if="authType != ''"
     >
-      <legend class="px-2 text-xs text-text-heading ml-2 py-0 px-1">
+      <legend class="text-text-heading ml-2 px-1 px-2 py-0 text-xs">
         {{ getAuthenticationTypeLabel(authType) }}
-        Configuration
+        {{ t("cipherKey.configuration") }}
       </legend>
       <div v-if="authType === 'access_key'">
         <div v-if="!isUpdate || isUpdateAccessKey || accessKey == ''">
@@ -72,14 +88,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             required
             class="showLabelOnTop w-full"
           />
-          <OButton data-test="add-cipher-key-akeyless-access-key-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && accessKey != ''" @click="isUpdateAccessKey = false">{{ t('common.cancel') }}</OButton>
+          <OButton
+            data-test="add-cipher-key-akeyless-access-key-input-cancel"
+            variant="outline"
+            size="sm-action"
+            class="mt-2"
+            v-if="isUpdate && accessKey != ''"
+            @click="isUpdateAccessKey = false"
+            >{{ t("common.cancel") }}</OButton
+          >
         </div>
         <div v-else>
-          <label class="flex mb-3">
-            <b>{{ t('cipherKey.accessKey') }}</b>
+          <label class="mb-3 flex">
+            <b>{{ t("cipherKey.accessKey") }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ accessKey }}</pre>
-          <OButton data-test="add-cipher-key-akeyless-access-key-input-update" variant="primary" size="sm-action" @click="isUpdateAccessKey = true">{{ t('common.update') }}</OButton>
+          <pre class="border-input-border mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
+            accessKey
+          }}</pre>
+          <OButton
+            data-test="add-cipher-key-akeyless-access-key-input-update"
+            variant="primary"
+            size="sm-action"
+            @click="isUpdateAccessKey = true"
+            >{{ t("common.update") }}</OButton
+          >
         </div>
       </div>
       <div v-if="authType === 'ldap'">
@@ -91,14 +123,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             required
             class="showLabelOnTop w-full"
           />
-          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && ldapUsername != ''" @click="isUpdateLDAPUsername = false">{{ t('common.cancel') }}</OButton>
+          <OButton
+            data-test="add-cipher-key-akeyless-ldap-username-input-cancel"
+            variant="outline"
+            size="sm-action"
+            class="mt-2"
+            v-if="isUpdate && ldapUsername != ''"
+            @click="isUpdateLDAPUsername = false"
+            >{{ t("common.cancel") }}</OButton
+          >
         </div>
         <div v-else>
-          <label class="flex mb-3">
-            <b>{{ t('cipherKey.ldapUsername') }}</b>
+          <label class="mb-3 flex">
+            <b>{{ t("cipherKey.ldapUsername") }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ ldapUsername }}</pre>
-          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPUsername = true">{{ t('common.update') }}</OButton>
+          <pre class="border-input-border mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
+            ldapUsername
+          }}</pre>
+          <OButton
+            data-test="add-cipher-key-akeyless-ldap-username-input-update"
+            variant="primary"
+            size="sm-action"
+            @click="isUpdateLDAPUsername = true"
+            >{{ t("common.update") }}</OButton
+          >
         </div>
         <div v-if="!isUpdate || isUpdateLDAPPass || ldapPassword == ''">
           <OFormInput
@@ -110,14 +158,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="password"
             autocomplete="new-password"
           />
-          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && ldapPassword != ''" @click="isUpdateLDAPPass = false">{{ t('common.cancel') }}</OButton>
+          <OButton
+            data-test="add-cipher-key-akeyless-ldap-password-input-cancel"
+            variant="outline"
+            size="sm-action"
+            class="mt-2"
+            v-if="isUpdate && ldapPassword != ''"
+            @click="isUpdateLDAPPass = false"
+            >{{ t("common.cancel") }}</OButton
+          >
         </div>
         <div v-else>
-          <label class="flex mb-3">
-            <b>{{ t('cipherKey.ldapPassword') }}</b>
+          <label class="mb-3 flex">
+            <b>{{ t("cipherKey.ldapPassword") }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ ldapPassword }}</pre>
-          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPPass = true">{{ t('common.update') }}</OButton>
+          <pre class="border-input-border mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
+            ldapPassword
+          }}</pre>
+          <OButton
+            data-test="add-cipher-key-akeyless-ldap-password-input-update"
+            variant="primary"
+            size="sm-action"
+            @click="isUpdateLDAPPass = true"
+            >{{ t("common.update") }}</OButton
+          >
         </div>
       </div>
     </fieldset>
@@ -132,12 +196,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="p-3 w-full border border-[lightgray] rounded-default relative"
+      class="rounded-default relative w-full border border-[lightgray] p-3"
       v-if="secretType != ''"
     >
-      <legend class="px-2 text-xs text-text-heading ml-2 py-0 px-1">
+      <legend class="text-text-heading ml-2 px-1 px-2 py-0 text-xs">
         {{ getSecretOptionLabel(secretType) }}
-        Configuration
+        {{ t("cipherKey.configuration") }}
       </legend>
       <div v-if="secretType === 'static_secret'">
         <OFormInput
@@ -176,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, inject, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
@@ -195,7 +259,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Local "edit the stored value" toggles (pure UI).
     const isUpdateLDAPPass = ref(false);
@@ -206,45 +270,33 @@ export default defineComponent({
     // Form-owned values read reactively from the parent OForm (drive conditional
     // display + the read-only/edit branches). `useStore` keeps them reactive.
     const form = inject(FORM_CONTEXT_KEY, null);
-    const select = <T>(fn: (_s: any) => T, fallback: T) =>
+    const select = <T,>(fn: (_s: any) => T, fallback: T) =>
       form ? form.useStore((s: any) => fn(s) ?? fallback) : computed(() => fallback);
 
     const accessId = select((s) => s?.values?.key?.store?.akeyless?.access_id, "");
     const authType = select((s) => s?.values?.key?.store?.akeyless?.auth?.type, "");
-    const accessKey = select(
-      (s) => s?.values?.key?.store?.akeyless?.auth?.access_key,
-      "",
-    );
-    const ldapUsername = select(
-      (s) => s?.values?.key?.store?.akeyless?.auth?.ldap?.username,
-      "",
-    );
-    const ldapPassword = select(
-      (s) => s?.values?.key?.store?.akeyless?.auth?.ldap?.password,
-      "",
-    );
-    const secretType = select(
-      (s) => s?.values?.key?.store?.akeyless?.store?.type,
-      "",
-    );
+    const accessKey = select((s) => s?.values?.key?.store?.akeyless?.auth?.access_key, "");
+    const ldapUsername = select((s) => s?.values?.key?.store?.akeyless?.auth?.ldap?.username, "");
+    const ldapPassword = select((s) => s?.values?.key?.store?.akeyless?.auth?.ldap?.password, "");
+    const secretType = select((s) => s?.values?.key?.store?.akeyless?.store?.type, "");
 
     const authenticationTypeOptions = [
-      { label: "Access Key", value: "access_key" },
-      { label: "LDAP", value: "ldap" },
+      { label: t("cipherKey.accessKey"), value: "access_key" },
+      { label: raw("LDAP"), value: "ldap" },
     ];
     const secretTypeOptions = [
-      { label: "Static Secret", value: "static_secret" },
-      { label: "DFC", value: "dfc" },
+      { label: t("cipherKey.staticSecret"), value: "static_secret" },
+      { label: raw("DFC"), value: "dfc" },
     ];
 
     const getSecretOptionLabel = (value: string) =>
       secretTypeOptions.find((option) => option.value === value)?.label ?? "";
 
     const getAuthenticationTypeLabel = (value: string) =>
-      authenticationTypeOptions.find((option) => option.value === value)?.label ??
-      "";
+      authenticationTypeOptions.find((option) => option.value === value)?.label ?? "";
 
     return {
+      raw,
       t,
       authenticationTypeOptions,
       secretTypeOptions,

@@ -36,7 +36,7 @@ import { chartColor } from "@/utils/chartTheme";
  * collapses into solid bands — you cannot see where one bucket ends and the
  * next begins.
  */
-export function heatmapCellItemStyle(store: any) {
+export function heatmapCellItemStyle(_store: any) {
   return {
     borderColor: chartColor("--color-surface-base"),
     borderWidth: 1,
@@ -79,10 +79,7 @@ export const HEATMAP_LABEL_CELL_LIMIT = 300;
 /**
  * The per-cell value label, shown only while the grid is small enough to read.
  */
-export function heatmapValueLabel(
-  cellCount: number,
-  formatter: (params: any) => string,
-) {
+export function heatmapValueLabel(cellCount: number, formatter: (params: any) => string) {
   if (cellCount > HEATMAP_LABEL_CELL_LIMIT) return { show: false };
   return { show: true, fontSize: 12, formatter };
 }

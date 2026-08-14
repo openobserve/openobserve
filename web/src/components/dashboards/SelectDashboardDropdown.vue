@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, onActivated, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -93,7 +93,7 @@ export default defineComponent({
 
     //dropdown selected dashboard id (primitive string for OSelect)
     const selectedDashboard = ref<string | null>(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // on add dashboard, select added dashboard
     const updateDashboardList = async (dashboardId: any) => {
@@ -106,17 +106,12 @@ export default defineComponent({
     const getDashboardList = useLoading(async () => {
       if (!props.folderId) return;
 
-      const allDashboardDataByFolderId = await getAllDashboardsByFolderId(
-        store,
-        props.folderId,
-      );
+      const allDashboardDataByFolderId = await getAllDashboardsByFolderId(store, props.folderId);
 
-      dashboardList.value = allDashboardDataByFolderId?.map(
-        (dashboard: any) => ({
-          label: dashboard.title,
-          value: dashboard.dashboardId,
-        }),
-      );
+      dashboardList.value = allDashboardDataByFolderId?.map((dashboard: any) => ({
+        label: dashboard.title,
+        value: dashboard.dashboardId,
+      }));
 
       // select first dashboard
       if (dashboardList.value.length > 0) {
@@ -147,11 +142,12 @@ export default defineComponent({
     watch(
       () => selectedDashboard.value,
       (dashboardId) => {
-        const dashboard = dashboardList.value.find(
-          (d: any) => d.value === dashboardId,
-        );
+        const dashboard = dashboardList.value.find((d: any) => d.value === dashboardId);
         // emit {label, value} for backward compatibility with parents
-        emit("dashboard-selected", dashboard ?? (dashboardId ? { label: dashboardId, value: dashboardId } : null));
+        emit(
+          "dashboard-selected",
+          dashboard ?? (dashboardId ? { label: dashboardId, value: dashboardId } : null),
+        );
       },
     );
 

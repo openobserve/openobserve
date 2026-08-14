@@ -47,7 +47,7 @@ export class CrossLinkPage {
         // Logs result-table expand toggle — kept as a Locator class member so
         // callers don't reach into raw `page.locator(...)` from the spec.
         this.firstLogRowExpand = page
-            .locator('[data-test="table-row-expand-menu"]')
+            .locator('[data-test^="o2-table-expand-"]')
             .first();
     }
 
@@ -78,6 +78,59 @@ export class CrossLinkPage {
 
     logDetailRow(fieldName) {
         return `[data-test="log-detail-row-${fieldName}"]`;
+    }
+
+    // ---- Sentinel POM locator getters (relocated from spec raw selectors) ----
+    getAddCrossLinkBtnLocator() {
+        return this.page.locator('[data-test="add-cross-link-btn"]');
+    }
+
+    getCrossLinkEmptyLocator() {
+        return this.page.locator('[data-test="cross-link-empty"]').first();
+    }
+
+    getCrossLinkListLocator() {
+        return this.page.locator('[data-test="cross-link-list"]').first();
+    }
+
+    getCrossLinkNameInputLocator() {
+        return this.page.locator('[data-test="cross-link-name-input"]');
+    }
+
+    getCrossLinkUrlInputLocator() {
+        return this.page.locator('[data-test="cross-link-url-input"]');
+    }
+
+    getCrossLinkFieldInputLocator() {
+        return this.page.locator('[data-test="cross-link-field-input"]');
+    }
+
+    getCrossLinkCancelBtnLocator() {
+        return this.page.locator('[data-test="cross-link-dialog"] [data-test="o-dialog-secondary-btn"]');
+    }
+
+    getCrossLinkItemLocator(idx) {
+        return this.page.locator(this.crossLinkItem(idx));
+    }
+
+    getCrossLinkEditBtnLocator(idx) {
+        return this.page.locator(this.crossLinkEditBtn(idx));
+    }
+
+    getCrossLinkDeleteBtnLocator(idx) {
+        return this.page.locator(this.crossLinkDeleteBtn(idx));
+    }
+
+    getLogDetailRowLocator(fieldName) {
+        return this.page.locator(this.logDetailRow(fieldName));
+    }
+
+    async getCrossLinkItemNameCount() {
+        return await this.page.locator('[data-test^="cross-link-item-name-"]').count();
+    }
+
+    async getDeletableCrossLinkCount() {
+        return await this.page.locator('[data-test^="cross-link-delete-"]').count();
     }
 
     logDetailsCrossLinkMenuItem(crossLinkName) {
@@ -269,6 +322,11 @@ export class CrossLinkPage {
         await this.page.locator(this.crossLinkSaveBtn).click();
     }
 
+    async clickSaveAndWait() {
+        await this.clickSave();
+        await this.expectDialogNotVisible();
+    }
+
     async clickCancel() {
         testLogger.debug('Clicking cancel button');
         await this.page.locator(this.crossLinkCancelBtn).click();
@@ -343,7 +401,7 @@ export class CrossLinkPage {
         for (const field of fields) {
             await this.addField(field);
         }
-        await this.clickSave();
+        await this.clickSaveAndWait();
     }
 
     async getCrossLinkItemText(idx) {
@@ -699,13 +757,6 @@ export class CrossLinkPage {
         return this.page.locator(this.crossLinkItem(idx));
     }
 
-    async crossLinkItemEditBtnLocatorByIdx(idx) {
-        return this.page.locator(this.crossLinkEditBtn(idx));
-    }
-
-    async crossLinkItemDeleteBtnLocatorByIdx(idx) {
-        return this.page.locator(this.crossLinkDeleteBtn(idx));
-    }
 
     // ── Locator getters for assertions in spec files ──────────────────────────
 
@@ -719,14 +770,14 @@ export class CrossLinkPage {
 
     /**
      * Click the first non-empty data cell in the rendered dashboard table panel.
-     * Uses the `dashboard-data-row-cell` data-test attribute emitted by
+     * Uses the `o2-table-cell-<columnId>` data-test attribute emitted by
      * TenstackTable so we never depend on raw <td> selectors.
      */
     async clickFirstDashboardTableCell() {
         testLogger.debug('Clicking first dashboard table cell to trigger drilldown');
         await this.page.evaluate(() => {
             const cells = document.querySelectorAll(
-                '[data-test="dashboard-panel-table"] [data-test="dashboard-data-row-cell"]'
+                '[data-test="dashboard-panel-table"] [data-test^="o2-table-cell-"]'
             );
             for (const cell of cells) {
                 if (cell.offsetParent !== null && cell.textContent && cell.textContent.trim()) {

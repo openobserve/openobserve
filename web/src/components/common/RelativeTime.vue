@@ -19,8 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
-import { ref, onMounted, onBeforeUnmount, watch, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 
 export default {
@@ -31,9 +32,9 @@ export default {
       default: null,
     },
     fullTimePrefix: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: false,
-      default: "",
+      default: raw(""),
     },
   },
   setup(props) {
@@ -51,14 +52,13 @@ export default {
       return null;
     };
 
-    const getBestUnit = (diffInSeconds: number): { value: number; unit: Intl.RelativeTimeFormatUnit } => {
+    const getBestUnit = (
+      diffInSeconds: number,
+    ): { value: number; unit: Intl.RelativeTimeFormatUnit } => {
       if (diffInSeconds < 60) return { value: diffInSeconds, unit: "second" };
-      if (diffInSeconds < 3600)
-        return { value: Math.floor(diffInSeconds / 60), unit: "minute" };
-      if (diffInSeconds < 86400)
-        return { value: Math.floor(diffInSeconds / 3600), unit: "hour" };
-      if (diffInSeconds < 2592000)
-        return { value: Math.floor(diffInSeconds / 86400), unit: "day" };
+      if (diffInSeconds < 3600) return { value: Math.floor(diffInSeconds / 60), unit: "minute" };
+      if (diffInSeconds < 86400) return { value: Math.floor(diffInSeconds / 3600), unit: "hour" };
+      if (diffInSeconds < 2592000) return { value: Math.floor(diffInSeconds / 86400), unit: "day" };
       if (diffInSeconds < 31536000)
         return { value: Math.floor(diffInSeconds / 2592000), unit: "month" };
       return { value: Math.floor(diffInSeconds / 31536000), unit: "year" };
@@ -90,7 +90,7 @@ export default {
       return `${props.fullTimePrefix} ${timestampToTimezoneDate(
         timestampMs,
         store.state.timezone,
-        "yyyy-MM-dd HH:mm:ss.SSS"
+        "yyyy-MM-dd HH:mm:ss.SSS",
       )} ${store.state.timezone}`;
     });
 
@@ -103,7 +103,7 @@ export default {
       () => props.timestamp,
       () => {
         updateRelativeTime(); // Update immediately if the timestamp prop changes
-      }
+      },
     );
 
     onBeforeUnmount(() => {
@@ -111,6 +111,7 @@ export default {
     });
 
     return {
+      raw,
       relativeTime,
       formattedExactTime,
     };

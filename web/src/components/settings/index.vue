@@ -28,23 +28,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Form-style sections (general, org params, license, domain): a section
          header above a centered reading column. -->
-    <div
-      v-if="isConstrainedSection"
-      class="h-full min-h-0 flex flex-col"
-    >
+    <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
       <OPageHeader
-        :title="activeSectionItem?.label || ''"
+        :title="raw(activeSectionItem?.label || '')"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
-        :subtitle="activeSectionItem?.description || ''"
-        :icon="(activeSectionItem?.icon as any)"
-        class="shrink-0 border-b border-border-default"
+        :subtitle="raw(activeSectionItem?.description || '')"
+        :icon="activeSectionItem?.icon as any"
+        class="border-border-default shrink-0 border-b"
       />
-      <ConstrainedPage
-        size="lg"
-        align="left"
-        :padded="false"
-        class="flex-1 min-h-0 px-4 py-3"
-      >
+      <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
         <router-view title="" />
       </ConstrainedPage>
     </div>
@@ -52,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          pass a `title` attr here: these children are OPageLayout-rooted, so a
          fallthrough `title` would clobber their own `:title` prop and blank the
          header (regression seen on Query Management / Nodes). -->
-    <section v-else class="h-full min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
+    <section v-else class="h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
       <router-view />
     </section>
   </OPageLayout>
@@ -63,19 +55,9 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import {
-  type SectionHubGroup,
-  type SectionHubItem,
-} from "@/components/common/SectionHub.vue";
-import {
-  defineComponent,
-  ref,
-  onBeforeMount,
-  onActivated,
-  onUpdated,
-  computed,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
+import { defineComponent, ref, onBeforeMount, onActivated, onUpdated, computed } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
@@ -92,7 +74,7 @@ export default defineComponent({
     SectionRail,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const router: any = useRouter();
@@ -100,27 +82,26 @@ export default defineComponent({
 
     // Maps a route name → the section key used by the hub/switcher.
     const routeToSettingsTab: Record<string, string> = {
-      general:               "general",
-      organization:          "organization",
-      organizationSettings:  "organization",
-      nodes:                 "nodes",
-      queryManagement:       "queryManagement",
-      query_management:      "queryManagement",
-      domainManagement:      "domain_management",
-      alertDestinations:     "alert_destinations",
-      pipelineDestinations:  "pipeline_destinations",
-      alertTemplates:        "templates",
-      modelPricing:          "model_pricing",
-      modelPricingEditor:    "model_pricing",
-      llmProviders:          "llm_providers",
-      storageSettings:       "storageSettings",
-      cipherKeys:            "cipher-keys",
-      license:               "license",
+      general: "general",
+      organization: "organization",
+      organizationSettings: "organization",
+      nodes: "nodes",
+      queryManagement: "queryManagement",
+      query_management: "queryManagement",
+      domainManagement: "domain_management",
+      pipelineDestinations: "pipeline_destinations",
+      alertTemplates: "templates",
+      modelPricing: "model_pricing",
+      modelPricingEditor: "model_pricing",
+      llmProviders: "llm_providers",
+      storageSettings: "storageSettings",
+      cipherKeys: "cipher-keys",
+      license: "license",
       orgnizationManagement: "organization_management",
-      regexPatterns:         "regex_patterns",
-      syntheticsLocations:   "synthetics_locations",
-      correlationSettings:   "correlation_settings",
-      genAiAgentMapping:     "gen_ai_agent_mapping",
+      regexPatterns: "regex_patterns",
+      syntheticsLocations: "synthetics_locations",
+      correlationSettings: "correlation_settings",
+      genAiAgentMapping: "gen_ai_agent_mapping",
     };
 
     const settingsTab = ref(
@@ -134,9 +115,7 @@ export default defineComponent({
       name: "settings",
       query: { org_identifier: store.state.selectedOrganization?.identifier },
     }));
-    const activeSection = computed(
-      () => routeToSettingsTab[route.name as string] ?? "",
-    );
+    const activeSection = computed(() => routeToSettingsTab[route.name as string] ?? "");
 
     // Form-style sections render in a centered reading column (ConstrainedPage);
     // table/list sections (nodes, destinations, templates, …) stay full-width.
@@ -146,9 +125,7 @@ export default defineComponent({
       "license",
       "domain_management",
     ]);
-    const isConstrainedSection = computed(() =>
-      CONSTRAINED_SECTIONS.has(activeSection.value),
-    );
+    const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
 
     // Full-width sections that still want the shell-owned header (their content
     // fills the whole width instead of a centered reading column).
@@ -170,8 +147,7 @@ export default defineComponent({
         return;
       }
       const notMeta =
-        store.state.zoConfig.meta_org &&
-        (!isMetaOrg.value || config.isEnterprise === "false");
+        store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
       if ((name === "nodes" || name === "license" || name === "syntheticsLocations") && notMeta) {
         settingsTab.value = "general";
         router.push({
@@ -197,7 +173,7 @@ export default defineComponent({
     const settingsGroupOrder = [
       "General",
       "Access & Security",
-      "Destinations & Templates",
+      "Destinations",
       "Data & AI",
       "Operations",
       "Synthetics",
@@ -261,15 +237,10 @@ export default defineComponent({
           dataTest: "domain-management-tab",
           group: "Access & Security",
         },
-        {
-          key: "alert_destinations",
-          label: t("alert_destinations.header"),
-          description: t("settings.alertDestinationsDesc"),
-          icon: "location-on",
-          to: { name: "alertDestinations", query: { org_identifier: org } },
-          dataTest: "alert-destinations-tab",
-          group: "Destinations & Templates",
-        },
+        // Notification Destinations and Templates are alerting configuration and
+        // now live under Reliability (/alert-destinations, /alert-templates).
+        // Pipeline Destinations stays here — it belongs to pipelines, not
+        // alerting — so the group is just "Destinations" now.
         {
           key: "pipeline_destinations",
           label: t("pipeline_destinations.header"),
@@ -278,16 +249,7 @@ export default defineComponent({
           to: { name: "pipelineDestinations", query: { org_identifier: org } },
           visible: isEnt,
           dataTest: "pipeline-destinations-tab",
-          group: "Destinations & Templates",
-        },
-        {
-          key: "templates",
-          label: t("alert_templates.header"),
-          description: t("settings.templatesDesc"),
-          icon: "description",
-          to: { name: "alertTemplates", query: { org_identifier: org } },
-          dataTest: "alert-templates-tab",
-          group: "Destinations & Templates",
+          group: "Destinations",
         },
         {
           key: "storageSettings",
@@ -298,8 +260,7 @@ export default defineComponent({
           visible:
             isEnt &&
             (!isCloud ||
-              store.state.organizationData.organizationSettings
-                .org_storage_enabled === true),
+              store.state.organizationData.organizationSettings.org_storage_enabled === true),
           dataTest: "storage-settings-tab",
           group: "Data & AI",
         },
@@ -309,7 +270,7 @@ export default defineComponent({
           description: t("settings.modelPricingDesc"),
           icon: "paid",
           to: { name: "modelPricing", query: { org_identifier: org } },
-          visible: !!z.model_pricing_enabled,
+          visible: (isEnt || isCloud) && !!z.model_pricing_enabled,
           dataTest: "model-pricing-tab",
           group: "Data & AI",
         },
@@ -417,21 +378,22 @@ export default defineComponent({
       };
       // Internal group keys stay English (used for bucketing + rank); only the
       // displayed label is translated so sorting/ranking is unaffected.
-      const groupLabels: Record<string, string> = {
-        "General": t("settings.groupGeneral"),
+      const groupLabels: Record<string, I18nText> = {
+        General: t("settings.groupGeneral"),
         "Access & Security": t("settings.groupAccessSecurity"),
-        "Destinations & Templates": t("settings.groupDestinationsTemplates"),
+        Destinations: t("settings.groupDestinations"),
         "Data & AI": t("settings.groupDataAI"),
-        "Operations": t("settings.groupOperations"),
-        "Synthetics": t("settings.groupSynthetics"),
-        "Account": t("settings.groupAccount"),
+        Operations: t("settings.groupOperations"),
+        Synthetics: t("settings.groupSynthetics"),
+        Account: t("settings.groupAccount"),
       };
       return [...buckets.keys()]
         .sort((a, b) => rank(a) - rank(b))
-        .map((label) => ({ label: groupLabels[label] ?? label, items: buckets.get(label)! }));
+        .map((label) => ({ label: groupLabels[label] ?? raw(label), items: buckets.get(label)! }));
     });
 
     return {
+      raw,
       t,
       store,
       router,

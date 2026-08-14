@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::spawn_pausable_job;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use config::{meta::stream::StreamType, spawn_pausable_job};
 use infra::{dist_lock, table::org_cleanup_tasks};
 
 const LOCK_KEY: &str = "/org_cleanup/worker_lock";
@@ -32,6 +35,26 @@ const ORDER_DELETE_SCHEDULER_TRIGGERS: i32 = 400;
 const ORDER_DELETE_USERS: i32 = 600;
 // Final step: remove the org record + OFGA tuples via the canonical delete path.
 const ORDER_DELETE_ORG_RECORD: i32 = 900;
+
+/// Deletes the physical data for a stream during organization cleanup.
+///
+/// The cleanup workflow owns orchestration and schema removal, while the binary
+/// wires in the data-lifecycle implementation used by its compactor.
+///
+/// Implementations must remove local-disk files, file_list rows, and dump files
+/// over the canonical (BASE_TIME, now) range — not a hand-rolled file_list scan
+/// with (0, i64::MAX), which query_for_dump rejects as invalid/overflowing.
+/// The compactor's `compaction::retention::delete_all` is the reference
+/// implementation.
+#[async_trait]
+pub trait StreamDataCleanup: Send + Sync {
+    async fn delete_stream_data(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<(), anyhow::Error>;
+}
 
 /// Grace-period length in days. Enterprise config; OSS builds have no grace period
 /// (deletion is cloud-only). `0` = delete immediately (legacy behavior).
@@ -72,7 +95,7 @@ pub fn fixed_steps(org_id: &str, org_name: &str) -> Vec<org_cleanup_tasks::NewCl
     .collect()
 }
 
-pub async fn run() -> Result<(), anyhow::Error> {
+pub async fn run(stream_data_cleanup: Arc<dyn StreamDataCleanup>) -> Result<(), anyhow::Error> {
     // A compactor that crashed mid-step leaves its task marked 'running'. Since
     // list_pending only returns pending/failed rows, such a task would never be
     // re-picked and the deletion would stall forever. Reset stale 'running' rows
@@ -88,12 +111,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     spawn_pausable_job!("org_cleanup_worker", POLL_INTERVAL_SECS, {
-        run_once().await;
+        run_once(Arc::clone(&stream_data_cleanup)).await;
     });
     Ok(())
 }
 
-async fn run_once() {
+async fn run_once(stream_data_cleanup: Arc<dyn StreamDataCleanup>) {
     let locker = match dist_lock::lock(LOCK_KEY, 0).await {
         Ok(l) => l,
         Err(e) => {
@@ -125,7 +148,10 @@ async fn run_once() {
         .into_values()
         .map(|mut org_tasks| {
             org_tasks.sort_by_key(|t| t.step_order);
-            tokio::spawn(process_org_tasks(org_tasks))
+            tokio::spawn(process_org_tasks(
+                org_tasks,
+                Arc::clone(&stream_data_cleanup),
+            ))
         })
         .collect();
 
@@ -138,7 +164,10 @@ async fn run_once() {
     }
 }
 
-async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
+async fn process_org_tasks(
+    tasks: Vec<org_cleanup_tasks::CleanupTask>,
+    stream_data_cleanup: Arc<dyn StreamDataCleanup>,
+) {
     for task in &tasks {
         let predecessors_done =
             match org_cleanup_tasks::list_by_org_status(&task.org_id, None).await {
@@ -198,7 +227,13 @@ async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
             task.attempts + 1
         );
 
-        let result = execute_step(&task.org_id, &task.org_name, &task.step).await;
+        let result = execute_step(
+            &task.org_id,
+            &task.org_name,
+            &task.step,
+            stream_data_cleanup.as_ref(),
+        )
+        .await;
 
         match result {
             Ok(()) => {
@@ -258,11 +293,16 @@ async fn emit_failed_alert(org_id: &str, _step: &str) {
     }
 }
 
-async fn execute_step(org_id: &str, org_name: &str, step: &str) -> Result<(), anyhow::Error> {
+async fn execute_step(
+    org_id: &str,
+    org_name: &str,
+    step: &str,
+    stream_data_cleanup: &dyn StreamDataCleanup,
+) -> Result<(), anyhow::Error> {
     if step == "delete_streams" {
         step_delete_streams(org_id, org_name).await
     } else if let Some(rest) = step.strip_prefix("delete_stream:") {
-        step_delete_stream(org_id, rest).await
+        step_delete_stream(org_id, rest, stream_data_cleanup).await
     } else if step == "delete_file_list" {
         step_delete_file_list(org_id).await
     } else if step == "delete_db_resources" {
@@ -303,22 +343,22 @@ async fn step_delete_streams(org_id: &str, org_name: &str) -> Result<(), anyhow:
     Ok(())
 }
 
-async fn step_delete_stream(org_id: &str, type_and_name: &str) -> Result<(), anyhow::Error> {
-    use config::meta::stream::StreamType;
-
+async fn step_delete_stream(
+    org_id: &str,
+    type_and_name: &str,
+    stream_data_cleanup: &dyn StreamDataCleanup,
+) -> Result<(), anyhow::Error> {
     let (stream_type_str, stream_name) = type_and_name
         .split_once('/')
         .ok_or_else(|| anyhow::anyhow!("invalid stream key: {type_and_name}"))?;
 
     let stream_type = StreamType::from(stream_type_str);
 
-    // Reuse the compactor's stream-deletion primitive instead of hand-rolling a
-    // file_list scan. It removes local-disk files, file_list rows, and dump files
-    // over the canonical (BASE_TIME, now) range — avoiding the invalid/overflowing
-    // (0, i64::MAX) range that query_for_dump rejects.
-    crate::compact::retention::delete_all(org_id, stream_type, stream_name).await?;
+    stream_data_cleanup
+        .delete_stream_data(org_id, stream_type, stream_name)
+        .await?;
 
-    // Delete the schema entry (delete_all removes data, not the stream definition).
+    // Delete the schema entry after the injected cleanup removes the stream data.
     crate::db::schema::delete(org_id, stream_name, Some(stream_type)).await?;
 
     Ok(())
@@ -378,14 +418,23 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
 }
 
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(not(feature = "enterprise"))]
+    use infra::table::service_streams;
     #[cfg(feature = "cloud")]
     use infra::table::trial_quota_usage;
-    use infra::table::{
-        action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
-        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
-        incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
-        re_pattern_stream_map, reports, search_queue, service_streams, short_urls, system_settings,
-        templates, timed_annotations,
+    // `service_streams` is NOT imported here: this branch routes the enterprise
+    // build through the storage layer instead, and imports the table module only
+    // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
+    // collide on the OSS build.
+    use infra::{
+        db::{ORM_CLIENT, connect_to_orm},
+        table::{
+            action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
+            destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
+            incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
+            re_pattern_stream_map, reports, search_queue, short_urls, slo, slo_backfill_jobs,
+            slo_budget, slos, system_settings, templates, timed_annotations,
+        },
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -397,6 +446,26 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     incident_events::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/incident_events: {e}"))?;
+    // SLOs go BEFORE alerts, deliberately: an alert-based SLO reads from a source
+    // alert, and a later PR refuses to delete an alert a live SLO still depends
+    // on. An org teardown must never stall on that guard.
+    //
+    // Within the SLO tables the order is also fixed: status rows and backfill jobs
+    // carry no org column and resolve their org through `slos`, so they are swept
+    // before the definitions that identify them.
+    let slo_conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    slo::delete_by_org(slo_conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slo_status: {e}"))?;
+    slo_backfill_jobs::delete_by_org(slo_conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slo_backfill_jobs: {e}"))?;
+    slos::delete_by_org(slo_conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slos: {e}"))?;
+    slo_budget::delete_by_org(slo_conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slo_budget: {e}"))?;
     // Delete alerts through the service layer (not a raw table wipe) so the
     // ALERTS/STREAM_ALERTS in-memory caches evict cluster-wide via the coordinator
     // delete event, and each alert's scheduler trigger is torn down. A direct table
@@ -472,6 +541,22 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_ingestion_tokens::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ingestion_tokens: {e}"))?;
+    // Same F6 pattern as the `_reset` handler: the table-layer delete alone leaves
+    // every node's org cache intact forever (no TTL). On enterprise builds go
+    // through the storage layer (clears local cache + super-cluster replication)
+    // and emit an org-scope reload so remote nodes drop their cached copies too.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
+        if let Err(e) = infra::coordinator::service_streams::emit_reload_event(org_id).await {
+            log::warn!(
+                "[OrgCleanup] service_streams: failed to emit reload event for org '{org_id}': {e}"
+            );
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
     service_streams::delete_all(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
@@ -518,7 +603,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // so once the rows are gone the objects can no longer be located and would leak.
     // (search_jobs service is enterprise-only; OSS just drops the rows below.)
     #[cfg(feature = "enterprise")]
-    crate::search_jobs::delete_org_result_files(org_id)
+    search_service::search_jobs::delete_org_result_files(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_job_results: {e}"))?;
     infra::table::search_job::search_jobs::delete_by_org(org_id)
@@ -859,6 +944,20 @@ pub async fn run_promotion_scheduler() -> Result<(), anyhow::Error> {
 mod tests {
     use super::*;
 
+    struct FailingStreamDataCleanup;
+
+    #[async_trait]
+    impl StreamDataCleanup for FailingStreamDataCleanup {
+        async fn delete_stream_data(
+            &self,
+            _org_id: &str,
+            _stream_type: StreamType,
+            _stream_name: &str,
+        ) -> Result<(), anyhow::Error> {
+            Err(anyhow::anyhow!("stream cleanup failed"))
+        }
+    }
+
     #[test]
     fn test_grace_period_days_non_negative() {
         assert!(grace_period_days() >= 0);
@@ -944,6 +1043,14 @@ mod tests {
         const { assert!(ORDER_DELETE_SCHEDULER_TRIGGERS < ORDER_DELETE_USERS) };
         // delete_org_record (OFGA + org record + billing-free precondition) runs last.
         const { assert!(ORDER_DELETE_USERS < ORDER_DELETE_ORG_RECORD) };
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_propagates_data_cleanup_error() {
+        let err = step_delete_stream("org", "logs/stream", &FailingStreamDataCleanup)
+            .await
+            .unwrap_err();
+        assert_eq!(err.to_string(), "stream cleanup failed");
     }
 
     #[cfg(feature = "enterprise")]
@@ -1043,6 +1150,114 @@ mod tests {
         assert!(
             steps.contains(&"delete_org_record"),
             "Missing delete_org_record step"
+        );
+    }
+
+    // ===================== SLO teardown ===================================
+    //
+    // `step_delete_db_resources` is a flat sequence of calls against global
+    // clients with no injection point, so the order it runs them in cannot be
+    // observed without a live database. The order is nonetheless a correctness
+    // requirement, so it is pinned against the source of the step itself.
+    //
+    // The limit of that technique, stated plainly: it reads the file, so it
+    // sees calls that are WRITTEN, not calls that RUN. Removing a call fails
+    // these tests by name, and each call's org argument is pinned too, so a
+    // sweep aimed at the wrong org is caught — but a call commented out, or
+    // made unreachable, still reads as present.
+
+    const SOURCE: &str = include_str!("org_cleanup.rs");
+
+    /// The body of `step_delete_db_resources`, so a match cannot come from a
+    /// neighbouring function (or from these tests).
+    fn db_resources_step() -> &'static str {
+        let start = SOURCE
+            .find("async fn step_delete_db_resources")
+            .expect("step_delete_db_resources is defined in this file");
+        let body = &SOURCE[start..];
+        let end = body
+            .find("\nasync fn step_delete_scheduler_triggers")
+            .expect("the step is followed by step_delete_scheduler_triggers");
+        &body[..end]
+    }
+
+    fn position_of(call: &str) -> usize {
+        db_resources_step()
+            .find(call)
+            .unwrap_or_else(|| panic!("step_delete_db_resources never calls {call}"))
+    }
+
+    /// Every SLO table, or org deletion orphans the rows it misses — each
+    /// swept for the org being torn down, not some other one.
+    const SLO_DELETES: [&str; 4] = [
+        "slo::delete_by_org(slo_conn, org_id)",
+        "slo_backfill_jobs::delete_by_org(slo_conn, org_id)",
+        "slos::delete_by_org(slo_conn, org_id)",
+        "slo_budget::delete_by_org(slo_conn, org_id)",
+    ];
+
+    #[test]
+    fn test_db_resources_deletes_every_slo_table() {
+        for call in SLO_DELETES {
+            position_of(call);
+        }
+    }
+
+    #[test]
+    fn test_slos_are_deleted_before_alerts() {
+        // An SLO reads from a source alert, and a later PR refuses to delete an
+        // alert that a live SLO still depends on. Org teardown must never trip
+        // that guard, so the SLOs are gone before the alerts are touched.
+        let alerts = position_of("delete_org_alerts(org_id)");
+        for call in SLO_DELETES {
+            assert!(
+                position_of(call) < alerts,
+                "{call} must run before delete_org_alerts"
+            );
+        }
+    }
+
+    #[test]
+    fn test_slo_children_are_deleted_before_their_definitions() {
+        // `slo_status` and `slo_backfill_jobs` carry no org column, so both
+        // resolve the org through `slos`. Wiping `slos` first would leave them
+        // with nothing to resolve — and nothing deleted.
+        let slos = position_of("slos::delete_by_org(slo_conn, org_id)");
+        assert!(
+            position_of("slo::delete_by_org(slo_conn, org_id)") < slos,
+            "status rows must be deleted before the SLOs that identify them"
+        );
+        assert!(
+            position_of("slo_backfill_jobs::delete_by_org(slo_conn, org_id)") < slos,
+            "backfill jobs must be deleted before the SLOs that identify them"
+        );
+    }
+
+    /// The other half of the same requirement (S-16 PR 4). Ordering alone is
+    /// not enough: `delete_by_id_user` refuses to delete an alert a live SLO
+    /// measures from, and one straggler — a row a failed earlier attempt left
+    /// behind, or an SLO created in the grace period — would stall the whole
+    /// teardown on a retry loop that can never succeed. Teardown therefore
+    /// goes through the UNGUARDED primitive, and the guard stays where it
+    /// belongs: on the user's delete.
+    #[test]
+    fn test_org_teardown_bypasses_the_slo_source_guard() {
+        let start = SOURCE
+            .find("async fn delete_org_alerts")
+            .expect("delete_org_alerts is defined in this file");
+        let body = &SOURCE[start..];
+        let end = body
+            .find("\n/// Delete every cipher key")
+            .expect("delete_org_alerts is followed by delete_org_cipher_keys");
+        let body = &body[..end];
+
+        assert!(
+            body.contains("crate::alerts::alert::delete_by_id(conn, org_id, alert_id)"),
+            "org teardown must call the unguarded delete"
+        );
+        assert!(
+            !body.contains("delete_by_id_user"),
+            "org teardown must never route through the user-facing guard"
         );
     }
 }

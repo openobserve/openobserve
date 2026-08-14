@@ -92,12 +92,8 @@ vi.mock("@/composables/useLatencyInsightsAnalysis", () => ({
 // useDimensionSelector — returns stable lists of dimensions
 // ---------------------------------------------------------------------------
 vi.mock("@/composables/useDimensionSelector", () => ({
-  selectDimensionsFromData: vi
-    .fn()
-    .mockReturnValue(["service_name", "span_status"]),
-  selectTraceDimensions: vi
-    .fn()
-    .mockReturnValue(["service_name", "span_status"]),
+  selectDimensionsFromData: vi.fn().mockReturnValue(["service_name", "span_status"]),
+  selectTraceDimensions: vi.fn().mockReturnValue(["service_name", "span_status"]),
 }));
 
 // ---------------------------------------------------------------------------
@@ -127,7 +123,6 @@ vi.mock("@/utils/zincutils", () => ({
 // Actual component import (after all mocks are in place)
 // ---------------------------------------------------------------------------
 import TracesAnalysisDashboard from "./TracesAnalysisDashboard.vue";
-
 
 // ---------------------------------------------------------------------------
 // Vuex store
@@ -239,36 +234,6 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
         OButton: OButtonStub,
         OTabs: OTabsStub,
         OTab: OTabStub,
-        QIcon: { template: "<span />" },
-        QBtn: {
-          template:
-            '<button @click="$emit(\'click\')" v-bind="$attrs"><slot /></button>',
-          emits: ["click"],
-          props: ["icon", "label", "color", "size", "dense", "round", "flat", "outline", "noCaps"],
-        },
-        QTooltip: { template: "<span />" },
-        QSplitter: {
-          template:
-            '<div><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-          props: ["modelValue", "limits"],
-          emits: ["update:modelValue"],
-        },
-        QList: { template: "<ul><slot /></ul>" },
-        QItem: { template: "<li><slot /></li>" },
-        QItemSection: { template: "<div><slot /></div>" },
-        QItemLabel: { template: "<span><slot /></span>" },
-        QCheckbox: {
-          template:
-            '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', !modelValue)" />',
-          props: ["modelValue", "color", "size", "dense"],
-          emits: ["update:modelValue"],
-        },
-        QInput: {
-          template:
-            '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-          props: ["modelValue", "dense", "borderless", "placeholder", "clearable"],
-          emits: ["update:modelValue"],
-        },
         // Heavy custom child — already mocked at module level
         RenderDashboardCharts: {
           template: '<div data-test="render-dashboard-charts"></div>',
@@ -295,9 +260,7 @@ describe("TracesAnalysisDashboard", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockGenerateDashboard.mockReturnValue(
-      JSON.parse(JSON.stringify(mockGeneratedDashboard)),
-    );
+    mockGenerateDashboard.mockReturnValue(JSON.parse(JSON.stringify(mockGeneratedDashboard)));
     wrapper = mountComponent();
     await flushPromises();
   });
@@ -335,9 +298,7 @@ describe("TracesAnalysisDashboard", () => {
     });
 
     it("should render header-left slot content (timeline header chips area)", () => {
-      const headerLeft = wrapper.find(
-        '[data-test-stub="o-drawer-header-left"]',
-      );
+      const headerLeft = wrapper.find('[data-test-stub="o-drawer-header-left"]');
       expect(headerLeft.exists()).toBe(true);
     });
 
@@ -604,11 +565,7 @@ describe("TracesAnalysisDashboard", () => {
     it("should sort dimensions alphabetically", async () => {
       wrapper.unmount();
       wrapper = mountComponent({
-        streamFields: [
-          { name: "zebra_field" },
-          { name: "alpha_field" },
-          { name: "middle_field" },
-        ],
+        streamFields: [{ name: "zebra_field" }, { name: "alpha_field" }, { name: "middle_field" }],
       });
       await flushPromises();
       const dims = wrapper.vm.availableDimensions;
@@ -709,16 +666,12 @@ describe("TracesAnalysisDashboard", () => {
 
     it("should derive start_time from timeRange.startTime", () => {
       const timeObj = wrapper.vm.currentTimeObj;
-      expect(timeObj.__global.start_time.getTime()).toBe(
-        defaultProps.timeRange.startTime,
-      );
+      expect(timeObj.__global.start_time.getTime()).toBe(defaultProps.timeRange.startTime);
     });
 
     it("should derive end_time from timeRange.endTime", () => {
       const timeObj = wrapper.vm.currentTimeObj;
-      expect(timeObj.__global.end_time.getTime()).toBe(
-        defaultProps.timeRange.endTime,
-      );
+      expect(timeObj.__global.end_time.getTime()).toBe(defaultProps.timeRange.endTime);
     });
   });
 
@@ -879,11 +832,7 @@ describe("TracesAnalysisDashboard", () => {
     beforeEach(async () => {
       wrapper.unmount();
       wrapper = mountComponent({
-        streamFields: [
-          { name: "service_name" },
-          { name: "span_status" },
-          { name: "http_method" },
-        ],
+        streamFields: [{ name: "service_name" }, { name: "span_status" }, { name: "http_method" }],
       });
       await flushPromises();
       // Force known starting state
@@ -974,9 +923,7 @@ describe("TracesAnalysisDashboard", () => {
   // -------------------------------------------------------------------------
   describe("method getInitialDimensions", () => {
     it("should call selectTraceDimensions for traces stream type", async () => {
-      const { selectTraceDimensions } = await import(
-        "@/composables/useDimensionSelector"
-      );
+      const { selectTraceDimensions } = await import("@/composables/useDimensionSelector");
       wrapper.unmount();
       wrapper = mountComponent({
         streamType: "traces",
@@ -987,9 +934,7 @@ describe("TracesAnalysisDashboard", () => {
     });
 
     it("should call selectDimensionsFromData for logs stream type with enough log samples", async () => {
-      const { selectDimensionsFromData } = await import(
-        "@/composables/useDimensionSelector"
-      );
+      const { selectDimensionsFromData } = await import("@/composables/useDimensionSelector");
       const samples = Array.from({ length: 10 }, (_, i) => ({
         service_name: `svc-${i}`,
       }));
@@ -1004,9 +949,7 @@ describe("TracesAnalysisDashboard", () => {
     });
 
     it("should fall back to selectDimensionsFromData for logs type without enough samples", async () => {
-      const { selectDimensionsFromData } = await import(
-        "@/composables/useDimensionSelector"
-      );
+      const { selectDimensionsFromData } = await import("@/composables/useDimensionSelector");
       wrapper.unmount();
       wrapper = mountComponent({
         streamType: "logs",
@@ -1023,9 +966,8 @@ describe("TracesAnalysisDashboard", () => {
   // -------------------------------------------------------------------------
   describe("method loadAnalysis", () => {
     it("should call generateDashboard and populate dashboardData", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard();
       wrapper.vm.dashboardData = null;
       await wrapper.vm.loadAnalysis();
@@ -1042,72 +984,62 @@ describe("TracesAnalysisDashboard", () => {
     });
 
     it("should call showErrorNotification when generateDashboard throws", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
-      (generateDashboard as ReturnType<typeof vi.fn>).mockImplementationOnce(
-        () => {
-          throw new Error("dashboard generation failed");
-        },
-      );
+      (generateDashboard as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+        throw new Error("dashboard generation failed");
+      });
       await wrapper.vm.loadAnalysis();
       await flushPromises();
       expect(mockShowErrorNotification).toHaveBeenCalled();
     });
 
     it("should use durationFilter config when activeAnalysisType is 'duration'", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
       wrapper.vm.activeAnalysisType = "duration";
       const durationFilter = { start: 100, end: 500 };
       await wrapper.setProps({ durationFilter });
       await wrapper.vm.loadAnalysis();
       await flushPromises();
-      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.at(-1)[1];
+      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[1];
       expect(callArg.durationFilter).toEqual(durationFilter);
       expect(callArg.rateFilter).toBeUndefined();
     });
 
     it("should use rateFilter config when activeAnalysisType is 'volume'", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
       wrapper.vm.activeAnalysisType = "volume";
       const rateFilter = { start: 10, end: 50 };
       await wrapper.setProps({ rateFilter });
       await wrapper.vm.loadAnalysis();
       await flushPromises();
-      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.at(-1)[1];
+      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[1];
       expect(callArg.rateFilter).toEqual(rateFilter);
       expect(callArg.durationFilter).toBeUndefined();
     });
 
     it("should use errorFilter config when activeAnalysisType is 'error'", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
       wrapper.vm.activeAnalysisType = "error";
       const errorFilter = { start: 1, end: 20 };
       await wrapper.setProps({ errorFilter });
       await wrapper.vm.loadAnalysis();
       await flushPromises();
-      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.at(-1)[1];
+      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[1];
       expect(callArg.errorFilter).toEqual(errorFilter);
       expect(callArg.durationFilter).toBeUndefined();
     });
 
     it("should override selectedTimeRange with rateFilter time when rateFilter has timeStart", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
       await wrapper.setProps({
         rateFilter: { start: 1, end: 5, timeStart: 3_000_000, timeEnd: 4_000_000 },
@@ -1115,8 +1047,7 @@ describe("TracesAnalysisDashboard", () => {
       wrapper.vm.activeAnalysisType = "volume";
       await wrapper.vm.loadAnalysis();
       await flushPromises();
-      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.at(-1)[1];
+      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[1];
       expect(callArg.selectedTimeRange).toEqual({
         startTime: 3_000_000,
         endTime: 4_000_000,
@@ -1124,28 +1055,24 @@ describe("TracesAnalysisDashboard", () => {
     });
 
     it("should pass selectedDimensions to generateDashboard config", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
       wrapper.vm.selectedDimensions = ["service_name", "http_method"];
       await wrapper.vm.loadAnalysis();
       await flushPromises();
-      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.at(-1)[1];
+      const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[1];
       expect(callArg.dimensions).toEqual(["service_name", "http_method"]);
     });
 
     it("should build mockAnalyses with one entry per selected dimension", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
       wrapper.vm.selectedDimensions = ["service_name"];
       await wrapper.vm.loadAnalysis();
       await flushPromises();
-      const mockAnalyses = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.at(-1)[0];
+      const mockAnalyses = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[0];
       expect(mockAnalyses).toHaveLength(1);
       expect(mockAnalyses[0].dimensionName).toBe("service_name");
       expect(mockAnalyses[0].data).toEqual([]);
@@ -1163,35 +1090,29 @@ describe("TracesAnalysisDashboard", () => {
     });
 
     it("should call loadAnalysis when analysisType is 'duration' and dashboardData is null", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
-      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.length;
+      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
       wrapper.vm.activeAnalysisType = "duration";
       wrapper.vm.dashboardData = null;
       wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: false });
       await flushPromises();
-      expect(
-        (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length,
-      ).toBeGreaterThan(callsBefore);
+      expect((generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
+        callsBefore,
+      );
     });
 
     it("should NOT call loadAnalysis when dashboardData is already populated", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
       wrapper.vm.dashboardData = { tabs: [{ panels: [] }] };
-      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.length;
+      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
       wrapper.vm.activeAnalysisType = "duration";
       wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: false });
       await flushPromises();
-      expect(
-        (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length,
-      ).toBe(callsBefore);
+      expect((generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
     });
   });
 
@@ -1286,17 +1207,15 @@ describe("TracesAnalysisDashboard", () => {
   // -------------------------------------------------------------------------
   describe("watcher: activeAnalysisType", () => {
     it("should call loadAnalysis when activeAnalysisType changes", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
-      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.length;
+      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
       wrapper.vm.activeAnalysisType = "volume";
       await flushPromises();
-      expect(
-        (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length,
-      ).toBeGreaterThan(callsBefore);
+      expect((generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
+        callsBefore,
+      );
     });
   });
 
@@ -1305,23 +1224,21 @@ describe("TracesAnalysisDashboard", () => {
   // -------------------------------------------------------------------------
   describe("watcher: selectedDimensions", () => {
     it("should call loadAnalysis when a dimension is removed", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
 
       // Ensure there are at least 2 dimensions to allow removal
       wrapper.vm.selectedDimensions = ["service_name", "span_status"];
       await flushPromises();
 
-      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.length;
+      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
       wrapper.vm.selectedDimensions = ["service_name"];
       await flushPromises();
 
-      expect(
-        (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length,
-      ).toBeGreaterThan(callsBefore);
+      expect((generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
+        callsBefore,
+      );
     });
   });
 
@@ -1330,19 +1247,17 @@ describe("TracesAnalysisDashboard", () => {
   // -------------------------------------------------------------------------
   describe("watcher: props.timeRange", () => {
     it("should call loadAnalysis when timeRange prop changes", async () => {
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
-      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock
-        .calls.length;
+      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
       await wrapper.setProps({
         timeRange: { startTime: 9_000_000, endTime: 10_000_000 },
       });
       await flushPromises();
-      expect(
-        (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length,
-      ).toBeGreaterThan(callsBefore);
+      expect((generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
+        callsBefore,
+      );
     });
   });
 
@@ -1414,15 +1329,12 @@ describe("TracesAnalysisDashboard", () => {
 
     it("should not call generateDashboard when loadAnalysis encounters an exception from showErrorNotification setup", async () => {
       // Edge: confirm error path does not re-throw (component stays stable)
-      const { useLatencyInsightsDashboard } = await import(
-        "@/composables/useLatencyInsightsDashboard"
-      );
+      const { useLatencyInsightsDashboard } =
+        await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard() as any;
-      (generateDashboard as ReturnType<typeof vi.fn>).mockImplementationOnce(
-        () => {
-          throw new Error("boom");
-        },
-      );
+      (generateDashboard as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+        throw new Error("boom");
+      });
       // Should not throw at the wrapper level
       await expect(wrapper.vm.loadAnalysis()).resolves.not.toThrow();
     });

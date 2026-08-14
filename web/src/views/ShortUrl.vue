@@ -1,10 +1,9 @@
 <template>
-  <div
-    data-test="loading-container"
-    class="h-[100vh] flex flex-col items-center justify-center"
-  >
+  <div data-test="loading-container" class="flex h-[100vh] flex-col items-center justify-center">
     <OSpinner size="lg" data-test="spinner" />
-    <div data-test="message" class="text-base text-text-secondary">Redirecting...</div>
+    <div data-test="message" class="text-text-secondary text-base">
+      {{ t("common.shortUrl.redirecting") }}
+    </div>
   </div>
 </template>
 
@@ -14,6 +13,7 @@ import { useRouter } from "vue-router";
 import shortURL from "@/services/short_url";
 import { useStore } from "vuex";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "ShortUrl",
@@ -27,6 +27,7 @@ export default defineComponent({
   setup(props) {
     const router = useRouter();
     const store = useStore();
+    const { t } = useI18nTyped();
 
     const routeToHome = () => {
       router.replace({
@@ -52,10 +53,7 @@ export default defineComponent({
 
     const fetchAndRedirect = async () => {
       try {
-        const response = await shortURL.get(
-          store.state.selectedOrganization.identifier,
-          props.id,
-        );
+        const response = await shortURL.get(store.state.selectedOrganization.identifier, props.id);
 
         if (typeof response.data === "string") {
           handleOriginalUrl(response.data);
@@ -76,6 +74,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       routeToHome,
       handleOriginalUrl,
       routeToOriginalUrl,
@@ -84,4 +83,3 @@ export default defineComponent({
   },
 });
 </script>
-

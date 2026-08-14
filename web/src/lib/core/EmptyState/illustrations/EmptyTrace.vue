@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   EmptyTrace — object-only "no traces" illustration: a span waterfall with a
-  sweeping scan line. CSS motion gated by `animated` + prefers-reduced-motion.
+  sweeping scan line. Pure SMIL motion gated behind `animated`
+  (prefers-reduced-motion; OEmptyState wires this up automatically).
 -->
 <template>
   <svg
@@ -25,19 +26,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="No traces found"
-    :class="['es-root', { 'es-static': !animated }]"
+    :aria-label="t('emptyState.noTraces.title')"
   >
     <ellipse cx="120" cy="156" rx="66" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
     <g fill="var(--color-border-default)" opacity="0.5">
-      <circle cx="26" cy="46" r="2" /><circle cx="214" cy="120" r="2" /><circle cx="210" cy="42" r="1.6" />
+      <circle cx="26" cy="46" r="2" />
+      <circle cx="214" cy="120" r="2" />
+      <circle cx="210" cy="42" r="1.6" />
     </g>
 
-    <rect x="42" y="30" width="156" height="118" rx="12" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2" />
+    <rect
+      x="42"
+      y="30"
+      width="156"
+      height="118"
+      rx="12"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="2"
+    />
     <!-- time axis -->
-    <line x1="54" y1="50" x2="186" y2="50" stroke="var(--color-border-default)" stroke-width="1.5" />
+    <line
+      x1="54"
+      y1="50"
+      x2="186"
+      y2="50"
+      stroke="var(--color-border-default)"
+      stroke-width="1.5"
+    />
     <g stroke="var(--color-border-default)" stroke-width="1.25">
-      <line x1="78" y1="48" x2="78" y2="52" /><line x1="110" y1="48" x2="110" y2="52" /><line x1="142" y1="48" x2="142" y2="52" /><line x1="174" y1="48" x2="174" y2="52" />
+      <line x1="78" y1="48" x2="78" y2="52" />
+      <line x1="110" y1="48" x2="110" y2="52" />
+      <line x1="142" y1="48" x2="142" y2="52" />
+      <line x1="174" y1="48" x2="174" y2="52" />
     </g>
 
     <!-- span waterfall -->
@@ -49,46 +70,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <rect x="96" y="126" width="58" height="9" rx="4.5" fill="var(--color-primary-400)" />
     </g>
 
-    <!-- sweeping scan line -->
-    <line class="es-scan" x1="60" y1="58" x2="60" y2="140" stroke="var(--color-primary-600)" stroke-width="1.75" opacity="0.7" />
+    <!-- sweeping scan line: left→right across the waterfall, brightening at mid-sweep -->
+    <line
+      x1="60"
+      y1="58"
+      x2="60"
+      y2="140"
+      stroke="var(--color-primary-600)"
+      stroke-width="1.75"
+      opacity="0.7"
+    >
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0.2;0.8;0.2"
+        keyTimes="0;0.5;1"
+        dur="3.4s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; 116 0; 0 0"
+        keyTimes="0;0.5;1"
+        dur="3.4s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+    </line>
   </svg>
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 260, animated: true },
-);
-</script>
+import { useI18nTyped } from "@/types/i18n";
 
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-.es-scan {
-  transform-box: view-box;
-  animation: es-scan 3.4s ease-in-out infinite;
-}
-@keyframes es-scan {
-  0%,
-  100% {
-    transform: translateX(0);
-    opacity: 0.2;
-  }
-  50% {
-    transform: translateX(116px);
-    opacity: 0.8;
-  }
-}
-.es-static :where(.es-scan) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-scan) {
-    animation: none;
-  }
-}
-</style>
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
+
+const { t } = useI18nTyped();
+</script>

@@ -108,22 +108,18 @@ describe("General settings Danger Zone", () => {
   // (initiate_org_deletion). The UI must not offer the action to anyone the API
   // would reject with a 403.
   describe("who may see it", () => {
-    const zone = (w: any) =>
-      w.find('[data-test="general-settings-danger-zone"]').exists();
+    const zone = (w: any) => w.find('[data-test="general-settings-danger-zone"]').exists();
 
     it("shows it to an admin of this org", async () => {
       expect(zone(await mountGeneral())).toBe(true);
     });
 
-    it.each(["editor", "viewer", "user", "member"])(
-      "hides it from a %s",
-      async (role) => {
-        orgUsersSpy.mockResolvedValue({
-          data: { data: [{ email: "me@o2.ai", role }] },
-        });
-        expect(zone(await mountGeneral())).toBe(false);
-      },
-    );
+    it.each(["editor", "viewer", "user", "member"])("hides it from a %s", async (role) => {
+      orgUsersSpy.mockResolvedValue({
+        data: { data: [{ email: "me@o2.ai", role }] },
+      });
+      expect(zone(await mountGeneral())).toBe(false);
+    });
 
     it("hides it when the caller is not in the member list at all", async () => {
       orgUsersSpy.mockResolvedValue({
@@ -149,25 +145,23 @@ describe("General settings Danger Zone", () => {
     });
 
     it.each([
-      ["zh-cn", "危险区域", "仅限管理员"],
-      ["ja", "危険ゾーン", "管理者のみ"],
-      ["de", "Gefahrenzone", "Nur Administratoren"],
-    ])("renders the panel in %s", async (locale, header, ownerFact) => {
+      ["zh-cn", "危险区域", "删除所有内容"],
+      ["ja", "危険ゾーン", "すべてを削除"],
+      ["de", "Gefahrenzone", "Löscht alles"],
+    ])("renders the panel in %s", async (locale, header, scopeFact) => {
       // Only en-us is bundled; every other locale is a lazy chunk. main.ts awaits
       // this before mounting, so mirror that here rather than assuming the
       // messages are already registered.
       await loadLocaleMessages(locale);
       i18n.global.locale.value = locale;
       const wrapper = await mountGeneral();
-      const text = wrapper
-        .find('[data-test="general-settings-danger-zone"]')
-        .text();
+      const text = wrapper.find('[data-test="general-settings-danger-zone"]').text();
 
       expect(text).toContain(header);
-      expect(text).toContain(ownerFact);
+      expect(text).toContain(scopeFact);
       // No English fallback leaking through.
       expect(text).not.toContain("Danger Zone");
-      expect(text).not.toContain("Admins only");
+      expect(text).not.toContain("Deletes everything");
       // The plural must still resolve after translation.
       expect(text).not.toContain("|");
       expect(text).not.toContain("{n}");
@@ -185,19 +179,13 @@ describe("General settings Danger Zone", () => {
 
   it("renders one consequence tile per fact", async () => {
     const wrapper = await mountGeneral();
-    expect(
-      wrapper.find('[data-test="general-settings-danger-zone"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.findAll('[data-test^="general-settings-delete-org-fact-"]'),
-    ).toHaveLength(4);
+    expect(wrapper.find('[data-test="general-settings-danger-zone"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test^="general-settings-delete-org-fact-"]')).toHaveLength(3);
   });
 
   it("names the org in the description and counts only human members", async () => {
     const wrapper = await mountGeneral();
-    const text = wrapper
-      .find('[data-test="general-settings-danger-zone"]')
-      .text();
+    const text = wrapper.find('[data-test="general-settings-danger-zone"]').text();
 
     expect(text).toContain("Acme Production");
     // Two humans + one service account -> service account is not a member.
@@ -207,29 +195,47 @@ describe("General settings Danger Zone", () => {
     expect(text).not.toContain("{n}");
   });
 
-  it("states the grace period without inventing a duration", async () => {
-    const wrapper = await mountGeneral();
-    const text = wrapper
-      .find('[data-test="general-settings-delete-org-fact-grace"]')
-      .text();
+  // org_deletion_grace_period_days comes from /config. It is an env var, so the panel
+  // has to read it rather than hardcode 30, and it has to survive both a backend that
+  // predates the field and the legal 0 value.
+  describe("recovery window duration", () => {
+    const graceText = (w: any) =>
+      w.find('[data-test="general-settings-delete-org-fact-grace"]').text();
+    afterEach(() => {
+      delete (mockStore.state.zoConfig as any).org_deletion_grace_period_days;
+    });
 
-    expect(text).toContain("Grace period");
-    // The real value lives in enterprise config and is not exposed to the
-    // frontend, so no day count may appear here.
-    expect(text).not.toMatch(/\d+\s*(day|days)/i);
-  });
+    it("shows the day count reported by /config", async () => {
+      (mockStore.state.zoConfig as any).org_deletion_grace_period_days = 30;
+      expect(graceText(await mountGeneral())).toContain("30 days");
+    });
 
-  // initiate_org_deletion allows root or UserRole::Admin in this org — and there
-  // is no Owner role in UserRole at all. The copy must name the real requirement,
-  // otherwise it invents a role the user cannot find anywhere in IAM.
-  it("describes the permission as Admin, not a non-existent Owner role", async () => {
-    const wrapper = await mountGeneral();
-    const text = wrapper
-      .find('[data-test="general-settings-delete-org-fact-owner"]')
-      .text();
+    it("uses the singular for a one-day window", async () => {
+      (mockStore.state.zoConfig as any).org_deletion_grace_period_days = 1;
+      const text = graceText(await mountGeneral());
 
-    expect(text).toMatch(/admin/i);
-    expect(text).not.toMatch(/owner/i);
+      expect(text).toContain("1 day");
+      expect(text).not.toContain("1 days");
+    });
+
+    // 0 means the org is purged immediately. Rendering "Recovery window" here would
+    // promise a reprieve that does not exist.
+    it("says there is no window when the duration is zero", async () => {
+      (mockStore.state.zoConfig as any).org_deletion_grace_period_days = 0;
+      const text = graceText(await mountGeneral());
+
+      expect(text).toContain("No recovery window");
+      expect(text).toContain("immediate and permanent");
+      expect(text).not.toMatch(/\d+\s*(day|days)/i);
+    });
+
+    // An older backend omits the field entirely; inventing 30 would be a guess.
+    it("states the window without a duration when /config omits the field", async () => {
+      const text = graceText(await mountGeneral());
+
+      expect(text).toContain("Recovery window");
+      expect(text).not.toMatch(/\d+\s*(day|days)/i);
+    });
   });
 
   // Resurrect is _meta-only, and org_blocking locks the actor out of their own
@@ -237,9 +243,7 @@ describe("General settings Danger Zone", () => {
   // a self-service restore.
   it("does not promise a self-service restore the API cannot deliver", async () => {
     const wrapper = await mountGeneral();
-    const text = wrapper
-      .find('[data-test="general-settings-danger-zone"]')
-      .text();
+    const text = wrapper.find('[data-test="general-settings-danger-zone"]').text();
 
     expect(text).not.toMatch(/you can (cancel and )?restore/i);
     expect(text).toMatch(/support/i);
@@ -249,24 +253,18 @@ describe("General settings Danger Zone", () => {
     const wrapper = await mountGeneral();
     expect(summarySpy).not.toHaveBeenCalled();
 
-    await wrapper
-      .find('[data-test="general-settings-delete-org-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="general-settings-delete-org-btn"]').trigger("click");
     await flushPromises();
 
     expect(summarySpy).toHaveBeenCalledTimes(1);
-    expect((wrapper.vm as any).orgScope).toBe(
-      "32 dashboards · 18 streams · 4.20 TB data",
-    );
+    expect((wrapper.vm as any).orgScope).toBe("32 dashboards · 18 streams · 4.20 TB data");
   });
 
   it("keeps the delete flow usable when /summary fails", async () => {
     summarySpy.mockRejectedValueOnce(new Error("boom"));
     const wrapper = await mountGeneral();
 
-    await wrapper
-      .find('[data-test="general-settings-delete-org-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="general-settings-delete-org-btn"]').trigger("click");
     await flushPromises();
 
     expect((wrapper.vm as any).confirmDeleteOrg).toBe(true);
