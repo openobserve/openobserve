@@ -250,7 +250,8 @@ pub struct ValidateCompositeRequestBody {
     /// When editing an existing composite, its ID (so the graph check can exempt
     /// the composite being updated); `None` when validating a new definition.
     pub composite_id: Option<String>,
-    /// Folder the composite would live in, for folder existence checks.
+    /// Reserved and currently unused: validation does not read this field, so
+    /// callers must not rely on it to scope or validate the composite.
     pub folder_id: Option<String>,
 }
 

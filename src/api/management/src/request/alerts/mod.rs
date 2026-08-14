@@ -208,10 +208,17 @@ async fn update_composite_alert(
     {
         return composite_access_error(children);
     }
-    let folder_id = openobserve_core::alerts::composite::get_composite(org_id, id)
+    let current = openobserve_core::alerts::composite::get_composite(org_id, id)
         .await
         .ok()
-        .flatten()
+        .flatten();
+    #[cfg(feature = "enterprise")]
+    if let Some(current) = &current
+        && composite_subject_unauthorized(&current.definition, &user_id, "PUT").await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+    let folder_id = current
         .map(|current| current.definition.folder_id)
         .unwrap_or_else(|| "default".to_string());
     let input = composite_input(
@@ -254,6 +261,29 @@ async fn composite_unauthorized_children(
     (!unauthorized.is_empty()).then_some(unauthorized)
 }
 
+/// Authorize the composite itself (not just its children) for a read/mutation.
+/// Returns `true` when the caller may not access the composite, so callers can
+/// short-circuit with a 403. Mirrors `move_composite`'s subject check.
+#[cfg(feature = "enterprise")]
+async fn composite_subject_unauthorized(
+    definition: &infra::table::entity::alert_composites::Model,
+    user_id: &str,
+    method: &str,
+) -> bool {
+    !check_permissions(
+        &definition.id,
+        &definition.org,
+        user_id,
+        "alerts",
+        method,
+        Some(&definition.folder_id),
+        false,
+        true,
+        false,
+    )
+    .await
+}
+
 fn composite_input(
     id: Option<String>,
     org_id: &str,
@@ -292,6 +322,12 @@ async fn composite_detail_response(
     _user_id: Option<&str>,
 ) -> Response {
     let definition = composite.definition;
+    #[cfg(feature = "enterprise")]
+    if let Some(user_id) = _user_id
+        && composite_subject_unauthorized(&definition, user_id, "GET").await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     let scheduler_job_present = infra::scheduler::get(
         &definition.org,
         TriggerModule::CompositeAlert,
@@ -364,8 +400,10 @@ async fn composite_detail_response(
         #[cfg(not(feature = "enterprise"))]
         let child_authorized = true;
         if !child_authorized {
+            // Redact the KSUID: an inaccessible child must not leak its stable
+            // alert_id to a caller who cannot read it.
             children.push(serde_json::json!({
-                "alert_id": child.child_alert_id,
+                "alert_id": null,
                 "accessible": false,
             }));
             continue;
@@ -798,12 +836,17 @@ pub async fn get_composite_references(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let kind = if openobserve_core::alerts::composite::get_composite(&org_id, &alert_id)
+    let subject = openobserve_core::alerts::composite::get_composite(&org_id, &alert_id)
         .await
         .ok()
-        .flatten()
-        .is_some()
+        .flatten();
+    #[cfg(feature = "enterprise")]
+    if let Some(_composite) = &subject
+        && composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "GET").await
     {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+    let kind = if subject.is_some() {
         infra::table::alert_composites::ChildKind::Composite
     } else {
         infra::table::alert_composites::ChildKind::Alert
@@ -893,6 +936,10 @@ pub async fn get_composite_timeline(
     else {
         return MetaHttpResponse::not_found(format!("composite alert not found: {alert_id}"));
     };
+    #[cfg(feature = "enterprise")]
+    if composite_subject_unauthorized(&composite.definition, &user_email.user_id, "GET").await {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
 
     let to = query
         .get("to")
@@ -976,7 +1023,7 @@ pub async fn get_composite_timeline(
             Vec::new()
         };
         children.push(CompositeTimelineLane {
-            alert_id: id,
+            alert_id: name.is_some().then_some(id),
             slot: Some(slot),
             name: name.clone(),
             accessible: name.is_some(),
@@ -1000,7 +1047,7 @@ pub async fn get_composite_timeline(
         .ok()
         .flatten();
     let result = CompositeTimelineLane {
-        alert_id: alert_id.clone(),
+        alert_id: Some(alert_id.clone()),
         slot: None,
         name: Some(composite.definition.name),
         accessible: true,
@@ -1507,6 +1554,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
 )]
 pub async fn clone_alert(
     Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<CloneAlertRequestBody>,
 ) -> Response {
     let alert_id_str = alert_id.clone();
@@ -1537,12 +1585,18 @@ pub async fn clone_alert(
             }
         }
         Err(AlertError::AlertNotFound) => {
-            if openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str)
-                .await
-                .ok()
-                .flatten()
-                .is_some()
+            if let Some(_composite) =
+                openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str)
+                    .await
+                    .ok()
+                    .flatten()
             {
+                #[cfg(feature = "enterprise")]
+                if composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "GET")
+                    .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
                 return match openobserve_core::alerts::composite::clone_composite(
                     &org_id,
                     &alert_id_str,
@@ -1809,12 +1863,16 @@ pub async fn delete_alert(
         };
     }
 
-    if openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str)
+    if let Some(_composite) = openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str)
         .await
         .ok()
         .flatten()
-        .is_some()
     {
+        #[cfg(feature = "enterprise")]
+        if composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "DELETE").await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
         return match openobserve_core::alerts::composite::delete_composite(&org_id, &alert_id_str)
             .await
         {
@@ -2001,12 +2059,16 @@ pub async fn delete_alert_bulk(
                 }
                 Err(error) => Err(error.to_string()),
             }
-        } else if openobserve_core::alerts::composite::get_composite(&org_id, &id)
-            .await
-            .ok()
-            .flatten()
-            .is_some()
+        } else if let Some(_composite) =
+            openobserve_core::alerts::composite::get_composite(&org_id, &id)
+                .await
+                .ok()
+                .flatten()
         {
+            #[cfg(feature = "enterprise")]
+            if composite_subject_unauthorized(&_composite.definition, &_user_id, "DELETE").await {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
             match openobserve_core::alerts::composite::delete_composite(&org_id, &id).await {
                 Ok(()) => Ok(()),
                 Err(
@@ -2732,6 +2794,7 @@ async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
 pub async fn enable_alert(
     Path((org_id, alert_id)): Path<(String, String)>,
     Query(query): Query<EnableAlertQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -2749,12 +2812,18 @@ pub async fn enable_alert(
             MetaHttpResponse::json(resp_body)
         }
         Err(AlertError::AlertNotFound) => {
-            if openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
-                .await
-                .ok()
-                .flatten()
-                .is_some()
+            if let Some(_composite) =
+                openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
+                    .await
+                    .ok()
+                    .flatten()
             {
+                #[cfg(feature = "enterprise")]
+                if composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "PUT")
+                    .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
                 return match openobserve_core::alerts::composite::set_composite_enabled(
                     &org_id,
                     &alert_id.to_string(),
@@ -2875,12 +2944,22 @@ pub async fn enable_alert_bulk(
                 successful.push(id);
             }
             Err(AlertError::AlertNotFound) => {
-                if openobserve_core::alerts::composite::get_composite(&org_id, &id.to_string())
-                    .await
-                    .ok()
-                    .flatten()
-                    .is_some()
+                if let Some(_composite) =
+                    openobserve_core::alerts::composite::get_composite(&org_id, &id.to_string())
+                        .await
+                        .ok()
+                        .flatten()
                 {
+                    #[cfg(feature = "enterprise")]
+                    if composite_subject_unauthorized(
+                        &_composite.definition,
+                        &user_email.user_id,
+                        "PUT",
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
                     match openobserve_core::alerts::composite::set_composite_enabled(
                         &org_id,
                         &id.to_string(),
@@ -2966,7 +3045,10 @@ pub async fn enable_alert_bulk(
         ("x-o2-mcp" = json!({"description": "Manually trigger an alert", "category": "alerts"}))
     )
 )]
-pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn trigger_alert(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
         Err(_) => {
@@ -2977,12 +3059,18 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     match alert::trigger_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
         Err(AlertError::AlertNotFound) => {
-            if openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
-                .await
-                .ok()
-                .flatten()
-                .is_some()
+            if let Some(_composite) =
+                openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
+                    .await
+                    .ok()
+                    .flatten()
             {
+                #[cfg(feature = "enterprise")]
+                if composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "PUT")
+                    .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
                 return match openobserve_core::alerts::composite::trigger_composite(
                     &org_id,
                     &alert_id.to_string(),

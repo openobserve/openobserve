@@ -259,7 +259,10 @@ pub struct CompositeTimelineTransition {
 /// A single status lane: one child (or the composite itself) over a window.
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct CompositeTimelineLane {
-    pub alert_id: String,
+    /// Redacted (`None`) when the child is not readable to the caller, so an
+    /// inaccessible child never leaks its stable KSUID.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_id: Option<String>,
     /// Position among the composite's children (A=0), for the letter chip.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slot: Option<usize>,
