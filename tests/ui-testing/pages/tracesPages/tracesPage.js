@@ -82,7 +82,7 @@ export class TracesPage {
     this.traceDetailsServiceMapChart = '[data-test="trace-details-service-map-chart"]';
     // Trace tree span selectors (dynamic suffix = span_id)
     this.traceTreeSpanSelectBtnPrefix = '[data-test^="trace-tree-span-select-btn-"]';
-    this.traceTreeSpanOperationNamePrefix = '[data-test^="trace-tree-span-operation-name-"]';
+    this.traceTreeSpanOperationNamePrefix = '[data-test^="trace-tree-span-operation-name-"]:not([data-test*="-container-"])';
     this.traceTreeSpanContainerPrefix = '[data-test^="trace-tree-span-container-"]';
     // Trace details sidebar header (verified against TraceDetailsSidebar.vue)
     this.traceDetailsSidebarHeaderOperationName = '[data-test="trace-details-sidebar-header-operation-name"]';
