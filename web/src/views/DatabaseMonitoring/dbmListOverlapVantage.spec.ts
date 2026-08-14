@@ -310,6 +310,120 @@ describe("DatabasesPage qualifies its overlap measures", () => {
 });
 
 /**
+ * A column may not RANK by one number and SHOW another.
+ *
+ * Once the two overlap columns became server-first, the figure in the cell
+ * stopped being the figure the ordering was built from: the backend ranks on
+ * the TRACE rollup (`sort_rows` over `calls` / `total_time_ns`, api.rs), and
+ * the server counters are joined on afterwards, in the browser, per row. So
+ * "sort by Database time, descending" produced a top row whose printed value
+ * was smaller than rows beneath it.
+ *
+ * Measured on the live `default` org (7d, stmt_class=all): of the 100 rows the
+ * page holds, 54 resolved to the server and 46 to traces, and 35 of the 99
+ * adjacent pairs were inversions — row 4 printed 15.5e12 ns above row 5's
+ * 22.7e12 ns under a descending header.
+ *
+ * Why the sort is REMOVED rather than moved client-side or re-specified
+ * server-side — the three options, and why only one survives contact with how
+ * the row set is actually assembled:
+ *
+ *   (a) Client-side sort on the resolved value. Rejected: the page does not
+ *       hold the full set. The backend sorts, THEN truncates to
+ *       `DEFAULT_QUERIES_LIMIT` (100) and reports the pre-truncation `total`.
+ *       Live: `hits: 100, total: 130` — 30 rows were cut by the traced rank
+ *       before the browser saw anything. Re-sorting 100 survivors of a traced
+ *       top-100 by their server values cannot surface the row that ranks 1st
+ *       by server time and 118th by traced time; it would produce a confident
+ *       "top by database time" that is a re-ordering of the wrong 100 rows.
+ *
+ *   (b) An additive server-side ordering key. Rejected as unsound at this
+ *       grain, not merely as scope: the ordering the column displays is not a
+ *       column the backend HAS. The displayed value is decided per row by a
+ *       join the browser performs against a SECOND endpoint
+ *       (`/server_queries`, itself capped at 200 and `truncated` on this org),
+ *       and it falls back to the traced figure whenever that join misses. The
+ *       backend would have to rank a mixed expression it cannot evaluate — one
+ *       whose per-row vantage depends on a different read's cap.
+ *
+ *   (c) Chosen: the two overlap columns are NOT sortable. A disabled sort is
+ *       better than one that lies, and the remaining columns (`p95_ns`,
+ *       `errors`, ...) are single-vantage traced figures whose display still
+ *       matches the backend's rank, so they keep their sort.
+ *
+ * The mixed-vantage problem is the deeper reason (b) would not have rescued
+ * this even if it were free. Ordering a column that mixes vantages puts a
+ * server figure and a traced figure in one comparison, and on this fleet those
+ * are not the same measure in either dimension:
+ *   • POPULATION — the server counts every client, traces only instrumented
+ *     ones (~3.7x apart on the live org), so a server row outranks a traced
+ *     row for having been measured more completely, not for being heavier; and
+ *   • UNIT — `exec_time_s` is EXECUTION time on Postgres and WAIT time on
+ *     MySQL/MariaDB (live: 143 postgres rows `execution`, 57 mysql rows
+ *     `wait`), while the traced `total_time_ns` is round-trip including
+ *     network and pool wait.
+ * A single ordering over that set has no defensible meaning, which is exactly
+ * the condition the task named for preferring (c).
+ */
+describe("the overlap columns do not offer a sort they cannot honour", () => {
+  const source = read("QueriesPage.vue");
+
+  /** The column definition object for one id, to the start of the next. */
+  const columnDef = (id: string): string => {
+    const columns = source.slice(source.indexOf("const columns = computed"));
+    const start = columns.indexOf(`id: "${id}"`);
+    if (start === -1) return "";
+    const next = columns.indexOf("    id: ", start + 10);
+    return columns.slice(start, next === -1 ? start + 800 : next);
+  };
+
+  it("does not let the calls column claim a sort", () => {
+    expect(columnDef("calls")).toContain("sortable: false");
+  });
+
+  it("does not let the database-time column claim a sort", () => {
+    expect(columnDef("total_time_ns")).toContain("sortable: false");
+  });
+
+  /**
+   * The reason has to survive in the file. Without it the next reader sees two
+   * numeric columns that are not sortable, reads it as an oversight, and
+   * restores exactly the defect this removed.
+   */
+  it("documents why, at the columns", () => {
+    const calls = columnDef("calls");
+    const load = columnDef("total_time_ns");
+    for (const def of [calls, load]) {
+      expect(def).toMatch(/rank|sort/i);
+    }
+    // The specific mechanism, not a vague "see above": the backend ranks the
+    // traced field and the truncation happens before the join.
+    const columns = source.slice(source.indexOf("const columns = computed"));
+    expect(columns).toMatch(/truncat/i);
+  });
+
+  /**
+   * The sort keys the page may still SEND. `calls` and `total_time_ns` stay on
+   * the whitelist because `total_time_ns` remains the page's default ranking
+   * (`sortBy`) and a URL may carry either — what changed is that no header
+   * offers them, not that the backend stopped accepting them.
+   */
+  it("keeps the traced default ranking, which no longer claims to be a column sort", () => {
+    expect(source).toContain('const sortBy = ref<QuerySortKey>("total_time_ns")');
+  });
+
+  /**
+   * Single-vantage columns are untouched: their displayed figure IS the traced
+   * field the backend ranked on, so their sort was never lying.
+   */
+  it("leaves the single-vantage columns sortable", () => {
+    for (const id of ["p95_ns", "errors"]) {
+      expect(columnDef(id)).toContain("sortable: true");
+    }
+  });
+});
+
+/**
  * The MySQL case, stated as an invariant over the source rather than an
  * example: there is no path on these pages that puts a duration on screen
  * with the engine's name attached and no word for WHICH time it is.

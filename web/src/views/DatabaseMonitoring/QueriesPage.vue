@@ -1867,16 +1867,28 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
   // column legitimately mixes vantages (a statement the databases never
   // reported keeps its traced count).
   //
-  // `sortable` stays TRUE and still sorts by the TRACED count, which is what
-  // the backend ranks on — the ordering is a property of the ranked read, not
-  // of the figures this column displays. The hint says so rather than leaving
-  // the reader to infer that a server-first column re-ranks by server counts.
+  // NOT SORTABLE, and it cannot become sortable without a different read.
+  // The backend ranks on the TRACED count and truncates to that ranking
+  // (`sort_rows` then `hits.truncate(limit)`) BEFORE these server counters are
+  // joined on here, in the browser. So the ordering and the printed figure are
+  // two different numbers, and offering the sort meant a descending column
+  // whose top row showed a smaller value than rows beneath it — measured on
+  // the live fleet as 35 inversions across 100 rows.
+  //
+  // The three ways out and why none is taken: re-sorting client-side ranks
+  // only the survivors of the traced top-N (live: 100 of 130 rows), so it
+  // cannot surface a row that is heavy by server count and light by traced
+  // count; an ordering key server-side would have to rank an expression the
+  // backend cannot evaluate, because which vantage each row resolves to
+  // depends on a SECOND capped read; and ordering the mixed column at all
+  // compares a population the server counted in full against one traces
+  // sampled (~3.7x apart). A column with no sort beats a sort that lies.
   {
     id: "calls",
     header: t("dbm.queries.columns.calls"),
     accessorKey: "calls",
     size: 112,
-    sortable: true,
+    sortable: false,
     meta: {
       align: "right",
       headerSubLabel: t("dbm.queries.columnSubLabels.calls"),
@@ -1913,11 +1925,20 @@ const columns = computed<OTableColumnDef<QueryRow>[]>(() => [
   },
   {
     // The id IS the backend sort key, so the cell slot is `#cell-total_time_ns`.
+    // It remains the page's DEFAULT ranking (`sortBy`) — what changed is that
+    // the header no longer offers it as a column sort.
     id: "total_time_ns",
     header: t("dbm.queries.columns.load"),
     accessorKey: "total_time_ns",
     size: 190,
-    sortable: true,
+    // NOT SORTABLE, for the reason spelled out on the calls column above, with
+    // one dimension more: this column's values are not even the same UNIT
+    // across rows. `exec_time_s` is EXECUTION time on Postgres and WAIT time
+    // on MySQL/MariaDB, while a row that fell back to traces is round-trip
+    // INCLUDING network and pool wait. Ranking those against each other reads
+    // three measures as one, which is the misreading the per-row qualifier
+    // exists to prevent.
+    sortable: false,
     meta: {
       align: "right",
       headerSubLabel: t("dbm.queries.columnSubLabels.load"),
@@ -1975,6 +1996,14 @@ const defaultColumnVisibility = { p99_ns: false, max_ns: false, services: false 
  * The table emits the column id; the ids of sortable columns are deliberately
  * spelled as the backend keys, so no mapping table can drift. Anything not on
  * the whitelist is ignored rather than sent.
+ *
+ * This is the REQUEST whitelist — which keys the endpoint accepts — and it is
+ * deliberately WIDER than the set of sortable headers. `total_time_ns` is the
+ * page's default ranking and `calls` can arrive in a URL, so both must still
+ * be sendable; neither is offered as a column sort, because the figures those
+ * two columns DISPLAY are resolved server-first and no longer match the field
+ * the backend ranks on. Do not prune this list to match the headers: that
+ * would drop the default ranking the page opens with.
  */
 const SORT_KEYS: QuerySortKey[] = [
   "calls",
