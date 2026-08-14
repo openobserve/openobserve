@@ -105,6 +105,7 @@ transform.workspace = true
 url.workspace = true
 usage_reporting.workspace = true
 utoipa.workspace = true
+uuid.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
