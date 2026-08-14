@@ -211,7 +211,6 @@ const selectedOrgValue = computed<SelectModelValue>({
     if (match) selectedOrg.value = match;
   },
 });
-const orgList = ref<OrgOption[]>([...orgOptions.value]);
 const usersDisplayOptions = [
   {
     label: t("iam.groupUsers.all"),
@@ -222,14 +221,6 @@ const usersDisplayOptions = [
     value: "selected",
   },
 ];
-const filterOrganizations = (val: string, update: (fn: () => void) => void) => {
-  // Filter logic
-  update(() => {
-    const needle = val.toLowerCase();
-    orgList.value = orgOptions.value.filter((org) => org.label.toLowerCase().includes(needle));
-  });
-};
-
 const userSearchKey = ref("");
 
 const hasFetchedOrgUsers = ref(false);

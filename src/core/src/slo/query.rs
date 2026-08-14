@@ -27,7 +27,7 @@
 //! epoch-based grid. That agreement is a **coincidence of the origin**, not a
 //! guarantee, which is why `slo::spike` pins it.
 
-use config::meta::slo::{CountSource, SliConfig, interval_literal};
+use config::meta::slo::{CountSource, QueryLanguage, SliConfig, interval_literal};
 
 /// The alias every SLI query projects its numerator/denominator under.
 pub const VALUE_ALIAS: &str = "zo_slo_value";
@@ -63,6 +63,13 @@ pub enum SliQueryPlan {
     Dual { good: SliQuery, total: SliQuery },
     /// Two PromQL range evaluations, joined at the group grain.
     PromQl { good: PromQuery, total: PromQuery },
+    /// One PromQL range evaluation yielding the slice's aggregate.
+    ///
+    /// A single expression rather than the good/total pair above, because a
+    /// time-slice SLI produces one number per slice and classifies it in Rust:
+    /// there is no numerator and denominator to divide, and a "good p95" beside
+    /// a "total p95" would be arithmetic with no meaning.
+    PromQlValue(PromQuery),
     /// Read the source alert's availability ledger (S-16) rather than raw
     /// data. Its own variant rather than a special case inside `fetch_rows`,
     /// so the plan stays the single source of truth for what a pass reads.
@@ -112,41 +119,57 @@ pub fn plan(sli: &SliConfig, group_by: &[String], range: PlanRange) -> SliQueryP
                     end_micros: range.end_secs * 1_000_000,
                 },
             },
-            CountSource::PromQl { good, total } => {
-                // PromQL evaluates AT instants, and a sample at T with a
-                // slice-wide range selector covers (T-interval, T]. So the
-                // instants are the slice ENDS: first = start + interval,
-                // last = end. Evaluating at slice STARTS would attribute
-                // every value to the wrong slice.
-                let step_micros = range.slice_interval_secs * 1_000_000;
-                let prom = |expr: &str| PromQuery {
-                    expr: expr.to_string(),
-                    start_micros: (range.start_secs + range.slice_interval_secs) * 1_000_000,
-                    end_micros: range.end_secs * 1_000_000,
-                    step_micros,
-                };
-                SliQueryPlan::PromQl {
-                    good: prom(good),
-                    total: prom(total),
-                }
-            }
+            CountSource::PromQl { good, total } => SliQueryPlan::PromQl {
+                good: prom_query(good, range),
+                total: prom_query(total, range),
+            },
         },
         SliConfig::TimeSlice {
             stream,
             query,
+            query_language,
             scope,
             ..
-        } => SliQueryPlan::Single(SliQuery {
-            sql: time_slice_sql(stream, query, scope.as_deref(), group_by, range),
-            start_micros: range.start_secs * 1_000_000,
-            end_micros: range.end_secs * 1_000_000,
-        }),
+        } => match query_language {
+            // The expression is passed through untouched — deliberately not
+            // wrapped in `sum by (<group_by>)` the way the SQL arm injects
+            // GROUP BY columns. Grouping comes from the labels the series
+            // already carry, and summing four pods' p95 does not produce a
+            // p95 of anything.
+            QueryLanguage::PromQl => SliQueryPlan::PromQlValue(prom_query(query, range)),
+            QueryLanguage::Sql => SliQueryPlan::Single(SliQuery {
+                sql: time_slice_sql(stream, query, scope.as_deref(), group_by, range),
+                start_micros: range.start_secs * 1_000_000,
+                end_micros: range.end_secs * 1_000_000,
+            }),
+        },
         // Reads the source alert's availability ledger, not raw data (S-16).
         SliConfig::Alert { alert_id } => SliQueryPlan::AlertLedger {
             alert_id: alert_id.clone(),
             start_secs: range.start_secs,
             end_secs: range.end_secs,
         },
+    }
+}
+
+/// The pass's PromQL evaluation instants, for **every** PromQL SLI shape.
+///
+/// PromQL evaluates AT instants, and a sample at T with a slice-wide range
+/// selector covers (T-interval, T]. So the instants are the slice ENDS: first =
+/// start + interval, last = end. Evaluating at slice STARTS would attribute
+/// every value to the wrong slice.
+///
+/// Shared rather than repeated per arm because the readers on the other side —
+/// [`super::job::promql_rows`] and [`super::job::promql_value_rows`] — both
+/// invert it as `slice_start = T - interval`. Two copies of the rule could
+/// drift, and a drift is a whole-slice time shift that is invisible in the
+/// values and wrong in every one of them.
+fn prom_query(expr: &str, range: PlanRange) -> PromQuery {
+    PromQuery {
+        expr: expr.to_string(),
+        start_micros: (range.start_secs + range.slice_interval_secs) * 1_000_000,
+        end_micros: range.end_secs * 1_000_000,
+        step_micros: range.slice_interval_secs * 1_000_000,
     }
 }
 
@@ -554,7 +577,10 @@ mod tests {
 /// Plan tests for the PromQL count source. Written before the variant exists.
 #[cfg(test)]
 mod promql_plan_tests {
-    use config::meta::slo::{CountSource, SliConfig};
+    use config::meta::{
+        alerts::Operator,
+        slo::{CountSource, QueryLanguage, SliConfig},
+    };
 
     use super::*;
 
@@ -564,6 +590,26 @@ mod promql_plan_tests {
                 good: "increase(hits[5m]) - increase(errs[5m])".into(),
                 total: "increase(hits[5m])".into(),
             },
+        }
+    }
+
+    /// The one expression a PromQL time-slice SLI carries. Deliberately an
+    /// aggregate rather than a counter ratio: `histogram_quantile` is the
+    /// shape that makes the good/total pair meaningless and forces the
+    /// single-value plan.
+    const P95_EXPR: &str =
+        "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))";
+
+    fn time_slice_sli(query_language: QueryLanguage, query: &str) -> SliConfig {
+        SliConfig::TimeSlice {
+            stream: "http_request_duration_seconds".into(),
+            stream_type: "metrics".into(),
+            query_language,
+            query: query.into(),
+            scope: None,
+            comparator: Operator::LessThan,
+            threshold: 0.3,
+            absent_is_bad: false,
         }
     }
 
@@ -601,5 +647,80 @@ mod promql_plan_tests {
         };
         assert_eq!(good.start_micros, 1_500 * 1_000_000);
         assert_eq!(good.end_micros, 2_100 * 1_000_000);
+    }
+
+    // ============ PromQL time-slice (one value, not a pair) ===============
+
+    /// `query_language` is stored on every time-slice SLI but the planner
+    /// ignored it, so a PromQL time-slice SLO saved fine and was then measured
+    /// by feeding its PromQL expression into a SQL `SELECT … FROM "stream"` —
+    /// a query that can only fail, forever, with nothing but a failed pass to
+    /// show for it.
+    ///
+    /// A time-slice SLI produces ONE number per slice and classifies it in
+    /// Rust, so the plan is a single expression rather than the good/total
+    /// pair the count source needs. Summing a good and a total for a p95 has
+    /// no meaning.
+    #[test]
+    fn a_promql_time_slice_plans_one_expression_not_a_pair() {
+        let sli = time_slice_sli(QueryLanguage::PromQl, P95_EXPR);
+        let SliQueryPlan::PromQlValue(q) = plan(&sli, &[], aligned_range()) else {
+            panic!("expected a promql value plan");
+        };
+        assert_eq!(q.expr, P95_EXPR);
+        assert_eq!(q.step_micros, 300 * 1_000_000);
+    }
+
+    /// Grouping comes from the returned series' LABELS, never from rewriting
+    /// the expression. The SQL arm injects its `group_by` as GROUP BY columns,
+    /// which makes wrapping the PromQL in `sum by (region)(…)` look like the
+    /// symmetrical move — and it would destroy the very thing being measured,
+    /// because the sum of four pods' p95 is not a p95. The expression reaches
+    /// the engine exactly as the user wrote it.
+    #[test]
+    fn a_grouped_promql_time_slice_leaves_its_expression_alone() {
+        let sli = time_slice_sli(QueryLanguage::PromQl, P95_EXPR);
+        let SliQueryPlan::PromQlValue(q) = plan(&sli, &["region".to_string()], aligned_range())
+        else {
+            panic!("expected a promql value plan");
+        };
+        assert_eq!(q.expr, P95_EXPR);
+    }
+
+    /// The same rule as the count arm, and it must not be re-derived
+    /// differently: a sample at T with a slice-wide range selector covers
+    /// (T-interval, T], so the instants are the slice ENDS. Evaluating at
+    /// slice STARTS would attribute every p95 to the wrong slice — a shift
+    /// that is invisible in the numbers and wrong in every one of them.
+    #[test]
+    fn a_promql_time_slice_evaluates_at_slice_ends() {
+        let sli = time_slice_sli(QueryLanguage::PromQl, P95_EXPR);
+        let SliQueryPlan::PromQlValue(q) = plan(&sli, &[], aligned_range()) else {
+            panic!("expected a promql value plan");
+        };
+        assert_eq!(q.start_micros, 1_500 * 1_000_000);
+        assert_eq!(q.end_micros, 2_100 * 1_000_000);
+    }
+
+    /// The branch is on the stored `query_language`, never on what the
+    /// expression looks like. A SQL time-slice SLI keeps its SQL scan
+    /// byte-for-byte — the PromQL arm is additive, not a replacement.
+    #[test]
+    fn a_sql_time_slice_still_plans_its_sql_scan() {
+        let sli = time_slice_sli(
+            QueryLanguage::Sql,
+            "approx_percentile_cont(duration_ms, 0.95)",
+        );
+        let SliQueryPlan::Single(q) = plan(&sli, &[], aligned_range()) else {
+            panic!("expected a single sql query");
+        };
+        assert!(
+            q.sql
+                .contains("approx_percentile_cont(duration_ms, 0.95) AS zo_slo_value"),
+            "{}",
+            q.sql
+        );
+        assert_eq!(q.start_micros, 1_200 * 1_000_000);
+        assert_eq!(q.end_micros, 2_100 * 1_000_000);
     }
 }

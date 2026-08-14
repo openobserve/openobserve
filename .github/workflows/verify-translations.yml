@@ -1,0 +1,101 @@
+# Copyright 2026 OpenObserve Inc.
+name: Verify Translations
+
+# The gate that makes "main is never missing translations" true.
+#
+# update-translations.yml *generates* translations, but it fires only when the
+# author signals the PR is done (auto_merge_enabled / ready_for_review) and it
+# cannot run for fork PRs. So there are ways for a merge to reach the queue with
+# English-only strings. This workflow catches those: it runs `main.py --check`,
+# which is a pure comparison of en-US.json against the locale files and
+# .translation_state.json — no API calls, no API key, and no dependencies to
+# install (`openai` is imported lazily inside translator.py). A run is a few
+# seconds and costs nothing, which is what makes it affordable as a required check
+# on every PR.
+#
+# Make this a required status check on `main` for it to actually gate anything.
+on:
+  # No `types` and deliberately no `paths`. A required status check whose workflow
+  # was filtered out sits at "Expected — waiting for status" forever, which would
+  # block every PR that doesn't touch en-US.json. It is cheap enough to just run.
+  pull_request:
+  merge_group:
+
+concurrency:
+  group: verify-translations-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify translations are up to date
+    runs-on: ubuntu-latest
+
+    # Read-only, and no secrets are referenced anywhere in this file. That is
+    # deliberate: unlike update-translations.yml, this one runs for fork PRs, so
+    # it must hold nothing worth stealing.
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Check for untranslated strings
+        env:
+          # In the merge queue this is the last chance to stop untranslated
+          # strings reaching main, so pending keys are a hard failure. On the PR
+          # itself they are expected for most of its life — translations are
+          # generated at "Merge when ready" — so we report and stay green rather
+          # than painting every in-progress PR red.
+          IS_QUEUE: ${{ github.event_name == 'merge_group' }}
+        run: |
+          cd scripts/translations
+
+          set +e
+          OUTPUT="$(python3 main.py --check 2>&1)"
+          STATUS=$?
+          set -e
+          echo "$OUTPUT"
+
+          if [ "$STATUS" -eq 0 ]; then
+            echo "✅ Every locale is up to date with en-US.json." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "$STATUS" -ne 2 ]; then
+            echo "::error::Translation check failed to run (exit $STATUS)."
+            exit "$STATUS"
+          fi
+
+          {
+            echo "### Untranslated strings"
+            echo
+            echo '```'
+            echo "$OUTPUT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$IS_QUEUE" = "true" ]; then
+            echo "::error::This merge would land English-only strings on main. Run the **Update Translations** workflow on the PR branch (or click 'Merge when ready' again, which triggers it) before re-queueing."
+            {
+              echo
+              echo "❌ **Blocked.** Merging this would leave \`main\` with untranslated strings."
+              echo "Run the **Update Translations** workflow on the PR branch, then re-queue."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "::notice::${OUTPUT##*$'\n'} These are generated automatically when you click 'Merge when ready'. This check only blocks in the merge queue."
+          {
+            echo
+            echo "ℹ️ Expected while the PR is in progress — translations are generated when you"
+            echo "click **Merge when ready**. This check only blocks in the merge queue."
+          } >> "$GITHUB_STEP_SUMMARY"

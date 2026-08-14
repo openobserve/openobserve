@@ -338,7 +338,6 @@ import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
@@ -1231,7 +1230,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+          tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
         },
       });
     };
@@ -1862,6 +1861,7 @@ export default defineComponent({
 });
 </script>
 
+<!-- eslint-disable-next-line vue/enforce-style-attribute -- must stay unscoped: the @media print block below targets ancestors outside this component (.o2-app-root, main, .o2-content-scroll, .scroll). `scoped` rewrites selectors to this component's own elements, so those rules would match nothing and dashboard printing would clip at viewport height. -->
 <style>
 /* keep(complex-state): fullscreen / sticky-header / print-mode toggled state
    classes (compound .stickyHeader.fullscreenHeader chain + high z-index stacking)

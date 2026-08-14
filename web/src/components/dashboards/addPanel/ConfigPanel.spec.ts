@@ -251,8 +251,8 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper({ dashboardPanelData: panelDataWithDescription });
       await wrapper.vm.$nextTick();
 
-      // Check if the prop was received correctly
-      expect(wrapper.props().dashboardPanelData.data.description).toBe("Test description");
+      // ConfigPanel reads panel data from useDashboardPanelData, not from a prop
+      expect(wrapper.vm.dashboardPanelData.data.description).toBe("Test description");
     });
 
     it("should update description when input changes", async () => {
@@ -277,7 +277,7 @@ describe("ConfigPanel", () => {
       wrapper = createWrapper({ dashboardPanelData: freshMockData });
 
       // Check that the component has the expected initial structure
-      expect(wrapper.props().dashboardPanelData.data.description).toBe("");
+      expect(wrapper.vm.dashboardPanelData.data.description).toBe("");
     });
 
     it("should support multiline descriptions with autogrow", () => {
@@ -349,7 +349,7 @@ describe("ConfigPanel", () => {
       );
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.props().dashboardPanelData.data.config.step_value).toBe(30);
+      expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe(30);
     });
 
     it("should update step value when input changes", async () => {
@@ -430,36 +430,15 @@ describe("ConfigPanel", () => {
       expect(wrapper.vm.dashboardPanelData.data.description).toBe("Updated description");
     });
 
-    it("should handle reactive prop updates", async () => {
+    it("should reflect updates to the shared panel data", async () => {
       wrapper = createWrapper();
 
-      const newPanelData = {
-        data: {
-          id: "panel-1",
-          title: "Test Panel",
-          description: "Updated from parent",
-          type: "line",
-          config: {
-            step_value: 0,
-            top_results: 10,
-            trellis_layout: "horizontal",
-            trellis: {
-              layout: "horizontal",
-            },
-          },
-        },
-        meta: {
-          dateTime: {
-            start_time: new Date("2023-01-01T00:00:00Z"),
-            end_time: new Date("2023-01-01T23:59:59Z"),
-          },
-        },
-      };
-
-      await wrapper.setProps({ dashboardPanelData: newPanelData });
+      // Panel data reaches ConfigPanel through the useDashboardPanelData store —
+      // shared reactive state, so updates arrive by mutation rather than by prop.
+      wrapper.vm.dashboardPanelData.data.description = "Updated from parent";
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.props().dashboardPanelData.data.description).toBe("Updated from parent");
+      expect(wrapper.vm.dashboardPanelData.data.description).toBe("Updated from parent");
     });
 
     it("should preserve configuration when switching modes", async () => {

@@ -77,7 +77,9 @@ const { variablesSplitter } = useCheckWizardUi();
 
 // Journey-only: the toggle lives in the journey toolbar, so sharing the flag
 // would hide the panel on Configure with no control there to bring it back.
-const variablesPanelOpen = ref(true);
+// Collapsed by default — the journey is the point of this page, and the
+// labelled toolbar button is there to bring the panel in when it is needed.
+const variablesPanelOpen = ref(false);
 const journeySplitter = computed({
   get: () => (variablesPanelOpen.value ? variablesSplitter.value : 100),
   set: (v: number) => (variablesSplitter.value = v),

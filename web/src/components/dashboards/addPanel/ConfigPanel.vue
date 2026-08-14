@@ -1845,9 +1845,9 @@ export default defineComponent({
     OIcon,
     OCollapsible,
   },
-  props: ["dashboardPanelData", "variablesData", "panelData"],
+  props: ["variablesData", "panelData"],
   emits: ["open-field-overrides"],
-  setup(props) {
+  setup() {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { t } = useI18nTyped();
     const { dashboardPanelData, promqlMode, isPivotMode } = useDashboardPanelData(
@@ -2330,13 +2330,13 @@ export default defineComponent({
     const dashboardSelectfieldPromQlList = computed(() => {
       // Get fields from groupedFields based on current query's stream
       const currentQuery =
-        props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
       const currentStream = currentQuery?.fields?.stream;
 
       if (!currentStream) return [];
 
       // Find the current stream in groupedFields
-      const streamFields = props.dashboardPanelData.meta.streamFields.groupedFields.find(
+      const streamFields = dashboardPanelData.meta.streamFields.groupedFields.find(
         (group: any) => group.name === currentStream,
       );
 

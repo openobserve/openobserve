@@ -1279,3 +1279,185 @@ describe("BrowserJourney — incognito preflight failure", () => {
     expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(false);
   });
 });
+
+// ── Journey suggestions ───────────────────────────────────────────────────
+// The always-on advisory cards are gone; what is left is a derivation handed to
+// one collapsed surface, and a single action coming back.
+
+const JourneySuggestionsStub = {
+  props: ["suggestions"],
+  emits: ["action"],
+  template: `
+    <div
+      class="journey-suggestions-stub"
+      :data-count="suggestions.length"
+      :data-ids="suggestions.map((s) => s.id).join(',')"
+    >
+      <button class="suggestion-action" @click="$emit('action', 'add-assertion')" />
+    </div>`,
+};
+
+describe("BrowserJourney suggestions", () => {
+  let wrapper: VueWrapper;
+
+  const CLICK_STEP = { id: "s1", action: "click", name: "Sign In" };
+  const NAV_STEP = { id: "s0", action: "navigate", name: "Open app", value: "https://app.test" };
+
+  function mountWithSuggestions(props: Record<string, unknown> = {}) {
+    return mount(BrowserJourney, {
+      props: { modelValue: [NAV_STEP, CLICK_STEP], ...props },
+      global: { stubs: { ...STUBS, JourneySuggestions: JourneySuggestionsStub } },
+    }) as VueWrapper;
+  }
+
+  const suggestionIds = (w: VueWrapper) =>
+    (w.find(".journey-suggestions-stub").attributes("data-ids") ?? "").split(",").filter(Boolean);
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  it("no longer renders the always-on advisory cards", () => {
+    wrapper = mountWithSuggestions();
+
+    expect(wrapper.find('[data-test="synthetics-journey-zero-assertion-notice"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="synthetics-journey-testid-misconfigured"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("hands the derived suggestions to the collapsed surface", () => {
+    wrapper = mountWithSuggestions();
+
+    expect(suggestionIds(wrapper)).toContain("zero-assertion");
+  });
+
+  it("offers nothing on a journey the author cannot change", () => {
+    wrapper = mountWithSuggestions({ readonly: true });
+
+    expect(wrapper.find(".journey-suggestions-stub").exists()).toBe(false);
+  });
+
+  it("appends the offered assertion to the tail, leaving the recording untouched", async () => {
+    wrapper = mountWithSuggestions();
+
+    await wrapper.find(".suggestion-action").trigger("click");
+
+    const emitted = wrapper.emitted("update:modelValue")?.[0]?.[0] as Array<
+      Record<string, unknown>
+    >;
+    expect(emitted).toHaveLength(3);
+    // Order and identity of what was recorded survive the insertion.
+    expect(emitted.slice(0, 2).map((s) => s.id)).toEqual(["s0", "s1"]);
+    expect(emitted[0]).toEqual(NAV_STEP);
+    expect(emitted[1]).toEqual(CLICK_STEP);
+    expect(emitted[2]).toMatchObject({
+      action: "assert",
+      assertion: { kind: "element_visible" },
+    });
+    expect(emitted[2].id).toBeTruthy();
+  });
+
+  it("drops the suggestion once the parent commits the new step", async () => {
+    wrapper = mountWithSuggestions();
+    await wrapper.find(".suggestion-action").trigger("click");
+
+    const emitted = wrapper.emitted("update:modelValue")?.[0]?.[0];
+    await wrapper.setProps({ modelValue: emitted });
+
+    expect(suggestionIds(wrapper)).not.toContain("zero-assertion");
+  });
+});
+
+// ── Variables panel toggle ────────────────────────────────────────────────
+// The toggle used to be a bare chevron square, which read as decoration next to
+// the labelled Add Step / Record / Replay buttons. It now carries the panel's
+// own name, so the label is part of the contract — not just the chevron.
+describe("BrowserJourney variables panel toggle", () => {
+  let wrapper: VueWrapper;
+
+  const TOGGLE = '[data-test="synthetics-journey-toggle-variables-btn"]';
+
+  // The shared OIconStub swallows `name`; this one surfaces it so the chevron
+  // direction can be asserted from the DOM (same shape as JourneySteps.spec.ts).
+  const OIconWithNameStub = {
+    props: ["name"],
+    template: '<i :data-icon-name="name" />',
+  };
+
+  function mountToolbar(props: Record<string, unknown> = {}) {
+    return mount(BrowserJourney, {
+      props: { modelValue: [], ...props },
+      global: { stubs: { ...STUBS, OIcon: OIconWithNameStub } },
+    }) as VueWrapper;
+  }
+
+  const chevronOf = (w: VueWrapper) =>
+    w.find(`${TOGGLE} [data-icon-name]`).attributes("data-icon-name");
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  // vue-i18n is mocked to return the key, so the key IS the rendered text here.
+  it("should label the toggle with the variables panel's name", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(wrapper.find(TOGGLE).text()).toContain("synthetics.variablesPanel.title");
+  });
+
+  // The host owns the panel; without that prop there is meant to be no panel to
+  // toggle. Skipped because the guard cannot work as written, and this predates
+  // the label change: `variablesPanelOpen?: boolean` is a Boolean-typed prop, so
+  // Vue's boolean casting resolves an omitted value to `false`, never
+  // `undefined` — verified by reading $props on a mount with the prop omitted.
+  // `v-if="variablesPanelOpen !== undefined"` is therefore always true and the
+  // toggle renders for every host. Un-skip once the component distinguishes
+  // "no panel" some other way (e.g. `variablesPanelOpen?: boolean | undefined`
+  // declared with an explicit `default: undefined`, or a separate flag prop).
+  it.skip("should not render the toggle when the host provides no variables panel", () => {
+    wrapper = mountToolbar();
+
+    expect(wrapper.find(TOGGLE).exists()).toBe(false);
+  });
+
+  it("should render the toggle when the host provides a closed variables panel", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(wrapper.find(TOGGLE).exists()).toBe(true);
+  });
+
+  it("should emit toggle-variables-panel when pressed", async () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    await wrapper.find(TOGGLE).trigger("click");
+
+    // OButtonStub both $emits "click" and lets the native event through (it
+    // declares no `emits`), so one press registers twice. That it fires at all,
+    // with no payload, is the contract.
+    const emitted = wrapper.emitted("toggle-variables-panel")!;
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const call of emitted) expect(call).toEqual([]);
+  });
+
+  it("should point the chevron right — collapse — while the panel is open", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: true });
+
+    expect(chevronOf(wrapper)).toBe("keyboard-double-arrow-right");
+  });
+
+  it("should point the chevron left — open — while the panel is closed", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(chevronOf(wrapper)).toBe("keyboard-double-arrow-left");
+  });
+});

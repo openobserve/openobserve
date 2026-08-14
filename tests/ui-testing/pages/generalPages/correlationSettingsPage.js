@@ -22,10 +22,23 @@ export class CorrelationSettingsPage {
         // Tab selectors (OTabs - render as [role="tablist"] / [role="tab"])
         // Note: tabs use name attribute: services, discovery, alert-correlation, field-aliases
         this.tabsContainer = '[role="tablist"]';
-        this.servicesTabName = 'Services';
-        this.serviceDiscoveryTabName = 'Configuration';
-        this.alertCorrelationTabName = 'Alert Correlation';
+        // The Correlation Settings tabs wrapper (data-test container).
+        this.correlationSettingsTabs = '[data-test="correlation-settings-tabs"]';
+        // Save button on the Detection Rules ("Distinguish Services By") view.
+        this.saveConfigurationButtonName = 'Save Configuration';
+        // Placeholder text of the "+ Add field" OSelect trigger.
+        this.selectAFieldText = 'Select a field';
+        // Visible tab labels (post-revamp): the tab `name` attrs are
+        // services / discovery / alert-correlation / field-aliases, rendered as
+        // these i18n labels.
+        this.servicesTabName = 'Discovered Services';
+        this.serviceDiscoveryTabName = 'Detection Rules';
+        this.alertCorrelationTabName = 'Alert Grouping';
         this.fieldAliasesTabName = 'Field Mappings';
+        // Detection Rules view (the "Distinguish Services By" configuration tab)
+        this.detectionRulesTabName = 'Detection Rules';
+        // "+ Add field" button that reveals the "Select a field" OSelect
+        this.addFieldButtonName = 'Add field';
 
         // ==================== Service Identity Tab Selectors ====================
         this.serviceIdentityBackwardBtn = '[data-test="correlation-service-identity-backward-btn"]';
@@ -48,6 +61,7 @@ export class CorrelationSettingsPage {
         this.semanticGroupCategorySelect = '[data-test="semantic-group-category-select"]';
         this.importJsonBtn = '[data-test="correlation-semanticfieldgroup-import-json-btn"]';
         this.addCustomGroupBtn = '[data-test="correlation-semanticfieldgroup-add-custom-group-btn"]';
+        this.semanticFieldGroupSaveBtn = '[data-test="correlation-semanticfieldgroup-save-btn"]';
 
         // ==================== Semantic Group Item Selectors ====================
         this.semanticGroupDisplayInput = '[data-test="semantic-group-display-input"]';
@@ -81,43 +95,33 @@ export class CorrelationSettingsPage {
         const password = process.env["ZO_ROOT_USER_PASSWORD"];
         const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
 
-        // Define test semantic groups that cover common use cases
+        // Define test semantic groups that cover common use cases.
+        // Post-revamp shape: {id, display, group, fields} only — the per-group
+        // flags (is_scope / is_stable / normalize) were removed.
         const testSemanticGroups = [
             {
                 id: 'k8s-cluster',
                 display: 'K8s Cluster',
                 group: 'Kubernetes',
                 fields: ['k8s.cluster.name', 'k8s_cluster_name'],
-                normalize: true,
-                is_scope: true,
-                is_stable: true
             },
             {
                 id: 'k8s-namespace',
                 display: 'K8s Namespace',
                 group: 'Kubernetes',
                 fields: ['k8s.namespace.name', 'k8s_namespace_name'],
-                normalize: true,
-                is_scope: true,
-                is_stable: true
             },
             {
                 id: 'k8s-deployment',
                 display: 'K8s Deployment',
                 group: 'Kubernetes',
                 fields: ['k8s.deployment.name', 'k8s_deployment_name'],
-                normalize: true,
-                is_scope: false,
-                is_stable: true
             },
             {
                 id: 'service',
                 display: 'Service',
                 group: 'Common',
                 fields: ['service.name', 'service_name', 'service'],
-                normalize: true,
-                is_scope: false,
-                is_stable: true
             }
         ];
 
@@ -168,9 +172,10 @@ export class CorrelationSettingsPage {
     // ==================== Page Assertions ====================
 
     async expectPageLoaded() {
-        await expect(this.page.locator(this.pageTitle)).toBeVisible({ timeout: 15000 });
-        const titleText = await this.page.locator(this.pageTitle).textContent();
-        expect(titleText.toLowerCase()).toContain('correlation');
+        // The tabs container is the reliable "page loaded" signal — the old
+        // `.general-page-title` class was removed in the revamp (the title is
+        // now [data-test="correlation-settings-page-title"]).
+        await expect(this.page.locator(this.correlationSettingsTabs)).toBeVisible({ timeout: 15000 });
     }
 
     async expectAllTabsVisible() {
@@ -198,6 +203,11 @@ export class CorrelationSettingsPage {
         const tab = this.page.getByRole('tab', { name: this.servicesTabName });
         await tab.click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
+    // The "services" tab IS the Discovered Services tab (post-revamp label).
+    async clickDiscoveredServicesTab() {
+        await this.clickServicesTab();
     }
 
     async clickAlertCorrelationTab() {
@@ -231,6 +241,99 @@ export class CorrelationSettingsPage {
         await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
     }
 
+    // ==================== Tab / Button Getters (raw-selector relocation) ====================
+
+    /**
+     * Field Mappings tab locator (a.k.a. Field Aliases).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getFieldMappingsTab() {
+        return this.page.getByRole('tab', { name: this.fieldAliasesTabName });
+    }
+
+    /**
+     * Detection Rules tab locator (the "Distinguish Services By" configuration).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getDetectionRulesTab() {
+        return this.page.getByRole('tab', { name: this.detectionRulesTabName });
+    }
+
+    /**
+     * "+ Add field" button on the Detection Rules view.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getAddFieldButton() {
+        return this.page.getByRole('button', { name: this.addFieldButtonName }).first();
+    }
+
+    /**
+     * The Correlation Settings tabs container (data-test wrapper).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getCorrelationSettingsTabs() {
+        return this.page.locator(this.correlationSettingsTabs);
+    }
+
+    /**
+     * "+ Add custom group" button on the Field Mappings view.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getAddCustomGroupButton() {
+        return this.page.locator(this.addCustomGroupBtn);
+    }
+
+    /**
+     * Semantic-group display-input wrapper (data-test sits on the component
+     * wrapper; the editable element is inside).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getSemanticGroupDisplayWrap() {
+        return this.page.locator(this.semanticGroupDisplayInput);
+    }
+
+    /**
+     * Save button for a semantic field group.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getSemanticFieldGroupSaveButton() {
+        return this.page.locator(this.semanticFieldGroupSaveBtn);
+    }
+
+    /**
+     * "Save Configuration" button on the Detection Rules view.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getSaveConfigurationButton() {
+        return this.page.getByRole('button', { name: this.saveConfigurationButtonName });
+    }
+
+    /**
+     * "Select a field" OSelect trigger (placeholder text, non-exact).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getSelectAFieldTrigger() {
+        return this.page.getByText(this.selectAFieldText, { exact: false });
+    }
+
+    /**
+     * Role=option locator matched by name (string or RegExp).
+     * @param {string|RegExp} name - Option accessible name.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getOptionByName(name) {
+        return this.page.getByRole('option', { name });
+    }
+
+    /**
+     * Visible text locator matched by string or RegExp.
+     * @param {string|RegExp} text - Text (or pattern) to match.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getTextByPattern(text) {
+        return this.page.getByText(text);
+    }
+
     async clickFieldAliasesTab() {
         // Correlation Settings (Field Mappings / Field Aliases) is an ENTERPRISE-only
         // feature — the tab only mounts on the enterprise build. Probe positively for
@@ -260,8 +363,11 @@ export class CorrelationSettingsPage {
     }
 
     async expectServiceDiscoveryContentVisible() {
-        // Wait for the Configuration tab content to be visible (formerly Service Identity)
-        await expect(this.page.locator(this.serviceIdentitySaveBtn)).toBeVisible({ timeout: 15000 });
+        // Detection Rules view: the "Save Configuration" button anchors it
+        // (the old dual-list Service Identity save-btn was removed in the revamp).
+        await expect(
+            this.page.getByRole('button', { name: this.saveConfigurationButtonName }).first(),
+        ).toBeVisible({ timeout: 15000 });
     }
 
     async expectFieldAliasesContentVisible() {
@@ -269,10 +375,7 @@ export class CorrelationSettingsPage {
         await expect(this.page.locator(this.importJsonBtn)).toBeVisible({ timeout: 15000 });
     }
 
-    async expectAlertCorrelationContentVisible() {
-        // Wait for the Alert Correlation tab content to be visible
-        await expect(this.page.locator(this.dedupSettingsRefreshBtn)).toBeVisible({ timeout: 15000 });
-    }
+
 
     // ==================== Service Discovery (Configuration) Tab Actions ====================
 
@@ -415,14 +518,15 @@ export class CorrelationSettingsPage {
     }
 
     async fillTimeWindowInput(minutes) {
-        const input = this.page.locator(this.defaultWindowInput);
-        await expect(input).toBeVisible({ timeout: 5000 });
-        await input.fill(String(minutes));
+        // OFormInput forwards data-test to a wrapper <div>; the real control is
+        // the inner <input type="number">.
+        const wrap = this.page.locator(this.defaultWindowInput);
+        await expect(wrap).toBeVisible({ timeout: 5000 });
+        await wrap.locator('input').first().fill(String(minutes));
     }
 
     async getTimeWindowValue() {
-        const input = this.page.locator(this.defaultWindowInput);
-        return await input.inputValue();
+        return await this.page.locator(this.defaultWindowInput).locator('input').first().inputValue();
     }
 
     async clickRefreshDedupSettings() {

@@ -42,6 +42,16 @@ export default class DashboardLegendsCopy {
     return this.showLegendsBtn.first();
   }
 
+  /** Returns the legends popup container locator */
+  getLegendsPopup() {
+    return this.legendsPopup;
+  }
+
+  /** Returns the raw legend-item locator (all items, unfiltered) */
+  getLegendItems() {
+    return this.page.locator('[data-test^="dashboard-legend-item-"]');
+  }
+
   /**
    * Hover over a panel to reveal the toolbar, then click Show Legends.
    * Works both in dashboard view (PanelContainer) and edit panel (AddPanel).

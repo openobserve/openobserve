@@ -24,17 +24,13 @@ import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { getThemeColors } from "@/utils/logs/keyValueParser";
 import { escapeHtml } from "@/utils/html";
 import { ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { searchState } from "@/composables/useLogs/searchState";
 
 export function useLogsHighlighter() {
   const processedResults = ref<Record<string, string>>({});
 
-  const store = useStore();
   const { isDark } = useTheme();
   const currentColors = ref(getThemeColors(isDark.value));
-  const { searchObj } = searchState();
 
   // Track active processing to prevent memory leaks
   let abortController: AbortController | null = null;

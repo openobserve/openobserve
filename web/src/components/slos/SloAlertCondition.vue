@@ -64,12 +64,20 @@
           </span>
         </div>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <!-- Selection styling copied from PredefinedThemes: same shape (a grid
+               of button-cards where one is applied), so the "this is the one in
+               effect" cue reads identically in both places. -->
           <button
             v-for="p in presets"
             :key="p.key"
             type="button"
-            class="rounded-default hover:border-primary border p-3 text-left transition-colors"
-            :class="isActivePreset(p) ? 'border-primary bg-primary/5' : 'border-border'"
+            class="rounded-default focus-visible:ring-accent/40 cursor-pointer border p-3 text-left transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
+            :class="
+              isActivePreset(p)
+                ? 'border-accent ring-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] ring-1 ring-inset'
+                : 'border-border-default hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+            "
+            :aria-pressed="isActivePreset(p)"
             :data-test="`slos-sloalertcondition-preset-${p.key}`"
             @click="applyPreset(p)"
           >
@@ -236,34 +244,35 @@ const windowLabel = computed(() =>
  *  These are not arbitrary: each threshold is the burn rate that consumes the
  *  stated fraction of the budget over the long window, which is what makes
  *  "×14.4" mean something. */
-const PRESETS: Record<number, Array<[string, number, number, number, number]>> = {
-  // window days -> [key/label, threshold, longSecs, shortSecs, budget %]
+const PRESETS: Record<number, Array<[string, number, number, number]>> = {
+  // window days -> [key/label, threshold, longSecs, shortSecs]
   7: [
-    ["fast", 16.8, 3600, 300, 2],
-    ["mid", 5.6, 21600, 1800, 5],
-    ["slow", 2.8, 86400, 7200, 10],
+    ["fast", 16.8, 3600, 300],
+    ["mid", 5.6, 21600, 1800],
+    ["slow", 2.8, 86400, 7200],
   ],
   30: [
-    ["fast", 14.4, 3600, 300, 2],
-    ["mid", 6, 21600, 1800, 5],
-    ["slow", 3, 86400, 7200, 10],
+    ["fast", 14.4, 3600, 300],
+    ["mid", 6, 21600, 1800],
+    ["slow", 3, 86400, 7200],
   ],
   90: [
-    ["fast", 21.6, 3600, 300, 2],
-    ["mid", 10.8, 21600, 1800, 5],
-    ["slow", 4.5, 86400, 7200, 10],
+    ["fast", 21.6, 3600, 300],
+    ["mid", 10.8, 21600, 1800],
+    ["slow", 4.5, 86400, 7200],
   ],
 };
 
 const presets = computed(() => {
   const days = Math.round((selectedSlo.value?.window_secs ?? 30 * 86400) / 86400);
-  const rows = PRESETS[days] ?? PRESETS[30];
+  const presetDays = PRESETS[days] ? days : 30;
+  const rows = PRESETS[presetDays];
   const labels: Record<string, string> = {
     fast: t("slos.alert.preset.fast"),
     mid: t("slos.alert.preset.mid"),
     slow: t("slos.alert.preset.slow"),
   };
-  return rows.map(([key, threshold, longSecs, rawShortSecs, budgetPct]) => {
+  return rows.map(([key, threshold, longSecs, rawShortSecs]) => {
     // The published rows assume a fine slice grid. Ours is the SLO's
     // own `slice_interval_secs`, and SA-8 requires every window to be a whole
     // multiple of it AND at least two slices — so on a 5-minute-slice SLO the
@@ -280,9 +289,8 @@ const presets = computed(() => {
     // card a hair over the cap — unsavable, and 16 digits wide in the UI.
     const ceiling = maxBurnValue.value;
     const clamped =
-      ceiling === null
-        ? (threshold as number)
-        : Math.min(threshold as number, Math.floor(ceiling * 100) / 100);
+      ceiling === null ? threshold : Math.min(threshold, Math.floor(ceiling * 100) / 100);
+    const budgetPct = Math.round((clamped * longSecs * 100) / (presetDays * 86400));
     return {
       key: key as string,
       label: labels[key as string],
@@ -320,14 +328,14 @@ function applyPreset(p: any) {
 }
 
 const longHours = computed({
-  get: () => (model.value.long_window_secs ?? 3600) / 3600,
+  get: () => model.value.long_window_secs / 3600,
   set: (v: number) => {
     model.value.long_window_secs = Math.round((Number(v) || 1) * 3600);
   },
 });
 
 const shortMinutes = computed({
-  get: () => (model.value.short_window_secs ?? 300) / 60,
+  get: () => model.value.short_window_secs / 60,
   set: (v: number) => {
     model.value.short_window_secs = Math.round((Number(v) || 5) * 60);
   },

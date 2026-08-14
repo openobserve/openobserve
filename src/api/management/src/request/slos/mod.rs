@@ -148,6 +148,11 @@ pub async fn create_slo(
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
     }
+    if slo.name.is_empty() || slo.name.len() > 256 {
+        return MetaHttpResponse::bad_request(
+            "name must be non empty and less than 256 characters",
+        );
+    }
 
     match slo_service::create(&mut slo).await {
         Ok(()) => MetaHttpResponse::json(

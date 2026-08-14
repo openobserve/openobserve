@@ -1471,7 +1471,7 @@ async fn process_llm_evaluation_node(
                         evaluator_span_id: None,
                         parent_span_id: None,
                         is_root: false,
-                        target_scope: ctx.target_scope.clone(),
+                        target_scope: ctx.target_scope,
                         target_id: ctx.target_id.clone(),
                         target_span_id: ctx.span_id.clone(),
                         target_trace_id: ctx.trace_id.clone(),

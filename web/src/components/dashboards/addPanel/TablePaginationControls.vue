@@ -88,6 +88,7 @@ import { defineComponent, computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only as a param type in a template inline handler, which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 export default defineComponent({
   name: "TablePaginationControls",

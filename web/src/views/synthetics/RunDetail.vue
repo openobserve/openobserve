@@ -1387,9 +1387,6 @@ const infoChips = computed<InfoChip[]>(() => [
     : []),
 ]);
 
-const initMs = computed(() => synthetics.runDetail.value?.initMs ?? 0);
-const queueDelayMs = computed(() => synthetics.runDetail.value?.queueDelayMs ?? null);
-
 // ── Emit status to parent (for drawer header-right badge) ──────────────────
 watch(
   () => synthetics.runDetail.value?.status ?? null,

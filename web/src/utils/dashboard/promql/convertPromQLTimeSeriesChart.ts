@@ -18,6 +18,7 @@ import { fillMissingTimestamps } from "./shared/dataProcessor";
 import { buildXAxis, buildYAxis, buildTooltip } from "./shared/axisBuilder";
 import { buildDynamicGrid } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
+import { chartColor } from "@/utils/chartTheme";
 
 /**
  * Converter for time-series charts (line, area, bar, scatter, area-stacked)
@@ -116,8 +117,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             data: this.getMarkLineData(panelSchema),
             zlevel: 2,
             lineStyle: {
-              shadowColor:
-                store.state.theme === "light" ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.7)",
+              shadowColor: chartColor("--color-chart-markline-shadow"),
               shadowBlur: 2,
               width: 2,
             },

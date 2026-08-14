@@ -1,4 +1,5 @@
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -42,7 +43,8 @@ const {
 test.describe.configure({ mode: "parallel" });
 
 test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
   });
@@ -58,7 +60,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Add a basic panel using helper (panel time disabled initially)
     let panelId = await addPanelWithPanelTime(page, pm, {
@@ -76,14 +78,14 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await assertPanelTimeToggleState(page, true);
 
     // Step 4: Verify "+Set" button appears with "Default Duration" title
-    const setButton = page.locator('[data-test="dashboard-config-set-panel-time"]');
+    const setButton = pm.dashboardPanelTime.getSetPanelTimeBtn();
     await expect(setButton).toBeVisible();
 
     // Step 5: Click "+Set" button to open date time picker
     await setButton.click();
 
     // Step 6: Verify date time picker is visible
-    const timePicker = page.locator('[data-test="dashboard-config-panel-time-picker"]');
+    const timePicker = pm.dashboardPanelTime.getConfigPanelTimePicker();
     await expect(timePicker).toBeVisible();
 
     // Step 7: Select "Last 1h" in the config picker
@@ -91,11 +93,11 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
 
     // Step 8: Click the global Apply button (at top of panel edit screen)
     // Note: Config picker doesn't have its own Apply button, uses global one
-    await page.locator('[data-test="dashboard-apply"]').click();
+    await pm.dashboardCreate.applyButton();
 
     // Step 9: Verify "Last 1h" is shown with Cancel button, "+Set" hidden
     await expect(setButton).not.toBeVisible();
-    const cancelButton = page.locator('[data-test="dashboard-config-cancel-panel-time"]');
+    const cancelButton = pm.dashboardPanelTime.getCancelPanelTimeBtn();
     await expect(cancelButton).toBeVisible();
 
     // Step 10: Click Cancel (X) button to clear panel_time_range
@@ -133,7 +135,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Add a basic panel without panel time
     let panelId = await addPanelWithPanelTime(page, pm, {
@@ -149,13 +151,13 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelTime.enablePanelTime();
 
     // Click "+Set" button
-    await page.locator('[data-test="dashboard-config-set-panel-time"]').click();
+    await pm.dashboardPanelTime.getSetPanelTimeBtn().click();
 
     // Select "Last 1h" in config picker
     await pm.dashboardPanelTime.setPanelTimeRelative("1-h");
 
     // Click global Apply button
-    await page.locator('[data-test="dashboard-apply"]').click();
+    await pm.dashboardCreate.applyButton();
 
     // Save panel
     await savePanel(page);
@@ -168,16 +170,16 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelConfigs.openConfigPanel();
 
     // Click Cancel to clear current time
-    await page.locator('[data-test="dashboard-config-cancel-panel-time"]').click();
+    await pm.dashboardPanelTime.getCancelPanelTimeBtn().click();
 
     // Click "+Set" button
-    await page.locator('[data-test="dashboard-config-set-panel-time"]').click();
+    await pm.dashboardPanelTime.getSetPanelTimeBtn().click();
 
     // Select "Last 15m" in config picker
     await pm.dashboardPanelTime.setPanelTimeRelative("15-m");
 
     // Click global Apply button (config picker uses global Apply)
-    await page.locator('[data-test="dashboard-apply"]').click();
+    await pm.dashboardCreate.applyButton();
 
     await savePanel(page);
 
@@ -186,16 +188,16 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelConfigs.openConfigPanel();
 
     // Click Cancel to clear current time
-    await page.locator('[data-test="dashboard-config-cancel-panel-time"]').click();
+    await pm.dashboardPanelTime.getCancelPanelTimeBtn().click();
 
     // Click "+Set" button
-    await page.locator('[data-test="dashboard-config-set-panel-time"]').click();
+    await pm.dashboardPanelTime.getSetPanelTimeBtn().click();
 
     // Select "Last 6d" in config picker
     await pm.dashboardPanelTime.setPanelTimeRelative("6-d");
 
     // Click global Apply button
-    await page.locator('[data-test="dashboard-apply"]').click();
+    await pm.dashboardCreate.applyButton();
 
     await savePanel(page);
 
@@ -207,16 +209,16 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelConfigs.openConfigPanel();
 
     // Click Cancel to clear current time
-    await page.locator('[data-test="dashboard-config-cancel-panel-time"]').click();
+    await pm.dashboardPanelTime.getCancelPanelTimeBtn().click();
 
     // Click "+Set" button
-    await page.locator('[data-test="dashboard-config-set-panel-time"]').click();
+    await pm.dashboardPanelTime.getSetPanelTimeBtn().click();
 
     // Set absolute time in config picker
     await pm.dashboardPanelTime.setPanelTimeAbsolute("1", "1");
 
     // Click global Apply button
-    await page.locator('[data-test="dashboard-apply"]').click();
+    await pm.dashboardCreate.applyButton();
 
     await savePanel(page);
 
@@ -236,7 +238,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Create basic panel without panel time enabled
     let panelId = await addPanelWithPanelTime(page, pm, {
@@ -254,7 +256,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelTime.enablePanelTime();
 
     // Verify "+Set" button appears
-    const setButton = page.locator('[data-test="dashboard-config-set-panel-time"]');
+    const setButton = pm.dashboardPanelTime.getSetPanelTimeBtn();
     await expect(setButton).toBeVisible();
 
     // Click "+Set" button to open date time picker
@@ -264,7 +266,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelTime.setPanelTimeRelative("1-h");
 
     // Click the global Apply button (at top of panel edit screen)
-    await page.locator('[data-test="dashboard-apply"]').click();
+    await pm.dashboardCreate.applyButton();
 
     // Save panel
     await savePanel(page);
@@ -275,7 +277,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Open config panel sidebar
     await pm.dashboardPanelConfigs.openConfigPanel();
     // Step 3: Verify top date time picker shows "Last 1h" (NOT global time)
-    const pickerText = await page.locator('[data-test="dashboard-config-panel-time-picker"]').textContent();
+    const pickerText = await pm.dashboardPanelTime.getConfigPanelTimePickerText();
     expect(pickerText).toContain("1");
     expect(pickerText.toLowerCase()).toContain("hour");
 
@@ -284,16 +286,16 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelTime.setPanelTimeRelative("6-d");
 
     // Click the global Apply button (required for config time changes)
-    await page.locator('[data-test="dashboard-apply"]').click();
+    await pm.dashboardCreate.applyButton();
 
-    await page.locator('[data-test="dashboard-panel-save"]').click();
+    await pm.dashboardPanelActions.getPanelSaveBtn().click();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Step 5: Edit panel again
     await editPanel(page, panelName);
     await pm.dashboardPanelConfigs.openConfigPanel();
     // Step 6: Verify picker shows "Last 6d"
-    const pickerText2 = await page.locator('[data-test="dashboard-config-panel-time-picker"]').textContent();
+    const pickerText2 = await pm.dashboardPanelTime.getConfigPanelTimePickerText();
     expect(pickerText2).toContain("6");
     expect(pickerText2.toLowerCase()).toContain("day");
 
@@ -303,7 +305,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       expect(dialog.message()).toContain("unsaved changes");
       await dialog.accept();
     });
-    await page.locator('[data-test="dashboard-panel-discard"]').click().catch(() => {});
+    await pm.dashboardPanelTime.clickPanelDiscard();
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Step 9: Edit panel without panel time config
@@ -314,7 +316,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelConfigs.openConfigPanel();
 
     await pm.dashboardPanelTime.disablePanelTime();
-    await page.locator('[data-test="dashboard-panel-save"]').click();
+    await pm.dashboardPanelActions.getPanelSaveBtn().click();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Step 10: Edit again and verify panel time picker is NOT in config sidebar
@@ -323,7 +325,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelConfigs.openConfigPanel();
 
     // Verify panel time picker is NOT present in config because panel time is disabled
-    const panelTimePickerInConfig = page.locator('[data-test="dashboard-config-panel-time-picker"]');
+    const panelTimePickerInConfig = pm.dashboardPanelTime.getConfigPanelTimePicker();
     await expect(panelTimePickerInConfig).not.toBeVisible();
 
     // Cleanup
@@ -332,7 +334,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       expect(dialog.message()).toContain("unsaved changes");
       await dialog.accept();
     });
-    await page.locator('[data-test="dashboard-panel-discard"]').click().catch(() => {});
+    await pm.dashboardPanelTime.clickPanelDiscard();
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await cleanupDashboard(page, pm, dashboardName);
   });
@@ -347,7 +349,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Panel A: panel_time_enabled: true with individual time "Last 1h"
     const panelAId = await addPanelWithPanelTime(page, pm, {
@@ -372,11 +374,11 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelTime.clickPanelTimePicker(panelAId);
 
     // Verify dropdown opens
-    await page.locator('#date-time-menu').waitFor({ state: "visible", timeout: 5000 });
+    await pm.dashboardPanelTime.waitForDateTimeMenuVisible(5000);
 
     // Step 5: Press Escape to close
     await page.keyboard.press('Escape');
-    await page.locator('#date-time-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await pm.dashboardPanelTime.waitForDateTimeMenuHidden(3000);
 
     // Wait for initial pt-period URL param to land before changing time — ensures
     // panelsInitializing guard in RenderDashboardCharts has cleared.
@@ -422,7 +424,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
 
     // Step 2: Click panel picker, select "Last 6 days"
     await pm.dashboardPanelTime.clickPanelTimePicker(panelId);
-    await page.locator('[data-test="date-time-relative-6-d-btn"]').click();
+    await pm.dashboardPanelTime.clickDateTimeRelative("6-d");
 
     // Step 3: Verify panel data does NOT refresh yet
     await assertPanelDataNotRefreshed(page, 2000);
@@ -431,7 +433,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     expect(page.url()).toBe(initialURL);
 
     // Step 5: Click Apply button
-    await page.locator('[data-test="date-time-apply-btn"]').click();
+    await pm.dashboardPanelTime.clickDateTimeApplyBtn();
 
     // Step 6: Verify API call fires immediately
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
@@ -443,8 +445,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     expect(page.url()).not.toBe(initialURL);
 
     // Step 9: Open Query Inspector from panel dropdown menu in View Dashboard
-    await page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`).click();
-    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+    await pm.dashboardPanelActions.selectPanelAction(panelName, "Inspector");
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Step 10: Verify query inspector shows new time (6d, not the old 1h)
@@ -468,7 +469,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Panel A: useDefaultTime enabled with panel_time_range set to "Last 1h" (custom time via +Set)
     const panelAId = await addPanelWithPanelTime(page, pm, {
@@ -507,13 +508,13 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await assertPanelTimeInURL(page, panelBId, "15m");
 
     // Step 3: Verify Panel A picker shows "Last 1h" (has custom time)
-    const panelAText = await page.locator(`[data-test="panel-time-picker-${panelAId}"]`).textContent();
+    const panelAText = await pm.dashboardPanelTime.panelTimePicker(panelAId).textContent();
     expect(panelAText).toContain("1");
     expect(panelAText.toLowerCase()).toContain("hour");
 
     // Step 4: Verify Panel B has picker visible showing "15m" (initial global time)
     await assertPanelTimePickerVisible(page, panelBId);
-    const panelBText = await page.locator(`[data-test="panel-time-picker-${panelBId}"]`).textContent();
+    const panelBText = await pm.dashboardPanelTime.panelTimePicker(panelBId).textContent();
     expect(panelBText).toContain("15");
     expect(panelBText.toLowerCase()).toContain("minute");
 
@@ -528,7 +529,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await assertPanelTimeInURL(page, panelAId, "6d");
 
     // Step 8: Verify Panel A picker updated to show "6d"
-    const panelATextAfter = await page.locator(`[data-test="panel-time-picker-${panelAId}"]`).textContent();
+    const panelATextAfter = await pm.dashboardPanelTime.panelTimePicker(panelAId).textContent();
     expect(panelATextAfter).toContain("6");
     expect(panelATextAfter.toLowerCase()).toContain("day");
 
@@ -556,7 +557,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Step 2: Add global variable
     await pm.dashboardSetting.openSetting();
@@ -567,7 +568,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       "kubernetes_container_name",
       { scope: "global" }
     );
-    await page.locator(getEditVariableBtn(globalVariableName)).waitFor({ state: "visible", timeout: 15000 });
+    await pm.dashboardVariablesScoped.getEditVariableBtnLocator(globalVariableName).waitFor({ state: "visible", timeout: 15000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await pm.dashboardSetting.closeSettingWindow();
     await safeWaitForHidden(page, SELECTORS.DIALOG, { timeout: 5000 });
@@ -589,7 +590,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
       "kubernetes_namespace_name",
       { scope: "panels", assignedPanels: [panelName] }
     );
-    await page.locator(getEditVariableBtn(panelVariableName)).waitFor({ state: "visible", timeout: 15000 });
+    await pm.dashboardVariablesScoped.getEditVariableBtnLocator(panelVariableName).waitFor({ state: "visible", timeout: 15000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await pm.dashboardSetting.closeSettingWindow();
     await safeWaitForHidden(page, SELECTORS.DIALOG, { timeout: 5000 });
@@ -606,10 +607,10 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await assertPanelTimeInURL(page, panelAId, "1h");
 
     // Step 6: Verify panel variable is visible
-    await page.locator(getVariableSelector(panelVariableName)).waitFor({ state: "visible", timeout: 10000 });
+    await pm.dashboardVariablesScoped.getVariableSelectorLocator(panelVariableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Step 7: Change Panel A's panel variable
-    const panelVariableDropdown = page.locator(getVariableSelector(panelVariableName));
+    const panelVariableDropdown = pm.dashboardVariablesScoped.getVariableSelectorLocator(panelVariableName);
     await panelVariableDropdown.waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -639,7 +640,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Step 12: Test global variable uses global time (not panel time)
-    const globalVariableDropdown = page.locator(getVariableSelector(globalVariableName));
+    const globalVariableDropdown = pm.dashboardVariablesScoped.getVariableSelectorLocator(globalVariableName);
     await globalVariableDropdown.waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 

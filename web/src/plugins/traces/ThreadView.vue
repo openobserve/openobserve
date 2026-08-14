@@ -355,7 +355,6 @@ const emit = defineEmits<{
   (e: "span-selected", spanId: string): void;
 }>();
 
-import { useStore } from "vuex";
 import {
   getModel,
   getCost,
@@ -371,7 +370,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
 import { renderMarkdown } from "./markdown";
 
-const store = useStore();
 const { t } = useI18nTyped();
 
 interface ThreadHead {
