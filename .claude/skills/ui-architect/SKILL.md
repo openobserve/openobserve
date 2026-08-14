@@ -333,6 +333,39 @@ per-archetype recipes: [references/calm-signal.md](references/calm-signal.md).
 Reference implementation: the Alerts list
 (`web/src/components/alerts/AlertList.vue`).
 
+## Interaction cost — the click budget
+
+Colour decides what a screen *says*; this decides what it *costs*. One rule:
+**the shortest path to the thing the screen exists for is one click, and no
+complete flow exceeds two — three at the absolute limit.**
+
+| Kind of thing | Budget |
+|---|---|
+| An answer the product already knows (a status, a count, a "would this work") | **0** — it is on the screen you already opened, not behind a drill-in |
+| A screen's primary action (acknowledge, resolve, enable, add) | **1** from the list the user is already looking at |
+| A complete flow, start to saved | **2**, hard ceiling **3** |
+
+Four consequences, each of which is a review objection on its own:
+
+1. **A navigation step is a click.** Rail → flyout → page → tab → button is four
+   spent before the user acts. A deep-linkable tab is shareable, not free.
+2. **Act from the row.** If a list can render a thing it can act on it — inline
+   row actions plus a bulk action on selection, not a mandatory drill-in.
+   Reference: the Alerts list, and `OnCallResponses.vue`'s inline
+   acknowledge/resolve.
+3. **Pre-fill from context.** A form opened from a row, a gap, or a failing item
+   arrives with everything that row already knew filled in. The click worth
+   removing is the one where the user re-types what the app is displaying.
+4. **No modal chains.** One `ODialog`/`ODrawer` per flow. A dialog that opens a
+   dialog has spent the budget on chrome. If a form needs a second surface, it
+   needs a better default instead — see below.
+
+**When a flow genuinely cannot fit**, the fix is a **better default, not a
+shorter form**: a preset/template that turns construction into *pick a shape →
+confirm*, a sensible value for every field the user has no opinion about, and a
+preview instead of a wizard step. Do not hit the budget by hiding required
+fields behind "Advanced" — that moves the click, it does not remove it.
+
 ## Pick a component
 
 The **scenario → component** index and the per-file catalog (what each `O*` is,
@@ -390,6 +423,12 @@ considering the UI done:
 - [ ] Form container matches weight: confirm → `ConfirmDialog`, short form →
       `ODialog`, large/contextual form → `ODrawer`, primary multi-section flow →
       full page.
+- [ ] **Click budget holds**: the screen's primary action is **1 click** from the
+      list (inline row action, not a mandatory drill-in), the whole flow is **≤ 2
+      clicks** (3 only with a reason), a form opened from a row arrives
+      **pre-filled from that row**, and no dialog opens another dialog. Count
+      navigation steps as clicks. If it doesn't fit, add a better default or a
+      preset — not an "Advanced" section.
 - [ ] Validated form uses `OForm` + a colocated Zod `<Form>.schema.ts`; every
       control inside is an `OForm*` addressed only by `name=` (no `v-model`/`ref`
       mirror, no `formData`), required via the `required` prop.
