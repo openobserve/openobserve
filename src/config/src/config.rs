@@ -1483,7 +1483,7 @@ pub struct Common {
     pub tracing_search_enabled: bool,
     #[env_config(
         name = "ZO_TRACE_TIME_INDEX_ENABLED",
-        default = false,
+        default = true,
         help = "Enable per-stream trace time indexes and trace time-range lookup"
     )]
     pub trace_time_index_enabled: bool,

@@ -2025,7 +2025,13 @@ export default defineComponent({
 
       // Fetch from API — standalone mode, or embedded with no pre-fetched spans
       await loadLogStreams();
-      await getTraceMeta();
+      const timeRange = effectiveTimeRange.value;
+      await getTraceDetails({
+        stream: effectiveStreamName.value,
+        trace_id: effectiveTraceId.value,
+        from: timeRange.from,
+        to: timeRange.to,
+      });
     };
 
     onMounted(async () => {
@@ -2100,79 +2106,6 @@ export default defineComponent({
       hoveredSpanId.value = "";
     };
 
-    const getTraceMeta = () => {
-      try {
-        searchObj.data.traceDetails.isLoadingTraceMeta = true;
-
-        let filter = (router.currentRoute.value.query.filter as string) || "";
-
-        if (filter?.length) filter += ` and trace_id='${effectiveTraceId.value}'`;
-        else filter += `trace_id='${effectiveTraceId.value}'`;
-
-        const timeRange = effectiveTimeRange.value;
-
-        searchService
-          .get_traces({
-            org_identifier: effectiveOrgIdentifier.value,
-            start_time: timeRange.from - 10000,
-            end_time: timeRange.to + 10000,
-            filter: filter || "",
-            size: 1,
-            from: 0,
-            stream_name: effectiveStreamName.value,
-          })
-          .then(async (res: any) => {
-            const trace = getTracesMetaData(res.data.hits)[0];
-            if (!trace) {
-              showTraceDetailsError();
-              return;
-            }
-            searchObj.data.traceDetails.selectedTrace = trace;
-
-            let startTime = Number(router.currentRoute.value.query.from);
-            let endTime = Number(router.currentRoute.value.query.to);
-            if (
-              res.data.hits.length === 1 &&
-              res.data.hits[0].start_time &&
-              res.data.hits[0].end_time
-            ) {
-              startTime = Math.floor(res.data.hits[0].start_time / 1000);
-              endTime = Math.ceil(res.data.hits[0].end_time / 1000);
-
-              // If the trace is not in the current time range, update the time range
-              if (
-                !(
-                  startTime >= Number(router.currentRoute.value.query.from) &&
-                  endTime <= Number(router.currentRoute.value.query.to)
-                )
-              ) {
-                updateUrlQueryParams({
-                  from: startTime,
-                  to: endTime,
-                });
-              }
-            }
-
-            getTraceDetails({
-              stream: effectiveStreamName.value,
-              trace_id: trace.trace_id,
-              from: startTime - 10000,
-              to: endTime + 10000,
-            });
-          })
-          .catch(() => {
-            showTraceDetailsError();
-          })
-          .finally(() => {
-            searchObj.data.traceDetails.isLoadingTraceMeta = false;
-          });
-      } catch (error) {
-        console.error("Error fetching trace meta:", error);
-        searchObj.data.traceDetails.isLoadingTraceMeta = false;
-        showTraceDetailsError();
-      }
-    };
-
     /**
      * Update the query parameters in the URL
      * @param newParams - object containing new parameters
@@ -2231,6 +2164,7 @@ export default defineComponent({
           ...rumSpans,
           ...deduplicatedTraceSpans,
         ];
+        updateSelectedTrace(data.trace_id, spanList.value);
         updateServiceColors();
         buildTracesTree();
       } catch (error) {
@@ -2241,24 +2175,14 @@ export default defineComponent({
       }
     };
 
-    const getTracesMetaData = (traces: any[]) => {
-      if (!traces.length) return [];
-
-      return traces.map((trace) => {
-        const _trace = {
-          trace_id: trace.trace_id,
-          trace_start_time: Math.round(trace.start_time / 1000),
-          trace_end_time: Math.round(trace.end_time / 1000),
-          service_name: trace.service_name,
-          operation_name: trace.operation_name,
-          spans: trace.spans[0],
-          errors: trace.spans[1],
-          duration: trace.duration,
-          services: {} as any,
-          zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
-        };
-        return _trace;
-      });
+    const updateSelectedTrace = (traceId: string, spans: any[]) => {
+      searchObj.data.traceDetails.selectedTrace = {
+        trace_id: traceId,
+        trace_start_time: Math.floor(Math.min(...spans.map((span) => span.start_time)) / 1000),
+        trace_end_time: Math.ceil(Math.max(...spans.map((span) => span.end_time)) / 1000),
+        service_name: extractServiceNames(spans),
+        services: {},
+      };
     };
 
     const updateServiceColors = () => {
