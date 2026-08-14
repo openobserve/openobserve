@@ -206,6 +206,31 @@ export const countClaim = (
 });
 
 /**
+ * An OVERLAP count, withheld when the vantage that produced it measured zero.
+ *
+ * D6: never render an overlap value without a qualifier, and never render
+ * absent as `0`. Those two rules collide on a measured zero — qualifying it
+ * produces `0 client-observed`, which reads as "the databases ran nothing"
+ * when what actually happened is that ONE of the two vantages saw nothing and
+ * the other may be carrying the whole population. On a zero-trace org that is
+ * every window: the trace rollup is empty by construction, so the badge
+ * asserted an idle fleet beside a Top-queries tab listing 50 live statements.
+ *
+ * A zero is therefore returned as `null` — "no number from this vantage" —
+ * which the badge already renders as blank rather than as `0`. The server
+ * fallback (see `fetchDbmTabCounts`) overwrites it when the database's own
+ * list is non-empty, so the honest number still wins where one exists.
+ *
+ * Non-overlap counts keep using `countClaim`: a deadlock count has one feed,
+ * so its zero is the population and prints as `0`.
+ */
+export const overlapClaim = (
+  count: number,
+  truncated?: boolean,
+  vantage?: DbmCountVantage,
+): DbmCountClaim | null => (count === 0 ? null : countClaim(count, truncated, vantage));
+
+/**
  * The vantage a badge count carries, or `null` when it carries none.
  *
  * Bare numbers answer `null` deliberately: a plain `number` is what the

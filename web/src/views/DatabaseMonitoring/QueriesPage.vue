@@ -425,8 +425,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the client table would read as traced traffic that never existed.
            The empty state above stays — it explains WHY the usual list is
            empty; this section answers what the databases saw meanwhile. -->
+      <!-- Gated on `serverListShown` — the SAME unfiltered condition that
+           unmounts the client table above. Testing `filteredServerRows` here
+           instead let a search matching none of the fallback rows unmount the
+           client table (and its empty state) while also failing to render this
+           section: the page went blank, with nothing saying why. The table's
+           own no-results state handles an empty filter. -->
       <section
-        v-if="!loading && !rows.length && filteredServerRows.length"
+        v-if="serverListShown"
         class="flex min-h-0 flex-1 flex-col gap-2 pt-4"
         data-test="dbm-server-queries-section"
       >

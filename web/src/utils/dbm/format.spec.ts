@@ -20,6 +20,7 @@ import {
   computeQps,
   errorRate,
   countClaim,
+  overlapClaim,
   dbmHttpError,
   formatAge,
   formatLagBytes,
@@ -198,6 +199,42 @@ describe("countClaim — total or floor", () => {
 
   it("treats an absent flag as a complete count", () => {
     expect(countClaim(7, undefined)).toEqual({ count: 7, complete: true });
+  });
+});
+
+/**
+ * An overlap count is the one kind that may not print its own zero.
+ *
+ * D2 makes the vantage qualifier mandatory on an overlap value, and D6 forbids
+ * rendering absent as `0`. A measured zero satisfies the first into a
+ * violation of the second — `0 client-observed` asserts an idle fleet on the
+ * strength of ONE of the two feeds, which on a zero-trace org is the feed that
+ * is empty by construction. Withholding is the honest answer; the other
+ * vantage's number replaces it when there is one.
+ */
+describe("overlapClaim — a vantage that saw nothing claims nothing", () => {
+  it("withholds a zero rather than qualifying it", () => {
+    expect(overlapClaim(0, false, "client")).toBeNull();
+  });
+
+  it("withholds a zero from the server vantage too", () => {
+    expect(overlapClaim(0, true, "server")).toBeNull();
+  });
+
+  it("carries a real count with its vantage", () => {
+    expect(overlapClaim(42, false, "client")).toEqual({
+      count: 42,
+      complete: true,
+      vantage: "client",
+    });
+  });
+
+  it("still discloses the cap on a real count", () => {
+    expect(overlapClaim(50, true, "server")).toEqual({
+      count: 50,
+      complete: false,
+      vantage: "server",
+    });
   });
 });
 

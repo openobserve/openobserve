@@ -36,7 +36,7 @@ import { dirname, join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { badgeCount, claimedCount } from "@/utils/dbm/format";
+import { badgeCount, claimedCount, countVantage } from "@/utils/dbm/format";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (file: string) => readFileSync(join(here, file), "utf8");
@@ -256,21 +256,29 @@ describe("the zero-trace fallback counts what the tabs actually show", () => {
    * unknown. The honest client zero stands; a null member must never be read
    * as rows.
    */
-  it("keeps the client zero when a fired fallback member is null", async () => {
+  it("does not invent rows when a fired fallback member is null", async () => {
     badgesAnswer({
       ...fullEnvelope(),
       queries: { total: 0 },
       server_queries: null,
     });
     const counts = await fetchDbmTabCounts("acme", WINDOW);
-    // A measured zero, still printed as "0" — distinct from the blank a failed
-    // read produces. The count is a claim now, so the badge is what is pinned.
-    expect(badgeCount(counts.queryCount)).toBe("0");
-    expect(claimedCount(counts.queryCount)).toBe(0);
+    // A null member is UNKNOWN, so nothing overwrites the client answer. That
+    // answer is an overlap zero, which D6/L2 withhold rather than qualify —
+    // the badge is blank, not `0 client-observed`. (This assertion previously
+    // pinned `"0"`, which was the fabricated zero itself.)
+    expect(badgeCount(counts.queryCount)).toBeNull();
+    expect(claimedCount(counts.queryCount)).toBeNull();
   });
 
-  /** An org with nothing anywhere keeps its honest zeros. */
-  it("keeps the client zeros when the databases report nothing either", async () => {
+  /**
+   * An org with nothing anywhere claims nothing anywhere.
+   *
+   * The two OVERLAP badges go blank (D6/L2 — a zero from one of two feeds is
+   * not a population), while `databaseCount` is not an overlap measure and
+   * keeps printing its measured zero.
+   */
+  it("withholds both overlap badges when the databases report nothing either", async () => {
     badgesAnswer({
       ...fullEnvelope(),
       queries: { total: 0 },
@@ -279,8 +287,8 @@ describe("the zero-trace fallback counts what the tabs actually show", () => {
       server_samples: { hits: [], truncated: false },
     });
     const counts = await fetchDbmTabCounts("acme", WINDOW);
-    expect(badgeCount(counts.queryCount)).toBe("0");
-    expect(badgeCount(counts.sampleCallsCount)).toBe("0");
+    expect(badgeCount(counts.queryCount)).toBeNull();
+    expect(badgeCount(counts.sampleCallsCount)).toBeNull();
     expect(counts.databaseCount).toBe(0);
   });
 });
@@ -572,5 +580,125 @@ describe("DatabasesPage gates the coverage caveat on the shared rule", () => {
   it("still prints the row's own percentage in the caveat", () => {
     expect(source).toMatch(/shortfallLine[\s\S]{0,300}dbm\.breakdown\.shortfall/);
     expect(source).toMatch(/shortfallLine[\s\S]{0,300}percent:/);
+  });
+});
+
+/**
+ * **A vantage that measured nothing must not claim a zero.**
+ *
+ * Both live-reported symptoms on the zero-trace org `dbm_notraces` came from
+ * one defect, in two places on the same strip. The trace rollup is empty there
+ * BY CONSTRUCTION — no instrumented callers exist — so the client-vantage
+ * slices answer an exact `0` on every window. Stamped with the vantage that
+ * D2 makes mandatory, that rendered as `0 client-observed` on the Top-queries
+ * and Slowest-calls badges: a qualified zero, sitting directly above a tab
+ * that lists 50 statements the database itself reported.
+ *
+ * D6 forbids exactly this pairing — "never render an overlap value without a
+ * qualifier" and "never render absent as `0`" collide on a measured zero, and
+ * L2 resolves the collision by withholding the number. So the zero folds to
+ * `null` (blank), and the server fallback overwrites it with the real count
+ * when the database's own list is non-empty.
+ *
+ * The payloads below are the LIVE bodies, captured from
+ * `/api/dbm_notraces/traces/db_monitoring/badges` at both windows.
+ */
+describe("an empty vantage withholds its overlap badge (D6/L2)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  /** The 1h window: every vantage genuinely measured nothing. */
+  const emptyBothVantages = () => ({
+    databases: { hits: [], top_n_subset: false },
+    queries: { hits: [], other: [], total: 0, top_n_subset: false },
+    activity: { hits: [], by_wait_event: [], by_state: [], total: 0, truncated: false },
+    deadlocks: { total: 0, truncated: false },
+    blocking: { hits: [], total: 0, truncated: false },
+    table_health: { hits: [], total: 0 },
+    // The fallback FIRED (the client answer was an exact zero) and the server
+    // had nothing either — present-and-empty, not absent.
+    server_queries: { hits: [], total: 0, truncated: false },
+    server_samples: { hits: [], total: 0, truncated: false },
+  });
+
+  it.each([["queryCount"], ["sampleCallsCount"]])(
+    "%s is blank, never a qualified 0, when no vantage saw anything",
+    async (badge) => {
+      badgesAnswer(emptyBothVantages());
+      const counts = await fetchDbmTabCounts("dbm_notraces", WINDOW);
+      const value = counts[badge as keyof typeof counts];
+      expect(value).toBeNull();
+      // What the strip would PRINT. `"0"` here is the reported symptom.
+      expect(badgeCount(value as never)).toBeNull();
+    },
+  );
+
+  /**
+   * The 7-day window on the same org: the trace vantage is still empty, but
+   * the database's own lists are not. The badge must show the SERVER number —
+   * this is the count that was being suppressed behind the fabricated zero.
+   */
+  it("renders the server list's count once the fallback has one", async () => {
+    badgesAnswer({
+      ...emptyBothVantages(),
+      server_queries: {
+        hits: Array.from({ length: 50 }, (_, i) => ({ fingerprint: `f${i}` })),
+        total: 50,
+        truncated: true,
+      },
+      server_samples: {
+        hits: Array.from({ length: 100 }, (_, i) => ({ fingerprint: `s${i}` })),
+        total: 100,
+        truncated: true,
+      },
+    });
+    const counts = await fetchDbmTabCounts("dbm_notraces", WINDOW);
+    // Capped reads, so the badge discloses the cap rather than printing it as
+    // a total — and carries the vantage that actually counted.
+    expect(badgeCount(counts.queryCount)).toBe("50+");
+    expect(badgeCount(counts.sampleCallsCount)).toBe("100+");
+    expect(countVantage(counts.queryCount)).toBe("server");
+    expect(countVantage(counts.sampleCallsCount)).toBe("server");
+  });
+
+  /**
+   * The activity badge is NOT an overlap measure — one feed, so its zero is
+   * the population and is allowed to print. What must never happen is the
+   * inverse defect: a populated breakdown folding to a blank badge.
+   */
+  it("still counts the activity population from the state breakdown", async () => {
+    badgesAnswer({
+      ...emptyBothVantages(),
+      activity: {
+        hits: [],
+        by_wait_event: [],
+        by_state: [
+          { state: "active", sessions: 3057 },
+          { state: "idle", sessions: 794 },
+          { state: "idle in transaction", sessions: 139 },
+          { state: "waiting", sessions: 20 },
+          { state: "running", sessions: 19 },
+          { state: "other", sessions: 3 },
+        ],
+        total: 100,
+        truncated: true,
+      },
+    });
+    const counts = await fetchDbmTabCounts("dbm_notraces", WINDOW);
+    expect(counts.activityCount).toBe(4032);
+    expect(badgeCount(counts.activityCount)).toBe("4032");
+  });
+
+  /**
+   * REGRESSION GUARD for the traced org. A real client-vantage number must
+   * still render, still qualified — withholding is for the ZERO only, and a
+   * rule that blanked every client count would break the `default` org.
+   */
+  it("leaves a real client-vantage count alone", async () => {
+    badgesAnswer(fullEnvelope());
+    const counts = await fetchDbmTabCounts("default", WINDOW);
+    expect(badgeCount(counts.queryCount)).toBe("42");
+    expect(countVantage(counts.queryCount)).toBe("client");
+    expect(claimedCount(counts.sampleCallsCount)).toBe(1200);
+    expect(countVantage(counts.sampleCallsCount)).toBe("client");
   });
 });

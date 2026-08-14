@@ -122,3 +122,38 @@ describe("DBM fallback lists ride the primary response", () => {
     expect(body).not.toMatch(/error\.value\s*=/);
   });
 });
+
+/**
+ * **The fallback section and the client table must switch on the SAME
+ * condition.**
+ *
+ * `serverListShown` unmounts the client table — and with it the empty state
+ * that would otherwise explain an empty page — on the UNFILTERED
+ * `serverRows`. The section that replaces it was gated on the FILTERED
+ * `filteredServerRows`. A search matching none of the database-reported rows
+ * therefore satisfied the first and not the second: the client table was gone,
+ * the fallback section never rendered, and the page went blank with nothing
+ * stating why. `restoreFromUrl` seeds the search box from the URL, so a shared
+ * link reproduced it on first paint.
+ *
+ * Both now read `serverListShown`; narrowing to zero rows is the TABLE's
+ * no-results state, which is where a reader looks for it. SamplesPage already
+ * held this contract (it tests its unfiltered `allRows` in both places).
+ */
+describe("the fallback section switches on the same condition as the client table", () => {
+  const source = read("QueriesPage.vue");
+
+  it("gates the server section on serverListShown, not on the filtered rows", () => {
+    expect(source).toMatch(/<section\s+v-if="serverListShown"/);
+  });
+
+  /** The exact shape of the bug: the section may not re-derive its own gate. */
+  it("no longer gates the section on filteredServerRows.length", () => {
+    expect(source).not.toMatch(/v-if="[^"]*filteredServerRows\.length[^"]*"/);
+  });
+
+  /** The filtered list still FEEDS the table — only the gate changed. */
+  it("still renders the filtered rows inside the section", () => {
+    expect(source).toMatch(/:data="filteredServerRows"/);
+  });
+});
