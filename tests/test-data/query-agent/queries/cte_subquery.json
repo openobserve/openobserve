@@ -47,13 +47,13 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-2",
             "4",
             "2",
             "50.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "4",
             "2",
             "50.0"
@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "manual",
+            "hybrid",
             "2"
           ],
           [
@@ -695,15 +695,15 @@
         ],
         "results": [
           [
-            "LANE-C",
-            "ZONE-2",
+            "LANE-B",
+            "ZONE-1",
             "4",
             "3.5",
             "0.5"
           ],
           [
-            "LANE-B",
-            "ZONE-1",
+            "LANE-C",
+            "ZONE-2",
             "4",
             "3.5",
             "0.5"
@@ -1242,14 +1242,14 @@
             "258.0"
           ],
           [
-            "ZONE-2",
-            "3",
-            "620.0"
-          ],
-          [
             "ZONE-3",
             "3",
             "94.0"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "620.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1561,16 +1561,16 @@
             "66.0"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
@@ -1754,22 +1754,22 @@
         ],
         "results": [
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "2",
-            "1"
-          ],
-          [
             "NetworkException: connection to batch sync failed",
             "2",
             "1"
           ],
           [
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
-            "1",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "2",
             "1"
           ],
           [
             "ConfigurationException: missing facility_zone ZONE-3 override",
+            "1",
+            "1"
+          ],
+          [
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
             "1",
             "1"
           ]
@@ -1815,6 +1815,11 @@
         ],
         "results": [
           [
+            "interaction",
+            "searchPage",
+            "2"
+          ],
+          [
             "navigation",
             "itemPage",
             "2"
@@ -1822,11 +1827,6 @@
           [
             "performanceMetric",
             "itemPage",
-            "2"
-          ],
-          [
-            "interaction",
-            "searchPage",
             "2"
           ],
           [
@@ -1993,22 +1993,22 @@
         "results": [
           [
             "fast",
-            "unknown",
+            "ok",
             "2"
           ],
           [
             "fast",
-            "ok",
+            "unknown",
             "2"
           ],
           [
             "degraded",
-            "ok",
+            "unknown",
             "1"
           ],
           [
             "degraded",
-            "unknown",
+            "ok",
             "1"
           ],
           [
@@ -2035,11 +2035,11 @@
         ],
         "results": [
           [
-            "E003",
+            "E001",
             "2"
           ],
           [
-            "E001",
+            "E003",
             "2"
           ],
           [
@@ -2143,7 +2143,12 @@
         ],
         "results": [
           [
-            "navigation",
+            "performanceMetric",
+            "searchPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
             "itemPage",
             "1"
           ],
@@ -2153,12 +2158,7 @@
             "1"
           ],
           [
-            "performanceMetric",
-            "searchPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
+            "navigation",
             "itemPage",
             "1"
           ],
@@ -2194,13 +2194,13 @@
             "2"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1",
             "1"
@@ -2945,22 +2945,22 @@
         ],
         "results": [
           [
-            "warehouse-south",
-            "2",
-            "45.0",
-            "2"
-          ],
-          [
             "warehouse-west",
             "2",
             "15.0",
             "0"
           ],
           [
-            "warehouse-east",
+            "warehouse-south",
+            "2",
+            "45.0",
+            "2"
+          ],
+          [
+            "warehouse-central",
             "1",
-            "1900.0",
-            "0"
+            "230.0",
+            "1"
           ],
           [
             "warehouse-north",
@@ -2969,10 +2969,10 @@
             "1"
           ],
           [
-            "warehouse-central",
+            "warehouse-east",
             "1",
-            "230.0",
-            "1"
+            "1900.0",
+            "0"
           ]
         ],
         "results_mode": "rowsort"
@@ -3920,13 +3920,13 @@
             "597.1428571428571"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "2",
             "602.5",
             "597.1428571428571"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "2",
             "602.5",
             "597.1428571428571"
@@ -4548,14 +4548,14 @@
             "610.0"
           ],
           [
-            "ZONE-4",
-            "hybrid",
+            "ZONE-2",
+            "auto",
             "1",
             "480.0"
           ],
           [
-            "ZONE-2",
-            "auto",
+            "ZONE-4",
+            "hybrid",
             "1",
             "480.0"
           ],
@@ -4566,14 +4566,14 @@
             "320.0"
           ],
           [
-            "ZONE-2",
-            "manual",
+            "ZONE-4",
+            "auto",
             "1",
             "150.0"
           ],
           [
-            "ZONE-4",
-            "auto",
+            "ZONE-2",
+            "manual",
             "1",
             "150.0"
           ]
@@ -4653,11 +4653,6 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "1",
-            "1740.0"
-          ],
-          [
             "ZONE-4",
             "1",
             "480.0"
@@ -4666,6 +4661,11 @@
             "ZONE-2",
             "1",
             "480.0"
+          ],
+          [
+            "ZONE-1",
+            "1",
+            "1740.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -4788,15 +4788,15 @@
             "0"
           ],
           [
-            "batch-sync",
-            "1450.0",
+            "lane-monitor",
+            "567.0",
             "None",
             "1",
             "0"
           ],
           [
-            "lane-monitor",
-            "567.0",
+            "batch-sync",
+            "1450.0",
             "None",
             "1",
             "0"
@@ -4896,14 +4896,14 @@
             "12.0"
           ],
           [
-            "batch-sync",
-            "1",
-            "1450.0"
-          ],
-          [
             "scan-hub",
             "1",
             "45.0"
+          ],
+          [
+            "batch-sync",
+            "1",
+            "1450.0"
           ],
           [
             "conveyor-driver",
@@ -4997,18 +4997,11 @@
             "ZONE-3",
             "2",
             "1455.0",
-            "manual",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "2",
-            "1455.0",
             "hybrid",
             "1"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "2",
             "1455.0",
             "manual",
@@ -5019,6 +5012,13 @@
             "2",
             "1455.0",
             "auto",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "2",
+            "1455.0",
+            "manual",
             "1"
           ],
           [
@@ -5064,12 +5064,18 @@
         "results": [
           [
             "1",
+            "conveyor-driver",
+            "1",
+            "15.0"
+          ],
+          [
+            "1",
             "sorter-engine",
             "1",
             "1900.0"
           ],
           [
-            "1",
+            "2",
             "conveyor-driver",
             "1",
             "15.0"
@@ -5079,12 +5085,6 @@
             "zone-controller",
             "1",
             "12.0"
-          ],
-          [
-            "2",
-            "conveyor-driver",
-            "1",
-            "15.0"
           ],
           [
             "3",
@@ -5346,15 +5346,15 @@
             "32.5"
           ],
           [
-            "ZONE-1",
-            "auto",
+            "ZONE-3",
+            "hybrid",
             "0.5615384615384615",
             "72.8",
             "22.0"
           ],
           [
-            "ZONE-3",
-            "hybrid",
+            "ZONE-1",
+            "auto",
             "0.5615384615384615",
             "72.8",
             "22.0"

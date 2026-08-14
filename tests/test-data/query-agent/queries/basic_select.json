@@ -1581,19 +1581,19 @@
         ],
         "results": [
           [
-            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
-            "2"
-          ],
-          [
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
-            "2"
-          ],
-          [
             "[\"credential_stuffing\"]",
             "2"
           ],
           [
+            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
+            "2"
+          ],
+          [
             "[\"scraping_pattern\",\"high_freq\"]",
+            "2"
+          ],
+          [
+            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
             "2"
           ]
         ],
@@ -5944,31 +5944,31 @@
         ],
         "results": [
           [
-            "1786707540.0",
+            "1786708140.0",
             "0",
             "performanceMetric",
             "itemPage"
           ],
           [
-            "1786707576.0",
+            "1786708176.0",
             "36000000",
             "performanceMetric",
             "searchPage"
           ],
           [
-            "1786707594.0",
+            "1786708194.0",
             "54000000",
             "performanceMetric",
             "cartPage"
           ],
           [
-            "1786707600.0",
+            "1786708200.0",
             "0",
             "performanceMetric",
             "cartPage"
           ],
           [
-            "1786707612.0",
+            "1786708212.0",
             "12000000",
             "performanceMetric",
             "itemPage"

@@ -297,19 +297,19 @@
         ],
         "results": [
           [
-            "2026-08-14T05:59:00",
+            "2026-08-14T06:09:00",
             "5",
             "5",
             "100.0"
           ],
           [
-            "2026-08-14T06:00:00",
+            "2026-08-14T06:10:00",
             "5",
             "5",
             "100.0"
           ],
           [
-            "2026-08-14T06:01:00",
+            "2026-08-14T06:11:00",
             "4",
             "4",
             "100.0"
@@ -675,16 +675,16 @@
             "88.1"
           ],
           [
-            "ZONE-3",
-            "3",
-            "571.6666666666666",
-            "72.8"
-          ],
-          [
             "ZONE-4",
             "3",
             "210.0",
             "88.1"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "571.6666666666666",
+            "72.8"
           ]
         ],
         "results_mode": "rowsort"
@@ -3829,22 +3829,22 @@
         ],
         "results": [
           [
-            "2026-08-14T15:35:00",
+            "2026-08-14T15:45:00",
             "2",
             "0"
           ],
           [
-            "2026-08-14T15:36:00",
+            "2026-08-14T15:46:00",
             "2",
             "0"
           ],
           [
-            "2026-08-14T15:37:00",
+            "2026-08-14T15:47:00",
             "2",
             "0"
           ],
           [
-            "2026-08-14T15:38:00",
+            "2026-08-14T15:48:00",
             "1",
             "0"
           ]
@@ -4154,11 +4154,11 @@
             "1"
           ],
           [
-            "sorter-engine",
+            "zone-controller",
             "1"
           ],
           [
-            "zone-controller",
+            "sorter-engine",
             "1"
           ]
         ],
@@ -4182,7 +4182,7 @@
         ],
         "results": [
           [
-            "ZONE-4",
+            "ZONE-3",
             "0",
             "1",
             "2"
@@ -4194,7 +4194,7 @@
             "2"
           ],
           [
-            "ZONE-3",
+            "ZONE-4",
             "0",
             "1",
             "2"
@@ -4315,12 +4315,6 @@
             "1"
           ],
           [
-            "ZONE-1",
-            "0",
-            "1",
-            "1"
-          ],
-          [
             "ZONE-2",
             "0",
             "2",
@@ -4330,6 +4324,12 @@
             "ZONE-4",
             "0",
             "2",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "0",
+            "1",
             "1"
           ]
         ],
@@ -4395,15 +4395,15 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "Q798 warehouse event record 1",
-            "Q799 warehouse event record 0 ACK batch batchIdList:Q799-0",
-            "2"
-          ],
-          [
             "ZONE-4",
             "Q797 warehouse event record 4",
             "Q798 warehouse event record 3 ACK batch batchIdList:Q798-3",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "Q798 warehouse event record 1",
+            "Q799 warehouse event record 0 ACK batch batchIdList:Q799-0",
             "2"
           ],
           [
@@ -4502,6 +4502,11 @@
         ],
         "results": [
           [
+            "track-router",
+            "1",
+            "0"
+          ],
+          [
             "scan-hub",
             "2",
             "0"
@@ -4512,18 +4517,13 @@
             "0"
           ],
           [
-            "batch-sync",
-            "2",
-            "0"
-          ],
-          [
             "zone-controller",
             "1",
             "0"
           ],
           [
-            "track-router",
-            "1",
+            "batch-sync",
+            "2",
             "0"
           ]
         ],
@@ -4730,14 +4730,19 @@
         ],
         "results": [
           [
+            "EU-WEST",
+            "outbound",
+            "2"
+          ],
+          [
             "US-EAST",
             "inbound",
             "2"
           ],
           [
-            "EU-WEST",
-            "outbound",
-            "2"
+            "US-WEST",
+            "inbound",
+            "1"
           ],
           [
             "EU-NORTH",
@@ -4747,11 +4752,6 @@
           [
             "AP-CENTRAL",
             "internal",
-            "1"
-          ],
-          [
-            "US-WEST",
-            "inbound",
             "1"
           ]
         ],
@@ -4879,13 +4879,13 @@
             "2"
           ],
           [
-            "ZONE-1",
-            "CC-DELTA",
+            "ZONE-4",
+            "CC-GAMMA",
             "2"
           ],
           [
-            "ZONE-4",
-            "CC-GAMMA",
+            "ZONE-1",
+            "CC-DELTA",
             "2"
           ],
           [
@@ -5137,14 +5137,14 @@
         ],
         "results": [
           [
-            "track-router",
-            "EU-NORTH",
+            "pallet-mapper",
+            "AP-EAST",
             "2",
             "0"
           ],
           [
-            "pallet-mapper",
-            "AP-EAST",
+            "track-router",
+            "EU-NORTH",
             "2",
             "0"
           ],
@@ -5188,19 +5188,19 @@
         ],
         "results": [
           [
-            "warehouse-north",
-            "2"
-          ],
-          [
             "warehouse-central",
             "2"
           ],
           [
-            "warehouse-south",
-            "1"
+            "warehouse-north",
+            "2"
           ],
           [
             "warehouse-east",
+            "1"
+          ],
+          [
+            "warehouse-south",
             "1"
           ],
           [
@@ -5912,40 +5912,6 @@
           [
             "D",
             "124"
-          ]
-        ],
-        "results_mode": "rowsort"
-      },
-      "time_offset": {
-        "start_offset": 0,
-        "end_offset": 6000000000
-      }
-    },
-    {
-      "id": "Q1016",
-      "sql": "WITH filtered AS (SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND regexp_match(log_message, 'GET') IS NOT NULL UNION ALL SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND regexp_match(log_message, 'POST') IS NOT NULL UNION ALL SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND regexp_match(log_message, 'ERROR') IS NOT NULL) SELECT facility_zone, COUNT(*) AS cnt FROM filtered GROUP BY facility_zone ORDER BY cnt DESC, facility_zone ASC LIMIT 10",
-      "category": "full_text_search",
-      "expected": {
-        "columns": [
-          "facility_zone",
-          "cnt"
-        ],
-        "results": [
-          [
-            "ZONE-4",
-            "378"
-          ],
-          [
-            "ZONE-1",
-            "375"
-          ],
-          [
-            "ZONE-2",
-            "375"
-          ],
-          [
-            "ZONE-3",
-            "372"
           ]
         ],
         "results_mode": "rowsort"
@@ -7090,40 +7056,6 @@
       }
     },
     {
-      "id": "Q1041",
-      "sql": "WITH src AS (SELECT facility_zone, log_message FROM \"{stream}\" WHERE match_all('warehouse')), regexed AS (SELECT facility_zone FROM src WHERE regexp_match(log_message, 'GET|POST|PUT') IS NOT NULL) SELECT facility_zone, COUNT(*) AS cnt FROM regexed GROUP BY facility_zone ORDER BY cnt DESC, facility_zone ASC LIMIT 10",
-      "category": "full_text_search",
-      "expected": {
-        "columns": [
-          "facility_zone",
-          "cnt"
-        ],
-        "results": [
-          [
-            "ZONE-4",
-            "126"
-          ],
-          [
-            "ZONE-1",
-            "125"
-          ],
-          [
-            "ZONE-2",
-            "125"
-          ],
-          [
-            "ZONE-3",
-            "124"
-          ]
-        ],
-        "results_mode": "rowsort"
-      },
-      "time_offset": {
-        "start_offset": 0,
-        "end_offset": 6000000000
-      }
-    },
-    {
       "id": "Q1042",
       "sql": "WITH s1 AS (SELECT region_code, org_name, pallet_id FROM \"{stream}\" WHERE match_all('warehouse')), s2 AS (SELECT region_code, org_name, pallet_id FROM s1 WHERE pallet_id IS NOT NULL AND org_name IS NOT NULL) SELECT region_code, COUNT(DISTINCT org_name) AS orgs, COUNT(DISTINCT pallet_id) AS pallets FROM s2 GROUP BY region_code ORDER BY orgs DESC, region_code ASC LIMIT 10",
       "category": "full_text_search",
@@ -7286,40 +7218,6 @@
           [
             "PUT",
             "100"
-          ]
-        ],
-        "results_mode": "rowsort"
-      },
-      "time_offset": {
-        "start_offset": 0,
-        "end_offset": 6000000000
-      }
-    },
-    {
-      "id": "Q1045",
-      "sql": "WITH raw AS (SELECT event_detail, facility_zone FROM \"{stream}\" WHERE match_all('warehouse')), extracted AS (SELECT facility_zone, event_detail FROM raw WHERE event_detail IS NOT NULL), matched AS (SELECT facility_zone FROM extracted WHERE regexp_match(event_detail, 'batch|segment') IS NOT NULL) SELECT facility_zone, COUNT(*) AS c FROM matched GROUP BY facility_zone ORDER BY c DESC, facility_zone ASC LIMIT 10",
-      "category": "full_text_search",
-      "expected": {
-        "columns": [
-          "facility_zone",
-          "c"
-        ],
-        "results": [
-          [
-            "ZONE-4",
-            "126"
-          ],
-          [
-            "ZONE-1",
-            "125"
-          ],
-          [
-            "ZONE-2",
-            "125"
-          ],
-          [
-            "ZONE-3",
-            "124"
           ]
         ],
         "results_mode": "rowsort"
@@ -8236,16 +8134,8 @@
         ],
         "results": [
           [
-            "2026-08-14T04:40:00",
-            "24"
-          ],
-          [
-            "2026-08-14T04:45:00",
-            "25"
-          ],
-          [
             "2026-08-14T04:50:00",
-            "25"
+            "24"
           ],
           [
             "2026-08-14T04:55:00",
@@ -8314,225 +8204,14 @@
           [
             "2026-08-14T06:15:00",
             "25"
-          ]
-        ],
-        "results_mode": "rowsort"
-      },
-      "time_offset": {
-        "start_offset": 0,
-        "end_offset": 6000000000
-      }
-    },
-    {
-      "id": "Q1071",
-      "sql": "WITH bucketed AS (SELECT histogram(_timestamp, '10 minute') AS bucket, facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND facility_zone IS NOT NULL) SELECT bucket, facility_zone, COUNT(*) AS n FROM bucketed GROUP BY bucket, facility_zone ORDER BY bucket ASC, n DESC LIMIT 30",
-      "category": "full_text_search",
-      "expected": {
-        "columns": [
-          "bucket",
-          "facility_zone",
-          "n"
-        ],
-        "results": [
-          [
-            "2026-08-14T04:40:00",
-            "ZONE-4",
-            "13"
           ],
           [
-            "2026-08-14T04:40:00",
-            "ZONE-2",
-            "12"
+            "2026-08-14T06:20:00",
+            "25"
           ],
           [
-            "2026-08-14T04:40:00",
-            "ZONE-3",
-            "12"
-          ],
-          [
-            "2026-08-14T04:40:00",
-            "ZONE-1",
-            "12"
-          ],
-          [
-            "2026-08-14T04:50:00",
-            "ZONE-2",
-            "13"
-          ],
-          [
-            "2026-08-14T04:50:00",
-            "ZONE-1",
-            "13"
-          ],
-          [
-            "2026-08-14T04:50:00",
-            "ZONE-4",
-            "12"
-          ],
-          [
-            "2026-08-14T04:50:00",
-            "ZONE-3",
-            "12"
-          ],
-          [
-            "2026-08-14T05:00:00",
-            "ZONE-4",
-            "13"
-          ],
-          [
-            "2026-08-14T05:00:00",
-            "ZONE-3",
-            "13"
-          ],
-          [
-            "2026-08-14T05:00:00",
-            "ZONE-1",
-            "12"
-          ],
-          [
-            "2026-08-14T05:00:00",
-            "ZONE-2",
-            "12"
-          ],
-          [
-            "2026-08-14T05:10:00",
-            "ZONE-1",
-            "13"
-          ],
-          [
-            "2026-08-14T05:10:00",
-            "ZONE-2",
-            "13"
-          ],
-          [
-            "2026-08-14T05:10:00",
-            "ZONE-4",
-            "12"
-          ],
-          [
-            "2026-08-14T05:10:00",
-            "ZONE-3",
-            "12"
-          ],
-          [
-            "2026-08-14T05:20:00",
-            "ZONE-4",
-            "13"
-          ],
-          [
-            "2026-08-14T05:20:00",
-            "ZONE-3",
-            "13"
-          ],
-          [
-            "2026-08-14T05:20:00",
-            "ZONE-1",
-            "12"
-          ],
-          [
-            "2026-08-14T05:20:00",
-            "ZONE-2",
-            "12"
-          ],
-          [
-            "2026-08-14T05:30:00",
-            "ZONE-2",
-            "13"
-          ],
-          [
-            "2026-08-14T05:30:00",
-            "ZONE-1",
-            "13"
-          ],
-          [
-            "2026-08-14T05:30:00",
-            "ZONE-4",
-            "12"
-          ],
-          [
-            "2026-08-14T05:30:00",
-            "ZONE-3",
-            "12"
-          ],
-          [
-            "2026-08-14T05:40:00",
-            "ZONE-3",
-            "13"
-          ],
-          [
-            "2026-08-14T05:40:00",
-            "ZONE-4",
-            "13"
-          ],
-          [
-            "2026-08-14T05:40:00",
-            "ZONE-1",
-            "12"
-          ],
-          [
-            "2026-08-14T05:40:00",
-            "ZONE-2",
-            "12"
-          ],
-          [
-            "2026-08-14T05:50:00",
-            "ZONE-2",
-            "13"
-          ],
-          [
-            "2026-08-14T05:50:00",
-            "ZONE-1",
-            "13"
-          ]
-        ],
-        "results_mode": "rowsort"
-      },
-      "time_offset": {
-        "start_offset": 0,
-        "end_offset": 6000000000
-      }
-    },
-    {
-      "id": "Q1072",
-      "sql": "SELECT bucket, avg_lat FROM (SELECT histogram(_timestamp, '15 minute') AS bucket, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE match_all('warehouse') AND latency_ms IS NOT NULL GROUP BY bucket) s ORDER BY bucket ASC LIMIT 20",
-      "category": "full_text_search",
-      "expected": {
-        "columns": [
-          "bucket",
-          "avg_lat"
-        ],
-        "results": [
-          [
-            "2026-08-14T04:30:00",
-            "984.25"
-          ],
-          [
-            "2026-08-14T04:45:00",
-            "695.32"
-          ],
-          [
-            "2026-08-14T05:00:00",
-            "821.88"
-          ],
-          [
-            "2026-08-14T05:15:00",
-            "695.32"
-          ],
-          [
-            "2026-08-14T05:30:00",
-            "821.88"
-          ],
-          [
-            "2026-08-14T05:45:00",
-            "695.32"
-          ],
-          [
-            "2026-08-14T06:00:00",
-            "821.88"
-          ],
-          [
-            "2026-08-14T06:15:00",
-            "602.6538461538462"
+            "2026-08-14T06:25:00",
+            "25"
           ]
         ],
         "results_mode": "rowsort"
@@ -8678,6 +8357,333 @@
           ]
         ],
         "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1016",
+      "sql": "WITH filtered AS (SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND log_message LIKE 'GET %' UNION ALL SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND log_message LIKE 'POST %' UNION ALL SELECT facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND log_message LIKE 'ERROR:%') SELECT facility_zone, COUNT(*) AS cnt FROM filtered GROUP BY facility_zone ORDER BY cnt DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "75"
+          ],
+          [
+            "ZONE-4",
+            "75"
+          ],
+          [
+            "ZONE-1",
+            "25"
+          ],
+          [
+            "ZONE-3",
+            "25"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1041",
+      "sql": "WITH src AS (SELECT facility_zone, log_message FROM \"{stream}\" WHERE match_all('warehouse')), filtered AS (SELECT facility_zone FROM src WHERE log_message LIKE 'GET %' OR log_message LIKE 'POST %' OR log_message LIKE 'PUT %') SELECT facility_zone, COUNT(*) AS cnt FROM filtered GROUP BY facility_zone ORDER BY cnt DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "25"
+          ],
+          [
+            "ZONE-2",
+            "25"
+          ],
+          [
+            "ZONE-3",
+            "25"
+          ],
+          [
+            "ZONE-4",
+            "25"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1045",
+      "sql": "WITH raw AS (SELECT event_detail, facility_zone FROM \"{stream}\" WHERE match_all('warehouse')), extracted AS (SELECT facility_zone, event_detail FROM raw WHERE event_detail IS NOT NULL), matched AS (SELECT facility_zone FROM extracted WHERE event_detail LIKE '%batch%' OR event_detail LIKE '%segment%') SELECT facility_zone, COUNT(*) AS c FROM matched GROUP BY facility_zone ORDER BY c DESC, facility_zone ASC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "c"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "100"
+          ],
+          [
+            "ZONE-3",
+            "99"
+          ],
+          [
+            "ZONE-2",
+            "75"
+          ],
+          [
+            "ZONE-4",
+            "75"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1071",
+      "sql": "WITH bucketed AS (SELECT histogram(_timestamp, '10 minute') AS bucket, facility_zone FROM \"{stream}\" WHERE match_all('warehouse') AND facility_zone IS NOT NULL) SELECT bucket, facility_zone, COUNT(*) AS n FROM bucketed GROUP BY bucket, facility_zone ORDER BY bucket ASC, n DESC LIMIT 30",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "bucket",
+          "facility_zone",
+          "n"
+        ],
+        "results": [
+          [
+            "2026-08-14T04:50:00",
+            "ZONE-4",
+            "13"
+          ],
+          [
+            "2026-08-14T04:50:00",
+            "ZONE-3",
+            "12"
+          ],
+          [
+            "2026-08-14T04:50:00",
+            "ZONE-1",
+            "12"
+          ],
+          [
+            "2026-08-14T04:50:00",
+            "ZONE-2",
+            "12"
+          ],
+          [
+            "2026-08-14T05:00:00",
+            "ZONE-1",
+            "13"
+          ],
+          [
+            "2026-08-14T05:00:00",
+            "ZONE-2",
+            "13"
+          ],
+          [
+            "2026-08-14T05:00:00",
+            "ZONE-3",
+            "12"
+          ],
+          [
+            "2026-08-14T05:00:00",
+            "ZONE-4",
+            "12"
+          ],
+          [
+            "2026-08-14T05:10:00",
+            "ZONE-3",
+            "13"
+          ],
+          [
+            "2026-08-14T05:10:00",
+            "ZONE-4",
+            "13"
+          ],
+          [
+            "2026-08-14T05:10:00",
+            "ZONE-1",
+            "12"
+          ],
+          [
+            "2026-08-14T05:10:00",
+            "ZONE-2",
+            "12"
+          ],
+          [
+            "2026-08-14T05:20:00",
+            "ZONE-2",
+            "13"
+          ],
+          [
+            "2026-08-14T05:20:00",
+            "ZONE-1",
+            "13"
+          ],
+          [
+            "2026-08-14T05:20:00",
+            "ZONE-3",
+            "12"
+          ],
+          [
+            "2026-08-14T05:20:00",
+            "ZONE-4",
+            "12"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "ZONE-4",
+            "13"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "ZONE-3",
+            "13"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "ZONE-1",
+            "12"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "ZONE-2",
+            "12"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-2",
+            "13"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-1",
+            "13"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-4",
+            "12"
+          ],
+          [
+            "2026-08-14T05:40:00",
+            "ZONE-3",
+            "12"
+          ],
+          [
+            "2026-08-14T05:50:00",
+            "ZONE-3",
+            "13"
+          ],
+          [
+            "2026-08-14T05:50:00",
+            "ZONE-4",
+            "13"
+          ],
+          [
+            "2026-08-14T05:50:00",
+            "ZONE-1",
+            "12"
+          ],
+          [
+            "2026-08-14T05:50:00",
+            "ZONE-2",
+            "12"
+          ],
+          [
+            "2026-08-14T06:00:00",
+            "ZONE-2",
+            "13"
+          ],
+          [
+            "2026-08-14T06:00:00",
+            "ZONE-1",
+            "13"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
+      },
+      "time_offset": {
+        "start_offset": 0,
+        "end_offset": 6000000000
+      }
+    },
+    {
+      "id": "Q1072",
+      "sql": "SELECT bucket, avg_lat FROM (SELECT histogram(_timestamp, '15 minute') AS bucket, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE match_all('warehouse') AND latency_ms IS NOT NULL GROUP BY bucket) s ORDER BY bucket ASC LIMIT 20",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "bucket",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "2026-08-14T04:45:00",
+            "772.265306122449"
+          ],
+          [
+            "2026-08-14T05:00:00",
+            "821.88"
+          ],
+          [
+            "2026-08-14T05:15:00",
+            "695.32"
+          ],
+          [
+            "2026-08-14T05:30:00",
+            "821.88"
+          ],
+          [
+            "2026-08-14T05:45:00",
+            "695.32"
+          ],
+          [
+            "2026-08-14T06:00:00",
+            "821.88"
+          ],
+          [
+            "2026-08-14T06:15:00",
+            "695.32"
+          ],
+          [
+            "2026-08-14T06:30:00",
+            "1450.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true,
+        "skip_column_check": true
       },
       "time_offset": {
         "start_offset": 0,
