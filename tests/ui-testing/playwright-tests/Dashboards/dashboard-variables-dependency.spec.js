@@ -43,7 +43,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
@@ -120,7 +120,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variables: A (independent), B (depends on A), C (depends on B)
     await pm.dashboardSetting.openSetting();
@@ -218,7 +218,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -317,7 +317,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -427,7 +427,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -555,7 +555,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -675,7 +675,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -774,7 +774,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -881,7 +881,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Create a variable with a valid stream but add an impossible filter to cause error during value loading
     await pm.dashboardSetting.openSetting();

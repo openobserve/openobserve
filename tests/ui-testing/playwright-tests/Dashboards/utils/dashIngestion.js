@@ -38,22 +38,41 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
       }
     );
 
-  try {
-    let fetchResponse = await post();
+  const MAX_ATTEMPTS = 3;
 
-    // On cloud the ingestion passcode is per-org and can be rotated out from under a
-    // running session (another shard sharing the org, or plain expiry). When that
-    // happens this call 401s, no data lands, and the failure surfaces much later and
-    // far away — as "No dropdown options appeared for stream", or a variable that
-    // loaded 0 options — with nothing pointing at auth. refreshCloudConfig re-fetches
-    // the passcode using the page's live cookie session, so retry once behind it.
-    if ((fetchResponse.status === 401 || fetchResponse.status === 403) && page) {
-      testLogger.warn(
-        `Ingestion returned ${fetchResponse.status} — refreshing cloud passcode and retrying`
-      );
-      if (await refreshCloudConfig(page)) {
-        fetchResponse = await post();
+  try {
+    let fetchResponse;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      fetchResponse = await post();
+
+      // On cloud the ingestion passcode is per-org and can be rotated out from under a
+      // running session (another shard sharing the org, or plain expiry). When that
+      // happens this call 401s, no data lands, and the failure surfaces much later and
+      // far away — as "No dropdown options appeared for stream", or a variable that
+      // loaded 0 options — with nothing pointing at auth. refreshCloudConfig re-fetches
+      // the passcode using the page's live cookie session, so retry behind it.
+      if ((fetchResponse.status === 401 || fetchResponse.status === 403) && page) {
+        testLogger.warn(
+          `Ingestion returned ${fetchResponse.status} — refreshing cloud passcode and retrying`
+        );
+        if (await refreshCloudConfig(page)) continue;
       }
+
+      // Transient upstream failures: the ingest node behind the proxy intermittently
+      // drops a request under load ("502 Proxy request failed: error sending request
+      // for url ..."). Nothing is wrong with the payload or the credentials, and a
+      // beforeEach that dies here fails the whole test far from the real cause, so back
+      // off briefly and try again.
+      if (fetchResponse.status >= 500 && attempt < MAX_ATTEMPTS) {
+        testLogger.warn(
+          `Ingestion returned ${fetchResponse.status} — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+        continue;
+      }
+
+      break;
     }
 
     if (!fetchResponse.ok) {

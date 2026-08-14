@@ -320,11 +320,18 @@ export default class DashboardVariablesScoped {
 
   /**
    * Wait for add panel button (empty dashboard state)
+   *
+   * Defaults to 30s to match setupTestDashboard(): createDashboard() returns once
+   * /dashboards/view is reachable and the header has mounted, but this button lives in
+   * RenderDashboardCharts (v-if="!panels.length") and only renders after the dashboard
+   * GET and variables init complete — which under parallel load against a deployed org
+   * lands well after the header.
+   *
    * @param {Object} options - Wait options
-   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   * @param {number} options.timeout - Timeout in ms (default: 30000)
    */
   async waitForAddPanelBtn(options = {}) {
-    const { timeout = 10000 } = options;
+    const { timeout = 30000 } = options;
     await this.page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout });
   }
 

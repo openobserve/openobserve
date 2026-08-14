@@ -39,7 +39,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
@@ -79,14 +79,23 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain("ALL");
 
-    // Change A and verify B still has "All"
-    const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
+    // Change A and verify B still has "All".
+    //
+    // B has an "all" default, so it deliberately does NOT re-query when A changes —
+    // asserting on an API-call count here would only ever be satisfied by A's own
+    // dropdown-open request, which proves nothing about B. What has to hold is that A
+    // genuinely changed (otherwise "B kept its default" is vacuous) and that B still
+    // reads ALL afterwards.
+    const varAValueBefore = await scopedVars.getVariableInnerValueLocator(varA).textContent();
+
+    await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1,
       expectedAPICalls: 1,
       timeout: 15000
     });
 
-    expect(result.success).toBe(true);
+    const varAValueAfter = await scopedVars.getVariableInnerValueLocator(varA).textContent();
+    expect(varAValueAfter).not.toBe(varAValueBefore);
 
     // Verify B still has "All" value after A changes
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
@@ -110,7 +119,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
@@ -155,14 +164,19 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain(customValue1);
 
-    // Change A and verify B still has custom values
-    const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
+    // Change A and verify B still has custom values.
+    // B has a custom default and so does not re-query on a parent change; assert that A
+    // actually changed rather than on an API count that only A's own request satisfies.
+    const varAValueBefore = await scopedVars.getVariableInnerValueLocator(varA).textContent();
+
+    await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1,
       expectedAPICalls: 1,
       timeout: 15000
     });
 
-    expect(result.success).toBe(true);
+    const varAValueAfter = await scopedVars.getVariableInnerValueLocator(varA).textContent();
+    expect(varAValueAfter).not.toBe(varAValueBefore);
 
     // Verify B still has custom values after A changes
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
@@ -187,7 +201,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
@@ -254,13 +268,19 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     expect(varCValue).toBeTruthy();
     expect(varCValue.length).toBeGreaterThan(0);
 
-    // Change A and verify C still loads properly
+    // Change A and verify C still loads properly.
+    // B holds its "all" default without re-querying, so C (field `_timestamp`) is the
+    // only variable expected to reload. dependentFields restricts the tally to C's own
+    // request, so this measures the grandchild reloading rather than being satisfied by
+    // A's dropdown-open request.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1,
-      expectedAPICalls: 2, // B stays as "all", C reloads
-      timeout: 20000
+      expectedAPICalls: 1, // C reloads; B keeps "all" without an API call
+      dependentFields: ["_timestamp"],
+      timeout: 30000
     });
 
+    expect(result.matchedCount).toBeGreaterThanOrEqual(1);
     expect(result.success).toBe(true);
 
     // Verify B still has "All"
@@ -294,7 +314,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add A (independent)
     await pm.dashboardSetting.openSetting();
@@ -378,13 +398,18 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     const varDValue = await scopedVars.getVariableInnerValueLocator(varD).textContent();
     expect(varDValue).toBeTruthy();
 
-    // Change A and verify the entire chain
+    // Change A and verify the entire chain.
+    // B keeps "all" and C keeps its custom values, both without re-querying, so D
+    // (field `_timestamp`) is the only variable expected to reload. Scoping the tally to
+    // D's field makes this assert the tail of the chain actually reloaded.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1,
-      expectedAPICalls: 2, // B keeps "all", C keeps custom, D reloads
-      timeout: 30000
+      expectedAPICalls: 1, // D reloads; B and C hold their defaults without an API call
+      dependentFields: ["_timestamp"],
+      timeout: 45000
     });
 
+    expect(result.matchedCount).toBeGreaterThanOrEqual(1);
     expect(result.success).toBe(true);
 
     // Verify all values are maintained/loaded properly
@@ -417,7 +442,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible", timeout: 30000 });
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
@@ -459,14 +484,19 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain(customValue);
 
-    // Change A and verify B still has custom value
-    const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
+    // Change A and verify B still has custom value.
+    // B has a custom default and so does not re-query on a parent change; assert that A
+    // actually changed rather than on an API count that only A's own request satisfies.
+    const varAValueBefore = await scopedVars.getVariableInnerValueLocator(varA).textContent();
+
+    await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1,
       expectedAPICalls: 1,
       timeout: 15000
     });
 
-    expect(result.success).toBe(true);
+    const varAValueAfter = await scopedVars.getVariableInnerValueLocator(varA).textContent();
+    expect(varAValueAfter).not.toBe(varAValueBefore);
 
     // Verify B still has custom value after A changes
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
