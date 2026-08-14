@@ -58,6 +58,7 @@ pub mod inferred;
 pub mod otel;
 pub mod service_graph;
 pub mod session;
+pub mod time_index;
 
 #[cfg(feature = "cloud")]
 use ::stream::get_stream;
@@ -1474,6 +1475,13 @@ async fn write_traces(
         .with_metadata(HashMap::new());
     let record_schema = Arc::new(record_schema);
     let schema_key = record_schema.hash_key();
+
+    if let Err(e) = time_index::write(org_id, stream_name, &json_data).await {
+        metrics::TRACE_TIME_INDEX_OPERATIONS
+            .with_label_values(&[org_id, "write", "error"])
+            .inc();
+        log::error!("[TRACE_TIME_INDEX] failed to write index for {org_id}/{stream_name}: {e}");
+    }
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);

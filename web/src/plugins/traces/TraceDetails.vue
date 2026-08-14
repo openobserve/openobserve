@@ -558,7 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   ref="traceScrollContainer"
-                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! [scrollbar-gutter:stable]! overflow-x-hidden! overflow-y-auto!"
+                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! overflow-x-hidden! overflow-y-auto! [scrollbar-gutter:stable]!"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"
@@ -2140,10 +2140,12 @@ export default defineComponent({
               endTime = Math.ceil(res.data.hits[0].end_time / 1000);
 
               // If the trace is not in the current time range, update the time range
-              if (!(
-                startTime >= Number(router.currentRoute.value.query.from) &&
-                endTime <= Number(router.currentRoute.value.query.to)
-              )) {
+              if (
+                !(
+                  startTime >= Number(router.currentRoute.value.query.from) &&
+                  endTime <= Number(router.currentRoute.value.query.to)
+                )
+              ) {
                 updateUrlQueryParams({
                   from: startTime,
                   to: endTime,
@@ -2184,36 +2186,6 @@ export default defineComponent({
       });
     };
 
-    const getDefaultRequest = () => {
-      return {
-        query: {
-          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time/1000) as trace_start_time, max(end_time/1000) as trace_end_time, min(service_name) as service_name, min(operation_name) as operation_name, count(trace_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
-          start_time: (new Date().getTime() - 900000) * 1000,
-          end_time: new Date().getTime() * 1000,
-          from: 0,
-          size: 0,
-        },
-        encoding: "base64",
-      };
-    };
-
-    const sanitizeTraceId = (id: string): string => String(id).replace(/['"\\]/g, "");
-
-    const buildTraceSearchQuery = (trace: any) => {
-      const req = getDefaultRequest();
-      req.query.from = 0;
-      // TODO : Handle this with _search_stream instead of adding size
-      req.query.size = 50000;
-      req.query.start_time = trace.from;
-      req.query.end_time = trace.to;
-
-      req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM "${trace.stream}" WHERE trace_id = '${sanitizeTraceId(trace.trace_id)}' ORDER BY start_time`,
-      ) as string;
-
-      return req;
-    };
-
     const { fetchRumEventsForTrace, formatRumEventsAsSpans } = useRumSpanBuilder(
       logStreams,
       searchObj,
@@ -2224,63 +2196,48 @@ export default defineComponent({
       try {
         searchObj.data.traceDetails.isLoadingTraceDetails = true;
         searchObj.data.traceDetails.spanList = [];
-        const req = buildTraceSearchQuery(data);
+        const traceRes = await searchService.get_trace_details({
+          org_identifier: effectiveOrgIdentifier.value,
+          stream_name: data.stream,
+          trace_id: data.trace_id,
+          start_time: data.from,
+          end_time: data.to,
+          hint_ts: data.from + Math.floor((data.to - data.from) / 2),
+        });
+        if (!traceRes.data?.hits?.length) {
+          showTraceDetailsError();
+          return;
+        }
 
-        const tracePromise = searchService.search(
-          {
-            org_identifier: effectiveOrgIdentifier.value,
-            query: req,
-            page_type: "traces",
-          },
-          "ui",
+        const effectiveStart = traceRes.data.new_start_time ?? data.from;
+        const effectiveEnd = traceRes.data.new_end_time ?? data.to;
+        if (effectiveStart !== data.from || effectiveEnd !== data.to) {
+          updateUrlQueryParams({ from: effectiveStart, to: effectiveEnd });
+        }
+        const rumData = await fetchRumEventsForTrace(data.trace_id, effectiveStart, effectiveEnd);
+        const traceSpans = traceRes.data.hits;
+        const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
+        const rumSpans = formatRumEventsAsSpans(
+          tracedResources,
+          viewEvents,
+          actionEvents,
+          allViewEvents,
         );
-
-        const rumPromise = fetchRumEventsForTrace(
-          data.trace_id,
-          req.query.start_time,
-          req.query.end_time,
-        );
-
-        Promise.all([tracePromise, rumPromise])
-          .then(([traceRes, rumData]) => {
-            if (!traceRes.data?.hits?.length) {
-              showTraceDetailsError();
-              return;
-            }
-
-            const traceSpans = traceRes.data?.hits || [];
-            const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
-            const rumSpans = formatRumEventsAsSpans(
-              tracedResources,
-              viewEvents,
-              actionEvents,
-              allViewEvents,
-            );
-            // RUM spans take priority over trace spans with the same span_id
-            const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
-            const deduplicatedTraceSpans = traceSpans.filter(
-              (s: any) => !rumSpanIds.has(s.span_id),
-            );
-            // spanList is never[] in useTraces state; widen container to accept spans.
-            (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
-              ...rumSpans,
-              ...deduplicatedTraceSpans,
-            ];
-            updateServiceColors();
-            buildTracesTree();
-          })
-          .catch((error) => {
-            console.error("Error fetching trace details:", error);
-            searchObj.data.traceDetails.isLoadingTraceDetails = false;
-            showTraceDetailsError();
-          })
-          .finally(() => {
-            searchObj.data.traceDetails.isLoadingTraceDetails = false;
-          });
+        // RUM spans take priority over trace spans with the same span_id
+        const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
+        const deduplicatedTraceSpans = traceSpans.filter((s: any) => !rumSpanIds.has(s.span_id));
+        // spanList is never[] in useTraces state; widen container to accept spans.
+        (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
+          ...rumSpans,
+          ...deduplicatedTraceSpans,
+        ];
+        updateServiceColors();
+        buildTracesTree();
       } catch (error) {
         console.error("Error fetching trace details:", error);
-        searchObj.data.traceDetails.isLoadingTraceDetails = false;
         showTraceDetailsError();
+      } finally {
+        searchObj.data.traceDetails.isLoadingTraceDetails = false;
       }
     };
 

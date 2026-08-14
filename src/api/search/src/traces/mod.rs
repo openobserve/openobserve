@@ -52,8 +52,10 @@ use crate::{
 };
 
 pub mod dag;
+pub mod details;
 pub(crate) mod schema_compat;
 pub mod session;
+pub mod time_index;
 pub mod user;
 
 /// TracesIngest

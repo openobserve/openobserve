@@ -28,6 +28,7 @@ pub mod nats;
 pub mod postgres;
 pub mod sqlite;
 pub mod tantivy_index;
+pub mod trace_time_index;
 
 pub static NEED_WATCH: bool = true;
 pub static NO_NEED_WATCH: bool = false;

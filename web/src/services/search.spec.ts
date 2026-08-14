@@ -632,6 +632,23 @@ describe("Search Service", () => {
     });
   });
 
+  describe("get_trace_details", () => {
+    it("should build the trace details URL with a caller range and hint", async () => {
+      await search.get_trace_details({
+        org_identifier: "test-org",
+        stream_name: "traces",
+        trace_id: "trace/id",
+        start_time: 10,
+        end_time: 20,
+        hint_ts: 15,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/traces/trace%2Fid/details?start_time=10&end_time=20&hint_ts=15",
+      );
+    });
+  });
+
   describe("partition", () => {
     it("should build correct URL for partition search", async () => {
       const params = {

@@ -1481,6 +1481,12 @@ pub struct Common {
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
     pub tracing_search_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACE_TIME_INDEX_ENABLED",
+        default = false,
+        help = "Enable per-stream trace time indexes and trace time-range lookup"
+    )]
+    pub trace_time_index_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]

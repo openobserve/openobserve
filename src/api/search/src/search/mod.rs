@@ -307,7 +307,6 @@ pub async fn search(
             return map_error_to_http_response(&(e.into()), Some(trace_id));
         }
     };
-
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
         {
@@ -1069,7 +1068,7 @@ pub async fn build_search_request_per_field(
     };
 
     let distinct_prefix = if can_use_distinct_stream {
-        format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
+        format!("{}{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
     } else {
         "".to_string()
     };
@@ -1338,7 +1337,7 @@ async fn values_v1(
         let actual_stream_type;
 
         if use_distinct_stream {
-            distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
+            distinct_prefix = format!("{}{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
             // if we are using distinct stream, we have already partially aggregated
             // the counts, so we need to sum over that field
             count_fn = "SUM(count)";
