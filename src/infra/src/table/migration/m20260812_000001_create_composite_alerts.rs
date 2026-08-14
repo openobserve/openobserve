@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-//! Composite-alert definitions, derived child index, and scheduler claim
-//! fencing. This is deliberately the complete v1 persistence footprint.
+//! Composite-alert definitions and the derived child index.
 
 use sea_orm_migration::prelude::*;
 
@@ -17,11 +16,6 @@ impl MigrationTrait for Migration {
         }
         manager.create_table(children_statement()).await?;
         manager.create_index(reverse_index_statement()).await?;
-        if manager.has_table("scheduled_jobs").await?
-            && !manager.has_column("scheduled_jobs", "claim_epoch").await?
-        {
-            manager.alter_table(claim_epoch_statement()).await?;
-        }
         Ok(())
     }
 
@@ -42,16 +36,6 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        if manager.has_column("scheduled_jobs", "claim_epoch").await? {
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(ScheduledJobs::Table)
-                        .drop_column(ScheduledJobs::ClaimEpoch)
-                        .to_owned(),
-                )
-                .await?;
-        }
         Ok(())
     }
 }
@@ -236,18 +220,6 @@ pub(super) fn reverse_index_statement() -> IndexCreateStatement {
         .to_owned()
 }
 
-pub(super) fn claim_epoch_statement() -> TableAlterStatement {
-    Table::alter()
-        .table(ScheduledJobs::Table)
-        .add_column(
-            ColumnDef::new(ScheduledJobs::ClaimEpoch)
-                .big_integer()
-                .not_null()
-                .default(0),
-        )
-        .to_owned()
-}
-
 #[derive(DeriveIden)]
 enum AlertComposites {
     Table,
@@ -281,10 +253,4 @@ enum AlertCompositeChildren {
     ChildAlertId,
     ChildKind,
     DisplayOrder,
-}
-
-#[derive(DeriveIden)]
-enum ScheduledJobs {
-    Table,
-    ClaimEpoch,
 }

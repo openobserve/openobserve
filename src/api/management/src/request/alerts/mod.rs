@@ -529,6 +529,9 @@ fn composite_error_response(
             "composite_super_cluster_unsupported",
             error,
         ),
+        CompositeServiceError::PermissionDenied => {
+            composite_machine_error(StatusCode::FORBIDDEN, "permission_denied", error)
+        }
         CompositeServiceError::Database(_) | CompositeServiceError::Scheduler(_) => {
             composite_machine_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -587,6 +590,11 @@ fn composite_field_error(
     path = "/v2/{org_id}/alerts/composites/validate",
     context_path = "/api",
     tag = "Alerts",
+    operation_id = "ValidateCompositeAlert",
+    summary = "Validate a composite alert condition",
+    description = "Parses and validates a composite alert's boolean expression over child alert IDs and returns the canonical form, resolved children, and an advisory result without persisting anything.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(ValidateCompositeRequestBody), content_type = "application/json"),
     responses((status = 200, body = crate::models::alerts::responses::CompositeValidationResponse))
 )]
@@ -750,6 +758,14 @@ pub async fn validate_composite_alert(
     path = "/v2/{org_id}/alerts/{id}/composite-references",
     context_path = "/api",
     tag = "Alerts",
+    operation_id = "GetCompositeReferences",
+    summary = "List composite alerts referencing an alert",
+    description = "Returns the composite alerts that reference the given alert as a child, plus the count of references hidden from the caller by permissions.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Alert or composite alert ID"),
+    ),
     responses((status = 200, body = crate::models::alerts::responses::CompositeReferencesResponse))
 )]
 pub async fn get_composite_references(
@@ -906,7 +922,11 @@ pub async fn get_composite_timeline(
                 _ => None,
             }
         };
-        let state = current.get(&id);
+        let state = if name.is_some() {
+            current.get(&id)
+        } else {
+            None
+        };
         let transitions = if name.is_some() {
             infra::table::alert_states::list_transitions_between(
                 &id,
@@ -2220,8 +2240,16 @@ pub async fn list_alerts(
     #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
     let requested_sort = (params.sort_by, params.sort_desc);
 
-    // Pagination is always applied after merging every alert storage kind.
-    params.page_size_and_idx = None;
+    // Only force a full fetch when composite/anomaly rows are merged in after
+    // the SQL query. A single-kind list keeps SQL LIMIT/OFFSET so we don't
+    // fetch and sort every row in memory.
+    let merges_extra = matches!(
+        alert_type,
+        AlertTypeFilter::All | AlertTypeFilter::Composite | AlertTypeFilter::AnomalyDetection
+    );
+    if merges_extra {
+        params.page_size_and_idx = None;
+    }
 
     // Fetch regular (scheduled / realtime) alerts unless the filter is anomaly-only.
     let mut list: Vec<ListAlertsResponseBodyItem> = if !matches!(
@@ -2363,14 +2391,20 @@ pub async fn list_alerts(
 
     sort_merged_alert_list(&mut list, requested_sort.0, requested_sort.1);
 
-    // Apply pagination to the combined list.
-    let list = if let Some((page_size, page_idx)) = page_size_and_idx {
-        // Use saturating_mul to prevent u64 overflow before casting to usize.
-        let start = page_idx.saturating_mul(page_size) as usize;
-        list.into_iter()
-            .skip(start)
-            .take(page_size as usize)
-            .collect()
+    // Apply pagination to the combined list. Single-kind lists were already
+    // paginated by the SQL query, so only re-paginate when extra kinds were
+    // merged in after it.
+    let list = if merges_extra {
+        if let Some((page_size, page_idx)) = page_size_and_idx {
+            // Use saturating_mul to prevent u64 overflow before casting to usize.
+            let start = page_idx.saturating_mul(page_size) as usize;
+            list.into_iter()
+                .skip(start)
+                .take(page_size as usize)
+                .collect()
+        } else {
+            list
+        }
     } else {
         list
     };

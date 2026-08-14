@@ -21,10 +21,17 @@ use infra::{
         entity::{alert_composite_children, alert_composites as composite_entity},
     },
 };
+#[cfg(feature = "enterprise")]
+use o2_openfga::{
+    authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
+    config::get_config as get_openfga_config,
+};
 use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait};
 use svix_ksuid::{Ksuid, KsuidLike as _};
 
 use crate::alerts::composite_graph_lock;
+#[cfg(feature = "enterprise")]
+use crate::auth::check_permissions;
 
 #[derive(Clone, Debug)]
 pub struct CompositeCreate {
@@ -73,6 +80,8 @@ pub enum CompositeServiceError {
     Lock(String),
     #[error("composite writes are disabled")]
     WritesDisabled,
+    #[error("permission denied")]
+    PermissionDenied,
     #[error("composite alerts are unsupported in super-cluster mode")]
     SuperClusterUnsupported,
     #[error(transparent)]
@@ -189,6 +198,31 @@ pub async fn move_composite(
     ensure_mutation_allowed()?;
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // Resolve the current folder for the authorization check and OpenFGA
+    // relation rewrite below, mirroring alert::move_to_folder.
+    #[cfg(feature = "enterprise")]
+    let current = composite_entity::Entity::find_by_id(id)
+        .filter(composite_entity::Column::Org.eq(org))
+        .one(db)
+        .await?
+        .ok_or(CompositeServiceError::NotFound)?;
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled
+        && !check_permissions(
+            id,
+            org,
+            editor,
+            "alerts",
+            "PUT",
+            Some(&current.folder_id),
+            false,
+            true,
+            false,
+        )
+        .await
+    {
+        return Err(CompositeServiceError::PermissionDenied);
+    }
     let result = composite_entity::Entity::update_many()
         .col_expr(composite_entity::Column::FolderId, Expr::value(folder_id))
         .col_expr(composite_entity::Column::LastEditedBy, Expr::value(editor))
@@ -204,6 +238,23 @@ pub async fn move_composite(
         .filter(composite_entity::Column::Id.eq(id))
         .exec(db)
         .await?;
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled {
+        set_parent_relation(
+            id,
+            &get_ofga_type("alerts"),
+            folder_id,
+            &get_ofga_type("alert_folders"),
+        )
+        .await;
+        remove_parent_relation(
+            id,
+            &get_ofga_type("alerts"),
+            &current.folder_id,
+            &get_ofga_type("alert_folders"),
+        )
+        .await;
+    }
     if result.rows_affected == 1 {
         Ok(())
     } else {
@@ -690,6 +741,11 @@ fn map_update_error(error: sea_orm::DbErr) -> CompositeServiceError {
     }
 }
 
+/// Gates every composite write (create/update/move/trigger).
+///
+/// `ZO_ALERT_COMPOSITE_WRITES_ENABLED` is an opt-out flag: when unset (or set
+/// to any value other than the falsy set below) writes stay enabled. Set it to
+/// `0`, `false`, or `no` to disable composite mutation.
 fn ensure_mutation_allowed() -> Result<(), CompositeServiceError> {
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()

@@ -138,50 +138,73 @@ pub struct ListAlertsResponseBodyItem {
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CompositeChildResponse {
+    /// Child alert ID.
     pub alert_id: String,
+    /// Whether the caller may read this child.
     pub accessible: bool,
+    /// Child name; `None` when the child is not accessible to the caller.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// Child alert type ("scheduled" | "composite" | "slo").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alert_type: Option<String>,
+    /// Folder containing the child.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub folder_id: Option<String>,
+    /// Whether the child is enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
+    /// Current severity level of the child's last evaluation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub level: Option<String>,
+    /// When `level` was last recorded.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub level_at: Option<i64>,
+    /// Effective evaluation cadence in seconds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effective_cadence_seconds: Option<i64>,
+    /// Deadline after which a missing evaluation marks the child stale.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stale_deadline: Option<i64>,
+    /// Whether the child's latest state is stale.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stale: Option<bool>,
+    /// Whether the child currently evaluates true.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub truth: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CompositeValidationResponse {
+    /// Whether the expression is syntactically valid.
     pub valid: bool,
+    /// Canonicalized form of the expression.
     pub canonical_expression: Option<String>,
+    /// Resolved child references.
     pub children: Vec<CompositeChildResponse>,
+    /// Advisory evaluation result (null when indeterminate).
     pub result: Option<bool>,
+    /// Advisory severity of the result.
     pub result_level: Option<String>,
+    /// Advisory warnings (e.g. disabled or never-evaluated children).
     pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CompositeReferenceItem {
+    /// Referencing composite alert ID.
     pub alert_id: String,
+    /// Referencing composite alert name.
     pub name: String,
+    /// Folder containing the referencing composite alert.
     pub folder_id: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CompositeReferencesResponse {
+    /// Composite alerts referencing the queried alert that the caller can read.
     pub references: Vec<CompositeReferenceItem>,
+    /// Number of referencing composites hidden from the caller by permissions.
     pub hidden_reference_count: usize,
 }
 
