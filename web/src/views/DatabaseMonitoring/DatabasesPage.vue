@@ -185,14 +185,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- A placeholder row states no figure in any column: the split is not
-             here yet, and a 0 would be a measurement it never made. -->
+             here yet, and a 0 would be a measurement it never made.
+
+             Through DbmOverlapValue because a call count exists in BOTH
+             vantages: the cell refuses to print a figure it cannot qualify, so
+             there is no path here that shows a number without saying whose
+             count it is. -->
         <template #cell-calls="{ row }">
-          <span
-            class="font-mono text-xs tabular-nums"
-            :class="isStatusRow(row) ? 'text-text-muted' : 'text-text-body'"
-          >
-            {{ noQueryFigures(row) ? raw("—") : formatCount(row.calls) }}
-          </span>
+          <DbmOverlapValue
+            :value="noQueryFigures(row) ? null : formatCount(row.calls)"
+            source="client"
+            :qualifier-key="CLIENT_OBSERVED"
+            :engine="row.db_system"
+            data-test="dbm-databases-calls"
+          />
         </template>
 
         <!-- FR-1: the same traffic as a RATE, so a 15-minute view and a 4-hour
@@ -317,17 +323,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              bar — on this page the share is context for the duration, not a
              magnitude to compare visually row-to-row, so a bar per row was
              ink without a reading. -->
+        <!-- The share STAYS here, unlike the queries list where it was
+             suppressed: there the duration became a server figure and the
+             share divided it by a traced total, two populations. Here both the
+             duration and the scope total are the same client vantage, so the
+             fraction is honest. -->
         <template #cell-load="{ row }">
           <span
             v-if="!noQueryFigures(row)"
-            class="flex items-baseline justify-end gap-1 leading-tight"
+            class="flex flex-col items-end leading-tight"
             data-test="dbm-databases-load"
           >
-            <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
-              {{ formatNs(row.total_time_ns) }}
+            <span class="flex items-baseline justify-end gap-1">
+              <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
+                {{ formatNs(row.total_time_ns) }}
+              </span>
+              <span class="text-text-label text-3xs font-mono tabular-nums">
+                {{ formatPercent(row.share, 0) }}
+              </span>
             </span>
-            <span class="text-text-label text-3xs font-mono tabular-nums">
-              {{ formatPercent(row.share, 0) }}
+            <!-- The other overlap measure, and the one where an absent
+                 qualifier is most costly: a duration under "Load" with no
+                 vantage named reads as time the ENGINE spent, which on
+                 MySQL/MariaDB would be wait time. This is span time, and it
+                 includes network and pool wait the server never sees (T7). -->
+            <span
+              class="text-text-label text-3xs"
+              :title="t('dbm.detail.overlap.clientObserved', { engine: row.db_system })"
+              data-test="dbm-databases-load-qualifier"
+            >
+              {{ t("dbm.list.overlap.clientObserved") }}
             </span>
           </span>
           <span v-else class="text-text-muted block text-right">{{ raw("—") }}</span>
@@ -438,6 +463,8 @@ import type { DbmInstanceMetricSet, DbmRowMetrics } from "@/utils/dbm/instanceMe
 import { unionFleetRows, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
 import { healthScalar, healthSortValue } from "@/utils/dbm/healthScalar";
 import { detectDrowningDatabases, isCriticalErrorRate, totalsKey } from "@/utils/dbm/insights";
+import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
+import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 
@@ -1284,6 +1311,49 @@ const noQueryFigures = (row: TableRow): boolean =>
   isStatusRow(row) || (!isBreakdownRow(row) && row.trafficless);
 
 /**
+ * Does THIS window have a trace vantage at all?
+ *
+ * Every figure this page ranks on — calls, load, the percentiles, the error
+ * rate — comes from `db_totals`, which is trace-derived. So when the trace
+ * read answers successfully with nothing, the latency columns are not "zero
+ * latency", they are a vantage that was never there, and D3 says hide them
+ * rather than paint a column of dashes a reader will average to "fast".
+ *
+ * `loading`/`error` keep the vantage PRESENT deliberately: a failed read is
+ * not an observation of absence, and hiding on it would make columns vanish
+ * and reappear on every refresh. See useDbmTraceVantage.
+ */
+const traceVantage = computed(() =>
+  hasDbmTraceVantage({
+    rows: clientHits.value,
+    readFailed: !!error.value,
+    loading: loading.value,
+  }),
+);
+
+/**
+ * The two OVERLAP measures on this page — the call count and the database
+ * time — carry no server counterpart, and the qualifier says so.
+ *
+ * This page's grain is the DATABASE, not the statement. The only server-side
+ * per-statement feed (`/server_queries`) is a top-N ranked BY CALLS and comes
+ * back `truncated` even at its 200-row cap on the live `default` org, so
+ * folding it up to a database total would publish a floor as a total (trap
+ * T8) — and its MySQL rows carry no `db_namespace` at all, so they cannot be
+ * attributed to a database row in the first place. There is therefore no
+ * honest server value to resolve to here, and inventing one is worse than
+ * labelling the one we have.
+ *
+ * So the resolver's server branch is unreachable at this grain and these
+ * render as `clientObserved`. That is not a placeholder for a future server
+ * number: it is the true provenance, and it is exactly what D2 demands be
+ * said out loud, because "Calls" with no qualifier reads as what the DATABASE
+ * counted when it is what our instrumented callers counted — a number the
+ * live fleet shows to be ~3.7x smaller.
+ */
+const CLIENT_OBSERVED = "clientObserved";
+
+/**
  * Calls-per-second for one row. Database rows carry the server-computed rate
  * (`qps`, stamped over the exact window the response answered); a breakdown
  * child carries only its calls, so the same division runs here over the same
@@ -1344,7 +1414,7 @@ const onRowAction = (id: string, row: DatabaseRow) => {
  * The percentile headers say what they mean. These are exact per-database
  * figures, so unlike the query grain they need no qualifier.
  */
-const columns = computed<OTableColumnDef<TableRow>[]>(() => [
+const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   {
     id: "instance",
     header: t("dbm.databases.columns.instance"),
@@ -1353,13 +1423,21 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: { isName: true },
   },
+  // An OVERLAP measure: both vantages count calls, so the column may not stay
+  // silent about which one it is quoting (D2). The header states the
+  // provenance once — it is constant for every row this endpoint returns —
+  // and the per-row marker in the cell states what the number IS, which is the
+  // half that cannot be hoisted into a header on a table that mixes engines.
   {
     id: "calls",
     header: t("dbm.databases.columns.calls"),
     accessorKey: "calls",
     size: 96,
     sortable: true,
-    meta: { align: "right" },
+    meta: {
+      align: "right",
+      headerSubLabel: t("dbm.databases.columnSubLabels.calls"),
+    },
   },
   {
     id: "qps",
@@ -1480,6 +1558,32 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
     meta: { align: "right" },
   },
 ]);
+
+/**
+ * Columns only the TRACE vantage can fill. Percentiles are trace-only for us
+ * by collection choice — neither receiver ships a quantile column — and the
+ * failure rate counts what the CALLER saw, including timeouts and pool
+ * exhaustion that never reached the database and so left no server row.
+ */
+const TRACE_ONLY_COLUMNS = new Set(["p50", "p95", "p99", "errorRate"]);
+
+/**
+ * D3: when this window has no trace vantage, the trace-only columns are
+ * REMOVED rather than filled with dashes.
+ *
+ * A column of "—" invites exactly the reading it should prevent: a reader
+ * scanning a latency column of dashes concludes the databases are idle, when
+ * what actually happened is that nothing instrumented called them. Dropping
+ * the column states the same fact without offering a number-shaped blank to
+ * misread. The server-vantage columns (attention, instance health) are
+ * untouched — they had no trace input to lose, and on a zero-trace fleet they
+ * are the entire value of the page.
+ */
+const columns = computed<OTableColumnDef<TableRow>[]>(() =>
+  traceVantage.value
+    ? allColumns.value
+    : allColumns.value.filter((column) => !TRACE_ONLY_COLUMNS.has(column.id)),
+);
 
 /** Every column in the mockup's set is on: at two rows there is room for all. */
 const defaultColumnVisibility = {};
