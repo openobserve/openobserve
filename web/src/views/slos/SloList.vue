@@ -643,14 +643,14 @@ function onStatSelect(key: string | null) {
   healthFilter.value = key === "total" ? null : key;
 }
 
-async function load(orgId: string| null, folderId: string) {
+async function load(orgId: string | null, folderId: string) {
   if (!org.value) return;
   loading.value = true;
   error.value = null;
   // sometimes the folder id might not be updated so passed via
   // query params.
   const currentOrg = orgId ?? org.value;
-  const folder = folderId?? activeFolderId.value;
+  const folder = folderId ?? activeFolderId.value;
   try {
     const res = await sloService.list(currentOrg, folder);
     rows.value = res.data?.list ?? [];
