@@ -29,7 +29,7 @@ export function useOnlineEvalsData() {
     );
   };
 
-  async function loadAll(orgId: string) {
+  async function loadAll(orgId: string, force = false) {
     if (!orgId) return;
     // `load`, not `get`: a stale entry still has rows, and `get` would block on
     // the network with the skeleton up, throwing away what the user was reading.
@@ -44,10 +44,10 @@ export function useOnlineEvalsData() {
       // its own so one failing endpoint cannot blank the other three.
       const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
         [
-          providersQuery.load({ org: orgId, apply: (rows) => (providers.value = rows) }),
-          scoreConfigsQuery.load({ org: orgId, apply: applyScoreConfigs }),
-          scorersQuery.load({ org: orgId, apply: (rows) => (scorers.value = rows) }),
-          evalJobsQuery.load({ org: orgId, apply: (rows) => (jobs.value = rows) }),
+          providersQuery.load({ org: orgId, apply: (rows) => (providers.value = rows), force }),
+          scoreConfigsQuery.load({ org: orgId, apply: applyScoreConfigs, force }),
+          scorersQuery.load({ org: orgId, apply: (rows) => (scorers.value = rows), force }),
+          evalJobsQuery.load({ org: orgId, apply: (rows) => (jobs.value = rows), force }),
         ],
       );
 

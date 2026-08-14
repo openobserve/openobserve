@@ -67,7 +67,7 @@
         icon-left="refresh"
         :loading="loading"
         data-test="alerts-alertevaluationhistory-refresh"
-        @click="fetchHistory"
+        @click="refreshHistory"
       >
         <OTooltip side="bottom" :content="t('alerts.groups.refresh')" />
       </OButton>
@@ -191,14 +191,19 @@ const rows = computed(() =>
     .map((row, index) => ({ ...row, rowKey: `${row.timestamp}-${index}` })),
 );
 
-const fetchHistory = async () => {
+// Named handler: binding fetchHistory straight to @click would put the
+// MouseEvent in `force`.
+const refreshHistory = () => fetchHistory(true);
+
+const fetchHistory = async (force = false) => {
   const orgId = store.state.selectedOrganization?.identifier;
   if (!orgId || !props.alertId) return;
   loading.value = true;
   try {
     const endTime = Date.now() * 1000;
     const startTime = endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
-    const data = await alertHistoryQuery.get(orgId, {
+    const read = force ? alertHistoryQuery.refresh : alertHistoryQuery.get;
+    const data = await read(orgId, {
       alert_id: props.alertId,
       start_time: startTime,
       end_time: endTime,
