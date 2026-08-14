@@ -887,7 +887,10 @@ export default defineComponent({
     }
 
     // Bound to the refresh control: always hits the server.
-    const refreshData = () => getData(false, true);
+    // `true` for the filter flag: a refresh must re-apply whatever the user has
+    // selected, or the rows come back unfiltered while the chips still show the
+    // selection.
+    const refreshData = () => getData(true, true);
 
     const applyNodes = (responseData: any, filterFlag: boolean) => {
       const { flattenedData, uniqueValues, maxValues } = flattenObject(responseData);

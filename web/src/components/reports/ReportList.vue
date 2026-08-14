@@ -130,12 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="refresh"
                   :loading="isRefreshingReports"
                   data-test="report-list-refresh-btn"
-                  @click="
-                    () => {
-                      invalidateFolderCache(activeFolderId);
-                      loadReports(activeFolderId, undefined, true);
-                    }
-                  "
+                  @click="refreshReports"
                 >
                   <OTooltip
                     side="bottom"
@@ -632,6 +627,14 @@ watch(searchAcrossFolders, (enabled) => {
     filterReports();
   }
 });
+
+// Named handler: a refresh keeps whatever the user is searching for. Passing
+// `undefined` here reset the name query, so the rows came back unfiltered while
+// the search box still showed the term.
+const refreshReports = () => {
+  invalidateFolderCache(activeFolderId.value);
+  return loadReports(activeFolderId.value, searchQuery.value || undefined, true);
+};
 
 const debouncedSearch = debounce(async (query: string) => {
   await loadReports(activeFolderId.value, query);
