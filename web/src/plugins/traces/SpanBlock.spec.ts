@@ -648,18 +648,30 @@ describe("SpanBlock", () => {
       expect(markers()[0].attributes("aria-label")!.length).toBeLessThan(120);
     });
 
-    it("renders a tick that does not span the full bar height", async () => {
+    // The bar is 8px. A tick of the same height replaces it rather than
+    // annotating it; 6px leaves 1px of bar visible above and below, so the bar
+    // reads through and the tick is unambiguously a mark on it.
+    it("renders a tick shorter than the bar so the bar reads through", async () => {
       await setEvents([{ name: "a", _timestamp: eventNsAt(0.4) }]);
 
-      // 0.3125rem = 5px against the measured 8px bar; not the old 8x8 dot.
-      expect(markers()[0].classes()).toContain("h-[0.3125rem]");
+      expect(markers()[0].classes()).toContain("h-1.5");
       expect(markers()[0].classes()).not.toContain("rounded-full");
     });
 
-    it("renders an error tick at full bar height as a prominence cue", async () => {
-      await setEvents([{ name: "boom", level: "ERROR", _timestamp: eventNsAt(0.4) }]);
+    // Severity is carried by colour, the ring, and the row's event-count badge —
+    // not by height. A saturated tick among achromatic ones is a stronger cue
+    // than the 8px-vs-5px difference this replaces.
+    it("renders every severity tier at the same height", async () => {
+      await setEvents([
+        { name: "boom", level: "ERROR", _timestamp: eventNsAt(0.2) },
+        { name: "hmm", level: "WARN", _timestamp: eventNsAt(0.5) },
+        { name: "fyi", level: "INFO", _timestamp: eventNsAt(0.8) },
+      ]);
 
-      expect(markers()[0].classes()).toContain("h-2");
+      expect(markers()).toHaveLength(3);
+      for (const marker of markers()) {
+        expect(marker.classes()).toContain("h-1.5");
+      }
     });
 
     it("gives the marker a hit area wider than the tick itself", async () => {
