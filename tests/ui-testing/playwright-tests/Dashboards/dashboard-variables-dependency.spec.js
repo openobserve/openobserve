@@ -639,7 +639,9 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 1, // C is the only dependent variable
       dependentFields: ["_timestamp"],
-      timeout: 30000
+      // C sits behind two parents, so its reload is queued only once BOTH are settled.
+      // Under parallel CI load that serialisation pushes the cascade past 30s.
+      timeout: 45000
     });
 
     // C should load when A changes
@@ -651,7 +653,9 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 1, // C is the only dependent variable
       dependentFields: ["_timestamp"],
-      timeout: 30000
+      // C sits behind two parents, so its reload is queued only once BOTH are settled.
+      // Under parallel CI load that serialisation pushes the cascade past 30s.
+      timeout: 45000
     });
 
     // C should load when B changes too

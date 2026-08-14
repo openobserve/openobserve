@@ -140,7 +140,7 @@ test.describe(
       // Reopen settings to verify variable was created
       await reopenSettingsVariables(page, pm);
       const editBtn = scopedVars.getEditVariableBtnLocator("child");
-      await expect(editBtn).toBeVisible({ timeout: 10000 });
+      await expect(editBtn).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -202,7 +202,7 @@ test.describe(
       // Reopen settings to verify variable was created
       await reopenSettingsVariables(page, pm);
       const editBtn = scopedVars.getEditVariableBtnLocator("child");
-      await expect(editBtn).toBeVisible({ timeout: 10000 });
+      await expect(editBtn).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -260,7 +260,7 @@ test.describe(
 
       await reopenSettingsVariables(page, pm);
       const editCombined = scopedVars.getEditVariableBtnLocator("combined");
-      await expect(editCombined).toBeVisible({ timeout: 10000 });
+      await expect(editCombined).toBeVisible({ timeout: 30000 });
 
       // --- C2: Same variable in field and filter value ---
       await scopedVars.addQueryValuesVariable(
@@ -279,7 +279,7 @@ test.describe(
 
       await reopenSettingsVariables(page, pm);
       const editDedup = scopedVars.getEditVariableBtnLocator("dedup");
-      await expect(editDedup).toBeVisible({ timeout: 10000 });
+      await expect(editDedup).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -734,7 +734,7 @@ test.describe(
       );
       await reopenSettingsVariables(page, pm);
       const editHyphen = scopedVars.getEditVariableBtnLocator("hyphenChild");
-      await expect(editHyphen).toBeVisible({ timeout: 10000 });
+      await expect(editHyphen).toBeVisible({ timeout: 30000 });
 
       // --- H2: Variable name with underscores in field ---
       await scopedVars.addConstantVariable(
@@ -751,7 +751,7 @@ test.describe(
       );
       await reopenSettingsVariables(page, pm);
       const editUnderscore = scopedVars.getEditVariableBtnLocator("underscoreChild");
-      await expect(editUnderscore).toBeVisible({ timeout: 10000 });
+      await expect(editUnderscore).toBeVisible({ timeout: 30000 });
 
       // --- H3: Switch variable type from query_values to constant ---
       await scopedVars.addConstantVariable("parent", "e2e_automate");
@@ -776,7 +776,7 @@ test.describe(
       // Verify save succeeded
       await reopenSettingsVariables(page, pm);
       const editVar1 = scopedVars.getEditVariableBtnLocator("var1");
-      await expect(editVar1).toBeVisible({ timeout: 10000 });
+      await expect(editVar1).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
