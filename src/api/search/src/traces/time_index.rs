@@ -360,15 +360,23 @@ pub async fn query(
             .with_label_values(&[org_id, "query", "timeout"])
             .inc();
     }
+    let elapsed = started.elapsed();
     config::metrics::TRACE_TIME_INDEX_QUERY_DURATION
         .with_label_values(&[org_id, status])
-        .observe(started.elapsed().as_secs_f64());
+        .observe(elapsed.as_secs_f64());
     config::metrics::TRACE_TIME_INDEX_QUERY_ROUNDS
         .with_label_values(&[org_id, "locate"])
         .observe(stats.locate_rounds as f64);
     config::metrics::TRACE_TIME_INDEX_QUERY_ROUNDS
         .with_label_values(&[org_id, "expand"])
         .observe(stats.expand_rounds as f64);
+    log::info!(
+        "[trace_time_index] query org_id={org_id:?} stream={stream_name:?} trace_id={trace_id:?} hint_ts={hint_ts:?} status={status} timed_out={} locate_rounds={} expand_rounds={} took={} ms",
+        stats.timed_out,
+        stats.locate_rounds,
+        stats.expand_rounds,
+        elapsed.as_millis(),
+    );
     result
 }
 
