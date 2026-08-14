@@ -1,0 +1,17 @@
+Cargo.lock
+src/api/management/Cargo.toml
+src/api/management/src/request/ai/chat.rs
+src/config/src/config.rs
+src/core/src/alerts/incidents.rs
+src/infra/src/cluster/ai_sessions.rs
+src/infra/src/cluster/mod.rs
+src/infra/src/db/mod.rs
+src/infra/src/db/nats.rs
+src/infra/src/errors/mod.rs
+web/src/components/O2AIChat.spec.ts
+web/src/components/O2AIChat.vue
+Cargo.lock
+Cargo.toml
+o2_enterprise/Cargo.toml
+o2_enterprise/src/enterprise/ai/client/mod.rs
+o2_enterprise/src/enterprise/alerts/rca_service.rs

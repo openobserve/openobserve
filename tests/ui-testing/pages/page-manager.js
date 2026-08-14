@@ -80,6 +80,7 @@ import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.
 import { CorrelationDrawerPage } from "./generalPages/correlationDrawerPage.js";
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
+import { AiChatPage } from "./generalPages/aiChatPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
@@ -203,6 +204,7 @@ class PageManager {
     this.correlationDrawerPage = new CorrelationDrawerPage(page);
     this.crossLinkPage = new CrossLinkPage(page);
     this.modelPricingPage = new ModelPricingPage(page);
+    this.aiChatPage = new AiChatPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);
