@@ -275,12 +275,18 @@ describe("the database-reported fallback list on Top queries", () => {
    * is SHOWING, as a capped claim — a shared-snapshot `0` above rendered rows
    * denies working data, the same false-zero rule the fleet badge follows.
    * Both fallback pages carry the override.
+   *
+   * The claim also carries the `server` VANTAGE, because this override is the
+   * third of the three reads that can feed one badge (F4). Without it the
+   * strip would print the trace qualifier over a database-reported count.
    */
   it.each([
     ["QueriesPage.vue", list],
     ["SamplesPage.vue", read("SamplesPage.vue")],
   ])("%s claims its fallback rows on the tab badge, cap disclosed", (_page, source) => {
-    expect(source).toMatch(/countClaim\(serverRows\.value\.length, serverTruncated\.value\)/);
+    expect(source).toMatch(
+      /countClaim\(serverRows\.value\.length, serverTruncated\.value, "server"\)/,
+    );
   });
 });
 

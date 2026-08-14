@@ -284,6 +284,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tile-data-test="dbm-detail-server-metric"
             data-test="dbm-detail-server-metrics-tiles"
           />
+
+          <!-- D5 · WHO CALLED IT — the one thing this vantage cannot answer.
+               The database counts every execution and records no caller;
+               sqlcommenter tags do not survive into `pg_stat_statements`
+               either. So the names come from traces, and they are attached to
+               the server row rather than replacing any of its numbers: this is
+               a context join, and nothing below is arithmetic across vantages.
+
+               It lives INSIDE this section on purpose. The endpoints table
+               further down is the client vantage's own account of itself; this
+               is the answer to "the database says this statement is expensive
+               — who do I go talk to", and it is only meaningful beside the
+               figure that made the statement expensive.
+
+               Hidden entirely when the fingerprint has no trace vantage: an
+               empty caller list under a five-million-execution row reads as
+               "nothing calls this", which is false. -->
+          <div
+            v-if="showsCallingServices(callingServices)"
+            class="flex flex-col gap-1 pt-1"
+            data-test="dbm-detail-calling-services"
+          >
+            <span class="text-text-secondary text-xs">
+              {{ t("dbm.detail.callingServices.title") }}
+            </span>
+
+            <!-- The join key could not be formed. A REFUSAL, stated — the same
+                 decision the pooler case makes one block up. Guessing would
+                 attach another engine's services to these counters. -->
+            <span
+              v-if="callingServices.state === 'unjoinable'"
+              class="text-text-muted text-xs"
+              data-test="dbm-detail-calling-services-unjoinable"
+            >
+              {{ t("dbm.detail.callingServices.unjoinable") }}
+            </span>
+
+            <template v-else>
+              <div class="flex flex-col gap-1">
+                <div
+                  v-for="service in callingServices.services"
+                  :key="service.name"
+                  class="flex min-w-0 flex-wrap items-baseline gap-x-2"
+                  data-test="dbm-detail-calling-service"
+                >
+                  <DbmServiceList :services="[service.name]" :max="1" />
+                  <!-- Calls only, and NO duration. The callers table below
+                       renders each caller's own client-observed timing, in the
+                       client-vantage section where a round-trip figure belongs.
+
+                       It is deliberately not repeated here. Inches from the
+                       engine's own mean, a second duration invites the reader
+                       to subtract the two — which reports transport and
+                       pool-wait cost as a database anomaly. A qualifier is a
+                       label; adjacency is the stronger signal, and this block
+                       only has to answer WHO, not how long. -->
+                  <span class="text-text-muted text-2xs tabular-nums">
+                    {{
+                      t("dbm.detail.callingServices.tracedCalls", {
+                        calls: formatCount(service.calls),
+                      })
+                    }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- The coverage sentence, never optional. The list above names
+                   the INSTRUMENTED subset only, and the traced population runs
+                   ~3.7x smaller than the server's on live data — so the names
+                   without this line read as a complete attribution of every
+                   execution the tiles just counted. -->
+              <span
+                class="text-text-muted text-2xs"
+                data-test="dbm-detail-calling-services-coverage"
+              >
+                {{ callingServicesCoverage }}
+              </span>
+            </template>
+          </div>
         </template>
       </DbmSection>
 
@@ -895,6 +974,7 @@ import DbmQueryText from "@/components/dbm/DbmQueryText.vue";
 import DbmMetricTiles, { type DbmMetricTile } from "@/components/dbm/DbmMetricTiles.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmSection from "@/components/dbm/DbmSection.vue";
+import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
 import DbmStateNote from "@/components/dbm/DbmStateNote.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
@@ -956,6 +1036,7 @@ import {
   serverMetricsTiles,
   type DbmServerMetrics,
 } from "@/utils/dbm/serverMetrics";
+import { foldCallingServices, showsCallingServices } from "@/utils/dbm/callingServices";
 import { buildHistorySeries, errorRateValues, qpsValues, seriesValues } from "@/utils/dbm/history";
 import {
   buildWhereItRunsRows,
@@ -1462,6 +1543,67 @@ const callCount = computed(() =>
     clientCalls: row.value?.calls,
   }),
 );
+
+/**
+ * D5 — the calling services attached to the server row.
+ *
+ * The two inputs are ALREADY on this page and no request is added for them: the
+ * callers ride `/query/history?include_endpoints=true` (the same round trip the
+ * chart uses), and the denominator is the counter `/query/insights` already
+ * returned. The join is a fold, not a fetch.
+ *
+ * The scope is the join key the SERVER read was performed under — the same
+ * engine and database `loadQueryInsights` sends — so the callers cannot be
+ * attributed to a different engine than the counters they are shown beside.
+ * `database` is deliberately passed through unfiltered: `overlapJoinKey` is the
+ * one place that decides mysql/mariadb drop it.
+ */
+const callingServices = computed(() =>
+  foldCallingServices(
+    // Distinguishes "the read answered with nothing" from "the read never
+    // answered": a failed or stream-less read must not read as zero callers.
+    endpointsError.value === null ? endpoints.value : null,
+    {
+      fingerprint: fingerprint.value,
+      engine: engineLabel.value,
+      database: row.value?.db_namespace ?? namespaceFilter.value,
+    },
+    // The SERVER's execution count, never the traced one — a traced total over
+    // a traced total is always 100% and says nothing about what was missed.
+    serverMetrics.value.calls ?? serverRow.value?.calls ?? null,
+  ),
+);
+
+/**
+ * The coverage sentence — the half of D5 that keeps the names honest.
+ *
+ * Three sentences, not one with blanks, because the reader needs a different
+ * fact in each case and a blank reads as zero:
+ *  - both halves known: "3 services seen in 1,495,679 of 5,581,260 executions".
+ *  - no server denominator: the count of what we saw, and NO percentage — a
+ *    share needs the total, and inventing one from the traced side alone is
+ *    the normalisation to 100% this feature exists to refuse.
+ *  - nothing named: what we traced and that none of it could be attributed,
+ *    which is a real finding about the traces, not an absence of callers.
+ */
+const callingServicesCoverage = computed<I18nText>(() => {
+  const c = callingServices.value;
+  const traced = c.tracedCalls + c.unattributedCalls;
+  if (!c.services.length) {
+    return t("dbm.detail.callingServices.noneNamed", { traced: formatCount(traced) });
+  }
+  if (c.serverCalls === null) {
+    return t("dbm.detail.callingServices.coverageUnknown", {
+      count: c.services.length,
+      traced: formatCount(traced),
+    });
+  }
+  return t("dbm.detail.callingServices.coverage", {
+    count: c.services.length,
+    traced: formatCount(traced),
+    executions: formatCount(c.serverCalls),
+  });
+});
 
 /**
  * RULE A applied to the headline grid. The percentile and error tiles are
