@@ -358,7 +358,9 @@ fn cached_schedule(cron: &str) -> Result<Arc<Schedule>, CompositeError> {
             .map_err(|error| CompositeError::Parse(format!("invalid cron: {error}")))?,
     );
     if let Ok(mut cache) = CRON_SCHEDULE_CACHE.lock() {
-        cache.entry(cron.to_string()).or_insert_with(|| schedule.clone());
+        cache
+            .entry(cron.to_string())
+            .or_insert_with(|| schedule.clone());
     }
     Ok(schedule)
 }

@@ -372,10 +372,9 @@ async fn composite_detail_response(
         .iter()
         .map(|child| child.child_alert_id.clone())
         .collect();
-    let resolutions =
-        infra::table::alert_composites::resolve_many(db, &definition.org, &child_ids)
-            .await
-            .unwrap_or_default();
+    let resolutions = infra::table::alert_composites::resolve_many(db, &definition.org, &child_ids)
+        .await
+        .unwrap_or_default();
 
     let mut children = Vec::with_capacity(composite.children.len());
     for child in composite.children {
@@ -703,7 +702,9 @@ pub async fn validate_composite_alert(
             continue;
         }
         match resolutions.get(&id) {
-            Some(infra::table::alert_composites::Resolution::Alert(alert)) if !alert.is_real_time => {
+            Some(infra::table::alert_composites::Resolution::Alert(alert))
+                if !alert.is_real_time =>
+            {
                 children.push(serde_json::json!({
                     "alert_id": id,
                     "accessible": true,
@@ -799,10 +800,7 @@ pub async fn validate_composite_alert(
     }
 
     let (result, result_level) = match evaluation.as_ref() {
-        Some(evaluation) => (
-            Some(evaluation.result),
-            Some(evaluation.level.to_string()),
-        ),
+        Some(evaluation) => (Some(evaluation.result), Some(evaluation.level.to_string())),
         None => (None, None),
     };
 
@@ -1617,8 +1615,12 @@ pub async fn clone_alert(
                     .flatten()
             {
                 #[cfg(feature = "enterprise")]
-                if composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "GET")
-                    .await
+                if composite_subject_unauthorized(
+                    &_composite.definition,
+                    &user_email.user_id,
+                    "GET",
+                )
+                .await
                 {
                     return MetaHttpResponse::forbidden("Unauthorized Access");
                 }
@@ -1889,13 +1891,15 @@ pub async fn delete_alert(
         };
     }
 
-    if let Some(_composite) = openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str)
-        .await
-        .ok()
-        .flatten()
+    if let Some(_composite) =
+        openobserve_core::alerts::composite::get_composite(&org_id, &alert_id_str)
+            .await
+            .ok()
+            .flatten()
     {
         #[cfg(feature = "enterprise")]
-        if composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "DELETE").await
+        if composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "DELETE")
+            .await
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
@@ -1953,8 +1957,6 @@ async fn readable_parent_snapshot(
     #[cfg(not(feature = "enterprise"))]
     let hidden = 0;
     for (alert_id, name, folder_id) in parents {
-        #[cfg(not(feature = "enterprise"))]
-        let _ = folder_id;
         #[cfg(feature = "enterprise")]
         if !check_permissions(
             &alert_id,
@@ -1972,7 +1974,11 @@ async fn readable_parent_snapshot(
             hidden += 1;
             continue;
         }
-        references.push(serde_json::json!({"alert_id": alert_id, "name": name}));
+        references.push(serde_json::json!({
+            "alert_id": alert_id,
+            "name": name,
+            "folder_id": folder_id,
+        }));
     }
     (references, hidden)
 }
@@ -2242,7 +2248,12 @@ pub async fn list_alert_tags(
                 .is_none_or(|folder| &composite.folder_id == folder)
         }) {
             #[cfg(feature = "enterprise")]
-            if !visible_alert(&visibility, &composite.id, &composite.folder_id, &composite.name) {
+            if !visible_alert(
+                &visibility,
+                &composite.id,
+                &composite.folder_id,
+                &composite.name,
+            ) {
                 continue;
             }
             let tags: Vec<String> = composite
@@ -2256,8 +2267,7 @@ pub async fn list_alert_tags(
     }
     // Index the alert tag counts by tag so the composite merge is O(1) per tag
     // instead of a linear scan over every existing tag.
-    let mut count_map: std::collections::HashMap<String, u64> =
-        counts.iter().cloned().collect();
+    let mut count_map: std::collections::HashMap<String, u64> = counts.iter().cloned().collect();
     for (tag, count) in composite_counts {
         *count_map.entry(tag).or_default() += count;
     }
@@ -2389,20 +2399,19 @@ pub async fn list_alerts(
     let merges_extra = match alert_type {
         AlertTypeFilter::Composite | AlertTypeFilter::AnomalyDetection => true,
         AlertTypeFilter::All => {
-            !composite_definitions.is_empty()
-                || {
-                    #[cfg(feature = "enterprise")]
-                    {
-                        openobserve_core::anomaly_detection::list_configs(&org_id, None, None)
-                            .await
-                            .map(|configs| !configs.is_empty())
-                            .unwrap_or(false)
-                    }
-                    #[cfg(not(feature = "enterprise"))]
-                    {
-                        false
-                    }
+            !composite_definitions.is_empty() || {
+                #[cfg(feature = "enterprise")]
+                {
+                    openobserve_core::anomaly_detection::list_configs(&org_id, None, None)
+                        .await
+                        .map(|configs| !configs.is_empty())
+                        .unwrap_or(false)
                 }
+                #[cfg(not(feature = "enterprise"))]
+                {
+                    false
+                }
+            }
         }
         _ => false,
     };
@@ -2412,9 +2421,8 @@ pub async fn list_alerts(
         // only push regular alerts down the merged order, so the regular rows in
         // any page are a subset of the first `(page_idx + 1) * page_size` regular
         // rows. Unpaginated requests (no page_size) still fetch everything.
-        params.page_size_and_idx = page_size_and_idx.map(|(page_size, page_idx)| {
-            (page_idx.saturating_add(1).saturating_mul(page_size), 0)
-        });
+        params.page_size_and_idx = page_size_and_idx
+            .map(|(page_size, page_idx)| (page_idx.saturating_add(1).saturating_mul(page_size), 0));
     }
 
     // Fetch regular (scheduled / realtime) alerts unless the filter is anomaly-only.
@@ -2465,18 +2473,16 @@ pub async fn list_alerts(
         AlertTypeFilter::All | AlertTypeFilter::Composite
     ) && !composite_definitions.is_empty()
     {
-        let folder_names: HashMap<String, String> = infra::table::folders::list_folders(
-            &org_id,
-            config::meta::folder::FolderType::Alerts,
-        )
-        .await
-        .map(|folders| {
-            folders
-                .into_iter()
-                .map(|folder| (folder.folder_id, folder.name))
-                .collect()
-        })
-        .unwrap_or_default();
+        let folder_names: HashMap<String, String> =
+            infra::table::folders::list_folders(&org_id, config::meta::folder::FolderType::Alerts)
+                .await
+                .map(|folders| {
+                    folders
+                        .into_iter()
+                        .map(|folder| (folder.folder_id, folder.name))
+                        .collect()
+                })
+                .unwrap_or_default();
 
         for definition in composite_definitions {
             if !folder_slug
@@ -2492,7 +2498,12 @@ pub async fn list_alerts(
             {
                 continue;
             }
-            if !visible_alert(&visibility, &definition.id, &definition.folder_id, &definition.name) {
+            if !visible_alert(
+                &visibility,
+                &definition.id,
+                &definition.folder_id,
+                &definition.name,
+            ) {
                 continue;
             }
             let folder_name = folder_names
@@ -2646,10 +2657,9 @@ async fn enrich_with_composite_metadata(
         }
     }
 
-    let child_counts =
-        infra::table::alert_composites::children_count_for_many(db, &composite_ids)
-            .await
-            .unwrap_or_default();
+    let child_counts = infra::table::alert_composites::children_count_for_many(db, &composite_ids)
+        .await
+        .unwrap_or_default();
     let parents_for_composites = infra::table::alert_composites::list_parents_for_many(
         db,
         org_id,
@@ -2845,8 +2855,12 @@ pub async fn enable_alert(
                     .flatten()
             {
                 #[cfg(feature = "enterprise")]
-                if composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "PUT")
-                    .await
+                if composite_subject_unauthorized(
+                    &_composite.definition,
+                    &user_email.user_id,
+                    "PUT",
+                )
+                .await
                 {
                     return MetaHttpResponse::forbidden("Unauthorized Access");
                 }
@@ -3092,8 +3106,12 @@ pub async fn trigger_alert(
                     .flatten()
             {
                 #[cfg(feature = "enterprise")]
-                if composite_subject_unauthorized(&_composite.definition, &user_email.user_id, "PUT")
-                    .await
+                if composite_subject_unauthorized(
+                    &_composite.definition,
+                    &user_email.user_id,
+                    "PUT",
+                )
+                .await
                 {
                     return MetaHttpResponse::forbidden("Unauthorized Access");
                 }

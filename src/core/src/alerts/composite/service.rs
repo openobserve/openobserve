@@ -7,12 +7,14 @@
 
 use std::collections::{HashMap, HashSet};
 
+use common::meta::authz::Authz;
 use config::meta::{
     alerts::composite::{
         CompositeError, canonical_expression, collect_references, parse_expr, validate_children,
     },
     triggers::{Trigger, TriggerModule, TriggerStatus},
 };
+use db::authz::{remove_ownership, set_ownership};
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     scheduler,
@@ -26,8 +28,6 @@ use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
     config::get_config as get_openfga_config,
 };
-use common::meta::authz::Authz;
-use db::authz::{remove_ownership, set_ownership};
 use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait};
 use svix_ksuid::{Ksuid, KsuidLike as _};
 
@@ -40,10 +40,9 @@ use crate::auth::check_permissions;
 ///
 /// Two fields carry encodings that only make sense once you know the API layer:
 /// - [`Self::stale_child_policy`] is the persisted integer id from
-///   `CompositeStaleChildPolicy::storage_id()` (0=use-last, 1=false, 2=true),
-///   not the wire string.
-/// - [`Self::silence_seconds`] is seconds; the API `trigger_condition.silence`
-///   is minutes and is multiplied by 60 before it reaches this struct.
+///   `CompositeStaleChildPolicy::storage_id()` (0=use-last, 1=false, 2=true), not the wire string.
+/// - [`Self::silence_seconds`] is seconds; the API `trigger_condition.silence` is minutes and is
+///   multiplied by 60 before it reaches this struct.
 #[derive(Clone, Debug)]
 pub struct CompositeCreate {
     /// Stable composite id. Assigned by the service on create; identifies the

@@ -217,8 +217,7 @@ pub async fn list_parents_for_many<C: ConnectionTrait>(
     let parents = alert_composites::Entity::find()
         .filter(alert_composites::Column::Org.eq(org))
         .filter(
-            alert_composites::Column::Id
-                .is_in(links.iter().map(|link| link.composite_id.clone())),
+            alert_composites::Column::Id.is_in(links.iter().map(|link| link.composite_id.clone())),
         )
         .order_by_asc(alert_composites::Column::Id)
         .all(conn)
