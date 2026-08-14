@@ -72,22 +72,22 @@
         "results": [
           [
             "SORT-X1",
-            "manual",
-            "2"
-          ],
-          [
-            "SORT-Q5",
-            "auto",
-            "2"
-          ],
-          [
-            "SORT-X1",
             "hybrid",
             "2"
           ],
           [
             "SORT-A7",
             "auto",
+            "2"
+          ],
+          [
+            "SORT-Z9",
+            "manual",
+            "2"
+          ],
+          [
+            "SORT-X1",
+            "manual",
             "2"
           ],
           [
@@ -1994,7 +1994,7 @@
         ],
         "results": [
           [
-            "PL-003",
+            "PL-005",
             "840.0"
           ],
           [
@@ -2002,7 +2002,7 @@
             "725.0"
           ],
           [
-            "PL-007",
+            "PL-001",
             "610.0"
           ]
         ],
@@ -2043,13 +2043,13 @@
             "290.0"
           ],
           [
-            "ZONE-4",
-            "auto",
+            "ZONE-2",
+            "manual",
             "190.0"
           ],
           [
-            "ZONE-2",
-            "manual",
+            "ZONE-4",
+            "auto",
             "190.0"
           ]
         ],
@@ -2697,11 +2697,11 @@
         ],
         "results": [
           [
-            "ZONE-2",
+            "ZONE-4",
             "630.0"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "630.0"
           ]
         ],
@@ -2762,7 +2762,7 @@
         ],
         "results": [
           [
-            "sorter-engine",
+            "pallet-mapper",
             "1"
           ],
           [
@@ -2939,12 +2939,12 @@
         ],
         "results": [
           [
-            "warehouse-west",
+            "warehouse-east",
             "inbound",
             "1"
           ],
           [
-            "warehouse-east",
+            "warehouse-west",
             "inbound",
             "1"
           ],

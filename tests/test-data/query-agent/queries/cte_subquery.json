@@ -47,13 +47,13 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-2",
             "4",
             "2",
             "50.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "4",
             "2",
             "50.0"
@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "hybrid",
+            "manual",
             "2"
           ],
           [
@@ -1232,14 +1232,14 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "4",
-            "258.0"
-          ],
-          [
             "ZONE-4",
             "4",
             "483.0"
+          ],
+          [
+            "ZONE-1",
+            "4",
+            "258.0"
           ],
           [
             "ZONE-3",
@@ -1561,16 +1561,16 @@
             "66.0"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
@@ -1699,12 +1699,12 @@
         ],
         "results": [
           [
-            "itemPage::performanceMetric",
+            "https://shop.example.com/item/1006::performanceMetric",
             "1",
             "1"
           ],
           [
-            "https://shop.example.com/item/1006::performanceMetric",
+            "itemPage::performanceMetric",
             "1",
             "1"
           ]
@@ -1754,12 +1754,12 @@
         ],
         "results": [
           [
-            "NetworkException: connection to batch sync failed",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
             "2",
             "1"
           ],
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "NetworkException: connection to batch sync failed",
             "2",
             "1"
           ],
@@ -1932,13 +1932,13 @@
         ],
         "results": [
           [
-            "sess_003",
-            "1",
+            "sess_001",
+            "4",
             "0"
           ],
           [
-            "sess_001",
-            "4",
+            "sess_003",
+            "1",
             "0"
           ],
           [
@@ -2007,13 +2007,13 @@
             "1"
           ],
           [
-            "degraded",
-            "unknown",
+            "fast",
+            "client_error",
             "1"
           ],
           [
-            "fast",
-            "client_error",
+            "degraded",
+            "unknown",
             "1"
           ]
         ],
@@ -2149,11 +2149,6 @@
           ],
           [
             "performanceMetric",
-            "cartPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
             "checkoutPage",
             "1"
           ],
@@ -2165,6 +2160,11 @@
           [
             "performanceMetric",
             "itemPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "cartPage",
             "1"
           ]
         ],
@@ -2194,13 +2194,13 @@
             "2"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1",
             "1"
@@ -2945,27 +2945,27 @@
         ],
         "results": [
           [
-            "warehouse-south",
-            "2",
-            "45.0",
-            "2"
-          ],
-          [
             "warehouse-west",
             "2",
             "15.0",
             "0"
           ],
           [
-            "warehouse-north",
-            "1",
-            "12.0",
-            "1"
+            "warehouse-south",
+            "2",
+            "45.0",
+            "2"
           ],
           [
             "warehouse-central",
             "1",
             "230.0",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "1",
+            "12.0",
             "1"
           ],
           [
@@ -4566,14 +4566,14 @@
             "320.0"
           ],
           [
-            "ZONE-4",
-            "auto",
+            "ZONE-2",
+            "manual",
             "1",
             "150.0"
           ],
           [
-            "ZONE-2",
-            "manual",
+            "ZONE-4",
+            "auto",
             "1",
             "150.0"
           ]
@@ -4653,6 +4653,11 @@
         ],
         "results": [
           [
+            "ZONE-1",
+            "1",
+            "1740.0"
+          ],
+          [
             "ZONE-4",
             "1",
             "480.0"
@@ -4661,11 +4666,6 @@
             "ZONE-2",
             "1",
             "480.0"
-          ],
-          [
-            "ZONE-1",
-            "1",
-            "1740.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -4788,13 +4788,6 @@
             "0"
           ],
           [
-            "batch-sync",
-            "1450.0",
-            "None",
-            "1",
-            "0"
-          ],
-          [
             "lane-monitor",
             "567.0",
             "None",
@@ -4802,11 +4795,11 @@
             "0"
           ],
           [
-            "temp-regulator",
+            "batch-sync",
+            "1450.0",
             "None",
-            "3200.0",
-            "0",
-            "2"
+            "1",
+            "0"
           ],
           [
             "charge-checker",
@@ -4814,6 +4807,13 @@
             "78.0",
             "0",
             "1"
+          ],
+          [
+            "temp-regulator",
+            "None",
+            "3200.0",
+            "0",
+            "2"
           ]
         ],
         "results_mode": "rowsort",
@@ -4853,15 +4853,15 @@
             "437.5"
           ],
           [
-            "ZONE-4",
-            "PL-006",
+            "ZONE-2",
+            "PL-008",
             "190.0",
             "150.0",
             "170.0"
           ],
           [
-            "ZONE-2",
-            "PL-008",
+            "ZONE-4",
+            "PL-006",
             "190.0",
             "150.0",
             "170.0"
@@ -4886,14 +4886,14 @@
         ],
         "results": [
           [
-            "zone-controller",
-            "2",
-            "12.0"
-          ],
-          [
             "track-router",
             "2",
             "230.0"
+          ],
+          [
+            "zone-controller",
+            "2",
+            "12.0"
           ],
           [
             "scan-hub",
@@ -5004,14 +5004,14 @@
             "ZONE-3",
             "2",
             "1455.0",
-            "hybrid",
+            "manual",
             "1"
           ],
           [
             "ZONE-3",
             "2",
             "1455.0",
-            "manual",
+            "hybrid",
             "1"
           ],
           [
@@ -5064,27 +5064,27 @@
         "results": [
           [
             "1",
+            "sorter-engine",
+            "1",
+            "1900.0"
+          ],
+          [
+            "1",
             "conveyor-driver",
             "1",
             "15.0"
           ],
           [
+            "2",
+            "conveyor-driver",
             "1",
-            "sorter-engine",
-            "1",
-            "1900.0"
+            "15.0"
           ],
           [
             "2",
             "zone-controller",
             "1",
             "12.0"
-          ],
-          [
-            "2",
-            "conveyor-driver",
-            "1",
-            "15.0"
           ],
           [
             "3",
@@ -5133,13 +5133,13 @@
             "725.0"
           ],
           [
-            "ZONE-1",
-            "auto",
+            "ZONE-3",
+            "hybrid",
             "610.0"
           ],
           [
-            "ZONE-3",
-            "hybrid",
+            "ZONE-1",
+            "auto",
             "610.0"
           ],
           [
@@ -5199,19 +5199,19 @@
             "None"
           ],
           [
-            "sorter-engine",
-            "AP-CENTRAL",
-            "1",
-            "0",
-            "1900.0",
-            "None"
-          ],
-          [
             "temp-regulator",
             "US-CENTRAL",
             "1",
             "0",
             "3200.0",
+            "None"
+          ],
+          [
+            "sorter-engine",
+            "AP-CENTRAL",
+            "1",
+            "0",
+            "1900.0",
             "None"
           ]
         ],

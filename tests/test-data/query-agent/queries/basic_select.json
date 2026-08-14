@@ -647,13 +647,13 @@
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-C3"
+            "BS-2026-A1"
           ],
           [
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-A1"
+            "BS-2026-C3"
           ],
           [
             "SORT-Q5",
@@ -1581,7 +1581,11 @@
         ],
         "results": [
           [
-            "[\"scraping_pattern\",\"high_freq\"]",
+            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
+            "2"
+          ],
+          [
+            "[\"credential_stuffing\"]",
             "2"
           ],
           [
@@ -1589,11 +1593,7 @@
             "2"
           ],
           [
-            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
-            "2"
-          ],
-          [
-            "[\"credential_stuffing\"]",
+            "[\"scraping_pattern\",\"high_freq\"]",
             "2"
           ]
         ],
@@ -5944,31 +5944,31 @@
         ],
         "results": [
           [
-            "1786629600.0",
+            "1786706340.0",
             "0",
             "performanceMetric",
             "itemPage"
           ],
           [
-            "1786629636.0",
+            "1786706376.0",
             "36000000",
             "performanceMetric",
             "searchPage"
           ],
           [
-            "1786629654.0",
+            "1786706394.0",
             "54000000",
             "performanceMetric",
             "cartPage"
           ],
           [
-            "1786629660.0",
+            "1786706400.0",
             "0",
             "performanceMetric",
             "cartPage"
           ],
           [
-            "1786629672.0",
+            "1786706412.0",
             "12000000",
             "performanceMetric",
             "itemPage"
@@ -7423,13 +7423,13 @@
           [
             "ZONE-1",
             "CC-DELTA",
-            "manual",
+            "auto",
             "SORT-M3"
           ],
           [
             "ZONE-1",
             "CC-DELTA",
-            "auto",
+            "manual",
             "SORT-M3"
           ],
           [
