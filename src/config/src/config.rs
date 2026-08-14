@@ -2383,7 +2383,13 @@ pub struct Compact {
     pub old_data_min_hours: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
     pub old_data_min_files: i64,
-    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
+    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_MINUTES", default = 120)] // minutes
+    pub delete_files_delay_minutes: i64,
+    #[deprecated(
+        since = "0.92.2",
+        note = "Please use `ZO_COMPACT_DELETE_FILES_DELAY_MINUTES` instead. This ENV will be removed in a future release"
+    )]
+    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 0)] // hours
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
@@ -3841,8 +3847,14 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.max_file_size = 512;
     }
     cfg.compact.max_file_size *= 1024 * 1024;
-    if cfg.compact.delete_files_delay_hours < 1 {
-        cfg.compact.delete_files_delay_hours = 2;
+    if cfg.compact.delete_files_delay_minutes < 1 {
+        cfg.compact.delete_files_delay_minutes = 120;
+    }
+    // Backward compatibility: if the deprecated ZO_COMPACT_DELETE_FILES_DELAY_HOURS is
+    // explicitly set (default is 0, so > 0 means user provided a value), convert to minutes.
+    #[allow(deprecated)]
+    if cfg.compact.delete_files_delay_hours > 0 {
+        cfg.compact.delete_files_delay_minutes = cfg.compact.delete_files_delay_hours * 60;
     }
 
     if cfg.compact.data_retention_interval < 1 {
@@ -4681,12 +4693,14 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
         let mut cfg = Config::default();
         cfg.compact.data_retention_days = 0;
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
+        cfg.compact.delete_files_delay_minutes = 0;
         cfg.compact.data_retention_interval = 0;
         cfg.compact.old_data_interval = 0;
         cfg.compact.old_data_max_days = 0;
@@ -4698,7 +4712,8 @@ mod tests {
         check_compact_config(&mut cfg).unwrap();
         assert_eq!(cfg.compact.interval, 10);
         assert_eq!(cfg.compact.max_file_size, 512 * 1024 * 1024);
-        assert_eq!(cfg.compact.delete_files_delay_hours, 2);
+        assert_eq!(cfg.compact.delete_files_delay_hours, 0);
+        assert_eq!(cfg.compact.delete_files_delay_minutes, 120);
         assert_eq!(cfg.compact.data_retention_interval, 3600);
         assert_eq!(cfg.compact.old_data_interval, 3600);
         assert_eq!(cfg.compact.old_data_max_days, 7);
