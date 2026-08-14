@@ -432,7 +432,13 @@ def test_reference_endpoint_and_single_delete_conflict_are_disclosure_bounded(
     )
     assert response.status_code == 200, response.text
     assert response.json() == {
-        "references": [{"alert_id": parent, "name": parent_name}],
+        "references": [
+            {
+                "alert_id": parent,
+                "name": parent_name,
+                "folder_id": composite_prereqs["folder_id"],
+            }
+        ],
         "hidden_reference_count": 0,
     }
 
@@ -440,7 +446,9 @@ def test_reference_endpoint_and_single_delete_conflict_are_disclosure_bounded(
     assert response.status_code == 409, response.text
     body = response.json()
     assert body["code"] == "child_referenced"
-    assert body["references"] == [{"alert_id": parent, "name": parent_name}]
+    assert body["references"] == [
+        {"alert_id": parent, "name": parent_name, "folder_id": composite_prereqs["folder_id"]}
+    ]
     assert body["hidden_reference_count"] == 0
     assert client.get(f"alerts/{child}", prefix="api/v2/").status_code == 200
 
@@ -700,7 +708,7 @@ def test_openapi_exposes_composite_union_validate_preview_and_references(
     document = response.json()
     paths = document["paths"]
     assert "/api/v2/{org_id}/alerts/composites/validate" in paths
-    assert "/api/v2/{org_id}/alerts/{id}/composite-references" in paths
+    assert "/api/v2/{org_id}/alerts/{alert_id}/composite-references" in paths
     create_schema = paths["/api/v2/{org_id}/alerts"]["post"]["requestBody"][
         "content"
     ]["application/json"]["schema"]
