@@ -630,6 +630,10 @@ export default defineComponent({
       type: Array,
       default: () => [],
     },
+    folderId: {
+      type: String,
+      default: undefined,
+    },
   },
   emits: ["update:list", "cancel:hideform", "refresh:destinations", "refresh:templates"],
   components: {

@@ -219,6 +219,7 @@ export interface AlertFormProps {
   isUpdated: boolean;
   destinations: any[];
   templates?: any[];
+  folderId?: string;
 }
 
 export interface AlertFormEmit {
@@ -537,8 +538,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const prefillWarnings = ref<AlertPrefillWarning[]>([]);
 
   const folderQuery = router.currentRoute.value.query.folder;
+  // Prefer the folder the caller (AlertList) hands us over the URL query: the
+  // folder tab's v-model is the authoritative current folder, while the URL
+  // query can be stale when the "New alert" dialog is opened from a tab.
   const activeFolderId = ref<string>(
-    (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) || "default",
+    props.folderId || (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) || "default",
   );
   const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 

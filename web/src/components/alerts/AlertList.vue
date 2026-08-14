@@ -703,6 +703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isUpdated="isUpdated"
         :destinations="destinations"
         :templates="templates"
+        :folderId="activeFolderId"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @refresh:destinations="refreshDestination"
