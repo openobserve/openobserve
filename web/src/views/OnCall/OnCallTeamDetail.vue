@@ -232,7 +232,6 @@
              calendar and rotation table, so showing it under these two put two
              of each on the screen. -->
         <OContent y class="flex flex-col gap-5">
-          <template v-if="!editingSchedule">
             <!-- Only when the window ahead has a hole in it. Handover and who
                  is on call are already in the strip above the tabs. -->
             <OnCallGapBanner
@@ -272,22 +271,12 @@
               @edit="openScheduleEditor({ mode: 'edit', name: $event })"
               @add="openScheduleEditor({ mode: 'new' })"
             />
-          </template>
 
-          <template v-else>
-            <span class="flex flex-wrap items-baseline gap-x-2">
-              <OText variant="panel-title">{{ t("oncall.scheduleEditing") }}</OText>
-              <OButton
-                variant="outline"
-                size="xs"
-                class="ms-auto"
-                data-test="oncall-schedule-done-editing"
-                @click="editingSchedule = false"
-              >
-                {{ t("oncall.scheduleDoneEditing") }}
-              </OButton>
-            </span>
+            <!-- Drawer only: the read view stays underneath. Swapping the tab
+                 into a separate editing mode meant "Add rotation" first landed
+                 on a page-sized editor with a second button of the same name. -->
             <OnCallScheduleEditor
+              drawer-only
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
               :schedule="schedule"
@@ -296,7 +285,6 @@
               @saved="onScheduleSaved"
               @intent-handled="scheduleIntent = null"
             />
-          </template>
         </OContent>
       </OTabPanel>
 
@@ -456,18 +444,13 @@ const teamLoad = ref<TeamLoad | null>(null);
 const segments = ref<ResolvedSegment[]>([]);
 const segmentsLoading = ref(false);
 /// Read or edit, never both — the editor brings its own calendar and table.
-const editingSchedule = ref(false);
 
-/// "Add rotation" used to mean "show me the bulk editor", so adding one cost
-/// two clicks on a button of the same name — and clicking a rotation row threw
-/// away the name it emitted and opened the same undifferentiated editor. The
-/// intent rides with the mode switch so one click lands on the rotation the
-/// user actually pointed at.
+/// What the drawer opens on. One click lands on the rotation the user pointed
+/// at — never on a bulk editing mode with its own copy of the page.
 const scheduleIntent = ref<ScheduleEditorIntent | null>(null);
 
 function openScheduleEditor(intent: ScheduleEditorIntent) {
   scheduleIntent.value = intent;
-  editingSchedule.value = true;
 }
 
 const coverOpen = ref(false);
@@ -833,7 +816,6 @@ async function onPolicySaved() {
 }
 
 async function onScheduleSaved() {
-  editingSchedule.value = false;
   await fetchAll();
   await fetchSegments();
 }

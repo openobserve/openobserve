@@ -149,35 +149,41 @@ describe("OnCallTeamDetail", () => {
 
     /// The editor carries its OWN draft calendar and rotation table, so showing
     /// it beneath the resolved pair put two of each on the screen.
-    it("shows the resolved schedule, not the editor, by default", async () => {
+    /// The editor rides along drawer-only: the resolved view is never swapped
+    /// out for a page-sized editing mode. "Add rotation" opening a page whose
+    /// own button is also "Add rotation" was the bug.
+    it("keeps the resolved schedule mounted, with the editor as a drawer beside it", async () => {
       const wrapper = await openSchedule();
 
       expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallRotationsTable" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallScheduleEditor" }).exists()).toBe(false);
+      const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
+      expect(editor.exists()).toBe(true);
+      expect(editor.props("drawerOnly")).toBe(true);
     });
 
-    it("swaps to the editor on demand, and never renders both", async () => {
+    /// One click on a row lands on THAT rotation: the click's intent reaches
+    /// the editor, and the read view stays underneath it.
+    it("hands the clicked rotation to the editor without unmounting the view", async () => {
       const wrapper = await openSchedule();
       wrapper.findComponent({ name: "OnCallRotationsTable" }).vm.$emit("edit", "Primary");
       await flushPromises();
 
-      expect(wrapper.findComponent({ name: "OnCallScheduleEditor" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(false);
-      expect(wrapper.findComponent({ name: "OnCallRotationsTable" }).exists()).toBe(false);
+      const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
+      expect(editor.props("intent")).toEqual({ mode: "edit", name: "Primary" });
+      expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallRotationsTable" }).exists()).toBe(true);
     });
 
     /// The point of saving is to see what the engine now says.
-    it("returns to the resolved view once the schedule is saved", async () => {
+    it("refetches the schedule once the editor saves", async () => {
       const wrapper = await openSchedule();
-      wrapper.findComponent({ name: "OnCallRotationsTable" }).vm.$emit("add");
-      await flushPromises();
+      const before = service.getSchedule.mock.calls.length;
 
       wrapper.findComponent({ name: "OnCallScheduleEditor" }).vm.$emit("saved");
       await flushPromises();
 
-      expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OnCallScheduleEditor" }).exists()).toBe(false);
+      expect(service.getSchedule.mock.calls.length).toBeGreaterThan(before);
     });
   });
 

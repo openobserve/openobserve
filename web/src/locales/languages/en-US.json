@@ -13137,7 +13137,6 @@
     "rotationNobody": "Nobody on call",
     "edit": "Edit",
     "timelineLoadFailed": "Could not resolve the schedule for this window",
-    "scheduleEditing": "Editing rotations",
     "scheduleDoneEditing": "Back to schedule",
     "coverWhoRequired": "Choose who is covering",
     "timelineCoverAria": "{who} is covering {rotation}, {from} to {to}",

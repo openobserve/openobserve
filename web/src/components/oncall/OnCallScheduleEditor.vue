@@ -7,14 +7,14 @@
 <template>
   <div class="flex flex-col gap-4" data-test="oncall-schedule-editor">
     <p
-      v-if="!props.members.length"
+      v-if="!drawerOnly && !props.members.length"
       class="text-text-secondary text-sm"
       data-test="oncall-schedule-no-members"
     >
       {{ t("oncall.scheduleNeedsMembers") }}
     </p>
 
-    <template v-else>
+    <template v-else-if="!drawerOnly">
       <OnCallScheduleCalendar :rotations="draft" :timezone="timezone" />
 
       <OTable
@@ -204,8 +204,21 @@
       </div>
 
       <template #footer>
-        <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="editing = false">
+        <div class="flex items-center gap-2">
+          <!-- The only home deletion has now that the bulk table is not on the
+               path. Absent on a new rotation — cancel already discards it. -->
+          <OButton
+            v-if="!isNew"
+            variant="ghost"
+            size="sm-action"
+            icon-left="delete-outline"
+            :loading="saving"
+            data-test="oncall-rotation-delete"
+            @click="deleteActive"
+          >
+            {{ t("oncall.removeRotation") }}
+          </OButton>
+          <OButton variant="outline" size="sm-action" class="ms-auto" @click="cancelDrawer">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
@@ -264,6 +277,13 @@ const props = defineProps<{
   members: OnCallTeamMember[];
   /** What the user asked for when they opened this. See `ScheduleEditorIntent`. */
   intent?: ScheduleEditorIntent | null;
+  /**
+   * Render only the drawer, over whatever view mounted this.
+   *
+   * The inline calendar/table/save surface is the bulk editor; opening it to
+   * add ONE rotation put a page-sized mode between the button and the form.
+   */
+  drawerOnly?: boolean;
 }>();
 const emit = defineEmits<{ saved: []; "intent-handled": [] }>();
 
@@ -477,6 +497,24 @@ function duplicateRotation(name: string) {
   draft.value.push(copy);
   isNew.value = true;
   editRotation(copy);
+}
+
+/// Cancel must also discard. In the bulk editor an abandoned draft stays
+/// visible and Cancel/Save deal with it; drawer-only has no such surface, so a
+/// half-added rotation would silently linger and reappear on the next open.
+function cancelDrawer() {
+  editing.value = false;
+  active.value = null;
+  if (props.drawerOnly) reset();
+}
+
+/// Deletion is a save: the drawer is the only surface, so there is no separate
+/// "now press Save" step to forget.
+async function deleteActive() {
+  const target = active.value;
+  if (!target) return;
+  draft.value = draft.value.filter((r) => r !== target);
+  await save();
 }
 
 async function save() {
