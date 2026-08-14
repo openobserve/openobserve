@@ -232,8 +232,10 @@ describe("groupNavLinks", () => {
     ]);
   });
 
-  /// With on-call ON, SLOs is no longer alone: the four on-call children need a
-  /// home, and a flyout is the only surface they have.
+  /// With on-call ON, SLOs is no longer alone: the on-call children need a
+  /// home, and a flyout is the only surface they have. Escalation policies are
+  /// edited on the team they belong to and My on-call is not built, so neither
+  /// has a rail entry.
   it("collapses SLOs into Reliability once on-call supplies the other children", () => {
     const entries = groupNavLinks([link("home"), link("sloList")], undefined, oncallOn);
     expect(keysOf(entries)).toEqual(["link:home", "linkGroup:reliability"]);
@@ -244,9 +246,7 @@ describe("groupNavLinks", () => {
     expect(reliability?.children.map((c) => c.name)).toEqual([
       "sloList",
       "onCallResponses",
-      "onCallMine",
       "onCallTeams",
-      "onCallPolicies",
       "onCallRouting",
     ]);
   });
