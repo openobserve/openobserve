@@ -64,12 +64,20 @@
           </span>
         </div>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <!-- Selection styling copied from PredefinedThemes: same shape (a grid
+               of button-cards where one is applied), so the "this is the one in
+               effect" cue reads identically in both places. -->
           <button
             v-for="p in presets"
             :key="p.key"
             type="button"
-            class="rounded-default hover:border-primary border p-3 text-left transition-colors"
-            :class="isActivePreset(p) ? 'border-primary bg-primary/5' : 'border-border'"
+            class="rounded-default focus-visible:ring-accent/40 cursor-pointer border p-3 text-left transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
+            :class="
+              isActivePreset(p)
+                ? 'border-accent ring-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] ring-1 ring-inset'
+                : 'border-border-default hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+            "
+            :aria-pressed="isActivePreset(p)"
             :data-test="`slos-sloalertcondition-preset-${p.key}`"
             @click="applyPreset(p)"
           >
@@ -320,14 +328,14 @@ function applyPreset(p: any) {
 }
 
 const longHours = computed({
-  get: () => (model.value.long_window_secs) / 3600,
+  get: () => model.value.long_window_secs / 3600,
   set: (v: number) => {
     model.value.long_window_secs = Math.round((Number(v) || 1) * 3600);
   },
 });
 
 const shortMinutes = computed({
-  get: () => (model.value.short_window_secs) / 60,
+  get: () => model.value.short_window_secs / 60,
   set: (v: number) => {
     model.value.short_window_secs = Math.round((Number(v) || 5) * 60);
   },
