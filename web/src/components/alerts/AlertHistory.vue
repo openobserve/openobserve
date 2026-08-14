@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-left="refresh"
         @click="refreshData"
         data-test="alert-history-refresh-btn"
-        :loading="loading"
+        :loading="fetching"
       >
         <OTooltip :content="t('common.refresh')" />
       </OButton>
@@ -496,6 +496,9 @@ const router = useRouter();
 
 // Data
 const loading = ref(false);
+// A request in flight while rows stay on screen — the refresh button's
+// spinner. `loading` is the skeleton, which only a cold read wants.
+const fetching = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
 const selectedAlert = ref<any>(null);
@@ -757,6 +760,8 @@ const fetchAlertHistory = async (force = false) => {
       org,
       args: [query],
       apply: applyHistory,
+      loading,
+      fetching,
       force,
     });
     {

@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="icon-sm"
                   icon-left="refresh"
-                  :loading="loading"
+                  :loading="fetching"
                   data-test="alert-list-refresh-btn"
                   @click="refreshAlerts"
                 >
@@ -918,6 +918,9 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    // A request in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
     const isSubmitting = ref(false);
 
     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
@@ -1732,6 +1735,7 @@ export default defineComponent({
         : alertsListQuery.get(org, folderId, query);
 
       loading.value = !painted;
+      fetching.value = true;
       const dismiss = painted
         ? () => {}
         : toast({
@@ -1774,6 +1778,7 @@ export default defineComponent({
         });
       } finally {
         loading.value = false;
+        fetching.value = false;
       }
     };
     /** Send an SLO alert to its SLO page instead of the generic editor.
@@ -3136,6 +3141,7 @@ export default defineComponent({
       streams,
       isFetchingStreams,
       loading,
+      fetching,
       isSubmitting,
       filterQuery,
       getImageURL,

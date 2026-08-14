@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="user-list-refresh-btn"
               @click="refreshUsers"
             >
@@ -743,6 +743,9 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    // A request in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
     // The ?email= deep link opens the edit dialog, so it is latched — the
     // cached paint and the fresh one must not open it twice.
     let deepLinkOpened = false;
@@ -829,6 +832,7 @@ export default defineComponent({
           });
 
       loading.value = !warm;
+      fetching.value = true;
       return new Promise((resolve, reject) => {
         (force ? orgUsersQuery.refresh(org) : orgUsersQuery.get(org))
           .then(async (orgUsers: any[]) => {
@@ -895,6 +899,7 @@ export default defineComponent({
           })
           .finally(() => {
             loading.value = false;
+            fetching.value = false;
           });
       });
     };
@@ -1419,6 +1424,7 @@ export default defineComponent({
       usersState,
       columns,
       loading,
+      fetching,
       orgData,
       confirmDelete,
       deleteUser,
