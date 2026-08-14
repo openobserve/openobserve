@@ -730,7 +730,7 @@ export default defineComponent({
       {
         id: "functionsRefresh",
         handler: () => {
-          if (!isInputFocused()) getJSTransforms();
+          if (!isInputFocused()) refreshJSTransforms();
         },
       },
       {

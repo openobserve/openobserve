@@ -890,9 +890,8 @@ useShortcuts([
     id: "reportsRefresh",
     handler: () => {
       if (!isInputFocused()) {
-        // Match the refresh button: drop the cache first so it actually reloads.
-        invalidateFolderCache(activeFolderId.value);
-        loadReports(activeFolderId.value);
+        // The same handler the button uses: forces, and keeps the active search.
+        refreshReports();
       }
     },
   },

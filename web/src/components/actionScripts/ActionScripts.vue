@@ -781,7 +781,7 @@ export default defineComponent({
       {
         id: "actionsRefresh",
         handler: () => {
-          if (!isInputFocused()) getActionScripts();
+          if (!isInputFocused()) refreshActionScripts();
         },
       },
     ]);

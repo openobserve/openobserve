@@ -1097,7 +1097,7 @@ export default defineComponent({
       {
         id: "iamServiceAccountsRefresh",
         handler: () => {
-          if (!isInputFocused()) getServiceAccountsUsers();
+          if (!isInputFocused()) refreshServiceAccounts();
         },
       },
       {

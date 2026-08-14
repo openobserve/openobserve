@@ -664,7 +664,7 @@ useShortcuts([
   {
     id: "alertTemplatesRefresh",
     handler: () => {
-      if (!isInputFocused()) getTemplates();
+      if (!isInputFocused()) refreshTemplates();
     },
   },
   {

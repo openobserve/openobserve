@@ -474,10 +474,7 @@ export default defineComponent({
       {
         id: "ingestionTokensRefresh",
         handler: () => {
-          if (!isInputFocused()) {
-            ingestionTokensQuery.invalidate(store.state.selectedOrganization.identifier);
-            fetchTokens();
-          }
+          if (!isInputFocused()) refreshTokens();
         },
       },
       {

@@ -649,7 +649,7 @@ export default defineComponent({
       {
         id: "pipelineDestinationsRefresh",
         handler: () => {
-          if (!isInputFocused()) getDestinations();
+          if (!isInputFocused()) refreshDestinations();
         },
       },
     ]);

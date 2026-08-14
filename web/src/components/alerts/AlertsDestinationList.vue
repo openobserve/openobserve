@@ -823,7 +823,7 @@ export default defineComponent({
       {
         id: "alertDestinationsRefresh",
         handler: () => {
-          if (!isInputFocused()) getDestinations();
+          if (!isInputFocused()) refreshDestinations();
         },
       },
       {

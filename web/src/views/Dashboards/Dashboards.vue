@@ -1690,7 +1690,7 @@ export default defineComponent({
       {
         id: "dashboardsListRefresh",
         handler: () => {
-          if (!isInputFocused()) getDashboards();
+          if (!isInputFocused()) refreshDashboards();
         },
       },
       {

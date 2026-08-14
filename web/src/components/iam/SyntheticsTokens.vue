@@ -564,10 +564,7 @@ export default defineComponent({
       {
         id: "syntheticsTokensRefresh",
         handler: () => {
-          if (!isInputFocused()) {
-            agentTokensQuery.invalidate(store.state.selectedOrganization.identifier);
-            fetchTokens();
-          }
+          if (!isInputFocused()) refreshTokens();
         },
       },
       {

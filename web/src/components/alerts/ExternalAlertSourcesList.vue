@@ -358,7 +358,7 @@ export default defineComponent({
       {
         id: "alertSourcesRefresh",
         handler: () => {
-          if (!isInputFocused()) vm()?.fetchAll();
+          if (!isInputFocused()) vm()?.refreshAll();
         },
       },
       {
