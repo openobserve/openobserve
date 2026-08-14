@@ -24,7 +24,7 @@ use config::{
     meta::{
         search::{Query, Request, RequestEncoding, Response as SearchResponse, SearchEventType},
         stream::StreamType,
-        traces::session::quote_identifier,
+        traces::session::{quote_identifier, quote_sql_string},
     },
 };
 use hashbrown::HashMap;
@@ -165,8 +165,9 @@ pub async fn get_trace_details(
     let request = Request {
         query: Query {
             sql: format!(
-                "SELECT * FROM {} WHERE trace_id = '{trace_id}' ORDER BY start_time",
+                "SELECT * FROM {} WHERE trace_id = {} ORDER BY start_time",
                 quote_identifier(&stream_name),
+                quote_sql_string(&trace_id),
             ),
             from: 0,
             size: 50_000,

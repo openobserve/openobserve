@@ -26,7 +26,7 @@ use config::{
     meta::{
         search::{Query, Request, RequestEncoding, SearchEventType},
         stream::StreamType,
-        traces::session::quote_identifier,
+        traces::session::{quote_identifier, quote_sql_string},
     },
     utils::{json, time::now_micros, util::get_trace_time_index_stream_name},
 };
@@ -129,8 +129,9 @@ async fn query_window(
     }
 
     let sql = format!(
-        "SELECT MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM {} WHERE trace_id = '{trace_id}'",
+        "SELECT MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM {} WHERE trace_id = {}",
         quote_identifier(index_stream),
+        quote_sql_string(trace_id),
     );
     let request = Request {
         query: Query {
