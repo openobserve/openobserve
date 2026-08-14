@@ -1,0 +1,151 @@
+# OpenCodeReview — AI code review for pull requests.
+#
+# Uses the official alibaba/open-code-review reusable action to review each PR
+# diff with DeepSeek and post inline review comments plus a sticky summary
+# comment. DeepSeek's OpenAI-compatible API is used with the DEEPSEEK_API_KEY
+# repository secret.
+#
+# This is the intended successor to ai-code-review.yml (which drives opencode
+# via scripts/ai-review). Once this workflow is validated, that one can be
+# removed.
+#
+# Triggers:
+#   - pull_request_target (opened/synchronize/reopened/ready_for_review): safe
+#     because the action only reads the diff and never executes PR code, and it
+#     makes DEEPSEEK_API_KEY available even for PRs from forks.
+#   - issue_comment ("/open-code-review" or "@open-code-review"): on-demand
+#     re-review, gated to collaborators only to protect LLM quota.
+#   - workflow_dispatch (pr_number): manual review of a specific PR.
+
+name: OpenCodeReview
+
+concurrency:
+  # Conditional concurrency group. GitHub evaluates concurrency BEFORE the
+  # job-level `if`, so a flat group would let any unrelated comment on the PR
+  # cancel an in-progress review. Matching events (PR events + trigger
+  # comments) share a per-PR group; non-matching comments land in a unique
+  # noop-<run_id> group that can never collide with a real review.
+  group: >-
+    ${{
+      (
+        github.event_name == 'pull_request_target'
+        || github.event_name == 'workflow_dispatch'
+        || (
+          github.event_name == 'issue_comment'
+          && github.event.issue.pull_request
+          && github.event.comment.user.type != 'Bot'
+          && (
+            github.event.comment.author_association == 'MEMBER'
+            || github.event.comment.author_association == 'OWNER'
+            || github.event.comment.author_association == 'COLLABORATOR'
+          )
+          && (
+            startsWith(github.event.comment.body, '/open-code-review')
+            || startsWith(github.event.comment.body, '@open-code-review')
+          )
+        )
+      )
+      && format('ocr-{0}', github.event.pull_request.number || github.event.issue.number || github.event.inputs.pr_number)
+      || format('noop-{0}', github.run_id)
+    }}
+  cancel-in-progress: true
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  # The summary comment is posted via the issues API (issues.createComment /
+  # issues.updateComment), which requires issues: write — pull-requests: write
+  # only covers inline review comments.
+  issues: write
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Run on PR events, or on human-authored comments starting with a trigger
+    # keyword. Bot comments are excluded as a safety net (GITHUB_TOKEN already
+    # suppresses bot-posted comment events, but a PAT/App token would not), and
+    # issue_comment triggers are gated on author_association so only
+    # MEMBER/OWNER/COLLABORATOR users can spend LLM quota via re-review.
+    if: |
+      github.event_name == 'pull_request_target'
+      || github.event_name == 'workflow_dispatch'
+      || (
+        github.event_name == 'issue_comment'
+        && github.event.issue.pull_request
+        && github.event.comment.user.type != 'Bot'
+        && (
+          github.event.comment.author_association == 'MEMBER'
+          || github.event.comment.author_association == 'OWNER'
+          || github.event.comment.author_association == 'COLLABORATOR'
+        )
+        && (
+          startsWith(github.event.comment.body, '/open-code-review')
+          || startsWith(github.event.comment.body, '@open-code-review')
+        )
+      )
+    steps:
+      # For workflow_dispatch the action cannot derive a PR number from the
+      # event, so its internal "Fetch PR head (fork-safe)" step is a no-op and
+      # the head commit is never fetched — merge-base would collapse to an empty
+      # diff. Pre-fetch base + head here (dispatch only). pull_request_target and
+      # issue_comment are handled entirely by the action.
+      - name: Checkout base
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Fetch PR head
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git fetch origin "pull/${{ github.event.inputs.pr_number }}/head"
+
+      - name: Resolve PR refs
+        id: pr-context
+        if: github.event_name != 'pull_request_target'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            // pull_request_target carries a top-level `pull_request` payload, so
+            // the action resolves refs from the event. For issue_comment and
+            // workflow_dispatch there is none — resolve base ref and head SHA
+            // from the PR number instead.
+            const prNumber = context.eventName === 'workflow_dispatch'
+              ? context.payload.inputs.pr_number
+              : context.issue.number;
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(prNumber)
+            });
+            core.setOutput('base_ref', pullRequest.base.ref);
+            core.setOutput('head_sha', pullRequest.head.sha);
+
+      - name: Run OpenCodeReview
+        uses: alibaba/open-code-review@v1.9.2
+        with:
+          # DeepSeek OpenAI-compatible API (https://api-docs.deepseek.com).
+          llm_url: https://api.deepseek.com
+          llm_auth_token: ${{ secrets.DEEPSEEK_API_KEY }}
+          llm_model: deepseek-v4-pro
+          llm_use_anthropic: 'false'
+          # Reproducibility: pin the OCR CLI to the same release as the action
+          # so review behavior doesn't drift with a new CLI release.
+          ocr_version: '1.9.2'
+          # For issue_comment and workflow_dispatch, pass the resolved refs;
+          # for pull_request_target the action resolves them from the event.
+          base_ref: ${{ steps.pr-context.outputs.base_ref }}
+          head_sha: ${{ steps.pr-context.outputs.head_sha }}
