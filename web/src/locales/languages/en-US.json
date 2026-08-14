@@ -14855,7 +14855,7 @@
       "columnSubLabels": {
         "attention": "server",
         "load": "client",
-        "calls": "server where reported"
+        "calls": "client"
       },
       "attention": {
         "connections": "connections",

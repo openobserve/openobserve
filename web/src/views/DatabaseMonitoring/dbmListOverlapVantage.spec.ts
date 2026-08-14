@@ -227,6 +227,89 @@ describe("QueriesPage sources its overlap measures from the database", () => {
 });
 
 /**
+ * The Databases page. Its grain is the DATABASE, not the statement, and that
+ * changes what "server-first" can mean here: the only per-statement server
+ * feed (`/server_queries`) is a top-N ranked BY CALLS that comes back
+ * `truncated` even at its 200-row cap on the live `default` org, and its MySQL
+ * rows carry no `db_namespace` to attribute to a database row at all. Folding
+ * it into a per-database total would publish a floor as a total (T8).
+ *
+ * So there is no server counterpart to resolve to at this grain, and the
+ * conversion is the OTHER half of D2: the two overlap measures say out loud
+ * that they are client-observed. That is not a stopgap for a future server
+ * number — it is the true provenance, and stating it is what stops "Calls"
+ * being read as what the database counted when it is ~3.7x smaller than that.
+ */
+describe("DatabasesPage qualifies its overlap measures", () => {
+  const source = read("DatabasesPage.vue");
+
+  it("renders the call count through the qualifier-bearing cell", () => {
+    const cell = cellSlot(source, "calls");
+    expect(cell).toContain("DbmOverlapValue");
+    // The bare count is gone: it cannot reach the screen except through the
+    // component that refuses to print an unqualified figure.
+    expect(cell).not.toMatch(
+      /\{\{\s*noQueryFigures\(row\) \? raw\("—"\) : formatCount\(row\.calls\)/,
+    );
+  });
+
+  /**
+   * Both overlap measures name their vantage. The load cell keeps its share —
+   * unlike the queries list, where the duration became a SERVER figure and the
+   * share would have divided it by a traced total; here both halves of the
+   * fraction are the same client vantage, so the percentage is honest.
+   */
+  it("qualifies the load column and keeps its client-scoped share", () => {
+    const cell = cellSlot(source, "load");
+    expect(cell).toContain("dbm.list.overlap.clientObserved");
+    expect(cell).toContain("formatPercent(row.share, 0)");
+  });
+
+  it("states the calls provenance in the header too", () => {
+    expect(source).toContain("dbm.databases.columnSubLabels.calls");
+  });
+
+  /**
+   * The precedent this page already set, and the one thing the pair must not
+   * hide: `attention` is the server's own saturation and `load` is
+   * client-observed span time. Extending the page must not cost these.
+   */
+  it("keeps the attention/load provenance sub-labels", () => {
+    expect(source).toContain("dbm.databases.columnSubLabels.attention");
+    expect(source).toContain("dbm.databases.columnSubLabels.load");
+  });
+
+  describe("the two vantage states", () => {
+    /** D3: trace-only columns are DROPPED when the trace read answered empty. */
+    it("removes the trace-only columns when there is no trace vantage", () => {
+      const filter = source.slice(source.indexOf("const columns = computed"));
+      expect(filter.slice(0, 400)).toContain("traceVantage.value");
+      expect(filter.slice(0, 400)).toContain("TRACE_ONLY_COLUMNS");
+      const set = source.slice(source.indexOf("const TRACE_ONLY_COLUMNS"));
+      // The percentiles and the caller-observed failure rate — never the
+      // server-vantage columns, which are the whole page on a zero-trace fleet.
+      for (const id of ["p50", "p95", "p99", "errorRate"]) {
+        expect(set.slice(0, 200)).toContain(`"${id}"`);
+      }
+      expect(set.slice(0, 200)).not.toContain('"attention"');
+      expect(set.slice(0, 200)).not.toContain('"instanceHealth"');
+    });
+
+    /**
+     * A failed or in-flight read is NOT an observation of absence. Hiding on
+     * it would drop columns that were there a moment ago, on nothing more than
+     * a 500.
+     */
+    it("keeps the vantage present while the read is failed or loading", () => {
+      const vantage = source.slice(source.indexOf("const traceVantage = computed"));
+      expect(vantage.slice(0, 300)).toContain("readFailed");
+      expect(vantage.slice(0, 300)).toContain("loading");
+      expect(vantage.slice(0, 300)).toContain("hasDbmTraceVantage(");
+    });
+  });
+});
+
+/**
  * The MySQL case, stated as an invariant over the source rather than an
  * example: there is no path on these pages that puts a duration on screen
  * with the engine's name attached and no word for WHICH time it is.
