@@ -12746,6 +12746,8 @@
   },
   "slos": {
     "title": "SLO",
+    "notFound": "未找到 SLO",
+    "notFoundDescription": "此 SLO 不再存在，或者您无权访问它。它可能已被删除。",
     "subtitle": "服务级别目标：目标、错误预算、燃烧率警报",
     "new": "新建 SLO",
     "newTitle": "新建 SLO",
@@ -12845,7 +12847,9 @@
       "sli": "SLI：“良好”的含义",
       "objective": "目标",
       "grouping": "分组",
-      "summary": "摘要"
+      "summary": "摘要",
+      "definition": "定义",
+      "definitionEmpty": "此 SLO 没有存储的定义。"
     },
     "field": {
       "name": "SLO 名称",

@@ -10578,6 +10578,8 @@
     "newAlert": "a37e1cde334a2bdd",
     "newTitle": "ed61e43a48bb3bda",
     "noGrouping": "b04cc3325adda721",
+    "notFound": "10d88160b3a2389d",
+    "notFoundDescription": "15289a609ac0140a",
     "overRolling": "46371483adee463f",
     "pause": "858e4ba7a29fd38b",
     "paused": "e159b06187d369a0",
@@ -10613,6 +10615,8 @@
     "saved": "544f668e5afe09d9",
     "searchPlaceholder": "70fa5884512faca2",
     "section": {
+      "definition": "9813fafb098c2180",
+      "definitionEmpty": "ed2265cd7a9616e5",
       "grouping": "b3c6e63fa9679a23",
       "identity": "45989de49fb7f66d",
       "objective": "3b20adc3b2ce1c15",

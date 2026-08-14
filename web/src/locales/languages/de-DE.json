@@ -12746,6 +12746,8 @@
   },
   "slos": {
     "title": "SLOs",
+    "notFound": "SLO nicht gefunden",
+    "notFoundDescription": "Dieses SLO existiert nicht mehr, oder Sie haben keinen Zugriff darauf. Es wurde möglicherweise gelöscht.",
     "subtitle": "Service-Level-Ziele: Ziele, Fehlerbudgets, Burn-Rate-Alarme",
     "new": "Neues SLO",
     "newTitle": "Neues SLO",
@@ -12845,7 +12847,9 @@
       "sli": "SLI: was \"gut\" bedeutet",
       "objective": "Ziel",
       "grouping": "Gruppierung",
-      "summary": "Zusammenfassung"
+      "summary": "Zusammenfassung",
+      "definition": "Definition",
+      "definitionEmpty": "Dieses SLO hat keine gespeicherte Definition."
     },
     "field": {
       "name": "SLO-Name",
