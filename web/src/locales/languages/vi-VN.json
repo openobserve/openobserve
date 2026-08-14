@@ -12740,6 +12740,8 @@
   },
   "slos": {
     "title": "SLO",
+    "notFound": "Không tìm thấy SLO",
+    "notFoundDescription": "SLO này không còn tồn tại hoặc bạn không có quyền truy cập. Nó có thể đã bị xóa.",
     "subtitle": "Mục tiêu mức dịch vụ: mục tiêu, ngân sách lỗi, cảnh báo tốc độ cháy",
     "new": "SLO mới",
     "newTitle": "SLO mới",
@@ -12839,7 +12841,9 @@
       "sli": "SLI: thế nào là \"tốt\"",
       "objective": "Mục tiêu",
       "grouping": "Phân nhóm",
-      "summary": "Tóm tắt"
+      "summary": "Tóm tắt",
+      "definition": "Định nghĩa",
+      "definitionEmpty": "SLO này không có định nghĩa được lưu trữ."
     },
     "field": {
       "name": "Tên SLO",

@@ -12740,6 +12740,8 @@
   },
   "slos": {
     "title": "SLO's",
+    "notFound": "SLO niet gevonden",
+    "notFoundDescription": "Deze SLO bestaat niet meer, of je hebt er geen toegang toe. Mogelijk is deze verwijderd.",
     "subtitle": "Service level objectives: doelen, foutbudgetten, burn-rate-alerts",
     "new": "Nieuwe SLO",
     "newTitle": "Nieuwe SLO",
@@ -12839,7 +12841,9 @@
       "sli": "SLI: wat 'goed' betekent",
       "objective": "Doelstelling",
       "grouping": "Groepering",
-      "summary": "Samenvatting"
+      "summary": "Samenvatting",
+      "definition": "Definitie",
+      "definitionEmpty": "Deze SLO heeft geen opgeslagen definitie."
     },
     "field": {
       "name": "SLO-naam",

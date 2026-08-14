@@ -12740,6 +12740,8 @@
   },
   "slos": {
     "title": "SLOs",
+    "notFound": "SLOが見つかりません",
+    "notFoundDescription": "このSLOは存在しないか、アクセス権がない可能性があります。削除された可能性もあります。",
     "subtitle": "サービスレベル目標: 目標、エラーバジェット、バーンレートアラート",
     "new": "新規SLO",
     "newTitle": "新規SLO",
@@ -12839,7 +12841,9 @@
       "sli": "SLI: 「良好」の意味",
       "objective": "目標",
       "grouping": "グループ化",
-      "summary": "概要"
+      "summary": "概要",
+      "definition": "定義",
+      "definitionEmpty": "このSLOには保存された定義がありません。"
     },
     "field": {
       "name": "SLO名",
