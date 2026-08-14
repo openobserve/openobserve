@@ -289,10 +289,22 @@ impl ScopeFilters {
     /// Escaped `AND col = 'value'` fragments for raw-span reads (see
     /// [`Self::SPAN_COLS`]).
     pub(crate) fn span_sql_preds(&self) -> String {
+        self.span_sql_preds_for("")
+    }
+
+    /// [`Self::span_sql_preds`], qualified for a self-join that ALIASES the
+    /// span table (`dbspan.o2_db_system = …`). A bare column name is ambiguous
+    /// the moment the same table appears twice, so the alias is not cosmetic —
+    /// without it the planner rejects the query outright.
+    ///
+    /// `alias` is a compile-time literal at every call site, never user input;
+    /// the injection contract of the VALUES is unchanged.
+    pub(crate) fn span_sql_preds_for(&self, alias: &str) -> String {
         let mut out = String::new();
         for (col, get) in Self::SPAN_COLS {
             if let Some(v) = get(self) {
                 out.push_str("\n    AND ");
+                out.push_str(alias);
                 out.push_str(col);
                 out.push_str(" = '");
                 out.push_str(&escape_sq(v));
@@ -413,11 +425,25 @@ pub(crate) fn build_backfill_sql(
 /// of the service-graph processor's `compute_stream_edges`. Bounded by the
 /// fingerprint + time predicates on the DB side and time predicates in the
 /// join ON clause on the root side.
+///
+/// `scope_preds` carries the rest of the join key (engine, database, …) as
+/// `dbspan.`-qualified fragments from [`ScopeFilters::span_sql_preds_for`], and
+/// it is the difference between attributing callers and inventing them.
+///
+/// **A fingerprint is not a join key.** It hashes statement TEXT ONLY, so the
+/// same `SELECT` under Postgres and under MySQL is one fingerprint — measured
+/// live: fp `69219a9c7fc5039d` in org `default` is 125,195 postgres spans AND
+/// 219,713 mysql spans. Aggregated on the fingerprint alone this returns one
+/// 344,908-call row that belongs to neither engine, and hands it to a
+/// server-vantage row that describes exactly one of them. The caller passes
+/// the engine it resolved; with none passed the behaviour is unchanged, which
+/// is why the parameter is additive rather than required.
 pub(crate) fn build_endpoints_sql(
     stream_name: &str,
     fingerprint: &str,
     start_time: i64,
     end_time: i64,
+    scope_preds: &str,
     limit: usize,
 ) -> String {
     let stream = escape_ident(stream_name);
@@ -436,7 +462,7 @@ LEFT JOIN "{stream}" AS root
     AND (root.reference_parent_span_id IS NULL OR root.reference_parent_span_id = '')
     AND root._timestamp >= {start_time} AND root._timestamp < {end_time}
 WHERE dbspan._timestamp >= {start_time} AND dbspan._timestamp < {end_time}
-    AND dbspan.o2_db_fingerprint = '{}'
+    AND dbspan.o2_db_fingerprint = '{}'{scope_preds}
 GROUP BY root.service_name, root.operation_name
 ORDER BY calls DESC
 LIMIT {limit}"#,
@@ -2503,7 +2529,19 @@ pub async fn get_dbm_query_history(
             return None;
         }
         let stream = backfill_stream_ref?;
-        let sql = build_endpoints_sql(stream, fingerprint, start_time, end_time, endpoints_limit);
+        // The SAME scope the series is read under, applied to the raw spans.
+        // Without it the aggregation keys on the fingerprint alone, which fuses
+        // engines (see `build_endpoints_sql`) — and the caller list is the one
+        // section on the page a server-vantage row is enriched FROM, so a fused
+        // list attributes another engine's services to this row's counters.
+        let sql = build_endpoints_sql(
+            stream,
+            fingerprint,
+            start_time,
+            end_time,
+            &filters.span_sql_preds_for("dbspan."),
+            endpoints_limit,
+        );
         Some(rollup::run_dbm_search(org, sql, start_time, end_time).await)
     };
 
@@ -2600,6 +2638,16 @@ pub struct EndpointsQuery {
     pub stream: Option<String>,
     pub start_time: Option<i64>,
     pub end_time: Option<i64>,
+    /// The REST of the join key. A fingerprint hashes statement text only, so
+    /// on a mixed fleet it names one statement running on several engines and
+    /// databases at once; aggregating callers without these fuses them into one
+    /// row that describes no engine (see [`build_endpoints_sql`]).
+    ///
+    /// Optional so the existing contract is unchanged for a caller that has no
+    /// engine to give — a fused answer is still what an unscoped question
+    /// deserves, and the caller that DOES enrich a server row now sends them.
+    pub system: Option<String>,
+    pub namespace: Option<String>,
     pub limit: Option<usize>,
 }
 
@@ -2622,6 +2670,8 @@ pub struct EndpointsQuery {
         ("stream" = String, Query, description = "Trace stream name (required)"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+        ("system" = Option<String>, Query, description = "Database system — the rest of the join key; without it a fingerprint shared by two engines returns their callers fused into one row"),
+        ("namespace" = Option<String>, Query, description = "Database/schema — the rest of the join key (see `system`)"),
         ("limit" = Option<usize>, Query, description = "Max rows (default 50)"),
     ),
     responses(
@@ -2666,7 +2716,19 @@ pub async fn get_dbm_query_endpoints(
         .unwrap_or(DEFAULT_ENDPOINTS_LIMIT)
         .clamp(1, MAX_ENDPOINTS_LIMIT);
 
-    let sql = build_endpoints_sql(stream, fingerprint, start_time, end_time, limit);
+    let scope = ScopeFilters {
+        system: q.system.clone(),
+        namespace: q.namespace.clone(),
+        ..Default::default()
+    };
+    let sql = build_endpoints_sql(
+        stream,
+        fingerprint,
+        start_time,
+        end_time,
+        &scope.span_sql_preds_for("dbspan."),
+        limit,
+    );
     match rollup::run_dbm_search(&org_id, sql, start_time, end_time).await {
         Ok(hits) => MetaHttpResponse::json(json!({ "hits": hits })),
         Err(e) => {
@@ -7843,9 +7905,79 @@ mod tests {
         assert!(sql.contains("o2_db_fingerprint = 'fp''x'"));
     }
 
+    /// D5 join guard. A fingerprint hashes statement TEXT ONLY, so the caller
+    /// aggregation MUST be able to carry the rest of the key — otherwise the
+    /// services it returns belong to whichever engines happen to share the
+    /// statement, and the server row they enrich belongs to exactly one.
+    ///
+    /// Live on org `default`, fp `69219a9c7fc5039d`: 125,195 postgres spans and
+    /// 219,713 mysql spans under one fingerprint. Unscoped this endpoint
+    /// returns their union as a single caller row.
+    #[test]
+    fn test_endpoints_sql_scopes_by_engine_and_database() {
+        let scope = ScopeFilters {
+            system: Some("postgresql".into()),
+            namespace: Some("dbmlab".into()),
+            ..Default::default()
+        };
+        let sql = build_endpoints_sql(
+            "otel_demo",
+            "69219a9c7fc5039d",
+            100,
+            200,
+            &scope.span_sql_preds_for("dbspan."),
+            50,
+        );
+        // Qualified, because the query self-joins the stream to itself: a bare
+        // `o2_db_system` is ambiguous across `dbspan` and `root`.
+        assert!(sql.contains("AND dbspan.o2_db_system = 'postgresql'"));
+        assert!(sql.contains("AND dbspan.o2_db_namespace = 'dbmlab'"));
+        assert!(
+            !sql.contains("AND o2_db_system = "),
+            "an unqualified column would be ambiguous in the self-join"
+        );
+        // The scope narrows the WHERE only — same projection, same grouping.
+        assert!(sql.contains("GROUP BY root.service_name, root.operation_name"));
+        assert!(sql.ends_with("LIMIT 50"));
+
+        // mysql/mariadb `top_query` records carry no database, so the caller
+        // drops it and the engine alone is the key. Still scoped — the fusion
+        // this guards against is BETWEEN engines.
+        let mysql = ScopeFilters {
+            system: Some("mysql".into()),
+            ..Default::default()
+        };
+        let sql = build_endpoints_sql(
+            "otel_demo",
+            "69219a9c7fc5039d",
+            100,
+            200,
+            &mysql.span_sql_preds_for("dbspan."),
+            50,
+        );
+        assert!(sql.contains("AND dbspan.o2_db_system = 'mysql'"));
+        assert!(!sql.contains("o2_db_namespace"));
+
+        // Values are escaped exactly as every other predicate in this module,
+        // and the alias is a literal, so no user input can name a column.
+        let hostile = ScopeFilters {
+            system: Some("pg'; DROP TABLE t;--".into()),
+            ..Default::default()
+        };
+        let sql = build_endpoints_sql(
+            "otel_demo",
+            "fp",
+            1,
+            2,
+            &hostile.span_sql_preds_for("dbspan."),
+            5,
+        );
+        assert!(sql.contains("dbspan.o2_db_system = 'pg''; DROP TABLE t;--'"));
+    }
+
     #[test]
     fn test_endpoints_sql_shape_and_injection() {
-        let sql = build_endpoints_sql("otel_demo", "deadbeef", 100, 200, 50);
+        let sql = build_endpoints_sql("otel_demo", "deadbeef", 100, 200, "", 50);
         // The compute_stream_edges self-join shape: db spans joined to trace
         // roots, time-bounded on BOTH sides, flat GROUP BY.
         assert!(sql.contains("FROM \"otel_demo\" AS dbspan"));
@@ -7860,7 +7992,7 @@ mod tests {
         assert!(sql.contains("GROUP BY root.service_name, root.operation_name"));
         assert!(sql.ends_with("LIMIT 50"));
 
-        let sql = build_endpoints_sql("s\"x", "fp' OR '1'='1", 1, 2, 10);
+        let sql = build_endpoints_sql("s\"x", "fp' OR '1'='1", 1, 2, "", 10);
         assert!(sql.contains("FROM \"s\"\"x\" AS dbspan"));
         assert!(sql.contains("o2_db_fingerprint = 'fp'' OR ''1''=''1'"));
     }
