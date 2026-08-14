@@ -315,6 +315,18 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     )
                     .await?;
                 }
+                AssociationDeleteEvent::TriggerWorkflow {
+                    org_id,
+                    trigger,
+                    workflow_id,
+                } => {
+                    infra::table::workflows::delete_association_by_trigger_workflow(
+                        org_id,
+                        trigger,
+                        workflow_id,
+                    )
+                    .await?;
+                }
             }
         }
 

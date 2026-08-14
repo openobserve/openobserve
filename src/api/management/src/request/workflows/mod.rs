@@ -31,7 +31,7 @@ use config::{
     },
     utils::time::now_micros,
 };
-use db::workflows::WorkflowTriggerType;
+use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use infra::table::workflows::{
     Workflow, WorkflowAssociation, WorkflowRunErrors, WorkflowTriggerEntity,
 };
@@ -331,6 +331,23 @@ pub async fn delete_workflows(
     let is_draft: bool = is_draft.parse().unwrap_or(false);
 
     if !is_draft {
+        let associations = match db::workflows::get_workflow_associations(&org_id, &id).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "error listing workflow associations before delete for {org_id}/{id} : {e}"
+                );
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+        if associations
+            .iter()
+            .any(|a| a.trigger_type != WorkflowTriggerType::IncidentEvent.to_string())
+        {
+            return MetaHttpResponse::bad_request(
+                "workflow is still associated with entities, must remove the connection first",
+            );
+        }
         match workflows::delete_workflow(&org_id, &id).await {
             Ok(_) => MetaHttpResponse::ok("deleted successfully"),
             Err(e) => {
@@ -408,14 +425,70 @@ pub async fn update_workflows(
             }
             _ => {}
         };
-        match workflows::update_workflow(workflow).await {
-            Ok(()) => MetaHttpResponse::json(
-                MetaHttpResponse::message(StatusCode::OK, "Workflow updated successfully")
-                    .with_id(id)
-                    .with_name(name),
-            ),
-            Err(e) => MetaHttpResponse::bad_request(e),
+        let existing_associations = match workflows::get_workflow_associations(&org_id, &id).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("error getting workflow associations for {org_id}/{id} : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+
+        let incident_association_exists = existing_associations
+            .iter()
+            .any(|v| v.trigger_type == WorkflowTriggerType::IncidentEvent.to_string());
+
+        // this means that originally this was a incident workflow and now we have made it an alert
+        // workflow
+        if incident_association_exists && payload.trigger_type == WorkflowTriggerType::AlertFired {
+            if let Err(e) = db::workflows::delete_workflow_association(
+                AssociationDeleteEvent::TriggerWorkflow {
+                    org_id: org_id.clone(),
+                    trigger: WorkflowTriggerType::IncidentEvent.to_string(),
+                    workflow_id: id.clone(),
+                },
+            )
+            .await
+            {
+                log::error!(
+                    "error deleting incident trigger for workflow {org_id}/{id} after update : {e}"
+                );
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+
+        if let Err(e) = workflows::update_workflow(workflow).await {
+            log::error!("error updating workflow {org_id}/{id} : {e}");
+            return MetaHttpResponse::bad_request(e);
+        };
+
+        // there is no existing incident association, but the new trigger type is incident,
+        // so we add an incident association. No reason to remove existing ones as workflows
+        // themselves as trigger type agnostic
+        if !incident_association_exists
+            && payload.trigger_type == WorkflowTriggerType::IncidentEvent
+        {
+            if let Err(e) = db::workflows::associate_workflow(
+                &org_id,
+                &id,
+                "system",
+                WorkflowTriggerEntity::Incident.to_string(),
+                WorkflowTriggerType::IncidentEvent.to_string(),
+            )
+            .await
+            {
+                log::error!(
+                    "error in associating workflow to incident after successful updating of workflow : {org_id}/{id} : {e}"
+                );
+                return MetaHttpResponse::internal_error(format!(
+                    "workflow updated successfully , but failed to save the association : {e}"
+                ));
+            }
         }
+        MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Workflow updated successfully")
+                .with_id(id)
+                .with_name(name),
+        )
     } else {
         match workflows::get_draft_by_id(&org_id, &id).await {
             Err(e) => {

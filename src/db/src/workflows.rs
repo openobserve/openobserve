@@ -45,6 +45,11 @@ pub enum AssociationDeleteEvent {
         entity_id: String,
         workflow_id: String,
     },
+    TriggerWorkflow {
+        org_id: String,
+        trigger: String,
+        workflow_id: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
@@ -382,6 +387,21 @@ pub async fn delete_workflow_association(
             workflow = workflow_id;
             infra::table::workflows::delete_workflow_association(org_id, workflow_id, entity_id)
                 .await?;
+        }
+        AssociationDeleteEvent::TriggerWorkflow {
+            org_id,
+            trigger,
+            workflow_id,
+        } => {
+            org = org_id;
+            workflow = workflow_id;
+            trigger_type = trigger;
+            infra::table::workflows::delete_association_by_trigger_workflow(
+                org_id,
+                trigger,
+                workflow_id,
+            )
+            .await?;
         }
     }
 
