@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   instants — a slot has no start and no end.
 -->
 <template>
-  <div :class="gridClass" data-test="oncall-team-pulse">
+  <div class="grid grid-cols-1 gap-px md:grid-cols-2 xl:grid-cols-4" data-test="oncall-team-pulse">
     <!-- ── On call now ─────────────────────────────────────────── -->
-    <section v-if="!hideHolder" class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
+    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
       <span class="flex items-center gap-1.5">
         <OIcon name="notifications-active" size="xs" class="text-text-secondary" />
         <OText variant="section">{{ t("oncall.teamOnCallNow") }}</OText>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </section>
 
     <!-- ── Backing them up ─────────────────────────────────────── -->
-    <section v-if="!hideHolder" class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
+    <section class="bg-surface-base flex flex-col gap-1.5 px-4 py-3">
       <span class="flex items-center gap-1.5">
         <OIcon name="group-work" size="xs" class="text-text-secondary" />
         <OText variant="section">{{ t("oncall.teamBackingUp") }}</OText>
@@ -79,6 +79,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="flex flex-wrap items-center gap-2">
           <OUserCell :value="backupWho" />
           <span class="text-text-secondary text-xs">{{ backupLine }}</span>
+          <!-- Where a derived secondary came from. Shown only when the offset is
+               not 1: at 1 the person literally IS the next in the cycle, which
+               the target label already says, and a "+1" beside it reads as a
+               second delay rather than a position. -->
+          <OTag
+            v-if="backupOffset"
+            variant="default-soft"
+            size="sm"
+            data-test="oncall-pulse-backup-offset"
+          >
+            {{ t("oncall.ctxSecondaryDerived", { offset: backupOffset }) }}
+          </OTag>
         </span>
         <p class="text-text-secondary text-xs" data-test="oncall-pulse-next">
           {{ nextPrimaryLine }}
@@ -219,13 +231,6 @@ const props = withDefaults(
     /** `GET .../reachability` — would a page to each person actually land. */
     reachability?: TeamReachability | null;
     timezone?: string;
-    /**
-     * Drop "on call now" and "backing them up".
-     *
-     * The schedule tab carries both in its own context strip, and a screen that
-     * says who holds the pager twice makes a reader check whether the two agree.
-     */
-    hideHolder?: boolean;
   }>(),
   {
     slots: () => [],
@@ -234,19 +239,11 @@ const props = withDefaults(
     overview: null,
     reachability: null,
     timezone: "UTC",
-    hideHolder: false,
   },
 );
 
 const { t } = useI18nTyped();
 
-/// Both strings are written out so Tailwind keeps them: a class assembled at
-/// runtime is not in the stylesheet.
-const gridClass = computed(() =>
-  props.hideHolder
-    ? "grid grid-cols-1 gap-px md:grid-cols-2"
-    : "grid grid-cols-1 gap-px md:grid-cols-2 xl:grid-cols-4",
-);
 const nowMicros = useOnCallClock();
 
 /// The primary slot, named rather than taken as "the first one with somebody in
@@ -358,6 +355,14 @@ const backupLine = computed<I18nText>(() => {
   return raw(
     `${label} · ${t("oncall.teamPagedAt", { delay: formatMicrosDuration(found.step.after_micros) })}`,
   );
+});
+
+/// How far down the cycle a derived secondary sits. Null unless the rung is
+/// the derived one AND the offset is interesting — see the template.
+const backupOffset = computed<number | null>(() => {
+  if (backupTarget.value?.target?.kind !== "next_on_call") return null;
+  const offset = holder.value?.next_offset ?? 1;
+  return offset > 1 ? offset : null;
 });
 
 /// Who that rung reaches. `next_on_call` stays **within** the primary slot, so

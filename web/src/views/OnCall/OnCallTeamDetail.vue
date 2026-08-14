@@ -61,7 +61,6 @@
          page. The tabs below are where you go to CHANGE any of them. -->
     <div class="bg-border-default border-border-default border-y">
       <OnCallTeamPulse
-        :hide-holder="activeTab === 'schedule'"
         :slots="onCallNow"
         :schedule="schedule"
         :policy="policy"
@@ -234,12 +233,10 @@
              of each on the screen. -->
         <OContent y class="flex flex-col gap-5">
           <template v-if="!editingSchedule">
-            <!-- The four facts somebody opens this tab to check, before any
-                 block on the chart below is worth reading. -->
+            <!-- The two facts that belong to the schedule rather than the
+                 team; who is on call stays in the strip above the tabs. -->
             <OnCallScheduleContext
-              :slots="onCallNow"
               :segments="segments"
-              :reachability="reachability"
               :timezone="team?.timezone ?? 'UTC'"
             />
 

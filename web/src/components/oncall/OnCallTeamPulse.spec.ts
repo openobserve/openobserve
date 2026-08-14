@@ -165,6 +165,64 @@ describe("OnCallTeamPulse", () => {
     expect(text).toContain("bo@o2.ai");
   });
 
+  /// One member list; the secondary is DERIVED from it. The offset says which
+  /// position, and without it the first question anybody asks is why that
+  /// person — but only when it is not 1, because at 1 they literally are next
+  /// and the label already says so.
+  it("says where a derived secondary came from when the offset is not 1", () => {
+    const wrapper = render({
+      slots: [
+        {
+          slot: "primary",
+          rotation: "Primary",
+          user_email: "ana@o2.ai",
+          next_user_email: "bo@o2.ai",
+          next_offset: 5,
+        },
+      ],
+      policy: {
+        rungs: [
+          {
+            priority: 1,
+            steps: [
+              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "next_on_call" }] },
+            ],
+            channels: [],
+          },
+        ],
+      },
+    });
+    expect(wrapper.find('[data-test="oncall-pulse-backup-offset"]').text()).toContain("+5");
+  });
+
+  it("stays quiet about an offset of 1, which the label already says", () => {
+    const wrapper = render({
+      slots: [
+        {
+          slot: "primary",
+          rotation: "Primary",
+          user_email: "ana@o2.ai",
+          next_user_email: "bo@o2.ai",
+          next_offset: 1,
+        },
+      ],
+      policy: {
+        rungs: [
+          {
+            priority: 1,
+            steps: [
+              { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+              { after_micros: 5 * MICROS_PER_MINUTE, targets: [{ kind: "next_on_call" }] },
+            ],
+            channels: [],
+          },
+        ],
+      },
+    });
+    expect(wrapper.find('[data-test="oncall-pulse-backup-offset"]').exists()).toBe(false);
+  });
+
   /// The primary slot is named, not guessed at as "the first staffed one" —
   /// a two-slot team returns two, in whatever order the server likes.
   it("shows the primary slot under 'on call now', whatever order the slots arrive in", () => {
