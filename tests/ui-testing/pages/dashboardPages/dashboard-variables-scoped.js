@@ -2432,8 +2432,13 @@ export default class DashboardVariablesScoped {
   async verifyVariableHasOptions(variableName, options = {}) {
     const { timeout = 10000 } = options;
 
-    // Open variable dropdown via the OSelect trigger
+    // Open variable dropdown via the OSelect trigger.
+    // Gate on the variable being idle first: loadVariableOptions() early-returns while
+    // isLoading is true, so a click landing mid-load shows the popover but never fetches,
+    // and the option wait below then burns its full timeout on a list that was never
+    // going to populate.
     const selector = this.page.locator(`[data-test="variable-selector-${variableName}-inner-trigger"]`);
+    await this.waitForVariableIdle(variableName);
     await selector.click();
 
     // Wait for dropdown menu
@@ -2523,13 +2528,18 @@ export default class DashboardVariablesScoped {
    * @param {string} variableName - Variable name
    */
   async editVariable(variableName) {
+    // The row is rendered by the settings drawer's variables list, which only populates
+    // after the drawer opens AND the dashboard fetch resolves. Under parallel load
+    // against a deployed org that lands past 10s, so use the same budget the other
+    // post-navigation waits here already use (setupTestDashboard: 30s) rather than a
+    // tighter one that fails on a list which was going to arrive.
     const editBtn = this.page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`);
-    await editBtn.waitFor({ state: "visible", timeout: 10000 });
+    await editBtn.waitFor({ state: "visible", timeout: 30000 });
     await editBtn.click();
 
     // Wait for form to be visible
     const nameInput = this.page.locator(SELECTORS.VARIABLE_NAME);
-    await nameInput.waitFor({ state: "visible", timeout: 10000 });
+    await nameInput.waitFor({ state: "visible", timeout: 15000 });
   }
 
   /**

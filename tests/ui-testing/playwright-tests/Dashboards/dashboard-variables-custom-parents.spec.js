@@ -356,6 +356,12 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
 
     testLogger.debug("Monitoring API calls when opening parent dropdown without changing value");
 
+    // Let the initial load fully settle before arming a "zero calls" monitor. Otherwise a
+    // values request still in flight from the dashboard opening above lands inside the
+    // 3s window and is counted against the dropdown-open, failing an assertion that has
+    // nothing to do with what it is measuring.
+    await scopedVars.waitForValuesQuiet({ timeout: 15000 });
+
     // Now test that opening dropdown WITHOUT changing value doesn't trigger additional API calls
     const apiMonitorPromise = monitorVariableAPICalls(page, {
       expectedCount: 0,
