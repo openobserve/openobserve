@@ -59,8 +59,11 @@ use o2_openfga::config::get_config as get_openfga_config;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+/// The chain assembler moved to `o2_enterprise` with the blocking canonicalizer
+/// it consumes; `super::chains` is the re-export that keeps this path valid.
+#[cfg(feature = "enterprise")]
+use super::chains;
 use super::{
-    chains,
     rollup::{self, O2_DB_STATS_STREAM, get_i64, get_str, get_str_ref},
     server_vantage,
 };
@@ -3447,6 +3450,7 @@ async fn run_events_search(
 /// That trade only holds ONCE THE SERVER IS KNOWN to be the same one — hence the
 /// identity guard in [`stitch_mysql_deadlocks`]. Across two servers the window is
 /// not evidence of anything, and a false merge fabricates a cycle.
+#[cfg(feature = "enterprise")]
 const MYSQL_SIDE_WINDOW_MICROS: i64 = 2_000_000;
 
 /// Rebuild a [`server_vantage::DeadlockEvent`] from one stored canonical row.
@@ -3454,6 +3458,7 @@ const MYSQL_SIDE_WINDOW_MICROS: i64 = 2_000_000;
 /// Reads only the canonical `o2_dbm_*` columns — the engine-specific fields they
 /// were derived from (`dl_query_1`, `my_trx_thread`) are ingest-side inputs and
 /// are never re-read here.
+#[cfg(feature = "enterprise")]
 fn deadlock_event_from_row(row: &Value) -> server_vantage::DeadlockEvent {
     let ts = match get_i64(row, server_vantage::O2_DBM_TIMESTAMP) {
         0 => get_i64(row, "_timestamp"),
@@ -3515,6 +3520,7 @@ fn deadlock_event_from_row(row: &Value) -> server_vantage::DeadlockEvent {
 /// Postgres events pass through untouched: the `DETAIL:` entry already carries
 /// the whole wait cycle, so a PG event arrives with both sides and merging two
 /// of them would invent a 4-way cycle that never happened.
+#[cfg(feature = "enterprise")]
 pub(crate) fn stitch_mysql_deadlocks(
     events: Vec<server_vantage::DeadlockEvent>,
 ) -> Vec<server_vantage::DeadlockEvent> {
@@ -3592,6 +3598,7 @@ pub(crate) fn stitch_mysql_deadlocks(
 /// `DeadlockEvent::query_shape` — the sorted, deduped, victim-order-independent
 /// fingerprint set — so a MySQL deadlock and a Postgres one group by the same
 /// rule.
+#[cfg(feature = "enterprise")]
 fn deadlock_event_to_dto(ev: &server_vantage::DeadlockEvent) -> Value {
     let ts = ev.timestamp.unwrap_or(0);
     let participants: Vec<Value> = ev
@@ -3645,6 +3652,7 @@ fn deadlock_event_to_dto(ev: &server_vantage::DeadlockEvent) -> Value {
 }
 
 /// The table(s) the sides fought over, in participant order and deduped.
+#[cfg(feature = "enterprise")]
 fn objects_of(ev: &server_vantage::DeadlockEvent) -> Vec<String> {
     let mut seen: Vec<String> = Vec::new();
     for p in &ev.participants {
@@ -3671,6 +3679,7 @@ fn objects_of(ev: &server_vantage::DeadlockEvent) -> Vec<String> {
 /// already carries both sides, grouped correctly. Recomputing from the stitched
 /// event via `DeadlockEvent::query_shape` makes the key the sorted, deduped
 /// fingerprint SET on both engines.
+#[cfg(feature = "enterprise")]
 pub(crate) fn rank_deadlock_shapes(events: &[server_vantage::DeadlockEvent]) -> Vec<Value> {
     let mut groups: BTreeMap<String, (i64, i64, BTreeSet<String>, Vec<String>)> = BTreeMap::new();
     for ev in events {
@@ -3974,6 +3983,7 @@ fn event_freshness(probe: &CollectionProbe) -> Value {
     })
 }
 
+#[cfg(feature = "enterprise")]
 #[derive(Debug, Deserialize)]
 pub struct DeadlocksQuery {
     pub start_time: Option<i64>,
@@ -4010,19 +4020,19 @@ macro_rules! impl_database_filter {
     )+};
 }
 
-impl_database_filter!(
-    DeadlocksQuery,
-    BlockingQuery,
-    ActivityQuery,
-    ServerQueriesQuery,
-    ServerSamplesQuery,
-);
+impl_database_filter!(ActivityQuery, ServerQueriesQuery, ServerSamplesQuery,);
+
+// The two enterprise query types use the same accessor, but only exist on an
+// enterprise build.
+#[cfg(feature = "enterprise")]
+impl_database_filter!(DeadlocksQuery, BlockingQuery,);
 
 /// Does this assembled event match the free-text term?
 ///
 /// Matches over the fields a reader would search by: the statements, the
 /// applications and users on each side, and the lock targets. Case-insensitive
 /// substring — the term is a needle from the incident, not a pattern language.
+#[cfg(feature = "enterprise")]
 fn deadlock_matches_search(ev: &server_vantage::DeadlockEvent, needle_lower: &str) -> bool {
     if needle_lower.is_empty() {
         return true;
@@ -4054,6 +4064,7 @@ fn deadlock_matches_search(ev: &server_vantage::DeadlockEvent, needle_lower: &st
 /// MySQL entries — one per transaction side — are stitched into whole deadlocks
 /// here (see [`stitch_mysql_deadlocks`]); Postgres records already carry the
 /// whole cycle and pass through untouched.
+#[cfg(feature = "enterprise")]
 #[utoipa::path(
     get,
     path = "/{org_id}/traces/db_monitoring/deadlocks",
@@ -4078,6 +4089,7 @@ fn deadlock_matches_search(ev: &server_vantage::DeadlockEvent, needle_lower: &st
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
+#[cfg(feature = "enterprise")]
 pub async fn get_dbm_deadlocks(
     Path(org_id): Path<String>,
     user_email: UserEmail,
@@ -4093,12 +4105,31 @@ pub async fn get_dbm_deadlocks(
     }
 }
 
+/// OSS stub — deadlocks are an Enterprise capability.
+///
+/// The ROUTE stays registered (see `router/mod.rs`); only the body is gated.
+/// Gating the route would answer 404, which reads as "this build is broken" or
+/// "you have the wrong URL"; 403 is what tells the UI to render an upgrade
+/// prompt. Deliberately NOT `disabled_response()`, which means
+/// `ZO_DB_MONITORING_ENABLED=false` and would send the operator to a collector
+/// checklist for a feature no amount of configuration will enable here.
+///
+/// The `Query<DeadlocksQuery>` extractor is dropped because that type is gated.
+#[cfg(not(feature = "enterprise"))]
+pub async fn get_dbm_deadlocks(
+    Path(_org_id): Path<String>,
+    _user_email: UserEmail,
+) -> HttpResponse {
+    unauthorized_response()
+}
+
 /// The deadlocks badge member — only the count-bearing fields the tab strip
 /// consumes: `total` (post-stitch, post-filter — the same count the tab
 /// renders), `truncated` and `stream`; shape ranking, the DTO serialization
 /// and the probe reads are enrichment it never consumes. A callable, like
 /// [`server_metrics_envelope`], so the shape is tested for real instead of
 /// scraped out of the handler's source text.
+#[cfg(feature = "enterprise")]
 pub(crate) fn deadlocks_badge_envelope(total: usize, truncated: bool, stream: &str) -> Value {
     json!({
         "total": total,
@@ -4110,6 +4141,7 @@ pub(crate) fn deadlocks_badge_envelope(total: usize, truncated: bool, stream: &s
 /// The full deadlocks response envelope — pure shape assembly (no I/O), same
 /// extraction rationale as [`server_metrics_envelope`]: the contract keys are
 /// asserted on real JSON instead of scraped out of the handler's source text.
+#[cfg(feature = "enterprise")]
 pub(crate) fn deadlocks_envelope(
     hits: &[Value],
     shapes: &[Value],
@@ -4158,6 +4190,7 @@ pub(crate) fn deadlocks_envelope(
 /// computed by this same assembly, so agreement with the tab holds — and
 /// skips the enrichment nothing on the strip reads. `prologue` shares the
 /// fan-in's one (auth, schema) prologue when it covers this body's stream.
+#[cfg(feature = "enterprise")]
 async fn read_deadlocks_body(
     org_id: &str,
     user_id: &str,
@@ -4286,6 +4319,7 @@ async fn read_deadlocks_body(
     ))
 }
 
+#[cfg(feature = "enterprise")]
 #[derive(Debug, Deserialize)]
 pub struct BlockingQuery {
     pub start_time: Option<i64>,
@@ -4305,6 +4339,7 @@ pub struct BlockingQuery {
 }
 
 /// Free-text match over one blocking sample.
+#[cfg(feature = "enterprise")]
 fn blocking_matches_search(s: &server_vantage::BlockingSample, needle_lower: &str) -> bool {
     if needle_lower.is_empty() {
         return true;
@@ -4330,6 +4365,7 @@ fn blocking_matches_search(s: &server_vantage::BlockingSample, needle_lower: &st
 /// Same contract as the deadlock DTO: no `o2_dbm_` prefixes, and `db_system` /
 /// `db_instance` / `db_namespace` are the names every other DBM endpoint uses
 /// for these three, so the UI reads one vocabulary across the whole feature.
+#[cfg(feature = "enterprise")]
 fn blocking_sample_to_dto(s: &server_vantage::BlockingSample) -> Value {
     json!({
         "timestamp": s.timestamp.unwrap_or(0),
@@ -4356,6 +4392,7 @@ fn blocking_sample_to_dto(s: &server_vantage::BlockingSample) -> Value {
 /// `chains[]`. `pg_blocking_pids()` yields only DIRECT blocker edges (proof
 /// §2.2/§4) — the transitive closure that identifies the one session worth
 /// killing is ours to build, and is [`super::chains::assemble_chains`].
+#[cfg(feature = "enterprise")]
 #[utoipa::path(
     get,
     path = "/{org_id}/traces/db_monitoring/blocking",
@@ -4381,6 +4418,7 @@ fn blocking_sample_to_dto(s: &server_vantage::BlockingSample) -> Value {
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
+#[cfg(feature = "enterprise")]
 pub async fn get_dbm_blocking(
     Path(org_id): Path<String>,
     user_email: UserEmail,
@@ -4396,11 +4434,20 @@ pub async fn get_dbm_blocking(
     }
 }
 
+/// OSS stub — blocked queries are an Enterprise capability.
+/// See [`get_dbm_deadlocks`]'s OSS stub for why this is 403 and not 404 or
+/// `disabled_response()`, and why the route stays registered.
+#[cfg(not(feature = "enterprise"))]
+pub async fn get_dbm_blocking(Path(_org_id): Path<String>, _user_email: UserEmail) -> HttpResponse {
+    unauthorized_response()
+}
+
 /// The blocking badge member — the strip reads `total`/`truncated` for the
 /// badge and `hits` for its high-impact-blocker rule — the same samples the
 /// tab renders; chain assembly and the probe reads are enrichment it never
 /// consumes. A callable, like [`server_metrics_envelope`], so the shape is
 /// tested for real instead of scraped out of the handler's source text.
+#[cfg(feature = "enterprise")]
 pub(crate) fn blocking_badge_envelope(hits: &[Value], truncated: bool, stream: &str) -> Value {
     json!({
         "hits": hits,
@@ -4412,6 +4459,7 @@ pub(crate) fn blocking_badge_envelope(hits: &[Value], truncated: bool, stream: &
 
 /// The full blocking response envelope — pure shape assembly (no I/O), same
 /// extraction rationale as [`server_metrics_envelope`].
+#[cfg(feature = "enterprise")]
 pub(crate) fn blocking_envelope(
     hits: &[Value],
     chains: &[Value],
@@ -4443,6 +4491,7 @@ pub(crate) fn blocking_envelope(
 /// [`read_databases_body`], auth included. `badge_mode`/`prologue`: see
 /// [`read_deadlocks_body`] — the badge member is [`blocking_badge_envelope`],
 /// which skips chain assembly and the probe reads.
+#[cfg(feature = "enterprise")]
 async fn read_blocking_body(
     org_id: &str,
     user_id: &str,
@@ -7258,12 +7307,20 @@ impl BadgeSliceResults {
     /// fan-out's `allSettled` did.
     pub(crate) fn all_forbidden(&self) -> bool {
         let forbidden = |r: &Result<Value, HttpResponse>| matches!(r, Err(resp) if resp.status() == axum::http::StatusCode::FORBIDDEN);
-        forbidden(&self.databases)
+        let all = forbidden(&self.databases)
             && forbidden(&self.queries)
             && forbidden(&self.activity)
-            && forbidden(&self.deadlocks)
-            && forbidden(&self.blocking)
-            && forbidden(&self.table_health)
+            && forbidden(&self.table_health);
+        // On OSS `deadlocks` and `blocking` are ALWAYS `Err(403)` — they are
+        // Enterprise capabilities — so consulting them here would make a
+        // whole-request 403 strictly EASIER to reach: a caller who used to get
+        // a 200 with partial members (because the deadlocks slice succeeded)
+        // would now get a blanket denial. Only members that can actually
+        // succeed are consulted. A `let` rebinding rather than `#[cfg]` on a
+        // `return`, which trips `clippy::needless_return`.
+        #[cfg(feature = "enterprise")]
+        let all = all && forbidden(&self.deadlocks) && forbidden(&self.blocking);
+        all
     }
 
     /// Fold into the response envelope: each member is its endpoint's own
@@ -7428,6 +7485,11 @@ pub async fn get_dbm_badges(
         namespace: None,
         limit: None,
     };
+    // `DeadlocksQuery` / `BlockingQuery` only exist on an enterprise build, so
+    // their construction is gated together with the join arm that consumes
+    // them. Task 5 does the full badges split; this is the minimum that keeps
+    // OSS compiling now that the two types are enterprise-only.
+    #[cfg(feature = "enterprise")]
     let deadlocks_q = DeadlocksQuery {
         start_time: q.start_time,
         end_time: q.end_time,
@@ -7439,6 +7501,7 @@ pub async fn get_dbm_badges(
         search: None,
         limit: None,
     };
+    #[cfg(feature = "enterprise")]
     let blocking_q = BlockingQuery {
         start_time: q.start_time,
         end_time: q.end_time,
@@ -7468,6 +7531,7 @@ pub async fn get_dbm_badges(
     let prologue = server_prologue(org, user).await;
     let prologue = prologue.as_ref();
 
+    #[cfg(feature = "enterprise")]
     let (databases, queries, activity, deadlocks, blocking, table_health) = tokio::join!(
         read_databases_body(org, user, &databases_q),
         read_queries_body(org, user, &queries_q),
@@ -7476,6 +7540,26 @@ pub async fn get_dbm_badges(
         read_blocking_body(org, user, &blocking_q, true, prologue),
         read_table_health_body(org, user, &table_health_q),
     );
+    // On OSS the two enterprise slices are refused without a read. The envelope
+    // already maps `Err` to `null` per member, so their badges render blank
+    // rather than as a misleading 0. Table health is still OSS until Task 4.
+    #[cfg(not(feature = "enterprise"))]
+    let (databases, queries, activity, deadlocks, blocking, table_health) = {
+        let (databases, queries, activity, table_health) = tokio::join!(
+            read_databases_body(org, user, &databases_q),
+            read_queries_body(org, user, &queries_q),
+            read_activity_body(org, user, &activity_q, true, prologue),
+            read_table_health_body(org, user, &table_health_q),
+        );
+        (
+            databases,
+            queries,
+            activity,
+            Err(unauthorized_response()),
+            Err(unauthorized_response()),
+            table_health,
+        )
+    };
 
     // ── The zero-trace fallback, folded server-side ──────────────────────
     //
@@ -9417,6 +9501,7 @@ mod tests {
     /// `not_collecting: true`. That tells the operator their collector is broken
     /// when only a schema read blipped, which is exactly the false alarm the
     /// design note above `LIVENESS_PROBE_MICROS` says must never be raised.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_empty_columns_would_silently_drop_every_blocking_row() {
         let sql = build_dbm_events_sql("dbm_server", "blocking", 100, 200, "", 50, &HashSet::new());
@@ -9438,6 +9523,7 @@ mod tests {
     /// with no engine, no participants and no victim. Worse than blocking's
     /// false alarm: `hits` is non-empty, so the probe is SKIPPED and the tab
     /// renders content-free rows with no diagnostic at all.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_empty_columns_would_yield_content_free_deadlock_events() {
         let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &HashSet::new());
@@ -9495,6 +9581,14 @@ mod tests {
         // Empty strings are not filters.
         assert_eq!(dbm_event_preds(Some(""), None, None), "");
     }
+    // ── Deadlock / blocking read path — ENTERPRISE ONLY ────────────────────
+    //
+    // Everything down to `test_database_param_accepts_namespace_alias`
+    // exercises `deadlock_event_from_row`, `stitch_mysql_deadlocks`,
+    // `rank_deadlock_shapes`, the two DTOs, the two search predicates and the
+    // two query types — all gated to the enterprise build now that deadlocks
+    // and blocking are Enterprise capabilities. Every fixture and assertion is
+    // unchanged; only availability moved.
 
     // ── Deadlock read path: row → event → stitch → DTO ─────────────────────
     //
@@ -9503,6 +9597,7 @@ mod tests {
     // JSON-string `o2_dbm_participants` column is covered on the way through.
 
     /// A stored Postgres row: one record already carrying the whole cycle.
+    #[cfg(feature = "enterprise")]
     fn pg_row(ts: i64, victim: i64, parts: Value) -> Value {
         json!({
             "_timestamp": ts,
@@ -9517,6 +9612,7 @@ mod tests {
     }
 
     /// A stored MySQL row: ONE transaction side, as InnoDB logs it.
+    #[cfg(feature = "enterprise")]
     fn my_row(ts: i64, thread: i64, trx: &str, fp: &str, victim: bool) -> Value {
         json!({
             "_timestamp": ts,
@@ -9536,11 +9632,13 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "enterprise")]
     fn events_of(rows: &[Value]) -> Vec<server_vantage::DeadlockEvent> {
         stitch_mysql_deadlocks(rows.iter().map(deadlock_event_from_row).collect())
     }
 
     /// The participants column round-trips out of its JSON-string storage form.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_deadlock_event_from_row_parses_string_participants() {
         let row = pg_row(
@@ -9559,6 +9657,7 @@ mod tests {
 
     /// The shape ranking answers "which query shape deadlocks most". The victim
     /// alternating between firings must NOT split one bug into two rows.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_rank_deadlock_shapes_groups_and_ranks() {
         let rows = vec![
@@ -9591,6 +9690,7 @@ mod tests {
         assert_eq!(fps.len(), 2);
     }
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_rank_deadlock_shapes_skips_shapeless_rows() {
         // A deadlock whose participants had unparseable SQL has no fingerprint,
@@ -9602,6 +9702,7 @@ mod tests {
     // ── GAP 2: MySQL side stitching ────────────────────────────────────────
 
     /// The headline case: two InnoDB entries ~150 µs apart are ONE deadlock.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_mysql_merges_two_sides() {
         let rows = vec![
@@ -9617,6 +9718,7 @@ mod tests {
 
     /// Postgres records already carry both sides. Merging two of them would
     /// invent a four-way cycle that never happened.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_leaves_postgres_untouched() {
         let rows = vec![
@@ -9639,6 +9741,7 @@ mod tests {
 
     /// A mixed window must not cross engines: a PG event and a MySQL side that
     /// happen to share a microsecond are unrelated.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_never_merges_across_engines() {
         let rows = vec![
@@ -9662,6 +9765,7 @@ mod tests {
 
     /// pids and transaction ids are only comparable within one server, so two
     /// sides logged by DIFFERENT instances are not one deadlock.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_never_merges_across_instances() {
         let mut a = my_row(1_000_000, 41, "trxA", "aaa", false);
@@ -9680,6 +9784,7 @@ mod tests {
     /// `unwrap_or_default()` collapsed every MySQL host into `("mysql","","")`,
     /// so two hosts each with their own two-sided deadlock inside the 2 s window
     /// fused into ONE 4-participant event describing no real lock cycle.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_never_merges_untagged_rows_from_two_servers() {
         // Two hosts, two independent two-sided deadlocks, all four entries
@@ -9729,6 +9834,7 @@ mod tests {
     /// would turn a real deadlock into no deadlock at all. It arrives as the
     /// one-participant event it is, flagged `partial`, exactly as an unmatched
     /// tagged singleton does.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_keeps_untagged_side_as_partial_event() {
         let mut row = my_row(1_000_000, 41, "trxA", "aaa", true);
@@ -9745,6 +9851,7 @@ mod tests {
     /// nothing else — no pid, no statement — so alone it would render a
     /// content-free deadlock row and inflate the count with a non-event. It is
     /// only meaningful joined to its sides, and untagged means it never can be.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_drops_untagged_participantless_verdict() {
         let verdict = json!({
@@ -9759,6 +9866,7 @@ mod tests {
 
     /// The guard must not cost the TAGGED deployment its stitch — tagging an
     /// instance in the recipe is the documented fix, so it has to work.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_still_merges_when_instance_is_tagged() {
         let events = events_of(&[
@@ -9771,6 +9879,7 @@ mod tests {
     }
 
     /// Sides far apart in time are two different deadlocks that each lost a half.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_leaves_far_apart_sides_separate() {
         let rows = vec![
@@ -9786,6 +9895,7 @@ mod tests {
     /// An unmatched singleton is returned as-is and flagged `partial`, not
     /// dropped: "a deadlock happened and we only caught one side" is true and
     /// useful, while silently discarding it under-reports the incident.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_keeps_unmatched_singleton_flagged_partial() {
         let events = events_of(&[my_row(1_000_000, 41, "trxA", "aaa", true)]);
@@ -9797,6 +9907,7 @@ mod tests {
 
     /// A 3-way pileup: InnoDB can log three transactions in one cycle. All
     /// three sides belong to ONE deadlock, not one-and-a-half.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_handles_three_way_pileup() {
         let rows = vec![
@@ -9812,6 +9923,7 @@ mod tests {
 
     /// A repeated transaction id inside the window is the NEXT deadlock reusing
     /// a hot pair, not a third side of the open one.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_repeated_transaction_id_starts_new_event() {
         let rows = vec![
@@ -9828,6 +9940,7 @@ mod tests {
 
     /// Identical timestamps must not blow up or drop a side — a tie is just a
     /// tie, and the two entries are still two sides of one deadlock.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_identical_timestamps_tie() {
         let rows = vec![
@@ -9843,6 +9956,7 @@ mod tests {
     /// Postgres one must land under the SAME shape key. Before stitching, the
     /// MySQL sides carried one fingerprint each and grouped as two half-sized
     /// bugs while Postgres grouped as one.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_shape_grouping_is_engine_consistent() {
         let pg = events_of(&[pg_row(
@@ -9867,6 +9981,7 @@ mod tests {
     }
 
     /// Stitched MySQL events rank as ONE firing, not two.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_rank_shapes_counts_stitched_mysql_once() {
         let rows = vec![
@@ -9888,6 +10003,7 @@ mod tests {
 
     /// The DTO is the contract: no `o2_dbm_` prefixes anywhere, `participants`
     /// is a real ARRAY, and the field names match what the UI service declares.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_deadlock_dto_shape() {
         let events = events_of(&[pg_row(
@@ -9939,6 +10055,7 @@ mod tests {
 
     /// The blocking DTO drops the prefixes too and speaks the same
     /// `db_system`/`db_instance`/`db_namespace` vocabulary.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_blocking_dto_shape() {
         let row = json!({
@@ -9978,6 +10095,7 @@ mod tests {
 
     // ── Free-text search (the UI has always sent it; it was ignored) ────────
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_deadlock_search_matches_and_is_case_insensitive() {
         let events = events_of(&[pg_row(
@@ -10001,6 +10119,7 @@ mod tests {
 
     /// Search runs AFTER stitching, so a term matching only ONE MySQL side
     /// still returns the whole two-sided deadlock rather than half of it.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_deadlock_search_runs_after_stitching() {
         let events = events_of(&[
@@ -10013,6 +10132,7 @@ mod tests {
         assert_eq!(events[0].participants.len(), 2, "both sides retained");
     }
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_blocking_search_matches_both_ends() {
         let row = json!({
@@ -10036,6 +10156,7 @@ mod tests {
 
     /// `namespace` is the spelling the rollup endpoints use; both must reach
     /// the same filter or the UI's one vocabulary silently drops the filter.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_database_param_accepts_namespace_alias() {
         let q: DeadlocksQuery =

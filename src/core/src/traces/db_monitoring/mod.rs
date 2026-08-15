@@ -26,9 +26,23 @@
 //! The RED-phase golden corpus lives in `corpus/*.json`, driven by `tests.rs`.
 
 pub mod api;
-pub mod chains;
 pub mod rollup;
 pub mod server_vantage;
+
+/// Deadlock and blocking canonicalization is an Enterprise capability.
+///
+/// The types and functions below moved to `o2_enterprise` together with the
+/// chain assembler (which used to be `db_monitoring::chains` here). They are
+/// re-exported at their ORIGINAL paths so every `super::chains::…` and
+/// `server_vantage::DeadlockEvent` call site in `api.rs` resolves unchanged on
+/// an enterprise build; on OSS the read handlers that use them are `cfg`-gated
+/// off and answer 403.
+#[cfg(feature = "enterprise")]
+pub use o2_enterprise::enterprise::db_monitoring::{
+    blocking::BlockingSample,
+    chains::{self, BlockingChain, assemble_chains},
+    deadlock::{DeadlockEvent, Participant, merge_mysql_deadlocks, participants_of},
+};
 
 #[cfg(test)]
 mod tests;

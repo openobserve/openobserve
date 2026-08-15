@@ -13,25 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Server-vantage canonicalization + chain-assembly tests.
+//! Server-vantage canonicalization tests.
 //!
 //! The deadlock/blocking fixtures are the REAL captured records from
 //! `docs/___databsepages/dbm-server-vantage-proof.md` §2.1/§2.2 — field names, pids, and SQL
 //! verbatim. If a collector release renames a field, these fail loudly rather than silently
 //! returning empty events.
+//!
+//! DEADLOCK / BLOCKING / CHAIN-ASSEMBLY UNIT TESTS MOVED TO ENTERPRISE. Their
+//! subjects (`canonicalize_pg_deadlock`, `canonicalize_blocking`,
+//! `assemble_chains`, …) now live in `o2_enterprise::enterprise::db_monitoring`
+//! and their tests moved with them, verbatim, to that crate's
+//! `db_monitoring/tests.rs`. What stays here is the handful that call the OSS
+//! DISPATCHER, [`canonicalize_record`] — the property they pin is which arm
+//! claims a record, which is only observable from this side of the boundary.
+//! Those run on the enterprise build and are gated accordingly.
 
 use std::collections::BTreeMap;
 
 use serde_json::{Map, Value, json};
 
 use super::{
-    chains::assemble_chains,
     server_vantage,
-    server_vantage::{
-        BlockingSample, Participant, canonicalize_blocking, canonicalize_mariadb_deadlock,
-        canonicalize_mssql_deadlock, canonicalize_mysql_deadlock, canonicalize_pg_deadlock,
-        canonicalize_record, fingerprint_statement, merge_mysql_deadlocks,
-    },
+    server_vantage::{canonicalize_record, fingerprint_statement},
 };
 
 fn obj(v: Value) -> Map<String, Value> {
@@ -115,363 +119,36 @@ fn pg_blocking_record() -> Map<String, Value> {
     }))
 }
 
-// ─── Deadlock canonicalization ───────────────────────────────────────────────
-
-#[test]
-fn pg_deadlock_assembles_both_participants_from_the_proof_record() {
-    let ev = canonicalize_pg_deadlock(&pg_deadlock_record()).expect("deadlock canonicalized");
-
-    assert_eq!(ev.engine.as_deref(), Some("postgresql"));
-    assert_eq!(ev.database.as_deref(), Some("dbmlab"));
-    assert_eq!(ev.victim_pid, Some(1071));
-    assert_eq!(ev.participants.len(), 2, "both sides of the cycle");
-
-    let victim = &ev.participants[0];
-    assert_eq!(victim.pid, Some(1071));
-    assert!(victim.victim, "pid 1071 is the engine-chosen victim");
-    assert_eq!(victim.lock_mode.as_deref(), Some("ShareLock"));
-    assert_eq!(victim.lock_target.as_deref(), Some("transaction 1430"));
-    assert_eq!(victim.app.as_deref(), Some("dbm-sv-deadlock-a"));
-    assert!(victim.fingerprint.is_some(), "victim SQL fingerprinted");
-
-    let survivor = &ev.participants[1];
-    assert_eq!(survivor.pid, Some(1072));
-    assert!(!survivor.victim);
-    assert_eq!(survivor.lock_target.as_deref(), Some("transaction 1429"));
-
-    // The two statements touch the same table in opposite order — different
-    // literals, so different fingerprints is CORRECT here (id = 2 vs id = 1 are
-    // both `?` after normalization, so they actually converge).
-    assert!(survivor.fingerprint.is_some());
-}
-
-/// The MULTI-LINE TRAP (proof §5.4). A pipeline matching only "deadlock detected"
-/// captures a 119-byte banner with NO participants. That must NOT become an event —
-/// otherwise the UI shows deadlocks with nothing actionable in them.
-#[test]
-fn pg_deadlock_banner_without_participants_is_not_an_event() {
-    let banner = obj(json!({
-        "_timestamp": 1_786_165_745_900_000i64,
-        "o2_pg_event": "deadlock",
-        "pg_pid": "1071",
-        "pg_severity": "ERROR",
-        "body": "deadlock detected",
-    }));
-    assert!(
-        canonicalize_pg_deadlock(&banner).is_none(),
-        "banner-only entry must be skipped, not stored as a participant-less deadlock"
-    );
-}
-
-#[test]
-fn pg_deadlock_participant_queries_are_normalized_not_raw() {
-    let ev = canonicalize_pg_deadlock(&pg_deadlock_record()).unwrap();
-    for p in &ev.participants {
-        let norm = p.query_norm.as_deref().unwrap();
-        // Literals must not survive into normalized text (NFR-2).
-        assert!(
-            !norm.contains("= 2") && !norm.contains("= 1"),
-            "literal leaked into query_norm: {norm}"
-        );
-        // sqlcommenter-style comments are stripped by the normalizer.
-        assert!(
-            !norm.contains("deadlock-a-step2"),
-            "comment leaked into query_norm: {norm}"
-        );
-    }
-}
-
-#[test]
-fn mysql_deadlock_captures_one_side_per_entry() {
-    // NOTE the absent `my_victim_side`. InnoDB logs `WE ROLL BACK TRANSACTION
-    // (N)` as its OWN entry, so a side's record never carries the verdict —
-    // verified against live collector output. The previous fixture put both
-    // fields on one record, a shape the collector never emits, which is why
-    // the "no MySQL participant is ever the victim" bug shipped green.
-    let side1 = obj(json!({
+/// Proof — a row the SHIPPED SQL Server deadlock shred actually returned against
+/// the rig (`tests/dbm-server-vantage/captures/mssql-deadlock.xml`). Kept here
+/// because the W8 recipe-classification tests below feed one realistic row per
+/// shipped recipe tag, `mssql_deadlock` included; the deadlock CANONICALIZER's
+/// own tests moved to enterprise along with their copy of this fixture.
+fn mssql_deadlock_row(spid: &str, victim: &str, query: &str) -> Map<String, Value> {
+    obj(json!({
         "_timestamp": 1_786_166_303_139_783i64,
-        "o2_my_event": "deadlock",
-        "my_trx_side": "1",
-        "my_trx_id": "4589",
-        "my_trx_thread": "89",
-        "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
-    }));
-    let ev = canonicalize_mysql_deadlock(&side1).expect("side 1 canonicalized");
-    assert_eq!(ev.engine.as_deref(), Some("mysql"));
-    assert_eq!(ev.participants.len(), 1);
-    assert_eq!(ev.participants[0].pid, Some(89));
-    assert_eq!(ev.participants[0].transaction_id.as_deref(), Some("4589"));
-    assert_eq!(
-        ev.participants[0].side,
-        Some(1),
-        "side retained for the join"
-    );
-    // Unresolved at this layer BY DESIGN — the verdict is a different record.
-    assert!(!ev.participants[0].victim);
-    assert_eq!(ev.victim_pid, None);
+        "o2_recipe": "mssql_deadlock",
+        "mssql_dl_ts": "2026-08-10T09:21:10.8600000",
+        "mssql_spid": spid,
+        "mssql_is_victim": victim,
+        "mssql_lock_mode": "X",
+        "mssql_app": "pymssql=2.3.2",
+        "mssql_user": "sa",
+        "mssql_db": "dbmlab",
+        "mssql_lock_target": "dbmlab.dbo.accounts",
+        "mssql_query": query,
+    }))
 }
 
-/// The rollback verdict is its own record, and it must SURVIVE canonicalization.
-///
-/// This is the record the old code dropped (`side.is_none() && query.is_none()`
-/// → `None`), which is why no MySQL participant was ever flagged and the UI's
-/// "cancelled by the database" panel rendered blank.
-#[test]
-fn mysql_rollback_verdict_record_is_kept_as_a_participantless_event() {
-    let verdict = obj(json!({
-        "_timestamp": 1_786_166_303_139_800i64,
-        "o2_my_event": "deadlock",
-        "my_victim_side": "2",
-    }));
-    let ev = canonicalize_mysql_deadlock(&verdict).expect("verdict must not be discarded");
-    assert_eq!(ev.victim_side, Some(2));
-    assert!(
-        ev.participants.is_empty(),
-        "a verdict is not a participant — it must not inflate participant_count"
-    );
-}
-
-/// A banner with neither a side, a statement, nor a verdict is still noise.
-#[test]
-fn mysql_banner_without_a_verdict_is_still_skipped() {
-    let banner = obj(json!({
-        "o2_my_event": "deadlock",
-        "my_code": "MY-012468",
-    }));
-    assert!(canonicalize_mysql_deadlock(&banner).is_none());
-}
-
-/// End to end: two sides plus a separately-logged verdict resolve to one event
-/// with the correct victim — the shape the live collector actually emits.
-#[test]
-fn mysql_victim_resolves_from_the_separately_logged_verdict() {
-    let mk_side = |ts: i64, side: &str, thread: &str, txid: &str| {
-        canonicalize_mysql_deadlock(&obj(json!({
-            "_timestamp": ts,
-            "o2_my_event": "deadlock",
-            "my_trx_side": side,
-            "my_trx_id": txid,
-            "my_trx_thread": thread,
-            "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
-        })))
-        .expect("side canonicalized")
-    };
-    // Timestamps mirror the observed order: sides first, verdict LAST.
-    let s1 = mk_side(1_786_166_303_139_234, "1", "15", "4589");
-    let s2 = mk_side(1_786_166_303_139_397, "2", "14", "4590");
-    let verdict = canonicalize_mysql_deadlock(&obj(json!({
-        "_timestamp": 1_786_166_303_139_569i64,
-        "o2_my_event": "deadlock",
-        "my_victim_side": "2",
-    })))
-    .expect("verdict canonicalized");
-
-    let merged = merge_mysql_deadlocks(vec![s1, s2, verdict], 2_000_000);
-    assert_eq!(merged.len(), 1, "one deadlock, not three");
-
-    let ev = &merged[0];
-    assert_eq!(
-        ev.participants.len(),
-        2,
-        "the verdict must not count as a participant"
-    );
-    assert_eq!(
-        ev.victim_pid,
-        Some(14),
-        "side 2 -> thread 14 was rolled back"
-    );
-
-    let victim: Vec<_> = ev.participants.iter().filter(|p| p.victim).collect();
-    assert_eq!(victim.len(), 1, "exactly one side is the victim");
-    assert_eq!(victim[0].pid, Some(14));
-    assert_eq!(
-        ev.participants.iter().filter(|p| !p.victim).count(),
-        1,
-        "the other side survives"
-    );
-}
-
-#[test]
-fn mysql_deadlock_banner_is_not_an_event() {
-    let banner = obj(json!({
-        "o2_my_event": "deadlock",
-        "my_code": "MY-012468",
-        "my_message": "Deadlock found when trying to get lock",
-    }));
-    assert!(canonicalize_mysql_deadlock(&banner).is_none());
-}
-
-/// MySQL splits one deadlock across N entries; merging must reassemble exactly one
-/// event with both sides (proof §2.1 MySQL block: two entries 145 µs apart).
-#[test]
-fn mysql_deadlock_sides_merge_into_one_event() {
-    let s1 = canonicalize_mysql_deadlock(&obj(json!({
-        "_timestamp": 1_786_166_303_139_783i64,
-        "o2_my_event": "deadlock",
-        "my_trx_side": "1", "my_trx_id": "4589", "my_trx_thread": "89",
-        "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
-    })))
-    .unwrap();
-    let s2 = canonicalize_mysql_deadlock(&obj(json!({
-        "_timestamp": 1_786_166_303_139_928i64,
-        "o2_my_event": "deadlock",
-        "my_trx_side": "2", "my_trx_id": "4588", "my_trx_thread": "88",
-        "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 12",
-    })))
-    .unwrap();
-
-    let merged = merge_mysql_deadlocks(vec![s1, s2], 5_000_000);
-    assert_eq!(merged.len(), 1, "the two sides are ONE deadlock");
-    assert_eq!(merged[0].participants.len(), 2);
-}
-
-/// Two deadlocks far apart in time must NOT merge.
-#[test]
-fn mysql_distant_deadlocks_do_not_merge() {
-    let a = canonicalize_mysql_deadlock(&obj(json!({
-        "_timestamp": 1_000_000_000i64, "o2_my_event": "deadlock",
-        "my_trx_side": "1", "my_trx_id": "1", "my_trx_thread": "10",
-        "my_trx_query": "UPDATE t SET a = 1",
-    })))
-    .unwrap();
-    let b = canonicalize_mysql_deadlock(&obj(json!({
-        "_timestamp": 9_000_000_000i64, "o2_my_event": "deadlock",
-        "my_trx_side": "1", "my_trx_id": "2", "my_trx_thread": "11",
-        "my_trx_query": "UPDATE t SET a = 2",
-    })))
-    .unwrap();
-    assert_eq!(merge_mysql_deadlocks(vec![a, b], 5_000_000).len(), 2);
-}
-
-// ─── MariaDB deadlocks ───────────────────────────────────────────────────────
+// ─── Dispatch: which arm claims which record ─────────────────────────────────
 //
-// Every fixture below uses the values from a REAL captured deadlock —
-// tests/dbm-server-vantage/captures/mariadb-deadlock.log — per the rule that
-// burned the MySQL path: fixture-test against captured collector output, never
-// hand-authored records. The capture's shape was:
-//   entry 2 → SIDE 1, trx 48, MariaDB thread id 14
-//   entry 5 → SIDE 2, trx 47, MariaDB thread id 15
-//   entry 8 → *** WE ROLL BACK TRANSACTION (2)
+// These call the OSS DISPATCHER, so they stay here even though their subjects
+// moved. On an enterprise build the two hooks canonicalize and the assertions
+// are the ones that shipped; on OSS the same records are enterprise-owned and
+// must yield NOTHING rather than leaking into a neighbouring arm — asserted by
+// `enterprise_owned_records_do_not_canonicalize_on_oss` below.
 
-#[test]
-fn mariadb_deadlock_captures_one_side_per_entry() {
-    let side1 = obj(json!({
-        "_timestamp": 1_786_166_303_139_783i64,
-        "o2_maria_event": "deadlock",
-        "maria_trx_side": "1",
-        "maria_trx_id": "48",
-        "maria_trx_thread": "14",
-        "maria_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
-    }));
-    let ev = canonicalize_mariadb_deadlock(&side1).expect("side 1 canonicalized");
-    assert_eq!(
-        ev.engine.as_deref(),
-        Some("mariadb"),
-        "MUST NOT report mysql — the stitch groups on engine, so a mislabelled \
-         MariaDB row could merge with a real MySQL deadlock"
-    );
-    assert_eq!(ev.participants.len(), 1);
-    assert_eq!(ev.participants[0].pid, Some(14));
-    assert_eq!(ev.participants[0].transaction_id.as_deref(), Some("48"));
-    assert_eq!(ev.participants[0].side, Some(1));
-    assert!(!ev.participants[0].victim);
-    assert_eq!(ev.victim_pid, None);
-}
-
-/// MariaDB splits the verdict onto its own entry exactly as MySQL does, so the
-/// participant-less event must survive here too.
-#[test]
-fn mariadb_rollback_verdict_record_is_kept_as_a_participantless_event() {
-    let verdict = obj(json!({
-        "_timestamp": 1_786_166_303_139_800i64,
-        "o2_maria_event": "deadlock",
-        "maria_victim_side": "2",
-    }));
-    let ev = canonicalize_mariadb_deadlock(&verdict).expect("verdict must not be discarded");
-    assert_eq!(ev.engine.as_deref(), Some("mariadb"));
-    assert_eq!(ev.victim_side, Some(2));
-    assert!(ev.participants.is_empty());
-}
-
-/// The whole point of the split-entry finding: the two sides plus the verdict
-/// stitch into ONE event with the right participant flagged.
-#[test]
-fn mariadb_sides_and_verdict_merge_into_one_event() {
-    let s1 = canonicalize_mariadb_deadlock(&obj(json!({
-        "_timestamp": 1_786_166_303_139_783i64,
-        "o2_maria_event": "deadlock",
-        "maria_trx_side": "1", "maria_trx_id": "48", "maria_trx_thread": "14",
-        "maria_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
-    })))
-    .unwrap();
-    let s2 = canonicalize_mariadb_deadlock(&obj(json!({
-        "_timestamp": 1_786_166_303_139_928i64,
-        "o2_maria_event": "deadlock",
-        "maria_trx_side": "2", "maria_trx_id": "47", "maria_trx_thread": "15",
-        "maria_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 12",
-    })))
-    .unwrap();
-    let verdict = canonicalize_mariadb_deadlock(&obj(json!({
-        "_timestamp": 1_786_166_303_139_950i64,
-        "o2_maria_event": "deadlock",
-        "maria_victim_side": "2",
-    })))
-    .unwrap();
-
-    let merged = merge_mysql_deadlocks(vec![s1, s2, verdict], 5_000_000);
-    assert_eq!(merged.len(), 1, "two sides + verdict are ONE deadlock");
-    assert_eq!(
-        merged[0].participants.len(),
-        2,
-        "the verdict is not a participant"
-    );
-    assert_eq!(merged[0].engine.as_deref(), Some("mariadb"));
-    // Side 2 (thread 15) was rolled back, so it — and only it — is the victim.
-    assert_eq!(merged[0].victim_pid, Some(15));
-    let victims: Vec<_> = merged[0]
-        .participants
-        .iter()
-        .filter(|p| p.victim)
-        .map(|p| p.pid)
-        .collect();
-    assert_eq!(
-        victims,
-        vec![Some(15)],
-        "exactly one victim, resolved side→pid"
-    );
-}
-
-/// MariaDB and MySQL deadlocks in the same window MUST NOT stitch together.
-///
-/// This is the fabricated-cross-server-deadlock trap. Both engines default
-/// instance/database to "", so if the engine did not distinguish them, two
-/// unrelated servers' sides would merge into one bogus event.
-#[test]
-fn mariadb_and_mysql_deadlocks_never_merge() {
-    let maria = canonicalize_mariadb_deadlock(&obj(json!({
-        "_timestamp": 1_786_166_303_139_783i64,
-        "o2_maria_event": "deadlock",
-        "maria_trx_side": "1", "maria_trx_id": "48", "maria_trx_thread": "14",
-        "maria_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
-    })))
-    .unwrap();
-    let mysql = canonicalize_mysql_deadlock(&obj(json!({
-        "_timestamp": 1_786_166_303_139_800i64,
-        "o2_my_event": "deadlock",
-        "my_trx_side": "2", "my_trx_id": "4588", "my_trx_thread": "88",
-        "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 12",
-    })))
-    .unwrap();
-
-    let merged = merge_mysql_deadlocks(vec![maria, mysql], 5_000_000);
-    assert_eq!(
-        merged.len(),
-        2,
-        "different engines are different servers — merging them fabricates a deadlock"
-    );
-}
-
-/// The recipe tag is the only thing separating the two servers' blocking rows.
+#[cfg(feature = "enterprise")]
 #[test]
 fn mariadb_blocking_rows_are_not_labelled_mysql() {
     let row = obj(json!({
@@ -491,169 +168,7 @@ fn mariadb_blocking_rows_are_not_labelled_mysql() {
     );
 }
 
-// ─── SQL Server deadlocks ────────────────────────────────────────────────────
-//
-// Fixtures use rows the SHIPPED shred actually returned against the rig — see
-// tests/dbm-server-vantage/captures/mssql-deadlock.xml. Real output was:
-//   spid 93, mssql_is_victim=1, "UPDATE accounts SET balance = balance - 1 WHERE id = 31"
-//   spid 92, mssql_is_victim=0, "UPDATE accounts SET balance = balance - 1 WHERE id = 32"
-
-fn mssql_deadlock_row(spid: &str, victim: &str, query: &str) -> Map<String, Value> {
-    obj(json!({
-        "_timestamp": 1_786_166_303_139_783i64,
-        "o2_recipe": "mssql_deadlock",
-        "mssql_dl_ts": "2026-08-10T09:21:10.8600000",
-        "mssql_spid": spid,
-        "mssql_is_victim": victim,
-        "mssql_lock_mode": "X",
-        "mssql_app": "pymssql=2.3.2",
-        "mssql_user": "sa",
-        "mssql_db": "dbmlab",
-        "mssql_lock_target": "dbmlab.dbo.accounts",
-        "mssql_query": query,
-    }))
-}
-
-/// The collector puts the statement in the RECORD BODY, not in an attribute.
-///
-/// `mssql_query` is the recipe's `body_column` (see `MSSQL_DEADLOG_RECEIVER` in
-/// `web/src/components/ingestion/setupCard/content/dbmShared.ts`), so it is
-/// NEVER one of the `attribute_columns` and the key `mssql_query` does not
-/// exist on the flattened record — the text arrives under `body`.
-///
-/// Measured against the live rig at contrib v0.158.0: `mssql_query` absent on
-/// 22/22 rows, `body` populated on 40/40
-/// (`tests/dbm-server-vantage/captures/`). Every SQL Server deadlock therefore
-/// canonicalized with `query: None` and rendered with no SQL at all.
-///
-/// The sibling `canonicalize_blocking` already reads `["…", "body"]`, and this
-/// same function reads `raw: first_str(rec, &["body"])`, so `body` was provably
-/// reachable the whole time. The pre-existing tests missed it because their
-/// fixture synthesized `mssql_query` as an attribute — a shape the collector
-/// never emits. This fixture is the real one.
-fn mssql_deadlock_row_as_collector_emits_it(
-    spid: &str,
-    victim: &str,
-    query: &str,
-) -> Map<String, Value> {
-    let mut row = mssql_deadlock_row(spid, victim, query);
-    // What the body_column declaration actually produces.
-    row.remove("mssql_query");
-    row.insert("body".into(), json!(query));
-    row
-}
-
-#[test]
-fn mssql_deadlock_reads_the_statement_from_the_body() {
-    let sql = "UPDATE accounts SET balance = balance - 1 WHERE id = 31";
-    let ev = canonicalize_mssql_deadlock(&mssql_deadlock_row_as_collector_emits_it("93", "1", sql))
-        .expect("row canonicalized");
-    let victim = ev
-        .participants
-        .iter()
-        .find(|p| p.victim)
-        .expect("victim participant");
-    assert!(
-        victim.query.is_some(),
-        "the statement is in the body, so a deadlock must not render with no SQL"
-    );
-    assert!(
-        victim.query.as_deref().unwrap().contains("accounts"),
-        "expected the real statement, got {:?}",
-        victim.query
-    );
-}
-
-/// `body` must not DISPLACE the column — order matters, both paths must work.
-///
-/// Reading `body` alone passes the test above, so without this a future edit
-/// could drop the `mssql_query` key entirely and nothing would notice. Any
-/// recipe that projects the statement as a real column must still win over the
-/// body, which for a deadlock row holds the same text today but is the generic
-/// catch-all and carries no such guarantee.
-#[test]
-fn mssql_deadlock_prefers_the_column_over_the_body() {
-    let mut row = mssql_deadlock_row("93", "1", "SELECT 'from-the-column'");
-    row.insert("body".into(), json!("SELECT 'from-the-body'"));
-    let ev = canonicalize_mssql_deadlock(&row).expect("row canonicalized");
-    let victim = ev
-        .participants
-        .iter()
-        .find(|p| p.victim)
-        .expect("victim participant");
-    assert!(
-        victim.query.as_deref().unwrap().contains("from-the-column"),
-        "the projected column must win over the body, got {:?}",
-        victim.query
-    );
-}
-
-/// The victim is resolved INSIDE the row — no stitch, unlike MySQL/MariaDB.
-#[test]
-fn mssql_deadlock_victim_is_resolved_without_stitching() {
-    let ev = canonicalize_mssql_deadlock(&mssql_deadlock_row(
-        "93",
-        "1",
-        "UPDATE accounts SET balance = balance - 1 WHERE id = 31",
-    ))
-    .expect("victim row canonicalized");
-
-    assert_eq!(ev.engine.as_deref(), Some("mssql"));
-    assert_eq!(ev.participants.len(), 1);
-    assert_eq!(ev.participants[0].pid, Some(93));
-    assert!(
-        ev.participants[0].victim,
-        "the graph named this spid inline"
-    );
-    assert_eq!(
-        ev.victim_pid,
-        Some(93),
-        "victim_pid must be set at canonicalization — there is no later pass to fill it"
-    );
-    assert_eq!(
-        ev.victim_side, None,
-        "MSSQL has no side/verdict indirection"
-    );
-    assert_eq!(ev.participants[0].lock_mode.as_deref(), Some("X"));
-    assert_eq!(
-        ev.participants[0].lock_target.as_deref(),
-        Some("dbmlab.dbo.accounts")
-    );
-    assert_eq!(ev.database.as_deref(), Some("dbmlab"));
-}
-
-#[test]
-fn mssql_deadlock_survivor_is_not_flagged() {
-    let ev = canonicalize_mssql_deadlock(&mssql_deadlock_row(
-        "92",
-        "0",
-        "UPDATE accounts SET balance = balance - 1 WHERE id = 32",
-    ))
-    .expect("survivor row canonicalized");
-    assert!(!ev.participants[0].victim);
-    assert_eq!(
-        ev.victim_pid, None,
-        "a survivor row must not claim to be the victim"
-    );
-}
-
-/// Guard against the worst failure mode: a recipe change that stops emitting
-/// "1"/"0" must NOT silently flag every participant as the victim.
-#[test]
-fn mssql_unexpected_victim_flag_does_not_flag_everyone() {
-    for weird in ["true", "yes", "", "2"] {
-        let ev =
-            canonicalize_mssql_deadlock(&mssql_deadlock_row("93", weird, "UPDATE t SET a = 1"))
-                .expect("row canonicalized");
-        assert!(
-            !ev.participants[0].victim,
-            "victim flag must be exactly \"1\"; {weird:?} must not qualify"
-        );
-    }
-}
-
-/// The full ingest entry point must route the recipe tag to the deadlock path,
-/// NOT to `canonicalize_blocking` (which would silently produce a blocking row).
+#[cfg(feature = "enterprise")]
 #[test]
 fn mssql_deadlock_rows_route_to_the_deadlock_path() {
     let rec = canonicalize_record(&mssql_deadlock_row(
@@ -673,47 +188,7 @@ fn mssql_deadlock_rows_route_to_the_deadlock_path() {
     );
 }
 
-// ─── Blocking canonicalization ───────────────────────────────────────────────
-
-#[test]
-fn blocking_sample_canonicalizes_from_the_proof_record() {
-    let s = canonicalize_blocking(&pg_blocking_record()).expect("blocking canonicalized");
-    assert_eq!(s.blocked_pid, Some(1070));
-    assert_eq!(s.blocking_pid, Some(1069));
-    assert_eq!(s.blocked_app.as_deref(), Some("dbm-sv-lock-waiter"));
-    assert_eq!(s.blocking_app.as_deref(), Some("dbm-sv-lock-holder"));
-    assert_eq!(s.wait_event_type.as_deref(), Some("Lock"));
-    assert_eq!(s.wait_event.as_deref(), Some("transactionid"));
-    assert_eq!(s.wait_seconds, Some(4.818));
-    assert!(
-        s.blocking_fingerprint.is_some(),
-        "root blocker SQL must be fingerprinted — that is the pivot to the query view"
-    );
-}
-
-/// A row missing one end of the edge is not a blocking relationship.
-#[test]
-fn blocking_half_row_is_rejected() {
-    let half = obj(json!({
-        "o2_recipe": "pg_blocking_chain",
-        "blocked_pid": "1070",
-    }));
-    assert!(canonicalize_blocking(&half).is_none());
-}
-
-/// The receiver ships every `sqlqueryreceiver` column as TEXT; the canonicalizer
-/// must parse those into real numbers or every downstream comparison breaks.
-#[test]
-fn numeric_columns_parse_from_receiver_strings() {
-    let s = canonicalize_blocking(&pg_blocking_record()).unwrap();
-    assert_eq!(s.blocked_pid, Some(1070), "string pid parsed to i64");
-    assert_eq!(s.wait_seconds, Some(4.818), "string wait parsed to f64");
-}
-
-/// A client-supplied `o2_dbm_*` key must never survive into the canonical columns —
-/// the logs ingest path flattens user keys directly, so without the strip in
-/// `finalize_and_buffer_record` a caller could POST a fabricated deadlock. This test
-/// pins the contract that canonicalization OVERWRITES rather than merges.
+#[cfg(feature = "enterprise")]
 #[test]
 fn client_supplied_canonical_fields_are_overwritten_by_canonicalization() {
     let mut spoofed = pg_deadlock_record();
@@ -733,8 +208,7 @@ fn client_supplied_canonical_fields_are_overwritten_by_canonicalization() {
     );
 }
 
-// ─── Dispatch ────────────────────────────────────────────────────────────────
-
+#[cfg(feature = "enterprise")]
 #[test]
 fn canonicalize_record_dispatches_on_recipe_tags() {
     let dl = canonicalize_record(&pg_deadlock_record()).expect("pg deadlock dispatched");
@@ -751,28 +225,66 @@ fn canonicalize_record_dispatches_on_recipe_tags() {
     assert!(canonicalize_record(&other).is_none());
 }
 
-/// The query shape must be victim-order independent: the proof's Demo 2 shows the
-/// victim ALTERNATING between firings of the same lock-ordering bug. If the shape
-/// key depended on victim order, one bug would split into two half-as-bad rows.
+/// The OSS counterpart of the four dispatch tests above.
+///
+/// The failure this guards is not "OSS lacks the feature" — that is the point of
+/// the split — but the record LEAKING into a neighbouring arm. Every deadlock
+/// marker (`o2_pg_event = "deadlock"`) is also the key the `explain` and
+/// `statement_duration` arms read, and every enterprise recipe tag is read by
+/// the `table_stats` / `index_stats` arms below. If the enterprise-owned records
+/// merely fell through instead of ending dispatch, a deadlock would be
+/// canonicalized as some other kind and stored under a wrong `o2_dbm_kind`.
+/// `None` is the only correct answer, and it is the same answer the enterprise
+/// build's `Claim::ClaimedButUnparsed` produces.
+#[cfg(not(feature = "enterprise"))]
 #[test]
-fn deadlock_query_shape_is_victim_order_independent() {
-    let mut rec_a = pg_deadlock_record();
-    let mut rec_b = pg_deadlock_record();
-    // Firing B: victim and survivor swap sides.
-    rec_b.insert("deadlock_victim_pid".into(), json!("1072"));
-    rec_b.insert("dl_query_1".into(), rec_a["dl_query_2"].clone());
-    rec_b.insert("dl_query_2".into(), rec_a["dl_query_1"].clone());
-    rec_a.insert("o2_pg_event".into(), json!("deadlock"));
+fn enterprise_owned_records_do_not_canonicalize_on_oss() {
+    let mssql = mssql_deadlock_row("93", "1", "UPDATE accounts SET balance = 1 WHERE id = 31");
+    let mut mysql_deadlock = obj(json!({
+        "_timestamp": 1_786_166_303_139_783i64,
+        "o2_my_event": "deadlock",
+        "my_trx_side": "1", "my_trx_id": "4589", "my_trx_thread": "89",
+        "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
+    }));
+    let maria_blocking = obj(json!({
+        "_timestamp": 1_786_166_303_139_783i64,
+        "o2_recipe": "mariadb_lock_waits",
+        "waiting_thread": "14",
+        "blocking_thread": "15",
+        "waiting_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
+        "blocking_query": "UPDATE accounts SET balance = balance + 1 WHERE id = 11",
+        "wait_secs": "3",
+    }));
+    for (name, rec) in [
+        ("pg deadlock", pg_deadlock_record()),
+        ("mysql deadlock", mysql_deadlock.clone()),
+        ("mssql deadlock", mssql),
+        ("pg blocking", pg_blocking_record()),
+        ("mariadb blocking", maria_blocking),
+    ] {
+        assert!(
+            canonicalize_record(&rec).is_none(),
+            "{name} is an Enterprise capability: OSS must canonicalize nothing \
+             rather than let the record fall through to a neighbouring arm"
+        );
+    }
 
-    let a = canonicalize_pg_deadlock(&rec_a).unwrap();
-    let b = canonicalize_pg_deadlock(&rec_b).unwrap();
-    assert_eq!(
-        a.query_shape(),
-        b.query_shape(),
-        "the same lock-ordering bug must group under one shape when the victim alternates"
+    // The strip still runs, so a caller cannot smuggle canonical columns in on
+    // an enterprise-owned record either.
+    mysql_deadlock.insert("o2_dbm_kind".into(), json!("deadlock"));
+    mysql_deadlock.insert("o2_dbm_victim_pid".into(), json!(999_999));
+    server_vantage::apply_to_record(&mut mysql_deadlock);
+    assert!(
+        !mysql_deadlock.contains_key("o2_dbm_kind")
+            && !mysql_deadlock.contains_key("o2_dbm_victim_pid"),
+        "client-supplied canonical columns must be stripped on OSS too — otherwise \
+         the OSS build is the spoofing hole the strip exists to close"
     );
 }
 
+/// The query shape must be victim-order independent: the proof's Demo 2 shows the
+/// victim ALTERNATING between firings of the same lock-ordering bug. If the shape
+/// key depended on victim order, one bug would split into two half-as-bad rows.
 // ─── Deliverable D: cross-path fingerprint equality ─────────────────────────
 
 /// THE correlation guarantee: a statement fingerprinted from a SERVER log record
@@ -838,254 +350,6 @@ fn empty_statement_yields_no_fingerprint() {
     );
 }
 
-// ─── Chain assembly ──────────────────────────────────────────────────────────
-
-fn sample(blocked: i64, blocking: i64, wait: f64) -> BlockingSample {
-    BlockingSample {
-        engine: Some("postgresql".into()),
-        instance: Some("db1".into()),
-        database: Some("dbmlab".into()),
-        timestamp: Some(1_000),
-        blocked_pid: Some(blocked),
-        blocked_app: Some(format!("app-{blocked}")),
-        blocked_query: Some(format!("SELECT {blocked}")),
-        blocked_fingerprint: Some(format!("fp{blocked}")),
-        blocking_pid: Some(blocking),
-        blocking_app: Some(format!("app-{blocking}")),
-        blocking_query: Some(format!("UPDATE {blocking}")),
-        blocking_fingerprint: Some(format!("fp{blocking}")),
-        wait_event_type: Some("Lock".into()),
-        wait_event: Some("transactionid".into()),
-        wait_seconds: Some(wait),
-        raw: None,
-    }
-}
-
-#[test]
-fn chain_single_edge_roots_at_the_blocker() {
-    let chains = assemble_chains(&[sample(1070, 1069, 4.8)]);
-    assert_eq!(chains.len(), 1);
-    let c = &chains[0];
-    assert_eq!(c.root.pid, 1069, "the holder is the root blocker");
-    assert_eq!(c.blocked_count, 1);
-    assert_eq!(c.depth, 1);
-    assert!(!c.cyclic);
-    assert_eq!(c.max_wait_seconds, 4.8);
-    assert_eq!(c.root.children.len(), 1);
-    assert_eq!(c.root.children[0].pid, 1070);
-}
-
-/// The case the proof explicitly leaves to us: `A→B→C` is ONE chain rooted at C,
-/// not three unrelated pairs. This is what makes "kill the root blocker" possible.
-#[test]
-fn chain_multi_level_forms_one_tree_with_the_true_root() {
-    // 3 waits on 2, 2 waits on 1, 1 blocks but waits for nobody.
-    let chains = assemble_chains(&[sample(3, 2, 5.0), sample(2, 1, 9.0)]);
-    assert_eq!(chains.len(), 1, "one tree, not two pairs");
-    let c = &chains[0];
-    assert_eq!(c.root.pid, 1, "root blocker is the session nobody blocks");
-    assert_eq!(c.blocked_count, 2, "both 2 and 3 are blocked by the root");
-    assert_eq!(c.depth, 2);
-    assert_eq!(c.max_wait_seconds, 9.0);
-
-    let mid = &c.root.children[0];
-    assert_eq!(mid.pid, 2);
-    assert_eq!(mid.depth, 1);
-    assert_eq!(mid.children[0].pid, 3);
-    assert_eq!(mid.children[0].depth, 2);
-}
-
-#[test]
-fn chain_deep_five_level_keeps_a_single_root() {
-    let chains = assemble_chains(&[
-        sample(5, 4, 1.0),
-        sample(4, 3, 2.0),
-        sample(3, 2, 3.0),
-        sample(2, 1, 4.0),
-    ]);
-    assert_eq!(chains.len(), 1);
-    assert_eq!(chains[0].root.pid, 1);
-    assert_eq!(chains[0].depth, 4);
-    assert_eq!(chains[0].blocked_count, 4);
-}
-
-/// A cycle (a deadlock sampled BEFORE the engine aborted a victim) has no root.
-/// A naive walk loops forever; assembly must terminate, flag it, and pick a
-/// deterministic root.
-#[test]
-fn chain_cycle_terminates_and_is_flagged() {
-    let chains = assemble_chains(&[sample(1, 2, 3.0), sample(2, 1, 4.0)]);
-    assert_eq!(chains.len(), 1);
-    let c = &chains[0];
-    assert!(c.cyclic, "A→B→A must be reported as cyclic");
-    assert_eq!(
-        c.root.pid, 1,
-        "cycle roots at the LOWEST pid, deterministically"
-    );
-    assert_eq!(c.blocked_count, 1);
-}
-
-#[test]
-fn chain_three_way_cycle_terminates() {
-    // The 3-way cycle the proof observed during rig calibration (181→179→180→181).
-    let chains = assemble_chains(&[
-        sample(181, 179, 1.0),
-        sample(179, 180, 2.0),
-        sample(180, 181, 3.0),
-    ]);
-    assert_eq!(chains.len(), 1);
-    assert!(chains[0].cyclic);
-    assert_eq!(chains[0].root.pid, 179, "lowest pid in the cycle");
-    // Every member appears exactly once.
-    assert_eq!(chains[0].blocked_count, 2);
-}
-
-/// `pg_blocking_pids()` can return a self-block in lock-type corner cases. It
-/// carries no information and would form a degenerate 1-cycle.
-#[test]
-fn chain_self_block_is_dropped() {
-    assert!(assemble_chains(&[sample(7, 7, 1.0)]).is_empty());
-}
-
-#[test]
-fn chain_self_block_does_not_corrupt_a_real_chain() {
-    let chains = assemble_chains(&[sample(7, 7, 1.0), sample(2, 1, 3.0)]);
-    assert_eq!(chains.len(), 1);
-    assert_eq!(chains[0].root.pid, 1);
-    assert_eq!(chains[0].blocked_count, 1);
-}
-
-/// The blocker is usually NOT itself a blocked row — it is just holding a lock and
-/// running fine, so it has no sample of its own. It must still appear as the root.
-#[test]
-fn chain_orphan_blocker_still_becomes_a_root() {
-    let chains = assemble_chains(&[sample(100, 999, 2.0)]);
-    assert_eq!(chains.len(), 1);
-    assert_eq!(chains[0].root.pid, 999);
-    // The root waits for nobody.
-    assert_eq!(chains[0].root.wait_seconds, None);
-    assert_eq!(
-        chains[0].root.app.as_deref(),
-        Some("app-999"),
-        "root identity comes from the blocking_* side of the edge"
-    );
-}
-
-/// One blocker, many victims — one tree with many children, deterministically
-/// ordered (longest wait first) so the API response is stable across calls.
-#[test]
-fn chain_fanout_orders_children_by_wait_desc() {
-    let chains = assemble_chains(&[sample(10, 1, 1.0), sample(11, 1, 9.0), sample(12, 1, 5.0)]);
-    assert_eq!(chains.len(), 1);
-    let kids: Vec<i64> = chains[0].root.children.iter().map(|c| c.pid).collect();
-    assert_eq!(kids, vec![11, 12, 10], "longest wait first");
-    assert_eq!(chains[0].blocked_count, 3);
-    assert_eq!(chains[0].depth, 1);
-}
-
-/// Equal waits must still order deterministically (by pid) — otherwise the UI
-/// reshuffles rows between identical requests.
-#[test]
-fn chain_ties_break_by_pid_deterministically() {
-    let chains = assemble_chains(&[sample(30, 1, 2.0), sample(20, 1, 2.0), sample(25, 1, 2.0)]);
-    let kids: Vec<i64> = chains[0].root.children.iter().map(|c| c.pid).collect();
-    assert_eq!(kids, vec![20, 25, 30]);
-}
-
-/// A session reported with several direct blockers must land in exactly ONE tree
-/// (the longest-waiting edge wins) — otherwise totals double-count it.
-#[test]
-fn chain_multiple_direct_blockers_pick_the_longest_wait() {
-    let chains = assemble_chains(&[sample(5, 1, 2.0), sample(5, 2, 8.0)]);
-    // Two roots (1 and 2), but 5 hangs off only the 8.0-second edge.
-    let with_child: Vec<&_> = chains.iter().filter(|c| c.blocked_count > 0).collect();
-    assert_eq!(with_child.len(), 1, "pid 5 belongs to exactly one tree");
-    assert_eq!(with_child[0].root.pid, 2);
-    assert_eq!(with_child[0].max_wait_seconds, 8.0);
-}
-
-/// Pids are only comparable within one server. Mixing instances would fabricate
-/// chains between unrelated databases.
-#[test]
-fn chain_does_not_span_instances() {
-    let mut a = sample(2, 1, 5.0);
-    a.instance = Some("db-a".into());
-    let mut b = sample(3, 2, 5.0);
-    b.instance = Some("db-b".into());
-
-    let chains = assemble_chains(&[a, b]);
-    assert_eq!(chains.len(), 2, "one chain per instance, never joined");
-    for c in &chains {
-        assert_eq!(c.depth, 1, "no cross-instance transitive link");
-    }
-}
-
-#[test]
-fn chain_empty_input_yields_no_chains() {
-    assert!(assemble_chains(&[]).is_empty());
-}
-
-/// Two independent trees rank worst-wait-first so the UI's top row is the worst
-/// incident.
-#[test]
-fn chains_sort_by_severity() {
-    let chains = assemble_chains(&[sample(2, 1, 1.0), sample(20, 10, 30.0)]);
-    assert_eq!(chains.len(), 2);
-    assert_eq!(chains[0].root.pid, 10, "worst wait first");
-    assert_eq!(chains[0].max_wait_seconds, 30.0);
-}
-
-/// Round-trip: canonical record → stored JSON → sample → chain. This is exactly
-/// the path the read endpoint takes, so a serialization mismatch surfaces here.
-#[test]
-fn blocking_record_round_trips_into_chain_assembly() {
-    let s = canonicalize_blocking(&pg_blocking_record()).unwrap();
-    let stored = Value::Object(s.to_record().into_iter().collect());
-    let back = BlockingSample::from_record(&stored).expect("round-tripped");
-
-    assert_eq!(back.blocked_pid, Some(1070));
-    assert_eq!(back.blocking_pid, Some(1069));
-    assert_eq!(back.wait_seconds, Some(4.818));
-
-    let chains = assemble_chains(&[back]);
-    assert_eq!(chains.len(), 1);
-    assert_eq!(chains[0].root.pid, 1069);
-}
-
-#[test]
-fn participant_round_trips_through_json() {
-    let p = Participant {
-        pid: Some(1071),
-        app: Some("dbm-sv-deadlock-a".into()),
-        user: Some("dbm".into()),
-        query: Some("UPDATE accounts SET balance = balance - 1 WHERE id = 2".into()),
-        query_norm: Some("UPDATE accounts SET balance = balance - ? WHERE id = ?".into()),
-        fingerprint: Some("6d5a42124a5b5bc8".into()),
-        lock_mode: Some("ShareLock".into()),
-        lock_target: Some("transaction 1430".into()),
-        transaction_id: Some("1429".into()),
-        victim: true,
-        // Postgres names its victim inline — no side correlation needed.
-        side: None,
-    };
-    let back = Participant::from_json(
-        &serde_json::to_value(json!({
-            "pid": 1071,
-            "app": "dbm-sv-deadlock-a",
-            "user": "dbm",
-            "query": "UPDATE accounts SET balance = balance - 1 WHERE id = 2",
-            "query_norm": "UPDATE accounts SET balance = balance - ? WHERE id = ?",
-            "fingerprint": "6d5a42124a5b5bc8",
-            "lock_mode": "ShareLock",
-            "lock_target": "transaction 1430",
-            "transaction_id": "1429",
-            "victim": true,
-        }))
-        .unwrap(),
-    );
-    assert_eq!(p, back);
-}
-
 // ─── Ingest wiring (regression: the OTLP path was never canonicalized) ────────
 
 /// EVERY logs ingest path must call [`server_vantage::apply_to_record`].
@@ -1126,6 +390,11 @@ fn every_logs_ingest_path_applies_canonicalization() {
 /// silently discarded every log shipped alongside it. Canonicalization runs AFTER flattening (it
 /// must — it reads the flattened receiver fields), so nothing downstream will flatten a nested
 /// value we emit here. `o2_dbm_participants` is therefore a JSON string.
+///
+/// Both fixtures are enterprise-owned, so this runs on the enterprise build.
+/// The scalar invariant itself is `config`-wide; the enterprise suite carries
+/// its own writers' half.
+#[cfg(feature = "enterprise")]
 #[test]
 fn canonical_record_contains_only_scalars() {
     for rec in [
@@ -1144,6 +413,7 @@ fn canonical_record_contains_only_scalars() {
 
 /// The JSON-string storage form must round-trip back to real participants, and a legacy row
 /// carrying a genuine array must still parse.
+#[cfg(feature = "enterprise")]
 #[test]
 fn participants_round_trip_from_both_storage_forms() {
     let rec = canonicalize_record(&pg_deadlock_record()).expect("deadlock");
@@ -1167,40 +437,15 @@ fn participants_round_trip_from_both_storage_forms() {
     assert_eq!(from_array[0].fingerprint.as_deref(), Some("abc"));
 }
 
-/// A blocking sample must know its engine.
-///
-/// `sqlqueryreceiver` rows contain ONLY the columns the recipe selects — no `pg_*`/`my_*` field
-/// and no `db_system` — so engine detection has to fall back to the recipe tag. Observed live:
-/// every blocking row landed with `o2_dbm_engine = null`, which silently made the `?system=`
-/// filter on `/blocking` match nothing.
-#[test]
-fn blocking_engine_is_derived_from_the_recipe_tag() {
-    let pg = canonicalize_blocking(&pg_blocking_record()).expect("pg blocking");
-    assert_eq!(
-        pg.engine.as_deref(),
-        Some("postgresql"),
-        "pg_blocking_chain rows must resolve to postgresql"
-    );
-
-    let mut my = pg_blocking_record();
-    my.insert("o2_recipe".into(), json!("mysql_lock_waits"));
-    let my = canonicalize_blocking(&my).expect("mysql blocking");
-    assert_eq!(my.engine.as_deref(), Some("mysql"));
-
-    let mut ms = pg_blocking_record();
-    ms.insert("o2_recipe".into(), json!("mssql_blocking_chain"));
-    let ms = canonicalize_blocking(&ms).expect("mssql blocking");
-    assert_eq!(ms.engine.as_deref(), Some("mssql"));
-}
-
 /// SQL Server blocking must survive the full ingest entry point, not just the
 /// blocking canonicalizer.
 ///
 /// `canonicalize_record` dispatches on the recipe tag, so an engine can pass
 /// `canonicalize_blocking` in isolation and still be dropped at ingest if its
-/// tag is missing from that match arm — which is exactly the shape of bug this
-/// asserts against. Note this covers BLOCKING only: SQL Server deadlocks arrive
-/// as an XML deadlock graph and have no parser yet.
+/// tag is missing from the hook's match arm — which is exactly the shape of bug
+/// this asserts against, and the shape the repo split makes MORE likely, not
+/// less: the tag list and the dispatcher now live in different crates.
+#[cfg(feature = "enterprise")]
 #[test]
 fn mssql_blocking_survives_the_ingest_entry_point() {
     let mut ms = pg_blocking_record();
@@ -1781,7 +1026,8 @@ fn the_strip_prescan_covers_every_reserved_field() {
 
 /// The no-regression guarantee must hold for the DBM records that DO canonicalize
 /// today: the deadlock path must not gain an `o2_event_name` column just because
-/// W1 exists.
+/// W1 exists. Enterprise-only, since deadlocks canonicalize only there now.
+#[cfg(feature = "enterprise")]
 #[test]
 fn existing_deadlock_canonicalization_gains_no_event_name_column() {
     let mut rec = pg_deadlock_record();
@@ -2968,18 +2214,35 @@ fn top_query_does_not_become_an_activity_record() {
 /// shadowed the deadlock/blocking tags would silently break shipped pages.
 #[test]
 fn activity_dispatch_does_not_capture_the_existing_kinds() {
-    assert_eq!(
-        canonicalize_record(&pg_deadlock_record())
-            .expect("deadlock")
-            .get(server_vantage::O2_DBM_KIND),
-        Some(&json!("deadlock"))
-    );
-    assert_eq!(
-        canonicalize_record(&pg_blocking_record())
-            .expect("blocking")
-            .get(server_vantage::O2_DBM_KIND),
-        Some(&json!("blocking"))
-    );
+    // Deadlocks and blocking are enterprise-owned. On OSS the property still
+    // holds in its meaningful form — the activity arm must not CLAIM those
+    // records — but the correct outcome there is `None`, not a deadlock row.
+    #[cfg(feature = "enterprise")]
+    {
+        assert_eq!(
+            canonicalize_record(&pg_deadlock_record())
+                .expect("deadlock")
+                .get(server_vantage::O2_DBM_KIND),
+            Some(&json!("deadlock"))
+        );
+        assert_eq!(
+            canonicalize_record(&pg_blocking_record())
+                .expect("blocking")
+                .get(server_vantage::O2_DBM_KIND),
+            Some(&json!("blocking"))
+        );
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        assert!(
+            canonicalize_record(&pg_deadlock_record()).is_none(),
+            "an enterprise-owned deadlock must not be swept up by the activity arm"
+        );
+        assert!(
+            canonicalize_record(&pg_blocking_record()).is_none(),
+            "an enterprise-owned blocking row must not be swept up by the activity arm"
+        );
+    }
     // Without this the test passes while the activity arm does not exist at all.
     assert_eq!(
         dispatch_activity(&with_event_name(pg_query_sample_unblocked()))
@@ -3401,18 +2664,10 @@ fn every_column_any_writer_emits_is_reserved() {
                 .to_record(),
         ));
     }
-    records.push((
-        "deadlock",
-        canonicalize_pg_deadlock(&pg_deadlock_record())
-            .expect("deadlock fixture must canonicalize")
-            .to_record(),
-    ));
-    records.push((
-        "blocking",
-        canonicalize_blocking(&pg_blocking_record())
-            .expect("blocking fixture must canonicalize")
-            .to_record(),
-    ));
+    // The deadlock and blocking writers moved to `o2_enterprise`; their half of
+    // this walk moved with them (`all_enterprise_columns_are_reserved`).
+    // `ALL_DBM_FIELDS` lives in `config` and stays ONE array covering both — the
+    // reservation is shared, only the writers split.
     for fixture in [
         pg_table_stats_record(),
         pg_table_stats_bloated_record(),
@@ -3451,6 +2706,20 @@ fn every_column_any_writer_emits_is_reserved() {
             .expect("statement-duration fixture must canonicalize")
             .to_record(),
     ));
+
+    // Iterating "whatever the writers emit" is satisfied by a walk that emits
+    // NOTHING, so the population is pinned. 5 activity + 2 top_query +
+    // 4 table_stats + 4 index_stats + explain + statement = 17. The deadlock and
+    // blocking fixtures left for `o2_enterprise`; table/index stats follow in
+    // Task 4, at which point this drops to 9. If this fails LOW, a fixture was
+    // dropped — restore it rather than lowering the number.
+    assert_eq!(
+        records.len(),
+        17,
+        "OSS must walk exactly its own 17 writers' fixtures; the 2 enterprise \
+         fixtures (deadlock, blocking) are covered by the o2-enterprise suite. \
+         A silently shrinking walk would still go green."
+    );
 
     for (kind, rec) in &records {
         for key in rec.keys() {
@@ -3531,9 +2800,13 @@ fn the_activity_dispatch_arm_consults_the_config_knob() {
     let gate = body
         .find("activity_enabled")
         .expect("checked immediately above");
+    // The deadlock and blocking canonicalizers moved to `o2_enterprise`, so the
+    // anchor is now the HOOK that replaced them at the identical position. The
+    // property is unchanged: the activity gate must sit BELOW the arms that
+    // already shipped, or turning activity off silently disables them too.
     let deadlock = body
-        .find("canonicalize_pg_deadlock")
-        .expect("the deadlock arm must still exist");
+        .find("claim_deadlock_markers")
+        .expect("the enterprise deadlock hook must still sit in the dispatcher");
     assert!(
         gate > deadlock,
         "the activity gate must come AFTER the deadlock/blocking arms, or turning \
@@ -3541,15 +2814,20 @@ fn the_activity_dispatch_arm_consults_the_config_knob() {
     );
 
     // And behaviourally, under the shipped default (activity OFF), the two
-    // pre-existing kinds must still canonicalize.
-    assert!(
-        canonicalize_record(&pg_deadlock_record()).is_some(),
-        "deadlock ingest must be unaffected by the activity knob"
-    );
-    assert!(
-        canonicalize_record(&pg_blocking_record()).is_some(),
-        "blocking ingest must be unaffected by the activity knob"
-    );
+    // pre-existing kinds must still canonicalize. Enterprise-only: on OSS those
+    // two kinds are not canonicalized at all, which the OSS-side
+    // `enterprise_owned_records_do_not_canonicalize_on_oss` pins instead.
+    #[cfg(feature = "enterprise")]
+    {
+        assert!(
+            canonicalize_record(&pg_deadlock_record()).is_some(),
+            "deadlock ingest must be unaffected by the activity knob"
+        );
+        assert!(
+            canonicalize_record(&pg_blocking_record()).is_some(),
+            "blocking ingest must be unaffected by the activity knob"
+        );
+    }
 }
 
 /// **The instance must resolve, or `?instance=` filters nothing.**
@@ -4921,7 +4199,11 @@ fn top_query_dispatch_is_gated_off_by_default() {
 #[test]
 fn each_record_kind_reaches_its_own_arm() {
     with_top_query_enabled(|| {
-        for (name, rec, expected) in [
+        // The two enterprise kinds are in the table only on an enterprise build;
+        // on OSS they canonicalize to nothing at all, which
+        // `enterprise_owned_records_do_not_canonicalize_on_oss` pins.
+        #[cfg(feature = "enterprise")]
+        let enterprise_kinds = [
             (
                 "pg deadlock",
                 pg_deadlock_record(),
@@ -4932,6 +4214,11 @@ fn each_record_kind_reaches_its_own_arm() {
                 pg_blocking_record(),
                 server_vantage::KIND_BLOCKING,
             ),
+        ];
+        #[cfg(not(feature = "enterprise"))]
+        let enterprise_kinds: [(&str, Map<String, Value>, &str); 0] = [];
+
+        for (name, rec, expected) in enterprise_kinds.into_iter().chain([
             (
                 "pg top_query",
                 pg_top_query(),
@@ -4942,7 +4229,7 @@ fn each_record_kind_reaches_its_own_arm() {
                 mysql_top_query_with_event_name(),
                 server_vantage::KIND_TOP_QUERY,
             ),
-        ] {
+        ]) {
             let out =
                 canonicalize_record(&rec).unwrap_or_else(|| panic!("{name} must canonicalize"));
             assert_eq!(
@@ -5928,11 +5215,21 @@ fn caller_supplied_table_columns_are_stripped() {
 /// return early on a tag that overlaps.
 #[test]
 fn adding_table_stats_leaves_the_other_recipes_dispatching() {
-    let dl = canonicalize_record(&pg_deadlock_record()).expect("pg deadlock still dispatches");
-    assert_eq!(dl.get("o2_dbm_kind").unwrap(), &json!("deadlock"));
+    // Deadlocks and blocking are enterprise-owned; on OSS the coexistence
+    // property is that they stay OUT of the arms under test, which is `None`.
+    #[cfg(feature = "enterprise")]
+    {
+        let dl = canonicalize_record(&pg_deadlock_record()).expect("pg deadlock still dispatches");
+        assert_eq!(dl.get("o2_dbm_kind").unwrap(), &json!("deadlock"));
 
-    let bl = canonicalize_record(&pg_blocking_record()).expect("blocking still dispatches");
-    assert_eq!(bl.get("o2_dbm_kind").unwrap(), &json!("blocking"));
+        let bl = canonicalize_record(&pg_blocking_record()).expect("blocking still dispatches");
+        assert_eq!(bl.get("o2_dbm_kind").unwrap(), &json!("blocking"));
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        assert!(canonicalize_record(&pg_deadlock_record()).is_none());
+        assert!(canonicalize_record(&pg_blocking_record()).is_none());
+    }
 
     // A recipe we still do not consume stays unconsumed rather than falling into
     // the table arm.
@@ -6752,11 +6049,21 @@ fn mariadb_index_stats_leaves_absent_idx_scan_absent() {
 /// recipes_dispatching`.
 #[test]
 fn adding_the_engine_twins_leaves_the_others_dispatching() {
-    let dl = canonicalize_record(&pg_deadlock_record()).expect("pg deadlock still dispatches");
-    assert_eq!(dl.get("o2_dbm_kind").unwrap(), &json!("deadlock"));
+    // Deadlocks and blocking are enterprise-owned; on OSS the coexistence
+    // property is that they stay OUT of the arms under test, which is `None`.
+    #[cfg(feature = "enterprise")]
+    {
+        let dl = canonicalize_record(&pg_deadlock_record()).expect("pg deadlock still dispatches");
+        assert_eq!(dl.get("o2_dbm_kind").unwrap(), &json!("deadlock"));
 
-    let bl = canonicalize_record(&pg_blocking_record()).expect("blocking still dispatches");
-    assert_eq!(bl.get("o2_dbm_kind").unwrap(), &json!("blocking"));
+        let bl = canonicalize_record(&pg_blocking_record()).expect("blocking still dispatches");
+        assert_eq!(bl.get("o2_dbm_kind").unwrap(), &json!("blocking"));
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        assert!(canonicalize_record(&pg_deadlock_record()).is_none());
+        assert!(canonicalize_record(&pg_blocking_record()).is_none());
+    }
 
     let pg_tbl =
         canonicalize_record(&pg_table_stats_record()).expect("pg table stats still dispatches");

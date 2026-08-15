@@ -78,6 +78,20 @@ use std::collections::BTreeMap;
 // shadow globs — so `RESERVED_DBM_PREFIX`, `WarnDecision` and friends below are
 // unaffected.
 pub use config::meta::db_monitoring::*;
+/// Deadlocks and blocking are ENTERPRISE capabilities; their canonicalizers and
+/// types live in `o2_enterprise::enterprise::db_monitoring`. Re-exported at
+/// their original `server_vantage::` paths so the existing `api.rs` call sites
+/// resolve unchanged on an enterprise build. On OSS these names do not exist and
+/// every use of them is `cfg`-gated off.
+#[cfg(feature = "enterprise")]
+pub use o2_enterprise::enterprise::db_monitoring::{
+    blocking::{BlockingSample, canonicalize_blocking},
+    deadlock::{
+        DeadlockEvent, Participant, canonicalize_mariadb_deadlock, canonicalize_mssql_deadlock,
+        canonicalize_mysql_deadlock, canonicalize_pg_deadlock, merge_mysql_deadlocks,
+        participants_of,
+    },
+};
 use serde_json::{Map, Value, json};
 
 // ─── OTLP event name (W1) ────────────────────────────────────────────────────
@@ -463,641 +477,26 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
 
 // ─── Canonical structures ────────────────────────────────────────────────────
 
-/// One side of a deadlock cycle.
-///
-/// `fingerprint`/`query_norm` are computed with the SAME normalizer the span enrichment uses,
-/// so a participant JOINs to `o2_db_fingerprint` on client spans (proof §2.6: both vantages
-/// normalize a statement to byte-identical text).
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct Participant {
-    /// Backend pid (Postgres) or MySQL thread id.
-    pub pid: Option<i64>,
-    /// Client `application_name` — the pivot back to a service in the trace store.
-    pub app: Option<String>,
-    pub user: Option<String>,
-    /// Raw statement text as the engine logged it.
-    pub query: Option<String>,
-    /// Normalized (literal-free) statement text.
-    pub query_norm: Option<String>,
-    /// Cross-vantage join key — identical to the span path's `o2_db_fingerprint`.
-    pub fingerprint: Option<String>,
-    /// e.g. `ShareLock`, `lock_mode X`.
-    pub lock_mode: Option<String>,
-    /// e.g. `transaction 1430`, `test/accounts`.
-    pub lock_target: Option<String>,
-    /// Engine transaction id, when the engine reports one.
-    pub transaction_id: Option<String>,
-    /// True for the participant the engine rolled back.
-    pub victim: bool,
-    /// MySQL side number (`*** (N) TRANSACTION:`), the join key for the
-    /// separately-logged rollback verdict.
-    ///
-    /// SERIALIZED, because the join happens at READ time: ingest canonicalizes
-    /// one record at a time, so a side and the verdict naming it are written as
-    /// different rows and only meet when the reader stitches them. Always
-    /// `None` on Postgres, which names its victim inline.
-    pub side: Option<i64>,
-}
-
-impl Participant {
-    fn to_json(&self) -> Value {
-        json!({
-            "pid": self.pid,
-            "app": self.app,
-            "user": self.user,
-            "query": self.query,
-            "query_norm": self.query_norm,
-            "fingerprint": self.fingerprint,
-            "lock_mode": self.lock_mode,
-            "lock_target": self.lock_target,
-            "transaction_id": self.transaction_id,
-            "victim": self.victim,
-            // The join key for MySQL's separately-logged verdict — stored
-            // because read-time stitching is where the join happens.
-            "side": self.side,
-        })
-    }
-
-    /// Rebuild from the stored JSON shape (the read path's inverse of [`to_json`]).
-    pub fn from_json(v: &Value) -> Self {
-        Participant {
-            pid: v.get("pid").and_then(|x| x.as_i64()),
-            app: str_field(v, "app"),
-            user: str_field(v, "user"),
-            query: str_field(v, "query"),
-            query_norm: str_field(v, "query_norm"),
-            fingerprint: str_field(v, "fingerprint"),
-            lock_mode: str_field(v, "lock_mode"),
-            lock_target: str_field(v, "lock_target"),
-            transaction_id: str_field(v, "transaction_id"),
-            victim: v.get("victim").and_then(|x| x.as_bool()).unwrap_or(false),
-            side: v.get("side").and_then(|x| x.as_i64()),
-        }
-    }
-}
-
-fn str_field(v: &Value, key: &str) -> Option<String> {
-    v.get(key)
-        .and_then(|x| x.as_str())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-}
-
-/// A canonicalized deadlock event.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct DeadlockEvent {
-    pub engine: Option<String>,
-    pub database: Option<String>,
-    pub instance: Option<String>,
-    pub timestamp: Option<i64>,
-    pub victim_pid: Option<i64>,
-    pub participants: Vec<Participant>,
-    pub raw: Option<String>,
-    /// MySQL only: the side number InnoDB rolled back, from
-    /// `*** WE ROLL BACK TRANSACTION (N)`.
-    ///
-    /// InnoDB logs that verdict as its OWN entry, separate from the per-side
-    /// `*** (N) TRANSACTION:` blocks, so it arrives as an event carrying only
-    /// this field and no participants. `merge_mysql_deadlocks` joins it to the
-    /// sides on `Participant::side` once the group is complete.
-    pub victim_side: Option<i64>,
-}
-
-/// A canonicalized blocking sample (one blocked→blocking edge at one poll).
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct BlockingSample {
-    pub engine: Option<String>,
-    pub database: Option<String>,
-    pub instance: Option<String>,
-    pub timestamp: Option<i64>,
-    pub blocked_pid: Option<i64>,
-    pub blocked_app: Option<String>,
-    pub blocked_query: Option<String>,
-    pub blocked_fingerprint: Option<String>,
-    pub blocking_pid: Option<i64>,
-    pub blocking_app: Option<String>,
-    pub blocking_query: Option<String>,
-    pub blocking_fingerprint: Option<String>,
-    pub wait_event_type: Option<String>,
-    pub wait_event: Option<String>,
-    pub wait_seconds: Option<f64>,
-    pub raw: Option<String>,
-}
-
 // ─── Receiver-field aliases (the ONLY place vendor names appear) ─────────────
 
 // ─── Query fingerprinting (Deliverable D — the cross-vantage join) ───────────
 
 // ─── Canonicalization entry points ───────────────────────────────────────────
-
-/// Canonicalize a Postgres deadlock `DETAIL:` record (the entry that carries the wait cycle and
-/// every participant's SQL) into a [`DeadlockEvent`].
-///
-/// **The multi-line trap** (proof §5.4): Postgres emits the `ERROR: deadlock detected` banner and
-/// the `DETAIL:` block as two separate entries. A pipeline matching only "deadlock detected"
-/// captures a banner with NO participants. This function therefore accepts the DETAIL-shaped
-/// record (`dl_*` fields populated) and treats a participant-less record as a banner to skip.
-pub fn canonicalize_pg_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEvent> {
-    let engine = detect_engine(rec).or_else(|| Some("postgresql".to_string()));
-    // Invariant 1 (module docs): canonical `o2_dbm_*` names are outputs, never
-    // input aliases — derivation reads receiver fields only.
-    let victim_pid = first_i64(rec, &["deadlock_victim_pid", "pg_pid"]);
-
-    // The two edges of the wait cycle, as the filelog operators captured them.
-    let edges: [(&str, &str, &str, &str); 2] = [
-        ("dl_waiter_pid", "dl_lock_mode", "dl_lock_target", "dl_p1"),
-        (
-            "dl_waiter2_pid",
-            "dl_lock_mode2",
-            "dl_lock_target2",
-            "dl_p2",
-        ),
-    ];
-    let queries = ["dl_query_1", "dl_query_2"];
-
-    let mut participants: Vec<Participant> = Vec::new();
-    for (i, (pid_key, mode_key, target_key, stmt_pid_key)) in edges.iter().enumerate() {
-        let pid = first_i64(rec, &[pid_key]);
-        // `dl_query_N` is attributed to `dl_pN` when the operators captured the statement pid;
-        // otherwise it falls back to positional order, which is how the DETAIL block prints.
-        let stmt_pid = first_i64(rec, &[stmt_pid_key]).or(pid);
-        let query = first_str(rec, &[queries[i]]);
-        if pid.is_none() && query.is_none() {
-            continue;
-        }
-        let (query_norm, fingerprint) = query
-            .as_deref()
-            .map(|q| fingerprint_statement(q, engine.as_deref()))
-            .unwrap_or((None, None));
-        participants.push(Participant {
-            pid: pid.or(stmt_pid),
-            app: first_str(rec, &["pg_app"]).filter(|_| i == 0),
-            user: first_str(rec, &["pg_user"]).filter(|_| i == 0),
-            query,
-            query_norm,
-            fingerprint,
-            lock_mode: first_str(rec, &[mode_key]),
-            lock_target: first_str(rec, &[target_key]),
-            transaction_id: first_str(rec, &["pg_txid"]).filter(|_| i == 0),
-            victim: pid.is_some() && pid == victim_pid,
-            // Postgres names its victim inline on the DETAIL entry, so it needs
-            // no cross-record side correlation.
-            side: None,
-        });
-    }
-
-    // A banner-only entry (no wait cycle, no SQL) is NOT a deadlock event — it is the trap.
-    if participants.is_empty() {
-        return None;
-    }
-
-    Some(DeadlockEvent {
-        engine,
-        database: detect_database(rec),
-        instance: detect_instance(rec),
-        timestamp: detect_timestamp(rec),
-        victim_pid,
-        participants,
-        raw: first_str(rec, &["o2_deadlock_raw", "body", "pg_message"]),
-        // Postgres names its victim pid inline on the DETAIL entry, so there is
-        // no side number to correlate across records.
-        victim_side: None,
-    })
-}
-
-/// Canonicalize ONE MySQL `*** (N) TRANSACTION:` entry into a single-participant
-/// [`DeadlockEvent`].
-///
-/// MySQL 8.4 splits a deadlock across a `MY-012468` banner plus one `MY-012469` entry per
-/// participant, so each entry yields one participant; [`merge_mysql_deadlocks`] stitches the
-/// sides back together by timestamp proximity.
-pub fn canonicalize_mysql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEvent> {
-    canonicalize_innodb_deadlock(rec, "mysql", "my")
-}
-
-/// MariaDB deadlocks — the SAME InnoDB record shape as MySQL, under a different
-/// field prefix.
-///
-/// MariaDB prints the whole deadlock inside one clock second, but every physical
-/// line carries its own timestamp, so `filelog` still cuts it into separate
-/// entries: side 1, side 2 and the `WE ROLL BACK TRANSACTION (N)` verdict each
-/// arrive as their own record. That is exactly MySQL's N+1 shape, so MariaDB owes
-/// the same read-time stitch and this delegates to the shared implementation.
-/// Verified against a real capture in `tests/dbm-server-vantage/captures/`.
-pub fn canonicalize_mariadb_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEvent> {
-    canonicalize_innodb_deadlock(rec, "mariadb", "maria")
-}
-
-/// SQL Server deadlocks, from the T-SQL-shredded `system_health` graph.
-///
-/// ONE ROW PER PARTICIPANT, victim already resolved. SQL Server names its victim
-/// inline in the same XML document, so the recipe decides `mssql_is_victim` at
-/// query time and there is no cross-record verdict to stitch — unlike MySQL and
-/// MariaDB. Each row is therefore a complete single-participant event that
-/// `merge_mysql_deadlocks` must NOT touch; the sides of one deadlock are joined
-/// by their shared `mssql_dl_ts`, which the shred copies onto every row.
-pub fn canonicalize_mssql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEvent> {
-    let spid = first_i64(rec, &["mssql_spid"]);
-    // `body` is not a fallback here, it is the NORMAL case: the recipe declares
-    // `mssql_query` as its `body_column`, so that key is never among the
-    // `attribute_columns` and the statement arrives in the record body. Reading
-    // only `mssql_query` meant every SQL Server deadlock rendered with no SQL
-    // (measured: absent on 22/22 rows, body populated on 40/40, contrib
-    // v0.158.0). `mssql_query` stays first for any recipe that does project it
-    // as a column, and `canonicalize_blocking` reads `body` the same way.
-    let query = first_str(rec, &["mssql_query", "body"]);
-    // A row with neither identity nor statement carries nothing to show.
-    spid?;
-
-    let (query_norm, fingerprint) = query
-        .as_deref()
-        .map(|q| fingerprint_statement(q, Some("mssql")))
-        .unwrap_or((None, None));
-
-    // The shred emits "1"/"0"; treat anything else as not-the-victim rather than
-    // guessing, so a recipe change can never silently flag every participant.
-    let is_victim = first_str(rec, &["mssql_is_victim"]).as_deref() == Some("1");
-
-    let participant = Participant {
-        pid: spid,
-        app: first_str(rec, &["mssql_app"]),
-        user: first_str(rec, &["mssql_user"]),
-        query,
-        query_norm,
-        fingerprint,
-        lock_mode: first_str(rec, &["mssql_lock_mode"]),
-        lock_target: first_str(rec, &["mssql_lock_target"]),
-        transaction_id: None,
-        victim: is_victim,
-        side: None,
-    };
-
-    Some(DeadlockEvent {
-        engine: Some("mssql".to_string()),
-        database: first_str(rec, &["mssql_db"]).or_else(|| detect_database(rec)),
-        instance: detect_instance(rec),
-        timestamp: detect_timestamp(rec),
-        // Already resolved — no side→pid post-pass needed.
-        victim_pid: if is_victim { spid } else { None },
-        participants: vec![participant],
-        raw: first_str(rec, &["body"]),
-        victim_side: None,
-    })
-}
-
-/// Shared InnoDB deadlock canonicalizer for MySQL and MariaDB.
-///
-/// The two servers emit byte-identical InnoDB bodies; only the log envelope and
-/// therefore the recipe's field prefix differ (`my_trx_side` vs
-/// `maria_trx_side`). Parameterising the prefix keeps one implementation of the
-/// subtle part — the participant-less verdict record — rather than two copies
-/// that can drift apart.
-fn canonicalize_innodb_deadlock(
-    rec: &Map<String, Value>,
-    engine_name: &str,
-    prefix: &str,
-) -> Option<DeadlockEvent> {
-    let key = |suffix: &str| format!("{prefix}_{suffix}");
-    let engine = Some(engine_name.to_string());
-    let side = first_i64(rec, &[&key("trx_side")]);
-    let victim_side = first_i64(rec, &[&key("victim_side")]);
-    let thread = first_i64(rec, &[&key("trx_thread")]);
-    let query = first_str(rec, &[&key("trx_query")]);
-
-    // The ROLLBACK VERDICT arrives on its own entry.
-    //
-    // InnoDB writes `*** WE ROLL BACK TRANSACTION (N)` separately from the
-    // per-side `*** (N) TRANSACTION:` blocks, so this record has a
-    // `my_victim_side` and nothing else — no side, no thread, no statement.
-    // Returning `None` here (as this did) threw the verdict away, which is why
-    // no MySQL participant was ever flagged `victim` and the UI rendered an
-    // empty "cancelled by the database" panel. Emit a participant-LESS event
-    // instead; `merge_mysql_deadlocks` joins it to the sides.
-    if side.is_none() && query.is_none() {
-        return victim_side.map(|v| DeadlockEvent {
-            engine,
-            database: detect_database(rec),
-            instance: detect_instance(rec),
-            timestamp: detect_timestamp(rec),
-            victim_side: Some(v),
-            ..Default::default()
-        });
-    }
-
-    let (query_norm, fingerprint) = query
-        .as_deref()
-        .map(|q| fingerprint_statement(q, Some(engine_name)))
-        .unwrap_or((None, None));
-
-    // NOT resolved here: on the real log shape `victim_side` is never present
-    // on a side's own record, so any same-record comparison is dead code that
-    // silently yields `false`. Resolution happens in `merge_mysql_deadlocks`,
-    // the first place that sees every side of one deadlock together.
-    let participant = Participant {
-        pid: thread,
-        app: first_str(rec, &[&key("trx_user"), &key("trx_host")]),
-        user: first_str(rec, &[&key("trx_user")]),
-        query,
-        query_norm,
-        fingerprint,
-        lock_mode: first_str(rec, &[&key("lock_mode")]),
-        lock_target: first_str(rec, &[&key("lock_table"), &key("lock_index")]),
-        transaction_id: first_str(rec, &[&key("trx_id")]),
-        victim: false,
-        side,
-    };
-
-    Some(DeadlockEvent {
-        engine,
-        database: detect_database(rec),
-        instance: detect_instance(rec),
-        timestamp: detect_timestamp(rec),
-        victim_pid: None,
-        participants: vec![participant],
-        raw: first_str(rec, &[&key("message"), "body"]),
-        victim_side,
-    })
-}
-
-/// Stitch per-participant MySQL deadlock entries into whole events.
-///
-/// InnoDB writes each `*** (N) TRANSACTION:` block as its own timestamped entry, all within a few
-/// milliseconds. Entries whose timestamps fall inside `window_micros` of the group's first entry
-/// merge into one event; a participant whose side number repeats starts a NEW group (that is a
-/// second deadlock, not a duplicate side).
-pub fn merge_mysql_deadlocks(
-    mut events: Vec<DeadlockEvent>,
-    window_micros: i64,
-) -> Vec<DeadlockEvent> {
-    events.sort_by_key(|e| e.timestamp.unwrap_or(0));
-    let mut out: Vec<DeadlockEvent> = Vec::new();
-    for ev in events {
-        let ts = ev.timestamp.unwrap_or(0);
-        let side_ids: Vec<Option<String>> = ev
-            .participants
-            .iter()
-            .map(|p| p.transaction_id.clone())
-            .collect();
-        let merged_into = out.iter_mut().rev().find(|prev| {
-            let prev_ts = prev.timestamp.unwrap_or(0);
-            (ts - prev_ts).abs() <= window_micros
-                && prev.engine == ev.engine
-                // a repeated transaction id means a NEW deadlock, not another side
-                && !prev
-                    .participants
-                    .iter()
-                    .any(|p| side_ids.contains(&p.transaction_id))
-        });
-        match merged_into {
-            Some(prev) => {
-                if prev.victim_pid.is_none() {
-                    prev.victim_pid = ev.victim_pid;
-                }
-                // The rollback verdict rides its own record, so whichever entry
-                // carries it hands it to the group.
-                if prev.victim_side.is_none() {
-                    prev.victim_side = ev.victim_side;
-                }
-                if prev.database.is_none() {
-                    prev.database = ev.database.clone();
-                }
-                if prev.instance.is_none() {
-                    prev.instance = ev.instance.clone();
-                }
-                prev.participants.extend(ev.participants);
-            }
-            None => out.push(ev),
-        }
-    }
-
-    // Resolve victimhood AFTER every group is closed, never during the merge.
-    //
-    // InnoDB logs `WE ROLL BACK TRANSACTION (N)` last — after both side blocks
-    // — so at merge time the sides it refers to may not have arrived yet.
-    // A post-pass is the only ordering that always sees the whole group.
-    for ev in &mut out {
-        let Some(victim_side) = ev.victim_side else {
-            continue;
-        };
-        for p in &mut ev.participants {
-            if p.side == Some(victim_side) {
-                p.victim = true;
-                if ev.victim_pid.is_none() {
-                    ev.victim_pid = p.pid;
-                }
-            }
-        }
-    }
-    out
-}
-
-/// Canonicalize a `pg_blocking_chain` / `mysql_lock_waits` recipe row into a [`BlockingSample`].
-pub fn canonicalize_blocking(rec: &Map<String, Value>) -> Option<BlockingSample> {
-    let engine = detect_engine(rec);
-    // Invariant 1 (module docs): receiver fields only — a caller cannot inject
-    // a blocking relationship.
-    let blocked_pid = first_i64(rec, &["blocked_pid", "waiting_thread"]);
-    let blocking_pid = first_i64(rec, &["blocking_pid", "blocking_thread"]);
-    // An edge needs both ends; a half-populated row is not a blocking relationship.
-    if blocked_pid.is_none() || blocking_pid.is_none() {
-        return None;
-    }
-
-    let blocked_query = first_str(rec, &["blocked_query", "waiting_query", "body"]);
-    let blocking_query = first_str(rec, &["blocking_query"]);
-    let (blocked_norm, blocked_fp) = blocked_query
-        .as_deref()
-        .map(|q| fingerprint_statement(q, engine.as_deref()))
-        .unwrap_or((None, None));
-    let (blocking_norm, blocking_fp) = blocking_query
-        .as_deref()
-        .map(|q| fingerprint_statement(q, engine.as_deref()))
-        .unwrap_or((None, None));
-
-    Some(BlockingSample {
-        engine,
-        database: detect_database(rec),
-        instance: detect_instance(rec),
-        timestamp: detect_timestamp(rec),
-        blocked_pid,
-        blocked_app: first_str(rec, &["blocked_app", "blocked_user"]),
-        blocked_query: blocked_norm.or(blocked_query),
-        blocked_fingerprint: blocked_fp,
-        blocking_pid,
-        blocking_app: first_str(rec, &["blocking_app", "blocking_state"]),
-        blocking_query: blocking_norm.or(blocking_query),
-        blocking_fingerprint: blocking_fp,
-        wait_event_type: first_str(rec, &["wait_event_type"]),
-        wait_event: first_str(rec, &["wait_event"]),
-        wait_seconds: first_f64(rec, &["blocked_wait_s", "wait_secs"]),
-        raw: first_str(rec, &["body"]),
-    })
-}
+//
+// DEADLOCKS AND BLOCKING MOVED TO ENTERPRISE. `Participant`, `DeadlockEvent`,
+// `BlockingSample`, the six deadlock canonicalizers, `merge_mysql_deadlocks`,
+// `participants_of`, `canonicalize_blocking` and the whole chain assembler now
+// live in `o2_enterprise::enterprise::db_monitoring::{deadlock, blocking,
+// chains}`. They are reached from [`canonicalize_record`] through the two
+// `#[cfg(feature = "enterprise")]` hooks, at exactly the positions their arms
+// occupied, and re-exported from this module's parent so existing `api.rs` call
+// sites resolve unchanged on an enterprise build.
+//
+// The shared vocabulary they consume (`first_str`, `detect_engine`,
+// `fingerprint_statement`, the `O2_DBM_*` consts) is in `config`, which both
+// crates depend on — enterprise cannot depend on `openobserve-core`.
 
 // ─── Serialization to the canonical record ───────────────────────────────────
-
-impl DeadlockEvent {
-    /// The flattened canonical record written onto the log row.
-    pub fn to_record(&self) -> BTreeMap<String, Value> {
-        let mut out = BTreeMap::new();
-        out.insert(O2_DBM_KIND.into(), json!(KIND_DEADLOCK));
-        insert_opt(&mut out, O2_DBM_ENGINE, self.engine.clone());
-        insert_opt(&mut out, O2_DBM_DATABASE, self.database.clone());
-        insert_opt(&mut out, O2_DBM_INSTANCE, self.instance.clone());
-        if let Some(ts) = self.timestamp {
-            out.insert(O2_DBM_TIMESTAMP.into(), json!(ts));
-        }
-        if let Some(v) = self.victim_pid {
-            out.insert(O2_DBM_VICTIM_PID.into(), json!(v));
-        }
-        // MySQL's rollback verdict must SURVIVE STORAGE.
-        //
-        // Ingest canonicalizes one record at a time, so the verdict entry
-        // (`WE ROLL BACK TRANSACTION (N)`, which carries no side and no
-        // statement) lands as its own row. Read-time stitching is the first
-        // place it can meet the side rows, so the side number has to be on the
-        // row — otherwise the victim is unknowable no matter what the merge
-        // does. Scalar, per the non-basic-type constraint above.
-        if let Some(v) = self.victim_side {
-            out.insert(O2_DBM_VICTIM_SIDE.into(), json!(v));
-        }
-        // Stored as a JSON *string*, not a JSON array (Invariant 2, module
-        // docs). Since canonicalization runs after flattening (it must: it
-        // reads the flattened receiver fields), a nested array here silently
-        // killed every batch containing a deadlock — the incident the
-        // invariant records. Readers parse it back via `participants_of`.
-        out.insert(
-            O2_DBM_PARTICIPANTS.into(),
-            json!(
-                Value::Array(self.participants.iter().map(|p| p.to_json()).collect()).to_string()
-            ),
-        );
-        out.insert(
-            O2_DBM_PARTICIPANT_COUNT.into(),
-            json!(self.participants.len()),
-        );
-        // Query-shape ranking key: the sorted set of participant fingerprints identifies the
-        // recurring lock-ordering bug across firings even when the victim alternates (proof
-        // Demo 2 — the victim swapping is the SIGNATURE, so it must not split the group).
-        if let Some(shape) = self.query_shape() {
-            out.insert("o2_dbm_query_shape".into(), json!(shape));
-        }
-        insert_opt(&mut out, O2_DBM_RAW, self.raw.clone());
-        out
-    }
-
-    /// Stable identity of the *statement pair* involved, independent of which side lost.
-    pub fn query_shape(&self) -> Option<String> {
-        let mut fps: Vec<&str> = self
-            .participants
-            .iter()
-            .filter_map(|p| p.fingerprint.as_deref())
-            .collect();
-        if fps.is_empty() {
-            return None;
-        }
-        fps.sort_unstable();
-        fps.dedup();
-        Some(fps.join("+"))
-    }
-}
-
-impl BlockingSample {
-    pub fn to_record(&self) -> BTreeMap<String, Value> {
-        let mut out = BTreeMap::new();
-        out.insert(O2_DBM_KIND.into(), json!(KIND_BLOCKING));
-        insert_opt(&mut out, O2_DBM_ENGINE, self.engine.clone());
-        insert_opt(&mut out, O2_DBM_DATABASE, self.database.clone());
-        insert_opt(&mut out, O2_DBM_INSTANCE, self.instance.clone());
-        if let Some(ts) = self.timestamp {
-            out.insert(O2_DBM_TIMESTAMP.into(), json!(ts));
-        }
-        if let Some(p) = self.blocked_pid {
-            out.insert(O2_DBM_BLOCKED_PID.into(), json!(p));
-        }
-        insert_opt(&mut out, O2_DBM_BLOCKED_APP, self.blocked_app.clone());
-        insert_opt(&mut out, O2_DBM_BLOCKED_QUERY, self.blocked_query.clone());
-        insert_opt(
-            &mut out,
-            O2_DBM_BLOCKED_FINGERPRINT,
-            self.blocked_fingerprint.clone(),
-        );
-        if let Some(p) = self.blocking_pid {
-            out.insert(O2_DBM_BLOCKING_PID.into(), json!(p));
-        }
-        insert_opt(&mut out, O2_DBM_BLOCKING_APP, self.blocking_app.clone());
-        insert_opt(&mut out, O2_DBM_BLOCKING_QUERY, self.blocking_query.clone());
-        insert_opt(
-            &mut out,
-            O2_DBM_BLOCKING_FINGERPRINT,
-            self.blocking_fingerprint.clone(),
-        );
-        insert_opt(
-            &mut out,
-            O2_DBM_WAIT_EVENT_TYPE,
-            self.wait_event_type.clone(),
-        );
-        insert_opt(&mut out, O2_DBM_WAIT_EVENT, self.wait_event.clone());
-        if let Some(w) = self.wait_seconds {
-            out.insert(O2_DBM_WAIT_SECONDS.into(), json!(w));
-        }
-        insert_opt(&mut out, O2_DBM_RAW, self.raw.clone());
-        out
-    }
-
-    /// Rebuild a sample from a canonical stored row (the read path).
-    pub fn from_record(row: &Value) -> Option<Self> {
-        let blocked_pid = row.get(O2_DBM_BLOCKED_PID).and_then(as_i64_loose);
-        let blocking_pid = row.get(O2_DBM_BLOCKING_PID).and_then(as_i64_loose);
-        if blocked_pid.is_none() || blocking_pid.is_none() {
-            return None;
-        }
-        Some(BlockingSample {
-            engine: str_field(row, O2_DBM_ENGINE),
-            database: str_field(row, O2_DBM_DATABASE),
-            instance: str_field(row, O2_DBM_INSTANCE),
-            timestamp: row
-                .get(O2_DBM_TIMESTAMP)
-                .and_then(as_i64_loose)
-                .or_else(|| row.get("_timestamp").and_then(as_i64_loose)),
-            blocked_pid,
-            blocked_app: str_field(row, O2_DBM_BLOCKED_APP),
-            blocked_query: str_field(row, O2_DBM_BLOCKED_QUERY),
-            blocked_fingerprint: str_field(row, O2_DBM_BLOCKED_FINGERPRINT),
-            blocking_pid,
-            blocking_app: str_field(row, O2_DBM_BLOCKING_APP),
-            blocking_query: str_field(row, O2_DBM_BLOCKING_QUERY),
-            blocking_fingerprint: str_field(row, O2_DBM_BLOCKING_FINGERPRINT),
-            wait_event_type: str_field(row, O2_DBM_WAIT_EVENT_TYPE),
-            wait_event: str_field(row, O2_DBM_WAIT_EVENT),
-            wait_seconds: row.get(O2_DBM_WAIT_SECONDS).and_then(|v| match v {
-                Value::Number(n) => n.as_f64(),
-                Value::String(s) => s.parse().ok(),
-                _ => None,
-            }),
-            raw: str_field(row, O2_DBM_RAW),
-        })
-    }
-}
-
-/// Read `o2_dbm_participants` off a stored row, tolerating BOTH storage forms.
-///
-/// The canonical write path stores the array as a JSON **string** (Invariant 2,
-/// module docs). A row produced by a VRL pipeline, or by an older build, may
-/// still carry a real JSON array, so both parse.
-pub fn participants_of(row: &Value) -> Vec<Participant> {
-    let parsed;
-    let arr = match row.get(O2_DBM_PARTICIPANTS) {
-        Some(Value::Array(a)) => Some(a),
-        Some(Value::String(s)) => {
-            parsed = serde_json::from_str::<Value>(s).ok();
-            parsed.as_ref().and_then(|v| v.as_array())
-        }
-        _ => None,
-    };
-    arr.map(|a| a.iter().map(Participant::from_json).collect())
-        .unwrap_or_default()
-}
 
 /// The tag on a record whose `o2_recipe` matches no dispatch arm, if any (W8).
 ///
@@ -1297,19 +696,34 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
 pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, Value>> {
     // One config load per record — the gated arms below all read from it.
     let cfg = config::get_config();
-    // Deadlocks — Postgres DETAIL entries and MySQL per-transaction entries.
-    let is_pg_deadlock = rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("deadlock");
-    let is_my_deadlock = rec.get("o2_my_event").and_then(|v| v.as_str()) == Some("deadlock");
-    let is_maria_deadlock = rec.get("o2_maria_event").and_then(|v| v.as_str()) == Some("deadlock");
-    if is_pg_deadlock {
-        return canonicalize_pg_deadlock(rec).map(|e| e.to_record());
+    // Deadlocks — Postgres DETAIL entries and MySQL/MariaDB per-transaction
+    // entries. ENTERPRISE-OWNED: the canonicalizers moved to
+    // `o2_enterprise::enterprise::db_monitoring::deadlock`, and the hook below
+    // reads exactly these three markers. They are named here, in the
+    // dispatcher's own body, because the shipped filelog recipes stamp them and
+    // `shipped_filelog_event_keys_and_backend_dispatch_agree` reads this
+    // function's source to prove the two sides of that contract still agree —
+    // a check that cannot reach across the repo boundary.
+    //
+    // The three lookups are performed HERE rather than only inside the hook so
+    // that the marker set stays visible to the source-scraping contract test and
+    // so an OSS build still cheaply distinguishes "this is an enterprise
+    // deadlock record" from "this is not a DBM record at all".
+    let is_enterprise_deadlock = rec.get("o2_pg_event").and_then(|v| v.as_str())
+        == Some("deadlock")
+        || rec.get("o2_my_event").and_then(|v| v.as_str()) == Some("deadlock")
+        || rec.get("o2_maria_event").and_then(|v| v.as_str()) == Some("deadlock");
+    // On OSS a deadlock marker ENDS dispatch with `None` rather than falling
+    // through. That is the same behaviour the enterprise hook's
+    // `ClaimedButUnparsed` produces, and it stops a deadlock record being
+    // re-examined by the explain / statement arms below, which read the SAME
+    // `o2_pg_event` key and would otherwise see a record that is not theirs.
+    #[cfg(not(feature = "enterprise"))]
+    if is_enterprise_deadlock {
+        return None;
     }
-    if is_my_deadlock {
-        return canonicalize_mysql_deadlock(rec).map(|e| e.to_record());
-    }
-    if is_maria_deadlock {
-        return canonicalize_mariadb_deadlock(rec).map(|e| e.to_record());
-    }
+    #[cfg(feature = "enterprise")]
+    let _ = is_enterprise_deadlock;
     // Enterprise: deadlock markers. Sits exactly where the OSS deadlock arms
     // sat, so no record changes hands. On OSS this compiles away and these
     // records are not canonicalized — the raw fields still ingest as ordinary
@@ -1368,29 +782,31 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
             Claim::NotMine => {}
         }
     }
-    // MSSQL deadlocks arrive from a sqlquery recipe, not a filelog one, so they
-    // are keyed on the recipe tag rather than an o2_*_event field.
-    if rec.get("o2_recipe").and_then(|v| v.as_str()) == Some("mssql_deadlock") {
-        return canonicalize_mssql_deadlock(rec).map(|e| e.to_record());
-    }
-
-    // Blocking chains — the sqlqueryreceiver recipes.
+    // MSSQL deadlocks (a sqlquery recipe, not a filelog one, so keyed on the
+    // recipe tag) and the four engine-agnostic blocking recipes are
+    // ENTERPRISE-OWNED — `claim_recipe_tags` above claims all five. The tags
+    // are named here, in the dispatcher's own body, because the shipped recipes
+    // stamp them and `shipped_recipe_tags_and_backend_dispatch_agree` reads this
+    // function's source to prove the two sides of that contract still agree — a
+    // check that cannot reach across the repo boundary.
     //
-    // Engine-agnostic by construction: `canonicalize_blocking` reads only the
-    // recipe's aliased columns (`blocked_pid`, `blocking_query`, …), so a new
-    // engine is a recipe that SELECTs those names plus a tag here — no new
-    // parser. SQL Server's `sys.dm_exec_requests` join supplies all of them,
-    // which is why mssql blocking works while mssql DEADLOCKS do not: those
-    // arrive as an XML deadlock graph in the system_health session, a shape
-    // nothing below can read yet.
+    // The binding below is NOT redundant with the hook: it is also consumed by
+    // the table_stats and index_stats arms, which remain OSS.
     let recipe = rec.get("o2_recipe").and_then(|v| v.as_str()).unwrap_or("");
-    if recipe == "pg_blocking_chain"
+    let is_enterprise_recipe = recipe == "mssql_deadlock"
+        || recipe == "pg_blocking_chain"
         || recipe == "mysql_lock_waits"
         || recipe == "mariadb_lock_waits"
-        || recipe == "mssql_blocking_chain"
-    {
-        return canonicalize_blocking(rec).map(|s| s.to_record());
+        || recipe == "mssql_blocking_chain";
+    // Same rule as the deadlock markers above: on OSS an enterprise-owned tag
+    // ENDS dispatch rather than falling through to the arms below, which is
+    // what the enterprise build's `Claim` does for the identical record.
+    #[cfg(not(feature = "enterprise"))]
+    if is_enterprise_recipe {
+        return None;
     }
+    #[cfg(feature = "enterprise")]
+    let _ = is_enterprise_recipe;
 
     // Table health (W10) — the table-stats sqlquery recipes. Keyed on the
     // recipe tag, the same extension point the blocking match above uses: these
