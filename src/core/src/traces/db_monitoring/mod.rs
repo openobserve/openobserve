@@ -27,7 +27,6 @@
 
 pub mod api;
 pub mod chains;
-pub mod normalizer;
 pub mod rollup;
 pub mod server_vantage;
 
@@ -45,8 +44,20 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-pub use normalizer::{
-    Dialect, NormalizeError, NormalizedStatement, StmtClass, normalize, normalize_with_opts,
+/// `MAX_NORM_INPUT` moved to `config` with the normalizer that reads it, but it
+/// was `pub` here before the move — re-exported so `db_monitoring::MAX_NORM_INPUT`
+/// keeps resolving for existing callers.
+pub use config::meta::db_monitoring::MAX_NORM_INPUT;
+/// Likewise for the shared DBM vocabulary — `canonical_system`, `route_dialect`
+/// and `strip_port` are read from `config` now, not defined here.
+use config::meta::db_monitoring::{canonical_system, route_dialect, strip_port};
+/// The statement normalizer moved DOWN into `config` so `o2_enterprise` can reach
+/// it — enterprise cannot depend on this crate (Cargo cycle), but both depend on
+/// `config`. Aliased back to `normalizer` here so the existing `normalizer::…`
+/// call sites in this module tree keep resolving unchanged.
+pub use config::meta::db_normalizer::{
+    self as normalizer, Dialect, NormalizeError, NormalizedStatement, StmtClass, normalize,
+    normalize_with_opts,
 };
 use serde_json::{Map, Value};
 
@@ -95,11 +106,6 @@ pub const FP_VERSION: u32 = 2;
 
 /// Cap on the stored `o2_db_query_norm` text (bytes).
 pub const MAX_NORM_STORED: usize = 4096;
-
-/// Cap on normalizer input (bytes): truncate at 16 KB, then lex; if truncation produces a lexer
-/// error the standard failure rule applies (no `query_norm`, operation+collection fallback
-/// fingerprint) so a mid-token cut can never leak a literal.
-pub const MAX_NORM_INPUT: usize = 16 * 1024;
 
 /// Bounded entries in the per-node raw-text → normalized-result LRU (design §3.2 overhead
 /// guard). Real workloads repeat a small set of raw texts constantly, so the lexer amortizes to
@@ -511,37 +517,6 @@ fn resolve<A: SpanAttrs>(attrs: &A, names: &[(&str, &str)]) -> Option<String> {
     None
 }
 
-/// Normalize `db.system.name`/`db.system` values to the stable enum vocabulary (design §3.1):
-/// new-semconv aliases fold onto the canonical short names; unknown systems pass through
-/// lowercased (they route to the operation+collection fallback).
-fn canonical_system(raw: &str) -> String {
-    let lower = raw.to_lowercase();
-    match lower.as_str() {
-        "microsoft.sql_server" => "mssql".to_string(),
-        "oracle.db" => "oracle".to_string(),
-        _ => lower,
-    }
-}
-
-/// Engine → normalizer routing (design §3.2). Unlisted systems return `None` → the
-/// operation+collection fallback hash with no query_norm.
-fn route_dialect(system: &str) -> Option<Dialect> {
-    Some(match system {
-        "postgresql" => Dialect::Postgresql,
-        "mysql" => Dialect::Mysql,
-        "mariadb" => Dialect::Mariadb,
-        "mssql" => Dialect::Mssql,
-        "oracle" => Dialect::Oracle,
-        "cockroachdb" => Dialect::Cockroachdb,
-        "cassandra" => Dialect::Cassandra,
-        "clickhouse" => Dialect::Clickhouse,
-        "redis" | "valkey" => Dialect::Redis,
-        "mongodb" => Dialect::Mongodb,
-        "elasticsearch" | "opensearch" => Dialect::Elasticsearch,
-        _ => return None,
-    })
-}
-
 /// Statement class when the normalizer did not run (no-text / lexer-failure / unlisted-system
 /// spans): derived from the resolved operation keyword.
 fn classify_operation(op: Option<&str>) -> StmtClass {
@@ -552,23 +527,6 @@ fn classify_operation(op: Option<&str>) -> StmtClass {
         Some("SET" | "RESET") => StmtClass::SessionControl,
         Some("PING") => StmtClass::Ping,
         _ => StmtClass::Query,
-    }
-}
-
-/// Strip a trailing `:port` from `server.address`/`net.peer.name`. Bare IPs are deliberately
-/// KEPT (deviation from `inferred.rs` — databases are commonly addressed by IP).
-fn strip_port(addr: &str) -> String {
-    if let Some(rest) = addr.strip_prefix('[') {
-        // [IPv6]:port
-        if let Some(end) = rest.find(']') {
-            return rest[..end].to_string();
-        }
-    }
-    match addr.rsplit_once(':') {
-        Some((host, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => {
-            host.to_string()
-        }
-        _ => addr.to_string(),
     }
 }
 
