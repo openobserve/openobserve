@@ -15256,7 +15256,10 @@
         "activity": "Activity",
         "activityHint": "Sessions your databases are running right now",
         "tableHealth": "Table health",
-        "tableHealthHint": "Table size, bloat and vacuum state (PostgreSQL only)"
+        "tableHealthHint": "Table size, bloat and vacuum state (PostgreSQL only)",
+        "deadlocksLocked": "Deadlocks is an Enterprise feature. Upgrade to see which queries deadlocked against each other, and why. The other database tabs work on every plan.",
+        "blockedLocked": "Blocked queries is an Enterprise feature. Upgrade to see which sessions are waiting on a lock and what is holding it. The other database tabs work on every plan.",
+        "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan."
       }
     },
     "samples": {

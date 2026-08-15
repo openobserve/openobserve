@@ -968,6 +968,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import config from "@/aws-exports";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmHistoryPanel from "@/components/dbm/DbmHistoryPanel.vue";
 import DbmQueryText from "@/components/dbm/DbmQueryText.vue";
@@ -1310,13 +1311,21 @@ interface SampleRow {
  * queries strands them on a tab they never stood on. An absent or unknown
  * `from` falls back to Top queries, the detail page's natural parent (deep
  * links and the traces-side entry point carry no origin).
+ *
+ * Deadlocks is enterprise-only, so on OSS it is not offered as a back target:
+ * the button would dead-end on a route that bounces straight back. Dropping
+ * the key lets the existing fallback do the work — no special case needed.
  */
 const backTarget = computed(() => {
   const targets: Record<string, { name: string; label: I18nText }> = {
     queries: { name: "dbmQueries", label: t("dbm.detail.backToQueries") },
     activity: { name: "dbmActivity", label: t("dbm.detail.backToActivity") },
     samples: { name: "dbmSamples", label: t("dbm.detail.backToSamples") },
-    deadlocks: { name: "dbmDeadlocks", label: t("dbm.detail.backToDeadlocks") },
+    // String comparison: `isEnterprise` is a string env value, and
+    // `Boolean("false")` is true.
+    ...(config.isEnterprise === "true"
+      ? { deadlocks: { name: "dbmDeadlocks", label: t("dbm.detail.backToDeadlocks") } }
+      : {}),
   };
   const origin = targets[(route.query.from as string) ?? ""] ?? targets.queries;
   return {

@@ -106,6 +106,27 @@ const dbMonitoringEnabled = (): boolean => {
   return Boolean(zoConfig.database_monitoring_enabled);
 };
 
+/**
+ * Guard for the three enterprise-only DBM tabs — Deadlocks, Blocked queries and
+ * Table health, whose reads an OSS backend answers 403 on. Disabling the tabs
+ * cannot stop a PASTED or bookmarked URL, so each route needs its own guard.
+ *
+ * It lands on the DBM overview, keeping the reader inside the section they
+ * aimed at, rather than on a page that renders empty because every fetch was
+ * refused. The scope travels so the window and filters survive the bounce.
+ *
+ * `isEnterprise` is a STRING — compared against the literal `"true"`, never
+ * coerced, since `Boolean("false")` is true and would open the gate on OSS.
+ * Same shape as the `serviceGraph` guard below.
+ */
+const dbmEnterpriseGuard = (to: any, from: any, next: any) => {
+  if (config.isEnterprise !== "true") {
+    next({ name: "dbmDatabases", query: to.query });
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
@@ -424,6 +445,7 @@ const useRoutes = () => {
           path: "deadlocks",
           name: "dbmDeadlocks",
           component: DbmDeadlocksPage,
+          beforeEnter: dbmEnterpriseGuard,
           meta: {
             keepAlive: true,
             title: "Databases",
@@ -435,6 +457,7 @@ const useRoutes = () => {
           path: "blocking",
           name: "dbmBlocking",
           component: DbmBlockedQueriesPage,
+          beforeEnter: dbmEnterpriseGuard,
           meta: {
             keepAlive: true,
             title: "Databases",
@@ -444,6 +467,7 @@ const useRoutes = () => {
           path: "table-health",
           name: "dbmTableHealth",
           component: DbmTableHealthPage,
+          beforeEnter: dbmEnterpriseGuard,
           meta: {
             keepAlive: true,
             title: "Databases",

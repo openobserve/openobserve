@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
 
@@ -28,6 +28,17 @@ vi.mock("vue-router", () => ({
   useRoute: () => currentRoute,
   useRouter: () => ({ push }),
 }));
+
+/**
+ * `isEnterprise` is a STRING env value, not a boolean — the component compares
+ * it as one, and this mock keeps it a string so a test cannot accidentally
+ * prove a comparison the real build never makes. Mutable because the build type
+ * is the variable under test.
+ */
+// `vi.hoisted` because `vi.mock` is hoisted above every other statement — a
+// plain const here is still in its TDZ when the factory runs.
+const mockConfig = vi.hoisted(() => ({ isEnterprise: "true" }));
+vi.mock("@/aws-exports", () => ({ default: mockConfig }));
 
 const mountAt = (name: string, query: Record<string, unknown> = {}) => {
   currentRoute = { name, query };
@@ -50,6 +61,13 @@ const selectTab = async (wrapper: ReturnType<typeof mountAt>, key: string) => {
 };
 
 describe("DbmSectionTabs", () => {
+  // Every test that is not ABOUT the build type runs as enterprise, where all
+  // seven tabs are live — otherwise a gated tab's assertions would silently be
+  // testing the disabled path.
+  beforeEach(() => {
+    mockConfig.isEnterprise = "true";
+  });
+
   describe("active tab follows the route", () => {
     it.each([
       ["dbmDatabases", "overview"],
@@ -210,7 +228,9 @@ describe("DbmSectionTabs", () => {
         .findAll("[data-test^='dbm-section-tab-']")
         .map((tab) => tab.attributes("data-test"))
         .filter((name) => !name?.startsWith("dbm-section-tab-badge-"))
-        .filter((name) => !name?.startsWith("dbm-section-tab-vantage-"));
+        .filter((name) => !name?.startsWith("dbm-section-tab-vantage-"))
+        // The lock a gated tab renders is a descendant sharing the prefix.
+        .filter((name) => !name?.startsWith("dbm-section-tab-lock-"));
       expect(labels).toEqual([
         "dbm-section-tab-overview",
         "dbm-section-tab-queries",
@@ -377,6 +397,123 @@ describe("DbmSectionTabs", () => {
       });
       // A tab whose count is unknown shows no badge rather than a misleading 0.
       expect(wrapper.text()).toContain("Deadlocks");
+    });
+  });
+
+  /**
+   * Deadlocks, Blocked queries and Table health are enterprise-only: the OSS
+   * backend answers 403 on all three reads. The tabs stay VISIBLE and go
+   * disabled rather than disappearing — a hidden tab tells an OSS reader
+   * nothing, while a locked one names the capability and says how to get it.
+   * That is also why the tab list length is asserted first: without it, an
+   * empty render would make every assertion below vacuously true.
+   */
+  describe("enterprise gating", () => {
+    /**
+     * The badge, vantage and lock elements are DESCENDANTS that share the
+     * `dbm-section-tab-` prefix, so a bare prefix selector matches far more
+     * than the seven tabs. Excluding them keeps the length assertion a real
+     * guard rather than a number that gets raised whenever it fails.
+     */
+    const DESCENDANT_PREFIXES = [
+      "dbm-section-tab-badge-",
+      "dbm-section-tab-vantage-",
+      "dbm-section-tab-lock-",
+    ];
+
+    const tabsOf = (wrapper: ReturnType<typeof mountAt>) =>
+      wrapper.findAll("[data-test^='dbm-section-tab-']").filter((tab) => {
+        const name = tab.attributes("data-test") ?? "";
+        return !DESCENDANT_PREFIXES.some((prefix) => name.startsWith(prefix));
+      });
+
+    const disabledKeys = (wrapper: ReturnType<typeof mountAt>) =>
+      tabsOf(wrapper)
+        .filter((tab) => tab.attributes("aria-disabled") === "true")
+        .map((tab) => tab.attributes("data-test"));
+
+    it("disables deadlocks, blocked and table health on an OSS build", () => {
+      mockConfig.isEnterprise = "false";
+      const wrapper = mountAt("dbmDatabases");
+
+      // All seven still RENDER — disabled, not hidden.
+      expect(tabsOf(wrapper)).toHaveLength(7);
+      expect(disabledKeys(wrapper)).toEqual([
+        "dbm-section-tab-deadlocks",
+        "dbm-section-tab-blocked",
+        "dbm-section-tab-tableHealth",
+      ]);
+    });
+
+    it("leaves every tab enabled on an enterprise build", () => {
+      mockConfig.isEnterprise = "true";
+      const wrapper = mountAt("dbmDatabases");
+      expect(tabsOf(wrapper)).toHaveLength(7);
+      expect(disabledKeys(wrapper)).toHaveLength(0);
+    });
+
+    /**
+     * `isEnterprise` is a string env value. Anything other than the exact
+     * `"true"` is OSS — a truthy-string check (`Boolean("false")`) would fail
+     * OPEN and light the three tabs on every OSS build.
+     */
+    it.each(["false", "", "TRUE", "1"])(
+      "treats isEnterprise=%p as OSS — only the literal string true unlocks",
+      (value) => {
+        mockConfig.isEnterprise = value;
+        expect(disabledKeys(mountAt("dbmDatabases"))).toHaveLength(3);
+      },
+    );
+
+    /** A locked tab must say WHY it is locked and what unlocks it. */
+    it("explains the upgrade path on a locked tab", () => {
+      mockConfig.isEnterprise = "false";
+      const hint = mountAt("dbmDatabases")
+        .find("[data-test='dbm-section-tab-deadlocks']")
+        .findComponent({ name: "OTooltip" })
+        .props("content") as string;
+      expect(hint).toContain("Enterprise");
+    });
+
+    /** The lock is the visual cue; without it a disabled tab just reads as broken. */
+    it("marks a locked tab with a lock icon", () => {
+      mockConfig.isEnterprise = "false";
+      const wrapper = mountAt("dbmDatabases");
+      expect(wrapper.find("[data-test='dbm-section-tab-lock-deadlocks']").exists()).toBe(true);
+      expect(wrapper.find("[data-test='dbm-section-tab-lock-queries']").exists()).toBe(false);
+    });
+
+    /**
+     * A disabled tab that is simultaneously ACTIVE is a state OTab does not
+     * model. `?from=deadlocks` on the detail route would produce exactly that
+     * on OSS, so the origin is not honoured there and the highlight falls back
+     * to Top queries — the detail page's natural parent.
+     */
+    it("does not light the disabled deadlocks tab from a detail-page origin on OSS", () => {
+      mockConfig.isEnterprise = "false";
+      expect(
+        mountAt("dbmQueryDetail", { from: "deadlocks" })
+          .findComponent({ name: "OTabs" })
+          .props("modelValue"),
+      ).toBe("queries");
+    });
+
+    /** ...while on enterprise that origin is still honoured. */
+    it("still lights deadlocks from a detail-page origin on enterprise", () => {
+      mockConfig.isEnterprise = "true";
+      expect(
+        mountAt("dbmQueryDetail", { from: "deadlocks" })
+          .findComponent({ name: "OTabs" })
+          .props("modelValue"),
+      ).toBe("deadlocks");
+    });
+
+    /** Belt and braces: even a forced `change` must not navigate to a locked tab. */
+    it("refuses to navigate to a locked tab on OSS", async () => {
+      mockConfig.isEnterprise = "false";
+      const wrapper = mountAt("dbmDatabases");
+      await selectTab(wrapper, "deadlocks");
+      expect(push).not.toHaveBeenCalled();
     });
   });
 });

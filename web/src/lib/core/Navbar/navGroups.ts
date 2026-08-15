@@ -271,6 +271,13 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       // own, so omitting them unlit the Databases entry the moment the user
       // opened either tab — the nav said they had left the section they were
       // still standing in.
+      //
+      // The last three are enterprise-only and their route guards bounce an OSS
+      // reader to `dbmDatabases`, so on that build these entries simply never
+      // match — this list only decides WHICH ROUTE keeps the entry lit, never
+      // whether a route is reachable. Keeping them unconditional keeps one
+      // list for both builds; the gate lives in the route, as it does for the
+      // section itself.
       activeOnRoutes: [
         "dbmQueries",
         "dbmQueryDetail",
