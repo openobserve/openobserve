@@ -282,9 +282,6 @@ fn enterprise_owned_records_do_not_canonicalize_on_oss() {
     );
 }
 
-/// The query shape must be victim-order independent: the proof's Demo 2 shows the
-/// victim ALTERNATING between firings of the same lock-ordering bug. If the shape
-/// key depended on victim order, one bug would split into two half-as-bad rows.
 // ─── Deliverable D: cross-path fingerprint equality ─────────────────────────
 
 /// THE correlation guarantee: a statement fingerprinted from a SERVER log record

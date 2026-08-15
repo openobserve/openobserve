@@ -3255,9 +3255,27 @@ pub(crate) fn build_dbm_activity_breakdown_sql(
 /// `o2_dbm_database` becomes `db_namespace`, and so on — the same vocabulary
 /// every other DBM endpoint uses. Leaking the prefix would make every
 /// ingest-schema change a breaking UI change.
+///
+/// The five blocking fields (`blocking_pids`, `blocked`, `lock_mode`,
+/// `lock_type`, `lock_relation`) are enterprise-only — they ARE the Blocked
+/// Queries capability, and serving them on OSS would let a user read which
+/// sessions are blocked and by whom. Activity itself stays OSS: what a session
+/// waits ON (`wait_event`/`wait_event_type`) is dual-use and deliberately
+/// retained.
 fn activity_row_to_dto(row: &Value) -> Value {
+    // Gated with its only consumer below: on OSS this binding would be unused
+    // and trip `unused_variables`.
+    #[cfg(feature = "enterprise")]
     let pids = server_vantage::blocking_pids_of(row);
-    json!({
+
+    // The five blocking keys are inserted after this literal rather than
+    // `#[cfg]`-annotated inside it: `serde_json::json!` does not accept
+    // attributes on its members, so gating them in place will not compile.
+    //
+    // `unused_mut` is allowed because the mutation is itself `cfg`-gated — on
+    // OSS nothing writes to `dto`, and the lint fires there and only there.
+    #[allow(unused_mut)]
+    let mut dto = json!({
         "timestamp": row
             .get(server_vantage::O2_DBM_TIMESTAMP)
             .and_then(server_vantage::as_i64_loose)
@@ -3281,20 +3299,45 @@ fn activity_row_to_dto(row: &Value) -> Value {
         // Present ONLY for a still-running session, so the UI never renders a
         // completed duration as an elapsed one.
         "duration_ms": row.get(server_vantage::O2_DBM_DURATION_MS).and_then(as_f64_loose),
-        // A real array on the wire, though stored as a scalar (the logs schema
-        // inferrer rejects nested values). Never `[0]` for an unblocked session.
-        "blocking_pids": pids,
-        "blocked": !pids.is_empty(),
-        "lock_mode": str_or_null(row, server_vantage::O2_DBM_LOCK_MODE),
-        "lock_type": str_or_null(row, server_vantage::O2_DBM_LOCK_TYPE),
-        "lock_relation": str_or_null(row, server_vantage::O2_DBM_LOCK_RELATION),
         "client_address": str_or_null(row, server_vantage::O2_DBM_CLIENT_ADDR),
         "client_host": str_or_null(row, server_vantage::O2_DBM_CLIENT_HOST),
         "client_port": row.get(server_vantage::O2_DBM_CLIENT_PORT).and_then(server_vantage::as_i64_loose),
         "db_system": get_str(row, server_vantage::O2_DBM_ENGINE),
         "db_instance": str_or_null(row, server_vantage::O2_DBM_INSTANCE),
         "db_namespace": str_or_null(row, server_vantage::O2_DBM_DATABASE),
-    })
+    });
+
+    // The blocking RELATIONSHIP is the Blocked Queries capability, so an OSS
+    // build does not serve it. OMITTED rather than nulled: `"blocked": false`
+    // on every row is an affirmative claim about lock state that an OSS build
+    // never looked for and is not licensed to make, whereas an absent key says
+    // "not available" — which is what the frontend's `Array.isArray` guard and
+    // its `showsLocks` column spread already handle (the "Blocked by" column
+    // drops rather than rendering a column of blanks, the same path a
+    // MySQL-only fleet already takes).
+    #[cfg(feature = "enterprise")]
+    {
+        let obj = dto.as_object_mut().expect("dto is an object");
+        // A real array on the wire, though stored as a scalar (the logs schema
+        // inferrer rejects nested values). Never `[0]` for an unblocked
+        // session.
+        obj.insert("blocking_pids".into(), json!(pids));
+        obj.insert("blocked".into(), json!(!pids.is_empty()));
+        obj.insert(
+            "lock_mode".into(),
+            str_or_null(row, server_vantage::O2_DBM_LOCK_MODE),
+        );
+        obj.insert(
+            "lock_type".into(),
+            str_or_null(row, server_vantage::O2_DBM_LOCK_TYPE),
+        );
+        obj.insert(
+            "lock_relation".into(),
+            str_or_null(row, server_vantage::O2_DBM_LOCK_RELATION),
+        );
+    }
+
+    dto
 }
 
 /// A string column, or JSON null when absent/empty.
@@ -7704,6 +7747,65 @@ mod tests {
         );
     }
 
+    // ── Enterprise gating of the three read endpoints ───────────────────────
+
+    /// The three enterprise endpoints must refuse with 403 on OSS — NOT with
+    /// [`disabled_response`], which means `ZO_DB_MONITORING_ENABLED=false` and
+    /// would make the UI render a collector checklist (a configuration problem
+    /// the operator could fix) instead of an upgrade prompt. And NOT 404: the
+    /// routes stay registered precisely so the client can tell "you may not"
+    /// from "no such thing".
+    ///
+    /// Asserted BEHAVIOURALLY by calling the handlers, not by scraping the
+    /// source: `include_str!` ignores `cfg`, so a scrape would find the
+    /// enterprise copy of `pub async fn get_dbm_deadlocks` first and assert
+    /// against a body this build does not contain.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn enterprise_read_endpoints_are_forbidden_on_oss() {
+        use axum::http::StatusCode;
+
+        let org = || Path("default".to_string());
+        let user = || UserEmail {
+            user_id: "a@a.com".to_string(),
+        };
+
+        assert_eq!(
+            get_dbm_deadlocks(org(), user()).await.status(),
+            StatusCode::FORBIDDEN,
+            "deadlocks must be 403 on OSS, not 404 and not disabled_response()'s 404"
+        );
+        assert_eq!(
+            get_dbm_blocking(org(), user()).await.status(),
+            StatusCode::FORBIDDEN,
+            "blocked queries must be 403 on OSS"
+        );
+        assert_eq!(
+            get_dbm_table_health(org(), user()).await.status(),
+            StatusCode::FORBIDDEN,
+            "table health must be 403 on OSS"
+        );
+    }
+
+    /// The 403 must come from [`unauthorized_response`] and NOT from
+    /// [`disabled_response`]. They are easy to confuse at the call site and the
+    /// difference is invisible to a status-code assertion alone if
+    /// `disabled_response` were ever changed — this pins the two apart, so a
+    /// future edit that swaps one for the other fails here rather than
+    /// silently sending OSS operators to a collector checklist.
+    #[test]
+    fn disabled_and_unauthorized_responses_are_distinct() {
+        use axum::http::StatusCode;
+
+        assert_eq!(unauthorized_response().status(), StatusCode::FORBIDDEN);
+        assert_ne!(
+            disabled_response().status(),
+            StatusCode::FORBIDDEN,
+            "disabled_response must not be a 403, or the OSS stubs' choice of \
+             helper would stop mattering"
+        );
+    }
+
     /// **The vantage → OFGA-object mapping, asserted directly.**
     ///
     /// §5.1: the client vantage is application trace spans; the server vantage
@@ -10637,8 +10739,74 @@ mod tests {
         assert_eq!(dto["wait_event"], json!("transactionid"));
     }
 
+    /// **A2: the OSS Activity DTO omits the five blocking fields — and keeps
+    /// `wait_event`/`wait_event_type`.**
+    ///
+    /// Activity itself stays OSS. But `blocking_pids`, `blocked`, `lock_mode`,
+    /// `lock_type` and `lock_relation` ARE the Blocked Queries capability:
+    /// serving them would let an OSS user read which sessions are blocked and
+    /// by whom, making "Blocked Queries is Enterprise" disprovable from the
+    /// product's own UI.
+    ///
+    /// OMITTED, not nulled. `"blocked": false` on every row is an affirmative
+    /// claim about lock state that an OSS build is not licensed to make; an
+    /// absent key says "not available", which is what the frontend's
+    /// `Array.isArray` guard and `showsLocks` column spread already handle —
+    /// the column drops rather than rendering a row of blanks.
+    ///
+    /// `wait_event`/`wait_event_type` deliberately STAY: they say what a
+    /// session waits ON (I/O, CPU, lock), not who blocks it. They are dual-use
+    /// and removing them would gut the OSS tab while protecting nothing —
+    /// which is why they are asserted PRESENT here, not merely unmentioned.
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn test_activity_dto_omits_the_blocking_fields_on_oss() {
+        let mut row = activity_row(81517, "active", "Lock", "tuple");
+        row[server_vantage::O2_DBM_BLOCKING_PIDS] =
+            server_vantage::store_blocking_pids(&[82363, 81491]);
+        row[server_vantage::O2_DBM_LOCK_MODE] = json!("ShareLock");
+        row[server_vantage::O2_DBM_LOCK_TYPE] = json!("transactionid");
+        row[server_vantage::O2_DBM_LOCK_RELATION] = json!("accounts");
+
+        let dto = activity_row_to_dto(&row);
+        let obj = dto.as_object().expect("dto is an object");
+        for key in [
+            "blocking_pids",
+            "blocked",
+            "lock_mode",
+            "lock_type",
+            "lock_relation",
+        ] {
+            assert!(
+                !obj.contains_key(key),
+                "OSS must not serve `{key}` — absent, not null: {dto}"
+            );
+        }
+        // Present even though the stored row carries blockers: an omitted key
+        // must not be achievable by emptying the row.
+        assert_eq!(
+            dto["wait_event"],
+            json!("tuple"),
+            "wait_event is dual-use and stays on OSS"
+        );
+        assert_eq!(
+            dto["wait_event_type"],
+            json!("Lock"),
+            "wait_event_type is dual-use and stays on OSS"
+        );
+        // The rest of the tab is untouched.
+        assert_eq!(dto["session_pid"], json!(81517));
+        assert_eq!(dto["state"], json!("active"));
+    }
+
     /// `blocking_pids` is stored as a scalar (X5) but is a real ARRAY on the
     /// wire — the UI must be able to render N blockers.
+    ///
+    /// Enterprise-only: the five blocking fields are absent from the OSS DTO
+    /// (see `test_activity_dto_omits_the_blocking_fields_on_oss`), so there is
+    /// no array to assert there. Gated rather than deleted — the array-shape
+    /// contract still holds wherever the fields are served.
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_activity_dto_renders_blocking_pids_as_an_array() {
         let mut row = activity_row(81517, "active", "Lock", "tuple");
@@ -10956,8 +11124,23 @@ mod tests {
         assert_eq!(dto["wait_event_type"], json!("Lock"));
         assert_eq!(dto["db_system"], json!("postgresql"));
         assert_eq!(dto["db_namespace"], json!("dbmlab"));
-        assert_eq!(dto["blocking_pids"], json!([82334]));
-        assert_eq!(dto["blocked"], json!(true));
+        // The blocking relationship is the Blocked Queries capability, so only
+        // an enterprise build serves it. The round-trip itself — writer output
+        // in, wire DTO out — is what this test exists for and stays OSS.
+        #[cfg(feature = "enterprise")]
+        {
+            assert_eq!(dto["blocking_pids"], json!([82334]));
+            assert_eq!(dto["blocked"], json!(true));
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            let obj = dto.as_object().expect("dto is an object");
+            assert!(
+                !obj.contains_key("blocking_pids") && !obj.contains_key("blocked"),
+                "OSS must not serve the blocking relationship even when the \
+                 written row carries it: {dto}"
+            );
+        }
         assert!(
             !dto.to_string().contains("o2_dbm_"),
             "no storage name may reach the browser: {dto}"
@@ -12623,10 +12806,19 @@ mod tests {
         );
     }
 
-    /// D-F: everything stays OSS. An `#[cfg(feature = "enterprise")]` here would
-    /// 404 the endpoint on OSS builds.
+    /// **The table-health ROUTE stays registered unconditionally, even though
+    /// the capability is enterprise-only.**
+    ///
+    /// The gate lives in the HANDLER BODY, which answers 403 on OSS (see
+    /// `enterprise_read_endpoints_are_forbidden_on_oss`). An
+    /// `#[cfg(feature = "enterprise")]` on the route registration would instead
+    /// answer 404 — "no such endpoint" — and the UI would render a broken-build
+    /// or wrong-URL story rather than an upgrade prompt. This is the only
+    /// automated guard against someone reaching for the route-level `#[cfg]`,
+    /// so the assertion stands whether or not the capability is gated: it
+    /// checks the route still sits among its ungated DBM siblings.
     #[test]
-    fn test_table_health_endpoint_is_not_enterprise_gated() {
+    fn test_table_health_route_is_registered_ungated() {
         let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
         let idx = router
             .find("db_monitoring/table_health")
@@ -13061,6 +13253,57 @@ mod tests {
             !one_answers.all_forbidden(),
             "a non-auth failure is not a denial — the caller may retry, not be locked out"
         );
+    }
+
+    /// **The OSS badge strip: the three enterprise members read `null`, the
+    /// rest read their real counts, and the request is NOT a blanket 403.**
+    ///
+    /// This is the exact slice set `get_dbm_badges` builds on an OSS build —
+    /// the three enterprise reads are refused without ever running, and the
+    /// OSS three answer. Two things must hold together, and each protects
+    /// against a different regression:
+    ///
+    /// 1. `null`, never `0`. A `0` is an affirmative claim that this org had no deadlocks in the
+    ///    window; an OSS build did not look and cannot make it. `null` is what the strip already
+    ///    renders as a blank badge.
+    /// 2. No whole-request 403. `all_forbidden` must not consult the three always-denied members on
+    ///    OSS — if it did, this very set (three healthy answers plus three licence denials) would
+    ///    403 the caller out of badges that do work.
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn test_badges_on_oss_nulls_the_enterprise_three_without_denying_the_request() {
+        let slices = BadgeSliceResults {
+            databases: Ok(json!({"hits": [{"calls": 12}], "top_n_subset": false})),
+            queries: Ok(json!({"hits": [], "total": 7, "other": []})),
+            activity: Ok(json!({"hits": [], "by_state": [{"state": "active", "sessions": 3}]})),
+            // Exactly what the OSS arm of the join substitutes.
+            deadlocks: Err(unauthorized_response()),
+            blocking: Err(unauthorized_response()),
+            table_health: Err(unauthorized_response()),
+            server_queries: None,
+            server_samples: None,
+        };
+        assert!(
+            !slices.all_forbidden(),
+            "three licence denials must not deny a request whose OSS members all answered"
+        );
+
+        let env = slices.into_envelope();
+        for member in ["deadlocks", "blocking", "table_health"] {
+            assert_eq!(
+                env[member],
+                Value::Null,
+                "{member} must be null on OSS — a 0 would claim the window was read and empty"
+            );
+            assert_ne!(env[member], json!(0), "{member} must never read as 0");
+        }
+        assert_eq!(
+            env["databases"]["hits"][0]["calls"],
+            json!(12),
+            "the OSS members keep their real counts"
+        );
+        assert_eq!(env["queries"]["total"], json!(7));
+        assert_eq!(env["activity"]["by_state"][0]["sessions"], json!(3));
     }
 
     /// The route + re-export wiring, source-pinned like its siblings, and
