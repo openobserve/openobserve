@@ -39,7 +39,7 @@
 
 use std::borrow::Cow;
 
-use super::MAX_NORM_INPUT;
+use super::db_monitoring::MAX_NORM_INPUT;
 
 /// Lexer/routing dialect, keyed off the canonical `o2_db_system` value (design §3.2 routing
 /// table). SQL-lexer dialect modes: postgresql, mysql, mariadb (mysql mode), mssql, oracle,
@@ -125,12 +125,12 @@ fn lexer_err(position: usize, reason: &str) -> NormalizeError {
 
 /// gxhash64 (workspace default hash, seed 0) of the canonical (case-folded, placeholder-canonical)
 /// text, as 16 lowercase hex chars.
-pub(crate) fn fingerprint_hex(input: &str) -> String {
-    use config::utils::hash::Sum64;
-    format!("{:016x}", config::utils::hash::gxhash::new().sum64(input))
+pub fn fingerprint_hex(input: &str) -> String {
+    use crate::utils::hash::Sum64;
+    format!("{:016x}", crate::utils::hash::gxhash::new().sum64(input))
 }
 
-pub(crate) fn truncate_at_boundary(text: &str, max: usize) -> &str {
+pub fn truncate_at_boundary(text: &str, max: usize) -> &str {
     if text.len() <= max {
         return text;
     }

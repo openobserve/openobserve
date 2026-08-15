@@ -35,9 +35,9 @@
 //!    Correlating those into one event needs cross-record state, which a per-record VRL transform
 //!    cannot express.
 //! 2. **The fingerprint must match the span path byte-for-byte.** Participant SQL is run through
-//!    the SAME [`normalizer::normalize`] the span enrichment uses, so a deadlock JOINs to the query
-//!    rows the UI already shows (proof §2.6). gxhash + the dialect lexer are not reachable from
-//!    VRL.
+//!    the SAME [`config::meta::db_normalizer::normalize`] the span enrichment uses, so a deadlock
+//!    JOINs to the query rows the UI already shows (proof §2.6). gxhash + the dialect lexer are not
+//!    reachable from VRL.
 //! 3. **Schema drift must be absorbed once.** Read-time normalization would spread the vendor
 //!    vocabulary across every query and every UI component — precisely what D1 exists to prevent;
 //!    when a receiver renames a field, one `FieldAliases` table changes here instead.
@@ -66,170 +66,21 @@
 
 use std::collections::BTreeMap;
 
+// ─── Canonical column names (the stable read surface) ────────────────────────
+//
+// The shared vocabulary — the 83-member `ALL_DBM_FIELDS`, every `O2_DBM_*` and
+// `KIND_*` const, and the receiver-field parsing helpers — lives in `config` so
+// `o2_enterprise` can reach it. Enterprise cannot depend on this crate (Cargo
+// rejects the cycle), but both crates depend on `config`. Re-exported here so
+// the ~250 existing `server_vantage::` call sites keep resolving unchanged.
+//
+// A glob re-export does not collide with items still defined locally — locals
+// shadow globs — so `RESERVED_DBM_PREFIX`, `WarnDecision` and friends below are
+// unaffected.
+pub use config::meta::db_monitoring::*;
 use serde_json::{Map, Value, json};
 
-use super::{Dialect, normalizer, route_dialect};
-
-// ─── Canonical column names (the stable read surface) ────────────────────────
-
-/// Record kind discriminator: `deadlock` | `blocking`.
-pub const O2_DBM_KIND: &str = "o2_dbm_kind";
-/// Engine: `postgresql` | `mysql` | … (same vocabulary as `o2_db_system`).
-pub const O2_DBM_ENGINE: &str = "o2_dbm_engine";
-/// Database / schema name the event occurred in.
-pub const O2_DBM_DATABASE: &str = "o2_dbm_database";
-/// Server instance (host, port-stripped) — joins to `o2_db_instance` on spans.
-pub const O2_DBM_INSTANCE: &str = "o2_dbm_instance";
-/// Event time in microseconds.
-pub const O2_DBM_TIMESTAMP: &str = "o2_dbm_timestamp";
-/// Raw receiver body, always retained (schemas are Development-stability: keep the evidence).
-pub const O2_DBM_RAW: &str = "o2_dbm_raw";
-
-// deadlock-specific
-/// PID/thread the engine chose to abort.
-pub const O2_DBM_VICTIM_PID: &str = "o2_dbm_victim_pid";
-/// Assembled participant array (see [`Participant`]).
-pub const O2_DBM_PARTICIPANTS: &str = "o2_dbm_participants";
-/// Count of participants — cheap ranking column so the UI need not unpack the array.
-pub const O2_DBM_PARTICIPANT_COUNT: &str = "o2_dbm_participant_count";
-/// MySQL only: side number InnoDB rolled back, from its separately-logged
-/// `*** WE ROLL BACK TRANSACTION (N)` entry. Joined to participants at read time.
-pub const O2_DBM_VICTIM_SIDE: &str = "o2_dbm_victim_side";
-
-// blocking-specific
-pub const O2_DBM_BLOCKED_PID: &str = "o2_dbm_blocked_pid";
-pub const O2_DBM_BLOCKED_APP: &str = "o2_dbm_blocked_app";
-pub const O2_DBM_BLOCKED_QUERY: &str = "o2_dbm_blocked_query";
-pub const O2_DBM_BLOCKED_FINGERPRINT: &str = "o2_dbm_blocked_fingerprint";
-pub const O2_DBM_BLOCKING_PID: &str = "o2_dbm_blocking_pid";
-pub const O2_DBM_BLOCKING_APP: &str = "o2_dbm_blocking_app";
-pub const O2_DBM_BLOCKING_QUERY: &str = "o2_dbm_blocking_query";
-pub const O2_DBM_BLOCKING_FINGERPRINT: &str = "o2_dbm_blocking_fingerprint";
-pub const O2_DBM_WAIT_EVENT_TYPE: &str = "o2_dbm_wait_event_type";
-pub const O2_DBM_WAIT_EVENT: &str = "o2_dbm_wait_event";
-pub const O2_DBM_WAIT_SECONDS: &str = "o2_dbm_wait_seconds";
-
-/// Every canonical field, for reservation against user-supplied keys (D1 condition 1).
-///
-/// Note this array does triple duty: write-side strip list (here), read-side projection
-/// allowlist (`api.rs` `present_dbm_columns`, schema-intersected so unknown entries are
-/// harmless), and schema gate. Adding an entry grows every DBM read's projection.
-pub const ALL_DBM_FIELDS: [&str; 83] = [
-    O2_DBM_KIND,
-    O2_DBM_ENGINE,
-    O2_DBM_DATABASE,
-    O2_DBM_INSTANCE,
-    O2_DBM_TIMESTAMP,
-    O2_DBM_RAW,
-    O2_DBM_VICTIM_PID,
-    O2_DBM_PARTICIPANTS,
-    O2_DBM_PARTICIPANT_COUNT,
-    O2_DBM_VICTIM_SIDE,
-    O2_DBM_BLOCKED_PID,
-    O2_DBM_BLOCKED_APP,
-    O2_DBM_BLOCKED_QUERY,
-    O2_DBM_BLOCKED_FINGERPRINT,
-    O2_DBM_BLOCKING_PID,
-    O2_DBM_BLOCKING_APP,
-    O2_DBM_BLOCKING_QUERY,
-    O2_DBM_BLOCKING_FINGERPRINT,
-    O2_DBM_WAIT_EVENT_TYPE,
-    O2_DBM_WAIT_EVENT,
-    O2_DBM_WAIT_SECONDS,
-    "o2_dbm_query_shape",
-    O2_EVENT_NAME,
-    // W2 · activity columns.
-    O2_DBM_SESSION_PID,
-    O2_DBM_SESSION_USER,
-    O2_DBM_SESSION_APP,
-    O2_DBM_SESSION_STATE,
-    O2_DBM_QUERY_START,
-    O2_DBM_XACT_START,
-    O2_DBM_WAIT_START,
-    O2_DBM_DURATION_MS,
-    O2_DBM_EXEC_TIME_MS,
-    O2_DBM_SERVER_QUERY_ID,
-    O2_DBM_ACTIVITY_QUERY,
-    O2_DBM_FINGERPRINT,
-    O2_DBM_BLOCKING_PIDS,
-    O2_DBM_LOCK_MODE,
-    O2_DBM_LOCK_TYPE,
-    O2_DBM_LOCK_RELATION,
-    O2_DBM_CLIENT_ADDR,
-    O2_DBM_CLIENT_HOST,
-    O2_DBM_CLIENT_PORT,
-    // W3 · top-query + plan columns.
-    O2_DBM_PLAN,
-    O2_DBM_PLAN_HASH,
-    O2_DBM_PLAN_HASH_VERSION,
-    O2_DBM_CALLS,
-    O2_DBM_ROWS,
-    O2_DBM_EXEC_TIME_S,
-    O2_DBM_SHARED_BLKS_HIT,
-    O2_DBM_SHARED_BLKS_READ,
-    O2_DBM_SHARED_BLKS_DIRTIED,
-    O2_DBM_SHARED_BLKS_WRITTEN,
-    O2_DBM_TEMP_BLKS_READ,
-    O2_DBM_TEMP_BLKS_WRITTEN,
-    O2_DBM_METRICS_ARE_DELTA,
-    O2_DBM_RECEIVER_VERSION,
-    // W-E3 · executed-plan (auto_explain) columns. `plan_source` is stamped on
-    // EVERY plan-bearing row (generic and executed), so it must be reserved
-    // like the rest — a caller-supplied value would let a forged record claim
-    // executed-plan provenance.
-    O2_DBM_PLAN_SOURCE,
-    O2_DBM_PLAN_DURATION_MS,
-    O2_DBM_PLAN_ROWS_ACTUAL,
-    // W10 · table health columns.
-    O2_DBM_RELATION,
-    O2_DBM_SCHEMA,
-    O2_DBM_TOTAL_BYTES,
-    O2_DBM_HEAP_BYTES,
-    O2_DBM_LIVE_TUPLES,
-    O2_DBM_DEAD_TUPLES,
-    O2_DBM_DEAD_TUP_PCT,
-    O2_DBM_MOD_SINCE_ANALYZE,
-    O2_DBM_SEQ_SCAN_COUNT,
-    O2_DBM_SEQ_TUP_READ,
-    O2_DBM_IDX_SCAN_COUNT,
-    O2_DBM_AUTOVACUUM_COUNT,
-    O2_DBM_FROZEN_XID_AGE,
-    O2_DBM_LAST_VACUUM,
-    O2_DBM_LAST_AUTOVACUUM,
-    O2_DBM_LAST_ANALYZE,
-    O2_DBM_COUNTERS_ARE_CUMULATIVE,
-    O2_DBM_TUPLES_ARE_ESTIMATED,
-    // W11 · index health columns. `o2_dbm_relation`, `o2_dbm_schema` and
-    // `o2_dbm_idx_scan_count` are SHARED with table health above rather than
-    // duplicated: an index's scan count is the same measurement on the same
-    // catalog, and a second column for it would let the two disagree.
-    O2_DBM_INDEX_NAME,
-    O2_DBM_INDEX_BYTES,
-    O2_DBM_IDX_TUP_READ,
-    O2_DBM_IDX_TUP_FETCH,
-    O2_DBM_INDEX_IS_UNIQUE,
-    // W-S1 · completed-statement duration (log_min_duration_statement).
-    O2_DBM_STMT_DURATION_MS,
-];
-
 // ─── OTLP event name (W1) ────────────────────────────────────────────────────
-
-/// The OTLP LogRecord `EventName`, surfaced onto the flattened log record.
-///
-/// The `postgresqlreceiver`/`mysqlreceiver` log events (`db.server.query_sample`,
-/// `db.server.top_query`) carry their discriminator ONLY in the OTLP `EventName`
-/// field — it is not an attribute, and the Body is unset. Logs ingest dropped it, so
-/// nothing downstream could tell the two events apart; `logs/otlp.rs` now surfaces it
-/// under this key.
-///
-/// It is a member of [`ALL_DBM_FIELDS`], so [`apply_to_record`] strips any
-/// caller-supplied value. See [`event_name_of`] for why that strip is unconditional.
-pub const O2_EVENT_NAME: &str = "o2_event_name";
-
-/// Receiver event name: one sampled session row from `pg_stat_activity`.
-pub const EVENT_QUERY_SAMPLE: &str = "db.server.query_sample";
-/// Receiver event name: one aggregated statement row from `pg_stat_statements`.
-pub const EVENT_TOP_QUERY: &str = "db.server.top_query";
 
 /// Read the OTLP-derived event name off a record.
 ///
@@ -294,49 +145,6 @@ pub fn resolve_event_name(rec: &Map<String, Value>) -> Option<&str> {
 // disagree the measurement wins — three of the columns an earlier draft
 // specified (`state_change`, `duration_ms`, `client_addr`) do not exist on the
 // wire at all, and reserving them would have shipped permanently-null columns.
-
-/// Backend pid (Postgres) or session/thread id (MySQL) — the session identity.
-pub const O2_DBM_SESSION_PID: &str = "o2_dbm_session_pid";
-pub const O2_DBM_SESSION_USER: &str = "o2_dbm_session_user";
-/// Client `application_name` — the pivot back to a service in the trace store.
-pub const O2_DBM_SESSION_APP: &str = "o2_dbm_session_app";
-/// `active` / `idle` / `idle in transaction` (PG); `running` / `waiting` (MySQL).
-pub const O2_DBM_SESSION_STATE: &str = "o2_dbm_session_state";
-/// When the CURRENT (or last) statement started.
-pub const O2_DBM_QUERY_START: &str = "o2_dbm_query_start";
-/// When the TRANSACTION started — a different clock from [`O2_DBM_QUERY_START`],
-/// and the one that ages an `idle in transaction` session.
-pub const O2_DBM_XACT_START: &str = "o2_dbm_xact_start";
-/// When the lock wait began (blocked sessions only).
-pub const O2_DBM_WAIT_START: &str = "o2_dbm_wait_start";
-/// Elapsed time of a session whose query is STILL RUNNING. Written only when
-/// [`ActivitySample::duration_is_live`] — see the state-dependent trap below.
-pub const O2_DBM_DURATION_MS: &str = "o2_dbm_duration_ms";
-/// Statement execution time in MILLISECONDS.
-///
-/// The unit is in the name deliberately. `total_exec_time` is SECONDS on
-/// `top_query` but genuine MILLISECONDS on `query_sample` — the same attribute
-/// name carrying two units, measured at a uniform ~1000.3 ratio against
-/// `pg_stat_statements` ground truth. A unit-less column name is how that
-/// ambiguity propagates into a 1000x wrong number on a latency page.
-pub const O2_DBM_EXEC_TIME_MS: &str = "o2_dbm_exec_time_ms";
-/// The engine's OWN statement id, stored verbatim: PG `query_id` (a SIGNED
-/// 64-bit hash — 41% of real values are negative) or the MySQL digest. This is
-/// the join key between server-vantage events; the fingerprint below is the
-/// separate join key to client spans.
-pub const O2_DBM_SERVER_QUERY_ID: &str = "o2_dbm_server_query_id";
-pub const O2_DBM_ACTIVITY_QUERY: &str = "o2_dbm_activity_query";
-/// Cross-vantage join key — identical to the span path's `o2_db_fingerprint`.
-pub const O2_DBM_FINGERPRINT: &str = "o2_dbm_fingerprint";
-/// Blocker pids, comma-joined. A SCALAR, never an array — see [`to_record`].
-pub const O2_DBM_BLOCKING_PIDS: &str = "o2_dbm_blocking_pids";
-pub const O2_DBM_LOCK_MODE: &str = "o2_dbm_lock_mode";
-pub const O2_DBM_LOCK_TYPE: &str = "o2_dbm_lock_type";
-pub const O2_DBM_LOCK_RELATION: &str = "o2_dbm_lock_relation";
-/// Where the session connected FROM — "which host to go kill".
-pub const O2_DBM_CLIENT_ADDR: &str = "o2_dbm_client_addr";
-pub const O2_DBM_CLIENT_HOST: &str = "o2_dbm_client_host";
-pub const O2_DBM_CLIENT_PORT: &str = "o2_dbm_client_port";
 
 /// The unblocked sentinel for `postgresql.blocking.pids`.
 ///
@@ -653,16 +461,6 @@ pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySam
     })
 }
 
-/// Record kind: one sampled active session.
-pub const KIND_ACTIVITY: &str = "activity";
-
-/// Record kind values.
-pub const KIND_DEADLOCK: &str = "deadlock";
-pub const KIND_BLOCKING: &str = "blocking";
-
-/// Max stored query text per participant — same cap the span path applies to `o2_db_query_norm`.
-const MAX_PARTICIPANT_QUERY: usize = 4096;
-
 // ─── Canonical structures ────────────────────────────────────────────────────
 
 /// One side of a deadlock cycle.
@@ -788,177 +586,7 @@ pub struct BlockingSample {
 
 // ─── Receiver-field aliases (the ONLY place vendor names appear) ─────────────
 
-/// Read the first present, non-empty value among `keys`, as a string.
-fn first_str(rec: &Map<String, Value>, keys: &[&str]) -> Option<String> {
-    for k in keys {
-        match rec.get(*k) {
-            Some(Value::String(s)) if !s.is_empty() => return Some(s.clone()),
-            Some(Value::Number(n)) => return Some(n.to_string()),
-            _ => {}
-        }
-    }
-    None
-}
-
-/// Read the first present value among `keys` as an i64 — receivers frequently ship numeric
-/// columns as STRINGS (`sqlqueryreceiver` `attribute_columns` are all text), so both forms parse.
-fn first_i64(rec: &Map<String, Value>, keys: &[&str]) -> Option<i64> {
-    for k in keys {
-        match rec.get(*k) {
-            Some(Value::Number(n)) => {
-                if let Some(i) = n.as_i64() {
-                    return Some(i);
-                }
-                if let Some(f) = n.as_f64() {
-                    return Some(f as i64);
-                }
-            }
-            Some(Value::String(s)) if !s.is_empty() => {
-                if let Ok(i) = s.trim().parse::<i64>() {
-                    return Some(i);
-                }
-                if let Ok(f) = s.trim().parse::<f64>() {
-                    return Some(f as i64);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
-fn first_f64(rec: &Map<String, Value>, keys: &[&str]) -> Option<f64> {
-    for k in keys {
-        match rec.get(*k) {
-            Some(Value::Number(n)) => return n.as_f64(),
-            Some(Value::String(s)) if !s.is_empty() => {
-                if let Ok(f) = s.trim().parse::<f64>() {
-                    return Some(f);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
-/// Engine detection. The recipes tag every record, but a bare filelog record may not be tagged,
-/// so vendor-specific field presence is the fallback.
-fn detect_engine(rec: &Map<String, Value>) -> Option<String> {
-    if let Some(sys) = first_str(rec, &["db_system_name", "db_system"]) {
-        return Some(super::canonical_system(&sys));
-    }
-    // The blocking recipes' `sqlqueryreceiver` rows carry ONLY the columns the recipe selects —
-    // no `pg_*`/`my_*` field and no `db_system`. Without this the engine (and therefore the
-    // `?system=` filter on /blocking) is null for every blocking sample, even though the recipe
-    // tag names the engine unambiguously.
-    match rec.get("o2_recipe").and_then(|v| v.as_str()) {
-        Some("pg_blocking_chain") => return Some("postgresql".to_string()),
-        Some("mysql_lock_waits") => return Some("mysql".to_string()),
-        // MariaDB's blocking SQL is a copy of MySQL's, so the TAG is the only
-        // thing distinguishing the two servers here.
-        Some("mariadb_lock_waits") => return Some("mariadb".to_string()),
-        Some("mssql_blocking_chain") | Some("mssql_deadlock") => {
-            return Some("mssql".to_string());
-        }
-        // The table/index health recipes — the tag names the engine for the
-        // same reason the blocking tags above do: a sqlquery row carries ONLY
-        // the columns the recipe selects, and the three engines' recipes emit
-        // the SAME column aliases by design, so the tag is the only
-        // discriminator there is.
-        Some("pg_table_stats") | Some("pg_index_stats") => {
-            return Some("postgresql".to_string());
-        }
-        Some("mysql_table_stats") | Some("mysql_index_stats") => {
-            return Some("mysql".to_string());
-        }
-        Some("mariadb_table_stats") | Some("mariadb_index_stats") => {
-            return Some("mariadb".to_string());
-        }
-        _ => {}
-    }
-    if rec.contains_key("o2_pg_event")
-        || rec
-            .keys()
-            .any(|k| k.starts_with("dl_") || k.starts_with("pg_"))
-    {
-        return Some("postgresql".to_string());
-    }
-    // MariaDB BEFORE MySQL: `maria_*` does not start with `my_`, so the order is
-    // not strictly required today — but keeping it first documents the intent and
-    // survives anyone shortening the prefix later. Mislabelling here is not
-    // cosmetic: `stitch_mysql_deadlocks` groups on (engine, instance, database)
-    // with "" defaults, so a MariaDB row calling itself "mysql" could merge with a
-    // real MySQL deadlock and fabricate a cross-server event.
-    if rec.contains_key("o2_maria_event") || rec.keys().any(|k| k.starts_with("maria_")) {
-        return Some("mariadb".to_string());
-    }
-    if rec.contains_key("o2_my_event") || rec.keys().any(|k| k.starts_with("my_")) {
-        return Some("mysql".to_string());
-    }
-    None
-}
-
-fn detect_database(rec: &Map<String, Value>) -> Option<String> {
-    first_str(
-        rec,
-        &[
-            "pg_db",
-            "datname",
-            "db_namespace",
-            "schema_name",
-            "my_db",
-            "database",
-        ],
-    )
-}
-
-fn detect_instance(rec: &Map<String, Value>) -> Option<String> {
-    first_str(
-        rec,
-        &[
-            "server_address",
-            "net_peer_name",
-            "db_instance",
-            "host_name",
-            "instance",
-        ],
-    )
-    .map(|a| super::strip_port(&a))
-}
-
-fn detect_timestamp(rec: &Map<String, Value>) -> Option<i64> {
-    // `_timestamp` is resolved by the ingest path before canonicalization runs, so it is
-    // trustworthy; the canonical name is an output only.
-    first_i64(rec, &["_timestamp"])
-}
-
 // ─── Query fingerprinting (Deliverable D — the cross-vantage join) ───────────
-
-/// Normalize a server-logged statement through the SAME path the span enrichment uses.
-///
-/// Returns `(query_norm, fingerprint)`. Per the design §3.2 failure rule, a lexer error yields
-/// NO normalized text and NO fingerprint — raw text is never used as fallback normalized text,
-/// and a fabricated fingerprint would join a deadlock to the wrong query row.
-pub fn fingerprint_statement(text: &str, engine: Option<&str>) -> (Option<String>, Option<String>) {
-    let trimmed = text.trim();
-    if trimmed.is_empty() {
-        return (None, None);
-    }
-    let dialect = engine
-        .and_then(route_dialect)
-        .unwrap_or(Dialect::Postgresql);
-    match normalizer::normalize(trimmed, dialect) {
-        Ok(ns) => {
-            let norm = ns
-                .query_norm
-                .as_deref()
-                .map(|s| normalizer::truncate_at_boundary(s, MAX_PARTICIPANT_QUERY).to_string());
-            (norm, Some(ns.fingerprint))
-        }
-        Err(_) => (None, None),
-    }
-}
 
 // ─── Canonicalization entry points ───────────────────────────────────────────
 
@@ -1452,22 +1080,6 @@ impl BlockingSample {
     }
 }
 
-/// Numbers arrive as JSON numbers from our own canonicalizer but as STRINGS when a record was
-/// canonicalized by a VRL pipeline (all `sqlqueryreceiver` columns are text).
-pub(crate) fn as_i64_loose(v: &Value) -> Option<i64> {
-    match v {
-        Value::Number(n) => n.as_i64(),
-        Value::String(s) => s.trim().parse().ok(),
-        _ => None,
-    }
-}
-
-fn insert_opt(out: &mut BTreeMap<String, Value>, key: &str, val: Option<String>) {
-    if let Some(v) = val.filter(|s| !s.is_empty()) {
-        out.insert(key.to_string(), json!(v));
-    }
-}
-
 /// Read `o2_dbm_participants` off a stored row, tolerating BOTH storage forms.
 ///
 /// The canonical write path stores the array as a JSON **string** (Invariant 2,
@@ -1486,46 +1098,6 @@ pub fn participants_of(row: &Value) -> Vec<Participant> {
     arr.map(|a| a.iter().map(Participant::from_json).collect())
         .unwrap_or_default()
 }
-
-/// Apply server-vantage canonicalization to one flattened log record, in place.
-///
-/// This is the hook every logs ingest path must call, and it MUST run before
-/// `refactor_map` so a user-defined schema listing the canonical columns keeps them
-/// (D1 condition 2).
-///
-/// It first drops any client-supplied `o2_dbm_*` key — the strip half of Invariant 1
-/// (module docs).
-///
-/// No-ops when db_monitoring is disabled, so callers need no `cfg` check of their own.
-///
-/// # Why a shared helper
-///
-/// The OTLP logs path (`logs/otlp.rs`) assembles records at THREE separate sites and the JSON
-/// path (`logs/ingest.rs`) at one. The canonicalizer was originally inlined at the JSON site
-/// only, which meant the shipped collector recipes — every one of which exports over OTLP to
-/// `/v1/logs` — ingested raw `dl_*`/`my_*` fields and produced ZERO `o2_dbm_*` columns, so the
-/// read endpoints returned nothing from real captured data. Centralizing the logic here means a
-/// new ingest path gets it by calling one function.
-/// Every `o2_recipe` tag [`canonicalize_record`] dispatches on.
-///
-/// This is the SAME list the dispatch arms below match, held once so the two
-/// cannot drift: a new recipe added to dispatch but not to this array would be
-/// reported to its author as unrecognized while working perfectly, which is a
-/// worse lie than the silence W8 exists to fix.
-/// `w8_recognized_recipes_match_the_dispatch_arms` pins the pairing.
-pub const RECOGNIZED_RECIPES: [&str; 11] = [
-    "pg_blocking_chain",
-    "mysql_lock_waits",
-    "mariadb_lock_waits",
-    "mssql_blocking_chain",
-    "mssql_deadlock",
-    "pg_table_stats",
-    "pg_index_stats",
-    "mysql_table_stats",
-    "mysql_index_stats",
-    "mariadb_table_stats",
-    "mariadb_index_stats",
-];
 
 /// The tag on a record whose `o2_recipe` matches no dispatch arm, if any (W8).
 ///
@@ -1871,124 +1443,7 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
 //   * Latency is NEVER attributed to a plan. Per-plan latency would come from `pg_stat_statements`
 //     real executions while this plan was never executed, so correlating them fabricates causality.
 
-/// The EXPLAIN document, stored as a JSON **string** (Invariant 2, module docs
-/// — a plan is a tree, and the deadlock path already paid for storing one
-/// nested). [`plan_of`] is its tolerant reader.
-pub const O2_DBM_PLAN: &str = "o2_dbm_plan";
-/// Structural hash of [`O2_DBM_PLAN`] — see [`plan_hash`].
-pub const O2_DBM_PLAN_HASH: &str = "o2_dbm_plan_hash";
-/// The [`PLAN_HASH_VERSION`] that produced [`O2_DBM_PLAN_HASH`].
-///
-/// Stored as a COLUMN, mirroring how `FP_VERSION` is stored as `o2_db_fp_version`
-/// rather than only living in code. Without it a hashing-scheme change silently
-/// compares incomparable hashes — the exact failure versioning exists to prevent.
-pub const O2_DBM_PLAN_HASH_VERSION: &str = "o2_dbm_plan_hash_version";
-pub const O2_DBM_CALLS: &str = "o2_dbm_calls";
-pub const O2_DBM_ROWS: &str = "o2_dbm_rows";
-/// Statement execution time in SECONDS.
-///
-/// The unit is in the name deliberately, and it is the OPPOSITE of
-/// [`O2_DBM_EXEC_TIME_MS`] on `query_sample`. `postgresql.total_exec_time` is
-/// spelled identically on both events and carries different units on each:
-/// upstream #50113 has `convertMillisecondToSecond` dividing by 1000 here, while
-/// `query_sample` computes `* 1e3` in SQL and is genuine milliseconds. Measured
-/// at a uniform ~1000.3 ratio against `pg_stat_statements` ground truth. A
-/// unit-less column name is how that ambiguity becomes a 1000x wrong number.
-pub const O2_DBM_EXEC_TIME_S: &str = "o2_dbm_exec_time_s";
-pub const O2_DBM_SHARED_BLKS_HIT: &str = "o2_dbm_shared_blks_hit";
-pub const O2_DBM_SHARED_BLKS_READ: &str = "o2_dbm_shared_blks_read";
-pub const O2_DBM_SHARED_BLKS_DIRTIED: &str = "o2_dbm_shared_blks_dirtied";
-pub const O2_DBM_SHARED_BLKS_WRITTEN: &str = "o2_dbm_shared_blks_written";
-pub const O2_DBM_TEMP_BLKS_READ: &str = "o2_dbm_temp_blks_read";
-pub const O2_DBM_TEMP_BLKS_WRITTEN: &str = "o2_dbm_temp_blks_written";
-/// Marks the counters on this row as PER-INTERVAL DELTAS, not cumulative.
-///
-/// Measured: the first emission per statement carries the whole
-/// `pg_stat_statements` backlog (19687 calls), and every subsequent one is a
-/// per-interval delta (2 calls). Summing them as cumulative double-counts the
-/// backlog; treating the first as a delta renders a false spike at every
-/// collector restart.
-///
-/// We cannot distinguish the two from a single record — the receiver ships no
-/// flag and no reset counter — so the marker is UNCONDITIONAL. A marker present
-/// on only some rows would be read as a claim that the others are cumulative.
-pub const O2_DBM_METRICS_ARE_DELTA: &str = "o2_dbm_metrics_are_delta";
-/// The emitting receiver's version, when the record carried one.
-///
-/// A unit test pins OUR PARSER, not the wire: when upstream fixes #50113 and
-/// `total_exec_time` becomes milliseconds, that test stays green while stored
-/// values silently become wrong by three orders of magnitude. This stamp is what
-/// makes the change recoverable after the fact — `0.158.0` means seconds.
-///
-/// Free to collect: logs ingest already flattens the OTLP scope version
-/// (`logs/otlp.rs:185`), and the emitting scope IS the receiver.
-///
-/// **The stamp is deliberately the WHOLE mitigation; the "drop values outside
-/// plausible bounds" half of spec §6's risk row is declined, not overlooked.**
-/// Measured across 9,028 captured records, legitimate `total_exec_time` spans
-/// 2.9e-7 to 118,335 seconds — nine orders of magnitude, because the first
-/// emission per statement carries the entire `pg_stat_statements` backlog while
-/// later ones are per-interval deltas. No bound is simultaneously tight enough
-/// to catch a 1000x unit flip and loose enough to admit a real cumulative
-/// backlog, so any bound worth having would discard real data. Silently
-/// dropping a measured number is the failure shape this feature's empty states
-/// exist to prevent: the page would look healthy and be wrong. The stamp makes
-/// a unit change detectable after the fact instead, which is recoverable.
-pub const O2_DBM_RECEIVER_VERSION: &str = "o2_dbm_receiver_version";
-
 // ─── W-E3 · Executed plans (auto_explain) — per-record plan provenance ───────
-
-/// WHO produced the plan on this row — the per-record honesty field (E-C).
-///
-/// Two producers write [`O2_DBM_PLAN`] now, and they support different claims:
-/// the receiver's generic NULL-bound estimate was never executed, while an
-/// auto_explain document is the plan Postgres actually ran. A response-level
-/// constant cannot distinguish them inside one window, so provenance is stored
-/// per record and read back per hit. Rows written before this column existed
-/// are, with certainty, generic — nothing else could have written them — so
-/// the reader treats absent ⇒ [`PLAN_SOURCE_GENERIC`], defaulting to the
-/// WEAKER claim.
-pub const O2_DBM_PLAN_SOURCE: &str = "o2_dbm_plan_source";
-/// The executed wall-clock duration of THIS execution, in milliseconds — the
-/// number in auto_explain's `duration: N.NNN ms  plan:` header.
-///
-/// Deliberately not [`O2_DBM_EXEC_TIME_S`] (top_query interval-aggregate
-/// seconds) nor [`O2_DBM_EXEC_TIME_MS`] (query_sample state-dependent
-/// milliseconds): a third meaning needs a third name, per the unit-in-the-name
-/// discipline those two established.
-pub const O2_DBM_PLAN_DURATION_MS: &str = "o2_dbm_plan_duration_ms";
-/// Rows the plan's root node ACTUALLY returned (`Actual Rows`, present only
-/// when `auto_explain.log_analyze = on`). [`O2_DBM_ROWS`] is the top_query
-/// interval delta — a different measurement.
-pub const O2_DBM_PLAN_ROWS_ACTUAL: &str = "o2_dbm_plan_rows_actual";
-/// [`O2_DBM_PLAN_SOURCE`] value: the receiver's generic, NULL-bound,
-/// never-executed EXPLAIN estimate (the W3 producer).
-pub const PLAN_SOURCE_GENERIC: &str = "generic_null_bound";
-/// [`O2_DBM_PLAN_SOURCE`] value: a real executed plan captured by
-/// Postgres `auto_explain`.
-pub const PLAN_SOURCE_AUTO_EXPLAIN: &str = "auto_explain";
-
-/// Record kind: one aggregated statement, with its plan when one was captured.
-///
-/// **This feed is a most-FREQUENT top-N, not a most-EXPENSIVE one, and that
-/// cannot be corrected downstream.** The receiver's `top_query` SQL orders by
-/// `calls DESC` and sends only the top slice, so the expensive-but-infrequent
-/// statement — the nightly report that runs four times and takes nine minutes,
-/// which is exactly what a DBA opens this page to find — never arrives at all.
-/// No read-side re-ranking can recover a row that was never sent.
-///
-/// Labelling is therefore the only honest option, and it is chosen deliberately
-/// over re-ranking (spec §6.1, which requires W3.1 to state which). Anything
-/// rendering these rows must say it is ranking by call count; a list titled
-/// "Top queries" with no qualifier reads as "your slowest queries" and is
-/// complete-looking enough that nobody checks.
-pub const KIND_TOP_QUERY: &str = "top_query";
-
-/// Plan-hashing algorithm version (`o2_dbm_plan_hash_version`).
-///
-/// Bump ONLY with a release note: like `FP_VERSION`, a bump is a discontinuity
-/// for every stored hash, and every stored hash is a comparison key.
-pub const PLAN_HASH_VERSION: u32 = 1;
 
 /// One aggregated statement (`db.server.top_query`), canonicalized.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -2313,9 +1768,6 @@ fn walk_plan_structure(node: &Value, out: &mut String, fields: &mut usize) {
 // Merging them would put a single-execution duration into a column family
 // whose entire contract is "these are interval deltas".
 
-/// Record kind: one real executed plan, captured by Postgres `auto_explain`.
-pub const KIND_EXPLAIN: &str = "explain";
-
 /// Rewrap an auto_explain document into the receiver's plan shape, so the two
 /// producers' hashes are comparable.
 ///
@@ -2504,22 +1956,6 @@ pub fn canonicalize_pg_auto_explain(rec: &Map<String, Value>) -> Option<AutoExpl
 // without a producer would be dead code that looks like coverage; it is
 // deferred until a slow-log tailer ships. See the dispatch note in
 // [`canonicalize_record`].
-
-/// Record kind: one completed statement execution with its exact duration.
-pub const KIND_STATEMENT: &str = "statement";
-
-/// The completed execution's duration in MILLISECONDS — the number in the
-/// `duration: N.NNN ms` header.
-///
-/// A FOURTH duration name, per the unit-in-the-name discipline the other three
-/// established, because it is a fourth meaning: [`O2_DBM_EXEC_TIME_MS`] is a
-/// query_sample's state-dependent elapsed/last-completed time,
-/// [`O2_DBM_DURATION_MS`] is a still-running session's elapsed-so-far, and
-/// [`O2_DBM_PLAN_DURATION_MS`] is an auto_explain execution. This one is the
-/// engine's own completed-statement measurement — in-engine time from
-/// statement start to completion, which no client necessarily experienced
-/// (network and connection-pool wait are not in it).
-pub const O2_DBM_STMT_DURATION_MS: &str = "o2_dbm_stmt_duration_ms";
 
 /// One completed statement execution, canonicalized.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -2715,100 +2151,6 @@ pub fn canonicalize_pg_statement_duration(
 // collected for this engine" rather than render an empty table that reads as
 // "no problems found".
 
-/// Record kind: one RELATION's storage and maintenance state at one snapshot.
-///
-/// Deliberately NOT one of the four existing kinds — see the module note above.
-pub const KIND_TABLE_STATS: &str = "table_stats";
-
-/// The table name. Arrives in `body`, because the recipe declares `table_name`
-/// as its `body_column` rather than an attribute.
-pub const O2_DBM_RELATION: &str = "o2_dbm_relation";
-/// The SCHEMA the relation lives in — NOT a database.
-///
-/// The recipe emits no `db.namespace`: `pg_class` and `pg_stat_user_tables` are
-/// per-database catalogs, so the database is implicit in the collector's
-/// connection and never appears on the row. `detect_database`'s alias list
-/// already contains `schema_name`, so reusing it here would file every
-/// `public.orders` under a DATABASE named `public` and grow the Databases page
-/// a database that does not exist. The schema is stored under its own name and
-/// the database is left ABSENT, which is the honest reading of a row that was
-/// never told one.
-pub const O2_DBM_SCHEMA: &str = "o2_dbm_schema";
-/// `pg_total_relation_size` — heap + indexes + TOAST.
-pub const O2_DBM_TOTAL_BYTES: &str = "o2_dbm_total_bytes";
-/// `pg_relation_size` — the heap alone. Total minus heap is the index+TOAST
-/// overhead, which is the number a "my indexes are bigger than my table"
-/// reading needs.
-pub const O2_DBM_HEAP_BYTES: &str = "o2_dbm_heap_bytes";
-/// ESTIMATED live row count (`n_live_tup`). See [`O2_DBM_TUPLES_ARE_ESTIMATED`].
-pub const O2_DBM_LIVE_TUPLES: &str = "o2_dbm_live_tuples";
-/// ESTIMATED dead row count (`n_dead_tup`).
-pub const O2_DBM_DEAD_TUPLES: &str = "o2_dbm_dead_tuples";
-/// Dead tuples as a percentage of live+dead, computed by the recipe.
-///
-/// Fractional, and parsed as `f64` deliberately: the recipe rounds to two
-/// decimals, so an integer parse turns every bloat figure under 1% into `0` and
-/// erases exactly the low-but-rising range a bloat trend is read from.
-pub const O2_DBM_DEAD_TUP_PCT: &str = "o2_dbm_dead_tup_pct";
-/// Rows changed since the last ANALYZE — how stale the planner's statistics are.
-pub const O2_DBM_MOD_SINCE_ANALYZE: &str = "o2_dbm_mod_since_analyze";
-/// Sequential scans, LIFETIME. See [`O2_DBM_COUNTERS_ARE_CUMULATIVE`].
-pub const O2_DBM_SEQ_SCAN_COUNT: &str = "o2_dbm_seq_scan_count";
-/// Rows returned by those sequential scans, LIFETIME.
-pub const O2_DBM_SEQ_TUP_READ: &str = "o2_dbm_seq_tup_read";
-/// Index scans against this table, LIFETIME.
-///
-/// A live table with `idx_scan = 0` is the never-index-scanned signal W11 is
-/// built on, so a measured zero is a FINDING and must survive canonicalization
-/// rather than being dropped as falsy.
-pub const O2_DBM_IDX_SCAN_COUNT: &str = "o2_dbm_idx_scan_count";
-/// Autovacuums run against this table, LIFETIME.
-pub const O2_DBM_AUTOVACUUM_COUNT: &str = "o2_dbm_autovacuum_count";
-/// `age(relfrozenxid)` — transaction-ID age, the wraparound-risk measure.
-pub const O2_DBM_FROZEN_XID_AGE: &str = "o2_dbm_frozen_xid_age";
-/// Last MANUAL vacuum, absent when the table has never had one.
-///
-/// The recipe COALESCEs a null to `''`, and a table nobody has manually
-/// vacuumed is the ordinary case. The empty string is therefore read as
-/// "never" and the column is OMITTED, rather than stored as `""` which renders
-/// as a blank cell indistinguishable from missing data.
-pub const O2_DBM_LAST_VACUUM: &str = "o2_dbm_last_vacuum";
-/// Last AUTOvacuum, absent when there has never been one.
-pub const O2_DBM_LAST_AUTOVACUUM: &str = "o2_dbm_last_autovacuum";
-/// Last ANALYZE, absent when there has never been one.
-pub const O2_DBM_LAST_ANALYZE: &str = "o2_dbm_last_analyze";
-/// Marks the scan and vacuum counters on this row as CUMULATIVE SINCE THE LAST
-/// `pg_stat_reset()`, not per-window.
-///
-/// `seq_scan`, `seq_tup_read`, `idx_scan` and `autovacuum_count` all come from
-/// `pg_stat_user_tables`, which counts from the last statistics reset — a point
-/// in time this feed never observes. So "0 sequential scans" means zero SINCE
-/// THE RESET, and rendering it under a window filter as "0 in the last hour" is
-/// a strictly stronger claim than the data supports.
-///
-/// **We disclose rather than delta, deliberately.** A delta needs two snapshots
-/// of the same relation and a guarantee no reset happened between them; the
-/// hazard the codebase already documents for the top-query feed is the same one
-/// here, where a reset (or a collector restart against a fresh replica) makes
-/// the later value SMALLER and a naive subtraction renders a negative or a
-/// wrapped-huge scan count. Labelling costs nothing and cannot be wrong.
-///
-/// UNCONDITIONAL, for the same reason `O2_DBM_METRICS_ARE_DELTA` is: a marker
-/// present on only some rows would read as a claim that the others are
-/// per-window.
-pub const O2_DBM_COUNTERS_ARE_CUMULATIVE: &str = "o2_dbm_counters_are_cumulative";
-/// Marks the tuple counts and the derived percentage on this row as PLANNER
-/// ESTIMATES, not exact counts.
-///
-/// `n_live_tup`/`n_dead_tup` are maintained incrementally by the statistics
-/// collector and reconciled against `reltuples` at each ANALYZE — they are not
-/// a `COUNT(*)` and can be arbitrarily stale on a table that has not been
-/// analyzed recently (which `o2_dbm_mod_since_analyze` on the same row
-/// quantifies). `dead_tup_pct` inherits the estimate because it is computed
-/// from them, and `total_bytes`/`heap_bytes` are exact by contrast — hence one
-/// flag about TUPLES rather than a blanket one about the row.
-pub const O2_DBM_TUPLES_ARE_ESTIMATED: &str = "o2_dbm_tuples_are_estimated";
-
 /// One relation's storage and maintenance state at one snapshot.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TableStatsSample {
@@ -2913,30 +2255,6 @@ impl TableStatsSample {
 // MySQL only — MariaDB ships with performance_schema OFF, so its rows honestly
 // omit `idx_scan` rather than reporting zero) and emit the same aliased
 // columns as `pg_index_stats`. SQL Server still has no index-stats recipe.
-
-/// Record kind: one INDEX's size and usage at one snapshot.
-pub const KIND_INDEX_STATS: &str = "index_stats";
-
-/// The index's own name — its identity. From the `index_name` attribute.
-pub const O2_DBM_INDEX_NAME: &str = "o2_dbm_index_name";
-/// `pg_relation_size` of the index. Exact, not an estimate.
-///
-/// This is the number that makes a never-scanned index worth reporting: an
-/// unused 8 KB index costs nothing, an unused 2.8 MB index is real storage and
-/// real write amplification.
-pub const O2_DBM_INDEX_BYTES: &str = "o2_dbm_index_bytes";
-/// Index entries returned by scans of this index, LIFETIME.
-pub const O2_DBM_IDX_TUP_READ: &str = "o2_dbm_idx_tup_read";
-/// Live table rows fetched by scans of this index, LIFETIME.
-pub const O2_DBM_IDX_TUP_FETCH: &str = "o2_dbm_idx_tup_fetch";
-/// Whether this index enforces a UNIQUE or PRIMARY KEY constraint.
-///
-/// Load-bearing for the never-scanned rule rather than decorative. Measured on
-/// the live rig: three of the six largest indexes are `*_pkey`, and a zero scan
-/// count on one of those means the planner has not chosen it for a LOOKUP — the
-/// constraint is still enforced on every insert. Without this the rule cannot
-/// separate a redundant index from a primary key.
-pub const O2_DBM_INDEX_IS_UNIQUE: &str = "o2_dbm_index_is_unique";
 
 /// One index's size and usage at one snapshot.
 #[derive(Debug, Clone, Default, PartialEq)]

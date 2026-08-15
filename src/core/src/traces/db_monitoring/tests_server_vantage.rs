@@ -5316,7 +5316,12 @@ fn the_mysql_plan_hash_is_insensitive_to_formatting() {
 /// and the alternative is that the obligation is discharged by nothing at all.
 #[test]
 fn the_top_query_selection_bias_is_documented() {
-    let src = include_str!("server_vantage.rs");
+    // `KIND_TOP_QUERY` and its doc comment moved into the shared `config`
+    // vocabulary so `o2_enterprise` can reach them; the scrape follows the
+    // const to its new home. What is asserted is unchanged: the selection bias
+    // must be stated where the kind is DEFINED, not somewhere a UI author has
+    // to already know to look.
+    let src = include_str!("../../../../config/src/meta/db_monitoring.rs");
     let anchor = src
         .find("pub const KIND_TOP_QUERY")
         .expect("the top_query kind must exist");
