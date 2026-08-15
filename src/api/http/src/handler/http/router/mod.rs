@@ -900,6 +900,9 @@ pub fn service_routes() -> Router {
 
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
+        .route("/v2/{org_id}/alerts/composites/validate", post(alerts::validate_composite_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/composite-references", get(alerts::get_composite_references))
+        .route("/v2/{org_id}/alerts/{alert_id}/composite-timeline", get(alerts::get_composite_timeline))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/groups", get(alerts::list_alert_groups))
         // The uptime this alert would produce as an SLI source. Sits with the

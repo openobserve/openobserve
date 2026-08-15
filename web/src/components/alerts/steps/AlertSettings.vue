@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="px-3 py-2">
       <div>
         <!-- For Real-Time Alerts -->
-        <template v-if="isRealTime === 'true'">
+        <template v-if="isRealTime === 'true' || isRealTime === 'composite'">
           <!-- Silence Notification (Cooldown) -->
           <div class="mb-4 flex items-start justify-start pb-3">
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">

@@ -42,6 +42,7 @@ WITH jobs_to_pull AS (
 )
 UPDATE scheduled_jobs AS jobs
 SET status = $1, start_time = $2,
+    claim_epoch = claim_epoch + 1,
     end_time = CASE
         WHEN jobs.module = $3 THEN $4
         ELSE $5
@@ -63,6 +64,7 @@ WITH jobs_to_pull AS (
 )
 UPDATE scheduled_jobs AS jobs
 SET status = $1, start_time = $2,
+    claim_epoch = claim_epoch + 1,
     end_time = CASE
         WHEN jobs.module = $3 THEN $4
         ELSE $5
@@ -85,6 +87,15 @@ SET status = $1, retries = jobs.retries + 1
 FROM timed_out_jobs
 WHERE jobs.id = timed_out_jobs.id;
 "#;
+
+const KEEP_ALIVE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
+SET end_time = CASE WHEN module = $1 THEN $2 ELSE $3 END
+WHERE id = $4 AND claim_epoch = $5 AND status = $6;"#;
+
+const COMPLETE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
+SET status = $1, retries = $2, next_run_at = $3,
+    is_realtime = $4, is_silenced = $5, data = $6
+WHERE id = $7 AND claim_epoch = $8 AND status = $9;"#;
 
 pub struct PostgresScheduler {}
 
@@ -123,7 +134,8 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    data         TEXT not null
+    data         TEXT not null,
+    claim_epoch  BIGINT default 0 not null
 );
             "#,
         )
@@ -132,6 +144,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
         // create data column for old version <= 0.10.9
         add_column("scheduled_jobs", "data", "TEXT NOT NULL DEFAULT ''").await?;
+        add_column("scheduled_jobs", "claim_epoch", "BIGINT NOT NULL DEFAULT 0").await?;
 
         // drop created_at column for old version <= 0.40.0
         drop_column("scheduled_jobs", "created_at").await?;
@@ -667,6 +680,51 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
+    async fn keep_alive_claim(
+        &self,
+        claim: &Trigger,
+        alert_timeout: i64,
+        report_timeout: i64,
+    ) -> Result<bool> {
+        let now = now_micros();
+        let report_max_time = now
+            + Duration::try_seconds(report_timeout)
+                .ok_or_else(|| Error::Message("invalid report timeout".into()))?
+                .num_microseconds()
+                .ok_or_else(|| Error::Message("report timeout overflow".into()))?;
+        let alert_max_time = now
+            + Duration::try_seconds(alert_timeout)
+                .ok_or_else(|| Error::Message("invalid alert timeout".into()))?
+                .num_microseconds()
+                .ok_or_else(|| Error::Message("alert timeout overflow".into()))?;
+        let result = sqlx::query(KEEP_ALIVE_CLAIM_QUERY)
+            .bind(TriggerModule::Report)
+            .bind(report_max_time)
+            .bind(alert_max_time)
+            .bind(claim.id)
+            .bind(claim.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .execute(&CLIENT.clone())
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn complete_claim(&self, trigger: Trigger) -> Result<bool> {
+        let result = sqlx::query(COMPLETE_CLAIM_QUERY)
+            .bind(&trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(trigger.id)
+            .bind(trigger.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .execute(&CLIENT.clone())
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
     /// Returns the Trigger jobs with "Waiting" status.
     /// Steps:
     /// - Take a global `pg_advisory_xact_lock` so only one puller across all nodes claims jobs at a
@@ -936,7 +994,10 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
 
 #[cfg(test)]
 mod tests {
-    use super::{PULL_QUERY, PULL_QUERY_BY_MODULE, PostgresScheduler, WATCH_TIMEOUT_QUERY};
+    use super::{
+        COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, PULL_QUERY_BY_MODULE,
+        PostgresScheduler, WATCH_TIMEOUT_QUERY,
+    };
 
     #[test]
     fn test_postgres_scheduler_new() {
@@ -956,5 +1017,35 @@ mod tests {
         assert!(PULL_QUERY_BY_MODULE.contains("FOR UPDATE SKIP LOCKED"));
         assert!(WATCH_TIMEOUT_QUERY.contains("ORDER BY id"));
         assert!(WATCH_TIMEOUT_QUERY.contains("FOR UPDATE SKIP LOCKED"));
+    }
+
+    #[test]
+    fn postgres_claim_epoch_is_created_incremented_and_returned_by_claim() {
+        assert!(PULL_QUERY.contains("claim_epoch = claim_epoch + 1"));
+        assert!(PULL_QUERY_BY_MODULE.contains("claim_epoch = claim_epoch + 1"));
+        assert!(PULL_QUERY.contains("RETURNING"));
+        assert!(PULL_QUERY_BY_MODULE.contains("RETURNING"));
+    }
+
+    #[test]
+    fn postgres_composite_keepalive_and_completion_are_epoch_fenced() {
+        for (operation, query) in [
+            ("keep alive", KEEP_ALIVE_CLAIM_QUERY),
+            ("completion", COMPLETE_CLAIM_QUERY),
+        ] {
+            let compact = query.split_whitespace().collect::<Vec<_>>().join(" ");
+            assert!(
+                compact.contains("id = $"),
+                "{operation} must match the job ID"
+            );
+            assert!(
+                compact.contains("claim_epoch = $"),
+                "{operation} must match the captured epoch"
+            );
+            assert!(
+                compact.contains("status = $"),
+                "{operation} must require Processing status"
+            );
+        }
     }
 }

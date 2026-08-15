@@ -380,6 +380,16 @@ async fn step_delete_file_list(org_id: &str) -> Result<(), anyhow::Error> {
 async fn delete_org_alerts(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::db::{ORM_CLIENT, connect_to_orm};
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // Organization teardown is the sole graph-guard bypass. Remove composite
+    // child-index rows and definitions before ordinary alerts so no dangling
+    // reverse reference can survive even transiently into the ordinary-alert
+    // phase. This helper is private to the teardown workflow; there is no
+    // public `force` capability.
+    infra::table::alert_composites::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("composite graph teardown: {e}"))?;
+
     let alerts = crate::db::alerts::alert::list(org_id, None, None).await?;
     for alert in alerts {
         let Some(alert_id) = alert.id else { continue };

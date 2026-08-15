@@ -308,7 +308,12 @@ watch(internalOpen, (open) => {
       <slot name="trigger" />
     </DialogTrigger>
 
-    <DialogPortal :to="props.portalTarget ?? 'body'">
+    <DialogPortal
+      v-if="!inline || internalOpen"
+      :to="props.portalTarget ?? 'body'"
+      :disabled="inline"
+      :force-mount="inline ? true : undefined"
+    >
       <!-- Overlay / scrim — same z-index as ODialog -->
       <DialogOverlay
         data-test="o-drawer-overlay"
@@ -324,6 +329,7 @@ watch(internalOpen, (open) => {
 
       <!-- Drawer panel -->
       <DialogContent
+        :force-mount="inline ? true : undefined"
         data-o2-drawer
         :data-test="parentDataTest || 'o-drawer-panel'"
         :style="contentStyle"
