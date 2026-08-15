@@ -46,9 +46,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="section in sections"
       :key="section.key"
       :name="section.key"
+      :disable="section.disabled"
       :data-test="`dbm-section-tab-${section.key}`"
     >
       <span>{{ section.label }}</span>
+      <!-- The lock is what makes a disabled tab READ as gated rather than
+           broken: dimmed text alone says "unavailable", not "available on
+           another plan". It is decorative for AT — the tooltip carries the
+           sentence, and TabsTrigger already exposes aria-disabled. -->
+      <OIcon
+        v-if="section.disabled"
+        name="lock"
+        size="xs"
+        aria-hidden="true"
+        :data-test="`dbm-section-tab-lock-${section.key}`"
+      />
       <!-- The count is what the tab is about, so the reader can see the shape
            of the other views without opening them.
 
@@ -85,6 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 
+import config from "@/aws-exports";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -137,6 +151,23 @@ const route = useRoute();
 const router = useRouter();
 
 /**
+ * Deadlocks, Blocked queries and Table health read endpoints an OSS build
+ * answers 403 on, so the three tabs are locked rather than live there.
+ *
+ * `isEnterprise` is a STRING env value — compared against the literal `"true"`,
+ * never coerced. `Boolean(config.isEnterprise)` is true for `"false"`, which
+ * would unlock all three on every OSS build.
+ *
+ * Read inside a computed rather than once at module scope: `/config` and the
+ * build flags are resolved during startup, and a module-scope snapshot would
+ * freeze whatever was there when this file first loaded.
+ */
+const isEnterprise = computed(() => config.isEnterprise === "true");
+
+/** The three tabs the OSS backend refuses. */
+const ENTERPRISE_ONLY_TABS = ["deadlocks", "blocked", "tableHealth"];
+
+/**
  * Route name → tab key. The detail route resolves to the tab it was opened
  * from, so the highlight follows what the user is looking at rather than the
  * literal route — the same reason PipelineSectionTabs maps its editor and
@@ -162,10 +193,23 @@ const ROUTE_TO_TAB: Record<string, string> = {
  */
 const DETAIL_ORIGIN_TABS = new Set(["queries", "activity", "samples", "deadlocks"]);
 
+/**
+ * The origins that can light a tab HERE. On OSS, `deadlocks` is dropped:
+ * `?from=deadlocks` would otherwise light a tab that is simultaneously
+ * disabled — a state OTab does not model — and it cannot be a real origin
+ * anyway, because the deadlocks page is unreachable on that build. The
+ * fallback below then lands on Top queries, the detail page's natural parent.
+ */
+const activeOriginTabs = computed(() =>
+  isEnterprise.value
+    ? DETAIL_ORIGIN_TABS
+    : new Set([...DETAIL_ORIGIN_TABS].filter((key) => !ENTERPRISE_ONLY_TABS.includes(key))),
+);
+
 const activeTab = computed(() => {
   if (route.name === "dbmQueryDetail") {
     const from = String(route.query.from ?? "");
-    if (DETAIL_ORIGIN_TABS.has(from)) return from;
+    if (activeOriginTabs.value.has(from)) return from;
   }
   return ROUTE_TO_TAB[route.name as string] ?? "overview";
 });
@@ -188,6 +232,12 @@ interface Section {
   vantageLabel?: I18nText;
   /** What the count means, when that is not obvious from the label. */
   hint?: I18nText;
+  /**
+   * Locked on this build — rendered dimmed with a lock rather than removed.
+   * A hidden tab tells an OSS reader nothing; a locked one names the
+   * capability and its hint says what unlocks it.
+   */
+  disabled?: boolean;
 }
 
 /**
@@ -288,15 +338,22 @@ const sections = computed<Section[]>(() => [
     key: "deadlocks",
     label: t("dbm.page.tabs.deadlocks"),
     to: { name: "dbmDeadlocks", query: carriedQuery.value },
-    count: badgeCount(props.deadlockCount),
-    hint: t("dbm.page.tabs.deadlocksHint"),
+    // A locked tab has no count to badge — the read that produces it is the
+    // one the OSS backend refuses — and its hint explains the lock rather
+    // than the (absent) number.
+    count: isEnterprise.value ? badgeCount(props.deadlockCount) : null,
+    hint: isEnterprise.value
+      ? t("dbm.page.tabs.deadlocksHint")
+      : t("dbm.page.tabs.deadlocksLocked"),
+    disabled: !isEnterprise.value,
   },
   {
     key: "blocked",
     label: t("dbm.page.tabs.blocked"),
     to: { name: "dbmBlocking", query: carriedQuery.value },
-    count: badgeCount(props.blockedCount),
-    hint: t("dbm.page.tabs.blockedHint"),
+    count: isEnterprise.value ? badgeCount(props.blockedCount) : null,
+    hint: isEnterprise.value ? t("dbm.page.tabs.blockedHint") : t("dbm.page.tabs.blockedLocked"),
+    disabled: !isEnterprise.value,
   },
   {
     // LAST: schema health is the slow-moving background question, read after
@@ -304,8 +361,11 @@ const sections = computed<Section[]>(() => [
     key: "tableHealth",
     label: t("dbm.page.tabs.tableHealth"),
     to: { name: "dbmTableHealth", query: carriedQuery.value },
-    count: badgeCount(props.tableHealthCount),
-    hint: t("dbm.page.tabs.tableHealthHint"),
+    count: isEnterprise.value ? badgeCount(props.tableHealthCount) : null,
+    hint: isEnterprise.value
+      ? t("dbm.page.tabs.tableHealthHint")
+      : t("dbm.page.tabs.tableHealthLocked"),
+    disabled: !isEnterprise.value,
   },
 ]);
 
@@ -313,6 +373,9 @@ const navigate = (key: string | number) => {
   if (key === activeTab.value) return;
   const section = sections.value.find((s) => s.key === key);
   if (!section) return;
+  // A locked tab must not navigate even if `change` reaches here some other
+  // way (keyboard, a future OTabs change) — the route would only bounce back.
+  if (section.disabled) return;
   router.push(section.to).catch(() => {});
 };
 </script>

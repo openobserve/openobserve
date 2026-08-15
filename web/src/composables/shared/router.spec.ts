@@ -745,6 +745,65 @@ describe("useRoutes (router.ts)", () => {
   });
 
   // =========================================================================
+  // 8b. Database Monitoring — the enterprise-only tabs
+  // =========================================================================
+  /**
+   * Deadlocks, Blocked queries and Table health read endpoints the OSS backend
+   * answers 403 on. Disabling the tabs cannot stop a PASTED URL, so each of the
+   * three routes carries its own guard. It lands on the DBM overview — the
+   * section the reader is already inside — rather than a page that renders
+   * empty because every fetch was refused.
+   */
+  describe("homeChildRoutes — Database Monitoring enterprise gate", () => {
+    const GATED = ["dbmDeadlocks", "dbmBlocking", "dbmTableHealth"] as const;
+    const OPEN = ["dbmDatabases", "dbmQueries", "dbmSamples", "dbmActivity"] as const;
+
+    it.each(GATED)("redirects %s to the DBM overview on an OSS build", (name) => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      const next = vi.fn();
+      findRoute(homeChildRoutes, name).beforeEnter({ query: { range: "360" } }, {}, next);
+      expect(next).toHaveBeenCalledWith({ name: "dbmDatabases", query: { range: "360" } });
+    });
+
+    it.each(GATED)("lets %s through on an enterprise build", async (name) => {
+      config.isEnterprise = "true";
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { homeChildRoutes } = useRoutes();
+      const to = { query: {} };
+      const next = vi.fn();
+      findRoute(homeChildRoutes, name).beforeEnter(to, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, {}, next);
+    });
+
+    /** Only the literal string unlocks — a truthy-string check would fail open. */
+    it.each(["", "TRUE", "1", "yes"])("treats isEnterprise=%p as OSS", (value) => {
+      config.isEnterprise = value;
+      const { homeChildRoutes } = useRoutes();
+      const next = vi.fn();
+      findRoute(homeChildRoutes, "dbmDeadlocks").beforeEnter({ query: {} }, {}, next);
+      expect(next).toHaveBeenCalledWith({ name: "dbmDatabases", query: {} });
+    });
+
+    /** The four OSS tabs must stay reachable — the gate is three routes, not the section. */
+    it.each(OPEN)("leaves %s reachable on an OSS build", (name) => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, name);
+      // No child guard of its own: the parent's Database Monitoring guard is
+      // the only thing standing between an OSS reader and these four pages.
+      expect(route.beforeEnter).toBeUndefined();
+    });
+
+    /** Routes stay REGISTERED on OSS — an unregistered route is a 404, not a redirect. */
+    it.each(GATED)("keeps %s registered on an OSS build", (name) => {
+      config.isEnterprise = "false";
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, name)).toBeDefined();
+    });
+  });
+
+  // =========================================================================
   // 9. homeChildRoutes — dashboards routes
   // =========================================================================
   describe("homeChildRoutes — dashboards routes", () => {
