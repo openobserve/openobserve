@@ -282,6 +282,107 @@ fn enterprise_owned_records_do_not_canonicalize_on_oss() {
     );
 }
 
+/// **Where the enterprise hooks are CALLED, pinned.**
+///
+/// Task 2 placed the two hooks at the exact positions the deadlock and
+/// recipe-tag arms occupied: hook 1 above `explain`/`statement_duration`, hook 2
+/// below them. That PLACEMENT is the only thing left that can regress, and a
+/// record carrying BOTH an `o2_pg_event` value and an `o2_recipe` tag —
+/// constructible by anyone who can POST to `/_json`, since the logs paths
+/// flatten caller keys straight onto the record — is what makes it observable.
+///
+/// 🚨 A test that called `claim_recipe_tags` / `claim_deadlock_markers` DIRECTLY
+/// would be vacuous. Both decline non-matching records by their first line, so
+/// such a test passes against a correct hook, a broken hook, and an empty map
+/// alike; it could not detect a worker hoisting hook 2 above the
+/// `statement_duration` arm, which is the exact regression this exists to catch.
+/// The property is only observable through `canonicalize_record`, so that is
+/// what is called, and the records are built from the REAL fixtures so each arm
+/// genuinely matches — an arm that fails its internal checks returns `None` and
+/// the assertion would prove nothing.
+#[cfg(feature = "enterprise")]
+#[test]
+fn enterprise_hooks_do_not_shadow_oss_arms() {
+    if !config::get_config().db_monitoring.statement_enabled {
+        return; // an env override turned the arm off; the default-on pin lives in config tests
+    }
+    // Case 1 — `statement_duration` sits ABOVE the recipe-tag hook. The real
+    // statement fixture, plus an enterprise recipe tag. The OSS arm must keep it.
+    let mut rec = pg_statement_duration_flattened();
+    rec.insert("o2_recipe".into(), json!("pg_table_stats"));
+    let out = canonicalize_record(&rec).expect(
+        "the statement_duration arm must still claim this record — if this is \
+         None the recipe-tag hook stole it and could not parse it either",
+    );
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_KIND)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::KIND_STATEMENT),
+        "the recipe-tag hook was hoisted above the OSS statement_duration arm \
+         and stole a record from it"
+    );
+
+    // Case 2 — the deadlock hook sits ABOVE both OSS arms, so the same dual
+    // marker resolves the other way. Same relative order as the arms it replaced.
+    let mut rec = pg_deadlock_record();
+    rec.insert("o2_recipe".into(), json!("pg_table_stats"));
+    let out = canonicalize_record(&rec).expect("the deadlock hook must claim this record");
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_KIND)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::KIND_DEADLOCK),
+        "the deadlock hook must sit above the recipe-tag hook, exactly where \
+         the deadlock arms sat"
+    );
+
+    // Case 3 — the TRI-STATE, which an `Option`-returning hook (or a worker who
+    // "simplifies" `ClaimedButUnparsed => return None` into a fall-through)
+    // would silently regress. A record the deadlock hook CLAIMS but cannot
+    // parse — a deadlock BANNER, no `dl_*` participants — must end dispatch at
+    // `None`, not be re-examined by the arms below.
+    //
+    // The assertion is only meaningful if a lower arm WOULD claim it, so the
+    // record carries a valid `pg_table_stats` payload too. Every field belongs
+    // to a different arm than the one that claimed it, which is exactly the
+    // dual-marker shape a caller can POST on `/_json`. With the tri-state
+    // intact the answer is `None`; degrade the claim to a fall-through and the
+    // record comes back canonicalized as `table_stats`, stored under a kind
+    // that describes neither what it is nor what it was claimed as.
+    let mut banner = obj(json!({
+        "_timestamp": 1_786_165_745_930_000i64,
+        "o2_pg_event": "deadlock",
+        "pg_db": "dbmlab",
+        "pg_pid": "1071",
+        // No dl_* participants at all — the canonicalizer rejects it on merit.
+    }));
+    for (k, v) in pg_table_stats_record() {
+        if k != "_timestamp" {
+            banner.insert(k, v);
+        }
+    }
+    // Precondition: the lower arm really would claim this payload, so a
+    // fall-through is observable rather than indistinguishable from `None`.
+    let without_marker: Map<String, Value> = banner
+        .iter()
+        .filter(|(k, _)| k.as_str() != "o2_pg_event")
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    assert_eq!(
+        canonicalize_record(&without_marker)
+            .expect("precondition: the table_stats arm claims this payload")
+            .get(server_vantage::O2_DBM_KIND)
+            .and_then(|v| v.as_str()),
+        Some(server_vantage::KIND_TABLE_STATS),
+    );
+    assert_eq!(
+        canonicalize_record(&banner),
+        None,
+        "the deadlock hook CLAIMED this record and could not parse it, so \
+         dispatch must END at None — falling through let the table_stats arm \
+         store a deadlock banner under o2_dbm_kind = table_stats"
+    );
+}
+
 // ─── Deliverable D: cross-path fingerprint equality ─────────────────────────
 
 /// THE correlation guarantee: a statement fingerprinted from a SERVER log record
@@ -6238,6 +6339,16 @@ fn w8_never_reports_a_recognized_tag_that_failed_to_parse() {
 /// its author as unrecognized while working perfectly — a worse lie than the
 /// silence W8 fixes. This asserts against the SOURCE of `canonicalize_record`,
 /// so adding an arm without the array fails here.
+///
+/// POST-SPLIT SCOPE. The canonicalizers for all 11 members now live in
+/// `o2_enterprise`, which `include_str!` cannot reach — a cross-repo scrape is
+/// not an option. What the OSS dispatcher still owns, and what this still pins,
+/// is the MARKER SET: Tasks 3/4 deliberately kept the tag literals in
+/// `canonicalize_record`'s body (`is_enterprise_recipe`) precisely so this and
+/// `shipped_recipe_tags_and_backend_dispatch_agree` stay honest across the
+/// boundary. The other half of the contract — that an enterprise ARM exists for
+/// each member — is pinned by `every_recognized_recipe_has_a_dispatch_arm` in
+/// the o2-enterprise suite, the only place that can see both sides.
 #[test]
 fn w8_recognized_recipes_match_the_dispatch_arms() {
     let src = include_str!("server_vantage.rs");
@@ -6283,6 +6394,83 @@ fn w8_recognized_recipes_match_the_dispatch_arms() {
     }
 }
 
+/// **The W8 silent-wrong-story the enterprise split reintroduces.**
+///
+/// All 11 `RECOGNIZED_RECIPES` members are ENTERPRISE-owned. Before this fix an
+/// OSS build answered every one of them with silence — `take_unrecognized_recipe`
+/// returns `None` for any array member — while canonicalizing nothing. The row
+/// then carries no `o2_dbm_kind`, so the liveness probe counts it as a
+/// `non_event_record` and the read path reports a healthy quiet database over a
+/// feed that is in fact being dropped on the floor. That is precisely the
+/// failure W8 exists to prevent, arriving through a new door.
+///
+/// So the classification must be THREE-valued, and this pins the OSS answer for
+/// every member: `EnterpriseOnly`, never `Handled` and never the silence of a
+/// recognized-and-working tag.
+#[cfg(not(feature = "enterprise"))]
+#[test]
+fn w8_every_recognized_recipe_is_enterprise_only_on_oss() {
+    assert_eq!(
+        server_vantage::RECOGNIZED_RECIPES.len(),
+        11,
+        "all 11 shipped recipes are enterprise-owned; if this count changed, \
+         `is_enterprise_owned_recipe` needs a real OSS-vs-enterprise distinction \
+         rather than 'every array member'"
+    );
+    for tag in server_vantage::RECOGNIZED_RECIPES {
+        assert_eq!(
+            server_vantage::classify_recipe(tag),
+            server_vantage::RecipeStatus::EnterpriseOnly,
+            "{tag} canonicalizes to nothing on an OSS build, so calling it \
+             merely 'recognized' tells the author their quiet database is \
+             healthy while their feed is being dropped"
+        );
+    }
+}
+
+/// The enterprise half of the same classification: with the canonicalizers
+/// compiled in, every member is genuinely `Handled` — the fix must not leave
+/// enterprise builds reporting their own working recipes as unavailable.
+#[cfg(feature = "enterprise")]
+#[test]
+fn w8_every_recognized_recipe_is_handled_on_enterprise() {
+    assert_eq!(server_vantage::RECOGNIZED_RECIPES.len(), 11);
+    for tag in server_vantage::RECOGNIZED_RECIPES {
+        assert_eq!(
+            server_vantage::classify_recipe(tag),
+            server_vantage::RecipeStatus::Handled,
+            "{tag} has an enterprise canonicalizer in this build and must \
+             classify as Handled"
+        );
+    }
+}
+
+/// A tag nobody ships is `Unknown` on BOTH builds — the distinction that makes
+/// the three-valued answer worth having. `EnterpriseOnly` means "your recipe is
+/// correct, this build cannot canonicalize it"; `Unknown` means "fix your
+/// collector config". Collapsing them would send OSS users to edit a recipe that
+/// is already right.
+#[test]
+fn w8_classifies_an_unshipped_tag_as_unknown_on_both_builds() {
+    for n in 0..8 {
+        let tag = format!("recipe_{}_{}", n * 7919, "zx".repeat(n % 3 + 1));
+        assert!(
+            !server_vantage::RECOGNIZED_RECIPES.contains(&tag.as_str()),
+            "precondition: {tag} must not be a shipped recipe"
+        );
+        assert_eq!(
+            server_vantage::classify_recipe(&tag),
+            server_vantage::RecipeStatus::Unknown,
+            "{tag} is nobody's recipe on either build"
+        );
+    }
+    assert_eq!(
+        server_vantage::classify_recipe(""),
+        server_vantage::RecipeStatus::Unknown,
+        "an empty tag names nothing"
+    );
+}
+
 /// The reporter must be a CLASSIFIER, not a list of tags we thought of.
 ///
 /// A hard-coded lookup of the fixture tags above passes every other W8 test —
@@ -6313,13 +6501,29 @@ fn w8_reports_a_tag_no_implementation_could_have_enumerated() {
     }
 }
 
-/// The complement: recognition must be driven by `RECOGNIZED_RECIPES`, so every
-/// member is silent — including ones added after this test was written — and
-/// every shipped recipe's REALISTIC row is silent too. A signal that fires on
-/// the recipes we do handle is noise, and would fire on every row of the
-/// reference rig.
+/// The complement: recognition must be driven by `RECOGNIZED_RECIPES`, so no
+/// member is ever reported as UNRECOGNIZED — including ones added after this
+/// test was written — and no shipped recipe's REALISTIC row is either. A
+/// "we could not read your recipe" signal that fires on the recipes we ship is
+/// noise, and would fire on every row of the reference rig.
+///
+/// **What changed with the enterprise split.** "Not unrecognized" is no longer
+/// the same thing as "silent". On OSS all 11 members canonicalize to nothing,
+/// and the old assertion (`take_unrecognized_recipe == None`, full stop) passed
+/// for exactly that reason while the row vanished — the silent-wrong-story W8
+/// exists to prevent. So each member is asserted on BOTH axes: never
+/// misreported as unrecognized (`take_unrecognized_recipe` is `None` — the fix
+/// is not a collector-config edit), AND classified with the answer this build
+/// can actually honour.
 #[test]
-fn w8_every_member_of_the_recognized_array_is_silent() {
+fn w8_every_member_of_the_recognized_array_is_classified_not_silent() {
+    // What this build can honour: enterprise canonicalizes all 11; OSS
+    // canonicalizes none and must say so rather than stay quiet.
+    #[cfg(feature = "enterprise")]
+    let expected = server_vantage::RecipeStatus::Handled;
+    #[cfg(not(feature = "enterprise"))]
+    let expected = server_vantage::RecipeStatus::EnterpriseOnly;
+
     // Array-driven, so a recipe added later is covered automatically.
     for tag in server_vantage::RECOGNIZED_RECIPES {
         let mut rec = custom_recipe_record();
@@ -6331,12 +6535,18 @@ fn w8_every_member_of_the_recognized_array_is_silent() {
             None,
             "{tag} is a shipped recipe and must never be reported as unrecognized"
         );
+        assert_eq!(
+            server_vantage::classify_recipe(tag),
+            expected,
+            "{tag} must carry this build's real answer, not silence"
+        );
     }
 
     // And over each shipped recipe's realistic fixture. The four blocking
     // recipes share the aliased-column shape by construction, so the tag is
     // the only thing that varies — which is precisely the input this
-    // classifier reads.
+    // classifier reads. The fixtures stay OSS-side (raw records only; the
+    // canonicalizers moved) because this test runs on both builds.
     let tagged_blocking = |tag: &str| {
         let mut r = pg_blocking_record();
         r.insert("o2_recipe".into(), json!(tag));
@@ -6366,6 +6576,11 @@ fn w8_every_member_of_the_recognized_array_is_silent() {
             server_vantage::take_unrecognized_recipe(&rec),
             None,
             "shipped recipe {name} is recognized and must not be reported"
+        );
+        assert_eq!(
+            server_vantage::classify_recipe(name),
+            expected,
+            "shipped recipe {name} must carry this build's real answer"
         );
     }
 }
