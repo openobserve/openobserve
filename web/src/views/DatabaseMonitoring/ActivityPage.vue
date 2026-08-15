@@ -603,6 +603,15 @@ const summaryStats = computed<StatItem[]>(() => {
   const idleInTransaction = stateRows.value
     .filter((row) => row.tone === "warning")
     .reduce((sum, row) => sum + row.sessions, 0);
+
+  // `waitTotals`/`stateRows` fold an EMPTY breakdown to 0, which is the same
+  // number a fleet with every session on-CPU and none waiting would produce.
+  // The breakdown arrays are the population signal that tells the two apart:
+  // absent renders `—`, a measured zero still prints `0`. (Live: dbm_notraces
+  // @ 1h answers `by_state: []`/`by_wait_event: []` with `not_collecting:
+  // false` — nothing sampled, not an idle fleet.)
+  const sampledWaits = waitBuckets.value.length > 0;
+  const sampledStates = stateBuckets.value.length > 0;
   return [
     {
       key: "sessions",
@@ -617,7 +626,7 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "onCpu",
       label: t("dbm.activity.summary.onCpu"),
-      value: waits.onCpu,
+      value: sampledWaits ? waits.onCpu : raw("—"),
       icon: "speed",
       tone: "neutral",
       dataTest: "dbm-activity-summary-on-cpu",
@@ -625,7 +634,7 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "waiting",
       label: t("dbm.activity.summary.waiting"),
-      value: waits.waiting,
+      value: sampledWaits ? waits.waiting : raw("—"),
       icon: "timer",
       tone: "neutral",
       dataTest: "dbm-activity-summary-waiting",
@@ -633,9 +642,11 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "idleInTransaction",
       label: t("dbm.activity.summary.idleInTransaction"),
-      value: idleInTransaction,
+      value: sampledStates ? idleInTransaction : raw("—"),
       icon: "lock",
-      tone: idleInTransaction > 0 ? "warning" : "neutral",
+      // Tone follows the MEASUREMENT, so an unsampled window cannot go amber:
+      // a warning colour is itself a claim that something was found.
+      tone: sampledStates && idleInTransaction > 0 ? "warning" : "neutral",
       dataTest: "dbm-activity-summary-idle-in-transaction",
     },
   ];

@@ -604,6 +604,7 @@ import {
   formatNs,
   formatPercent,
   oneLine,
+  overlapTile,
   showsPerRequest,
 } from "@/utils/dbm/format";
 import { createDbmFilterEntry, optionsFrom } from "@/utils/dbm/filters";
@@ -1067,12 +1068,31 @@ const summaryStats = computed<StatItem[]>(() => {
   const qualifier = (key: string | null): I18nText =>
     key === null ? raw("") : t(`dbm.list.overlap.${key}` as "dbm.list.overlap.serverWait");
 
+  // Whether the vantage these totals were summed from produced ANY row. A sum
+  // cannot say so itself — `[].reduce(+, 0)` is the same 0 as a row that
+  // genuinely ran zero calls — so the population signal is read from the list
+  // the total was taken over. Without it the strip printed `0us
+  // client-observed` on a fleet whose trace vantage measured nothing.
+  const measured = serverListShown.value
+    ? filteredServerRows.value.length > 0
+    : rows.value.length > 0 || other.value.length > 0;
+  const calls = overlapTile(totals.calls.value, measured, formatCount);
+  const time = overlapTile(totals.time.value, measured, formatNs);
+
   return [
     {
       key: "queries",
       // In fallback mode the count describes the rows actually on screen.
       label: t("dbm.queries.summary.queries"),
-      value: serverListShown.value ? filteredServerRows.value.length : rows.value.length,
+      // The one tile that is NOT an overlap measure: it counts the rows in the
+      // table below, which the reader can see. An empty table honestly has 0
+      // kinds of query on it — but only once a read has ANSWERED, so the
+      // pre-answer state is withheld rather than asserted as an empty fleet.
+      value: measured
+        ? serverListShown.value
+          ? filteredServerRows.value.length
+          : rows.value.length
+        : raw("—"),
       icon: "database",
       tone: "primary",
       dataTest: "dbm-queries-summary-queries",
@@ -1080,8 +1100,9 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "calls",
       label: t("dbm.queries.summary.calls"),
-      value: formatCount(totals.calls.value),
-      sub: qualifier(totals.calls.qualifierKey),
+      value: calls.value ?? raw("—"),
+      // D2: the qualifier renders only alongside a value it can qualify.
+      ...(calls.qualified ? { sub: qualifier(totals.calls.qualifierKey) } : {}),
       icon: "bar-chart",
       tone: "info",
       dataTest: "dbm-queries-summary-calls",
@@ -1089,8 +1110,8 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "time",
       label: t("dbm.queries.summary.time"),
-      value: formatNs(totals.time.value),
-      sub: qualifier(totals.time.qualifierKey),
+      value: time.value ?? raw("—"),
+      ...(time.qualified ? { sub: qualifier(totals.time.qualifierKey) } : {}),
       icon: "timer",
       tone: "teal",
       dataTest: "dbm-queries-summary-time",
