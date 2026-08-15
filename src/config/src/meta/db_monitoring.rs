@@ -363,13 +363,29 @@ pub const MAX_PARTICIPANT_QUERY: usize = 4096;
 /// `/v1/logs` — ingested raw `dl_*`/`my_*` fields and produced ZERO `o2_dbm_*` columns, so the
 /// read endpoints returned nothing from real captured data. Centralizing the logic here means a
 /// new ingest path gets it by calling one function.
-/// Every `o2_recipe` tag [`canonicalize_record`] dispatches on.
+/// Every `o2_recipe` tag the ingest dispatcher recognizes.
 ///
-/// This is the SAME list the dispatch arms below match, held once so the two
-/// cannot drift: a new recipe added to dispatch but not to this array would be
-/// reported to its author as unrecognized while working perfectly, which is a
-/// worse lie than the silence W8 exists to fix.
-/// `w8_recognized_recipes_match_the_dispatch_arms` pins the pairing.
+/// This is the SAME list the dispatch arms match, held once so the two cannot
+/// drift: a new recipe added to dispatch but not to this array would be reported
+/// to its author as unrecognized while working perfectly, which is a worse lie
+/// than the silence W8 exists to fix.
+///
+/// 🚨 **The two sides now live in DIFFERENT REPOS.** All 11 members are
+/// enterprise-owned: the array is here in `config`, and every arm that handles
+/// one is in `o2_enterprise::enterprise::db_monitoring::claim_recipe_tags`.
+/// Nothing in the OSS repo can see both — `include_str!` does not cross the
+/// boundary — so the pairing is pinned from the enterprise side by
+/// `every_recognized_recipe_has_a_dispatch_arm`, and the OSS side pins only what
+/// it can still see: that the tag literals remain in the dispatcher's own body
+/// (`w8_recognized_recipes_match_the_dispatch_arms`, plus
+/// `shipped_recipe_tags_and_backend_dispatch_agree` against the shipped
+/// collector recipes).
+///
+/// Because all 11 are enterprise-owned, an OSS build canonicalizes NONE of them.
+/// `server_vantage::classify_recipe` reports that as `EnterpriseOnly` rather than
+/// leaving them silently "recognized" — silence here would be the W8
+/// wrong-story defect arriving through a new door. If an OSS-owned recipe is
+/// ever added to this array, `classify_recipe` needs a real per-tag distinction.
 pub const RECOGNIZED_RECIPES: [&str; 11] = [
     "pg_blocking_chain",
     "mysql_lock_waits",

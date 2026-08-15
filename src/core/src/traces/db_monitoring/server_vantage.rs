@@ -530,6 +530,73 @@ pub fn take_unrecognized_recipe(rec: &Map<String, Value>) -> Option<String> {
     Some(tag.to_string())
 }
 
+/// What this BUILD can do with an `o2_recipe` tag.
+///
+/// W8's job is to make sure the author of a recipe whose rows produce no
+/// `o2_dbm_*` columns learns WHY. Before the enterprise split there were only
+/// two answers — a canonicalizer claims the tag, or nobody does — and
+/// [`take_unrecognized_recipe`] returning `None`/`Some` expressed both.
+///
+/// The split adds a third, and it is the dangerous one. Every one of the 11
+/// [`RECOGNIZED_RECIPES`] is ENTERPRISE-owned, so on an OSS build all 11 tags
+/// dispatch to nothing: the row canonicalizes to zero `o2_dbm_*` columns, no
+/// read endpoint can see it, and the liveness probe counts it as a
+/// `non_event_record` — the "the tail is running and none of those lines was an
+/// event" signal. Left as `None` (i.e. "recognized, stay quiet"), the read path
+/// would answer the author's empty page with an affirmative *wrong* story about
+/// a healthy quiet database. That is exactly the failure W8 exists to prevent,
+/// reintroduced by the split.
+///
+/// A `log::warn!` alone is not enough here: no log-capture harness exists in
+/// this suite, so a warning-only fix is a behaviour no test can observe. This
+/// enum is the assertable form, and it makes the W8 classification tests
+/// behavioural on BOTH builds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecipeStatus {
+    /// A canonicalizer in THIS build claims the tag.
+    Handled,
+    /// A shipped recipe whose canonicalizer is an Enterprise capability and is
+    /// not compiled into this build. The rows ingest raw and produce no
+    /// `o2_dbm_*` columns — a materially different answer from [`Self::Unknown`],
+    /// because the recipe is correct and the fix is a licence, not an edit.
+    EnterpriseOnly,
+    /// No canonicalizer anywhere claims the tag — a custom or mistyped recipe.
+    Unknown,
+}
+
+/// Every [`RECOGNIZED_RECIPES`] member whose canonicalizer lives in
+/// `o2_enterprise`. All 11 of them: the four blocking recipes, `mssql_deadlock`,
+/// and the six table/index-stats recipes.
+///
+/// Kept as a predicate over the array rather than a second list, so it cannot
+/// drift from it. `w8_every_recognized_recipe_is_enterprise_only_on_oss` pins
+/// that all 11 members are covered, count included — if an OSS-owned recipe is
+/// ever added to the array, that test fails and this function must grow a real
+/// distinction rather than answering "every member".
+fn is_enterprise_owned_recipe(tag: &str) -> bool {
+    RECOGNIZED_RECIPES.contains(&tag)
+}
+
+/// Classify one `o2_recipe` tag for THIS build.
+///
+/// The empty tag is [`RecipeStatus::Unknown`] with the same reasoning as
+/// [`take_unrecognized_recipe`]: it names nothing, so nothing is reported by
+/// name — the caller decides, and [`apply_to_record`] uses
+/// `take_unrecognized_recipe` (which filters the empty tag) for the warning.
+pub fn classify_recipe(tag: &str) -> RecipeStatus {
+    if !is_enterprise_owned_recipe(tag) {
+        return RecipeStatus::Unknown;
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        RecipeStatus::Handled
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        RecipeStatus::EnterpriseOnly
+    }
+}
+
 /// Tags already warned about, so a 200-row/second recipe logs once, not
 /// 200 times a second.
 ///
@@ -606,6 +673,36 @@ fn warn_unrecognized_recipe(tag: &str) {
             );
         }
     }
+}
+
+/// Warn once per enterprise-only recipe tag on an OSS build.
+///
+/// Separate from [`warn_unrecognized_recipe`] because the two situations need
+/// OPPOSITE remedies and conflating them misdirects the author: an unrecognized
+/// tag means "fix your collector config", while this means "your collector
+/// config is right and this capability is not in this build".
+///
+/// Shares the same warn-once set, so a 200-row/second table-stats recipe logs
+/// once rather than 200 times a second. The set stays bounded for free here —
+/// the tag must be one of the 11 [`RECOGNIZED_RECIPES`] members to reach this
+/// function at all, so it is not an author-controlled growth vector the way the
+/// unrecognized path is. The key is prefixed so the two paths cannot silence
+/// each other for the same string.
+#[cfg(not(feature = "enterprise"))]
+fn warn_enterprise_only_recipe(tag: &str) {
+    let Ok(mut seen) = WARNED_RECIPES.lock() else {
+        return; // a poisoned mutex must never take an ingest path down
+    };
+    let key = format!("enterprise:{tag}");
+    if !seen.insert(key) {
+        return;
+    }
+    log::warn!(
+        "[DbMonitoring] `o2_recipe` tag {tag:?} is an Enterprise capability. This is an \
+         Open Source build, so these records are stored raw and will NOT appear on any Database \
+         Monitoring page — the recipe itself is correct, and no collector-config change will fix \
+         it. Deadlocks, Blocked Queries and Table Health require an Enterprise licence."
+    );
 }
 
 /// The reserved namespace prefix. Every [`ALL_DBM_FIELDS`] member is either
@@ -689,6 +786,19 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     // liveness probe is simultaneously describing as healthy.
     if let Some(tag) = take_unrecognized_recipe(local_val) {
         warn_unrecognized_recipe(&tag);
+        return;
+    }
+    // The enterprise-split half of the same defect. On OSS every shipped recipe
+    // tag is `EnterpriseOnly`: the recipe is CORRECT, and staying silent about
+    // it would tell exactly the wrong story — "recognized" plus an empty page
+    // plus a liveness probe reporting a healthy quiet database. The message
+    // must therefore be distinct from the unrecognized-tag one: the fix is a
+    // licence, not a collector-config edit.
+    #[cfg(not(feature = "enterprise"))]
+    if let Some(tag) = local_val.get("o2_recipe").and_then(|v| v.as_str())
+        && classify_recipe(tag) == RecipeStatus::EnterpriseOnly
+    {
+        warn_enterprise_only_recipe(tag);
     }
 }
 
