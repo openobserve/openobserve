@@ -776,6 +776,35 @@ describe("parseActivitySessions", () => {
     expect(row.blocked).toBe(false);
     expect(row.blocking_pids).toEqual([]);
   });
+
+  /**
+   * An OSS-shaped hit: the backend omits ALL FIVE blocking keys, because the
+   * blocking relationship is the Blocked Queries capability and an OSS build
+   * does not serve it. The cases above each remove one key; this pins the
+   * whole shape at once, which is the one the OSS API actually emits.
+   *
+   * `hasLockData` returning false is the load-bearing half — it is what makes
+   * `ActivityPage` DROP the "Blocked by" and lock columns rather than render a
+   * column of blanks on every row. Without it the OSS Activity tab shows empty
+   * columns that look like a broken read rather than an absent feature.
+   */
+  it("renders an OSS hit with no blocking keys as unblocked and lock-free", () => {
+    const oss = session();
+    delete (oss as Partial<ActivitySession>).blocking_pids;
+    delete (oss as Partial<ActivitySession>).blocked;
+    delete (oss as Partial<ActivitySession>).lock_mode;
+    delete (oss as Partial<ActivitySession>).lock_type;
+    delete (oss as Partial<ActivitySession>).lock_relation;
+
+    const rows = parseActivitySessions([oss]);
+    expect(rows[0].blocked).toBe(false);
+    expect(rows[0].blocking_pids).toEqual([]);
+    expect(hasLockData(rows)).toBe(false);
+    // The dual-use wait columns must survive — they say what a session waits
+    // ON, not who blocks it, and OSS keeps them.
+    expect(rows[0].wait_event).toBe("transactionid");
+    expect(rows[0].wait_event_type).toBe("Lock");
+  });
 });
 
 describe("buildActivityRows", () => {
