@@ -77,8 +77,11 @@ const DbmBlockedQueriesPage = () => import("@/views/DatabaseMonitoring/BlockedQu
 const DbmTableHealthPage = () => import("@/views/DatabaseMonitoring/TableHealthPage.vue");
 
 /**
- * The one DBM gate. Runtime flag only — no build-type conjunct, because
- * Database Monitoring ships in OSS.
+ * The SECTION gate. Runtime flag only — no build-type conjunct, because the
+ * Database Monitoring section itself is not enterprise-only. The build-type
+ * gate for its three enterprise tabs is `dbmEnterpriseGuard` below, applied per
+ * route; adding an isEnterprise conjunct here would close the whole section on
+ * OSS instead.
  *
  * The store is IMPORTED, not read off `window`: nothing in the app ever assigns
  * `window.store`, so the old `(window as any).store` read was permanently
@@ -374,14 +377,18 @@ const useRoutes = () => {
     },
     {
       // Database Monitoring reads the database spans already inside traces, so
-      // it lives under /traces. Gated on `database_monitoring_enabled` ALONE —
-      // DBM is OSS, with no per-database-host SKU, so there is deliberately no
-      // isEnterprise conjunct here or on the nav entries.
+      // it lives under /traces. The PARENT is gated on
+      // `database_monitoring_enabled` ALONE — there is no per-database-host
+      // SKU, and the section as a whole is not enterprise-only, so no
+      // isEnterprise conjunct belongs here or on the nav entry.
       //
       // A PARENT with children, because the sub-views are in-page tabs over one
-      // shared scope rather than separate destinations — so the gate is written
-      // once here and inherited, instead of being repeated (and drifting) on
-      // each leaf.
+      // shared scope rather than separate destinations — so the RUNTIME-FLAG
+      // gate is written once here and inherited, instead of being repeated (and
+      // drifting) on each leaf. The BUILD-TYPE gate cannot be: only three of
+      // the children (deadlocks, blocking, table health) are enterprise-only,
+      // so those three carry their own `dbmEnterpriseGuard` beforeEnter, which
+      // runs after this one and bounces an OSS reader to `dbmDatabases`.
       //
       // The parent's component is a BARE host: a `<router-view>` wrapped in one
       // `<keep-alive>`, and nothing else. It contributes no header, no layout
