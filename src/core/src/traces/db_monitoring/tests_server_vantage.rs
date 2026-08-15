@@ -2664,36 +2664,11 @@ fn every_column_any_writer_emits_is_reserved() {
                 .to_record(),
         ));
     }
-    // The deadlock and blocking writers moved to `o2_enterprise`; their half of
-    // this walk moved with them (`all_enterprise_columns_are_reserved`).
-    // `ALL_DBM_FIELDS` lives in `config` and stays ONE array covering both — the
-    // reservation is shared, only the writers split.
-    for fixture in [
-        pg_table_stats_record(),
-        pg_table_stats_bloated_record(),
-        mysql_table_stats_record(),
-        mariadb_table_stats_record(),
-    ] {
-        records.push((
-            "table_stats",
-            server_vantage::canonicalize_table_stats(&fixture)
-                .expect("table-stats fixture must canonicalize")
-                .to_record(),
-        ));
-    }
-    for fixture in [
-        pg_index_stats_unused_record(),
-        pg_index_stats_used_record(),
-        mysql_index_stats_record(),
-        mariadb_index_stats_record(),
-    ] {
-        records.push((
-            "index_stats",
-            server_vantage::canonicalize_index_stats(&fixture)
-                .expect("index-stats fixture must canonicalize")
-                .to_record(),
-        ));
-    }
+    // The deadlock, blocking, table-stats and index-stats writers moved to
+    // `o2_enterprise`; their half of this walk moved with them
+    // (`all_enterprise_columns_are_reserved`). `ALL_DBM_FIELDS` lives in
+    // `config` and stays ONE array covering both — the reservation is shared,
+    // only the writers split.
     records.push((
         "explain",
         server_vantage::canonicalize_pg_auto_explain(&pg_auto_explain_flattened())
@@ -2708,17 +2683,17 @@ fn every_column_any_writer_emits_is_reserved() {
     ));
 
     // Iterating "whatever the writers emit" is satisfied by a walk that emits
-    // NOTHING, so the population is pinned. 5 activity + 2 top_query +
-    // 4 table_stats + 4 index_stats + explain + statement = 17. The deadlock and
-    // blocking fixtures left for `o2_enterprise`; table/index stats follow in
-    // Task 4, at which point this drops to 9. If this fails LOW, a fixture was
+    // NOTHING, so the population is pinned. 5 activity + 2 top_query + explain
+    // + statement = 9. The deadlock, blocking, table-stats and index-stats
+    // fixtures left for `o2_enterprise`. If this fails LOW, a fixture was
     // dropped — restore it rather than lowering the number.
     assert_eq!(
         records.len(),
-        17,
-        "OSS must walk exactly its own 17 writers' fixtures; the 2 enterprise \
-         fixtures (deadlock, blocking) are covered by the o2-enterprise suite. \
-         A silently shrinking walk would still go green."
+        9,
+        "OSS must walk exactly its own 9 writers' fixtures; the 10 enterprise \
+         fixtures (deadlock, blocking, 4 table_stats, 4 index_stats) are \
+         covered by `all_enterprise_columns_are_reserved` in the o2-enterprise \
+         suite. A silently shrinking walk would still go green."
     );
 
     for (kind, rec) in &records {
@@ -4935,6 +4910,7 @@ fn the_carried_event_name_is_not_stored_on_the_record() {
 // table name arrives as `body` and NOT as a `table_name` attribute — the exact
 // producer/parser mismatch that shipped two DBM bugs green through 205 tests.
 
+#[cfg(feature = "enterprise")]
 /// Table-driven canonicalization check: run `rec` through `apply_to_record`
 /// (the production entry point — the B19 discipline: tests that call
 /// `canonicalize_record` directly skip the strip and repeat the hole that
@@ -4984,6 +4960,7 @@ fn pg_table_stats_record() -> Map<String, Value> {
     }))
 }
 
+#[cfg(feature = "enterprise")]
 /// **Through `apply_to_record`, the production entry point — never
 /// `canonicalize_record` directly.**
 ///
@@ -5018,6 +4995,7 @@ fn table_stats_canonicalizes_through_the_ingest_entry_point() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// The measurement columns must SURVIVE canonicalization, and arrive as numbers.
 ///
 /// `sqlqueryreceiver` casts every column to text (`::text` in the recipe), so a
@@ -5061,6 +5039,7 @@ fn table_stats_parses_the_text_columns_into_numbers() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// **The cumulative counters must be MARKED as cumulative, unconditionally.**
 ///
 /// `seq_scan`, `idx_scan` and `autovacuum_count` come from `pg_stat_user_tables`
@@ -5084,6 +5063,7 @@ fn table_stats_marks_its_counters_as_lifetime_totals() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// **The size and dead-tuple figures are PLANNER ESTIMATES and must say so.**
 ///
 /// `n_live_tup`/`n_dead_tup` come from `pg_stat_user_tables`' estimated counters
@@ -5103,6 +5083,7 @@ fn table_stats_declares_its_tuple_counts_estimated() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// An empty vacuum timestamp means NEVER VACUUMED, which is the ordinary case
 /// and an actual finding — it must not be confused with a parse failure, and it
 /// must not be stored as an empty string that renders as a blank cell.
@@ -5125,6 +5106,7 @@ fn table_stats_reads_an_empty_vacuum_timestamp_as_never() {
     assert_eq!(rec.get(server_vantage::O2_DBM_LAST_ANALYZE), None);
 }
 
+#[cfg(feature = "enterprise")]
 /// **A table row is scoped by SCHEMA, and must never claim a DATABASE it was
 /// never told.**
 ///
@@ -5152,6 +5134,7 @@ fn table_stats_never_reports_the_schema_as_a_database() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// The instance must land, because it is the only thing separating a `users`
 /// table on one server from a `users` table on another.
 #[test]
@@ -5237,6 +5220,7 @@ fn adding_table_stats_leaves_the_other_recipes_dispatching() {
     assert!(canonicalize_record(&unknown).is_none());
 }
 
+#[cfg(feature = "enterprise")]
 /// **A SECOND, materially different relation — the discriminator.**
 ///
 /// Every other test in this group uses one fixture, and a hard-coded lookup
@@ -5272,6 +5256,7 @@ fn pg_table_stats_bloated_record() -> Map<String, Value> {
     }))
 }
 
+#[cfg(feature = "enterprise")]
 #[test]
 fn table_stats_reads_each_relation_from_its_own_record() {
     assert_canonicalizes(
@@ -5325,6 +5310,7 @@ fn table_stats_reads_each_relation_from_its_own_record() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// **A record pulled off the LIVE rig, verbatim** — the negative control the
 /// TDD skill requires for anything crossing a wire.
 ///
@@ -5364,6 +5350,7 @@ fn pg_table_stats_live_record() -> Map<String, Value> {
     }))
 }
 
+#[cfg(feature = "enterprise")]
 #[test]
 fn live_captured_table_stats_record_canonicalizes() {
     assert_canonicalizes(
@@ -5491,6 +5478,7 @@ fn pg_index_stats_unused_record() -> Map<String, Value> {
     }))
 }
 
+#[cfg(feature = "enterprise")]
 /// A real heavily-used index. Every numeric differs from the fixture above.
 fn pg_index_stats_used_record() -> Map<String, Value> {
     obj(json!({
@@ -5512,6 +5500,7 @@ fn pg_index_stats_used_record() -> Map<String, Value> {
     }))
 }
 
+#[cfg(feature = "enterprise")]
 /// **Through `apply_to_record`, the production entry point.** B19 shipped
 /// broken for weeks because tests called the internal function instead.
 #[test]
@@ -5540,6 +5529,7 @@ fn index_stats_canonicalizes_through_the_ingest_entry_point() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// The text columns parse into numbers, and a measured ZERO survives.
 ///
 /// `idx_scan = 0` is the entire never-scanned signal. Dropped as falsy, the
@@ -5565,6 +5555,7 @@ fn index_stats_parses_text_columns_and_keeps_a_measured_zero() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// The second fixture, inverted: a parser must track the record, not a lookup.
 #[test]
 fn index_stats_reads_a_used_index_from_its_own_row() {
@@ -5595,6 +5586,7 @@ fn index_stats_reads_a_used_index_from_its_own_row() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// A CONSTRAINT index must be marked as one.
 ///
 /// Verified against the live rig: three of the six largest indexes there are
@@ -5625,6 +5617,7 @@ fn index_stats_marks_a_constraint_index_as_unique() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// The counters are LIFETIME totals, and the row says so itself.
 ///
 /// Without the disclosure the read surface cannot phrase "never scanned"
@@ -5643,6 +5636,7 @@ fn index_stats_marks_its_counters_as_lifetime_totals() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// The engine is stated by the RECIPE. `pg_index_stats` reads
 /// `pg_stat_user_indexes`, which exists only on Postgres.
 #[test]
@@ -5757,6 +5751,7 @@ fn mysql_index_stats_record() -> Map<String, Value> {
     }))
 }
 
+#[cfg(feature = "enterprise")]
 /// A never-scanned MySQL index — the rig's `orders` PRIMARY KEY, verbatim.
 /// `idx_scan: "0"` here is a MEASURED zero from performance_schema.
 fn mysql_index_stats_unused_record() -> Map<String, Value> {
@@ -5777,6 +5772,7 @@ fn mysql_index_stats_unused_record() -> Map<String, Value> {
     }))
 }
 
+#[cfg(feature = "enterprise")]
 /// A FUNCTIONAL index (`(LOWER(customer_ref))`), verbatim from the rig — the
 /// row that exposed the recipe bug: an expression key part has NULL
 /// `COLUMN_NAME`, which nulled GROUP_CONCAT and then the whole `index_def`
@@ -5820,6 +5816,7 @@ fn mariadb_index_stats_record() -> Map<String, Value> {
     }))
 }
 
+#[cfg(feature = "enterprise")]
 /// **Through `apply_to_record`, the production entry point** — the same B19
 /// discipline every fixture in this file follows.
 #[test]
@@ -5857,6 +5854,7 @@ fn mysql_table_stats_canonicalizes_as_mysql() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// **The Postgres-only columns are ABSENT, never zero.** MySQL reports no
 /// dead-tuple, vacuum or xid state; a zero would claim "0% bloat, wraparound
 /// age 0" about measurements that never happened.
@@ -5891,6 +5889,7 @@ fn mysql_table_stats_leaves_postgres_only_columns_absent() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 #[test]
 fn mariadb_table_stats_canonicalizes_as_mariadb() {
     assert_canonicalizes(
@@ -5920,6 +5919,7 @@ fn mariadb_table_stats_canonicalizes_as_mariadb() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 #[test]
 fn mysql_index_stats_canonicalizes_as_mysql() {
     assert_canonicalizes(
@@ -5958,6 +5958,7 @@ fn mysql_index_stats_canonicalizes_as_mysql() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// **A measured zero survives as the never-scanned FINDING.** The rig's
 /// `orders` PRIMARY KEY, verbatim: performance_schema reported COUNT_READ=0,
 /// which is a measurement, not an absence.
@@ -5980,6 +5981,7 @@ fn mysql_index_stats_keeps_a_measured_zero_idx_scan() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// **The functional-index row canonicalizes with its definition intact** —
 /// the regression the rig pass caught: an expression key part has NULL
 /// `COLUMN_NAME` in `information_schema.STATISTICS`, which nulled
@@ -6015,6 +6017,7 @@ fn mysql_index_stats_functional_index_keeps_its_identity_and_definition() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// **The MariaDB shape's missing `idx_scan` stays missing.** performance_schema
 /// is OFF by default on MariaDB, so the recipe omits the usage join entirely —
 /// and a zero invented here would BE the never-scanned finding, fabricated for
@@ -6043,6 +6046,7 @@ fn mariadb_index_stats_leaves_absent_idx_scan_absent() {
     );
 }
 
+#[cfg(feature = "enterprise")]
 /// **The other kinds must not regress** — the widened `||` chains sit beside
 /// five existing dispatch arms, and the cheapest way to break them is a tag
 /// that overlaps. Same pattern as `adding_table_stats_leaves_the_other_

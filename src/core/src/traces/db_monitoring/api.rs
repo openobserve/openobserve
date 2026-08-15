@@ -6706,6 +6706,7 @@ pub(crate) fn plans_envelope(
 ///
 /// `""` (no engine filter) answers `unknown` rather than guessing: an unfiltered
 /// request spans every engine in the fleet, so no single verdict is true of it.
+#[cfg(feature = "enterprise")]
 pub(crate) fn table_health_engine_support(engine: &str) -> &'static str {
     match engine {
         "postgresql" | "mysql" | "mariadb" => "supported",
@@ -6736,6 +6737,7 @@ pub(crate) fn table_health_engine_support(engine: &str) -> &'static str {
 /// absent column in a `GROUP BY` fails the WHOLE query with a schema error, and
 /// the exposed case is the common one: no deployment has shipped this recipe
 /// yet.
+#[cfg(feature = "enterprise")]
 pub(crate) fn build_dbm_table_health_sql(
     stream_name: &str,
     start_time: i64,
@@ -6813,6 +6815,7 @@ pub(crate) fn build_dbm_table_health_sql(
 /// definition still make its rows worth collecting. See
 /// [`table_health_engine_support`] for why the empty filter answers `unknown`
 /// rather than guessing.
+#[cfg(feature = "enterprise")]
 pub(crate) fn index_health_engine_support(engine: &str) -> &'static str {
     match engine {
         "postgresql" | "mysql" | "mariadb" => "supported",
@@ -6834,6 +6837,7 @@ pub(crate) fn index_health_engine_support(engine: &str) -> &'static str {
 /// Returns `None` when the stream's schema lacks the index column — naming an
 /// absent column in a GROUP BY fails the whole query, and the common case is a
 /// deployment that has not shipped this recipe.
+#[cfg(feature = "enterprise")]
 pub(crate) fn build_dbm_index_health_sql(
     stream_name: &str,
     start_time: i64,
@@ -6894,6 +6898,7 @@ pub(crate) fn build_dbm_index_health_sql(
 // unnoticed.
 
 /// The column under its wire alias, falling back to its storage name.
+#[cfg(feature = "enterprise")]
 fn pick_col(row: &Value, wire: &str, storage: &str) -> Value {
     match row.get(wire) {
         Some(v) if !v.is_null() => v.clone(),
@@ -6902,6 +6907,7 @@ fn pick_col(row: &Value, wire: &str, storage: &str) -> Value {
 }
 
 /// [`pick_col`] as an integer, or null.
+#[cfg(feature = "enterprise")]
 fn int_col(row: &Value, wire: &str, storage: &str) -> Value {
     match server_vantage::as_i64_loose(&pick_col(row, wire, storage)) {
         Some(n) => json!(n),
@@ -6910,6 +6916,7 @@ fn int_col(row: &Value, wire: &str, storage: &str) -> Value {
 }
 
 /// [`pick_col`] as a non-empty string, or null.
+#[cfg(feature = "enterprise")]
 fn text_col(row: &Value, wire: &str, storage: &str) -> Value {
     match pick_col(row, wire, storage) {
         Value::String(s) if !s.is_empty() => json!(s),
@@ -6918,6 +6925,7 @@ fn text_col(row: &Value, wire: &str, storage: &str) -> Value {
 }
 
 /// One index's size and usage, in WIRE names (see the reader helpers above).
+#[cfg(feature = "enterprise")]
 fn index_health_row_to_dto(row: &Value) -> Value {
     let pick = |wire: &str, storage: &str| pick_col(row, wire, storage);
     let int = |wire: &str, storage: &str| int_col(row, wire, storage);
@@ -6953,6 +6961,7 @@ fn index_health_row_to_dto(row: &Value) -> Value {
 /// qualifier on the RESPONSE ENVELOPE rather than per-row: the flags are
 /// properties of the feed, not of a table, and repeating them on every row
 /// would invite a reader to assume a row without them is exact.
+#[cfg(feature = "enterprise")]
 fn table_health_row_to_dto(row: &Value) -> Value {
     let pick = |wire: &str, storage: &str| pick_col(row, wire, storage);
     let int = |wire: &str, storage: &str| int_col(row, wire, storage);
@@ -6984,6 +6993,7 @@ fn table_health_row_to_dto(row: &Value) -> Value {
     })
 }
 
+#[cfg(feature = "enterprise")]
 #[derive(Debug, Deserialize)]
 pub struct TableHealthQuery {
     pub stream: Option<String>,
@@ -7030,6 +7040,7 @@ pub struct TableHealthQuery {
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
+#[cfg(feature = "enterprise")]
 pub async fn get_dbm_table_health(
     Path(org_id): Path<String>,
     user_email: UserEmail,
@@ -7045,8 +7056,28 @@ pub async fn get_dbm_table_health(
     }
 }
 
+/// OSS stub — Table Health is an Enterprise capability.
+///
+/// The ROUTE stays registered (see `router/mod.rs`); only the body is gated.
+/// Gating the route would answer 404, which reads as "this build is broken" or
+/// "you have the wrong URL"; 403 is what tells the UI to render an upgrade
+/// prompt. Deliberately NOT `disabled_response()`, which means
+/// `ZO_DB_MONITORING_ENABLED=false` and would send the operator to a collector
+/// checklist for a feature no amount of configuration will enable here.
+///
+/// The `Query<TableHealthQuery>` extractor is dropped because that type is
+/// gated.
+#[cfg(not(feature = "enterprise"))]
+pub async fn get_dbm_table_health(
+    Path(_org_id): Path<String>,
+    _user_email: UserEmail,
+) -> HttpResponse {
+    unauthorized_response()
+}
+
 /// The table-health endpoint's whole body as a callable — same extraction as
 /// [`read_databases_body`], auth included.
+#[cfg(feature = "enterprise")]
 async fn read_table_health_body(
     org_id: &str,
     user_id: &str,
@@ -7162,6 +7193,7 @@ async fn read_table_health_body(
 /// cumulative/estimated disclosures are asserted on real JSON instead of
 /// scraped out of the handler's source text. `index_section` is
 /// `(index_hits, index_read_failed)` when the caller asked for indexes.
+#[cfg(feature = "enterprise")]
 pub(crate) fn table_health_envelope(
     hits: &[Value],
     stream: &str,
@@ -7307,19 +7339,21 @@ impl BadgeSliceResults {
     /// fan-out's `allSettled` did.
     pub(crate) fn all_forbidden(&self) -> bool {
         let forbidden = |r: &Result<Value, HttpResponse>| matches!(r, Err(resp) if resp.status() == axum::http::StatusCode::FORBIDDEN);
-        let all = forbidden(&self.databases)
-            && forbidden(&self.queries)
-            && forbidden(&self.activity)
-            && forbidden(&self.table_health);
-        // On OSS `deadlocks` and `blocking` are ALWAYS `Err(403)` — they are
-        // Enterprise capabilities — so consulting them here would make a
-        // whole-request 403 strictly EASIER to reach: a caller who used to get
-        // a 200 with partial members (because the deadlocks slice succeeded)
-        // would now get a blanket denial. Only members that can actually
-        // succeed are consulted. A `let` rebinding rather than `#[cfg]` on a
-        // `return`, which trips `clippy::needless_return`.
+        let all =
+            forbidden(&self.databases) && forbidden(&self.queries) && forbidden(&self.activity);
+        // On OSS `deadlocks`, `blocking` and `table_health` are ALWAYS
+        // `Err(403)` — they are Enterprise capabilities — so consulting them
+        // here would make a whole-request 403 strictly EASIER to reach: a
+        // caller who used to get a 200 with partial members (because the
+        // deadlocks slice succeeded) would now get a blanket denial. Only
+        // members that can actually succeed are consulted. A `let` rebinding
+        // rather than `#[cfg]` on a `return`, which trips
+        // `clippy::needless_return`.
         #[cfg(feature = "enterprise")]
-        let all = all && forbidden(&self.deadlocks) && forbidden(&self.blocking);
+        let all = all
+            && forbidden(&self.deadlocks)
+            && forbidden(&self.blocking)
+            && forbidden(&self.table_health);
         all
     }
 
@@ -7485,10 +7519,11 @@ pub async fn get_dbm_badges(
         namespace: None,
         limit: None,
     };
-    // `DeadlocksQuery` / `BlockingQuery` only exist on an enterprise build, so
-    // their construction is gated together with the join arm that consumes
-    // them. Task 5 does the full badges split; this is the minimum that keeps
-    // OSS compiling now that the two types are enterprise-only.
+    // `DeadlocksQuery` / `BlockingQuery` / `TableHealthQuery` only exist on an
+    // enterprise build, so their construction is gated together with the join
+    // arm that consumes them. Task 5 does the full badges split; this is the
+    // minimum that keeps OSS compiling now that the three types are
+    // enterprise-only.
     #[cfg(feature = "enterprise")]
     let deadlocks_q = DeadlocksQuery {
         start_time: q.start_time,
@@ -7514,6 +7549,7 @@ pub async fn get_dbm_badges(
         min_wait_seconds: None,
         limit: None,
     };
+    #[cfg(feature = "enterprise")]
     let table_health_q = TableHealthQuery {
         stream: None,
         start_time: q.start_time,
@@ -7540,16 +7576,15 @@ pub async fn get_dbm_badges(
         read_blocking_body(org, user, &blocking_q, true, prologue),
         read_table_health_body(org, user, &table_health_q),
     );
-    // On OSS the two enterprise slices are refused without a read. The envelope
-    // already maps `Err` to `null` per member, so their badges render blank
-    // rather than as a misleading 0. Table health is still OSS until Task 4.
+    // On OSS the three enterprise slices are refused without a read. The
+    // envelope already maps `Err` to `null` per member, so their badges render
+    // blank rather than as a misleading 0.
     #[cfg(not(feature = "enterprise"))]
     let (databases, queries, activity, deadlocks, blocking, table_health) = {
-        let (databases, queries, activity, table_health) = tokio::join!(
+        let (databases, queries, activity) = tokio::join!(
             read_databases_body(org, user, &databases_q),
             read_queries_body(org, user, &queries_q),
             read_activity_body(org, user, &activity_q, true, prologue),
-            read_table_health_body(org, user, &table_health_q),
         );
         (
             databases,
@@ -7557,7 +7592,7 @@ pub async fn get_dbm_badges(
             activity,
             Err(unauthorized_response()),
             Err(unauthorized_response()),
-            table_health,
+            Err(unauthorized_response()),
         )
     };
 
@@ -10652,6 +10687,7 @@ mod tests {
 
     // ── W11 · Index health read API ─────────────────────────────────────
 
+    #[cfg(feature = "enterprise")]
     /// The newest snapshot per INDEX, keyed on the index — not the relation.
     ///
     /// Two indexes on one table share a relation, so grouping by relation alone
@@ -10676,6 +10712,7 @@ mod tests {
         assert!(sql.contains("LIMIT 50"));
     }
 
+    #[cfg(feature = "enterprise")]
     /// MAX, never SUM: these are point-in-time snapshots re-emitted every 60s.
     /// Summing them multiplies an index's size by the number of samples.
     #[test]
@@ -10692,6 +10729,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     /// A stream that never carried index stats yields no query at all, rather
     /// than a query naming an absent column — which fails the WHOLE request.
     #[test]
@@ -10704,6 +10742,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     /// Scope filters reach the aggregate, and injection is neutralized.
     #[test]
     fn test_index_health_sql_honours_scope_filters_and_escapes_them() {
@@ -10718,6 +10757,7 @@ mod tests {
         assert!(sql.contains("\"ev\"\"il\""), "identifier is escaped: {sql}");
     }
 
+    #[cfg(feature = "enterprise")]
     /// Storage names must never reach the browser, and a measured ZERO must
     /// survive as 0 rather than becoming null — it is the whole finding.
     #[test]
@@ -10752,6 +10792,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     /// The DTO must also read the CANONICALIZER's own output, closing the
     /// write/read loop — a DTO that only understood the SQL aliases could not
     /// be fed what ingest actually wrote, which is how a name split hides.
@@ -10787,6 +10828,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     /// Index health is collected for the three engines with index-stats
     /// recipes, and the envelope must say so per engine — an empty list for an
     /// unsupported engine's user reads as "no problems found".
@@ -12172,6 +12214,7 @@ mod tests {
 
     // ── W10 · Table health read API ─────────────────────────────────────────
 
+    #[cfg(feature = "enterprise")]
     /// **One row per RELATION, not one per snapshot.**
     ///
     /// The recipe re-emits every table every 60 s, so an hour's window holds 60
@@ -12211,6 +12254,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     /// **The aggregate must take the LATEST snapshot, never a SUM or an AVG.**
     ///
     /// Every measurement on this feed is a point-in-time state of a relation:
@@ -12238,6 +12282,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     /// The query degrades rather than 500s when the stream predates table
     /// ingest — the common case, since no shipped deployment has the recipe yet.
     #[test]
@@ -12251,6 +12296,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     /// Injection-safe, like every other builder here.
     #[test]
     fn test_table_health_sql_escapes_its_inputs() {
@@ -12261,6 +12307,7 @@ mod tests {
         assert!(sql.contains("\"ev\"\"il\""));
     }
 
+    #[cfg(feature = "enterprise")]
     /// **Closes the writer/reader loop** — the DTO is fed the CANONICALIZER'S
     /// OWN OUTPUT, so a column written under one name and read under another
     /// cannot pass. That split is invisible to both sides in isolation and
@@ -12316,6 +12363,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     /// **A SECOND, materially different relation — the discriminator.**
     ///
     /// The writer/reader-loop test above uses one fixture, and a DTO hard-coded
@@ -12379,6 +12427,7 @@ mod tests {
         assert_eq!(dto["last_seen"], json!(1_786_600_000_000_000i64));
     }
 
+    #[cfg(feature = "enterprise")]
     /// The DTO speaks WIRE names; storage names never reach the browser.
     #[test]
     fn test_table_health_dto_uses_wire_names() {
@@ -12395,6 +12444,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "enterprise")]
     /// **The cumulative/estimated disclosure must reach the WIRE.**
     ///
     /// The ingest side marks every row, but the UI reads the RESPONSE, not the
@@ -12448,6 +12498,7 @@ mod tests {
         assert!(body.get("index_hits").is_none());
     }
 
+    #[cfg(feature = "enterprise")]
     /// **Per-engine honesty: the surface must SAY which engines collect this.**
     ///
     /// Postgres, MySQL and MariaDB all ship table-stats recipes; SQL Server
@@ -12987,13 +13038,17 @@ mod tests {
         };
         assert!(all_denied.all_forbidden());
 
+        // The readable slice is `activity` — an OSS member on purpose. The
+        // three enterprise members are ALWAYS `Err(403)` on OSS and
+        // `all_forbidden` deliberately does not consult them there, so using
+        // one of them here would assert nothing on the OSS build.
         let mut one_answers = BadgeSliceResults {
             databases: denied(),
             queries: denied(),
-            activity: denied(),
+            activity: Ok(json!({"hits": [], "total": 0})),
             deadlocks: denied(),
             blocking: denied(),
-            table_health: Ok(json!({"hits": [], "total": 0})),
+            table_health: denied(),
             server_queries: None,
             server_samples: None,
         };
@@ -13001,7 +13056,7 @@ mod tests {
             !one_answers.all_forbidden(),
             "one readable slice means the caller gets an answer, not a 403"
         );
-        one_answers.table_health = Err(MetaHttpResponse::internal_error("down"));
+        one_answers.activity = Err(MetaHttpResponse::internal_error("down"));
         assert!(
             !one_answers.all_forbidden(),
             "a non-auth failure is not a denial — the caller may retry, not be locked out"
