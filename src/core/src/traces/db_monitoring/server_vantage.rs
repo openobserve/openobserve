@@ -78,8 +78,9 @@ use std::collections::BTreeMap;
 // shadow globs — so `RESERVED_DBM_PREFIX`, `WarnDecision` and friends below are
 // unaffected.
 pub use config::meta::db_monitoring::*;
-/// Deadlocks and blocking are ENTERPRISE capabilities; their canonicalizers and
-/// types live in `o2_enterprise::enterprise::db_monitoring`. Re-exported at
+/// Deadlocks, blocking and table/index health are ENTERPRISE capabilities;
+/// their canonicalizers and types live in
+/// `o2_enterprise::enterprise::db_monitoring`. Re-exported at
 /// their original `server_vantage::` paths so the existing `api.rs` call sites
 /// resolve unchanged on an enterprise build. On OSS these names do not exist and
 /// every use of them is `cfg`-gated off.
@@ -90,6 +91,9 @@ pub use o2_enterprise::enterprise::db_monitoring::{
         DeadlockEvent, Participant, canonicalize_mariadb_deadlock, canonicalize_mssql_deadlock,
         canonicalize_mysql_deadlock, canonicalize_pg_deadlock, merge_mysql_deadlocks,
         participants_of,
+    },
+    table_stats::{
+        IndexStatsSample, TableStatsSample, canonicalize_index_stats, canonicalize_table_stats,
     },
 };
 use serde_json::{Map, Value, json};
@@ -782,22 +786,34 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
             Claim::NotMine => {}
         }
     }
-    // MSSQL deadlocks (a sqlquery recipe, not a filelog one, so keyed on the
-    // recipe tag) and the four engine-agnostic blocking recipes are
-    // ENTERPRISE-OWNED — `claim_recipe_tags` above claims all five. The tags
-    // are named here, in the dispatcher's own body, because the shipped recipes
-    // stamp them and `shipped_recipe_tags_and_backend_dispatch_agree` reads this
-    // function's source to prove the two sides of that contract still agree — a
-    // check that cannot reach across the repo boundary.
+    // Every ENTERPRISE-OWNED sqlquery recipe tag, named here in the
+    // dispatcher's own body: MSSQL deadlocks (a sqlquery recipe, not a filelog
+    // one, so keyed on the tag), the four engine-agnostic blocking recipes, and
+    // the six table/index-stats recipes. `claim_recipe_tags` above claims all
+    // eleven.
     //
-    // The binding below is NOT redundant with the hook: it is also consumed by
-    // the table_stats and index_stats arms, which remain OSS.
+    // The literals are NOT redundant with the hook. `shipped_recipe_tags_and_
+    // backend_dispatch_agree` reads THIS function's source to prove the shipped
+    // collector recipes (`dbmShared.ts`) and the backend still tag the same set
+    // — a check that cannot reach across the repo boundary, so deleting the
+    // literals would make it silently pass over a shorter list.
     let recipe = rec.get("o2_recipe").and_then(|v| v.as_str()).unwrap_or("");
     let is_enterprise_recipe = recipe == "mssql_deadlock"
         || recipe == "pg_blocking_chain"
         || recipe == "mysql_lock_waits"
         || recipe == "mariadb_lock_waits"
-        || recipe == "mssql_blocking_chain";
+        || recipe == "mssql_blocking_chain"
+        // Table health (W10) and index health (W11) — one row per relation /
+        // per index per 60 s. The three engines' recipes emit the SAME column
+        // aliases (the `mariadb_lock_waits` precedent), so one enterprise
+        // canonicalizer serves all three and `detect_engine` reads the engine
+        // off the tag.
+        || recipe == "pg_table_stats"
+        || recipe == "mysql_table_stats"
+        || recipe == "mariadb_table_stats"
+        || recipe == "pg_index_stats"
+        || recipe == "mysql_index_stats"
+        || recipe == "mariadb_index_stats";
     // Same rule as the deadlock markers above: on OSS an enterprise-owned tag
     // ENDS dispatch rather than falling through to the arms below, which is
     // what the enterprise build's `Claim` does for the identical record.
@@ -807,39 +823,6 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     }
     #[cfg(feature = "enterprise")]
     let _ = is_enterprise_recipe;
-
-    // Table health (W10) — the table-stats sqlquery recipes. Keyed on the
-    // recipe tag, the same extension point the blocking match above uses: these
-    // rows carry no OTLP event name and no engine attribute, so the tag is the
-    // only discriminator there is. The three engines' recipes emit the SAME
-    // column aliases (the `mariadb_lock_waits` precedent), so one canonicalizer
-    // serves all three and `detect_engine` reads the engine off the tag.
-    //
-    // Ungated, unlike activity and top_query. Those two are opt-in because of
-    // VOLUME — one row per session per poll, and 2.4 KB plan documents. This
-    // recipe emits one row per TABLE per 60 s (measured: 448 rows/hour on the
-    // reference rig, against ~200 rows/SECOND for activity), which is the same
-    // order as the deadlock and blocking feeds that already ship enabled. A
-    // knob whose only effect is to hide a cheap signal is a knob nobody sets
-    // correctly.
-    if recipe == "pg_table_stats"
-        || recipe == "mysql_table_stats"
-        || recipe == "mariadb_table_stats"
-    {
-        return canonicalize_table_stats(rec).map(|s| s.to_record());
-    }
-
-    // Index health (W11) — the index-stats sqlquery recipes, keyed on the same
-    // extension point and sharing one canonicalizer across engines exactly as
-    // table stats does. Ungated for the same reason: one row per INDEX per 60 s
-    // is the same order as the deadlock and blocking feeds that already ship
-    // enabled, not the per-session volume that made activity opt-in.
-    if recipe == "pg_index_stats"
-        || recipe == "mysql_index_stats"
-        || recipe == "mariadb_index_stats"
-    {
-        return canonicalize_index_stats(rec).map(|s| s.to_record());
-    }
 
     // Active sessions (W2) — LAST, and gated on its own knob.
     //
@@ -1564,300 +1547,5 @@ pub fn canonicalize_pg_statement_duration(
         // Normalized ONLY — never `.or(text)`. See the privacy rule above.
         query: query_norm,
         fingerprint,
-    })
-}
-
-// ─── W10 · Table health (`pg_table_stats`) ───────────────────────────────────
-//
-// One snapshot of one RELATION's storage and maintenance state, from the
-// `pg_table_stats` sqlquery recipe (capture rig `server.yaml` R3a). The recipe
-// joins `pg_class` (size) to `pg_stat_user_tables` (activity, vacuum history).
-//
-// **This is a fifth record kind, not a variant of the four that exist.**
-// Activity describes a SESSION, top_query a STATEMENT, deadlock and blocking an
-// EVENT between sessions. A table row describes a RELATION: it has no pid, no
-// statement, no participants, and it persists between snapshots rather than
-// occurring at one. Filing it under any existing kind would put rows with no
-// session and no query into a table whose every column is about one or the
-// other.
-//
-// **Two honesty properties bind everything downstream, and both are stated as
-// COLUMNS rather than left to the reader** (see `O2_DBM_COUNTERS_ARE_CUMULATIVE`
-// and `O2_DBM_TUPLES_ARE_ESTIMATED`).
-//
-// **Postgres, MySQL and MariaDB.** The three engines expose schema statistics
-// through entirely different catalogs (`pg_stat_user_tables`,
-// `information_schema.TABLES` + `mysql.innodb_table_stats`), but their recipes
-// emit the SAME aliased columns — the `mariadb_lock_waits` precedent — so this
-// one canonicalizer reads all three and the recipe tag names the engine. The
-// engine-specific columns simply stay absent where an engine has no source for
-// them (MySQL reports no dead-tuple or vacuum state, for instance). SQL Server
-// still has no table-stats recipe, and the read surface must say "not
-// collected for this engine" rather than render an empty table that reads as
-// "no problems found".
-
-/// One relation's storage and maintenance state at one snapshot.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct TableStatsSample {
-    pub engine: Option<String>,
-    /// Always `None` from this recipe — see [`O2_DBM_SCHEMA`]. Kept on the
-    /// struct so the field's absence is an explicit decision at every
-    /// construction site rather than an omission nobody notices.
-    pub database: Option<String>,
-    pub instance: Option<String>,
-    pub timestamp: Option<i64>,
-    pub relation: Option<String>,
-    pub schema: Option<String>,
-    pub total_bytes: Option<i64>,
-    pub heap_bytes: Option<i64>,
-    pub live_tuples: Option<i64>,
-    pub dead_tuples: Option<i64>,
-    pub dead_tup_pct: Option<f64>,
-    pub mod_since_analyze: Option<i64>,
-    pub seq_scan: Option<i64>,
-    pub seq_tup_read: Option<i64>,
-    pub idx_scan: Option<i64>,
-    pub autovacuum_count: Option<i64>,
-    pub frozen_xid_age: Option<i64>,
-    pub last_vacuum: Option<String>,
-    pub last_autovacuum: Option<String>,
-    pub last_analyze: Option<String>,
-}
-
-impl TableStatsSample {
-    /// The flattened canonical record. Every value is a SCALAR (Invariant 2,
-    /// module docs).
-    pub fn to_record(&self) -> BTreeMap<String, Value> {
-        let mut out = BTreeMap::new();
-        out.insert(O2_DBM_KIND.into(), json!(KIND_TABLE_STATS));
-        insert_opt(&mut out, O2_DBM_ENGINE, self.engine.clone());
-        insert_opt(&mut out, O2_DBM_DATABASE, self.database.clone());
-        insert_opt(&mut out, O2_DBM_INSTANCE, self.instance.clone());
-        if let Some(ts) = self.timestamp {
-            out.insert(O2_DBM_TIMESTAMP.into(), json!(ts));
-        }
-        insert_opt(&mut out, O2_DBM_RELATION, self.relation.clone());
-        insert_opt(&mut out, O2_DBM_SCHEMA, self.schema.clone());
-        // `if let Some` and never `unwrap_or(0)`: a measured zero and an absent
-        // column are different facts, and defaulting turns "the recipe did not
-        // report this" into "there were none of these".
-        for (col, val) in [
-            (O2_DBM_TOTAL_BYTES, self.total_bytes),
-            (O2_DBM_HEAP_BYTES, self.heap_bytes),
-            (O2_DBM_LIVE_TUPLES, self.live_tuples),
-            (O2_DBM_DEAD_TUPLES, self.dead_tuples),
-            (O2_DBM_MOD_SINCE_ANALYZE, self.mod_since_analyze),
-            (O2_DBM_SEQ_SCAN_COUNT, self.seq_scan),
-            (O2_DBM_SEQ_TUP_READ, self.seq_tup_read),
-            (O2_DBM_IDX_SCAN_COUNT, self.idx_scan),
-            (O2_DBM_AUTOVACUUM_COUNT, self.autovacuum_count),
-            (O2_DBM_FROZEN_XID_AGE, self.frozen_xid_age),
-        ] {
-            if let Some(v) = val {
-                out.insert(col.into(), json!(v));
-            }
-        }
-        if let Some(p) = self.dead_tup_pct {
-            out.insert(O2_DBM_DEAD_TUP_PCT.into(), json!(p));
-        }
-        insert_opt(&mut out, O2_DBM_LAST_VACUUM, self.last_vacuum.clone());
-        insert_opt(
-            &mut out,
-            O2_DBM_LAST_AUTOVACUUM,
-            self.last_autovacuum.clone(),
-        );
-        insert_opt(&mut out, O2_DBM_LAST_ANALYZE, self.last_analyze.clone());
-        // Both UNCONDITIONAL — see the two consts. A flag on only some rows
-        // would read as a claim about the rows that lack it.
-        out.insert(O2_DBM_COUNTERS_ARE_CUMULATIVE.into(), json!(true));
-        out.insert(O2_DBM_TUPLES_ARE_ESTIMATED.into(), json!(true));
-        out
-    }
-}
-
-// ─── W11 · Index health (`pg_index_stats`) ───────────────────────────────────
-//
-// One snapshot of one INDEX, from the `pg_index_stats` sqlquery recipe. These
-// rows have been arriving on the live rig all along (312 per window, measured)
-// and falling through to the trailing `None` because no arm claimed them.
-//
-// **A sixth kind, not a table-stats variant.** A table row and an index row
-// share a relation but not an identity: two indexes on one table are two rows
-// with the same `o2_dbm_relation`, so filing them under `table_stats` would
-// make the relation a non-unique key and silently collapse them in any
-// newest-per-relation read.
-//
-// **The identity is `index_name`, NOT `body`.** `pg_table_stats` declares
-// `table_name` as its `body_column`, so there the name arrives as `body`. This
-// recipe declares no body column: `index_name` and `table_name` are ordinary
-// attributes and `body` carries the `CREATE INDEX ...` DDL. Reusing the
-// table-stats convention here would file every index under a DDL statement —
-// the same producer/parser mismatch that shipped two DBM bugs green.
-//
-// **Postgres, MySQL and MariaDB**, exactly as table health is: the MySQL and
-// MariaDB recipes read `information_schema.STATISTICS` (+
-// `performance_schema.table_io_waits_summary_by_index_usage` for usage counts,
-// MySQL only — MariaDB ships with performance_schema OFF, so its rows honestly
-// omit `idx_scan` rather than reporting zero) and emit the same aliased
-// columns as `pg_index_stats`. SQL Server still has no index-stats recipe.
-
-/// One index's size and usage at one snapshot.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct IndexStatsSample {
-    pub engine: Option<String>,
-    /// Always `None` — the recipe never names a database. See [`O2_DBM_SCHEMA`].
-    pub database: Option<String>,
-    pub instance: Option<String>,
-    pub timestamp: Option<i64>,
-    pub index_name: Option<String>,
-    /// The table the index belongs to.
-    pub relation: Option<String>,
-    pub schema: Option<String>,
-    pub index_bytes: Option<i64>,
-    pub idx_scan: Option<i64>,
-    pub idx_tup_read: Option<i64>,
-    pub idx_tup_fetch: Option<i64>,
-    /// `None` when the recipe predates the column — UNKNOWN, not "ordinary".
-    pub is_unique: Option<bool>,
-}
-
-impl IndexStatsSample {
-    /// The flattened canonical record. Every value is a SCALAR.
-    pub fn to_record(&self) -> BTreeMap<String, Value> {
-        let mut out = BTreeMap::new();
-        out.insert(O2_DBM_KIND.into(), json!(KIND_INDEX_STATS));
-        insert_opt(&mut out, O2_DBM_ENGINE, self.engine.clone());
-        insert_opt(&mut out, O2_DBM_DATABASE, self.database.clone());
-        insert_opt(&mut out, O2_DBM_INSTANCE, self.instance.clone());
-        if let Some(ts) = self.timestamp {
-            out.insert(O2_DBM_TIMESTAMP.into(), json!(ts));
-        }
-        insert_opt(&mut out, O2_DBM_INDEX_NAME, self.index_name.clone());
-        insert_opt(&mut out, O2_DBM_RELATION, self.relation.clone());
-        insert_opt(&mut out, O2_DBM_SCHEMA, self.schema.clone());
-        // `if let Some` and never `unwrap_or(0)`: a measured zero is the
-        // never-scanned FINDING, and an absent column is a different fact.
-        for (col, val) in [
-            (O2_DBM_INDEX_BYTES, self.index_bytes),
-            (O2_DBM_IDX_SCAN_COUNT, self.idx_scan),
-            (O2_DBM_IDX_TUP_READ, self.idx_tup_read),
-            (O2_DBM_IDX_TUP_FETCH, self.idx_tup_fetch),
-        ] {
-            if let Some(v) = val {
-                out.insert(col.into(), json!(v));
-            }
-        }
-        // Written only when the recipe reported it. An absent flag is UNKNOWN,
-        // and defaulting it to `false` would assert that a primary key is an
-        // ordinary index — the exact confusion this column exists to prevent.
-        if let Some(u) = self.is_unique {
-            out.insert(O2_DBM_INDEX_IS_UNIQUE.into(), json!(u));
-        }
-        // UNCONDITIONAL: `pg_stat_user_indexes` counts from the last stats
-        // reset. Without this the read surface cannot say "never scanned"
-        // without implying "never scanned in this window".
-        out.insert(O2_DBM_COUNTERS_ARE_CUMULATIVE.into(), json!(true));
-        out
-    }
-}
-
-/// Canonicalize one index-stats recipe row (`pg_index_stats`,
-/// `mysql_index_stats` or `mariadb_index_stats` — all three emit the same
-/// aliased columns) into an [`IndexStatsSample`].
-///
-/// Reads only the recipe's own column names (Invariant 1, module docs), so a
-/// caller cannot POST a fabricated index row.
-pub fn canonicalize_index_stats(rec: &Map<String, Value>) -> Option<IndexStatsSample> {
-    // The index's own name is the identity. Absent, there is no index to show
-    // and a fabricated name would invent a row in the health list. NOT read
-    // from `body`, which holds the CREATE INDEX statement.
-    let index_name = first_str(rec, &["index_name"])?;
-
-    Some(IndexStatsSample {
-        // Stated by the RECIPE TAG via `detect_engine` — the row carries no
-        // `db.system` attribute, and the same aliased columns arrive from the
-        // Postgres, MySQL and MariaDB recipes. Legacy rows written before the
-        // MySQL/MariaDB twins existed can only have come from `pg_index_stats`,
-        // hence the Postgres fallback.
-        engine: detect_engine(rec).or_else(|| Some("postgresql".to_string())),
-        database: None,
-        instance: detect_instance(rec),
-        timestamp: detect_timestamp(rec),
-        index_name: Some(index_name),
-        relation: first_str(rec, &["table_name"]),
-        schema: first_str(rec, &["schema_name"]),
-        // Every column is `::text` in the recipe. `idx_tup_read` exceeds i32 on
-        // real data (2,937,877,460 measured), so these must be i64.
-        index_bytes: first_i64(rec, &["index_bytes"]),
-        idx_scan: first_i64(rec, &["idx_scan"]),
-        idx_tup_read: first_i64(rec, &["idx_tup_read"]),
-        idx_tup_fetch: first_i64(rec, &["idx_tup_fetch"]),
-        // Postgres renders a boolean `::text` as "true"/"false"; a JSON bool is
-        // accepted too so the column survives a producer that sends one.
-        is_unique: match rec.get("is_unique") {
-            Some(Value::Bool(b)) => Some(*b),
-            Some(Value::String(s)) => match s.as_str() {
-                "true" | "t" => Some(true),
-                "false" | "f" => Some(false),
-                // An unrecognised value is UNKNOWN, never silently `false`.
-                _ => None,
-            },
-            _ => None,
-        },
-    })
-}
-
-/// Canonicalize one table-stats recipe row (`pg_table_stats`,
-/// `mysql_table_stats` or `mariadb_table_stats` — all three emit the same
-/// aliased columns) into a [`TableStatsSample`].
-///
-/// Follows the module invariants (Invariant 1: the recipe's own column names
-/// only): returns `None` without a relation identity, and reuses the shared
-/// detectors where they apply.
-pub fn canonicalize_table_stats(rec: &Map<String, Value>) -> Option<TableStatsSample> {
-    // The table name is the recipe's `body_column`, so it arrives as `body` and
-    // there is NO `table_name` attribute. `canonicalize_mssql_deadlock` reads
-    // `body` for the same reason. Without a relation there is no table to show,
-    // and inventing a name would fabricate a row in the health list.
-    let relation = first_str(rec, &["body"])?;
-
-    Some(TableStatsSample {
-        // Stated by the RECIPE TAG via `detect_engine`, not sniffed: the row
-        // carries no `db.system` attribute at all, and the Postgres, MySQL and
-        // MariaDB recipes emit the same aliased columns — the tag is the only
-        // thing naming the engine. Without it the engine would be null and a
-        // fleet view could not tell which engines it is missing data for.
-        // Legacy rows written before the MySQL/MariaDB twins existed can only
-        // have come from `pg_table_stats`, hence the Postgres fallback.
-        engine: detect_engine(rec).or_else(|| Some("postgresql".to_string())),
-        // Deliberately absent — the recipe never names a database, and
-        // `schema_name` is NOT one. See `O2_DBM_SCHEMA`.
-        database: None,
-        instance: detect_instance(rec),
-        timestamp: detect_timestamp(rec),
-        relation: Some(relation),
-        schema: first_str(rec, &["schema_name"]),
-        // Every column is `::text` in the recipe, so all of these parse from
-        // strings. `first_i64`/`first_f64` already handle both forms.
-        total_bytes: first_i64(rec, &["total_bytes"]),
-        heap_bytes: first_i64(rec, &["heap_bytes"]),
-        live_tuples: first_i64(rec, &["n_live_tup"]),
-        dead_tuples: first_i64(rec, &["n_dead_tup"]),
-        // f64, not i64: the recipe rounds to two decimals and an integer parse
-        // would collapse every sub-1% bloat figure to zero.
-        dead_tup_pct: first_f64(rec, &["dead_tup_pct"]),
-        mod_since_analyze: first_i64(rec, &["n_mod_since_analyze"]),
-        seq_scan: first_i64(rec, &["seq_scan"]),
-        seq_tup_read: first_i64(rec, &["seq_tup_read"]),
-        idx_scan: first_i64(rec, &["idx_scan"]),
-        autovacuum_count: first_i64(rec, &["autovacuum_count"]),
-        frozen_xid_age: first_i64(rec, &["frozen_xid_age"]),
-        // `first_str` treats `""` as absent, which is exactly right here: the
-        // recipe COALESCEs "never vacuumed" to the empty string, and omitting
-        // the column is how "never" is expressed. Relied on deliberately rather
-        // than inherited by accident.
-        last_vacuum: first_str(rec, &["last_vacuum"]),
-        last_autovacuum: first_str(rec, &["last_autovacuum"]),
-        last_analyze: first_str(rec, &["last_analyze"]),
     })
 }
