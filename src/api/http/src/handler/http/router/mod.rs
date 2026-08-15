@@ -798,9 +798,13 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
-        // Database Monitoring (OSS feature — deliberately in the UNGATED router
-        // section, design §6: the enterprise-gated block would 404 these on OSS
-        // builds; runtime off-switch is ZO_DB_MONITORING_ENABLED)
+        // Database Monitoring — deliberately in the UNGATED router section
+        // (design §6). Every route below is registered in BOTH builds; the
+        // build-type gate lives in the handlers, three of which
+        // (deadlocks/blocking/table_health) are dual-implemented and answer 403
+        // on OSS. Moving them into the enterprise-gated block would 404 them
+        // instead, losing the distinction between "not licensed" and "no such
+        // endpoint". Runtime off-switch is ZO_DB_MONITORING_ENABLED.
         .route("/{org_id}/traces/db_monitoring/databases", get(traces::get_dbm_databases))
         .route("/{org_id}/traces/db_monitoring/queries", get(traces::get_dbm_queries))
         .route("/{org_id}/traces/db_monitoring/query/history", get(traces::get_dbm_query_history))

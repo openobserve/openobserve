@@ -671,7 +671,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(flatten_compactor::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(service_graph::run());
-    // Plain OSS — the DBM rollup ships in all builds (design §5/§7).
+    // No cfg, unlike service_graph above: parts of DBM's read API are
+    // enterprise-only, but this rollup works on ordinary database spans and is
+    // identical in both builds (design §5/§7).
     tokio::task::spawn(db_monitoring::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());

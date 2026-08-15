@@ -16,10 +16,16 @@
 //! Database Monitoring read API (design: `docs/___databsepages/dbm-design-doc.md`
 //! §6 routes + §5.4/D4 hybrid live tail).
 //!
-//! Four plain-OSS GET handlers (no 403 stub, no `#[cfg]` — DBM is an OSS
-//! feature, D2) structurally modeled on the service-graph read API
+//! GET handlers structurally modeled on the service-graph read API
 //! (`../service_graph/api.rs`): fixed SQL over the `_o2_db_stats` summary
 //! stream via `crate::search::search`, read as `StreamType::Logs`.
+//!
+//! Most of them carry no `#[cfg]` and serve both builds. Three do not:
+//! `get_dbm_deadlocks`, `get_dbm_blocking` and `get_dbm_table_health` are
+//! dual-implemented — the real handler behind `#[cfg(feature = "enterprise")]`
+//! and, on OSS, a stub returning 403 (`unauthorized_response`) before any auth
+//! or search work. Their bodies and the server-vantage canonicalizers they read
+//! live in `o2_enterprise`.
 //!
 //! The three rollup-backed endpoints (databases / queries / query history)
 //! serve a **hybrid**: rolled-up records for the requested window PLUS a live
@@ -89,10 +95,15 @@ const DEFAULT_SERVER_STREAM: &str = "dbm_server";
 /// stream type through `OFGA_MODELS`, and returns `true` for root users.
 ///
 /// On OSS the underlying helper is a stub returning `false`, so this wrapper
-/// returns `true` there — DBM is an OSS feature whose documented posture is
-/// org-level visibility (FRD NFR-6), and denying every read on a build with no
-/// OFGA to consult would break the feature rather than secure it. The gate that
-/// matters is the enterprise one, where RBAC is actually configured.
+/// returns `true` there — the endpoints that DO reach it on OSS are the ones
+/// whose documented posture is org-level visibility (FRD NFR-6), and denying
+/// every read on a build with no OFGA to consult would break them rather than
+/// secure them. The gate that matters is the enterprise one, where RBAC is
+/// actually configured.
+///
+/// Note this wrapper is not what gates the enterprise-only endpoints: on OSS,
+/// deadlocks/blocking/table health never get here at all, because their
+/// handlers are `#[cfg]`-stubbed to 403 before any auth or search runs.
 async fn can_read_stream(
     org_id: &str,
     user_id: &str,

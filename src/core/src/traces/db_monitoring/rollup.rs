@@ -16,8 +16,9 @@
 //! Database Monitoring rollup: the Phase-2 `_o2_db_stats` writer
 //! (design: `docs/___databsepages/dbm-design-doc.md` §5).
 //!
-//! A dedicated OSS windowed job (structurally cloned from the service-graph
-//! processor, but plain OSS — no enterprise cfg) that, per `(org, trace
+//! A dedicated windowed job (structurally cloned from the service-graph
+//! processor, but with no enterprise cfg — unlike parts of the read API in
+//! `api.rs`, this module is identical in both builds) that, per `(org, trace
 //! stream)` and per window, runs THREE aggregation queries over the
 //! ingest-stamped `o2_db_*` columns and writes three record families into the
 //! `_o2_db_stats` summary stream:

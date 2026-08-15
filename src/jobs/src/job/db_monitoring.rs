@@ -15,10 +15,16 @@
 
 //! Database Monitoring rollup job (design `docs/___databsepages/dbm-design-doc.md` §5).
 //!
-//! A dedicated, plain-OSS windowed job — structurally the service-graph job
-//! (scheduler-role-only, `spawn_pausable_job!`) but with NO enterprise cfg:
-//! DBM ships in all builds and paces on its own interval
-//! (`ZO_DB_MONITORING_INTERVAL_SECS`, default 900 s).
+//! A dedicated windowed job — structurally the service-graph job
+//! (scheduler-role-only, `spawn_pausable_job!`) but with NO enterprise cfg and
+//! paced on its own interval (`ZO_DB_MONITORING_INTERVAL_SECS`, default 900 s).
+//!
+//! The cfg-free shape is not an oversight. Parts of DBM's READ surface are
+//! enterprise-only (deadlocks, blocked queries, table health), but this job
+//! rolls up the `o2_db_*` columns on ordinary database SPANS — data every build
+//! ingests — into `_o2_db_stats`, which backs the endpoints that stay OSS. It
+//! is genuinely identical in both builds, so gating it would only starve the
+//! OSS tabs.
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job};
 

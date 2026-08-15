@@ -43,8 +43,12 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // Pipelines: the Stream Pipelines tab hides when custom_hide_menus lists
   // "pipelines" — mirrors PipelineSectionTabs.vue exactly.
   streamPipelines: (c) => !c.hiddenMenus.has("pipelines"),
-  // Database Monitoring is OSS — the runtime flag is the WHOLE gate. Adding an
-  // isEnterprise conjunct here would hide it from the builds it ships in.
+  // The runtime flag is the whole gate for the MENU ENTRY, which is not
+  // enterprise-only. Three of Database Monitoring's seven tabs (deadlocks,
+  // blocked queries, table health) ARE enterprise-only, but they are gated
+  // per-tab in DbmSectionTabs.vue and per-route in router.ts — not here. An
+  // isEnterprise conjunct at this level would take the four OSS tabs down with
+  // them and hide the section from a build that still serves most of it.
   databaseMonitoring: (c) => c.databaseMonitoring,
 };
 
