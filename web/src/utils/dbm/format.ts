@@ -38,6 +38,13 @@
  */
 export const formatNs = (ns: number | undefined | null): string => {
   if (ns === undefined || ns === null || !Number.isFinite(ns)) return "—";
+  // `0us` is reachable ONLY for a duration that was genuinely measured at zero
+  // — a single sub-nanosecond row, or an engine that reported a zero total.
+  // It is NOT the rendering for "this vantage measured nothing": an absent
+  // measurement must never reach a formatter, because a formatter's contract
+  // is total (every input returns a string) and so it cannot withhold. Callers
+  // holding an OVERLAP measure route through `overlapTile`, which withholds
+  // before formatting; see D6/L2 and the constraint note there.
   if (ns <= 0) return "0us";
 
   const units: [limit: number, divisor: number, suffix: string][] = [
@@ -229,6 +236,53 @@ export const overlapClaim = (
   truncated?: boolean,
   vantage?: DbmCountVantage,
 ): DbmCountClaim | null => (count === 0 ? null : countClaim(count, truncated, vantage));
+
+/** What a summary tile prints: a value, and the qualifier it is allowed to carry. */
+export interface DbmOverlapTile {
+  /**
+   * The formatted figure, or `null` for "this vantage measured nothing".
+   * `null` is what `OStatCard` already renders as `—`, so the withheld state
+   * needs no new rendering path.
+   */
+  value: string | null;
+  /** `true` only when `value` is non-null — a qualifier may not render alone. */
+  qualified: boolean;
+}
+
+/**
+ * A summary TILE for an OVERLAP measure, under the same rule as the badges.
+ *
+ * This is the third surface to hit the D6/L2 collision (detail tiles, tab
+ * badges, now the summary strip). Each re-implemented the absent-vs-zero
+ * decision and each got it wrong the same way, so the decision lives here and
+ * the render sites consume it.
+ *
+ * The collision: D2 makes the vantage qualifier mandatory on any overlap value
+ * that renders, and L2 forbids rendering absent as `0`. A vantage that measured
+ * nothing satisfies both only by NOT RENDERING — `0 client-observed` is a
+ * stronger claim than the data supports ("your instrumented callers observed
+ * zero database time"), and on a server-vantage-only fleet it is an all-clear
+ * printed inches from a server section reporting real traffic.
+ *
+ * `total` is the summed measure and `measured` is whether the vantage produced
+ * that sum from ANY row. The two are separate arguments because a sum cannot
+ * tell them apart: `[].reduce(+, 0)` and `[{calls: 0}].reduce(+, 0)` are both
+ * `0`, and only the caller knows whether there were rows. That is the whole
+ * absent-vs-measured-zero distinction, and it is why this takes a population
+ * signal rather than sniffing the number.
+ *
+ * A genuine measured zero — rows present, all reporting zero — still prints,
+ * qualifier and all. That zero IS the population, and hiding it would be its
+ * own lie.
+ */
+export const overlapTile = (
+  total: number | null | undefined,
+  measured: boolean,
+  format: (value: number) => string,
+): DbmOverlapTile =>
+  !measured || total === null || total === undefined || !Number.isFinite(total)
+    ? { value: null, qualified: false }
+    : { value: format(total), qualified: true };
 
 /**
  * The vantage a badge count carries, or `null` when it carries none.

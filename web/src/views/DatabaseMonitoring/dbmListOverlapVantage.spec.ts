@@ -171,13 +171,60 @@ describe("QueriesPage sources its overlap measures from the database", () => {
       expect(totals.slice(0, 900)).toContain("serverListShown.value");
     });
 
-    it("carries a qualifier on both overlap tiles", () => {
+    /**
+     * The qualifier is now CONDITIONAL on the value rendering at all, which is
+     * the D6 fix: a withheld tile may not keep its vantage word. It still
+     * renders on every value that does reach the screen — dropping the
+     * qualifier is not an acceptable way to fix the zero.
+     */
+    it("carries a qualifier on both overlap tiles, but only beside a value", () => {
       const stats = source.slice(
         source.indexOf("const summaryStats ="),
         source.indexOf("const visibleSummaryStats ="),
       );
-      expect(stats).toContain("sub: qualifier(totals.calls.qualifierKey)");
-      expect(stats).toContain("sub: qualifier(totals.time.qualifierKey)");
+      expect(stats).toContain(
+        "...(calls.qualified ? { sub: qualifier(totals.calls.qualifierKey) }",
+      );
+      expect(stats).toContain("...(time.qualified ? { sub: qualifier(totals.time.qualifierKey) }");
+    });
+
+    /**
+     * The reported defect: on a fleet whose trace vantage measured nothing the
+     * strip printed `0us client-observed` and `0 Calls client-observed` — a
+     * qualified zero, which asserts an all-clear over a vantage that took no
+     * measurement. The tiles route through the shared `overlapTile` seam, the
+     * same withhold rule the tab badges use.
+     */
+    it("withholds an overlap tile whose vantage measured nothing", () => {
+      const stats = source.slice(
+        source.indexOf("const summaryStats ="),
+        source.indexOf("const visibleSummaryStats ="),
+      );
+      // The population signal a sum cannot supply for itself.
+      expect(stats).toContain("const measured =");
+      expect(stats).toContain("overlapTile(totals.calls.value, measured, formatCount)");
+      expect(stats).toContain("overlapTile(totals.time.value, measured, formatNs)");
+      // `null` from the seam becomes the em dash OStatCard already renders.
+      expect(stats).toContain('calls.value ?? raw("—")');
+      expect(stats).toContain('time.value ?? raw("—")');
+    });
+
+    /**
+     * "0 Kinds of query" is the third fabricated figure in the same strip. It
+     * is NOT an overlap measure — it counts the rows the reader can see — so a
+     * genuine empty table still reads 0; only the un-answered state withholds.
+     */
+    it("does not assert a query count before any read has answered", () => {
+      const stats = source.slice(
+        source.indexOf("const summaryStats ="),
+        source.indexOf("const visibleSummaryStats ="),
+      );
+      const queriesTile = stats.slice(
+        stats.indexOf('key: "queries"'),
+        stats.indexOf('key: "calls"'),
+      );
+      expect(queriesTile).toContain("measured");
+      expect(queriesTile).toContain('raw("—")');
     });
 
     /**
@@ -306,6 +353,102 @@ describe("DatabasesPage qualifies its overlap measures", () => {
       expect(vantage.slice(0, 300)).toContain("loading");
       expect(vantage.slice(0, 300)).toContain("hasDbmTraceVantage(");
     });
+
+    /**
+     * The same D6 fix as QueriesPage's strip. Both tiles sum the CLIENT hits,
+     * so on a zero-trace fleet they were `[].reduce(+, 0)` rendered as real
+     * figures — `0 Calls` beside `0us` of database time, on a fleet the
+     * databases themselves report as busy.
+     */
+    it("withholds the two query-vantage tiles when the trace vantage is empty", () => {
+      const stats = source.slice(
+        source.indexOf("const summaryStats = computed"),
+        source.indexOf("const isFiltered = computed"),
+      );
+      expect(stats).toContain("overlapTile(totalCalls.value, traceVantage.value, formatCount)");
+      expect(stats).toContain("overlapTile(totalTime.value, traceVantage.value, formatNs)");
+      expect(stats).toContain('calls.value ?? raw("—")');
+      expect(stats).toContain('time.value ?? raw("—")');
+    });
+
+    /**
+     * The inverse defect, guarded: the fleet count is a SERVER-side row count,
+     * not an overlap measure. A zero-trace fleet still has databases, and
+     * withholding this alongside the query tiles would deny the very rows the
+     * table below is listing.
+     */
+    it("never withholds the server-side fleet count", () => {
+      const stats = source.slice(
+        source.indexOf("const summaryStats = computed"),
+        source.indexOf("const isFiltered = computed"),
+      );
+      const fleetTile = stats.slice(
+        stats.indexOf('key: "databases"'),
+        stats.indexOf('key: "calls"'),
+      );
+      expect(fleetTile).toContain("value: fleetRowCount.value");
+      expect(fleetTile).not.toContain("overlapTile");
+    });
+  });
+});
+
+/**
+ * ActivityPage's strip has the same absent-vs-zero collision in a SINGLE
+ * vantage: `waitTotals` and the state summary both fold an EMPTY breakdown to
+ * 0, which is the same number a fleet with every session on-CPU would produce.
+ *
+ * Live evidence (org `dbm_notraces` @ 1h): `/activity` answers `by_state: []`,
+ * `by_wait_event: []` with `not_collecting: false` — the sampler is healthy and
+ * simply captured nothing in that window. Rendering `0 On CPU / 0 Waiting /
+ * 0 Idle in transaction` there states a measurement nobody took. The same org
+ * at 2d answers 6 `by_state` buckets (2840 active, 750 idle, 131 idle in
+ * transaction, …), where the figures are real and must print.
+ */
+describe("ActivityPage does not fabricate a session breakdown it never sampled", () => {
+  const source = read("ActivityPage.vue");
+
+  it("withholds the wait tiles when nothing was sampled", () => {
+    const stats = source.slice(
+      source.indexOf("const summaryStats = computed"),
+      source.indexOf("const countLine = computed"),
+    );
+    expect(stats).toContain("const sampledWaits = waitBuckets.value.length > 0");
+    expect(stats).toContain('sampledWaits ? waits.onCpu : raw("—")');
+    expect(stats).toContain('sampledWaits ? waits.waiting : raw("—")');
+  });
+
+  it("withholds the idle-in-transaction tile when no states were sampled", () => {
+    const stats = source.slice(
+      source.indexOf("const summaryStats = computed"),
+      source.indexOf("const countLine = computed"),
+    );
+    expect(stats).toContain("const sampledStates = stateBuckets.value.length > 0");
+    expect(stats).toContain('sampledStates ? idleInTransaction : raw("—")');
+  });
+
+  /**
+   * A warning colour is itself a claim that something was found, so it may not
+   * fire on a window nobody sampled.
+   */
+  it("keeps an unsampled window out of the warning tone", () => {
+    const stats = source.slice(
+      source.indexOf("const summaryStats = computed"),
+      source.indexOf("const countLine = computed"),
+    );
+    expect(stats).toContain('sampledStates && idleInTransaction > 0 ? "warning" : "neutral"');
+  });
+
+  /**
+   * The session total was ALREADY correct — `activitySampleTotal` returns
+   * `null` for an empty breakdown and the tile dashes it. Pinned so the fix
+   * above does not get "simplified" into re-fabricating it.
+   */
+  it("keeps the session total's existing null-not-zero contract", () => {
+    const stats = source.slice(
+      source.indexOf("const summaryStats = computed"),
+      source.indexOf("const countLine = computed"),
+    );
+    expect(stats).toContain('sampleTotal.value ?? raw("—")');
   });
 });
 

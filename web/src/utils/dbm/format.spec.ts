@@ -21,6 +21,8 @@ import {
   errorRate,
   countClaim,
   overlapClaim,
+  overlapTile,
+  formatCount,
   dbmHttpError,
   formatAge,
   formatLagBytes,
@@ -234,6 +236,73 @@ describe("overlapClaim — a vantage that saw nothing claims nothing", () => {
       count: 50,
       complete: false,
       vantage: "server",
+    });
+  });
+});
+
+/**
+ * The summary-tile form of the badge rule, and the third surface to need it.
+ *
+ * Fixtures are the LIVE shapes: org `dbm_notraces` at 1h answers
+ * `{"hits":[],"other":[],"total":0}` on `/queries` and `{"hits":[],"total":0}`
+ * on `/server_queries` — every vantage absent — while the same org at 2d
+ * answers 50 server rows summing 1,117,188+ calls. Org `default` at 2d answers
+ * 53 trace rows whose first carries `calls: 167430`,
+ * `total_time_ns: 28119997249111`.
+ */
+describe("overlapTile — a summary tile withholds what its vantage never measured", () => {
+  it("withholds the figure when the vantage produced no rows at all", () => {
+    // dbm_notraces @ 1h: `[].reduce((a, r) => a + r.calls, 0)` is 0, but there
+    // was nothing to add. This is the fabricated `0us client-observed`.
+    expect(overlapTile(0, false, formatNs)).toEqual({ value: null, qualified: false });
+    expect(overlapTile(0, false, formatCount)).toEqual({ value: null, qualified: false });
+  });
+
+  it("prints a GENUINE measured zero, qualifier and all", () => {
+    // Rows present, all reporting zero: that zero IS the population, and
+    // hiding it would be its own lie.
+    expect(overlapTile(0, true, formatNs)).toEqual({ value: "0us", qualified: true });
+    expect(overlapTile(0, true, formatCount)).toEqual({ value: "0", qualified: true });
+  });
+
+  it("renders a real total and lets it carry its qualifier", () => {
+    // org `default` @ 2d, first trace row.
+    expect(overlapTile(28_119_997_249_111, true, formatNs)).toEqual({
+      value: "7.81h",
+      qualified: true,
+    });
+    expect(overlapTile(167_430, true, formatCount)).toEqual({
+      value: "167,430",
+      qualified: true,
+    });
+  });
+
+  it("withholds when the measure itself is absent, even with rows on screen", () => {
+    // `server_calls: null` on org `default`'s rows — the row exists, that
+    // measure does not.
+    expect(overlapTile(null, true, formatCount)).toEqual({ value: null, qualified: false });
+    expect(overlapTile(undefined, true, formatNs)).toEqual({ value: null, qualified: false });
+  });
+
+  it("never lets a qualifier render without a value beside it", () => {
+    // The inverse defect: a bare "client-observed" under an empty tile.
+    for (const tile of [
+      overlapTile(0, false, formatNs),
+      overlapTile(null, true, formatNs),
+      overlapTile(undefined, false, formatCount),
+    ]) {
+      expect(tile.qualified).toBe(false);
+      expect(tile.value).toBeNull();
+    }
+  });
+
+  it("does not hide a real count on a truncated server read", () => {
+    // dbm_notraces @ 2d: 50 rows, `truncated: true`. The prior fix nearly
+    // suppressed exactly this — a genuine server count of 50.
+    expect(overlapTile(50, true, formatCount)).toEqual({ value: "50", qualified: true });
+    expect(overlapTile(1_117_188, true, formatCount)).toEqual({
+      value: "1,117,188",
+      qualified: true,
     });
   });
 });

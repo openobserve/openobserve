@@ -453,6 +453,7 @@ import {
   formatNs,
   formatPercent,
   formatRate,
+  overlapTile,
 } from "@/utils/dbm/format";
 import { createDbmFilterEntry, optionsFrom } from "@/utils/dbm/filters";
 import searchService from "@/services/search";
@@ -602,44 +603,55 @@ const errorCount = computed(() => rows.value.reduce((acc, row) => acc + (row.err
  * facet the table can filter to, so making them clickable would promise a
  * behaviour the page does not have.
  */
-const summaryStats = computed<StatItem[]>(() => [
-  {
-    key: "databases",
-    label: t("dbm.databases.summary.databases"),
-    // The same count the tab badge shows: two different numbers under one
-    // word on one screen is worse than either. Trafficless rows count — see
-    // fleetRowCount — while the three query-vantage tiles beside this one
-    // honestly read 0 for them.
-    value: fleetRowCount.value,
-    icon: "database",
-    tone: "primary",
-    dataTest: "dbm-databases-summary-databases",
-  },
-  {
-    key: "calls",
-    label: t("dbm.databases.summary.calls"),
-    value: formatCount(totalCalls.value),
-    icon: "bar-chart",
-    tone: "info",
-    dataTest: "dbm-databases-summary-calls",
-  },
-  {
-    key: "time",
-    label: t("dbm.databases.summary.time"),
-    value: formatNs(totalTime.value),
-    icon: "timer",
-    tone: "teal",
-    dataTest: "dbm-databases-summary-time",
-  },
-  {
-    key: "failed",
-    label: t("dbm.databases.summary.failed"),
-    value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
-    icon: "error-outline",
-    tone: errorCount.value ? "error" : "neutral",
-    dataTest: "dbm-databases-summary-failed",
-  },
-]);
+const summaryStats = computed<StatItem[]>(() => {
+  // Both figures are summed over the CLIENT hits, so the trace vantage is the
+  // population signal: no trace rows means nobody measured, and the sums are
+  // `[].reduce(+, 0)` rather than a fleet that ran nothing. `traceVantage`
+  // keeps the tiles rendering while loading or after a failed read, so they do
+  // not flicker out — see useDbmTraceVantage.
+  const calls = overlapTile(totalCalls.value, traceVantage.value, formatCount);
+  const time = overlapTile(totalTime.value, traceVantage.value, formatNs);
+
+  return [
+    {
+      key: "databases",
+      label: t("dbm.databases.summary.databases"),
+      // The same count the tab badge shows: two different numbers under one
+      // word on one screen is worse than either. Trafficless rows count — see
+      // fleetRowCount — and this is a SERVER-side fleet count, so it stands on
+      // its own when the trace vantage is empty rather than being withheld
+      // with the two query-vantage tiles beside it.
+      value: fleetRowCount.value,
+      icon: "database",
+      tone: "primary",
+      dataTest: "dbm-databases-summary-databases",
+    },
+    {
+      key: "calls",
+      label: t("dbm.databases.summary.calls"),
+      value: calls.value ?? raw("—"),
+      icon: "bar-chart",
+      tone: "info",
+      dataTest: "dbm-databases-summary-calls",
+    },
+    {
+      key: "time",
+      label: t("dbm.databases.summary.time"),
+      value: time.value ?? raw("—"),
+      icon: "timer",
+      tone: "teal",
+      dataTest: "dbm-databases-summary-time",
+    },
+    {
+      key: "failed",
+      label: t("dbm.databases.summary.failed"),
+      value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
+      icon: "error-outline",
+      tone: errorCount.value ? "error" : "neutral",
+      dataTest: "dbm-databases-summary-failed",
+    },
+  ];
+});
 
 const isFiltered = computed(() => !!search.value || !!systemFilter.value);
 
