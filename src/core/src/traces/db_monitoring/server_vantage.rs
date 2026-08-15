@@ -1310,6 +1310,21 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     if is_maria_deadlock {
         return canonicalize_mariadb_deadlock(rec).map(|e| e.to_record());
     }
+    // Enterprise: deadlock markers. Sits exactly where the OSS deadlock arms
+    // sat, so no record changes hands. On OSS this compiles away and these
+    // records are not canonicalized — the raw fields still ingest as ordinary
+    // log columns.
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::db_monitoring::Claim;
+        match o2_enterprise::enterprise::db_monitoring::claim_deadlock_markers(rec) {
+            Claim::Canonicalized(canon) => return Some(canon),
+            // Mirrors today's `return canonicalize_pg_deadlock(rec).map(…)`
+            // yielding None: a claimed record ends dispatch either way.
+            Claim::ClaimedButUnparsed => return None,
+            Claim::NotMine => {}
+        }
+    }
     // Real executed plans (W-E3) — auto_explain filelog records. Same tag
     // family as the deadlock arms above: filelog produces no OTLP EventName,
     // so the collector tag is the only discriminator there is. Gated on its
@@ -1338,6 +1353,20 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
         && rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("statement_duration")
     {
         return canonicalize_pg_statement_duration(rec).map(|e| e.to_record());
+    }
+    // Enterprise: recipe-tag records (mssql deadlock, blocking, table/index
+    // stats). Placed after `statement_duration` deliberately — hoisting it
+    // above would let a dual-marker record (constructible on the untrusted
+    // `/_json` path) change which arm claims it. Pinned by
+    // `enterprise_hooks_do_not_shadow_oss_arms`.
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::db_monitoring::Claim;
+        match o2_enterprise::enterprise::db_monitoring::claim_recipe_tags(rec) {
+            Claim::Canonicalized(canon) => return Some(canon),
+            Claim::ClaimedButUnparsed => return None,
+            Claim::NotMine => {}
+        }
     }
     // MSSQL deadlocks arrive from a sqlquery recipe, not a filelog one, so they
     // are keyed on the recipe tag rather than an o2_*_event field.
