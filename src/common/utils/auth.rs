@@ -326,13 +326,11 @@ where
         // `/config` is a longer path than the read route, so it has to be
         // recognised first or authoring would fall through to the open read.
         //
-        // - `/{org}/announcements/config` (GET, PUT) — authoring is a
-        //   settings-level action. The handler additionally restricts it to the
-        //   meta org.
-        // - `/{org}/announcements` (GET) — bypass: a banner has to render for
-        //   every member of the org, not just those holding a settings grant. The
-        //   handler returns only banners targeting this org, so nothing
-        //   cross-tenant leaks.
+        // - `/{org}/announcements/config` (GET, PUT) — authoring is a settings-level action. The
+        //   handler additionally restricts it to the meta org.
+        // - `/{org}/announcements` (GET) — bypass: a banner has to render for every member of the
+        //   org, not just those holding a settings grant. The handler returns only banners
+        //   targeting this org, so nothing cross-tenant leaks.
         if url_len > 1 && path_columns[1].eq("announcements") {
             let auth_str = extract_auth_str_from_headers(&parts.headers).await;
             let is_config = url_len == 3 && path_columns[2].eq("config");
