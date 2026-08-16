@@ -35,7 +35,7 @@ use openobserve::{
     telemetry::{enable_tracing, setup_logs},
 };
 use openobserve_api_http::handler::http::router::*;
-use openobserve_core::{bootstrap, metadata};
+use openobserve_core::bootstrap;
 use openobserve_jobs::job;
 use tokio::sync::oneshot;
 #[cfg(feature = "enterprise")]
@@ -232,8 +232,6 @@ async fn main() -> Result<(), anyhow::Error> {
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
 
-            // flush distinct values
-            _ = metadata::close().await;
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
             // flush compact offset cache to disk disk

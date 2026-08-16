@@ -21,7 +21,7 @@ use config::{
     meta::stream::{FileMeta, StreamType},
     utils::{
         parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
-        util::{DISTINCT_STREAM_PREFIX, is_trace_time_index_stream},
+        util::is_trace_time_index_stream,
     },
 };
 use datafusion::{
@@ -107,20 +107,6 @@ pub async fn merge_parquet_files(
     let sql = if stream_type == StreamType::Metadata && is_trace_time_index_stream(stream_name) {
         format!(
             "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, trace_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM tbl GROUP BY trace_id ORDER BY {TIMESTAMP_COL_NAME} DESC"
-        )
-    } else if cfg.limit.distinct_values_hourly
-        && stream_type == StreamType::Metadata
-        && stream_name.starts_with(DISTINCT_STREAM_PREFIX)
-    {
-        let fields = schema
-            .fields()
-            .iter()
-            .filter(|f| f.name() != TIMESTAMP_COL_NAME && f.name() != "count")
-            .map(|x| x.name().to_string())
-            .collect::<Vec<_>>();
-        let fields_str = fields.join(", ");
-        format!(
-            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, SUM(count) as count, {fields_str} FROM tbl GROUP BY {fields_str} ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
     } else if stream_type == StreamType::Filelist {
         // for file list we do not have timestamp, so we instead sort by min ts of entries
