@@ -20,8 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[store.state.printMode === true ? 'printMode' : '']"
   >
     <q-header>
-      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-      <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
+      <!-- Every bar that sits above the toolbar, in one measured wrapper so
+           `--navbar-height` accounts for whichever of them is actually showing.
+           The wrapper always renders — an unconditional ref keeps the observer
+           attached even when nothing is on screen yet. -->
+      <div ref="announcementBarRef">
+        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+        <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
+
+        <!-- Operator-authored announcement bars (enterprise) -->
+        <AnnouncementBanner v-if="config.isEnterprise === 'true'" />
+      </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
       <Header
@@ -166,6 +175,7 @@ import {
   KeepAlive,
   computed,
   onMounted,
+  onUnmounted,
   watch,
   markRaw,
   nextTick,
@@ -215,6 +225,7 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
+import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 
 let mainLayoutMixin: any = null;
@@ -231,6 +242,7 @@ export default defineComponent({
     "menu-link": MenuLink,
     Header,
     WebinarBanner,
+    AnnouncementBanner,
     "keep-alive": KeepAlive,
     "q-page": QPage,
     "q-page-container": QPageContainer,
@@ -534,16 +546,37 @@ export default defineComponent({
       }
     });
 
-    watch(
-      () => store.state.isWebinarBannerVisible,
-      (visible) => {
-        const navbarHeight = visible
-          ? "calc(36px + 27px)"
-          : "36px";
-        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
-      },
-      { immediate: true },
-    );
+    // Measured rather than assumed. The strip now holds two independent bars
+    // (the cloud webinar promo and any number of operator-authored banners),
+    // each of which wraps its own text, so no fixed value can describe it — the
+    // old `isWebinarBannerVisible` two-value calc only ever fit one bar of one
+    // line. WebinarBanner still dispatches that flag; nothing reads it for
+    // height any more.
+    const announcementBarRef = ref<HTMLElement | null>(null);
+    let announcementBarObserver: ResizeObserver | null = null;
+
+    const setNavbarHeight = (barHeightPx: number) => {
+      document.documentElement.style.setProperty(
+        "--navbar-height",
+        `calc(36px + ${barHeightPx}px)`,
+      );
+    };
+
+    onMounted(() => {
+      setNavbarHeight(announcementBarRef.value?.offsetHeight ?? 0);
+
+      if (announcementBarRef.value && typeof ResizeObserver !== "undefined") {
+        announcementBarObserver = new ResizeObserver(([entry]) => {
+          setNavbarHeight(entry.contentRect.height);
+        });
+        announcementBarObserver.observe(announcementBarRef.value);
+      }
+    });
+
+    onUnmounted(() => {
+      announcementBarObserver?.disconnect();
+      announcementBarObserver = null;
+    });
 
     onMounted(async () => {
       filterMenus();
@@ -1149,6 +1182,7 @@ export default defineComponent({
       router,
       store,
       config,
+      announcementBarRef,
       langList,
       selectedLanguage,
       linksList,
