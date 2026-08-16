@@ -10316,6 +10316,60 @@ mod tests {
         );
     }
 
+    /// The mssql arm's own presence hazard: PARTIAL presence, measured live.
+    ///
+    /// Adding mssql to the vocabulary did not remove the hazard, it added a new
+    /// instance of it that the all-absent test above cannot see. On the rig — a
+    /// stream with real SQL Server deadlocks flowing — 8 of the 9 mssql columns
+    /// materialized and `mssql_query` did NOT, because the shred emits it as an
+    /// empty string and the collector drops empty attributes. So the realistic
+    /// mssql deployment is not "all present" or "all absent"; it is 8-of-9, and
+    /// naming the ninth 400s the whole Deadlocks page.
+    ///
+    /// This is the test that proves the mssql names are CANDIDATES intersected
+    /// with the schema, not a projection hardcoded alongside the new arm.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_deadlock_sql_projects_mssql_partially_when_only_some_columns_exist() {
+        // Exactly the rig's post-DSN-fix shape.
+        let raw = raw_cols(&[
+            "o2_recipe",
+            "mssql_spid",
+            "mssql_is_victim",
+            "mssql_app",
+            "mssql_user",
+            "mssql_lock_mode",
+            "mssql_lock_target",
+            "mssql_db",
+        ]);
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&all_cols(), Some(&raw)),
+        );
+
+        assert!(
+            !sql.contains("mssql_query"),
+            "mssql_query is absent on a stream that HAS live mssql deadlocks — \
+             naming it 400s the whole page:\n{sql}"
+        );
+        for present in ["mssql_spid", "mssql_is_victim", "mssql_lock_target"] {
+            assert!(
+                sql.contains(present),
+                "{present} is present and must still project:\n{sql}"
+            );
+        }
+        assert!(
+            sql.contains("o2_recipe = 'mssql_deadlock'"),
+            "the mssql marker is a RECIPE TAG — comparing it to 'deadlock' would \
+             match zero rows while looking correct:\n{sql}"
+        );
+    }
+
     /// The MARKER columns are columns too, so the widened predicate is gated on
     /// presence exactly like the projection.
     ///
