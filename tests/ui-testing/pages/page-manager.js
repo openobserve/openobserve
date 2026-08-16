@@ -88,6 +88,7 @@ import { SharedComponentsFormValidationPage } from "./generalPages/sharedCompone
 import { SettingsFormValidationPage } from "./generalPages/settingsFormValidationPage.js";
 import { AiToolsetsFormValidationPage } from "./generalPages/aiToolsetsFormValidationPage.js";
 import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
+import { AnnouncementBannersPage } from "./generalPages/announcementBannersPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -235,6 +236,9 @@ class PageManager {
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
     this.anomalyFormValidation = new AnomalyFormValidationPage(page);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
+
+    // ===== ANNOUNCEMENT BANNERS PAGE OBJECT =====
+    this.announcementBannersPage = new AnnouncementBannersPage(page);
 
     // ===== RUM PAGE OBJECTS =====
     this.rumFormValidation = new RumFormValidationPage(page);

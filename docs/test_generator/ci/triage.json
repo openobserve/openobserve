@@ -1,0 +1,31 @@
+{
+  "feature_slug": "announcement-banners",
+  "feature_title": "Announcement Banners",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "announcementBanners.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/announcementBanners.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/AnnouncementBanners.vue",
+    "web/src/components/settings/AnnouncementBannerDialog.vue",
+    "web/src/components/settings/AnnouncementBannerCard.vue",
+    "web/src/components/announcements/AnnouncementBanner.vue",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/composables/useAnnouncementBanners.ts",
+    "web/src/services/announcements.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The changed paths span both editions: the frontend (web/src/components/announcements, web/src/components/settings/AnnouncementBanners*.vue) and the API surface (src/api/http/.../router, src/api/management/src/request/announcements) are open-source, while o2_enterprise/src/enterprise/announcements/{mod,meta}.rs plus o2_enterprise/src/enterprise/mod.rs and o2_openfga/src/meta/route_permissions.rs are enterprise-owned. This is the classic OSS UI + API shell with an enterprise authoring/storage layer, so edition is 'both'. The banner itself is enterprise-gated in the UI (v-if config.isEnterprise === 'true'), which corroborates the enterprise layer but the change is not enterprise-only.",
+    "skip": "Not skipped. There is no tests-added label or skip comment (trigger_comment.txt and feature_hint.txt are both empty), and the change is clearly user-facing: a new Settings > Announcements authoring surface plus a header banner rendered on every page via MainLayout. This is not docs-only, CI-only, or test-data-only.",
+    "e2e": "E2E is warranted. The diff adds a Settings drawer (AnnouncementBanners.vue) with an add/edit dialog, variant/CTA/scheduling/dismissal controls, and a banner strip rendered in the global MainLayout header. These are new, user-exercisable UI flows (author a banner, see it appear/disappear by schedule, dismiss it) that need browser verification.",
+    "area": "GeneralTests, because the feature is a cross-cutting global-UI concern (a banner that appears across all pages, authored under Settings), not tied to Logs/Metrics/Traces/etc. Sibling specs like logoManagement.spec.js, theme-management.spec.js, languageTranslation.spec.js, and landingPage.spec.js already live in the GeneralTests folder for exactly this kind of surface.",
+    "group": "GeneralTests is the closest existing matrix shard in .github/workflows/playwright.yml (testfolder 'GeneralTests', actual_folder 'GeneralTests'), whose run_files already hold cross-cutting UI specs (logoManagement, theme-management, languageTranslation, landingPage). The new announcementBanners.spec.js should join that shard.",
+    "existing_tests": "No Playwright E2E specs in the diff. The only test files changed are Vitest unit specs under web/src (AnnouncementBannerDialog.spec.ts, AnnouncementBanners.spec.ts, announcementDrafts.spec.ts, useAnnouncementBanners.spec.ts, announcementOrder.spec.ts) and Rust #[test] additions in o2_openfga route_permissions.rs — none of these is E2E coverage, so existing_tests_in_diff is false."
+  }
+}

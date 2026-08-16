@@ -1,0 +1,23 @@
+{
+  "feature_slug": "announcement-banners",
+  "feature_title": "Announcement Banners",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "announcementBanners.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/announcementBanners.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/AnnouncementBanners.vue",
+    "web/src/components/settings/AnnouncementBannerDialog.vue",
+    "web/src/components/settings/AnnouncementBannerCard.vue",
+    "web/src/components/announcements/AnnouncementBanner.vue",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/composables/useAnnouncementBanners.ts",
+    "web/src/services/announcements.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

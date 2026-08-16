@@ -1,0 +1,4075 @@
+===== COMPLETE LIST OF CHANGED FILES (28 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+src/api/http/src/handler/http/router/mod.rs
+src/api/http/src/handler/http/router/openapi.rs
+src/api/management/src/request/announcements/mod.rs
+src/api/management/src/request/mod.rs
+web/src/components/announcements/AnnouncementBanner.vue
+web/src/components/settings/AnnouncementBannerCard.vue
+web/src/components/settings/AnnouncementBannerDialog.schema.ts
+web/src/components/settings/AnnouncementBannerDialog.spec.ts
+web/src/components/settings/AnnouncementBannerDialog.vue
+web/src/components/settings/AnnouncementBanners.spec.ts
+web/src/components/settings/AnnouncementBanners.vue
+web/src/components/settings/General.vue
+web/src/components/settings/announcementDrafts.spec.ts
+web/src/components/settings/announcementDrafts.ts
+web/src/composables/useAnnouncementBanners.spec.ts
+web/src/composables/useAnnouncementBanners.ts
+web/src/layouts/MainLayout.vue
+web/src/lib/core/Button/OButton.types.ts
+web/src/lib/core/Button/OButton.vue
+web/src/lib/feedback/Banner/OBanner.vue
+web/src/locales/languages/en-US.json
+web/src/services/announcements.ts
+web/src/utils/announcementOrder.spec.ts
+web/src/utils/announcementOrder.ts
+o2_enterprise/src/enterprise/announcements/meta.rs
+o2_enterprise/src/enterprise/announcements/mod.rs
+o2_enterprise/src/enterprise/mod.rs
+o2_openfga/src/meta/route_permissions.rs
+===== END CHANGED FILES =====
+
+diff --git a/src/api/http/src/handler/http/router/mod.rs b/src/api/http/src/handler/http/router/mod.rs
+index fd726478c4d..5d85e9f1975 100644
+--- a/src/api/http/src/handler/http/router/mod.rs
++++ b/src/api/http/src/handler/http/router/mod.rs
+@@ -31,8 +31,8 @@ use openobserve_api_management::request::cloud;
+ #[cfg(feature = "profiling")]
+ use openobserve_api_management::request::profiling;
+ use openobserve_api_management::request::{
+-    alerts, authz, dashboards, folders, kv, model_pricing, organization, service_accounts,
+-    short_url, slos, sourcemaps, status, stream, users,
++    alerts, announcements, authz, dashboards, folders, kv, model_pricing, organization,
++    service_accounts, short_url, slos, sourcemaps, status, stream, users,
+ };
+ use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
+ use openobserve_api_search::{promql, search, traces};
+@@ -742,6 +742,10 @@ pub fn service_routes() -> Router {
+         .route("/{org_id}/settings/v2/user/{user_id}", post(organization::system_settings::set_user_setting))
+         .route("/{org_id}/settings/v2/user/{user_id}/{key}", delete(organization::system_settings::delete_user_setting))
+ 
++        // Announcement banners: read by every org, authored on the meta org
++        .route("/{org_id}/announcements", get(announcements::get_announcements))
++        .route("/{org_id}/announcements/config", get(announcements::get_announcements_config).put(announcements::set_announcements_config))
++
+         // Org info
+         .route("/{org_id}/summary", get(organization::org::org_summary))
+         .route("/{org_id}/passcode", get(organization::org::get_user_passcode).put(organization::org::update_user_passcode))
+diff --git a/src/api/http/src/handler/http/router/openapi.rs b/src/api/http/src/handler/http/router/openapi.rs
+index 66e6bc4fa4a..1af37ea4207 100644
+--- a/src/api/http/src/handler/http/router/openapi.rs
++++ b/src/api/http/src/handler/http/router/openapi.rs
+@@ -60,6 +60,9 @@ use crate::{
+         openobserve_api_management::request::organization::system_settings::set_user_setting,
+         openobserve_api_management::request::organization::system_settings::delete_org_setting,
+         openobserve_api_management::request::organization::system_settings::delete_user_setting,
++        openobserve_api_management::request::announcements::get_announcements,
++        openobserve_api_management::request::announcements::get_announcements_config,
++        openobserve_api_management::request::announcements::set_announcements_config,
+         stream::list,
+         stream::schema,
+         stream::create,
+@@ -521,6 +524,7 @@ use crate::{
+         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
+         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
+         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
++        (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
+     ),
+     info(
+         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
+diff --git a/src/api/management/src/request/announcements/mod.rs b/src/api/management/src/request/announcements/mod.rs
+new file mode 100644
+index 00000000000..251317c5055
+--- /dev/null
++++ b/src/api/management/src/request/announcements/mod.rs
+@@ -0,0 +1,297 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++//! Announcement Banners HTTP Handler
++//!
++//! Banners are authored once on the `_meta` org and read by every organization
++//! they target. Reads are open to any authenticated org so each tenant's UI can
++//! poll them; writes are restricted to `_meta`.
++//!
++//! The org allowlist is applied server-side in [`get_announcements`] so one tenant
++//! never receives another tenant's notice text or org identifiers.
++
++use axum::{extract::Path, response::Response};
++use common::meta::http::HttpResponse as MetaHttpResponse;
++use config::META_ORG_ID;
++
++/// The stored `system_settings` value.
++///
++/// Both halves are kept: `source` is what the operator typed, `resolved` is what
++/// readers consume. Normalization is lossy in a way that matters to the author —
++/// it turns `"2026-08-12T07:30:00+05:30"` into microseconds and `"1h"` into an
++/// absolute end — so the editor is served the source verbatim instead of a
++/// round-tripped rewrite of it.
++#[cfg(feature = "enterprise")]
++mod storage {
++    use config::meta::system_settings::{SettingScope, SystemSetting};
++    use o2_enterprise::enterprise::announcements::{
++        self, ANNOUNCEMENT_BANNERS_KEY, meta::AnnouncementBanners,
++    };
++
++    /// Key holding the operator's authored JSON inside the stored envelope.
++    const SOURCE_FIELD: &str = "source";
++    /// Key holding the normalized banners inside the stored envelope.
++    const RESOLVED_FIELD: &str = "resolved";
++
++    pub fn envelope(
++        source: &serde_json::Value,
++        resolved: &AnnouncementBanners,
++    ) -> serde_json::Value {
++        serde_json::json!({
++            SOURCE_FIELD: source,
++            RESOLVED_FIELD: resolved,
++        })
++    }
++
++    /// Read the stored value, if any.
++    async fn read_raw() -> Result<Option<serde_json::Value>, infra::errors::Error> {
++        let setting = db::system_settings::get(
++            &SettingScope::Org,
++            Some(config::META_ORG_ID),
++            None,
++            ANNOUNCEMENT_BANNERS_KEY,
++        )
++        .await?;
++        Ok(setting.map(|s| s.setting_value))
++    }
++
++    /// The authored JSON, for the editor. Absent when nothing has been saved yet.
++    pub async fn read_source() -> Result<Option<serde_json::Value>, infra::errors::Error> {
++        Ok(read_raw().await?.and_then(|v| {
++            v.get(SOURCE_FIELD)
++                .cloned()
++                // A value written before the envelope existed (or seeded directly
++                // into the table) is itself the source.
++                .or(Some(v))
++        }))
++    }
++
++    /// The normalized banners, for readers.
++    ///
++    /// Falls back to normalizing the stored value when the envelope is missing, so
++    /// a config seeded straight into the table still renders. `now` only anchors
++    /// relative durations, which that fallback path may contain.
++    pub async fn read_resolved(now: i64) -> Result<AnnouncementBanners, infra::errors::Error> {
++        let Some(raw) = read_raw().await? else {
++            return Ok(AnnouncementBanners::default());
++        };
++
++        if let Some(resolved) = raw.get(RESOLVED_FIELD) {
++            return serde_json::from_value(resolved.clone())
++                .map_err(|e| infra::errors::Error::Message(e.to_string()));
++        }
++
++        announcements::normalize(&raw, now)
++            .map_err(|e| infra::errors::Error::Message(e.to_string()))
++    }
++
++    pub async fn write(value: serde_json::Value) -> Result<(), infra::errors::Error> {
++        let mut setting =
++            SystemSetting::new_org(config::META_ORG_ID, ANNOUNCEMENT_BANNERS_KEY, value);
++        setting.setting_category = Some("ui".to_string());
++        setting.description = Some("Announcement banners shown across organizations".to_string());
++
++        db::system_settings::set(&setting).await.map(|_| ())
++    }
++}
++
++/// Writes are `_meta`-only: these banners render for every organization, so the
++/// authority to publish one has to sit above any single tenant.
++fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
++    if org_id != META_ORG_ID {
++        return Err(infra::errors::Error::Message(format!(
++            "Announcement banners can only be configured from the meta organization. Provided \
++             org_id: {org_id}, expected: {META_ORG_ID}"
++        )));
++    }
++    Ok(())
++}
++
++/// Get the banners this organization should currently display
++#[utoipa::path(
++    get,
++    path = "/{org_id}/announcements",
++    context_path = "/api",
++    tag = "Announcements",
++    operation_id = "GetAnnouncements",
++    summary = "Get active announcement banners",
++    description = "Returns the announcement banners that are active right now for this organization, \
++                   most severe first. Banners are authored on the meta organization; the per-banner \
++                   organization allowlist is applied server-side. Also returns the server clock and the \
++                   next instant the set changes, so clients can correct for clock skew and refresh on \
++                   the exact boundary rather than waiting out a poll interval. Returns an empty list \
++                   when nothing is configured.",
++    security(("Authorization" = [])),
++    params(
++        ("org_id" = String, Path, description = "Organization name"),
++    ),
++    responses(
++        (status = 200, description = "Success", content_type = "application/json", body = Object),
++        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
++    ),
++    extensions(
++        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
++        ("x-o2-mcp" = json!({"description": "Get active announcement banners", "category": "system"}))
++    )
++)]
++pub async fn get_announcements(Path(org_id): Path<String>) -> Response {
++    let now = chrono::Utc::now().timestamp_micros();
++
++    #[cfg(feature = "enterprise")]
++    {
++        use o2_enterprise::enterprise::announcements::{
++            self, meta::AnnouncementsResponse, next_boundary_for_org,
++        };
++
++        let config = match storage::read_resolved(now).await {
++            Ok(config) => config,
++            Err(e) => {
++                log::error!("Error reading announcement banners: {e}");
++                return MetaHttpResponse::internal_error(e);
++            }
++        };
++
++        return MetaHttpResponse::json(AnnouncementsResponse {
++            banners: announcements::resolve_for_org(&config, &org_id, now),
++            now,
++            next_boundary: next_boundary_for_org(&config, &org_id, now),
++        });
++    }
++
++    // An OSS build has no banners to serve. Answering with an empty set rather
++    // than a 403 keeps a client that polls this endpoint quiet.
++    #[cfg(not(feature = "enterprise"))]
++    {
++        let _ = org_id;
++        MetaHttpResponse::json(serde_json::json!({ "banners": [], "now": now }))
++    }
++}
++
++/// Get the authored announcement banner configuration
++#[utoipa::path(
++    get,
++    path = "/{org_id}/announcements/config",
++    context_path = "/api",
++    tag = "Announcements",
++    operation_id = "GetAnnouncementsConfig",
++    summary = "Get authored announcement banner configuration",
++    description = "Retrieves the announcement banner JSON exactly as it was authored, for editing. \
++                   Only accessible from the meta organization. Unlike the read endpoint, this returns \
++                   every configured banner including scheduled and expired ones, with timestamps in \
++                   their original authored form.",
++    security(("Authorization" = [])),
++    params(
++        ("org_id" = String, Path, description = "Organization name (must be meta org)"),
++    ),
++    responses(
++        (status = 200, description = "Success", content_type = "application/json", body = Object),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
++        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
++    ),
++    extensions(
++        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
++        ("x-o2-mcp" = json!({"description": "Get authored announcement banner config", "category": "system"}))
++    )
++)]
++pub async fn get_announcements_config(Path(org_id): Path<String>) -> Response {
++    if let Err(e) = validate_meta_org_access(&org_id) {
++        return MetaHttpResponse::forbidden(e);
++    }
++
++    #[cfg(feature = "enterprise")]
++    match storage::read_source().await {
++        // Nothing saved yet: hand the editor an empty document rather than null,
++        // so it opens on something valid to type into.
++        Ok(source) => {
++            MetaHttpResponse::json(source.unwrap_or_else(|| serde_json::json!({ "banners": [] })))
++        }
++        Err(e) => {
++            log::error!("Error reading announcement banner config: {e}");
++            MetaHttpResponse::internal_error(e)
++        }
++    }
++
++    #[cfg(not(feature = "enterprise"))]
++    MetaHttpResponse::forbidden("Announcement banners are not available")
++}
++
++/// Set the announcement banner configuration
++#[utoipa::path(
++    put,
++    path = "/{org_id}/announcements/config",
++    context_path = "/api",
++    tag = "Announcements",
++    operation_id = "SetAnnouncementsConfig",
++    summary = "Configure announcement banners",
++    description = "Replaces the announcement banner configuration. Only accessible from the meta \
++                   organization. The body is validated and normalized before storage: timestamps must \
++                   be RFC 3339 with a UTC offset, and relative durations are resolved to absolute \
++                   instants at write time. An empty banner list removes every banner. Validation \
++                   errors name the offending banner index and field.",
++    security(("Authorization" = [])),
++    request_body(content = Object, description = "Announcement banner configuration", content_type = "application/json"),
++    params(
++        ("org_id" = String, Path, description = "Organization name (must be meta org)"),
++    ),
++    responses(
++        (status = 200, description = "Success", content_type = "application/json", body = Object),
++        (status = 400, description = "Bad Request", content_type = "application/json", body = ()),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
++        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
++    ),
++    extensions(
++        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
++        ("x-o2-mcp" = json!({"description": "Configure announcement banners", "category": "system"}))
++    )
++)]
++pub async fn set_announcements_config(
++    Path(org_id): Path<String>,
++    #[cfg(feature = "enterprise")] axum::Json(body): axum::Json<serde_json::Value>,
++) -> Response {
++    if let Err(e) = validate_meta_org_access(&org_id) {
++        return MetaHttpResponse::forbidden(e);
++    }
++
++    #[cfg(feature = "enterprise")]
++    {
++        use o2_enterprise::enterprise::announcements;
++
++        let now = chrono::Utc::now().timestamp_micros();
++
++        // Reject malformed input here rather than at render time: a typo that
++        // silently blanked every banner would not be noticed until the window it
++        // was meant to cover had already passed.
++        let resolved = match announcements::normalize(&body, now) {
++            Ok(resolved) => resolved,
++            Err(e) => return MetaHttpResponse::bad_request(e),
++        };
++
++        let banner_count = resolved.banners.len();
++        if let Err(e) = storage::write(storage::envelope(&body, &resolved)).await {
++            log::error!("Error saving announcement banners: {e}");
++            return MetaHttpResponse::internal_error(e);
++        }
++
++        // The normalized form goes back with the response so the caller can see
++        // what the relative durations actually resolved to.
++        MetaHttpResponse::json(serde_json::json!({
++            "message": format!("Saved {banner_count} announcement banner(s)"),
++            "resolved": resolved,
++        }))
++    }
++
++    #[cfg(not(feature = "enterprise"))]
++    MetaHttpResponse::forbidden("Announcement banners are not available")
++}
+diff --git a/src/api/management/src/request/mod.rs b/src/api/management/src/request/mod.rs
+index 3585446db7c..e3799beacc4 100644
+--- a/src/api/management/src/request/mod.rs
++++ b/src/api/management/src/request/mod.rs
+@@ -23,6 +23,7 @@ pub mod alerts;
+ pub mod annotation_queues;
+ #[cfg(feature = "enterprise")]
+ pub mod annotations;
++pub mod announcements;
+ #[cfg(feature = "enterprise")]
+ pub mod anomaly_detection;
+ pub mod authz;
+diff --git a/web/src/components/announcements/AnnouncementBanner.vue b/web/src/components/announcements/AnnouncementBanner.vue
+new file mode 100644
+index 00000000000..ad5029df001
+--- /dev/null
++++ b/web/src/components/announcements/AnnouncementBanner.vue
+@@ -0,0 +1,97 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<template>
++  <OBanner
++    v-for="banner in banners"
++    :key="banner.id"
++    bar
++    :variant="bannerVariant(banner)"
++    :icon="bannerIcon(banner)"
++    :data-test="`announcement-banner-${banner.variant}`"
++  >
++    {{ banner.message }}
++
++    <template v-if="banner.cta || banner.dismissible" #actions>
++      <div class="flex flex-wrap items-center gap-3">
++        <OButton
++          v-if="banner.cta"
++          as="a"
++          :href="banner.cta.url"
++          target="_blank"
++          rel="noopener noreferrer"
++          variant="banner-dismiss"
++          size="sm"
++          :data-test="`announcement-banner-cta-${banner.id}`"
++        >
++          {{ banner.cta.text }}
++        </OButton>
++
++        <OButton
++          v-if="banner.dismissible"
++          variant="banner-dismiss"
++          size="sm"
++          :aria-label="t('announcements.dismissAriaLabel')"
++          :data-test="`announcement-banner-dismiss-${banner.id}`"
++          @click="dismiss(banner.id)"
++        >
++          {{ t("announcements.dismiss") }}
++        </OButton>
++      </div>
++    </template>
++  </OBanner>
++</template>
++
++<script setup lang="ts">
++import { onMounted } from "vue";
++
++import { useAnnouncementBanners, type Banner } from "@/composables/useAnnouncementBanners";
++import OButton from "@/lib/core/Button/OButton.vue";
++import OBanner from "@/lib/feedback/Banner/OBanner.vue";
++import { useI18nTyped } from "@/types/i18n";
++
++const { t } = useI18nTyped();
++const { banners, dismiss, start } = useAnnouncementBanners();
++
++/** Our severities are operator-facing; OBanner's variants are visual. */
++const bannerVariant = (banner: Banner) => {
++  switch (banner.variant) {
++    case "critical":
++      return "error";
++    case "warning":
++      return "warning";
++    case "info":
++      return "info";
++    default:
++      return "default";
++  }
++};
++
++const bannerIcon = (banner: Banner) => {
++  switch (banner.variant) {
++    case "critical":
++      return "error";
++    case "warning":
++      return "warning";
++    case "promo":
++      return "campaign";
++    default:
++      return "info";
++  }
++};
++
++onMounted(start);
++</script>
+diff --git a/web/src/components/settings/AnnouncementBannerCard.vue b/web/src/components/settings/AnnouncementBannerCard.vue
+new file mode 100644
+index 00000000000..f1af64c28a6
+--- /dev/null
++++ b/web/src/components/settings/AnnouncementBannerCard.vue
+@@ -0,0 +1,97 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<template>
++  <div
++    class="rounded-default border-border-default bg-surface-base flex items-start gap-3 border p-3"
++    :data-test="`announcements-banner-card-${index}`"
++  >
++    <div class="flex min-w-0 flex-1 flex-col gap-2">
++      <p class="text-text-heading line-clamp-2 text-sm">{{ raw(draft.message) }}</p>
++
++      <!-- The four things an author checks before publishing: how loud it is, when
++           it runs, who sees it, and whether it can be dismissed. Plain text rather
++           than badges — the preview above already carries the colour. -->
++      <div class="text-text-secondary flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
++        <span>{{ t(`announcements.variants.${draft.variant}`) }}</span>
++        <span>{{ scheduleSummary }}</span>
++        <span>{{ audienceSummary }}</span>
++        <span v-if="!draft.dismissible">{{ t("announcements.card.notDismissible") }}</span>
++      </div>
++    </div>
++
++    <div class="flex shrink-0 items-center gap-1">
++      <OButton
++        variant="ghost"
++        size="sm"
++        icon-left="edit"
++        :aria-label="t('announcements.card.edit')"
++        :data-test="`announcements-banner-card-edit-${index}`"
++        @click="$emit('edit')"
++      />
++      <OButton
++        variant="ghost"
++        size="sm"
++        icon-left="delete"
++        :aria-label="t('announcements.card.remove')"
++        :data-test="`announcements-banner-card-remove-${index}`"
++        @click="$emit('remove')"
++      />
++    </div>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { computed } from "vue";
++
++import OButton from "@/lib/core/Button/OButton.vue";
++import { raw, useI18nTyped } from "@/types/i18n";
++import type { BannerDraft } from "./announcementDrafts";
++
++const props = defineProps<{ draft: BannerDraft; index: number }>();
++
++defineEmits<{ (_e: "edit"): void; (_e: "remove"): void }>();
++
++const { t } = useI18nTyped();
++
++const formatStamp = (value: string) =>
++  new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
++
++const scheduleSummary = computed(() => {
++  const { schedule, startsAt, endsAt, duration } = props.draft;
++
++  if (schedule === "duration") {
++    return t("announcements.card.forDuration", { duration: duration });
++  }
++  if (schedule === "window") {
++    if (startsAt && endsAt) {
++      return t("announcements.card.between", {
++        from: formatStamp(startsAt),
++        to: formatStamp(endsAt),
++      });
++    }
++    if (startsAt) return t("announcements.card.from", { from: formatStamp(startsAt) });
++    if (endsAt) return t("announcements.card.until", { to: formatStamp(endsAt) });
++  }
++  return t("announcements.card.always");
++});
++
++const audienceSummary = computed(() =>
++  props.draft.orgs.length
++    ? t("announcements.card.someOrgs", { count: props.draft.orgs.length })
++    : t("announcements.card.allOrgs"),
++);
++</script>
+diff --git a/web/src/components/settings/AnnouncementBannerDialog.schema.ts b/web/src/components/settings/AnnouncementBannerDialog.schema.ts
+new file mode 100644
+index 00000000000..e11170ad6b1
+--- /dev/null
++++ b/web/src/components/settings/AnnouncementBannerDialog.schema.ts
+@@ -0,0 +1,93 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { z } from "zod";
++
++import { parseDurationMs } from "./announcementDrafts";
++
++/**
++ * The same rules the API enforces, checked here so an author is told at the
++ * field rather than by a rejected save that names a banner index.
++ */
++export const makeBannerSchema = (t: (_key: string) => string) =>
++  z
++    .object({
++      id: z.string().optional(),
++      message: z
++        .string()
++        .trim()
++        .min(1, { message: t("announcements.form.messageRequired") }),
++      variant: z.enum(["info", "warning", "critical", "promo"]),
++      schedule: z.enum(["always", "duration", "window"]),
++      duration: z.string().optional(),
++      startsAt: z.string().optional(),
++      endsAt: z.string().optional(),
++      dismissible: z.boolean(),
++      hasCta: z.boolean(),
++      ctaText: z.string().optional(),
++      ctaUrl: z.string().optional(),
++      orgs: z.array(z.string()).optional(),
++    })
++    .superRefine((value, ctx) => {
++      if (value.schedule === "duration" && !parseDurationMs(value.duration ?? "")) {
++        ctx.addIssue({
++          code: z.ZodIssueCode.custom,
++          path: ["duration"],
++          message: t("announcements.form.durationInvalid"),
++        });
++      }
++
++      if (value.schedule === "window") {
++        if (!value.startsAt && !value.endsAt) {
++          ctx.addIssue({
++            code: z.ZodIssueCode.custom,
++            path: ["startsAt"],
++            message: t("announcements.form.windowRequired"),
++          });
++        }
++        // The API rejects a backwards window; catching it here saves a round trip.
++        if (
++          value.startsAt &&
++          value.endsAt &&
++          new Date(value.endsAt).getTime() <= new Date(value.startsAt).getTime()
++        ) {
++          ctx.addIssue({
++            code: z.ZodIssueCode.custom,
++            path: ["endsAt"],
++            message: t("announcements.form.windowBackwards"),
++          });
++        }
++      }
++
++      if (value.hasCta) {
++        if (!value.ctaText?.trim()) {
++          ctx.addIssue({
++            code: z.ZodIssueCode.custom,
++            path: ["ctaText"],
++            message: t("announcements.form.ctaTextRequired"),
++          });
++        }
++        const url = value.ctaUrl?.trim() ?? "";
++        if (!url.startsWith("http://") && !url.startsWith("https://")) {
++          ctx.addIssue({
++            code: z.ZodIssueCode.custom,
++            path: ["ctaUrl"],
++            message: t("announcements.form.ctaUrlInvalid"),
++          });
++        }
++      }
++    });
++
++export type BannerForm = z.infer<ReturnType<typeof makeBannerSchema>>;
+diff --git a/web/src/components/settings/AnnouncementBannerDialog.spec.ts b/web/src/components/settings/AnnouncementBannerDialog.spec.ts
+new file mode 100644
+index 00000000000..b43242cff52
+--- /dev/null
++++ b/web/src/components/settings/AnnouncementBannerDialog.spec.ts
+@@ -0,0 +1,193 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { flushPromises, mount } from "@vue/test-utils";
++import { describe, expect, it } from "vitest";
++
++import i18n from "@/locales";
++import AnnouncementBannerDialog from "./AnnouncementBannerDialog.vue";
++import { makeBannerSchema } from "./AnnouncementBannerDialog.schema";
++import { emptyDraft } from "./announcementDrafts";
++
++const t = (key: string) => i18n.global.t(key) as string;
++const schema = makeBannerSchema(t);
++
++const draft = (overrides: Record<string, unknown> = {}) => ({ ...emptyDraft(), ...overrides });
++
++/** The paths the schema complained about. */
++const issuesFor = (value: unknown): string[] => {
++  const result = schema.safeParse(value);
++  return result.success ? [] : result.error.issues.map((issue) => issue.path.join("."));
++};
++
++describe("makeBannerSchema", () => {
++  it("accepts a banner with nothing but a message", () => {
++    expect(issuesFor(draft({ message: "Heads up" }))).toEqual([]);
++  });
++
++  it("requires a message", () => {
++    expect(issuesFor(draft({ message: "   " }))).toContain("message");
++  });
++
++  it("rejects a duration that is not a span", () => {
++    expect(issuesFor(draft({ message: "m", schedule: "duration", duration: "soon" }))).toContain(
++      "duration",
++    );
++    expect(issuesFor(draft({ message: "m", schedule: "duration", duration: "90m" }))).toEqual([]);
++  });
++
++  it("wants at least one end of a scheduled window", () => {
++    expect(issuesFor(draft({ message: "m", schedule: "window" }))).toContain("startsAt");
++    expect(
++      issuesFor(draft({ message: "m", schedule: "window", startsAt: "2026-08-12T02:00" })),
++    ).toEqual([]);
++  });
++
++  it("rejects a window that ends before it starts, as the server would", () => {
++    const issues = issuesFor(
++      draft({
++        message: "m",
++        schedule: "window",
++        startsAt: "2026-08-12T04:00",
++        endsAt: "2026-08-12T02:00",
++      }),
++    );
++
++    expect(issues).toContain("endsAt");
++  });
++
++  it("ignores schedule fields the chosen mode does not use", () => {
++    // A leftover bad duration from a previous choice must not block a save.
++    expect(issuesFor(draft({ message: "m", schedule: "always", duration: "nonsense" }))).toEqual(
++      [],
++    );
++  });
++
++  it("requires both halves of a CTA once it is turned on", () => {
++    const issues = issuesFor(draft({ message: "m", hasCta: true }));
++
++    expect(issues).toContain("ctaText");
++    expect(issues).toContain("ctaUrl");
++  });
++
++  it("rejects a CTA link that is not http(s)", () => {
++    // The same rule the server enforces — a javascript: URL never reaches an anchor.
++    expect(
++      issuesFor(
++        draft({ message: "m", hasCta: true, ctaText: "Go", ctaUrl: "javascript:alert(1)" }),
++      ),
++    ).toContain("ctaUrl");
++
++    expect(
++      issuesFor(draft({ message: "m", hasCta: true, ctaText: "Go", ctaUrl: "https://x.dev" })),
++    ).toEqual([]);
++  });
++
++  it("ignores CTA fields while the CTA is off", () => {
++    expect(issuesFor(draft({ message: "m", hasCta: false, ctaUrl: "not-a-url" }))).toEqual([]);
++  });
++});
++
++describe("AnnouncementBannerDialog", () => {
++  const mountDialog = async (overrides: Record<string, unknown> = {}) => {
++    const wrapper = mount(AnnouncementBannerDialog, {
++      props: {
++        open: true,
++        draft: { ...emptyDraft(), ...overrides },
++        isNew: true,
++        orgOptions: [{ label: i18n.global.t("common.all"), value: "acme" }],
++      },
++      global: { plugins: [i18n] },
++      attachTo: document.body,
++    });
++    await flushPromises();
++    return wrapper;
++  };
++
++  it("renders the fields an author always needs", async () => {
++    await mountDialog();
++
++    // ODialog teleports, so assert against the document rather than the wrapper.
++    for (const field of ["message", "variant", "schedule", "dismissible", "has-cta", "orgs"]) {
++      expect(
++        document.querySelector(`[data-test="announcements-banner-dialog-${field}"]`),
++        `${field} is missing`,
++      ).not.toBeNull();
++    }
++  });
++
++  it("shows the schedule controls only for the mode that uses them", async () => {
++    const stamps = () => ({
++      duration: document.querySelector('[data-test="announcements-banner-dialog-duration"]'),
++      startsAt: document.querySelector('[data-test="announcements-banner-dialog-starts-at"]'),
++    });
++
++    await mountDialog({ schedule: "always" });
++    expect(stamps().duration).toBeNull();
++    expect(stamps().startsAt).toBeNull();
++
++    document.body.innerHTML = "";
++    await mountDialog({ schedule: "duration" });
++    expect(stamps().duration).not.toBeNull();
++    expect(stamps().startsAt).toBeNull();
++
++    document.body.innerHTML = "";
++    await mountDialog({ schedule: "window" });
++    expect(stamps().duration).toBeNull();
++    expect(stamps().startsAt).not.toBeNull();
++  });
++
++  it("applies a valid banner instead of spinning forever", async () => {
++    // The submit has to actually resolve: a schema handed to useOForm as a ref
++    // never validates, so Apply span with no emit and no way out of the dialog.
++    document.body.innerHTML = "";
++    const wrapper = await mountDialog({ message: "Ready to apply", variant: "warning" });
++
++    await (wrapper.vm as any).form.handleSubmit();
++    await flushPromises();
++
++    expect(wrapper.emitted("save")).toBeTruthy();
++    expect(wrapper.emitted("save")![0][0]).toMatchObject({
++      message: "Ready to apply",
++      variant: "warning",
++    });
++    // And the dialog closes, rather than sitting there mid-save.
++    expect(wrapper.emitted("update:open")![0]).toEqual([false]);
++  });
++
++  it("blocks a banner with no message, without hanging", async () => {
++    document.body.innerHTML = "";
++    const wrapper = await mountDialog({ message: "" });
++
++    await (wrapper.vm as any).form.handleSubmit();
++    await flushPromises();
++
++    expect(wrapper.emitted("save")).toBeFalsy();
++    // The submit still settles, so Apply is clickable again once fixed.
++    expect((wrapper.vm as any).form.state.isSubmitting).toBe(false);
++  });
++
++  it("reveals the CTA fields only once the CTA is turned on", async () => {
++    document.body.innerHTML = "";
++    await mountDialog({ hasCta: false });
++    expect(document.querySelector('[data-test="announcements-banner-dialog-cta-url"]')).toBeNull();
++
++    document.body.innerHTML = "";
++    await mountDialog({ hasCta: true });
++    expect(
++      document.querySelector('[data-test="announcements-banner-dialog-cta-url"]'),
++    ).not.toBeNull();
++  });
++});
+diff --git a/web/src/components/settings/AnnouncementBannerDialog.vue b/web/src/components/settings/AnnouncementBannerDialog.vue
+new file mode 100644
+index 00000000000..ecfbba4a3a5
+--- /dev/null
++++ b/web/src/components/settings/AnnouncementBannerDialog.vue
+@@ -0,0 +1,210 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<template>
++  <ODialog
++    :open="open"
++    size="lg"
++    :title="isNew ? t('announcements.form.addTitle') : t('announcements.form.editTitle')"
++    :sub-title="t('announcements.form.subtitle')"
++    :form-id="FORM_ID"
++    :primary-button-label="t('announcements.form.apply')"
++    :secondary-button-label="t('announcements.settings.cancel')"
++    data-test="announcements-banner-dialog"
++    @update:open="$emit('update:open', $event)"
++    @click:secondary="$emit('update:open', false)"
++  >
++    <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">
++      <OFormInput
++        name="message"
++        type="textarea"
++        :rows="3"
++        :label="t('announcements.form.message')"
++        :placeholder="t('announcements.form.messagePlaceholder')"
++        :help-text="t('announcements.form.messageHelp')"
++        required
++        data-test="announcements-banner-dialog-message"
++      />
++
++      <div class="grid grid-cols-2 gap-4">
++        <OFormSelect
++          name="variant"
++          :label="t('announcements.form.severity')"
++          :options="variantOptions"
++          :help-text="t('announcements.form.severityHelp')"
++          data-test="announcements-banner-dialog-variant"
++        />
++        <OFormSelect
++          name="schedule"
++          :label="t('announcements.form.schedule')"
++          :options="scheduleOptions"
++          data-test="announcements-banner-dialog-schedule"
++        />
++      </div>
++
++      <OFormInput
++        v-if="schedule === 'duration'"
++        name="duration"
++        :label="t('announcements.form.duration')"
++        :placeholder="t('announcements.form.durationPlaceholder')"
++        :help-text="t('announcements.form.durationHelp')"
++        field-width="sm"
++        data-test="announcements-banner-dialog-duration"
++      />
++
++      <div v-if="schedule === 'window'" class="flex flex-col gap-2">
++        <div class="grid grid-cols-2 gap-4">
++          <OFormInput
++            name="startsAt"
++            type="datetime-local"
++            :label="t('announcements.form.startsAt')"
++            data-test="announcements-banner-dialog-starts-at"
++          />
++          <OFormInput
++            name="endsAt"
++            type="datetime-local"
++            :label="t('announcements.form.endsAt')"
++            data-test="announcements-banner-dialog-ends-at"
++          />
++        </div>
++        <!-- The picker is in the author's own zone; saying so avoids a notice
++             scheduled hours off by someone assuming it means UTC. -->
++        <span class="text-text-secondary text-xs">
++          {{ t("announcements.form.timezoneHint", { zone: timeZone }) }}
++        </span>
++      </div>
++
++      <OFormSwitch
++        name="dismissible"
++        :label="t('announcements.form.dismissible')"
++        data-test="announcements-banner-dialog-dismissible"
++      />
++
++      <div class="flex flex-col gap-4">
++        <OFormSwitch
++          name="hasCta"
++          :label="t('announcements.form.hasCta')"
++          data-test="announcements-banner-dialog-has-cta"
++        />
++        <div v-if="hasCta" class="grid grid-cols-2 gap-4">
++          <OFormInput
++            name="ctaText"
++            :label="t('announcements.form.ctaText')"
++            :placeholder="t('announcements.form.ctaTextPlaceholder')"
++            data-test="announcements-banner-dialog-cta-text"
++          />
++          <OFormInput
++            name="ctaUrl"
++            :label="t('announcements.form.ctaUrl')"
++            :placeholder="t('announcements.form.ctaUrlPlaceholder')"
++            data-test="announcements-banner-dialog-cta-url"
++          />
++        </div>
++      </div>
++
++      <OFormSelect
++        name="orgs"
++        multiple
++        :label="t('announcements.form.orgs')"
++        :options="orgOptions"
++        :placeholder="t('announcements.form.orgsAll')"
++        :help-text="t('announcements.form.orgsHelp')"
++        data-test="announcements-banner-dialog-orgs"
++      />
++    </OForm>
++  </ODialog>
++</template>
++
++<script setup lang="ts">
++import { computed } from "vue";
++
++import OForm from "@/lib/forms/Form/OForm.vue";
++import { useOForm } from "@/lib/forms/Form/useOForm";
++import OFormInput from "@/lib/forms/Input/OFormInput.vue";
++import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
++import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
++import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
++import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
++import { useI18nTyped } from "@/types/i18n";
++import { makeBannerSchema, type BannerForm } from "./AnnouncementBannerDialog.schema";
++import { VARIANTS, type BannerDraft } from "./announcementDrafts";
++
++const props = defineProps<{
++  open: boolean;
++  /** The banner being edited. Mounted fresh per edit, so this seeds the form once. */
++  draft: BannerDraft;
++  isNew: boolean;
++  orgOptions: SelectOption[];
++}>();
++
++const emit = defineEmits<{
++  (_e: "update:open", _value: boolean): void;
++  (_e: "save", _draft: BannerDraft): void;
++}>();
++
++const { t } = useI18nTyped();
++
++const FORM_ID = "announcement-banner-form";
++
++const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
++
++const variantOptions = computed<SelectOption[]>(() =>
++  VARIANTS.map((variant) => ({
++    label: t(`announcements.variants.${variant}`),
++    value: variant,
++  })),
++);
++
++const scheduleOptions = computed<SelectOption[]>(() => [
++  { label: t("announcements.form.scheduleAlways"), value: "always" },
++  { label: t("announcements.form.scheduleDuration"), value: "duration" },
++  { label: t("announcements.form.scheduleWindow"), value: "window" },
++]);
++
++const form = useOForm<BannerForm>({
++  defaultValues: { ...props.draft } as BannerForm,
++  // Passed as the schema itself, never a computed — useOForm hands this straight
++  // to TanStack's validator slot, where a ref never resolves and the submit hangs.
++  schema: makeBannerSchema(t),
++  onSubmit: (values) => {
++    // Explicit keys: the draft shape is what the list and the JSON writer read,
++    // and a spread would carry whatever the schema happened to hold.
++    emit("save", {
++      id: values.id ?? "",
++      message: values.message,
++      variant: values.variant,
++      schedule: values.schedule,
++      duration: values.duration ?? "",
++      startsAt: values.startsAt ?? "",
++      endsAt: values.endsAt ?? "",
++      dismissible: values.dismissible,
++      hasCta: values.hasCta,
++      ctaText: values.ctaText ?? "",
++      ctaUrl: values.ctaUrl ?? "",
++      orgs: values.orgs ?? [],
++    });
++    emit("update:open", false);
++  },
++});
++
++// Drive the conditional sections from the one form, never a mirrored ref.
++const schedule = form.useStore((state) => state.values.schedule);
++const hasCta = form.useStore((state) => state.values.hasCta);
++
++// Exposed so a test can drive the real submit — the footer button lives in the
++// teleported dialog, out of the wrapper's reach.
++defineExpose({ form });
++</script>
+diff --git a/web/src/components/settings/AnnouncementBanners.spec.ts b/web/src/components/settings/AnnouncementBanners.spec.ts
+new file mode 100644
+index 00000000000..c968216dcbb
+--- /dev/null
++++ b/web/src/components/settings/AnnouncementBanners.spec.ts
+@@ -0,0 +1,229 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { flushPromises, mount } from "@vue/test-utils";
++import { createStore } from "vuex";
++import { beforeEach, describe, expect, it, vi } from "vitest";
++
++import i18n from "@/locales";
++import announcements from "@/services/announcements";
++import AnnouncementBanners from "./AnnouncementBanners.vue";
++
++vi.mock("@/services/announcements", () => ({
++  default: {
++    getConfig: vi.fn(),
++    setConfig: vi.fn(),
++  },
++}));
++
++const store = createStore({
++  state: {
++    zoConfig: { meta_org: "_meta" },
++    organizations: [{ identifier: "acme" }, { identifier: "globex" }],
++  },
++});
++
++async function mountEditor(saved: unknown = { banners: [] }) {
++  vi.mocked(announcements.getConfig).mockResolvedValue({ data: saved } as any);
++
++  const wrapper = mount(AnnouncementBanners, {
++    props: { open: true },
++    global: { plugins: [i18n, store] },
++    attachTo: document.body,
++  });
++  await flushPromises();
++  return wrapper;
++}
++
++/** ODrawer teleports its body, so assertions run against the document. */
++const q = (selector: string) => document.querySelector(selector);
++const qa = (selector: string) => Array.from(document.querySelectorAll(selector));
++const textOf = (selector: string) => q(selector)?.textContent ?? "";
++
++describe("AnnouncementBanners", () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++    document.body.innerHTML = "";
++  });
++
++  it("reads the authored config from the meta org", async () => {
++    await mountEditor();
++
++    expect(announcements.getConfig).toHaveBeenCalledWith("_meta");
++  });
++
++  it("authors through the form, with no raw-JSON surface", async () => {
++    await mountEditor();
++
++    expect(q('[data-test="announcement-banners-list"]') !== null).toBe(true);
++    expect(q('[data-test="announcement-banners-editor"]') !== null).toBe(false);
++    expect(q('[data-test="announcement-banners-mode"]') !== null).toBe(false);
++  });
++
++  it("builds a card per saved banner", async () => {
++    await mountEditor({
++      banners: [{ message: "First" }, { message: "Second", variant: "critical" }],
++    });
++
++    expect(qa('[data-test^="announcements-banner-card-"]').length).toBeGreaterThan(0);
++    expect(textOf('[data-test="announcements-banner-card-0"]')).toContain("First");
++    expect(textOf('[data-test="announcements-banner-card-1"]')).toContain("Second");
++  });
++
++  it("says so when nothing is configured yet", async () => {
++    await mountEditor();
++
++    expect(q('[data-test="announcement-banners-list-empty"]') !== null).toBe(true);
++  });
++
++  it("previews in render order, not authored order", async () => {
++    // The whole point of the preview: authored order is not what users see.
++    await mountEditor({
++      banners: [
++        { message: "promo one", variant: "promo" },
++        { message: "notice one", variant: "info" },
++        { message: "warning one", variant: "warning" },
++      ],
++    });
++
++    const preview = textOf('[data-test="announcement-banners-preview"]');
++
++    expect(preview.indexOf("warning one")).toBeLessThan(preview.indexOf("notice one"));
++    expect(preview.indexOf("notice one")).toBeLessThan(preview.indexOf("promo one"));
++  });
++
++  it("hides promos in the preview exactly as the live bar does", async () => {
++    await mountEditor({
++      banners: [
++        { message: "webinar", variant: "promo" },
++        { message: "outage", variant: "critical" },
++      ],
++    });
++
++    const preview = textOf('[data-test="announcement-banners-preview"]');
++
++    expect(preview).toContain("outage");
++    expect(preview).not.toContain("webinar");
++  });
++
++  it("says so when the config would render no banner", async () => {
++    await mountEditor();
++
++    expect(q('[data-test="announcement-banners-preview-empty"]') !== null).toBe(true);
++  });
++
++  it("publishes what the form holds", async () => {
++    const wrapper = await mountEditor({
++      banners: [{ message: "Ship it", cta: { text: "Docs", url: "https://example.com/a//b" } }],
++    });
++    vi.mocked(announcements.setConfig).mockResolvedValue({ data: {} } as any);
++
++    await (wrapper.vm as any).save();
++
++    expect(announcements.setConfig).toHaveBeenCalledWith("_meta", {
++      banners: [{ message: "Ship it", cta: { text: "Docs", url: "https://example.com/a//b" } }],
++    });
++  });
++
++  it("adds a banner through the dialog", async () => {
++    const wrapper = await mountEditor();
++    vi.mocked(announcements.setConfig).mockResolvedValue({ data: {} } as any);
++
++    (wrapper.vm as any).editingIndex = -1;
++    (wrapper.vm as any).applyDraft({
++      id: "",
++      message: "Added from the form",
++      variant: "warning",
++      schedule: "always",
++      duration: "",
++      startsAt: "",
++      endsAt: "",
++      dismissible: true,
++      hasCta: false,
++      ctaText: "",
++      ctaUrl: "",
++      orgs: [],
++    });
++    await flushPromises();
++
++    await (wrapper.vm as any).save();
++
++    expect(announcements.setConfig).toHaveBeenCalledWith("_meta", {
++      banners: [{ message: "Added from the form", variant: "warning" }],
++    });
++  });
++
++  it("surfaces the server's message when publishing is rejected", async () => {
++    const wrapper = await mountEditor();
++    vi.mocked(announcements.setConfig).mockRejectedValue({
++      response: { data: { message: "banners[0].message must not be empty" } },
++    });
++
++    await (wrapper.vm as any).save();
++    await flushPromises();
++
++    expect(textOf('[data-test="announcement-banners-error"]')).toContain(
++      "banners[0].message must not be empty",
++    );
++  });
++
++  it("discards edits by re-reading what is published", async () => {
++    const wrapper = await mountEditor();
++    vi.mocked(announcements.getConfig).mockClear();
++
++    await (wrapper.vm as any).reload();
++
++    expect(announcements.getConfig).toHaveBeenCalledWith("_meta");
++  });
++
++  it("publishes and discards from the drawer footer", async () => {
++    // Pinned in the footer rather than floating mid-body, so they stay reachable
++    // however long the banner list gets.
++    await mountEditor();
++    vi.mocked(announcements.setConfig).mockResolvedValue({ data: {} } as any);
++
++    const publish = q('[data-test="o-drawer-primary-btn"]') as HTMLElement;
++    const discard = q('[data-test="o-drawer-secondary-btn"]') as HTMLElement;
++    expect(publish).not.toBeNull();
++    expect(discard).not.toBeNull();
++
++    publish.click();
++    await flushPromises();
++    expect(announcements.setConfig).toHaveBeenCalled();
++
++    vi.mocked(announcements.getConfig).mockClear();
++    discard.click();
++    await flushPromises();
++    expect(announcements.getConfig).toHaveBeenCalledWith("_meta");
++  });
++
++  it("reads the config when the drawer opens, not before", async () => {
++    // The component now outlives the drawer, so an unopened Settings page must
++    // not fetch, and a second open must not show the first open's leftovers.
++    vi.mocked(announcements.getConfig).mockResolvedValue({ data: { banners: [] } } as any);
++
++    const wrapper = mount(AnnouncementBanners, {
++      props: { open: false },
++      global: { plugins: [i18n, store] },
++      attachTo: document.body,
++    });
++    await flushPromises();
++    expect(announcements.getConfig).not.toHaveBeenCalled();
++
++    await wrapper.setProps({ open: true });
++    await flushPromises();
++    expect(announcements.getConfig).toHaveBeenCalledWith("_meta");
++  });
++});
+diff --git a/web/src/components/settings/AnnouncementBanners.vue b/web/src/components/settings/AnnouncementBanners.vue
+new file mode 100644
+index 00000000000..a299e6b8e1c
+--- /dev/null
++++ b/web/src/components/settings/AnnouncementBanners.vue
+@@ -0,0 +1,308 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<template>
++  <ODrawer
++    :open="open"
++    side="right"
++    size="xl"
++    :title="t('announcements.settings.label')"
++    :sub-title="t('announcements.settings.description')"
++    :secondary-button-label="t('announcements.settings.reset')"
++    :primary-button-label="t('announcements.settings.save')"
++    :secondary-button-disabled="isSaving"
++    :primary-button-loading="isSaving"
++    data-test="announcement-banners-settings"
++    @update:open="$emit('update:open', $event)"
++    @click:secondary="loadConfig"
++    @click:primary="save"
++  >
++    <div class="flex flex-col gap-4">
++      <!-- Rendered through the same resolver the live bar uses, so the order here
++           is the order users get — not the order the banners were authored in. -->
++      <div class="flex flex-col gap-2">
++        <div class="text-text-label text-sm font-bold">
++          {{ t("announcements.settings.previewLabel") }}
++        </div>
++        <div
++          class="rounded-surface border-border-default overflow-hidden border"
++          data-test="announcement-banners-preview"
++        >
++          <OBanner
++            v-for="(banner, index) in previewBanners"
++            :key="index"
++            bar
++            :variant="previewVariant(banner)"
++            :icon="previewIcon(banner)"
++          >
++            {{ raw(banner.message) }}
++          </OBanner>
++          <div
++            v-if="!previewBanners.length"
++            class="text-text-muted px-4 py-3 text-center text-sm"
++            data-test="announcement-banners-preview-empty"
++          >
++            {{ t("announcements.settings.previewEmpty") }}
++          </div>
++        </div>
++      </div>
++
++      <div class="flex flex-col gap-2" data-test="announcement-banners-list">
++        <div class="flex items-center justify-between gap-2">
++          <span class="text-text-label text-sm font-bold">
++            {{ t("announcements.settings.bannersLabel") }}
++          </span>
++          <OButton
++            variant="outline"
++            size="sm"
++            icon-left="add"
++            data-test="announcement-banners-add-btn"
++            @click="openAdd"
++          >
++            {{ t("announcements.settings.addBanner") }}
++          </OButton>
++        </div>
++
++        <div v-if="!isLoaded" class="text-text-muted py-6 text-center text-sm">
++          {{ t("announcements.settings.loading") }}
++        </div>
++
++        <div
++          v-else-if="!drafts.length"
++          class="rounded-default border-border-default text-text-muted flex flex-col items-center gap-1 border border-dashed px-4 py-8 text-center text-sm"
++          data-test="announcement-banners-list-empty"
++        >
++          <span>{{ t("announcements.settings.emptyTitle") }}</span>
++          <span class="text-xs">{{ t("announcements.settings.emptyHint") }}</span>
++        </div>
++
++        <div v-else class="flex flex-col gap-2">
++          <AnnouncementBannerCard
++            v-for="(draft, index) in drafts"
++            :key="index"
++            :draft="draft"
++            :index="index"
++            @edit="openEdit(index)"
++            @remove="removeDraft(index)"
++          />
++        </div>
++      </div>
++
++      <OBanner
++        v-if="errorMessage"
++        variant="error-soft"
++        icon="error"
++        data-test="announcement-banners-error"
++      >
++        {{ errorMessage }}
++      </OBanner>
++
++      <AnnouncementBannerDialog
++        v-if="dialogOpen"
++        :key="editingIndex"
++        :open="dialogOpen"
++        :draft="editingDraft"
++        :is-new="editingIndex === NEW_BANNER"
++        :org-options="orgOptions"
++        @update:open="dialogOpen = $event"
++        @save="applyDraft"
++      />
++    </div>
++  </ODrawer>
++</template>
++
++<script setup lang="ts">
++import { computed, ref, watch } from "vue";
++import { useStore } from "vuex";
++
++import OButton from "@/lib/core/Button/OButton.vue";
++import OBanner from "@/lib/feedback/Banner/OBanner.vue";
++import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
++import { toast } from "@/lib/feedback/Toast/useToast";
++import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
++import announcements from "@/services/announcements";
++import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
++import { orderBanners } from "@/utils/announcementOrder";
++import AnnouncementBannerCard from "./AnnouncementBannerCard.vue";
++import AnnouncementBannerDialog from "./AnnouncementBannerDialog.vue";
++import {
++  configFromDrafts,
++  draftsFromConfig,
++  emptyDraft,
++  type BannerDraft,
++} from "./announcementDrafts";
++
++const props = defineProps<{ open: boolean }>();
++
++defineEmits<{ (_e: "update:open", _value: boolean): void }>();
++
++const { t } = useI18nTyped();
++const store = useStore();
++
++/** `editingIndex` sentinel for a banner that is not in the list yet. */
++const NEW_BANNER = -1;
++
++const drafts = ref<BannerDraft[]>([]);
++
++const errorMessage = ref<I18nText | "">("");
++const isSaving = ref(false);
++/** False until the saved config has been read; the list shows a placeholder. */
++const isLoaded = ref(false);
++
++const dialogOpen = ref(false);
++const editingIndex = ref(NEW_BANNER);
++const editingDraft = ref<BannerDraft>(emptyDraft());
++
++const metaOrg = computed(() => store.state.zoConfig?.meta_org);
++
++/** Picking from the real org list beats typing identifiers that silently match nothing. */
++const orgOptions = computed<SelectOption[]>(() =>
++  (store.state.organizations ?? []).map((org: { identifier: string }) => ({
++    label: raw(org.identifier),
++    value: org.identifier,
++  })),
++);
++
++/** A banner as far as the preview cares. */
++interface PreviewBanner {
++  message: string;
++  variant?: string;
++}
++
++const previewBanners = computed<PreviewBanner[]>(() =>
++  orderBanners(drafts.value.map((d) => ({ message: d.message, variant: d.variant }))),
++);
++
++const previewVariant = (banner: PreviewBanner) => {
++  switch (banner.variant) {
++    case "critical":
++      return "error";
++    case "warning":
++      return "warning";
++    case "promo":
++      return "default";
++    default:
++      return "info";
++  }
++};
++
++const previewIcon = (banner: PreviewBanner) => {
++  switch (banner.variant) {
++    case "critical":
++      return "error";
++    case "warning":
++      return "warning";
++    case "promo":
++      return "campaign";
++    default:
++      return "info";
++  }
++};
++
++// ── Banner list editing ────────────────────────────────────────────────────
++
++const openAdd = () => {
++  editingDraft.value = emptyDraft();
++  editingIndex.value = NEW_BANNER;
++  dialogOpen.value = true;
++};
++
++const openEdit = (index: number) => {
++  // A copy, so cancelling the dialog leaves the list untouched.
++  editingDraft.value = { ...drafts.value[index] };
++  editingIndex.value = index;
++  dialogOpen.value = true;
++};
++
++const applyDraft = (draft: BannerDraft) => {
++  if (editingIndex.value === NEW_BANNER) {
++    drafts.value = [...drafts.value, draft];
++  } else {
++    drafts.value = drafts.value.map((existing, index) =>
++      index === editingIndex.value ? draft : existing,
++    );
++  }
++  errorMessage.value = "";
++};
++
++const removeDraft = (index: number) => {
++  drafts.value = drafts.value.filter((_, i) => i !== index);
++};
++
++// ── Load / save ────────────────────────────────────────────────────────────
++
++const loadConfig = async () => {
++  // Cleared first so a re-open never shows the previous org's banners while the
++  // read is still in flight.
++  isLoaded.value = false;
++
++  try {
++    const response = await announcements.getConfig(metaOrg.value);
++    const source = response?.data ?? { banners: [] };
++
++    drafts.value = draftsFromConfig(source);
++    errorMessage.value = "";
++  } catch (error: any) {
++    errorMessage.value =
++      raw(error?.response?.data?.message) || t("announcements.settings.loadFailed");
++  } finally {
++    // Even a failed read has to let the surface mount, or the drawer is stuck on
++    // its placeholder with no way to author anything.
++    isLoaded.value = true;
++  }
++};
++
++const save = async () => {
++  const payload = configFromDrafts(drafts.value);
++
++  isSaving.value = true;
++  try {
++    await announcements.setConfig(metaOrg.value, payload);
++    errorMessage.value = "";
++    toast({ variant: "success", message: t("announcements.settings.saved") });
++    // Re-read so relative durations come back as the absolute window the server
++    // resolved them to.
++    await loadConfig();
++  } catch (error: any) {
++    // The server names the offending banner index and field; surfacing its
++    // message verbatim is more useful than a generic failure.
++    errorMessage.value =
++      raw(error?.response?.data?.message) || t("announcements.settings.saveFailed");
++  } finally {
++    isSaving.value = false;
++  }
++};
++
++// The drawer owns the lifecycle now, so read on open rather than on mount —
++// otherwise every Settings visit fetches a config nobody asked to see, and a
++// second open would show whatever was left over from the first.
++watch(
++  () => props.open,
++  (isOpen) => void (isOpen && loadConfig()),
++  { immediate: true },
++);
++
++// Still exposed so the drawer (or a test) can drive the same two actions the
++// footer buttons do; the rest is what tests assert the list round-trip on.
++defineExpose({
++  save,
++  reload: loadConfig,
++  applyDraft,
++  isSaving,
++  drafts,
++  editingIndex,
++});
++</script>
+diff --git a/web/src/components/settings/General.vue b/web/src/components/settings/General.vue
+index e156ae0e98e..204e43ec48f 100644
+--- a/web/src/components/settings/General.vue
++++ b/web/src/components/settings/General.vue
+@@ -379,7 +379,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             {{ t("settings.customLogoDarkDescription") }}
+           </span>
+         </div>
++
++        <!-- Authoring banners needs far more room than a settings row, so the
++             row is just the entry point into a drawer. -->
++        <div
++          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
++        >
++          <span class="individual-setting-title text-sm leading-5 font-medium">
++            {{ t("announcements.settings.label") }}
++          </span>
++          <div class="flex items-center">
++            <OButton
++              variant="outline"
++              size="sm-action"
++              data-test="settings_ent_announcement_banners_btn"
++              @click="showAnnouncementBanners = true"
++            >
++              {{ t("announcements.settings.configure") }}
++            </OButton>
++          </div>
++          <span class="individual-setting-description text-compact opacity-70">
++            {{ t("announcements.settings.description") }}
++          </span>
++        </div>
+       </div>
++
++      <!-- The drawer belongs to the component that fills it — its header toggle
++           and footer actions are part of the same surface. -->
++      <AnnouncementBanners v-model:open="showAnnouncementBanners" />
+     </div>
+ 
+     <!-- Danger Zone: delete this organization (owner/admin only).
+@@ -587,6 +614,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
++import AnnouncementBanners from "./AnnouncementBanners.vue";
+ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+ import OFile from "@/lib/forms/File/OFile.vue";
+ import OForm from "@/lib/forms/Form/OForm.vue";
+@@ -611,6 +639,7 @@ export default defineComponent({
+     },
+   },
+   components: {
++    AnnouncementBanners,
+     GroupHeader,
+     OButton,
+     ODialog,
+@@ -642,6 +671,7 @@ export default defineComponent({
+     const loadingState = ref(false);
+     const customText = ref("");
+     const editingText = ref(false);
++    const showAnnouncementBanners = ref(false);
+     const files = ref(null);
+     const filesLight = ref(null);
+     const filesDark = ref(null);
+@@ -1307,6 +1337,7 @@ export default defineComponent({
+       store,
+       config,
+       router,
++      showAnnouncementBanners,
+       // Form wiring (Options-API: schema + defaults MUST be returned so :schema
+       // resolves and validation runs).
+       generalSettingsSchema,
+diff --git a/web/src/components/settings/announcementDrafts.spec.ts b/web/src/components/settings/announcementDrafts.spec.ts
+new file mode 100644
+index 00000000000..7f8a6ceeb92
+--- /dev/null
++++ b/web/src/components/settings/announcementDrafts.spec.ts
+@@ -0,0 +1,205 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it } from "vitest";
++
++import {
++  authoredFromDraft,
++  configFromDrafts,
++  draftFromAuthored,
++  draftsFromConfig,
++  emptyDraft,
++  parseDurationMs,
++  toLocalInput,
++  toRfc3339,
++} from "./announcementDrafts";
++
++describe("parseDurationMs", () => {
++  it("reads the spans the server accepts", () => {
++    expect(parseDurationMs("30m")).toBe(30 * 60_000);
++    expect(parseDurationMs("2h")).toBe(2 * 3_600_000);
++    expect(parseDurationMs("3d")).toBe(3 * 86_400_000);
++    expect(parseDurationMs(" 1w ")).toBe(604_800_000);
++  });
++
++  it("rejects anything that is not one", () => {
++    expect(parseDurationMs("")).toBeNull();
++    expect(parseDurationMs("soon")).toBeNull();
++    expect(parseDurationMs("0h")).toBeNull();
++    expect(parseDurationMs("5")).toBeNull();
++  });
++});
++
++describe("timestamp conversion", () => {
++  it("round-trips a picked time through RFC 3339 and back", () => {
++    const picked = "2026-08-12T02:00";
++
++    expect(toLocalInput(toRfc3339(picked))).toBe(picked);
++  });
++
++  it("stamps an offset, because the server rejects a naive timestamp", () => {
++    expect(toRfc3339("2026-08-12T02:00")).toMatch(/[+-]\d{2}:\d{2}$/);
++  });
++
++  it("returns an empty string rather than an Invalid Date", () => {
++    expect(toLocalInput("not a date")).toBe("");
++    expect(toLocalInput(undefined)).toBe("");
++    expect(toRfc3339("")).toBe("");
++  });
++});
++
++describe("draftFromAuthored", () => {
++  it("defaults everything but the message", () => {
++    const draft = draftFromAuthored({ message: "Heads up" });
++
++    expect(draft.message).toBe("Heads up");
++    expect(draft.variant).toBe("info");
++    expect(draft.schedule).toBe("always");
++    expect(draft.dismissible).toBe(true);
++    expect(draft.hasCta).toBe(false);
++    expect(draft.orgs).toEqual([]);
++  });
++
++  it("reads a duration-only banner as a duration schedule", () => {
++    const draft = draftFromAuthored({ message: "Back soon", duration: "90m" });
++
++    expect(draft.schedule).toBe("duration");
++    expect(draft.duration).toBe("90m");
++  });
++
++  it("resolves starts_at + duration into a window rather than losing half of it", () => {
++    // The form has no third control for that pair, but dropping the end would
++    // quietly turn a timed notice into a permanent one.
++    const draft = draftFromAuthored({
++      message: "Maintenance",
++      starts_at: toRfc3339("2026-08-12T02:00"),
++      duration: "2h",
++    });
++
++    expect(draft.schedule).toBe("window");
++    expect(draft.startsAt).toBe("2026-08-12T02:00");
++    expect(draft.endsAt).toBe("2026-08-12T04:00");
++  });
++
++  it("keeps an explicit id so an edit does not re-show a dismissed banner", () => {
++    expect(draftFromAuthored({ message: "m", id: "maint" }).id).toBe("maint");
++  });
++
++  it("ignores a variant it does not recognise", () => {
++    expect(draftFromAuthored({ message: "m", variant: "chartreuse" }).variant).toBe("info");
++  });
++
++  it("picks up a CTA and its orgs", () => {
++    const draft = draftFromAuthored({
++      message: "m",
++      cta: { text: "Docs", url: "https://example.com" },
++      orgs: ["acme", 42 as unknown as string],
++    });
++
++    expect(draft.hasCta).toBe(true);
++    expect(draft.ctaText).toBe("Docs");
++    expect(draft.orgs).toEqual(["acme"]);
++  });
++});
++
++describe("draftsFromConfig", () => {
++  it("survives anything that is not a banner list", () => {
++    expect(draftsFromConfig(null)).toEqual([]);
++    expect(draftsFromConfig({})).toEqual([]);
++    expect(draftsFromConfig({ banners: "nope" })).toEqual([]);
++  });
++
++  it("drops entries with no message, which could not be saved anyway", () => {
++    const drafts = draftsFromConfig({
++      banners: [{ message: "keep" }, { message: "  " }, null, { variant: "info" }],
++    });
++
++    expect(drafts.map((d) => d.message)).toEqual(["keep"]);
++  });
++});
++
++describe("authoredFromDraft", () => {
++  it("writes only what differs from the defaults", () => {
++    const draft = { ...emptyDraft(), message: "Just this" };
++
++    expect(authoredFromDraft(draft)).toEqual({ message: "Just this" });
++  });
++
++  it("writes a duration only in duration mode", () => {
++    const draft = { ...emptyDraft(), message: "m", schedule: "duration" as const, duration: "1h" };
++
++    expect(authoredFromDraft(draft)).toEqual({ message: "m", duration: "1h" });
++  });
++
++  it("writes offset timestamps only in window mode", () => {
++    const draft = {
++      ...emptyDraft(),
++      message: "m",
++      schedule: "window" as const,
++      startsAt: "2026-08-12T02:00",
++      endsAt: "2026-08-12T04:00",
++      // Left over from a previous choice — it must not leak into the payload.
++      duration: "1h",
++    };
++
++    const authored = authoredFromDraft(draft);
++
++    expect(authored.duration).toBeUndefined();
++    expect(authored.starts_at).toMatch(/^2026-08-12T02:00:00[+-]\d{2}:\d{2}$/);
++    expect(authored.ends_at).toMatch(/^2026-08-12T04:00:00[+-]\d{2}:\d{2}$/);
++  });
++
++  it("omits a CTA that was toggled off", () => {
++    const draft = {
++      ...emptyDraft(),
++      message: "m",
++      hasCta: false,
++      ctaText: "Docs",
++      ctaUrl: "https://example.com",
++    };
++
++    expect(authoredFromDraft(draft).cta).toBeUndefined();
++  });
++
++  it("writes dismissible only when it is false", () => {
++    expect(authoredFromDraft({ ...emptyDraft(), message: "m" }).dismissible).toBeUndefined();
++    expect(
++      authoredFromDraft({ ...emptyDraft(), message: "m", dismissible: false }).dismissible,
++    ).toBe(false);
++  });
++});
++
++describe("the form/JSON round trip", () => {
++  it("returns the same config it was given", () => {
++    const config = {
++      banners: [
++        { message: "Outage", variant: "critical", dismissible: false },
++        { message: "Webinar", variant: "promo", cta: { text: "Join", url: "https://x.dev" } },
++        { message: "Scoped", orgs: ["acme"] },
++        { message: "Timed", duration: "1h" },
++      ],
++    };
++
++    expect(configFromDrafts(draftsFromConfig(config))).toEqual(config);
++  });
++
++  it("survives a second trip unchanged", () => {
++    // Convergence matters: an author toggling between Form and JSON must not
++    // watch their config drift a little further on every switch.
++    const once = configFromDrafts(draftsFromConfig({ banners: [{ message: "Stable" }] }));
++
++    expect(configFromDrafts(draftsFromConfig(once))).toEqual(once);
++  });
++});
+diff --git a/web/src/components/settings/announcementDrafts.ts b/web/src/components/settings/announcementDrafts.ts
+new file mode 100644
+index 00000000000..ca3a2e921fa
+--- /dev/null
++++ b/web/src/components/settings/announcementDrafts.ts
+@@ -0,0 +1,249 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++/**
++ * The form model behind the banner builder, and its translation to and from the
++ * authored JSON the API stores.
++ *
++ * Kept out of the components so the round-trip — the part that quietly loses an
++ * author's work when it is wrong — is stated and tested in one place.
++ */
++
++import type { BannerVariantName } from "@/utils/announcementOrder";
++
++/**
++ * How an author describes when a banner shows. The three cases the form offers
++ * cover every window the API accepts; a JSON-authored `starts_at` + `duration`
++ * pair is folded into `window` on the way in.
++ */
++export type BannerSchedule = "always" | "duration" | "window";
++
++/** One banner as the form holds it. Flat and all-strings, so fields bind directly. */
++export interface BannerDraft {
++  /** Dismissal key. Preserved when present so editing text does not re-show it. */
++  id: string;
++  message: string;
++  variant: BannerVariantName;
++  schedule: BannerSchedule;
++  /** A span like "1h", when `schedule` is `duration`. */
++  duration: string;
++  /** `datetime-local` values in the author's own zone, when `schedule` is `window`. */
++  startsAt: string;
++  endsAt: string;
++  dismissible: boolean;
++  hasCta: boolean;
++  ctaText: string;
++  ctaUrl: string;
++  /** Empty means every organization. */
++  orgs: string[];
++}
++
++export const VARIANTS: BannerVariantName[] = ["info", "warning", "critical", "promo"];
++
++export function emptyDraft(): BannerDraft {
++  return {
++    id: "",
++    message: "",
++    variant: "info",
++    schedule: "always",
++    duration: "1h",
++    startsAt: "",
++    endsAt: "",
++    dismissible: true,
++    hasCta: false,
++    ctaText: "",
++    ctaUrl: "",
++    orgs: [],
++  };
++}
++
++const DURATION_UNIT_MS: Record<string, number> = {
++  s: 1000,
++  m: 60_000,
++  h: 3_600_000,
++  d: 86_400_000,
++  w: 604_800_000,
++};
++
++/** Milliseconds in a span like `"90m"`, or null when it is not one. */
++export function parseDurationMs(value: string): number | null {
++  const match = /^\s*(\d+(?:\.\d+)?)\s*([smhdw])\s*$/i.exec(value);
++  if (!match) return null;
++
++  const amount = Number(match[1]);
++  const unit = DURATION_UNIT_MS[match[2].toLowerCase()];
++  if (!amount || !unit) return null;
++
++  return amount * unit;
++}
++
++function pad(value: number): string {
++  return String(value).padStart(2, "0");
++}
++
++/**
++ * An RFC 3339 instant as a `datetime-local` value in the viewer's own zone.
++ *
++ * The author picks a wall-clock time where they are sitting; showing them the
++ * stored UTC offset instead would mean mentally converting a maintenance window.
++ */
++export function toLocalInput(value?: string | null): string {
++  if (!value) return "";
++
++  const date = new Date(value);
++  if (Number.isNaN(date.getTime())) return "";
++
++  return (
++    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
++    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
++  );
++}
++
++/**
++ * A `datetime-local` value as RFC 3339 carrying the browser's offset.
++ *
++ * The offset is what makes this safe to send: the API rejects a naive timestamp
++ * rather than guessing a zone, so the picker has to supply one.
++ */
++export function toRfc3339(value: string): string {
++  if (!value) return "";
++
++  const date = new Date(value);
++  if (Number.isNaN(date.getTime())) return "";
++
++  // getTimezoneOffset is minutes *behind* UTC, so the sign is inverted.
++  const offsetMinutes = -date.getTimezoneOffset();
++  const sign = offsetMinutes < 0 ? "-" : "+";
++  const abs = Math.abs(offsetMinutes);
++
++  return (
++    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
++    `T${pad(date.getHours())}:${pad(date.getMinutes())}:00` +
++    `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
++  );
++}
++
++/** One authored banner, as loose as it arrives from the API. */
++interface AuthoredBanner {
++  message?: unknown;
++  id?: unknown;
++  variant?: unknown;
++  starts_at?: unknown;
++  ends_at?: unknown;
++  duration?: unknown;
++  dismissible?: unknown;
++  cta?: { text?: unknown; url?: unknown } | null;
++  orgs?: unknown;
++}
++
++function str(value: unknown): string {
++  return typeof value === "string" ? value : "";
++}
++
++export function draftFromAuthored(banner: AuthoredBanner): BannerDraft {
++  const draft = emptyDraft();
++
++  draft.id = str(banner.id);
++  draft.message = str(banner.message);
++
++  const variant = str(banner.variant) as BannerVariantName;
++  if (VARIANTS.includes(variant)) draft.variant = variant;
++
++  draft.startsAt = toLocalInput(str(banner.starts_at));
++  draft.endsAt = toLocalInput(str(banner.ends_at));
++
++  const duration = str(banner.duration);
++  if (draft.startsAt && duration && !draft.endsAt) {
++    // `starts_at` + `duration` is a valid authored pair the form has no third
++    // control for. Resolving it to an end instant keeps the window intact
++    // instead of dropping one half of it.
++    const durationMs = parseDurationMs(duration);
++    if (durationMs) {
++      draft.endsAt = toLocalInput(
++        new Date(new Date(draft.startsAt).getTime() + durationMs).toISOString(),
++      );
++    }
++  }
++
++  if (draft.startsAt || draft.endsAt) {
++    draft.schedule = "window";
++  } else if (duration) {
++    draft.schedule = "duration";
++    draft.duration = duration;
++  }
++
++  if (typeof banner.dismissible === "boolean") draft.dismissible = banner.dismissible;
++
++  if (banner.cta && str(banner.cta.text)) {
++    draft.hasCta = true;
++    draft.ctaText = str(banner.cta.text);
++    draft.ctaUrl = str(banner.cta.url);
++  }
++
++  if (Array.isArray(banner.orgs)) {
++    draft.orgs = banner.orgs.filter((org): org is string => typeof org === "string");
++  }
++
++  return draft;
++}
++
++/**
++ * Drafts for every banner in a parsed config. Entries without a message are
++ * dropped — they cannot be saved anyway, and the API names them by index.
++ */
++export function draftsFromConfig(parsed: unknown): BannerDraft[] {
++  const banners = (parsed as { banners?: unknown } | null)?.banners;
++  if (!Array.isArray(banners)) return [];
++
++  return banners
++    .filter((banner): banner is AuthoredBanner => typeof banner === "object" && banner !== null)
++    .filter((banner) => str(banner.message).trim())
++    .map(draftFromAuthored);
++}
++
++/**
++ * One draft as authored JSON.
++ *
++ * Defaults are omitted rather than written out, so the stored config stays the
++ * short document a person would have written by hand.
++ */
++export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
++  const banner: Record<string, unknown> = { message: draft.message.trim() };
++
++  if (draft.id.trim()) banner.id = draft.id.trim();
++  if (draft.variant !== "info") banner.variant = draft.variant;
++
++  if (draft.schedule === "duration" && draft.duration.trim()) {
++    banner.duration = draft.duration.trim();
++  }
++  if (draft.schedule === "window") {
++    if (draft.startsAt) banner.starts_at = toRfc3339(draft.startsAt);
++    if (draft.endsAt) banner.ends_at = toRfc3339(draft.endsAt);
++  }
++
++  if (!draft.dismissible) banner.dismissible = false;
++
++  if (draft.hasCta && draft.ctaText.trim() && draft.ctaUrl.trim()) {
++    banner.cta = { text: draft.ctaText.trim(), url: draft.ctaUrl.trim() };
++  }
++
++  if (draft.orgs.length) banner.orgs = [...draft.orgs];
++
++  return banner;
++}
++
++export function configFromDrafts(drafts: BannerDraft[]): { banners: Record<string, unknown>[] } {
++  return { banners: drafts.map(authoredFromDraft) };
++}
+diff --git a/web/src/composables/useAnnouncementBanners.spec.ts b/web/src/composables/useAnnouncementBanners.spec.ts
+new file mode 100644
+index 00000000000..9c7e386d964
+--- /dev/null
++++ b/web/src/composables/useAnnouncementBanners.spec.ts
+@@ -0,0 +1,271 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { effectScope } from "vue";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++
++const getActive = vi.fn();
++
++vi.mock("@/services/announcements", () => ({
++  default: {
++    getActive: (...args: unknown[]) => getActive(...args),
++  },
++}));
++
++// Mutable so a case can flip the build edition.
++const mockConfig = vi.hoisted(() => ({ isEnterprise: "true", isCloud: "false" }));
++
++vi.mock("@/aws-exports", () => ({ default: mockConfig }));
++
++const mockStore = {
++  state: { selectedOrganization: { identifier: "acme" } },
++};
++
++vi.mock("vuex", () => ({
++  useStore: () => mockStore,
++}));
++
++import { useAnnouncementBanners } from "./useAnnouncementBanners";
++
++const MINUTE_MICROS = 60 * 1_000_000;
++/** Browser clock, fixed so "now" is predictable in every test. */
++const BROWSER_NOW_MS = 1_754_985_600_000;
++const BROWSER_NOW_MICROS = BROWSER_NOW_MS * 1000;
++
++function banner(overrides: Record<string, unknown> = {}) {
++  return {
++    id: "b1",
++    message: "Scheduled maintenance",
++    variant: "warning",
++    dismissible: true,
++    ...overrides,
++  };
++}
++
++/** Respond as the API would, with the server clock defaulting to the browser's. */
++function respondWith(banners: unknown[], extra: Record<string, unknown> = {}) {
++  getActive.mockResolvedValue({
++    data: { banners, now: BROWSER_NOW_MICROS, ...extra },
++  });
++}
++
++/** Run the composable inside a scope so its cleanup can be triggered. */
++async function mountComposable() {
++  const scope = effectScope();
++  const api = scope.run(() => useAnnouncementBanners())!;
++  api.start();
++  await vi.waitFor(() => expect(getActive).toHaveBeenCalled());
++  return { ...api, dispose: () => scope.stop() };
++}
++
++describe("useAnnouncementBanners", () => {
++  beforeEach(() => {
++    vi.useFakeTimers();
++    vi.setSystemTime(BROWSER_NOW_MS);
++    getActive.mockReset();
++
++    // The shared test setup's localStorage stub has no clear(), and dismissal
++    // state has to start empty for each case.
++    const store = new Map<string, string>();
++    vi.stubGlobal("localStorage", {
++      getItem: (key: string) => store.get(key) ?? null,
++      setItem: (key: string, value: string) => void store.set(key, value),
++      removeItem: (key: string) => void store.delete(key),
++      clear: () => store.clear(),
++    });
++
++    mockConfig.isEnterprise = "true";
++    mockConfig.isCloud = "false";
++    respondWith([]);
++  });
++
++  afterEach(() => {
++    vi.useRealTimers();
++    vi.unstubAllGlobals();
++  });
++
++  it("exposes the banners the server returned", async () => {
++    respondWith([banner({ message: "Heads up" })]);
++
++    const { banners, dispose } = await mountComposable();
++
++    expect(banners.value).toHaveLength(1);
++    expect(banners.value[0].message).toBe("Heads up");
++    expect(getActive).toHaveBeenCalledWith("acme");
++    dispose();
++  });
++
++  it("stacks every active banner, in the order the server ranked them", async () => {
++    respondWith([
++      banner({ id: "outage", variant: "critical", message: "Search is down" }),
++      banner({ id: "maint", variant: "warning", message: "Maintenance tonight" }),
++      banner({ id: "notice", variant: "info", message: "New release" }),
++    ]);
++
++    const { banners, dispose } = await mountComposable();
++
++    expect(banners.value).toHaveLength(3);
++    expect(banners.value.map((b) => b.id)).toEqual(["outage", "maint", "notice"]);
++    dispose();
++  });
++
++  it("keeps stacking the rest when one of them is dismissed", async () => {
++    respondWith([
++      banner({ id: "a", message: "First" }),
++      banner({ id: "b", message: "Second" }),
++      banner({ id: "c", message: "Third" }),
++    ]);
++
++    const { banners, dismiss, dispose } = await mountComposable();
++    dismiss("b");
++
++    expect(banners.value.map((b) => b.id)).toEqual(["a", "c"]);
++    dispose();
++  });
++
++  it("hides a banner whose window has not opened yet", async () => {
++    respondWith([banner({ starts_at: BROWSER_NOW_MICROS + 5 * MINUTE_MICROS })]);
++
++    const { banners, dispose } = await mountComposable();
++
++    expect(banners.value).toHaveLength(0);
++    dispose();
++  });
++
++  it("hides a banner whose window has closed", async () => {
++    respondWith([banner({ ends_at: BROWSER_NOW_MICROS - 1 })]);
++
++    const { banners, dispose } = await mountComposable();
++
++    expect(banners.value).toHaveLength(0);
++    dispose();
++  });
++
++  it("uses the server clock, so a skewed browser still flips at the right instant", async () => {
++    // Browser runs 10 minutes fast. Judged by the browser the banner would
++    // already be live; judged by the server it is still 5 minutes out.
++    const serverNow = BROWSER_NOW_MICROS - 10 * MINUTE_MICROS;
++    respondWith([banner({ starts_at: serverNow + 5 * MINUTE_MICROS })], { now: serverNow });
++
++    const { banners, dispose } = await mountComposable();
++
++    expect(banners.value).toHaveLength(0);
++    dispose();
++  });
++
++  it("refetches on the boundary instead of waiting out the poll", async () => {
++    const startsAt = BROWSER_NOW_MICROS + 2 * MINUTE_MICROS;
++    respondWith([banner({ starts_at: startsAt })], { next_boundary: startsAt });
++
++    const { dispose } = await mountComposable();
++    expect(getActive).toHaveBeenCalledTimes(1);
++
++    // Just before the boundary, nothing has fired...
++    await vi.advanceTimersByTimeAsync(2 * 60 * 1000 - 1);
++    expect(getActive).toHaveBeenCalledTimes(1);
++
++    // ...and just after it (plus the 1s of slack) the refetch lands, well inside
++    // the 3-minute poll interval.
++    await vi.advanceTimersByTimeAsync(1_100);
++    expect(getActive).toHaveBeenCalledTimes(2);
++    dispose();
++  });
++
++  it("ignores a boundary too far out for a timer and leaves it to the poll", async () => {
++    const startsAt = BROWSER_NOW_MICROS + 48 * 60 * MINUTE_MICROS;
++    respondWith([banner({ starts_at: startsAt })], { next_boundary: startsAt });
++
++    const { dispose } = await mountComposable();
++
++    // Only the poll should be running — no timer armed two days ahead.
++    await vi.advanceTimersByTimeAsync(3 * 60 * 1000 + 100);
++    expect(getActive).toHaveBeenCalledTimes(2);
++    dispose();
++  });
++
++  it("keeps a dismissed banner hidden across a remount", async () => {
++    respondWith([banner({ id: "maint-1" })]);
++
++    const first = await mountComposable();
++    expect(first.banners.value).toHaveLength(1);
++    first.dismiss("maint-1");
++    expect(first.banners.value).toHaveLength(0);
++    first.dispose();
++
++    const second = await mountComposable();
++    expect(second.banners.value).toHaveLength(0);
++    second.dispose();
++  });
++
++  it("re-shows a banner whose id changed because its text was edited", async () => {
++    respondWith([banner({ id: "auto-aaa", message: "v1" })]);
++    const first = await mountComposable();
++    first.dismiss("auto-aaa");
++    first.dispose();
++
++    respondWith([banner({ id: "auto-bbb", message: "v2" })]);
++    const second = await mountComposable();
++
++    expect(second.banners.value).toHaveLength(1);
++    expect(second.banners.value[0].message).toBe("v2");
++    second.dispose();
++  });
++
++  it("suppresses a promo while a critical banner is up", async () => {
++    respondWith([
++      banner({ id: "outage", variant: "critical", message: "Search is down" }),
++      banner({ id: "promo", variant: "promo", message: "Join our webinar" }),
++    ]);
++
++    const { banners, dispose } = await mountComposable();
++
++    expect(banners.value.map((b) => b.id)).toEqual(["outage"]);
++    dispose();
++  });
++
++  it("keeps the promo when nothing critical is up", async () => {
++    respondWith([
++      banner({ id: "notice", variant: "info" }),
++      banner({ id: "promo", variant: "promo" }),
++    ]);
++
++    const { banners, dispose } = await mountComposable();
++
++    expect(banners.value.map((b) => b.id)).toEqual(["notice", "promo"]);
++    dispose();
++  });
++
++  it("keeps whatever is on screen when a poll fails", async () => {
++    respondWith([banner({ message: "Still here" })]);
++    const { banners, dispose } = await mountComposable();
++    expect(banners.value).toHaveLength(1);
++
++    getActive.mockRejectedValue(new Error("network down"));
++    await vi.advanceTimersByTimeAsync(3 * 60 * 1000 + 100);
++
++    expect(banners.value).toHaveLength(1);
++    dispose();
++  });
++
++  it("stops polling once the scope is disposed", async () => {
++    respondWith([]);
++    const { dispose } = await mountComposable();
++
++    dispose();
++    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
++
++    expect(getActive).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/web/src/composables/useAnnouncementBanners.ts b/web/src/composables/useAnnouncementBanners.ts
+new file mode 100644
+index 00000000000..29ba881f9e5
+--- /dev/null
++++ b/web/src/composables/useAnnouncementBanners.ts
+@@ -0,0 +1,216 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { computed, onScopeDispose, ref, watch } from "vue";
++import { useStore } from "vuex";
++
++import config from "@/aws-exports";
++import announcements from "@/services/announcements";
++import { raw, type I18nText } from "@/types/i18n";
++import { orderBanners, type BannerVariantName } from "@/utils/announcementOrder";
++
++export type BannerVariant = BannerVariantName;
++
++export interface BannerCta {
++  text: I18nText;
++  url: string;
++}
++
++export interface Banner {
++  id: string;
++  /** Operator-authored, so it is not translatable — rendered as plain text. */
++  message: I18nText;
++  variant: BannerVariant;
++  /** Microseconds. Absent means "already showing" / "until removed". */
++  starts_at?: number;
++  ends_at?: number;
++  dismissible: boolean;
++  cta?: BannerCta;
++}
++
++/** The banner as it arrives from the API, before its copy is branded via `raw()`. */
++interface WireBanner extends Omit<Banner, "message" | "cta"> {
++  message: string;
++  cta?: { text: string; url: string };
++}
++
++/** Poll cadence. The server reads these from an in-memory cache, so this is cheap. */
++const POLL_INTERVAL_MS = 3 * 60 * 1000;
++
++/**
++ * `setTimeout` saturates past ~24.8 days and background tabs throttle long timers,
++ * so a boundary further out than this is left to the next poll to pick up.
++ */
++const MAX_TIMER_MS = 60 * 60 * 1000;
++
++const DISMISSED_STORAGE_KEY = "o2_dismissed_announcements";
++
++function readDismissed(): string[] {
++  try {
++    const stored = window.localStorage.getItem(DISMISSED_STORAGE_KEY);
++    const parsed = stored ? JSON.parse(stored) : [];
++    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
++  } catch {
++    // Private mode or a corrupted entry — treat as nothing dismissed.
++    return [];
++  }
++}
++
++function writeDismissed(ids: string[]): void {
++  try {
++    window.localStorage.setItem(DISMISSED_STORAGE_KEY, JSON.stringify(ids));
++  } catch {
++    // Dismissal not persisting is survivable; the banner reappears next reload.
++  }
++}
++
++/**
++ * Active announcement banners for the current org.
++ *
++ * Three pieces of timing care, all of which matter for a banner scheduled to the
++ * minute:
++ * - the server's clock is authoritative, so a viewer whose laptop is minutes off
++ *   still flips the banner at the right instant;
++ * - a timer is armed on the next boundary rather than waiting out the poll, so a
++ *   banner set for 02:00 appears at 02:00 and not somewhere in the next 3 minutes;
++ * - polling continues regardless, so a banner published mid-session shows up on a
++ *   tab that has been open since yesterday.
++ */
++export function useAnnouncementBanners() {
++  const store = useStore();
++
++  const banners = ref<Banner[]>([]);
++  const dismissedIds = ref<string[]>(readDismissed());
++
++  /** Server time minus browser time, in ms. */
++  const clockSkewMs = ref(0);
++  let pollTimer: ReturnType<typeof setInterval> | undefined;
++  let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
++
++  const isEnterprise = computed(() => config.isEnterprise === "true");
++  const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
++
++  const serverNowMicros = () => (Date.now() + clockSkewMs.value) * 1000;
++
++  const isActive = (banner: Banner, nowMicros: number) => {
++    if (banner.starts_at != null && nowMicros < banner.starts_at) return false;
++    if (banner.ends_at != null && nowMicros >= banner.ends_at) return false;
++    return true;
++  };
++
++  /**
++   * The server already filtered by org and window, but it did so at fetch time.
++   * Re-checking here is what lets the boundary timer flip a banner in place
++   * without a round-trip.
++   */
++  const visibleBanners = computed(() => {
++    const nowMicros = serverNowMicros();
++    return banners.value.filter(
++      (banner) => isActive(banner, nowMicros) && !dismissedIds.value.includes(banner.id),
++    );
++  });
++
++  /** Same resolver the settings preview uses, so the two always agree. */
++  const renderedBanners = computed(() => orderBanners(visibleBanners.value));
++
++  const clearBoundaryTimer = () => {
++    if (boundaryTimer) {
++      clearTimeout(boundaryTimer);
++      boundaryTimer = undefined;
++    }
++  };
++
++  /**
++   * Wake exactly when the next banner appears or disappears.
++   *
++   * Re-armed on every fetch rather than scheduled once far ahead, which keeps it
++   * clear of the timer clamp and of background-tab throttling.
++   */
++  const armBoundaryTimer = (nextBoundaryMicros?: number) => {
++    clearBoundaryTimer();
++    if (nextBoundaryMicros == null) return;
++
++    const delayMs = nextBoundaryMicros / 1000 - (Date.now() + clockSkewMs.value);
++    if (delayMs <= 0 || delayMs > MAX_TIMER_MS) return;
++
++    // +1s of slack so the refetch lands just past the boundary rather than
++    // racing it.
++    boundaryTimer = setTimeout(() => void fetchBanners(), delayMs + 1000);
++  };
++
++  const fetchBanners = async () => {
++    const org = orgIdentifier.value;
++
++    if (!org || !isEnterprise.value) {
++      banners.value = [];
++      return;
++    }
++
++    try {
++      const response = await announcements.getActive(org);
++      const data = response?.data ?? {};
++
++      if (typeof data.now === "number") {
++        clockSkewMs.value = data.now / 1000 - Date.now();
++      }
++
++      // Operator-authored copy is not translatable, but it still has to satisfy
++      // the text brand to reach a template.
++      const authored: Banner[] = Array.isArray(data.banners)
++        ? data.banners.map((banner: WireBanner) => ({
++            ...banner,
++            message: raw(banner.message),
++            cta: banner.cta ? { text: raw(banner.cta.text), url: banner.cta.url } : undefined,
++          }))
++        : [];
++
++      // Already most-severe-first from the server; the order is kept as-is so
++      // every node and every tab agrees on which banner sits on top.
++      banners.value = authored;
++
++      armBoundaryTimer(data.next_boundary ?? undefined);
++    } catch {
++      // A banner is decoration on top of the app — a failed fetch must never
++      // surface an error to the user. Keep whatever is already on screen.
++    }
++  };
++
++  const dismiss = (id: string) => {
++    if (dismissedIds.value.includes(id)) return;
++    dismissedIds.value = [...dismissedIds.value, id];
++    writeDismissed(dismissedIds.value);
++  };
++
++  const start = () => {
++    void fetchBanners();
++    pollTimer = setInterval(() => void fetchBanners(), POLL_INTERVAL_MS);
++  };
++
++  // Switching orgs changes which banners apply, so refetch rather than carrying
++  // the previous org's set across.
++  watch(orgIdentifier, () => void fetchBanners());
++
++  onScopeDispose(() => {
++    if (pollTimer) clearInterval(pollTimer);
++    clearBoundaryTimer();
++  });
++
++  return {
++    banners: renderedBanners,
++    dismiss,
++    start,
++    refresh: fetchBanners,
++  };
++}
+diff --git a/web/src/layouts/MainLayout.vue b/web/src/layouts/MainLayout.vue
+index 820401b0eaa..565dc4f372b 100644
+--- a/web/src/layouts/MainLayout.vue
++++ b/web/src/layouts/MainLayout.vue
+@@ -30,12 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     ]"
+   >
+     <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
+-      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+-      <div
+-        v-if="config.isCloud === 'true'"
+-        class="bg-button-primary text-button-primary-foreground text-center"
+-      >
+-        <WebinarBanner variant="header" />
++      <!-- Every bar that sits above the toolbar, in one measured wrapper so
++           `--navbar-height` accounts for whichever of them is actually showing.
++           The wrapper always renders — an unconditional ref keeps the observer
++           attached even when nothing is on screen yet. -->
++      <div ref="announcementBarRef">
++        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
++        <div
++          v-if="config.isCloud === 'true'"
++          class="bg-button-primary text-button-primary-foreground text-center"
++        >
++          <WebinarBanner variant="header" />
++        </div>
++
++        <!-- Operator-authored announcement bars (enterprise) -->
++        <AnnouncementBanner v-if="config.isEnterprise === 'true'" />
+       </div>
+ 
+       <!-- Header component containing logo, navigation, and user controls -->
+@@ -181,6 +190,7 @@ import {
+   KeepAlive,
+   computed,
+   onMounted,
++  onUnmounted,
+   watch,
+   markRaw,
+   nextTick,
+@@ -212,6 +222,7 @@ import { openobserveRum } from "@openobserve/browser-rum";
+ import useSearchWebSocket from "@/composables/useSearchWebSocket";
+ import O2AIChat from "@/components/O2AIChat.vue";
+ import WebinarBanner from "@/components/WebinarBanner.vue";
++import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
+ import useRoutePrefetch from "@/composables/useRoutePrefetch";
+ import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
+ import { useShortcuts } from "@/lib/vue-shortcut-manager";
+@@ -231,6 +242,7 @@ export default defineComponent({
+   components: {
+     AppHeader,
+     WebinarBanner,
++    AnnouncementBanner,
+     "keep-alive": KeepAlive,
+     ONavbar,
+     "router-view": RouterView,
+@@ -569,14 +581,35 @@ export default defineComponent({
+       }
+     });
+ 
+-    watch(
+-      () => store.state.isWebinarBannerVisible,
+-      (visible) => {
+-        const navbarHeight = visible ? "calc(2.5rem + 1.688rem)" : "2.5rem";
+-        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
+-      },
+-      { immediate: true },
+-    );
++    // Measured rather than assumed. The strip now holds two independent bars
++    // (the cloud webinar promo and any number of operator-authored banners),
++    // each of which wraps its own text, so no fixed value can describe it — the
++    // old `isWebinarBannerVisible` two-value calc only ever fit one bar of one
++    // line. WebinarBanner still dispatches that flag; nothing reads it for
++    // height any more.
++    const announcementBarRef = ref<HTMLElement | null>(null);
++    let announcementBarObserver: ResizeObserver | null = null;
++
++    const setNavbarHeight = (barHeightPx: number) => {
++      const barHeightRem = barHeightPx / 16;
++      document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
++    };
++
++    onMounted(() => {
++      setNavbarHeight(announcementBarRef.value?.offsetHeight ?? 0);
++
++      if (announcementBarRef.value && typeof ResizeObserver !== "undefined") {
++        announcementBarObserver = new ResizeObserver(([entry]) => {
++          setNavbarHeight(entry.contentRect.height);
++        });
++        announcementBarObserver.observe(announcementBarRef.value);
++      }
++    });
++
++    onUnmounted(() => {
++      announcementBarObserver?.disconnect();
++      announcementBarObserver = null;
++    });
+ 
+     onMounted(async () => {
+       filterMenus();
+@@ -1311,6 +1344,7 @@ export default defineComponent({
+       router,
+       store,
+       config,
++      announcementBarRef,
+       langList,
+       selectedLanguage,
+       linksList,
+diff --git a/web/src/lib/core/Button/OButton.types.ts b/web/src/lib/core/Button/OButton.types.ts
+index 00c8dcb7453..c1d36d316dd 100644
+--- a/web/src/lib/core/Button/OButton.types.ts
++++ b/web/src/lib/core/Button/OButton.types.ts
+@@ -43,6 +43,8 @@ export type ButtonVariant =
+   | "preview-action"
+   // Webinar banner dismiss — inline text-link style button for the top bar banner
+   | "webinar-dismiss"
++  // Banner action — inline text-link style button for actions inside an OBanner bar
++  | "banner-dismiss"
+   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
+   | "pricing-chip"
+   // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)
+diff --git a/web/src/lib/core/Button/OButton.vue b/web/src/lib/core/Button/OButton.vue
+index bcb04e47c6a..c0b2ac72c9d 100644
+--- a/web/src/lib/core/Button/OButton.vue
++++ b/web/src/lib/core/Button/OButton.vue
+@@ -202,10 +202,18 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
+   // webinar-dismiss: Inline text-link style for the webinar top bar banner dismiss button
+   "webinar-dismiss": [
+     "bg-transparent border-0 text-promo-webinar-link underline font-bold text-compact whitespace-nowrap",
+-    "!h-auto !p-0",
++    "h-auto! p-0!",
+     "enabled:hover:text-promo-webinar-link-hover",
+     "disabled:opacity-60",
+   ].join(" "),
++  // banner-dismiss: Inline text-link style for the actions inside an OBanner bar.
++  // Inherits the banner's own text color so it reads correctly on every variant.
++  "banner-dismiss": [
++    "bg-transparent border-0 text-inherit underline font-bold text-compact whitespace-nowrap",
++    "h-auto! p-0!",
++    "enabled:hover:opacity-80",
++    "disabled:opacity-60",
++  ].join(" "),
+   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
+   // Use for edition/tier badges that must stand out without being a heavy CTA.
+   "outline-primary": [
+diff --git a/web/src/lib/feedback/Banner/OBanner.vue b/web/src/lib/feedback/Banner/OBanner.vue
+index 63e276ff7ef..ca6eed1b8f8 100644
+--- a/web/src/lib/feedback/Banner/OBanner.vue
++++ b/web/src/lib/feedback/Banner/OBanner.vue
+@@ -9,6 +9,14 @@ interface Props {
+   icon?: string;
+   dense?: boolean;
+   inlineActions?: boolean;
++  /**
++   * Full-bleed strip instead of an inset block — square corners, no border, the
++   * message on the left and its actions pinned right. For an app-wide bar spanning
++   * the whole viewport, where an inset card with soft corners would read as
++   * floating debris, and where centering each row independently leaves a stack of
++   * banners visibly ragged.
++   */
++  bar?: boolean;
+   dataTest?: string;
+ }
+ 
+@@ -16,6 +24,7 @@ const props = withDefaults(defineProps<Props>(), {
+   variant: "default",
+   dense: false,
+   inlineActions: false,
++  bar: false,
+ });
+ 
+ const slots = useSlots();
+@@ -47,6 +56,30 @@ const variantClass = computed(() => {
+       return "bg-banner-default-bg text-banner-default-text";
+   }
+ });
++
++/**
++ * Bar mode carries the fill and the text colour but none of the borders.
++ * An inset card's 1px box and 4px left accent become a hairline down the
++ * viewport edge and a stub in the corner once the banner spans the screen —
++ * and, because only some variants carry them, a stack of bars ends up with
++ * rows of different heights.
++ */
++const barVariantClass = computed(() => {
++  switch (props.variant) {
++    case "info":
++      return "bg-banner-info-bg text-banner-info-text";
++    case "success":
++      return "bg-banner-success-bg text-banner-success-text";
++    case "warning":
++      return "bg-banner-warning-bg text-banner-warning-text";
++    case "error":
++      return "bg-banner-error-bg text-banner-error-text";
++    case "error-soft":
++      return "bg-banner-error-soft-bg text-banner-error-soft-text";
++    default:
++      return "bg-banner-default-bg text-banner-default-text";
++  }
++});
+ </script>
+ 
+ <template>
+@@ -54,26 +87,34 @@ const variantClass = computed(() => {
+     :role="ariaRole"
+     :data-test="dataTest"
+     :class="[
+-      'rounded-default flex',
+-      inlineActions ? 'flex-row items-center gap-3' : 'flex-col gap-2',
+-      dense ? 'p-2' : 'p-4',
+-      variantClass,
++      'flex',
++      bar ? 'w-full flex-row flex-wrap items-center justify-between gap-3 px-4 py-2' : '',
++      bar ? '' : 'rounded-default',
++      bar ? '' : inlineActions ? 'flex-row items-center gap-3' : 'flex-col gap-2',
++      bar ? '' : dense ? 'p-2' : 'p-4',
++      bar ? barVariantClass : variantClass,
+     ]"
+   >
+-    <div :class="['flex flex-row items-start gap-3', inlineActions ? 'flex-1' : '']">
+-      <div v-if="showIconArea" class="flex shrink-0 items-start">
++    <div
++      :class="[
++        'flex flex-row gap-3',
++        bar ? 'min-w-0 flex-1 items-center' : 'items-start',
++        inlineActions && !bar ? 'flex-1' : '',
++      ]"
++    >
++      <div v-if="showIconArea" :class="['flex shrink-0', bar ? 'items-center' : 'items-start']">
+         <slot name="icon">
+           <OIcon :name="icon" size="sm" />
+         </slot>
+       </div>
+ 
+-      <div class="flex-1 text-sm">
++      <div :class="bar ? 'text-compact' : 'flex-1 text-sm'">
+         <slot />
+         <template v-if="showContentProp">{{ content }}</template>
+       </div>
+     </div>
+ 
+-    <div v-if="hasActionsSlot">
++    <div v-if="hasActionsSlot" :class="bar ? 'shrink-0' : ''">
+       <slot name="actions" />
+     </div>
+   </div>
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 0b784a7ab80..baeccf94748 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -2120,6 +2120,82 @@
+     },
+     "summaryOtherRoles": "+{count} more roles"
+   },
++  "announcements": {
++    "dismiss": "Dismiss",
++    "dismissAriaLabel": "Dismiss announcement",
++    "settings": {
++      "label": "Announcement Banners",
++      "description": "Publish a notice across every organization",
++      "configure": "Configure",
++      "previewLabel": "Preview",
++      "previewEmpty": "No banner will be shown.",
++      "reset": "Discard changes",
++      "save": "Publish",
++      "saved": "Announcement banners updated",
++      "saveFailed": "Could not save the announcement banners",
++      "loadFailed": "Could not load the announcement banners",
++      "loading": "Loading the current configuration…",
++      "cancel": "Cancel",
++      "bannersLabel": "Banners",
++      "addBanner": "Add banner",
++      "emptyTitle": "No banners yet",
++      "emptyHint": "Add one to show a notice at the top of the app."
++    },
++    "variants": {
++      "info": "Info",
++      "warning": "Warning",
++      "critical": "Critical",
++      "promo": "Promotion"
++    },
++    "card": {
++      "edit": "Edit banner",
++      "remove": "Remove banner",
++      "always": "Shows until removed",
++      "forDuration": "Shows for {duration}",
++      "between": "{from} to {to}",
++      "from": "From {from}",
++      "until": "Until {to}",
++      "allOrgs": "All organizations",
++      "someOrgs": "{count} organization | {count} organizations",
++      "notDismissible": "Cannot be dismissed"
++    },
++    "form": {
++      "addTitle": "Add banner",
++      "editTitle": "Edit banner",
++      "subtitle": "This is what people see at the top of the app.",
++      "apply": "Apply",
++      "message": "Message",
++      "messagePlaceholder": "Scheduled maintenance Sat 02:00-04:00 UTC. Search may be unavailable.",
++      "messageHelp": "Plain text. Links and formatting are not applied.",
++      "messageRequired": "Enter the message people will see.",
++      "severity": "Severity",
++      "severityHelp": "More severe banners are shown above less severe ones.",
++      "schedule": "Show this banner",
++      "scheduleAlways": "Straight away, until I remove it",
++      "scheduleDuration": "Straight away, for a set time",
++      "scheduleWindow": "During a specific window",
++      "duration": "For how long",
++      "durationPlaceholder": "1h",
++      "durationHelp": "A span such as 30m, 2h, 3d or 1w.",
++      "durationInvalid": "Enter a span such as 30m, 2h, 3d or 1w.",
++      "startsAt": "Starts",
++      "endsAt": "Ends",
++      "timezoneHint": "Times are in your own timezone ({zone}).",
++      "windowRequired": "Set a start time, an end time, or both.",
++      "windowBackwards": "The end time must be after the start time.",
++      "dismissible": "Let people dismiss this banner",
++      "hasCta": "Add a link button",
++      "ctaText": "Button text",
++      "ctaTextPlaceholder": "Status page",
++      "ctaTextRequired": "Enter the text for the button.",
++      "ctaUrl": "Button link",
++      "ctaUrlPlaceholder": "https://status.example.com",
++      "ctaUrlInvalid": "The link must start with http:// or https://",
++      "orgs": "Show to",
++      "orgsAll": "All organizations",
++      "orgsHelp": "Leave empty to show this banner to every organization."
++    }
++  },
+   "ticket": {
+     "noDataErrorMsg": "No data available",
+     "noOrganizationSelected": "No Organization Selected",
+diff --git a/web/src/services/announcements.ts b/web/src/services/announcements.ts
+new file mode 100644
+index 00000000000..0d1cd36f6d2
+--- /dev/null
++++ b/web/src/services/announcements.ts
+@@ -0,0 +1,44 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import http from "./http";
++
++const announcements = {
++  /**
++   * Banners active right now for this org, most severe first. Readable by any
++   * member of the org; the per-banner org allowlist is applied server-side.
++   */
++  getActive: (org_identifier: string) => {
++    return http().get(`/api/${org_identifier}/announcements`);
++  },
++
++  /**
++   * The authored JSON, for the editor. Meta org only.
++   */
++  getConfig: (org_identifier: string) => {
++    return http().get(`/api/${org_identifier}/announcements/config`);
++  },
++
++  /**
++   * Replace the banner configuration. Meta org only. The server validates and
++   * normalizes before storing, so a rejected payload comes back as a 400 whose
++   * message names the offending banner index and field.
++   */
++  setConfig: (org_identifier: string, payload: unknown) => {
++    return http().put(`/api/${org_identifier}/announcements/config`, payload);
++  },
++};
++
++export default announcements;
+diff --git a/web/src/utils/announcementOrder.spec.ts b/web/src/utils/announcementOrder.spec.ts
+new file mode 100644
+index 00000000000..34612e7b2f4
+--- /dev/null
++++ b/web/src/utils/announcementOrder.spec.ts
+@@ -0,0 +1,79 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it } from "vitest";
++
++import { bannerRank, orderBanners } from "./announcementOrder";
++
++const named = (variant: string, message: string) => ({ variant, message });
++
++describe("announcementOrder", () => {
++  it("ranks severities the way the server does", () => {
++    expect(bannerRank("critical")).toBeGreaterThan(bannerRank("warning"));
++    expect(bannerRank("warning")).toBeGreaterThan(bannerRank("info"));
++    expect(bannerRank("info")).toBeGreaterThan(bannerRank("promo"));
++  });
++
++  it("treats an unknown variant as the default rather than dropping it", () => {
++    // A banner authored against a newer schema still has to be seen.
++    expect(bannerRank("whatever-comes-next")).toBe(bannerRank("info"));
++    expect(orderBanners([named("whatever-comes-next", "keep me")])).toHaveLength(1);
++  });
++
++  it("sorts most severe first, whatever order they arrived in", () => {
++    const ordered = orderBanners([
++      named("promo", "promo"),
++      named("info", "info"),
++      named("warning", "warning"),
++    ]);
++
++    expect(ordered.map((b) => b.message)).toEqual(["warning", "info", "promo"]);
++  });
++
++  it("keeps equal severities in the order they came in", () => {
++    // The live bar relies on this: the server already broke ties by starts_at.
++    const ordered = orderBanners([
++      named("warning", "first"),
++      named("warning", "second"),
++      named("warning", "third"),
++    ]);
++
++    expect(ordered.map((b) => b.message)).toEqual(["first", "second", "third"]);
++  });
++
++  it("hides promos while a critical banner is up", () => {
++    const ordered = orderBanners([
++      named("promo", "webinar"),
++      named("critical", "outage"),
++      named("info", "notice"),
++    ]);
++
++    expect(ordered.map((b) => b.message)).toEqual(["outage", "notice"]);
++  });
++
++  it("shows promos again once the critical is gone", () => {
++    const ordered = orderBanners([named("promo", "webinar"), named("info", "notice")]);
++
++    expect(ordered.map((b) => b.message)).toEqual(["notice", "webinar"]);
++  });
++
++  it("does not mutate its input", () => {
++    const input = [named("promo", "a"), named("critical", "b")];
++
++    orderBanners(input);
++
++    expect(input.map((b) => b.message)).toEqual(["a", "b"]);
++  });
++});
+diff --git a/web/src/utils/announcementOrder.ts b/web/src/utils/announcementOrder.ts
+new file mode 100644
+index 00000000000..032fc201d39
+--- /dev/null
++++ b/web/src/utils/announcementOrder.ts
+@@ -0,0 +1,60 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++/**
++ * The one place that decides which announcement banners render, and in what
++ * order.
++ *
++ * Shared by the live bar and by the settings preview so the two cannot drift:
++ * a preview that ordered banners differently from the real thing is worse than
++ * no preview, because it is confidently wrong.
++ */
++
++export type BannerVariantName = "info" | "warning" | "critical" | "promo";
++
++/** The only field ordering depends on, so both the wire and draft shapes fit. */
++export interface OrderableBanner {
++  variant?: string | null;
++}
++
++/** Higher sorts first. Mirrors `BannerVariant::rank` on the server. */
++export function bannerRank(variant?: string | null): number {
++  switch (variant) {
++    case "critical":
++      return 3;
++    case "warning":
++      return 2;
++    case "promo":
++      return 0;
++    // Anything unrecognised is treated as the default variant rather than
++    // dropped — a banner authored against a newer schema still gets seen.
++    default:
++      return 1;
++  }
++}
++
++/**
++ * Severity order, then the promo rule: a marketing banner is hidden while a
++ * critical one is up, because a webinar ad beside an outage notice reads badly.
++ *
++ * The sort is stable, so banners of equal severity keep the order they arrived
++ * in — which for the live bar is the server's `starts_at` tiebreak.
++ */
++export function orderBanners<T extends OrderableBanner>(banners: T[]): T[] {
++  const hasCritical = banners.some((banner) => banner.variant === "critical");
++  const visible = hasCritical ? banners.filter((banner) => banner.variant !== "promo") : banners;
++
++  return [...visible].sort((a, b) => bannerRank(b.variant) - bannerRank(a.variant));
++}
+
+
+===== LINKED / SISTER PR: openobserve/o2-enterprise #2367 (combined for full feature context) =====
+
+diff --git a/o2_enterprise/src/enterprise/announcements/meta.rs b/o2_enterprise/src/enterprise/announcements/meta.rs
+new file mode 100644
+index 000000000..859cdeedf
+--- /dev/null
++++ b/o2_enterprise/src/enterprise/announcements/meta.rs
+@@ -0,0 +1,197 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++//! Announcement banner types.
++//!
++//! Timestamps on the wire are microseconds; they are parsed from RFC 3339 during
++//! [`super::normalize`].
++
++use serde::{Deserialize, Serialize};
++use utoipa::ToSchema;
++
++/// Visual treatment. Also the ordering key: the most severe banner wins the slot.
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
++#[serde(rename_all = "lowercase")]
++pub enum BannerVariant {
++    #[default]
++    Info,
++    Warning,
++    Critical,
++    /// Marketing content. Always sorts last. The client additionally hides promos
++    /// while a `critical` banner is up — a webinar ad next to an outage notice
++    /// reads badly — and it has to happen there rather than here, because the
++    /// client mixes in a promo of its own that the server never sees.
++    Promo,
++}
++
++impl BannerVariant {
++    /// Higher sorts first.
++    pub fn rank(&self) -> u8 {
++        match self {
++            BannerVariant::Critical => 3,
++            BannerVariant::Warning => 2,
++            BannerVariant::Info => 1,
++            BannerVariant::Promo => 0,
++        }
++    }
++}
++
++fn default_dismissible() -> bool {
++    true
++}
++
++/// Optional call-to-action link.
++///
++/// Structured rather than embedded markup: the message renders as plain text so
++/// that stored config can never become stored XSS.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
++pub struct BannerCta {
++    pub text: String,
++    pub url: String,
++}
++
++/// One announcement.
++///
++/// Deserialization is deliberately lenient about unknown keys so a newer authoring
++/// schema does not break an older node mid-rollout.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
++pub struct Banner {
++    /// Plain text. The only required field.
++    pub message: String,
++
++    /// Stable key for dismissal. Derived from the content when omitted, so editing
++    /// the text re-shows a banner a user had already dismissed.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub id: Option<String>,
++
++    #[serde(default)]
++    pub variant: BannerVariant,
++
++    /// Display window start, micros. Absent means "already showing".
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub starts_at: Option<i64>,
++
++    /// Display window end, micros. Absent means "until removed".
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub ends_at: Option<i64>,
++
++    #[serde(default = "default_dismissible")]
++    pub dismissible: bool,
++
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub cta: Option<BannerCta>,
++
++    /// Organizations that should see this. Absent or empty means all of them.
++    ///
++    /// Round-trips through storage, which holds the whole config. It is stripped
++    /// from what any single org receives — see [`super::resolve_for_org`].
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub orgs: Option<Vec<String>>,
++}
++
++impl Banner {
++    /// Whether this banner's display window contains `now` (micros).
++    ///
++    /// The window is half-open: a banner is visible at its start instant and gone
++    /// at its end instant.
++    pub fn is_active_at(&self, now: i64) -> bool {
++        if let Some(start) = self.starts_at
++            && now < start
++        {
++            return false;
++        }
++        if let Some(end) = self.ends_at
++            && now >= end
++        {
++            return false;
++        }
++        true
++    }
++
++    /// Whether this banner targets `org`. An absent or empty allowlist means all orgs.
++    pub fn targets_org(&self, org: &str) -> bool {
++        match &self.orgs {
++            None => true,
++            Some(orgs) if orgs.is_empty() => true,
++            Some(orgs) => orgs.iter().any(|o| o == org),
++        }
++    }
++
++    /// The next instant at which this banner's visibility changes, if any.
++    ///
++    /// Lets the client arm a timer on the exact boundary instead of waiting out its
++    /// poll interval — a banner scheduled for 02:00 should appear at 02:00, not
++    /// somewhere in the following five minutes.
++    pub fn next_boundary_after(&self, now: i64) -> Option<i64> {
++        [self.starts_at, self.ends_at]
++            .into_iter()
++            .flatten()
++            .filter(|t| *t > now)
++            .min()
++    }
++}
++
++/// The stored value: `{"banners": [...]}`.
++#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
++pub struct AnnouncementBanners {
++    #[serde(default)]
++    pub banners: Vec<Banner>,
++}
++
++/// What the client receives.
++///
++/// `now` is the server's clock. Browsers with skewed clocks would otherwise flip a
++/// scheduled banner minutes early or late; the client keeps the offset and times
++/// its boundaries against this instead of `Date.now()`.
++#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
++pub struct AnnouncementsResponse {
++    pub banners: Vec<Banner>,
++    /// Server time in microseconds.
++    pub now: i64,
++    /// The next instant any banner in this set appears or disappears, if any.
++    #[serde(skip_serializing_if = "Option::is_none")]
++    pub next_boundary: Option<i64>,
++}
++
++/// What a banner looks like as authored, before normalization.
++///
++/// Timestamps arrive as RFC 3339 strings and `duration` as a human span (`"1h"`),
++/// both resolved to absolute micros on write.
++#[derive(Debug, Clone, Deserialize)]
++pub(super) struct RawBanner {
++    pub message: String,
++    #[serde(default)]
++    pub id: Option<String>,
++    #[serde(default)]
++    pub variant: Option<BannerVariant>,
++    #[serde(default)]
++    pub starts_at: Option<String>,
++    #[serde(default)]
++    pub ends_at: Option<String>,
++    #[serde(default)]
++    pub duration: Option<String>,
++    #[serde(default)]
++    pub dismissible: Option<bool>,
++    #[serde(default)]
++    pub cta: Option<BannerCta>,
++    #[serde(default)]
++    pub orgs: Option<Vec<String>>,
++}
++
++#[derive(Debug, Clone, Deserialize)]
++pub(super) struct RawAnnouncementBanners {
++    #[serde(default)]
++    pub banners: Vec<RawBanner>,
++}
+diff --git a/o2_enterprise/src/enterprise/announcements/mod.rs b/o2_enterprise/src/enterprise/announcements/mod.rs
+new file mode 100644
+index 000000000..15de08eb3
+--- /dev/null
++++ b/o2_enterprise/src/enterprise/announcements/mod.rs
+@@ -0,0 +1,506 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++//! Announcement Banners
++//!
++//! One generic primitive for operator-authored notices shown at the top of the
++//! app: maintenance windows, release notes, policy reminders, promos. Downtime is
++//! a use case, not the model.
++//!
++//! Authored as JSON and stored as a single row in `system_settings` (scope `org`,
++//! org `_meta`, key [`ANNOUNCEMENT_BANNERS_KEY`]). `message` is the only required
++//! field; an empty list means no banner renders.
++//!
++//! Timestamps are authored as RFC 3339 **with an offset** and normalized to
++//! microseconds on write. Naive datetimes are rejected rather than assumed to be
++//! UTC — guessing a zone silently shifts a maintenance notice by hours.
++//!
++//! This module is pure: storage lives on the OSS side, which owns the cached and
++//! cluster-watched `system_settings` service.
++
++pub mod meta;
++
++use std::{
++    collections::hash_map::DefaultHasher,
++    hash::{Hash, Hasher},
++};
++
++use chrono::{DateTime, Utc};
++use config::utils::time::parse_milliseconds;
++
++use crate::enterprise::announcements::meta::{
++    AnnouncementBanners, Banner, RawAnnouncementBanners, RawBanner,
++};
++
++/// `system_settings` key holding the authored banner config on the `_meta` org.
++pub const ANNOUNCEMENT_BANNERS_KEY: &str = "announcement_banners";
++
++/// Parse a timestamp that carries an explicit UTC offset.
++///
++/// A naive datetime is an error: assuming UTC (or server-local) is how a notice
++/// scheduled for 02:00 local shows up hours off for whoever authored it.
++fn parse_offset_timestamp(field: &str, index: usize, value: &str) -> Result<i64, anyhow::Error> {
++    DateTime::parse_from_rfc3339(value.trim())
++        .map(|dt| dt.with_timezone(&Utc).timestamp_micros())
++        .map_err(|_| {
++            anyhow::anyhow!(
++                "banners[{index}].{field}: expected an RFC 3339 timestamp with a UTC offset, \
++                 e.g. \"2026-08-12T02:00:00Z\" or \"2026-08-12T07:30:00+05:30\", got {value:?}"
++            )
++        })
++}
++
++/// Fallback id: a hash of the fields a reader actually sees.
++///
++/// Editing the message or the CTA yields a new id, which re-shows the banner to
++/// users who dismissed the previous wording. That is the desired behavior, and it
++/// spares authors from inventing unique ids they would otherwise recycle.
++fn derive_id(banner: &RawBanner) -> String {
++    let mut hasher = DefaultHasher::new();
++    banner.message.hash(&mut hasher);
++    if let Some(cta) = &banner.cta {
++        cta.text.hash(&mut hasher);
++        cta.url.hash(&mut hasher);
++    }
++    format!("auto-{:x}", hasher.finish())
++}
++
++/// Validate and normalize authored banner JSON.
++///
++/// `now` (micros) anchors relative durations and is passed in so callers stay
++/// testable. Resolving `duration` here rather than at read time keeps the window
++/// from restarting every time an unrelated field is edited, and keeps cluster
++/// nodes from disagreeing at the boundary.
++///
++/// Errors name the offending index and field — this is authored in a raw JSON
++/// editor, so a vague failure leaves the author guessing.
++pub fn normalize(
++    value: &serde_json::Value,
++    now: i64,
++) -> Result<AnnouncementBanners, anyhow::Error> {
++    // Clearing the setting is the documented way to take every banner down, so
++    // null and empty string are valid input meaning "nothing".
++    if value.is_null() {
++        return Ok(AnnouncementBanners::default());
++    }
++    if let Some(s) = value.as_str()
++        && s.trim().is_empty()
++    {
++        return Ok(AnnouncementBanners::default());
++    }
++
++    let raw: RawAnnouncementBanners = serde_json::from_value(value.clone())
++        .map_err(|e| anyhow::anyhow!("invalid announcement banner config: {e}"))?;
++
++    let mut banners = Vec::with_capacity(raw.banners.len());
++    for (index, item) in raw.banners.into_iter().enumerate() {
++        if item.message.trim().is_empty() {
++            return Err(anyhow::anyhow!(
++                "banners[{index}].message must not be empty"
++            ));
++        }
++
++        if item.ends_at.is_some() && item.duration.is_some() {
++            return Err(anyhow::anyhow!(
++                "banners[{index}]: set either \"ends_at\" or \"duration\", not both"
++            ));
++        }
++
++        let starts_at = item
++            .starts_at
++            .as_deref()
++            .map(|v| parse_offset_timestamp("starts_at", index, v))
++            .transpose()?;
++
++        let ends_at = match (&item.ends_at, &item.duration) {
++            (Some(v), _) => Some(parse_offset_timestamp("ends_at", index, v)?),
++            (None, Some(d)) => {
++                let millis = parse_milliseconds(d.trim()).map_err(|e| {
++                    anyhow::anyhow!(
++                        "banners[{index}].duration: expected a span like \"30m\", \"1h\" or \
++                         \"2d\", got {d:?} ({e})"
++                    )
++                })?;
++                if millis == 0 {
++                    return Err(anyhow::anyhow!(
++                        "banners[{index}].duration must be greater than zero"
++                    ));
++                }
++                // Anchored to the display start so that a later edit does not
++                // silently extend the window.
++                let anchor = starts_at.unwrap_or(now);
++                Some(anchor + (millis as i64) * 1000)
++            }
++            (None, None) => None,
++        };
++
++        if let (Some(start), Some(end)) = (starts_at, ends_at)
++            && end <= start
++        {
++            return Err(anyhow::anyhow!(
++                "banners[{index}]: the display window ends before it starts"
++            ));
++        }
++
++        if let Some(cta) = &item.cta {
++            if cta.text.trim().is_empty() {
++                return Err(anyhow::anyhow!(
++                    "banners[{index}].cta.text must not be empty"
++                ));
++            }
++            let url = cta.url.trim();
++            // Anything but http(s) is either a mistake or an attempt at
++            // `javascript:` — neither should reach a rendered anchor.
++            if !url.starts_with("http://") && !url.starts_with("https://") {
++                return Err(anyhow::anyhow!(
++                    "banners[{index}].cta.url must start with http:// or https://"
++                ));
++            }
++        }
++
++        let id = item.id.clone().filter(|s| !s.trim().is_empty());
++        let id = Some(id.unwrap_or_else(|| derive_id(&item)));
++
++        banners.push(Banner {
++            message: item.message,
++            id,
++            variant: item.variant.unwrap_or_default(),
++            starts_at,
++            ends_at,
++            dismissible: item.dismissible.unwrap_or(true),
++            cta: item.cta,
++            orgs: item.orgs,
++        });
++    }
++
++    Ok(AnnouncementBanners { banners })
++}
++
++/// Banners an org should see at `now`, most severe first.
++///
++/// The allowlist is applied here, server-side, so one tenant never receives another
++/// tenant's notice text or org identifiers. `orgs` is cleared on the way out for the
++/// same reason: a banner targeting three tenants would otherwise name the other two
++/// to each of them.
++pub fn resolve_for_org(config: &AnnouncementBanners, org: &str, now: i64) -> Vec<Banner> {
++    let mut visible: Vec<Banner> = config
++        .banners
++        .iter()
++        .filter(|b| b.targets_org(org) && b.is_active_at(now))
++        .map(|b| Banner {
++            orgs: None,
++            ..b.clone()
++        })
++        .collect();
++
++    visible.sort_by(|a, b| {
++        b.variant
++            .rank()
++            .cmp(&a.variant.rank())
++            .then_with(|| a.starts_at.unwrap_or(0).cmp(&b.starts_at.unwrap_or(0)))
++    });
++
++    visible
++}
++
++/// The next instant the rendered set changes for `org`, across every configured
++/// banner — including ones not currently visible, whose start time is exactly what
++/// the client needs to wake up for.
++pub fn next_boundary_for_org(config: &AnnouncementBanners, org: &str, now: i64) -> Option<i64> {
++    config
++        .banners
++        .iter()
++        .filter(|b| b.targets_org(org))
++        .filter_map(|b| b.next_boundary_after(now))
++        .min()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::{meta::BannerVariant, *};
++
++    const HOUR: i64 = 3_600_000_000;
++    const NOW: i64 = 1_754_985_600_000_000;
++
++    fn normalize_ok(json: serde_json::Value) -> AnnouncementBanners {
++        normalize(&json, NOW).expect("expected config to normalize")
++    }
++
++    fn banner_with_window(starts_at: Option<i64>, ends_at: Option<i64>) -> Banner {
++        Banner {
++            message: "m".into(),
++            id: None,
++            variant: BannerVariant::Info,
++            starts_at,
++            ends_at,
++            dismissible: true,
++            cta: None,
++            orgs: None,
++        }
++    }
++
++    #[test]
++    fn message_is_the_only_required_field() {
++        let cfg = normalize_ok(serde_json::json!({"banners": [{"message": "Heads up"}]}));
++        let banner = &cfg.banners[0];
++
++        assert_eq!(banner.message, "Heads up");
++        assert_eq!(banner.variant, BannerVariant::Info);
++        assert!(banner.dismissible);
++        assert!(banner.starts_at.is_none());
++        assert!(banner.ends_at.is_none());
++        assert!(banner.is_active_at(NOW));
++    }
++
++    #[test]
++    fn empty_config_renders_nothing() {
++        assert!(
++            normalize_ok(serde_json::json!({"banners": []}))
++                .banners
++                .is_empty()
++        );
++        assert!(normalize_ok(serde_json::json!({})).banners.is_empty());
++        assert!(normalize_ok(serde_json::json!(null)).banners.is_empty());
++        assert!(normalize_ok(serde_json::json!("")).banners.is_empty());
++    }
++
++    #[test]
++    fn duration_resolves_against_the_display_start() {
++        // Anchored to starts_at when present...
++        let cfg = normalize_ok(serde_json::json!({"banners": [{
++            "message": "Maintenance",
++            "starts_at": "2026-08-12T02:00:00Z",
++            "duration": "2h",
++        }]}));
++        let start = cfg.banners[0].starts_at.unwrap();
++        assert_eq!(cfg.banners[0].ends_at, Some(start + 2 * HOUR));
++
++        // ...and to "now" when it is not.
++        let cfg = normalize_ok(serde_json::json!({"banners": [{
++            "message": "Back in an hour",
++            "duration": "1h",
++        }]}));
++        assert_eq!(cfg.banners[0].ends_at, Some(NOW + HOUR));
++    }
++
++    #[test]
++    fn naive_timestamps_are_rejected() {
++        let err = normalize(
++            &serde_json::json!({"banners": [{
++                "message": "Maintenance",
++                "starts_at": "2026-08-12T02:00:00",
++            }]}),
++            NOW,
++        )
++        .unwrap_err()
++        .to_string();
++
++        assert!(err.contains("banners[0].starts_at"), "{err}");
++        assert!(err.contains("UTC offset"), "{err}");
++    }
++
++    #[test]
++    fn offsets_are_honored_not_dropped() {
++        let cfg = normalize_ok(serde_json::json!({"banners": [
++            {"message": "a", "starts_at": "2026-08-12T07:30:00+05:30"},
++            {"message": "b", "starts_at": "2026-08-12T02:00:00Z"},
++        ]}));
++        assert_eq!(cfg.banners[0].starts_at, cfg.banners[1].starts_at);
++    }
++
++    #[test]
++    fn ends_at_and_duration_are_mutually_exclusive() {
++        let err = normalize(
++            &serde_json::json!({"banners": [{
++                "message": "Maintenance",
++                "ends_at": "2026-08-12T04:00:00Z",
++                "duration": "1h",
++            }]}),
++            NOW,
++        )
++        .unwrap_err()
++        .to_string();
++        assert!(err.contains("not both"), "{err}");
++    }
++
++    #[test]
++    fn backwards_window_is_rejected() {
++        let err = normalize(
++            &serde_json::json!({"banners": [{
++                "message": "Maintenance",
++                "starts_at": "2026-08-12T04:00:00Z",
++                "ends_at": "2026-08-12T02:00:00Z",
++            }]}),
++            NOW,
++        )
++        .unwrap_err()
++        .to_string();
++        assert!(err.contains("ends before it starts"), "{err}");
++    }
++
++    #[test]
++    fn non_http_cta_urls_are_rejected() {
++        let err = normalize(
++            &serde_json::json!({"banners": [{
++                "message": "Click",
++                "cta": {"text": "Go", "url": "javascript:alert(1)"},
++            }]}),
++            NOW,
++        )
++        .unwrap_err()
++        .to_string();
++        assert!(err.contains("http://"), "{err}");
++    }
++
++    #[test]
++    fn unknown_keys_are_ignored_for_forward_compatibility() {
++        let cfg = normalize_ok(serde_json::json!({"banners": [{
++            "message": "Hello",
++            "some_future_field": {"nested": true},
++        }]}));
++        assert_eq!(cfg.banners.len(), 1);
++    }
++
++    #[test]
++    fn derived_id_tracks_content() {
++        let first = normalize_ok(serde_json::json!({"banners": [{"message": "v1"}]}));
++        let same = normalize_ok(serde_json::json!({"banners": [{"message": "v1"}]}));
++        let edited = normalize_ok(serde_json::json!({"banners": [{"message": "v2"}]}));
++
++        assert_eq!(first.banners[0].id, same.banners[0].id);
++        assert_ne!(first.banners[0].id, edited.banners[0].id);
++    }
++
++    #[test]
++    fn explicit_id_survives_an_edit() {
++        let before = normalize_ok(serde_json::json!({
++            "banners": [{"id": "maint", "message": "starting soon"}]
++        }));
++        let after = normalize_ok(serde_json::json!({
++            "banners": [{"id": "maint", "message": "still running"}]
++        }));
++        assert_eq!(before.banners[0].id, after.banners[0].id);
++    }
++
++    #[test]
++    fn window_bounds_are_half_open() {
++        let banner = banner_with_window(Some(NOW), Some(NOW + HOUR));
++
++        assert!(!banner.is_active_at(NOW - 1));
++        assert!(banner.is_active_at(NOW), "the start instant is inclusive");
++        assert!(banner.is_active_at(NOW + HOUR - 1));
++        assert!(
++            !banner.is_active_at(NOW + HOUR),
++            "the end instant is exclusive"
++        );
++    }
++
++    #[test]
++    fn next_boundary_is_the_nearest_future_edge() {
++        let banner = banner_with_window(Some(NOW + HOUR), Some(NOW + 2 * HOUR));
++
++        assert_eq!(banner.next_boundary_after(NOW), Some(NOW + HOUR));
++        assert_eq!(banner.next_boundary_after(NOW + HOUR), Some(NOW + 2 * HOUR));
++        assert_eq!(banner.next_boundary_after(NOW + 2 * HOUR), None);
++    }
++
++    #[test]
++    fn allowlist_scopes_banners_to_named_orgs() {
++        let cfg = normalize_ok(serde_json::json!({"banners": [
++            {"message": "everyone"},
++            {"message": "acme only", "orgs": ["acme"]},
++            {"message": "empty list means everyone", "orgs": []},
++        ]}));
++
++        assert_eq!(resolve_for_org(&cfg, "acme", NOW).len(), 3);
++
++        let other: Vec<_> = resolve_for_org(&cfg, "other", NOW)
++            .into_iter()
++            .map(|b| b.message)
++            .collect();
++        assert_eq!(other, vec!["everyone", "empty list means everyone"]);
++    }
++
++    #[test]
++    fn resolution_strips_the_allowlist_from_what_a_tenant_receives() {
++        let cfg = normalize_ok(serde_json::json!({"banners": [
++            {"message": "shared notice", "orgs": ["acme", "globex", "initech"]},
++        ]}));
++
++        let resolved = resolve_for_org(&cfg, "acme", NOW);
++        assert_eq!(resolved.len(), 1);
++        assert!(
++            resolved[0].orgs.is_none(),
++            "acme must not learn that globex and initech were targeted too"
++        );
++
++        // Belt and braces: the wire form must not carry the key either.
++        let wire = serde_json::to_value(&resolved[0]).unwrap();
++        assert!(wire.get("orgs").is_none(), "{wire}");
++
++        // The stored config keeps it, or the allowlist would not survive a write.
++        assert_eq!(
++            cfg.banners[0].orgs.as_deref(),
++            Some(&["acme".to_string(), "globex".into(), "initech".into()][..])
++        );
++    }
++
++    #[test]
++    fn resolution_drops_inactive_and_sorts_by_severity() {
++        let cfg = normalize_ok(serde_json::json!({"banners": [
++            {"message": "promo", "variant": "promo"},
++            {"message": "outage", "variant": "critical"},
++            {"message": "notice", "variant": "info"},
++            {"message": "expired", "variant": "critical", "ends_at": "2020-01-01T00:00:00Z"},
++            {"message": "future", "variant": "critical", "starts_at": "2099-01-01T00:00:00Z"},
++        ]}));
++
++        let visible: Vec<_> = resolve_for_org(&cfg, "acme", NOW)
++            .into_iter()
++            .map(|b| b.message)
++            .collect();
++        assert_eq!(visible, vec!["outage", "notice", "promo"]);
++    }
++
++    #[test]
++    fn next_boundary_covers_banners_not_yet_visible() {
++        let cfg = AnnouncementBanners {
++            banners: vec![
++                banner_with_window(None, None),
++                banner_with_window(Some(NOW + 2 * HOUR), None),
++                banner_with_window(Some(NOW + HOUR), Some(NOW + 3 * HOUR)),
++            ],
++        };
++
++        // The soonest edge wins even though that banner is not on screen yet.
++        assert_eq!(next_boundary_for_org(&cfg, "acme", NOW), Some(NOW + HOUR));
++    }
++
++    #[test]
++    fn next_boundary_ignores_other_orgs() {
++        let mut theirs = banner_with_window(Some(NOW + HOUR), None);
++        theirs.orgs = Some(vec!["other".into()]);
++        let mut mine = banner_with_window(Some(NOW + 2 * HOUR), None);
++        mine.orgs = Some(vec!["acme".into()]);
++
++        let cfg = AnnouncementBanners {
++            banners: vec![theirs, mine],
++        };
++        assert_eq!(
++            next_boundary_for_org(&cfg, "acme", NOW),
++            Some(NOW + 2 * HOUR)
++        );
++    }
++}
+diff --git a/o2_enterprise/src/enterprise/mod.rs b/o2_enterprise/src/enterprise/mod.rs
+index c38f70282..757f63dc6 100644
+--- a/o2_enterprise/src/enterprise/mod.rs
++++ b/o2_enterprise/src/enterprise/mod.rs
+@@ -17,6 +17,7 @@ pub mod actions;
+ pub mod agent_signals;
+ pub mod ai;
+ pub mod alerts;
++pub mod announcements;
+ pub mod anomaly_detection;
+ pub mod assume_service_account;
+ pub mod auth;
+diff --git a/o2_openfga/src/meta/route_permissions.rs b/o2_openfga/src/meta/route_permissions.rs
+index ea29859d6..e83f921a1 100644
+--- a/o2_openfga/src/meta/route_permissions.rs
++++ b/o2_openfga/src/meta/route_permissions.rs
+@@ -507,6 +507,49 @@ static ROUTE_PERMISSIONS: LazyLock<Vec<RoutePermission>> = LazyLock::new(|| {
+             use_self_parent: false,
+             bypass: true,
+         },
++        // ── Announcement banners ───────────────────────────────────────
++        // /{org}/announcements/config (GET, PUT) — authoring the banners is a
++        // settings-level action. The handler additionally restricts it to _meta.
++        // Must precede the read entry below so it is not swallowed by it.
++        RoutePermission {
++            path: &["{org}", "announcements", "config"],
++            methods: &[
++                MethodMapping {
++                    http_method: "GET",
++                    ofga_permission: None,
++                },
++                MethodMapping {
++                    http_method: "PUT",
++                    ofga_permission: None,
++                },
++            ],
++            resource: "settings",
++            entity: EntitySource::Org,
++            check_kind: CheckKind::Standard,
++            parent_from_folder: false,
++            resolve_stream_type: false,
++            use_self_context: false,
++            use_self_parent: false,
++            bypass: false,
++        },
++        // /{org}/announcements (GET) — bypass: a banner has to render for every
++        // member of the org, not just those holding a settings grant. The handler
++        // returns only banners targeting this org, so nothing cross-tenant leaks.
++        RoutePermission {
++            path: &["{org}", "announcements"],
++            methods: &[MethodMapping {
++                http_method: "GET",
++                ofga_permission: None,
++            }],
++            resource: "",
++            entity: EntitySource::Org,
++            check_kind: CheckKind::Standard,
++            parent_from_folder: false,
++            resolve_stream_type: false,
++            use_self_context: false,
++            use_self_parent: false,
++            bypass: true,
++        },
+         // ── Settings ───────────────────────────────────────────────────
+         // /{org}/settings and all sub-paths (v1, v2, logo, text, etc.)
+         RoutePermission {
+@@ -7633,6 +7676,54 @@ mod tests {
+         assert_eq!(result.o2_type, "synthetics:check-1");
+     }
+ 
++    #[test]
++    fn test_announcements_read_bypasses() {
++        // Every member of the org must see the banner, whatever their role, so the
++        // read is not gated on a settings grant.
++        let result =
++            resolve_permission(&["myorg", "announcements"], "GET", "myorg", "", None).unwrap();
++
++        assert!(result.bypass_check);
++    }
++
++    #[test]
++    fn test_announcements_config_requires_settings_permission() {
++        for (http_method, expected) in [("GET", "GET"), ("PUT", "PUT")] {
++            let result = resolve_permission(
++                &["_meta", "announcements", "config"],
++                http_method,
++                "_meta",
++                "",
++                None,
++            )
++            .unwrap();
++
++            assert_eq!(result.method, expected);
++            assert_eq!(result.o2_type, "settings:_meta");
++            assert!(
++                !result.bypass_check,
++                "authoring banners must stay behind a settings grant"
++            );
++        }
++    }
++
++    #[test]
++    fn test_announcements_config_is_not_shadowed_by_the_read_route() {
++        // The read entry is a prefix of the config path; if it were matched first,
++        // authoring would silently become unauthenticated.
++        let result = resolve_permission(
++            &["myorg", "announcements", "config"],
++            "PUT",
++            "myorg",
++            "",
++            None,
++        )
++        .unwrap();
++
++        assert!(!result.bypass_check);
++        assert_eq!(result.o2_type, "settings:myorg");
++    }
++
+     #[test]
+     fn test_settings_subpath() {
+         let result = resolve_permission(

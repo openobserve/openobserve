@@ -1,0 +1,9 @@
+[
+  { "title": "should author a banner in Settings and render it in the app header", "action": "new", "verifies": "Configure opens the editor drawer; an authored warning banner publishes and renders in the global header strip with the exact message" },
+  { "title": "should dismiss a banner and keep it hidden across a reload", "action": "new", "verifies": "the Dismiss control removes the bar and persists the dismissal in localStorage so it stays hidden after reload" },
+  { "title": "should render a CTA link with the authored text and URL", "action": "new", "verifies": "a banner with 'Add a link button' renders an anchor with the authored text and https href" },
+  { "title": "should order banners by severity and suppress promo while a critical banner is up", "action": "new", "verifies": "the shared resolver orders critical > warning > info > promo and hides promo when a critical banner is active, in both preview and live bar" },
+  { "title": "should block a banner with an empty message and recover without hanging", "action": "new", "verifies": "Apply with an empty message is rejected with the field-level error and the dialog recovers once fixed" },
+  { "title": "should edit an existing banner and remove it (list round-trip)", "action": "new", "verifies": "editing updates a card in place, removing drops it, and publish persists only the edited banner" },
+  { "title": "should render no dismiss control for a non-dismissible banner", "action": "new", "verifies": "a banner authored with the dismissible switch off renders no Dismiss button" }
+]
