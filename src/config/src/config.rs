@@ -992,6 +992,22 @@ pub struct DatabaseMonitoring {
         help = "Canonicalize OSS-ingested (raw) deadlock rows at READ time so they appear on the Deadlocks page; on by default — a performance kill-switch for deployments with a long OSS-only history, not an opt-in"
     )]
     pub deadlock_read_fallback: bool,
+
+    /// The same read-time fallback for the Blocked Queries page (A1 phase 2a).
+    ///
+    /// Separate from `deadlock_read_fallback` rather than one shared switch: the
+    /// two pages have different scan profiles, and the escape hatch exists to
+    /// take back the cost of ONE widened read on a deployment where it hurts. A
+    /// single knob would force an operator throttling blocking to give up
+    /// deadlocks too.
+    ///
+    /// Defaults ON, for the reasons its deadlock twin documents above.
+    #[env_config(
+        name = "ZO_DB_MONITORING_BLOCKING_READ_FALLBACK",
+        default = true,
+        help = "Canonicalize OSS-ingested (raw) blocking-chain rows at READ time so they appear on the Blocked Queries page; on by default — a performance kill-switch, not an opt-in"
+    )]
+    pub blocking_read_fallback: bool,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -5603,6 +5619,12 @@ mod tests {
             cfg.db_monitoring.deadlock_read_fallback,
             "ZO_DB_MONITORING_DEADLOCK_READ_FALLBACK must default ON: it is a \
              kill-switch for a fix, not an opt-in for a cost"
+        );
+        assert!(
+            cfg.db_monitoring.blocking_read_fallback,
+            "ZO_DB_MONITORING_BLOCKING_READ_FALLBACK must default ON, for the same \
+             reason: an empty Blocked Queries page over real contention is the bug, \
+             and a knob defaulting off leaves it unfixed"
         );
     }
 

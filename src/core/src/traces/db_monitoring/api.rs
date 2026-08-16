@@ -3208,6 +3208,34 @@ fn raw_deadlock_columns_in(
     queryable_columns(&server_vantage::RAW_DEADLOCK_FIELDS, schema, uds_fields)
 }
 
+/// The raw BLOCKING columns this stream can be queried for.
+///
+/// Same gate, same reasoning, different vocabulary — see
+/// [`raw_deadlock_columns_in`]. Kept as its own function rather than a parameter
+/// on one shared helper because the two vocabularies are consumed by different
+/// callers and a shared entry point invites passing the wrong one.
+#[cfg(feature = "enterprise")]
+fn raw_blocking_columns_in(
+    schema: &arrow_schema::Schema,
+    uds_fields: &[String],
+) -> HashSet<String> {
+    queryable_columns(&server_vantage::RAW_BLOCKING_FIELDS, schema, uds_fields)
+}
+
+/// Read the raw BLOCKING column gate for one stream.
+///
+/// Mirror of [`present_raw_deadlock_columns`], including its `Err` discipline.
+#[cfg(feature = "enterprise")]
+async fn present_raw_blocking_columns(
+    org_id: &str,
+    stream_name: &str,
+) -> Result<HashSet<String>, anyhow::Error> {
+    let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await?;
+    let settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs).await;
+    let uds = infra::schema::get_stream_setting_defined_schema_fields(&settings);
+    Ok(raw_blocking_columns_in(&schema, &uds))
+}
+
 /// Read the raw-column gate for one stream.
 ///
 /// Propagates `Err` rather than `unwrap_or_default()`, for the reason
@@ -3548,6 +3576,41 @@ impl RawDeadlockFallback {
     }
 }
 
+/// The A1 phase-2a read-time fallback for BLOCKING, carrying its schema-gated
+/// raw column set.
+///
+/// A distinct type from [`RawDeadlockFallback`] rather than one generic carrier:
+/// the two vocabularies are different arrays and the marker shapes differ (four
+/// columns vs one column with four values), so a single type would have to be
+/// told which it was holding — and the compiler can enforce that for free by
+/// making them different types. It is what stops the activity caller, which
+/// shares the builder, from being handed either one.
+///
+/// NOT `#[cfg]`-gated, for the same reason as its deadlock twin: activity is an
+/// OSS-owned ungated page calling the same builder, so the parameter's type must
+/// exist in both builds. Inert on OSS — nothing there constructs one.
+pub(crate) struct RawBlockingFallback {
+    /// Raw columns this stream can actually be queried for.
+    pub present: HashSet<String>,
+}
+
+impl RawBlockingFallback {
+    /// The marker terms for the `WHERE`, gated on the marker COLUMN's presence.
+    ///
+    /// All four blocking recipes share the single `o2_recipe` column, so unlike
+    /// the deadlock markers this is all-or-nothing: either the stream has
+    /// `o2_recipe` and all four terms are emitted, or it has none and the
+    /// widening cannot fire at all. Naming the column when it is absent is the
+    /// same whole-page 400 the projection gate exists to prevent.
+    fn marker_terms(&self) -> Vec<String> {
+        server_vantage::BLOCKING_MARKERS
+            .into_iter()
+            .filter(|(col, _)| self.present.contains(*col))
+            .map(|(col, val)| format!("{col} = '{val}'"))
+            .collect()
+    }
+}
+
 // ─── A1.1 · the canonicalization boundary ────────────────────────────────────
 //
 // A1 shipped ALWAYS-ON: every deadlocks read widened its SQL with the raw
@@ -3774,6 +3837,79 @@ async fn deadlock_window_needs_fallback(
     needed
 }
 
+/// SQL for ANY raw-marker BLOCKING row inside the window.
+///
+/// Mirror of [`build_raw_deadlock_presence_sql`] over the blocking markers.
+/// `None` when the stream has no `o2_recipe` column: no raw blocking row can
+/// exist, so the caller reads that as "no raw rows" without running a query.
+#[cfg(feature = "enterprise")]
+pub(crate) fn build_raw_blocking_presence_sql(
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+    raw: &RawBlockingFallback,
+) -> Option<String> {
+    let markers = raw.marker_terms();
+    if markers.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "SELECT _timestamp FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND ({})\nLIMIT 1",
+        escape_ident(stream_name),
+        markers.join(" OR "),
+    ))
+}
+
+/// Does this window need the raw BLOCKING widening?
+///
+/// **This reuses the `has_raw_row` probe, deliberately, and does NOT
+/// reintroduce a canonicalization-boundary check.** §11.0 of the design records
+/// that the boundary timestamp was falsified during phase 1: it is entirely
+/// SUBSUMED by raw-row presence, and consulting it reintroduces A1 under
+/// enterprise→OSS→enterprise interleaving, where raw rows appear AFTER canonical
+/// ones and a boundary-only verdict says "go fast" and drops them.
+///
+/// So the question is the same one phase 1 settled on — "does this window
+/// contain anything the canonical fast path would miss" — and the answer is
+/// exactly raw-row presence. That makes the widening self-limiting: once no raw
+/// blocking row remains in retention, no window contains one and the widening
+/// stops firing, with no operator action and no date to set.
+///
+/// Errors degrade to the SAFE direction (widen), matching the house rule that
+/// ambiguous cases resolve toward SHOWING data.
+#[cfg(feature = "enterprise")]
+async fn blocking_window_needs_fallback(
+    org_id: &str,
+    stream: &str,
+    start_time: i64,
+    end_time: i64,
+    raw: &RawBlockingFallback,
+) -> bool {
+    let Some(raw_sql) = build_raw_blocking_presence_sql(stream, start_time, end_time, raw) else {
+        // No marker column on this stream, so no raw row can exist.
+        return false;
+    };
+    match run_events_search(org_id, stream, raw_sql, start_time, end_time).await {
+        Ok(rows) => {
+            let needed = !rows.is_empty();
+            if needed {
+                log::debug!(
+                    "[DbMonitoring] blocking widening for {org_id}/{stream}: a raw \
+                     blocking row is present in the window"
+                );
+            }
+            needed
+        }
+        Err(e) => {
+            log::warn!(
+                "[DbMonitoring] blocking raw-presence probe failed for {org_id}/{stream}, \
+                 widening the read: {e:?}"
+            );
+            true
+        }
+    }
+}
+
 /// Everything the builder may project, gated on what the stream actually has.
 ///
 /// The two halves travel together because they are answers to the same
@@ -3783,13 +3919,68 @@ async fn deadlock_window_needs_fallback(
 pub(crate) struct DbmProjection<'a> {
     /// Canonical `o2_dbm_*` columns present on the stream.
     pub present: &'a HashSet<String>,
-    /// The A1 deadlock read-time fallback. `Some` for the DEADLOCKS caller only
-    /// — blocking and activity pass `None` and get byte-identical SQL to what
-    /// they emitted before A1. Widening the shared builder for everyone would
-    /// push raw deadlock columns into their projections: cost with no reader,
-    /// and for blocking a real risk, since its degraded projection already drops
-    /// every row.
-    pub raw: Option<&'a RawDeadlockFallback>,
+    /// The A1 read-time fallback for this caller's KIND, or `None` for the
+    /// canonical fast path.
+    ///
+    /// `Some` for the DEADLOCKS (phase 1) and BLOCKING (phase 2a) callers.
+    /// ACTIVITY passes `None` and gets byte-identical SQL to what it emitted
+    /// before A1: it is an OSS-owned ungated page, so a raw projection there is
+    /// cost with no reader on every build.
+    ///
+    /// The two vocabularies are carried by DIFFERENT TYPES rather than one
+    /// generic set, so a caller cannot be handed the wrong one — see
+    /// [`RawProjection`].
+    pub raw: Option<RawProjection<'a>>,
+}
+
+/// Which raw vocabulary a widened read is using.
+///
+/// The projection and the marker predicate are both derived from this, and both
+/// must come from the SAME vocabulary: projecting the deadlock columns while
+/// matching the blocking markers would fetch bytes nobody reads and return rows
+/// the caller's canonicalizer refuses. Making it one enum means the builder
+/// cannot mix them, and adding a third capability is a new variant the compiler
+/// demands be handled everywhere.
+///
+/// The variants are `dead_code`-exempt because on an OSS build NOTHING
+/// constructs them — only the enterprise deadlocks and blocking bodies do — yet
+/// the type itself must exist in both builds, because activity is an OSS-owned
+/// ungated page that calls the same builder and so names this type in its
+/// signature. That is the same "inert on OSS" property `RawDeadlockFallback`
+/// documents; it only needs an attribute here because an unconstructed VARIANT
+/// is dead code where an unconstructed struct's read field is not.
+#[derive(Clone, Copy)]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+pub(crate) enum RawProjection<'a> {
+    Deadlock(&'a RawDeadlockFallback),
+    Blocking(&'a RawBlockingFallback),
+}
+
+impl RawProjection<'_> {
+    /// The candidate vocabulary for this variant — the array the projection is
+    /// intersected against.
+    fn fields(&self) -> &'static [&'static str] {
+        match self {
+            RawProjection::Deadlock(_) => &server_vantage::RAW_DEADLOCK_FIELDS,
+            RawProjection::Blocking(_) => &server_vantage::RAW_BLOCKING_FIELDS,
+        }
+    }
+
+    /// Whether this stream can be queried for a given raw column.
+    fn has(&self, field: &str) -> bool {
+        match self {
+            RawProjection::Deadlock(r) => r.present.contains(field),
+            RawProjection::Blocking(r) => r.present.contains(field),
+        }
+    }
+
+    /// The marker terms for the widened `WHERE`, already schema-gated.
+    fn marker_terms(&self) -> Vec<String> {
+        match self {
+            RawProjection::Deadlock(r) => r.marker_terms(),
+            RawProjection::Blocking(r) => r.marker_terms(),
+        }
+    }
 }
 
 /// Read canonical server-vantage events of one kind from a LOGS stream.
@@ -3838,9 +4029,8 @@ pub(crate) fn build_dbm_events_sql(
                 .filter(|f| present.contains(*f)),
         )
         .chain(
-            server_vantage::RAW_DEADLOCK_FIELDS
-                .into_iter()
-                .filter(|f| raw.is_some_and(|r| r.present.contains(*f))),
+            raw.into_iter()
+                .flat_map(|r| r.fields().iter().copied().filter(move |f| r.has(f))),
         )
         .collect::<Vec<_>>()
         .join(", ");
@@ -3854,9 +4044,7 @@ pub(crate) fn build_dbm_events_sql(
     // back to the bare canonical predicate rather than emitting `OR ()`.
     let kind_pred = {
         let canonical = format!("{} = '{}'", server_vantage::O2_DBM_KIND, escape_sq(kind),);
-        let markers = raw
-            .map(RawDeadlockFallback::marker_terms)
-            .unwrap_or_default();
+        let markers = raw.map(|r| r.marker_terms()).unwrap_or_default();
         if markers.is_empty() {
             canonical
         } else {
@@ -3995,6 +4183,69 @@ fn deadlock_event_for_row(row: &Value) -> Option<server_vantage::DeadlockEvent> 
     // path uses, so a row read back reads exactly as it would have been written.
     let rec = row.as_object()?;
     o2_enterprise::enterprise::db_monitoring::deadlock::canonicalize_deadlock_event(rec)
+}
+
+/// Turn ONE stored row into a [`server_vantage::BlockingSample`], whichever
+/// shape it is in — the phase-2a row-level branch.
+///
+/// Same per-ROW discriminator and same dedup argument as
+/// [`deadlock_event_for_row`]: a row either has `o2_dbm_kind = 'blocking'` or it
+/// does not, and this branches on exactly that, consuming each row once.
+///
+/// A raw row the canonicalizer refuses yields `None` and is DROPPED.
+/// `canonicalize_blocking` requires BOTH pids, so a row whose blocking side
+/// never resolved is not a blocking relationship and must not reach the page as
+/// a half-empty chain.
+///
+/// Unlike deadlocks, this needs NO new enterprise entry point:
+/// `canonicalize_blocking` is already engine-agnostic (it resolves each field
+/// through an alias list rather than dispatching per engine), already returns
+/// `Option<BlockingSample>`, and is already re-exported to OSS.
+#[cfg(feature = "enterprise")]
+fn blocking_sample_for_row(row: &Value) -> Option<server_vantage::BlockingSample> {
+    if get_str(row, server_vantage::O2_DBM_KIND) == server_vantage::KIND_BLOCKING {
+        return server_vantage::BlockingSample::from_record(row);
+    }
+    let rec = row.as_object()?;
+    server_vantage::canonicalize_blocking(rec)
+}
+
+/// Scope narrowing for BLOCKING, applied in Rust for the same reason as
+/// [`ScopeNarrowing`] — raw rows carry no `o2_dbm_*` scope column, so pushing
+/// `?system=` to SQL drops every one of them.
+///
+/// A separate type from `ScopeNarrowing` because it matches a different event
+/// type; the rule it implements is identical, including "an UNKNOWN field does
+/// not match" and "an EMPTY STRING is not a filter".
+#[cfg(feature = "enterprise")]
+struct BlockingScopeNarrowing {
+    system: Option<String>,
+    instance: Option<String>,
+    database: Option<String>,
+}
+
+#[cfg(feature = "enterprise")]
+impl BlockingScopeNarrowing {
+    fn new(q: &BlockingQuery) -> Self {
+        BlockingScopeNarrowing {
+            system: q.system.clone(),
+            instance: q.instance.clone(),
+            database: q.database().map(str::to_string),
+        }
+    }
+
+    fn matches(&self, s: &server_vantage::BlockingSample) -> bool {
+        let ok = |want: &Option<String>, got: &Option<String>| match want
+            .as_deref()
+            .filter(|s| !s.is_empty())
+        {
+            None => true,
+            Some(w) => got.as_deref() == Some(w),
+        };
+        ok(&self.system, &s.engine)
+            && ok(&self.instance, &s.instance)
+            && ok(&self.database, &s.database)
+    }
 }
 
 /// Scope filters (`?system=` / `?instance=` / `?database=`) applied in RUST
@@ -4900,7 +5151,7 @@ async fn read_deadlocks_body(
         limit,
         &DbmProjection {
             present: &present,
-            raw: raw_fallback.as_ref(),
+            raw: raw_fallback.as_ref().map(RawProjection::Deadlock),
         },
     );
     let rows = match run_events_search(org_id, stream, sql, start_time, end_time).await {
@@ -5210,21 +5461,61 @@ async fn read_blocking_body(
             }
         },
     };
+    // A1 phase 2a · the same read-time fallback deadlocks got in phase 1.
+    //
+    // An OSS build stores a blocking-chain row verbatim and canonicalizes
+    // nothing, so an enterprise build reading that history finds no
+    // `o2_dbm_kind = 'blocking'` row and renders an empty page over real lock
+    // contention — with `not_collecting: true`, a healthy collector reported as
+    // broken.
+    //
+    // A failed raw-schema read degrades to `None` rather than failing the
+    // request, the same asymmetry with `present` above that deadlocks documents:
+    // `present` failing means the canonical path emits content-free rows, which
+    // is a false verdict and must be a 500; the raw gate failing means only that
+    // the fallback cannot run, and the canonical path is still correct.
+    //
+    // TRANSITIONAL, via the same raw-presence probe. The kill-switch is read
+    // FIRST so turning it off costs zero searches.
+    let raw_fallback = if config::get_config().db_monitoring.blocking_read_fallback {
+        match present_raw_blocking_columns(org_id, stream).await {
+            Ok(present) => {
+                let candidate = RawBlockingFallback { present };
+                if blocking_window_needs_fallback(org_id, stream, start_time, end_time, &candidate)
+                    .await
+                {
+                    Some(candidate)
+                } else {
+                    None
+                }
+            }
+            Err(e) => {
+                log::warn!(
+                    "[DbMonitoring] blocking raw-column read failed for {org_id}/{stream}, \
+                     serving canonical rows only: {e}"
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // SCOPE FILTERS MUST NOT REACH THE RAW ROWS' SQL — see the deadlocks handler.
+    // `dbm_event_preds` names canonical columns a raw row does not have, so
+    // appending them to the widened WHERE silently drops EVERY raw row.
+    let scope = BlockingScopeNarrowing::new(q);
+    let sql_preds = if raw_fallback.is_some() { "" } else { &preds };
     let sql = build_dbm_events_sql(
         stream,
         server_vantage::KIND_BLOCKING,
         start_time,
         end_time,
-        &preds,
+        sql_preds,
         limit,
         &DbmProjection {
             present: &present,
-            // Phase 1 is DEADLOCKS ONLY. Blocking needs its own raw-field
-            // mapping via `canonicalize_blocking`, which is engine-agnostic over
-            // recipe-aliased columns — a different detection shape from the
-            // three deadlock markers. Activity is an OSS-owned ungated page and
-            // is not in A1's scope at all.
-            raw: None,
+            raw: raw_fallback.as_ref().map(RawProjection::Blocking),
         },
     );
     let rows = match run_events_search(org_id, stream, sql, start_time, end_time).await {
@@ -5242,7 +5533,13 @@ async fn read_blocking_body(
     let needle = q.search.as_deref().unwrap_or("").trim().to_lowercase();
     let samples: Vec<server_vantage::BlockingSample> = rows
         .iter()
-        .filter_map(server_vantage::BlockingSample::from_record)
+        // Per-ROW branch: canonical rows keep the canonical reader, raw rows go
+        // to the enterprise canonicalizer, and a raw row it refuses (one with
+        // only one end of the edge) is dropped rather than emitted blank.
+        .filter_map(blocking_sample_for_row)
+        // Scope narrowing in Rust when the fallback moved it off the SQL. A
+        // no-op when inactive, because then the SQL predicates already applied.
+        .filter(|s| raw_fallback.is_none() || scope.matches(s))
         .filter(|s| s.wait_seconds.unwrap_or(0.0) >= min_wait)
         .filter(|s| blocking_matches_search(s, &needle))
         .collect();
@@ -8372,12 +8669,27 @@ mod tests {
         }
     }
 
-    /// Bundle the two projection halves the builder takes.
+    /// Bundle the two projection halves the builder takes, for a DEADLOCKS read.
     fn proj<'a>(
         present: &'a HashSet<String>,
         raw: Option<&'a RawDeadlockFallback>,
     ) -> DbmProjection<'a> {
-        DbmProjection { present, raw }
+        DbmProjection {
+            present,
+            raw: raw.map(RawProjection::Deadlock),
+        }
+    }
+
+    /// ...and for a BLOCKING read.
+    #[cfg(feature = "enterprise")]
+    fn proj_blocking<'a>(
+        present: &'a HashSet<String>,
+        raw: Option<&'a RawBlockingFallback>,
+    ) -> DbmProjection<'a> {
+        DbmProjection {
+            present,
+            raw: raw.map(RawProjection::Blocking),
+        }
     }
 
     /// A stream schema with exactly these fields, for the presence gates.
@@ -10967,12 +11279,16 @@ mod tests {
         );
     }
 
-    /// The OTHER two callers must be untouched in phase 1.
+    /// ACTIVITY must stay untouched — and exactly TWO callers may widen.
     ///
-    /// `build_dbm_events_sql` is shared with blocking (`read_blocking_body`) and
-    /// activity, and widening it for everyone would push raw deadlock columns
-    /// into their projections — cost with no reader, and for blocking a real
-    /// risk, since its degraded projection already drops rows.
+    /// This began as phase 1's tripwire asserting exactly ONE widened call site.
+    /// Phase 2a makes it two: `build_dbm_events_sql` is shared by deadlocks,
+    /// blocking and activity, and blocking now carries its own raw fallback. The
+    /// assertion is UPDATED rather than deleted, because what it guards is
+    /// unchanged — a caller acquiring a raw projection it has no reader for.
+    ///
+    /// Activity is the one that must never widen: it is an OSS-owned, ungated
+    /// page, so a raw projection there is cost with no reader on every build.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_the_fallback_does_not_reach_the_blocking_or_activity_callers() {
@@ -11001,30 +11317,407 @@ mod tests {
             sites.len()
         );
 
-        // Exactly ONE may be widened, and it must be the deadlocks one.
+        // Exactly TWO may be widened — deadlocks (phase 1) and blocking (2a).
         let widened: Vec<&&str> = sites.iter().filter(|s| !s.contains("raw: None")).collect();
         assert_eq!(
             widened.len(),
-            1,
-            "exactly ONE caller — deadlocks — may pass the raw opts in phase 1; \
-             blocking and activity must keep passing `raw: None`. Widened: {widened:?}"
+            2,
+            "exactly TWO callers — deadlocks and blocking — may pass the raw opts; \
+             activity must keep passing `raw: None`. Widened: {widened:?}"
         );
-        assert!(
-            widened[0].contains("KIND_DEADLOCK"),
-            "the widened caller must be deadlocks, not {}",
-            widened[0]
-        );
-        for kind in ["KIND_BLOCKING", "KIND_ACTIVITY"] {
-            let site = sites
-                .iter()
-                .find(|s| s.contains(kind))
-                .unwrap_or_else(|| panic!("no {kind} call site"));
+        for kind in ["KIND_DEADLOCK", "KIND_BLOCKING"] {
             assert!(
-                site.contains("raw: None"),
-                "the {kind} caller must pass `raw: None`, or A1 pushes raw deadlock \
-                 columns into a projection with no reader:\n{site}"
+                widened.iter().any(|s| s.contains(kind)),
+                "the {kind} caller must be one of the widened two, found {widened:?}"
             );
         }
+
+        // Activity is the one that must NEVER widen.
+        let activity = sites
+            .iter()
+            .find(|s| s.contains("KIND_ACTIVITY"))
+            .expect("no KIND_ACTIVITY call site");
+        assert!(
+            activity.contains("raw: None"),
+            "the activity caller must pass `raw: None` — it is an OSS-owned ungated \
+             page, so a raw projection there is cost with no reader on every \
+             build:\n{activity}"
+        );
+    }
+
+    // ── A1 phase 2a · the BLOCKING arm ──────────────────────────────────────
+
+    /// The raw-fallback opts for a blocking stream. Mirror of [`raw_cols`].
+    #[cfg(feature = "enterprise")]
+    fn raw_blocking_cols(present: &[&str]) -> RawBlockingFallback {
+        for f in present {
+            assert!(
+                server_vantage::RAW_BLOCKING_FIELDS.contains(f),
+                "{f} is not a RAW_BLOCKING_FIELDS member — the fixture is testing a \
+                 column the gate could never return"
+            );
+        }
+        RawBlockingFallback {
+            present: present.iter().map(|f| f.to_string()).collect(),
+        }
+    }
+
+    /// **The §1.3 regression test, for blocking.** The single most important
+    /// test in this phase: naming a column absent from the stream schema fails
+    /// the WHOLE page with a 400, so the widened projection must be intersected
+    /// with what the stream actually has.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_blocking_projection_names_no_absent_raw_column() {
+        // A stream that only ever ran the PG blocking recipe: it has none of the
+        // InnoDB alias columns, and naming one takes the page down.
+        let schema = schema_of(&[
+            "_timestamp",
+            "o2_recipe",
+            "blocked_pid",
+            "blocking_pid",
+            "blocked_query",
+        ]);
+        let present = raw_blocking_columns_in(&schema, &[]);
+
+        for absent in [
+            "waiting_thread",
+            "blocking_thread",
+            "waiting_query",
+            "wait_secs",
+        ] {
+            assert!(
+                !present.contains(absent),
+                "{absent} is absent from this stream's schema; projecting it 400s the \
+                 whole Blocked Queries page"
+            );
+        }
+        assert!(
+            present.contains("blocked_pid") && present.contains("o2_recipe"),
+            "what IS present must survive the gate, or the fallback can never fire"
+        );
+    }
+
+    /// The presence gate must be UDS-aware — the quieter variant of the same
+    /// 400. A field can be in the stored schema and still be unqueryable.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_blocking_presence_gate_honours_a_user_defined_schema() {
+        let schema = schema_of(&["_timestamp", "o2_recipe", "blocked_pid", "blocking_pid"]);
+        let uds = vec!["_timestamp".to_string(), "o2_recipe".to_string()];
+        let present = raw_blocking_columns_in(&schema, &uds);
+
+        assert!(
+            !present.contains("blocked_pid"),
+            "blocked_pid is in the stored schema but truncated out of the UDS, so \
+             naming it 400s with 'exists in the stream but not in its User-Defined \
+             Schema'"
+        );
+        assert!(
+            present.contains("o2_recipe"),
+            "a kept field stays queryable"
+        );
+    }
+
+    /// The marker terms must be gated on presence too — the half of the hazard
+    /// that lives in the predicate rather than the projection.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_blocking_marker_terms_are_schema_gated() {
+        assert!(
+            raw_blocking_cols(&["blocked_pid"])
+                .marker_terms()
+                .is_empty(),
+            "without the o2_recipe column there is no marker term to emit; naming it \
+             anyway 400s the page"
+        );
+
+        let terms = raw_blocking_cols(&["o2_recipe"]).marker_terms();
+        assert_eq!(
+            terms.len(),
+            4,
+            "all four blocking recipes share the one marker column, so the presence \
+             of o2_recipe enables all four terms"
+        );
+        assert!(terms.iter().any(|t| t.contains("mysql_lock_waits")));
+        assert!(terms.iter().any(|t| t.contains("mssql_blocking_chain")));
+    }
+
+    /// The widened blocking SQL must return BOTH populations from one query.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_widened_blocking_sql_matches_both_shapes() {
+        let present = all_cols();
+        let raw = raw_blocking_cols(&["o2_recipe", "blocked_pid", "waiting_thread"]);
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            server_vantage::KIND_BLOCKING,
+            0,
+            10,
+            "",
+            100,
+            &proj_blocking(&present, Some(&raw)),
+        );
+
+        assert!(
+            sql.contains(&format!(
+                "{} = '{}'",
+                server_vantage::O2_DBM_KIND,
+                server_vantage::KIND_BLOCKING
+            )),
+            "the canonical predicate must survive — canonical rows are the majority \
+             on an upgraded deployment:\n{sql}"
+        );
+        assert!(
+            sql.contains("o2_recipe = 'mysql_lock_waits'"),
+            "the raw markers must be OR-ed in, or OSS-ingested rows stay invisible:\n{sql}"
+        );
+        assert!(
+            sql.contains("waiting_thread"),
+            "the raw columns must be projected, or the canonicalizer gets a row with \
+             no pids and drops it:\n{sql}"
+        );
+    }
+
+    /// With the fallback OFF, the blocking SQL must be byte-identical to pre-2a.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_blocking_fallback_off_emits_byte_identical_sql() {
+        let present = all_cols();
+        let off = build_dbm_events_sql(
+            "dbm_server",
+            server_vantage::KIND_BLOCKING,
+            0,
+            10,
+            " AND o2_dbm_engine = 'mysql'",
+            100,
+            &proj_blocking(&present, None),
+        );
+        assert!(
+            !off.contains("o2_recipe"),
+            "with no fallback the blocking read must emit exactly what it emitted \
+             before phase 2a — no marker terms, no raw columns:\n{off}"
+        );
+        assert!(
+            off.contains("AND o2_dbm_engine = 'mysql'"),
+            "and the scope predicates stay in SQL, where they narrow before the LIMIT"
+        );
+    }
+
+    /// A RAW blocking row must reach the enterprise canonicalizer.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_raw_blocking_row_is_canonicalized() {
+        // An InnoDB lock-wait row, exactly the shape `mysql_lock_waits` emits.
+        let sample = blocking_sample_for_row(&json!({
+            "_timestamp": 1_786_166_303_139_783i64,
+            "o2_recipe": "mysql_lock_waits",
+            "waiting_thread": "82",
+            "blocking_thread": "79",
+            "waiting_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 13",
+            "blocking_query": "UPDATE accounts SET balance = balance + 1 WHERE id = 13",
+            "wait_secs": "4",
+            "db_system_name": "mysql",
+        }))
+        .expect("a raw lock-wait row must yield a sample");
+
+        assert_eq!(
+            sample.blocked_pid,
+            Some(82),
+            "read via the waiting_thread alias"
+        );
+        assert_eq!(sample.blocking_pid, Some(79));
+        assert_eq!(sample.engine.as_deref(), Some("mysql"));
+        assert_eq!(
+            sample.wait_seconds,
+            Some(4.0),
+            "read via the wait_secs alias"
+        );
+    }
+
+    /// A CANONICAL blocking row must still use the canonical reader.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_canonical_blocking_row_still_uses_the_canonical_reader() {
+        let sample = blocking_sample_for_row(&json!({
+            "_timestamp": 1_786_166_303_139_783i64,
+            server_vantage::O2_DBM_KIND: "blocking",
+            server_vantage::O2_DBM_ENGINE: "postgresql",
+            server_vantage::O2_DBM_BLOCKED_PID: 41,
+            server_vantage::O2_DBM_BLOCKING_PID: 42,
+        }))
+        .expect("a canonical row yields a sample");
+        assert_eq!(sample.blocked_pid, Some(41));
+        assert_eq!(sample.engine.as_deref(), Some("postgresql"));
+    }
+
+    /// A raw row the canonicalizer refuses must be DROPPED, not emitted blank.
+    ///
+    /// `canonicalize_blocking` requires BOTH pids — a half-populated row is not
+    /// a blocking relationship. The InnoDB recipes `COALESCE(...,0)` the thread
+    /// ids, and a row whose blocking side never resolved is exactly that.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_raw_blocking_row_without_both_ends_is_dropped() {
+        assert!(
+            blocking_sample_for_row(&json!({
+                "_timestamp": 1i64,
+                "o2_recipe": "mysql_lock_waits",
+                "waiting_thread": "82",
+                "waiting_query": "SELECT 1",
+            }))
+            .is_none(),
+            "an edge needs both ends; emitting it blank would put a chain on the page \
+             with nothing at one end"
+        );
+    }
+
+    /// Scope narrowing must work on raw-derived BLOCKING samples.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_blocking_scope_narrowing_keeps_raw_samples_that_match() {
+        let sample = blocking_sample_for_row(&json!({
+            "_timestamp": 1i64,
+            "o2_recipe": "mysql_lock_waits",
+            "waiting_thread": "82", "blocking_thread": "79",
+            "server_address": "db-7.internal:3306",
+            "db_system_name": "mysql",
+        }))
+        .expect("sample");
+
+        assert!(
+            BlockingScopeNarrowing {
+                system: Some("mysql".into()),
+                instance: None,
+                database: None,
+            }
+            .matches(&sample),
+            "the engine was DERIVED by the canonicalizer, so ?system=mysql must still \
+             find this sample"
+        );
+        assert!(
+            !BlockingScopeNarrowing {
+                system: Some("postgresql".into()),
+                instance: None,
+                database: None,
+            }
+            .matches(&sample),
+            "...and a non-matching filter must exclude it, or the filter is decorative"
+        );
+    }
+
+    /// **The structural guard.** Phase 1's two mutation survivors were both
+    /// WIRING bugs — a handler bypassing the gate — that every behavioural test
+    /// passed, because the pure functions stayed perfect. This asserts the
+    /// binding itself, which is the only thing that catches that class.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_blocking_read_consults_the_probe_and_the_kill_switch() {
+        let src = include_str!("api.rs");
+        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+        let body = {
+            let start = code
+                .find("async fn read_blocking_body(")
+                .expect("read_blocking_body exists");
+            let rest = &code[start..];
+            &rest[..rest
+                .find("\nasync fn ")
+                .or_else(|| rest.find("\npub async fn "))
+                .unwrap_or(rest.len())]
+        };
+
+        assert!(
+            body.contains("blocking_window_needs_fallback"),
+            "the blocking read must consult the transitional probe; without it the \
+             widening is ALWAYS-ON and every steady-state read pays for it"
+        );
+        assert!(
+            body.contains("blocking_read_fallback"),
+            "the kill-switch must be consulted in the blocking read"
+        );
+        // The kill-switch must be tested BEFORE the probe, so `=false` costs zero
+        // searches. Phase 1 pins the same ordering for deadlocks.
+        let switch = body
+            .find("blocking_read_fallback")
+            .expect("kill-switch is read");
+        let probe = body
+            .find("blocking_window_needs_fallback")
+            .expect("probe is called");
+        assert!(
+            switch < probe,
+            "the kill-switch must short-circuit BEFORE the probe runs, or turning the \
+             feature off still costs two searches per read"
+        );
+        assert!(
+            body.contains("raw: raw_fallback.as_ref()") || body.contains("raw_fallback.as_ref()"),
+            "the resolved fallback must actually reach the projection — a hardcoded \
+             `Some(..)` here restores always-on and every behavioural test still passes"
+        );
+    }
+
+    /// A FAILED probe must degrade to widening, never to the fast path.
+    ///
+    /// **This test exists because a mutation survived without it.** Flipping the
+    /// probe's error arm from `true` to `false` — "we could not tell, so go
+    /// fast" — passed all 492 tests. It is a real defect: an unreadable window
+    /// is not an empty one, and resolving that ambiguity toward the fast path
+    /// renders an empty Blocked Queries page over real contention, which is
+    /// precisely the A1 bug this phase fixes, reintroduced through the error
+    /// path. The house rule (`plan_row_to_dto`) is that ambiguous cases resolve
+    /// toward SHOWING data.
+    ///
+    /// Structural rather than behavioural because the error arm needs a failing
+    /// search backend, which these tests have no meta store to provide — the
+    /// same reason `test_present_dbm_columns_reports_errors_instead_of_empty` is
+    /// `#[ignore]`d.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_failed_blocking_probe_widens_rather_than_hiding_rows() {
+        let src = include_str!("api.rs");
+        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+        let start = code
+            .find("async fn blocking_window_needs_fallback(")
+            .expect("the blocking probe exists");
+        let rest = &code[start..];
+        let body = &rest[..rest.find("\n/// ").unwrap_or(rest.len())];
+
+        let err_arm = body.find("Err(e) =>").expect("the probe has an error arm");
+        let after = &body[err_arm..];
+        assert!(
+            after.contains("true"),
+            "the blocking probe's error arm must return `true` (widen). Returning \
+             `false` treats an unreadable window as an empty one and hides real \
+             blocking rows — A1 reintroduced through the error path:\n{after}"
+        );
+        assert!(
+            !after.trim_end().ends_with("false"),
+            "the error arm must not fall through to the fast path"
+        );
+    }
+
+    /// Scope predicates must NOT reach the SQL when the blocking fallback is on.
+    ///
+    /// Raw rows have no `o2_dbm_*` scope column, so an appended predicate drops
+    /// every one of them. This asserts the CALL SITE, not the behaviour — the
+    /// equivalent deadlocks mutation survived every behavioural test.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_blocking_scope_predicates_leave_the_sql_when_widening() {
+        let src = include_str!("api.rs");
+        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+        let start = code
+            .find("async fn read_blocking_body(")
+            .expect("read_blocking_body exists");
+        let rest = &code[start..];
+        let body = &rest[..rest.find("\nasync fn ").unwrap_or(rest.len())];
+
+        assert!(
+            body.contains("if raw_fallback.is_some() { \"\" }")
+                || body.contains("raw_fallback.is_some()"),
+            "when the fallback is on the scope predicates must move OUT of the SQL; \
+             leaving them in silently drops every raw row, so the page looks correct \
+             with no filter and under-reports with one"
+        );
     }
 
     // ── A1 · the row-level branch and the Rust-side scope narrowing ─────────
