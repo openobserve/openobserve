@@ -574,6 +574,95 @@ pub const RAW_DEADLOCK_FIELDS: [&str; 65] = [
     "body",
 ];
 
+// ─── A1 phase 2a · raw blocking vocabulary (read-time fallback) ──────────────
+//
+// The same A1 defect, on the Blocked Queries page: an OSS build stores a
+// blocking-chain row verbatim and canonicalizes nothing, so an enterprise build
+// reading that history finds no `o2_dbm_kind = 'blocking'` row and renders an
+// empty page over real lock contention.
+//
+// Blocking is a materially SIMPLER fallback than deadlocks, for two reasons
+// worth stating because they are why this phase is small:
+//
+//  1. It folds in Rust, like deadlocks and unlike table/index health — the read projects columns
+//     and `assemble_chains` runs over the result, so there is no `GROUP BY` to rewrite.
+//  2. `canonicalize_blocking` is already ENGINE-AGNOSTIC. It reads recipe-aliased column names
+//     (`blocked_pid` OR `waiting_thread`, …) rather than dispatching per engine, so unlike
+//     deadlocks there is no new enterprise entry point to add — the existing one already returns
+//     `Option<BlockingSample>` and is already re-exported to OSS.
+
+/// The blocking markers: ONE column, four accepted recipe values.
+///
+/// **This is deliberately NOT shaped like `DEADLOCK_MARKERS`.** Deadlocks span
+/// two ingestion shapes — three filelog engines tagged with their own
+/// `o2_*_event` field, plus MSSQL keyed on its recipe tag — so detection there
+/// needs four different COLUMNS. Every blocking recipe is a **sqlquery** recipe;
+/// there is no log line to tag, so all four engines are identified by
+/// `o2_recipe` alone and the marker set collapses to one column with four values.
+///
+/// The values are exactly the four blocking entries of [`RECOGNIZED_RECIPES`],
+/// pinned by `every_blocking_marker_value_is_a_recognized_recipe` — a tag that
+/// no collector emits matches zero rows and leaves the page as empty as it was
+/// before the fallback existed.
+pub const BLOCKING_MARKERS: [(&str, &str); 4] = [
+    ("o2_recipe", "pg_blocking_chain"),
+    ("o2_recipe", "mysql_lock_waits"),
+    ("o2_recipe", "mariadb_lock_waits"),
+    ("o2_recipe", "mssql_blocking_chain"),
+];
+
+/// Every RAW vendor column `canonicalize_blocking` reads, across all four
+/// engines.
+///
+/// Carries the same hazard as [`RAW_DEADLOCK_FIELDS`]: naming a column absent
+/// from the stream schema fails the whole query with a 400 rather than yielding
+/// a null column, so this is a CANDIDATE list always intersected with the stream
+/// schema before it reaches a projection — never emitted whole.
+///
+/// The list is short because `canonicalize_blocking` is engine-agnostic: it
+/// resolves each field through a small alias list (`blocked_pid` OR
+/// `waiting_thread`) rather than carrying a per-engine column set, so the
+/// vocabulary is the union of those aliases plus the shared detection inputs.
+///
+/// `_timestamp` is deliberately NOT here — the builder emits it itself, and it
+/// is the one column DataFusion will not null-fill.
+pub const RAW_BLOCKING_FIELDS: [&str; 20] = [
+    // ── The blocking edge. BOTH ends are required: `canonicalize_blocking`
+    //    returns None unless both pids resolve, so dropping either alias here
+    //    silently discards every row from the engines that use it. ──
+    "blocked_pid",
+    "waiting_thread",
+    "blocking_pid",
+    "blocking_thread",
+    // ── Statements. `body` is the recipe's `body_column` and the last-resort
+    //    fallback for the blocked statement on every engine. ──
+    "blocked_query",
+    "waiting_query",
+    "blocking_query",
+    // ── Actor identity. `blocking_state` is read as the blocking APP, which
+    //    reads oddly but is what the canonicalizer does: the InnoDB recipes have
+    //    no application name and expose the transaction state in that slot. ──
+    "blocked_app",
+    "blocked_user",
+    "blocking_state",
+    // ── Wait attribution. The InnoDB recipes spell the wait `wait_secs`; pg and
+    //    mssql spell it `blocked_wait_s`. ──
+    "wait_event_type",
+    "wait_event",
+    "blocked_wait_s",
+    "wait_secs",
+    // ── Shared detection inputs — how a raw-derived sample acquires the
+    //    engine / database / instance that the Rust-side scope filter narrows on.
+    //    Without them every fallback sample is invisible to `?system=`. ──
+    "o2_recipe",
+    "db_system_name",
+    "db_system",
+    "server_address",
+    "db_instance",
+    // The last-resort statement fallback, and `canonicalize_blocking`'s `raw`.
+    "body",
+];
+
 /// The EXPLAIN document, stored as a JSON **string** (Invariant 2, module docs
 /// — a plan is a tree, and the deadlock path already paid for storing one
 /// nested). [`plan_of`] is its tolerant reader.
@@ -1230,5 +1319,108 @@ mod tests {
             "mssql_dl_ts is read by no canonicalizer — detect_timestamp supplies \
              the event time"
         );
+    }
+
+    // ── A1 phase 2a · the raw BLOCKING vocabulary ───────────────────────────
+
+    /// Same duplicate-projection hazard as the deadlock vocabulary.
+    #[test]
+    fn raw_blocking_fields_never_overlap_the_canonical_ones() {
+        use std::collections::HashSet;
+
+        let canonical: HashSet<&str> = ALL_DBM_FIELDS.into_iter().collect();
+        let overlap: Vec<&str> = RAW_BLOCKING_FIELDS
+            .into_iter()
+            .filter(|f| canonical.contains(f))
+            .collect();
+        assert!(
+            overlap.is_empty(),
+            "a raw column that is also an ALL_DBM_FIELDS member would be projected twice \
+             in one SELECT and 400 the whole page: {overlap:?}"
+        );
+    }
+
+    #[test]
+    fn raw_blocking_fields_have_no_duplicates() {
+        use std::collections::HashSet;
+
+        let uniq: HashSet<&str> = RAW_BLOCKING_FIELDS.into_iter().collect();
+        assert_eq!(
+            uniq.len(),
+            RAW_BLOCKING_FIELDS.len(),
+            "a repeated member is projected twice in one SELECT"
+        );
+    }
+
+    #[test]
+    fn raw_blocking_fields_exclude_the_timestamp_column() {
+        assert!(
+            !RAW_BLOCKING_FIELDS.contains(&"_timestamp"),
+            "_timestamp is emitted by the builder itself and is non-nullable"
+        );
+    }
+
+    /// Blocking is detected by ONE marker column, not four.
+    ///
+    /// Unlike deadlocks — where three filelog engines each tag their own
+    /// `o2_*_event` field and only MSSQL keys on the recipe — every blocking
+    /// recipe is a **sqlquery** recipe, so there is no log line to tag and all
+    /// four engines are identified by `o2_recipe` alone. That collapses the
+    /// four-column marker set to a single column with four accepted values,
+    /// which is why this cannot reuse `DEADLOCK_MARKERS`' shape.
+    #[test]
+    fn the_blocking_markers_are_one_column_with_four_recipe_values() {
+        let cols: std::collections::HashSet<&str> =
+            BLOCKING_MARKERS.iter().map(|(c, _)| *c).collect();
+        assert_eq!(
+            cols.len(),
+            1,
+            "every blocking recipe is a sqlquery recipe keyed on o2_recipe; a second \
+             marker column means an engine was given a filelog detection it does not have"
+        );
+        assert!(cols.contains("o2_recipe"));
+
+        let values: Vec<&str> = BLOCKING_MARKERS.iter().map(|(_, v)| *v).collect();
+        assert_eq!(
+            values,
+            vec![
+                "pg_blocking_chain",
+                "mysql_lock_waits",
+                "mariadb_lock_waits",
+                "mssql_blocking_chain",
+            ],
+            "all four blocking recipes must be detected, or that engine's OSS-ingested \
+             history stays invisible"
+        );
+    }
+
+    /// The marker column must itself be schema-gated through the vocabulary.
+    #[test]
+    fn the_blocking_marker_column_is_part_of_the_raw_vocabulary() {
+        for (col, _) in BLOCKING_MARKERS {
+            assert!(
+                RAW_BLOCKING_FIELDS.contains(&col),
+                "marker column {col:?} is named in the widened WHERE, so it must also be \
+                 schema-gated through RAW_BLOCKING_FIELDS"
+            );
+        }
+    }
+
+    /// Every blocking marker value must be a RECOGNIZED recipe.
+    ///
+    /// The two lists are maintained independently but describe the same four
+    /// recipes, and a typo in either is silent: a marker naming a recipe tag no
+    /// collector emits matches zero rows, and the page stays empty exactly as it
+    /// did before the fallback existed.
+    #[test]
+    fn every_blocking_marker_value_is_a_recognized_recipe() {
+        for (_, tag) in BLOCKING_MARKERS {
+            assert!(
+                RECOGNIZED_RECIPES.contains(&tag),
+                "blocking marker {tag:?} is not in RECOGNIZED_RECIPES — either it is a \
+                 typo that will match zero rows, or a recipe was added without \
+                 registering it"
+            );
+        }
     }
 }
