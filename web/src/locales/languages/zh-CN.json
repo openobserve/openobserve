@@ -7796,9 +7796,9 @@
       "layout": "布局",
       "types": "类型",
       "mode": {
-        "auto": "汽车",
-        "expanded": "已扩展",
-        "collapsed": "崩溃了"
+        "auto": "自动",
+        "expanded": "展开",
+        "collapsed": "折叠"
       },
       "kind": {
         "service": "服务",
@@ -7892,12 +7892,12 @@
     "previousMatch": "上一个匹配项",
     "nextMatch": "下一个匹配项",
     "searchInSpans": "在跨度内搜索",
-    "spansTableView": "Spans 表格视图",
+    "spansTableView": "跨度表格视图",
     "comingSoon": "即将推出...",
     "fetchingTrace": "正在获取您的追踪。",
     "traceFilters": "追踪过滤器",
     "showTraces": "显示追踪",
-    "applyAndSearch": "申请并搜索",
+    "applyAndSearch": "应用并搜索",
     "timestamp": "时间戳",
     "noErrorPresent": "此跨度没有错误",
     "noEventsPresent": "此跨度没有事件",
@@ -7906,11 +7906,11 @@
     "exceptionsWithCount": "异常 ({count})",
     "typeLabel": "类型：",
     "messageLabel": "消息：",
-    "escapedLabel": "逃脱了：",
+    "escapedLabel": "已转义：",
     "stacktraceLabel": "堆栈跟踪：",
     "copyStacktrace": "复制堆栈跟踪",
     "noStacktraceAvailable": "没有可用的堆栈跟踪",
-    "stacktraceCopied": "Stacktrace 已复制到剪贴板",
+    "stacktraceCopied": "堆栈跟踪已复制到剪贴板",
     "stacktraceCopyFailed": "无法复制堆栈跟踪",
     "evaluations": {
       "templateBadge": "模板"
@@ -7950,8 +7950,8 @@
       "sessionNotFound": "未找到会话",
       "noSpansFound": "在当前时间范围内未找到 {id} 的跨度。",
       "searchPlaceholder": "在此会话中搜索追踪...",
-      "turn": "转",
-      "turns": "转弯",
+      "turn": "回合",
+      "turns": "回合",
       "turnCount": "{count} {unit}",
       "openInTraceExplorer": "查看追踪",
       "filters": {
@@ -7960,15 +7960,15 @@
         "all": "全部"
       },
       "expandToView": "展开查看回复",
-      "noTurnsMatch": "没有与您的滤镜相匹配的回合",
-      "viewCollapsed": "崩溃了",
-      "viewPretty": "漂亮",
+      "noTurnsMatch": "没有符合筛选条件的回合",
+      "viewCollapsed": "折叠",
+      "viewPretty": "格式化",
       "rail": {
-        "slowestTurns": "最慢的转弯",
+        "slowestTurns": "最慢回合",
         "costHotspots": "成本热点",
         "toolHotspots": "工具热点",
-        "calls": "{n} 个电话",
-        "call": "{n} 打电话",
+        "calls": "{n} 次调用",
+        "call": "{n} 次调用",
         "usedIn": "用于",
         "noTools": "此会话中没有工具调用"
       },
@@ -7990,28 +7990,28 @@
         "latencyLead": "最慢 {slowest} ·",
         "costLead": "峰值 {peak} ·",
         "tokens": "{ratio}% 已缓存",
-        "cacheImpact": "{ratio}% 重复使用·{tokens} Tok Read",
+        "cacheImpact": "{ratio}% 复用 · 读取 {tokens} Token",
         "cacheEstimate": "净影响包括缓存读取和缓存创建成本。",
         "cacheImpactTooltipTitle": "缓存成本明细",
         "actualCost": "实际成本",
-        "estimatedWithoutCache": "估计不带缓存",
+        "estimatedWithoutCache": "无缓存估算成本",
         "grossCacheReadSavings": "缓存读取总节省量",
         "cacheCreationCost": "缓存创建成本",
-        "netCacheImpact": "网络缓存影响"
+        "netCacheImpact": "缓存净影响"
       },
       "ribbon": {
-        "title": "会话功能区",
+        "title": "会话概览",
         "subtitle": "每回合成本、持续时间和 Token"
       },
       "conversation": "对话",
-      "turnLabel": "转",
-      "statusOk": "好吧",
+      "turnLabel": "回合",
+      "statusOk": "正常",
       "statusError": "错误",
       "noUserMessage": "本回合未捕获任何用户消息。",
       "noAssistantMessage": "本回合未捕获助手回应。",
       "roles": {
         "user": "用户",
-        "assistant": "助理"
+        "assistant": "助手"
       },
       "stats": {
         "cost": "成本",
