@@ -29,6 +29,53 @@ pub mod api;
 pub mod rollup;
 pub mod server_vantage;
 
+/// The hits of a search, or an error when the read was PARTIAL.
+///
+/// `crate::search::search` answers `Ok` with `is_partial: true` when part of the
+/// read did not complete — a leaf that dropped out, or (the case seen live on
+/// the rig) a WAL parquet file rotating underneath the query. The `hits` it
+/// carries are then an ARBITRARY SUBSET of the window, and for a read whose
+/// only surviving leaf contributed nothing, the EMPTY vec.
+///
+/// Returning that as `Ok` is a false-verdict generator of exactly the shape
+/// `api::present_dbm_columns` refuses for schema reads, and it produces two
+/// distinct wrong answers on the DBM screens:
+///
+///  1. **The false "no data" page.** An empty partial read is byte-identical to a healthy empty
+///     window, so the tab renders "nothing happened" over a window that may be full of deadlocks.
+///  2. **The false `not_collecting: true` alarm.** The envelopes gate their collection diagnostic
+///     on `hits.is_empty()`, so an empty partial read trips the probe and tells the operator their
+///     collector is broken when it is fine — the false alarm the `api::LIVENESS_PROBE_MICROS`
+///     design note says must never be raised.
+///
+/// Erroring costs the honest cases nothing: a stream that does not exist is
+/// short-circuited before the search runs, and a genuinely empty window comes
+/// back complete (`is_partial: false`) and still renders its self-diagnosing
+/// empty state. What it buys is "we could not read the whole window" — a
+/// visible failure — in place of an invented verdict.
+///
+/// `function_error` is quoted when present because it is the only description of
+/// WHY the read tore. It is NOT itself a failure condition: on a complete read
+/// it carries per-row VRL notes about rows that *were* read, and failing those
+/// would 500 pages that are fine.
+pub(crate) fn hits_or_partial_error(
+    resp: config::meta::search::Response,
+    read: &str,
+) -> Result<Vec<Value>, anyhow::Error> {
+    if resp.is_partial {
+        let why = if resp.function_error.is_empty() {
+            "no further detail from the search layer".to_string()
+        } else {
+            resp.function_error.join("; ")
+        };
+        return Err(anyhow::anyhow!(
+            "the {read} read returned a partial result and cannot be trusted as \
+             complete: {why}"
+        ));
+    }
+    Ok(resp.hits)
+}
+
 /// Deadlock and blocking canonicalization is an Enterprise capability.
 ///
 /// The types and functions below moved to `o2_enterprise` together with the

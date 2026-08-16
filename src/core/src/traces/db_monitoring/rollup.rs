@@ -788,7 +788,11 @@ pub(crate) async fn run_dbm_search(
 
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
-    Ok(resp.hits)
+    // A PARTIAL response is not an empty one — see `hits_or_partial_error`.
+    // This harness feeds the rollup WRITER as well as the read APIs, so a torn
+    // read absorbed here would not merely render a wrong page: it would persist
+    // an under-counted aggregate that every later read trusts.
+    super::hits_or_partial_error(resp, "db_monitoring rollup")
 }
 
 /// Write the window's records to `_o2_db_stats` via the internal ingestion
