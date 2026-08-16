@@ -794,6 +794,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/session", get(traces::session::get_latest_sessions))
         .route("/{org_id}/{stream_name}/traces/session/details", get(traces::session::get_session_details))
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/time_range", get(traces::time_index::get_trace_time_range))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
         // LLM Model Pricing
@@ -902,6 +904,9 @@ pub fn service_routes() -> Router {
 
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
+        .route("/v2/{org_id}/alerts/composites/validate", post(alerts::validate_composite_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/composite-references", get(alerts::get_composite_references))
+        .route("/v2/{org_id}/alerts/{alert_id}/composite-timeline", get(alerts::get_composite_timeline))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/groups", get(alerts::list_alert_groups))
         // The uptime this alert would produce as an SLI source. Sits with the

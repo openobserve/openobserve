@@ -425,28 +425,47 @@ describe("validateSql — mutation detection on broken queries", () => {
     },
   );
 
-  // Per-mutation thresholds
-  const perMutationThresholds: Record<string, number> = {
-    truncate_after_AND: 0.85,
-    truncate_after_OR: 0.99,
-    truncate_after_WHERE: 0.95,
-    truncate_after_ORDER: 0.8,
-    truncate_after_GROUP: 0.99,
-    truncate_after_HAVING: 0.99,
-    truncate_after_LIMIT: 0.97,
-    remove_WHERE_keyword: 0.8, // tightened missingWhere guard: ambiguous patterns suppressed; expanded query set lowers rate
-    unquote_like_pattern: 0.5, // small sample, parser handles some cases
-    drop_AND_between_conditions: 0.9,
+  // Per-mutation expectations. A `rate` is the share of that mutation's queries
+  // that must get a specific message; a `minSpecific` is an absolute floor, for
+  // mutations whose detectable share is a property of the corpus rather than of
+  // the diagnostics (see unquote_like_pattern).
+  type Expectation = { rate: number } | { minSpecific: number };
+
+  const perMutationExpectations: Record<string, Expectation> = {
+    truncate_after_AND: { rate: 0.85 },
+    truncate_after_OR: { rate: 0.99 },
+    truncate_after_WHERE: { rate: 0.95 },
+    truncate_after_ORDER: { rate: 0.8 },
+    truncate_after_GROUP: { rate: 0.99 },
+    truncate_after_HAVING: { rate: 0.99 },
+    truncate_after_LIMIT: { rate: 0.97 },
+    // tightened missingWhere guard: ambiguous patterns suppressed; expanded query set lowers rate
+    remove_WHERE_keyword: { rate: 0.8 },
+    // Counted, not rated. Only one shape is localizable: the parser must report
+    // `found === "%"`. An unquoted pattern that lexes as valid SQL — LIKE E00%,
+    // LIKE /api/%, LIKE Android% — puts the error somewhere unrelated, and
+    // `col LIKE other_col` is itself valid SQL, so these cannot be flagged from
+    // the source text without squiggling correct queries. The corpus lives in
+    // tests/test-data/query-agent/ and grows with backend PRs, so every added
+    // LIKE query dilutes a ratio without the diagnostics changing at all: this
+    // was 6/12 = 0.50, then 6/13 after #13808, then 6/14 after #13810.
+    unquote_like_pattern: { minSpecific: 6 },
+    drop_AND_between_conditions: { rate: 0.9 },
     // Complex-construct mutations
-    truncate_inside_case_when: 0.9,
-    truncate_inside_coalesce: 0.85,
-    truncate_after_UNION: 0.9,
-    truncate_after_OVER_paren: 0.8,
-    truncate_inside_cte: 0.8,
+    truncate_inside_case_when: { rate: 0.9 },
+    truncate_inside_coalesce: { rate: 0.85 },
+    truncate_after_UNION: { rate: 0.9 },
+    truncate_after_OVER_paren: { rate: 0.8 },
+    truncate_inside_cte: { rate: 0.8 },
   };
 
-  for (const [mutName, threshold] of Object.entries(perMutationThresholds)) {
-    it(`${mutName}: ≥ ${Math.round(threshold * 100)}% specific messages`, async () => {
+  for (const [mutName, expectation] of Object.entries(perMutationExpectations)) {
+    const label =
+      "rate" in expectation
+        ? `≥ ${Math.round(expectation.rate * 100)}% specific messages`
+        : `≥ ${expectation.minSpecific} specific messages`;
+
+    it(`${mutName}: ${label}`, async () => {
       const broken = generateBrokenQueries().filter((b) => b.mutation === mutName);
       if (broken.length === 0) return; // mutation didn't apply to any query
 
@@ -456,8 +475,13 @@ describe("validateSql — mutation detection on broken queries", () => {
         if (r !== null && isSpecificMessage(r.error)) specific++;
       }
 
-      const rate = specific / broken.length;
-      expect(rate).toBeGreaterThanOrEqual(threshold);
+      // Report the counts, so a corpus change is diagnosable from the failure alone.
+      const detail = `${specific}/${broken.length} specific`;
+      if ("rate" in expectation) {
+        expect(specific / broken.length, detail).toBeGreaterThanOrEqual(expectation.rate);
+      } else {
+        expect(specific, detail).toBeGreaterThanOrEqual(expectation.minSpecific);
+      }
     });
   }
 });

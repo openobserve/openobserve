@@ -109,6 +109,16 @@ export const BADGE_GROUPS = {
         icon: "query-stats",
         labelKey: "components.badge.alertType.anomalydetection",
       },
+      composite: {
+        variant: "purple-soft",
+        icon: "account-tree",
+        labelKey: "components.badge.alertType.composite",
+      },
+      slo: {
+        variant: "indigo-soft",
+        icon: "monitor-heart",
+        labelKey: "components.badge.alertType.slo",
+      },
     },
   },
 

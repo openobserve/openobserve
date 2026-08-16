@@ -233,8 +233,8 @@ impl Metadata for DistinctValues {
                     }
                 };
 
-                if let Some(ret) =
-                    stream::get_stream_retention(&org_id, stream_type, &stream_name).await
+                if let Some(source_settings) =
+                    infra::schema::get_settings(&org_id, &stream_name, stream_type).await
                 {
                     // local editable copy; persisted via save_stream_settings below
                     let mut new_settings = infra::schema::get_settings(
@@ -245,7 +245,9 @@ impl Metadata for DistinctValues {
                     .await
                     .map(|s| (*s).clone())
                     .unwrap_or_default();
-                    new_settings.data_retention = ret;
+                    new_settings.data_retention = source_settings.data_retention;
+                    new_settings.extended_retention_days =
+                        source_settings.extended_retention_days.clone();
                     if let Err(e) = stream::save_stream_settings(
                         &org_id,
                         &distinct_stream_name,

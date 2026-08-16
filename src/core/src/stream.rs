@@ -52,6 +52,24 @@ async fn cleanup_related_resources(
     stream_name: String,
     stream_type: StreamType,
 ) -> Result<(), Response> {
+    // Preflight and remove the complete alert set before touching pipelines.
+    // `delete_many_for_cascade` holds the organization graph lock and checks
+    // every target before deleting the first, so a referenced sibling leaves
+    // the entire stream-level cleanup untouched.
+    let alerts = db::alerts::alert::list(&org_id, Some(stream_type), Some(&stream_name))
+        .await
+        .map_err(|error| alert_cleanup_error(error.into()))?;
+    let alert_ids = alerts
+        .iter()
+        .filter_map(|alert| alert.id)
+        .collect::<Vec<_>>();
+    let client = infra::db::ORM_CLIENT
+        .get_or_init(infra::db::connect_to_orm)
+        .await;
+    crate::alerts::alert::delete_many_for_cascade(client, &org_id, &alert_ids)
+        .await
+        .map_err(alert_cleanup_error)?;
+
     for pipeline in
         crate::pipeline::db::get_by_stream(&StreamParams::new(&org_id, &stream_name, stream_type))
             .await
@@ -72,29 +90,38 @@ async fn cleanup_related_resources(
         }
     }
 
-    if let Ok(alerts) =
-        db::alerts::alert::list(&org_id, Some(stream_type), Some(&stream_name)).await
-    {
-        for alert in alerts {
-            if let Err(e) =
-                db::alerts::alert::delete_by_name(&org_id, stream_type, &stream_name, &alert.name)
-                    .await
-            {
-                return Err((
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    [(ERROR_HEADER, format!("failed to delete alert: {e}"))],
-                    Json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!(
-                            "Error: failed to delete the associated alert \"{}\": {e}",
-                            alert.name
-                        ),
-                    )),
-                )
-                    .into_response());
-            }
-        }
-    }
-
     Ok(())
+}
+
+fn alert_cleanup_error(error: crate::alerts::alert::AlertError) -> Response {
+    use crate::alerts::alert::AlertError;
+    match error {
+        AlertError::AlertReferencedByComposites { parents } => (
+            http::StatusCode::CONFLICT,
+            Json(serde_json::json!({
+                "code": "child_referenced",
+                "message": "one or more stream alerts are referenced by composite alerts",
+                "references": [],
+                "hidden_reference_count": parents.len(),
+            })),
+        )
+            .into_response(),
+        AlertError::CompositeGraphLockUnavailable(_) => (
+            http::StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({
+                "code": "composite_graph_lock_unavailable",
+                "message": "composite graph lock is temporarily unavailable",
+            })),
+        )
+            .into_response(),
+        other => (
+            http::StatusCode::INTERNAL_SERVER_ERROR,
+            [(ERROR_HEADER, "failed to delete stream alerts")],
+            Json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to delete stream alerts: {other}"),
+            )),
+        )
+            .into_response(),
+    }
 }

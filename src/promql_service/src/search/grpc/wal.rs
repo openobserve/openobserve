@@ -155,7 +155,7 @@ async fn get_wal_batches(
         }
     };
 
-    df = apply_matchers(df, &schema, &matchers)?;
+    df = apply_matchers(df, &matchers)?;
 
     match apply_label_selector(df, &schema, &label_selector) {
         Some(dataframe) => df = dataframe,

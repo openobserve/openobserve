@@ -3,6 +3,8 @@
 pub mod prelude;
 
 pub mod action_scripts;
+pub mod alert_composite_children;
+pub mod alert_composites;
 pub mod alert_dedup_state;
 pub mod alert_eval_intervals;
 pub mod alert_incident_alerts;
