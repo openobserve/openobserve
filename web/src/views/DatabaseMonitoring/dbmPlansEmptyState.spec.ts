@@ -213,10 +213,20 @@ describe("the drift finding is promoted and plans precede samples", () => {
     expect(block, "the callout must jump to the plans section").toContain('@click="scrollToPlans"');
   });
 
-  it("orders the stack endpoints → plans → samples", () => {
+  /**
+   * The page is tabbed now, so "order" is TAB order rather than scroll order —
+   * but the contract it encodes is unchanged and is the reason the tab split
+   * was drawn where it was: the diagnosis reads before the raw evidence.
+   *
+   * Plans has its own tab; the endpoints table and the samples scatter share
+   * the one after it, because both are trace-vantage reads off the same
+   * resolved stream. So plans must precede BOTH of them, where the old
+   * single-column stack had the callers table above it.
+   */
+  it("orders the tabs plans → callers, with the two trace sections together", () => {
     const text = source();
-    const endpointsAt = text.indexOf('data-test="dbm-detail-endpoints"');
     const plansAt = text.indexOf('data-test="dbm-detail-plans"');
+    const endpointsAt = text.indexOf('data-test="dbm-detail-endpoints"');
     const samplesAt = text.indexOf('data-test="dbm-detail-samples"');
     expect(endpointsAt).toBeGreaterThan(-1);
     expect(plansAt).toBeGreaterThan(-1);
@@ -224,6 +234,33 @@ describe("the drift finding is promoted and plans precede samples", () => {
     // Diagnosis before rawest evidence: samples are individual executions, the
     // plan is the explanation, and the explanation reads first.
     expect(plansAt, "plans must sit above the samples").toBeLessThan(samplesAt);
-    expect(endpointsAt, "callers stay above both").toBeLessThan(plansAt);
+    expect(plansAt, "plans must sit above the callers table too").toBeLessThan(endpointsAt);
+
+    // And the grouping itself: both trace sections live on ONE panel, so no
+    // panel boundary may separate them.
+    const between = text.slice(endpointsAt, samplesAt);
+    expect(between, "endpoints and samples must share a tab panel").not.toContain("<OTabPanel");
+  });
+
+  /**
+   * The jump the drift callout performs now crosses a tab boundary, and the
+   * inactive panel is UNMOUNTED (`OTabPanel` defaults to `v-if`) — so the
+   * section it scrolls to does not exist at click time. Scrolling before the
+   * switch has rendered is a silent no-op that looks exactly like a jump
+   * nobody clicked, which is the failure `dbmPlansJump.spec.ts` exists to
+   * prevent. The handler must therefore select the tab and await a tick.
+   */
+  it("selects the plans tab before scrolling to it", () => {
+    const text = source();
+    const at = text.indexOf("const scrollToPlans");
+    expect(at, "the jump handler must exist").toBeGreaterThan(-1);
+    const handler = text.slice(at, text.indexOf("\n};", at));
+
+    expect(handler, "the jump must switch to the plans tab").toContain('selectTab("plans")');
+    expect(handler, "the jump must wait for the panel to mount").toContain("await nextTick()");
+    expect(handler).toContain("scrollIntoView");
+    // Order matters: scrolling first would aim at an unmounted section.
+    expect(handler.indexOf('selectTab("plans")')).toBeLessThan(handler.indexOf("scrollIntoView"));
+    expect(handler.indexOf("await nextTick()")).toBeLessThan(handler.indexOf("scrollIntoView"));
   });
 });

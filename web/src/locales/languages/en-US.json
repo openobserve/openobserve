@@ -15223,6 +15223,15 @@
     },
     "detail": {
       "title": "Query detail",
+      "tabs": {
+        "overview": "Overview",
+        "overviewHint": "How slow this query is, how often it runs, and where it runs.",
+        "plans": "Query plans",
+        "plansHint": "The steps your database took to run this query. Start here to work out why it's slow.",
+        "callers": "Callers and examples",
+        "callersHint": "Which parts of your application ran this query, and individual slow runs you can open as a trace.",
+        "callersLocked": "Individual runs come from tracing. Nothing traced this query in this time range."
+      },
       "backToQueries": "Back to top queries",
       "backToActivity": "Back to activity",
       "backToSamples": "Back to slowest calls",

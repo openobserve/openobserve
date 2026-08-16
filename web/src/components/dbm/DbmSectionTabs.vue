@@ -289,10 +289,13 @@ const queriesVantageLabel = computed<I18nText | undefined>(() => {
  * carrying any of them would put a stale detail-page key in a table's URL.
  */
 const carriedQuery = computed(() => {
-  const { fingerprint, stream, from, ...rest } = route.query;
+  const { fingerprint, stream, from, tab, ...rest } = route.query;
   void fingerprint;
   void stream;
   void from;
+  // `tab` is the DETAIL page's own in-page tab. It names nothing on a list, and
+  // carrying it would put a stale detail-page key in every table's URL.
+  void tab;
   return rest;
 });
 

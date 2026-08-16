@@ -69,6 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="flex flex-col gap-4 pt-3">
+      <!-- OUTSIDE the tabs, deliberately, and the main thing a tabbed redesign
+           gets wrong: identity is not a section, it is the answer to "which
+           query am I reading". A plan tree or a caller list with the statement
+           hidden one tab away is unreadable. -->
       <!-- Identity: the statement, then the dimensions that locate it. -->
       <section class="flex flex-col gap-2" data-test="dbm-detail-identity">
         <div class="flex flex-wrap items-center gap-1.5">
@@ -108,7 +112,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </section>
 
-      <!-- The headline numbers, before the charts: minute 0 of an incident is
+      <!-- The three views of one query, in troubleshooting order: how bad it
+           is, why it is slow, who ran it. Same primitives as the L2 strip in
+           DbmSectionTabs, one level down — OTabs/OTab with a hint tooltip, and
+           the Callers tab locked with the same lock+tooltip treatment when the
+           vantage that fills it reported nothing.
+
+           No horizontal padding: a tab strip's first label self-aligns to the
+           page-edge grid, so the labels line up with the statement above. -->
+      <OTabs
+        :model-value="activeTab"
+        align="left"
+        class="shrink-0"
+        data-test="dbm-detail-tabs"
+        @change="onTabChange"
+      >
+        <OTab
+          v-for="tab in detailTabs"
+          :key="tab.key"
+          :name="tab.key"
+          :disable="tab.disabled"
+          :data-test="`dbm-detail-tab-${tab.key}`"
+        >
+          <span>{{ tab.label }}</span>
+          <!-- The lock is what makes an empty tab read as "nothing measured
+               this" rather than "broken" — the same reason the L2 strip locks
+               its gated tabs instead of hiding them. Decorative for AT; the
+               tooltip carries the sentence. -->
+          <OIcon
+            v-if="tab.disabled"
+            name="lock"
+            size="xs"
+            aria-hidden="true"
+            :data-test="`dbm-detail-tab-lock-${tab.key}`"
+          />
+          <OTooltip side="bottom" :content="tab.hint" />
+        </OTab>
+      </OTabs>
+
+      <OTabPanels :model-value="activeTab" data-test="dbm-detail-tab-panels">
+        <!-- ── Overview ────────────────────────────────────────────────────
+             How bad it is and whether it is getting worse. The client tiles
+             and the database's own counters stay on ONE panel and in ONE flex
+             column: they are the two vantages on the same two measures, and
+             the `order-*` classes that hoist the populated one on a zero-trace
+             fleet only work while they share a flex parent. -->
+        <OTabPanel name="overview" layout="flex-col" class="gap-4">
+          <!-- The headline numbers, before the charts: minute 0 of an incident is
            "how bad and how much of the database is it", and that is figures,
            not a graph.
 
@@ -124,54 +174,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            measured nothing here, so it renders only alongside the tiles it
            actually qualifies. -->
 
-      <!-- STEP 4 — information hierarchy. With no trace vantage the database's
+          <!-- STEP 4 — information hierarchy. With no trace vantage the database's
            own section is the only populated one, so it must LEAD rather than
            sit under hidden client tiles. The order is expressed as flex
            `order-*` on the two blocks rather than by duplicating either of them
            in a second branch: one copy of each section, one source of truth for
            its states, and the trace-led order restored the moment traces
            return. -->
-      <div
-        v-if="traceVantage"
-        class="text-text-muted text-xs"
-        data-test="dbm-detail-stats-provenance"
-      >
-        {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
-      </div>
-      <DbmMetricTiles
-        :items="visibleHeadlineStats"
-        with-sub-labels
-        :class="traceVantage ? '' : 'order-2'"
-        tile-data-test="dbm-detail-stat"
-        data-test="dbm-detail-stats"
-      />
+          <div
+            v-if="traceVantage"
+            class="text-text-muted text-xs"
+            data-test="dbm-detail-stats-provenance"
+          >
+            {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
+          </div>
+          <DbmMetricTiles
+            :items="visibleHeadlineStats"
+            with-sub-labels
+            :class="traceVantage ? '' : 'order-2'"
+            tile-data-test="dbm-detail-stat"
+            data-test="dbm-detail-stats"
+          />
 
-      <!-- Plan drift, promoted. "It got slow because the plan changed" is the
+          <!-- Plan drift, promoted. "It got slow because the plan changed" is the
            most actionable finding on this page, and the section that computes it
            sits below three tables — so the FINDING surfaces here, beside the
            headline numbers, while the evidence stays where it is. Same state and
            copy as the plans section (nothing recomputed), and when there is no
            drift this renders nothing: only exceptions get a chip. -->
-      <OBanner
-        v-if="planDrift === 'drifted'"
-        variant="warning"
-        data-test="dbm-detail-plans-drift-top"
-      >
-        <div class="flex flex-wrap items-center gap-2">
-          <span>{{ t("dbm.detail.plans.driftCallout", { count: plans.length }) }}</span>
-          <OButton
-            variant="outline"
-            size="sm"
-            class="shrink-0"
-            data-test="dbm-detail-plans-drift-view"
-            @click="scrollToPlans"
+          <OBanner
+            v-if="planDrift === 'drifted'"
+            variant="warning"
+            data-test="dbm-detail-plans-drift-top"
           >
-            {{ t("dbm.detail.plans.viewPlans") }}
-          </OButton>
-        </div>
-      </OBanner>
+            <div class="flex flex-wrap items-center gap-2">
+              <span>{{ t("dbm.detail.plans.driftCallout", { count: plans.length }) }}</span>
+              <OButton
+                variant="outline"
+                size="sm"
+                class="shrink-0"
+                data-test="dbm-detail-plans-drift-view"
+                @click="scrollToPlans"
+              >
+                {{ t("dbm.detail.plans.viewPlans") }}
+              </OButton>
+            </div>
+          </OBanner>
 
-      <!-- W6 · What the DATABASE recorded.
+          <!-- W6 · What the DATABASE recorded.
            A SEPARATE block under its own heading, never merged into the grid
            above. The two vantages measure different populations over different
            windows: the client sees only instrumented callers and measures
@@ -181,111 +231,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            No figure spans the two: subtracting a server MEAN from a client
            PERCENTILE, over misaligned windows, is arithmetic on incomparable
            quantities. -->
-      <!-- Capture is off (or this row has no join key, so nothing server-side
+          <!-- Capture is off (or this row has no join key, so nothing server-side
            can ever surface): ONE quiet line with the route to the fix, not a
            panel in prime position on every un-instrumented install. The env-var
            detail is operator depth, so it lives in the tooltip, and the "Set
            up" button goes where the list pages' empty states already go.
            Renders only once the read has ANSWERED off — never while it is in
            flight, and never for a failed read (that is `failed`, below). -->
-      <div
-        v-if="serverMetricsRead === 'done' && serverMetrics.state === 'off'"
-        class="flex flex-wrap items-center gap-2"
-        :class="traceVantage ? '' : 'order-1'"
-        data-test="dbm-detail-server-metrics"
-      >
-        <span class="text-text-muted text-xs" data-test="dbm-detail-server-metrics-off">
-          {{ t("dbm.detail.serverMetrics.off") }}
-          <OTooltip side="top" :content="t('dbm.detail.serverMetrics.offHint')" />
-        </span>
-        <OButton
-          variant="outline"
-          size="sm"
-          class="shrink-0"
-          data-test="dbm-detail-server-metrics-setup"
-          @click="openDbmSetup"
-        >
-          {{ t("dbm.detail.serverMetrics.setUp") }}
-        </OButton>
-      </div>
-
-      <DbmSection
-        v-else
-        :title="t('dbm.detail.serverMetrics.title')"
-        :class="traceVantage ? '' : 'order-1'"
-        data-test="dbm-detail-server-metrics"
-      >
-        <template #hint>
-          <span class="text-text-muted text-xs" data-test="dbm-detail-server-metrics-provenance">
-            {{ t("dbm.detail.serverMetrics.subtitle") }}
-          </span>
-          <span
-            v-if="serverMetrics.instance"
-            class="text-text-secondary text-xs"
-            data-test="dbm-detail-server-metrics-instance"
+          <div
+            v-if="serverMetricsRead === 'done' && serverMetrics.state === 'off'"
+            class="flex flex-wrap items-center gap-2"
+            :class="traceVantage ? '' : 'order-1'"
+            data-test="dbm-detail-server-metrics"
           >
-            {{ t("dbm.detail.serverMetrics.instance", { instance: serverMetrics.instance }) }}
-          </span>
-          <!-- mysql/mariadb server records carry no database, so their
+            <span class="text-text-muted text-xs" data-test="dbm-detail-server-metrics-off">
+              {{ t("dbm.detail.serverMetrics.off") }}
+              <OTooltip side="top" :content="t('dbm.detail.serverMetrics.offHint')" />
+            </span>
+            <OButton
+              variant="outline"
+              size="sm"
+              class="shrink-0"
+              data-test="dbm-detail-server-metrics-setup"
+              @click="openDbmSetup"
+            >
+              {{ t("dbm.detail.serverMetrics.setUp") }}
+            </OButton>
+          </div>
+
+          <DbmSection
+            v-else
+            :title="t('dbm.detail.serverMetrics.title')"
+            :class="traceVantage ? '' : 'order-1'"
+            data-test="dbm-detail-server-metrics"
+          >
+            <template #hint>
+              <span
+                class="text-text-muted text-xs"
+                data-test="dbm-detail-server-metrics-provenance"
+              >
+                {{ t("dbm.detail.serverMetrics.subtitle") }}
+              </span>
+              <span
+                v-if="serverMetrics.instance"
+                class="text-text-secondary text-xs"
+                data-test="dbm-detail-server-metrics-instance"
+              >
+                {{ t("dbm.detail.serverMetrics.instance", { instance: serverMetrics.instance }) }}
+              </span>
+              <!-- mysql/mariadb server records carry no database, so their
                counters span every database on the instance. Stated in the
                header, or the tiles below read as per-database figures — a
                claim that vantage cannot support. -->
-          <span
-            v-if="serverMetrics.state === 'matched' && serverMetrics.attribution === 'instance'"
-            class="text-text-muted text-xs"
-            data-test="dbm-detail-server-metrics-attribution"
-          >
-            {{ t("dbm.detail.serverMetrics.instanceWide") }}
-          </span>
-        </template>
+              <span
+                v-if="serverMetrics.state === 'matched' && serverMetrics.attribution === 'instance'"
+                class="text-text-muted text-xs"
+                data-test="dbm-detail-server-metrics-attribution"
+              >
+                {{ t("dbm.detail.serverMetrics.instanceWide") }}
+              </span>
+            </template>
 
-        <!-- The read FAILED. Distinct from `off` on purpose: a failed request
+            <!-- The read FAILED. Distinct from `off` on purpose: a failed request
              says nothing about whether capture is running, and the off copy
              sends the reader to reconfigure a collector that may be fine. -->
-        <DbmStateNote
-          v-if="serverMetricsRead === 'failed'"
-          :title="t('dbm.detail.serverMetrics.readFailed')"
-          :hint="t('dbm.detail.serverMetrics.readFailedHint')"
-          data-test="dbm-detail-server-metrics-failed"
-        />
+            <DbmStateNote
+              v-if="serverMetricsRead === 'failed'"
+              :title="t('dbm.detail.serverMetrics.readFailed')"
+              :hint="t('dbm.detail.serverMetrics.readFailedHint')"
+              data-test="dbm-detail-server-metrics-failed"
+            />
 
-        <!-- In flight: the header only, never a claim — which sentence applies
+            <!-- In flight: the header only, never a claim — which sentence applies
              is exactly what the read has not answered yet. -->
-        <template v-else-if="serverMetricsRead === 'done'">
-          <!-- Two instances share this database name, so the join cannot tell
+            <template v-else-if="serverMetricsRead === 'done'">
+              <!-- Two instances share this database name, so the join cannot tell
                which one ran the query. Deliberately NOT an error, and the
                numbers are withheld rather than guessed. -->
-          <DbmStateNote
-            v-if="serverMetrics.state === 'ambiguous'"
-            :title="t('dbm.detail.serverMetrics.ambiguous')"
-            :hint="
-              t('dbm.detail.serverMetrics.ambiguousHint', {
-                instances: serverMetrics.candidateInstances.join(', '),
-              })
-            "
-            data-test="dbm-detail-server-metrics-ambiguous"
-          />
+              <DbmStateNote
+                v-if="serverMetrics.state === 'ambiguous'"
+                :title="t('dbm.detail.serverMetrics.ambiguous')"
+                :hint="
+                  t('dbm.detail.serverMetrics.ambiguousHint', {
+                    instances: serverMetrics.candidateInstances.join(', '),
+                  })
+                "
+                data-test="dbm-detail-server-metrics-ambiguous"
+              />
 
-          <!-- Capture ran and found no counterpart. ORDINARY, not a failure:
+              <!-- Capture ran and found no counterpart. ORDINARY, not a failure:
                fingerprint convergence is partial by measurement, and the server
                legitimately sees statements no instrumented client issued. Muted
                copy, never error styling. -->
-          <DbmStateNote
-            v-else-if="serverMetrics.state === 'unmatched'"
-            :title="t('dbm.detail.serverMetrics.noMatch')"
-            :hint="t('dbm.detail.serverMetrics.noMatchHint')"
-            data-test="dbm-detail-server-metrics-unmatched"
-          />
+              <DbmStateNote
+                v-else-if="serverMetrics.state === 'unmatched'"
+                :title="t('dbm.detail.serverMetrics.noMatch')"
+                :hint="t('dbm.detail.serverMetrics.noMatchHint')"
+                data-test="dbm-detail-server-metrics-unmatched"
+              />
 
-          <DbmMetricTiles
-            v-else
-            :items="serverTileItems"
-            variant="attached"
-            tile-data-test="dbm-detail-server-metric"
-            data-test="dbm-detail-server-metrics-tiles"
-          />
+              <DbmMetricTiles
+                v-else
+                :items="serverTileItems"
+                variant="attached"
+                tile-data-test="dbm-detail-server-metric"
+                data-test="dbm-detail-server-metrics-tiles"
+              />
 
-          <!-- D5 · WHO CALLED IT — the one thing this vantage cannot answer.
+              <!-- D5 · WHO CALLED IT — the one thing this vantage cannot answer.
                The database counts every execution and records no caller;
                sqlcommenter tags do not survive into `pg_stat_statements`
                either. So the names come from traces, and they are attached to
@@ -301,36 +354,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                Hidden entirely when the fingerprint has no trace vantage: an
                empty caller list under a five-million-execution row reads as
                "nothing calls this", which is false. -->
-          <div
-            v-if="showsCallingServices(callingServices)"
-            class="flex flex-col gap-1 pt-1"
-            data-test="dbm-detail-calling-services"
-          >
-            <span class="text-text-secondary text-xs">
-              {{ t("dbm.detail.callingServices.title") }}
-            </span>
+              <div
+                v-if="showsCallingServices(callingServices)"
+                class="flex flex-col gap-1 pt-1"
+                data-test="dbm-detail-calling-services"
+              >
+                <span class="text-text-secondary text-xs">
+                  {{ t("dbm.detail.callingServices.title") }}
+                </span>
 
-            <!-- The join key could not be formed. A REFUSAL, stated — the same
+                <!-- The join key could not be formed. A REFUSAL, stated — the same
                  decision the pooler case makes one block up. Guessing would
                  attach another engine's services to these counters. -->
-            <span
-              v-if="callingServices.state === 'unjoinable'"
-              class="text-text-muted text-xs"
-              data-test="dbm-detail-calling-services-unjoinable"
-            >
-              {{ t("dbm.detail.callingServices.unjoinable") }}
-            </span>
-
-            <template v-else>
-              <div class="flex flex-col gap-1">
-                <div
-                  v-for="service in callingServices.services"
-                  :key="service.name"
-                  class="flex min-w-0 flex-wrap items-baseline gap-x-2"
-                  data-test="dbm-detail-calling-service"
+                <span
+                  v-if="callingServices.state === 'unjoinable'"
+                  class="text-text-muted text-xs"
+                  data-test="dbm-detail-calling-services-unjoinable"
                 >
-                  <DbmServiceList :services="[service.name]" :max="1" />
-                  <!-- Calls only, and NO duration. The callers table below
+                  {{ t("dbm.detail.callingServices.unjoinable") }}
+                </span>
+
+                <template v-else>
+                  <div class="flex flex-col gap-1">
+                    <div
+                      v-for="service in callingServices.services"
+                      :key="service.name"
+                      class="flex min-w-0 flex-wrap items-baseline gap-x-2"
+                      data-test="dbm-detail-calling-service"
+                    >
+                      <DbmServiceList :services="[service.name]" :max="1" />
+                      <!-- Calls only, and NO duration. The callers table below
                        renders each caller's own client-observed timing, in the
                        client-vantage section where a round-trip figure belongs.
 
@@ -340,101 +393,101 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        pool-wait cost as a database anomaly. A qualifier is a
                        label; adjacency is the stronger signal, and this block
                        only has to answer WHO, not how long. -->
-                  <span class="text-text-muted text-2xs tabular-nums">
-                    {{
-                      t("dbm.detail.callingServices.tracedCalls", {
-                        calls: formatCount(service.calls),
-                      })
-                    }}
-                  </span>
-                </div>
-              </div>
+                      <span class="text-text-muted text-2xs tabular-nums">
+                        {{
+                          t("dbm.detail.callingServices.tracedCalls", {
+                            calls: formatCount(service.calls),
+                          })
+                        }}
+                      </span>
+                    </div>
+                  </div>
 
-              <!-- The coverage sentence, never optional. The list above names
+                  <!-- The coverage sentence, never optional. The list above names
                    the INSTRUMENTED subset only, and the traced population runs
                    ~3.7x smaller than the server's on live data — so the names
                    without this line read as a complete attribution of every
                    execution the tiles just counted. -->
-              <span
-                class="text-text-muted text-2xs"
-                data-test="dbm-detail-calling-services-coverage"
-              >
-                {{ callingServicesCoverage }}
-              </span>
+                  <span
+                    class="text-text-muted text-2xs"
+                    data-test="dbm-detail-calling-services-coverage"
+                  >
+                    {{ callingServicesCoverage }}
+                  </span>
+                </template>
+              </div>
             </template>
-          </div>
-        </template>
-      </DbmSection>
+          </DbmSection>
 
-      <!-- Coverage, as the same quiet line the list pages carry. Hidden on a
+          <!-- Coverage, as the same quiet line the list pages carry. Hidden on a
            server-vantage-only entry: with NO client row and the database's
            own sections answering above, its "nothing to measure" state would
            contradict the visible data — the client heading already carries
            the instrumented-callers-only disclaimer, and there is no client
            coverage to be stale about. -->
-      <DbmCoverageLine
-        v-if="traceVantage && (clientRowFound || !serverAnswering)"
-        :freshness="freshness"
-        :hits="row ? [row] : []"
-        :top-n-subset="topNSubset"
-        :coded-error-share="uncodedErrorShare === undefined ? undefined : 1 - uncodedErrorShare"
-        :error-count="row?.errors"
-        subject="query"
-        data-test="dbm-detail-coverage"
-      />
+          <DbmCoverageLine
+            v-if="traceVantage && (clientRowFound || !serverAnswering)"
+            :freshness="freshness"
+            :hits="row ? [row] : []"
+            :top-n-subset="topNSubset"
+            :coded-error-share="uncodedErrorShare === undefined ? undefined : 1 - uncodedErrorShare"
+            :error-count="row?.errors"
+            subject="query"
+            data-test="dbm-detail-coverage"
+          />
 
-      <!-- Fidelity disclosure. Fires only when the series actually contains
+          <!-- Fidelity disclosure. Fires only when the series actually contains
            below-top-N windows, so it describes this chart rather than standing
            permanently and being skipped. -->
-      <OBanner
-        v-if="history?.hasBelowTopN"
-        variant="info"
-        icon="info"
-        data-test="dbm-detail-below-top-n"
-      >
-        <div class="flex flex-col gap-1">
-          <span class="font-medium">{{ t("dbm.detail.belowTopN.title") }}</span>
-          <span class="text-xs">
-            {{
-              history.backfillCapped
-                ? t("dbm.detail.belowTopN.capped", { windows: BACKFILL_MAX_WINDOWS })
-                : t("dbm.detail.belowTopN.body")
-            }}
-          </span>
-        </div>
-      </OBanner>
+          <OBanner
+            v-if="history?.hasBelowTopN"
+            variant="info"
+            icon="info"
+            data-test="dbm-detail-below-top-n"
+          >
+            <div class="flex flex-col gap-1">
+              <span class="font-medium">{{ t("dbm.detail.belowTopN.title") }}</span>
+              <span class="text-xs">
+                {{
+                  history.backfillCapped
+                    ? t("dbm.detail.belowTopN.capped", { windows: BACKFILL_MAX_WINDOWS })
+                    : t("dbm.detail.belowTopN.body")
+                }}
+              </span>
+            </div>
+          </OBanner>
 
-      <!-- Both charts are drawn from the rollup series, which only traces fill.
+          <!-- Both charts are drawn from the rollup series, which only traces fill.
            Hidden entirely rather than shown as two empty axes labelled "No
            history for this query" — there is no history because nothing traced
            it, and an empty chart reads as a gap in data we should have. -->
-      <div v-if="traceVantage" class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <DbmHistoryPanel
-          :title="t('dbm.detail.latencyTitle')"
-          :empty-label="t('dbm.detail.noSeries')"
-          :loading="loading"
-          :has-series="hasSeries"
-          :panel-schema="latencyPanelSchema"
-          :selected-time-obj="selectedTimeObj"
-          :injected-promql-data="latencyInjectedData"
-          panel-data-test="dbm-detail-latency-panel"
-          data-test="dbm-detail-latency-chart"
-        />
+          <div v-if="traceVantage" class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <DbmHistoryPanel
+              :title="t('dbm.detail.latencyTitle')"
+              :empty-label="t('dbm.detail.noSeries')"
+              :loading="loading"
+              :has-series="hasSeries"
+              :panel-schema="latencyPanelSchema"
+              :selected-time-obj="selectedTimeObj"
+              :injected-promql-data="latencyInjectedData"
+              panel-data-test="dbm-detail-latency-panel"
+              data-test="dbm-detail-latency-chart"
+            />
 
-        <DbmHistoryPanel
-          :title="t('dbm.detail.volumeTitle')"
-          :empty-label="t('dbm.detail.noSeries')"
-          :loading="loading"
-          :has-series="hasSeries"
-          :panel-schema="volumePanelSchema"
-          :selected-time-obj="selectedTimeObj"
-          :injected-promql-data="volumeInjectedData"
-          panel-data-test="dbm-detail-volume-panel"
-          data-test="dbm-detail-volume-chart"
-        />
-      </div>
+            <DbmHistoryPanel
+              :title="t('dbm.detail.volumeTitle')"
+              :empty-label="t('dbm.detail.noSeries')"
+              :loading="loading"
+              :has-series="hasSeries"
+              :panel-schema="volumePanelSchema"
+              :selected-time-obj="selectedTimeObj"
+              :injected-promql-data="volumeInjectedData"
+              panel-data-test="dbm-detail-volume-panel"
+              data-test="dbm-detail-volume-chart"
+            />
+          </div>
 
-      <!-- Where it runs (FR-5). The same rows the two charts merge per window,
+          <!-- Where it runs (FR-5). The same rows the two charts merge per window,
            folded per (instance, database) instead — served precomputed on the
            history response, so this section costs no extra read. Its rows ARE
            the page's dimension filters: clicking one narrows every number on
@@ -448,523 +501,573 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            render — their share must stay visible — but refuse the click: the
            stored rows spell "absent" two ways, and a filter on one spelling
            would silently miss the other. -->
-      <DbmSection
-        v-if="traceVantage && (whereRows.length || whereScopeActive)"
-        :title="t('dbm.detail.whereItRuns.title')"
-        header-align="center"
-        data-test="dbm-detail-where-it-runs"
-      >
-        <template #hint>
-          <span class="text-text-secondary text-xs">
-            {{ t("dbm.detail.whereItRuns.hint") }}
-            <OTooltip side="top" :content="t('dbm.detail.whereItRuns.trackedHint')" />
-          </span>
-        </template>
-        <template #actions>
-          <div class="flex-1"></div>
-          <OButton
-            v-if="whereScopeActive"
-            variant="outline"
-            size="sm"
-            class="shrink-0"
-            data-test="dbm-detail-where-show-all"
-            @click="clearWhereScope"
+          <DbmSection
+            v-if="traceVantage && (whereRows.length || whereScopeActive)"
+            :title="t('dbm.detail.whereItRuns.title')"
+            header-align="center"
+            data-test="dbm-detail-where-it-runs"
           >
-            {{ t("dbm.detail.whereItRuns.showAll") }}
-          </OButton>
-        </template>
-
-        <!-- A focus that empties out still renders the section: the reader
-             needs the way back, not a page that quietly hid the exit. -->
-        <div
-          v-if="!whereRows.length"
-          class="text-text-muted p-6 pt-2 text-sm"
-          data-test="dbm-detail-where-empty"
-        >
-          {{ t("dbm.detail.whereItRuns.emptyFiltered") }}
-        </div>
-        <OTable
-          v-else
-          :data="whereRows"
-          :columns="whereColumns"
-          row-key="rowKey"
-          :loading="loading"
-          :frame="false"
-          :show-global-filter="false"
-          :page-size="10"
-          table-id="dbm-query-where-it-runs"
-          data-test="dbm-detail-where-table"
-          @row-click="onWhereRowClick"
-        >
-          <template #cell-location="{ row: whereRow }">
-            <div class="flex min-w-0 items-center gap-1.5" :class="whereRow.isChild ? 'pl-6' : ''">
-              <OIcon
-                v-if="whereRow.isChild"
-                name="database"
-                size="xs"
-                class="text-text-label shrink-0"
-              />
-              <span
-                class="min-w-0 truncate"
-                :class="[
-                  whereRow.isChild ? 'text-text-secondary text-xs' : 'text-text-heading text-sm',
-                  whereRow.label ? '' : 'text-text-muted italic',
-                ]"
-              >
-                {{
-                  whereRow.label
-                    ? whereRow.label
-                    : whereRow.isChild
-                      ? t("dbm.breakdown.noSchema")
-                      : t("dbm.detail.whereItRuns.noInstance")
-                }}
+            <template #hint>
+              <span class="text-text-secondary text-xs">
+                {{ t("dbm.detail.whereItRuns.hint") }}
+                <OTooltip side="top" :content="t('dbm.detail.whereItRuns.trackedHint')" />
               </span>
-              <OTag
-                v-if="isWhereRowActive(whereRow, whereScope)"
-                :label="t('dbm.detail.whereItRuns.focused')"
-                size="xs"
-                :data-test="`dbm-detail-where-focused-${whereRow.rowKey}`"
+            </template>
+            <template #actions>
+              <div class="flex-1"></div>
+              <OButton
+                v-if="whereScopeActive"
+                variant="outline"
+                size="sm"
+                class="shrink-0"
+                data-test="dbm-detail-where-show-all"
+                @click="clearWhereScope"
               >
-                <OTooltip side="top" :content="t('dbm.detail.whereItRuns.focusHint')" />
-              </OTag>
-            </div>
-          </template>
-          <template #cell-load="{ row: whereRow }">
-            <ODataBarCell
-              :value="whereRow.totalTimeNs"
-              :max="whereTimeMax"
-              :display="`${formatNs(whereRow.totalTimeNs)} · ${formatPercent(whereRow.share, 0)}`"
-            />
-          </template>
-          <template #cell-calls="{ row: whereRow }">
-            <span class="text-text-body font-mono text-xs tabular-nums">
-              {{ formatCount(whereRow.calls) }}
-            </span>
-          </template>
-          <template #cell-avg="{ row: whereRow }">
-            <span
-              class="font-mono text-xs tabular-nums"
-              :class="whereRow.avgNs === null ? 'text-text-muted' : 'text-text-body'"
+                {{ t("dbm.detail.whereItRuns.showAll") }}
+              </OButton>
+            </template>
+
+            <!-- A focus that empties out still renders the section: the reader
+             needs the way back, not a page that quietly hid the exit. -->
+            <div
+              v-if="!whereRows.length"
+              class="text-text-muted p-6 pt-2 text-sm"
+              data-test="dbm-detail-where-empty"
             >
-              {{ whereRow.avgNs === null ? raw("—") : formatNs(whereRow.avgNs) }}
-            </span>
-          </template>
-          <!-- A failure RATE, not a count — and red only past the calibrated
+              {{ t("dbm.detail.whereItRuns.emptyFiltered") }}
+            </div>
+            <OTable
+              v-else
+              :data="whereRows"
+              :columns="whereColumns"
+              row-key="rowKey"
+              :loading="loading"
+              :frame="false"
+              :show-global-filter="false"
+              :page-size="10"
+              table-id="dbm-query-where-it-runs"
+              data-test="dbm-detail-where-table"
+              @row-click="onWhereRowClick"
+            >
+              <template #cell-location="{ row: whereRow }">
+                <div
+                  class="flex min-w-0 items-center gap-1.5"
+                  :class="whereRow.isChild ? 'pl-6' : ''"
+                >
+                  <OIcon
+                    v-if="whereRow.isChild"
+                    name="database"
+                    size="xs"
+                    class="text-text-label shrink-0"
+                  />
+                  <span
+                    class="min-w-0 truncate"
+                    :class="[
+                      whereRow.isChild
+                        ? 'text-text-secondary text-xs'
+                        : 'text-text-heading text-sm',
+                      whereRow.label ? '' : 'text-text-muted italic',
+                    ]"
+                  >
+                    {{
+                      whereRow.label
+                        ? whereRow.label
+                        : whereRow.isChild
+                          ? t("dbm.breakdown.noSchema")
+                          : t("dbm.detail.whereItRuns.noInstance")
+                    }}
+                  </span>
+                  <OTag
+                    v-if="isWhereRowActive(whereRow, whereScope)"
+                    :label="t('dbm.detail.whereItRuns.focused')"
+                    size="xs"
+                    :data-test="`dbm-detail-where-focused-${whereRow.rowKey}`"
+                  >
+                    <OTooltip side="top" :content="t('dbm.detail.whereItRuns.focusHint')" />
+                  </OTag>
+                </div>
+              </template>
+              <template #cell-load="{ row: whereRow }">
+                <ODataBarCell
+                  :value="whereRow.totalTimeNs"
+                  :max="whereTimeMax"
+                  :display="`${formatNs(whereRow.totalTimeNs)} · ${formatPercent(whereRow.share, 0)}`"
+                />
+              </template>
+              <template #cell-calls="{ row: whereRow }">
+                <span class="text-text-body font-mono text-xs tabular-nums">
+                  {{ formatCount(whereRow.calls) }}
+                </span>
+              </template>
+              <template #cell-avg="{ row: whereRow }">
+                <span
+                  class="font-mono text-xs tabular-nums"
+                  :class="whereRow.avgNs === null ? 'text-text-muted' : 'text-text-body'"
+                >
+                  {{ whereRow.avgNs === null ? raw("—") : formatNs(whereRow.avgNs) }}
+                </span>
+              </template>
+              <!-- A failure RATE, not a count — and red only past the calibrated
                threshold, same gating as the headline tile, so the two cannot
                give different answers to one question. -->
-          <template #cell-errors="{ row: whereRow }">
-            <span
-              class="font-mono text-xs tabular-nums"
-              :class="
-                isCriticalErrorRate(whereRow.errors, whereRow.calls)
-                  ? 'text-status-error-text font-semibold'
-                  : 'text-text-muted'
-              "
-            >
-              <template v-if="whereRow.errorRate === null">{{ raw("—") }}</template>
-              <template v-else-if="whereRow.errors <= 0">{{
-                t("dbm.queries.errorsNone")
-              }}</template>
-              <template v-else>{{ formatPercent(whereRow.errorRate, 0) }}</template>
-            </span>
-          </template>
-        </OTable>
-      </DbmSection>
+              <template #cell-errors="{ row: whereRow }">
+                <span
+                  class="font-mono text-xs tabular-nums"
+                  :class="
+                    isCriticalErrorRate(whereRow.errors, whereRow.calls)
+                      ? 'text-status-error-text font-semibold'
+                      : 'text-text-muted'
+                  "
+                >
+                  <template v-if="whereRow.errorRate === null">{{ raw("—") }}</template>
+                  <template v-else-if="whereRow.errors <= 0">{{
+                    t("dbm.queries.errorsNone")
+                  }}</template>
+                  <template v-else>{{ formatPercent(whereRow.errorRate, 0) }}</template>
+                </span>
+              </template>
+            </OTable>
+          </DbmSection>
 
-      <!-- Errors by code (FR-5). Rendered only when there ARE coded failures:
+          <!-- Errors by code (FR-5). Rendered only when there ARE coded failures:
            a standing empty "no errors" card would spend prime space saying
            nothing. The counts prefer the server's exact per-code tally over the
            range; when the scope is narrower than that tally exists at, the
            section falls back to counting the sample rows below — and SAYS so,
            because a capped sample undercounts precisely when errors spike. -->
-      <DbmSection
-        v-if="errorClasses.length"
-        :title="t('dbm.detail.errorsByCode.title')"
-        data-test="dbm-detail-error-codes"
-      >
-        <template #hint>
-          <span class="text-text-secondary text-xs" data-test="dbm-detail-error-codes-provenance">
-            {{
-              errorClassesExact
-                ? t("dbm.detail.errorsByCode.exactHint")
-                : t("dbm.detail.errorsByCode.sampleHint")
-            }}
-          </span>
-        </template>
-        <div class="flex flex-col gap-1.5 p-3 pt-1">
-          <div
-            v-for="entry in errorClasses"
-            :key="entry.status_code"
-            class="flex items-center gap-3"
-            :data-test="`dbm-detail-error-code-${entry.status_code}`"
+          <DbmSection
+            v-if="errorClasses.length"
+            :title="t('dbm.detail.errorsByCode.title')"
+            data-test="dbm-detail-error-codes"
           >
-            <span class="text-text-heading w-28 shrink-0 truncate font-mono text-xs">
-              {{
-                entry.status_code === "unknown"
-                  ? t("dbm.detail.errorsByCode.noCode")
-                  : entry.status_code
-              }}
-            </span>
-            <DbmShareBar
-              :share="errorCodeBarShare(entry)"
-              track-class="h-1.5 w-40 shrink-0"
-              fill-class="bg-status-error-text"
-            />
-            <span class="text-text-body font-mono text-xs tabular-nums">
-              {{ formatCount(entry.errors) }}
-            </span>
-          </div>
-        </div>
-      </DbmSection>
-
-      <!-- The two panels below read RAW traces, so they need to know which
-           trace stream this fingerprint lives on — and the queries endpoint does
-           not carry it. With several streams in the org there is no way to tell,
-           and picking one silently would put another stream's callers under this
-           query's headline numbers. So it says so, and asks. -->
-      <!-- The picker exists to disambiguate WHICH trace stream to read. With no
-           trace vantage for this fingerprint there is nothing to pick between —
-           every stream would answer empty — so asking would be busywork. -->
-      <OBanner
-        v-if="traceVantage && streamAmbiguous"
-        variant="warning"
-        class="shrink-0"
-        data-test="dbm-detail-stream-ambiguous"
-      >
-        <div class="flex flex-wrap items-center gap-2">
-          <span>{{ t("dbm.detail.ambiguousStream") }}</span>
-          <OSelect
-            :model-value="pickedStream"
-            :options="streamOptions"
-            width="sm"
-            :placeholder="t('dbm.detail.pickStream')"
-            data-test="dbm-detail-stream-picker"
-            @update:model-value="onStreamPick"
-          />
-        </div>
-      </OBanner>
-
-      <!-- Calling endpoints: who is responsible for this query's load. The
-           per-caller bars answer the share question ("which caller do I go
-           talk to") faster than a number does. -->
-      <!-- Callers are read from raw traces and exist nowhere else. Hidden, not
-           shown as an empty table saying we couldn't tell which part of the
-           application ran this: that sentence is a finding about broken
-           instrumentation, and here nothing was instrumented to begin with. -->
-      <DbmSection
-        v-if="traceVantage"
-        :title="t('dbm.detail.endpointsTitle')"
-        header-align="between"
-        data-test="dbm-detail-endpoints"
-      >
-        <template #hint>
-          <span class="text-text-secondary text-xs">{{ t("dbm.detail.endpointsHint") }}</span>
-        </template>
-        <OTable
-          :data="endpoints"
-          :columns="endpointColumns"
-          row-key="rowKey"
-          :loading="loading"
-          :frame="false"
-          :show-global-filter="false"
-          :page-size="10"
-          table-id="dbm-query-endpoints"
-          data-test="dbm-detail-endpoints-table"
-        >
-          <template #cell-caller="{ row: endpoint }">
-            <div class="flex min-w-0 flex-col">
-              <span class="text-text-heading truncate text-sm">{{ endpoint.serviceLabel }}</span>
-              <span v-if="endpoint.endpoint" class="text-text-secondary truncate text-xs">
-                {{ endpoint.endpoint }}
+            <template #hint>
+              <span
+                class="text-text-secondary text-xs"
+                data-test="dbm-detail-error-codes-provenance"
+              >
+                {{
+                  errorClassesExact
+                    ? t("dbm.detail.errorsByCode.exactHint")
+                    : t("dbm.detail.errorsByCode.sampleHint")
+                }}
               </span>
+            </template>
+            <div class="flex flex-col gap-1.5 p-3 pt-1">
+              <div
+                v-for="entry in errorClasses"
+                :key="entry.status_code"
+                class="flex items-center gap-3"
+                :data-test="`dbm-detail-error-code-${entry.status_code}`"
+              >
+                <span class="text-text-heading w-28 shrink-0 truncate font-mono text-xs">
+                  {{
+                    entry.status_code === "unknown"
+                      ? t("dbm.detail.errorsByCode.noCode")
+                      : entry.status_code
+                  }}
+                </span>
+                <DbmShareBar
+                  :share="errorCodeBarShare(entry)"
+                  track-class="h-1.5 w-40 shrink-0"
+                  fill-class="bg-status-error-text"
+                />
+                <span class="text-text-body font-mono text-xs tabular-nums">
+                  {{ formatCount(entry.errors) }}
+                </span>
+              </div>
             </div>
-          </template>
-          <template #cell-calls="{ row: endpoint }">
-            <ODataBarCell
-              :value="endpoint.calls"
-              :max="endpointCallsMax"
-              :display="`${formatCount(endpoint.calls)} · ${formatPercent(endpoint.share)}`"
-            />
-          </template>
-          <template #cell-errors="{ row: endpoint }">
-            <span
-              class="tabular-nums"
-              :class="endpoint.errors > 0 ? 'text-status-error-text' : 'text-text-muted'"
-            >
-              {{ formatCount(endpoint.errors) }}
-            </span>
-          </template>
-          <template #cell-p95_ns="{ row: endpoint }">
-            <span class="tabular-nums">{{ formatNs(endpoint.p95_ns) }}</span>
-          </template>
-          <template #cell-actions="{ row: endpoint }">
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              icon-left="open-in-new"
-              :data-test="`dbm-detail-endpoint-traces-${endpoint.rowKey}`"
-              @click="openEndpointTraces(endpoint)"
-            >
-              <OTooltip side="left" :content="t('dbm.detail.viewTraces')" />
-            </OButton>
-          </template>
-          <template #empty>
-            <div v-if="!loading" class="text-text-muted p-6 text-center text-sm">
-              {{ endpointsError ?? t("dbm.detail.noEndpoints") }}
-            </div>
-          </template>
-        </OTable>
-      </DbmSection>
+          </DbmSection>
+        </OTabPanel>
 
-      <!-- Query plans. Provenance is PER ROW now (W-E3): generic NULL-bound
+        <!-- ── Query plans ─────────────────────────────────────────────────
+             The diagnosis, and its own tab rather than a card buried under
+             three tables. It is SERVER-vantage, so it is populated on a fleet
+             with no traced traffic at all — exactly where the Overview panel
+             collapses to two tiles and the Callers tab locks. -->
+        <OTabPanel name="plans" layout="flex-col" class="gap-4">
+          <!-- Query plans. Provenance is PER ROW now (W-E3): generic NULL-bound
            estimates keep the gap tag — the statement EXPLAINed with every bind
            set to NULL, never executed, no latency ever shown beside it.
            Executed auto_explain rows are the plan Postgres really ran, and
            they alone may carry a duration, labelled "across N captured
            executions" because the capture is threshold-filtered and sampled.
 
-           Above the samples, deliberately: plans are the diagnosis, samples the
-           rawest evidence, so the diagnosis reads first. -->
-      <!-- Plans are a SERVER-vantage section (captured by the collector, not
-           derived from traces), so they stay whatever the trace vantage says —
-           and follow the counters directly when the counters are leading. -->
-      <DbmSection
-        ref="plansSection"
-        :title="t('dbm.detail.plans.title')"
-        header-align="center"
-        :class="traceVantage ? '' : 'order-3'"
-        data-test="dbm-detail-plans"
-      >
-        <div v-if="plansError" class="text-text-muted p-6 text-center text-sm">
-          {{ plansError }}
-        </div>
+           On its own tab, ahead of the samples tab: plans are the diagnosis,
+           samples the rawest evidence, so the diagnosis reads first. -->
+          <!-- Plans are a SERVER-vantage section (captured by the collector, not
+           derived from traces), so this tab is populated — and stays
+           unlocked — on a fleet with no traced traffic at all. -->
+          <DbmSection
+            ref="plansSection"
+            :title="t('dbm.detail.plans.title')"
+            header-align="center"
+            data-test="dbm-detail-plans"
+          >
+            <div v-if="plansError" class="text-text-muted p-6 text-center text-sm">
+              {{ plansError }}
+            </div>
 
-        <!-- Zero plans, and the two causes read oppositely. Capture off is a
+            <!-- Zero plans, and the two causes read oppositely. Capture off is a
              config problem the reader can fix; capture on with no plan for THIS
              statement is normal — the database cannot explain a COMMIT,
              ROLLBACK or SHOW — so it must not be blamed on config. -->
-        <template v-else-if="planEmpty === 'captureOff'">
-          <DbmStateNote
-            :title="t('dbm.detail.plans.noPlans')"
-            :hint="t('dbm.detail.plans.noPlansHint')"
-            placement="centered"
-          />
-        </template>
+            <template v-else-if="planEmpty === 'captureOff'">
+              <DbmStateNote
+                :title="t('dbm.detail.plans.noPlans')"
+                :hint="t('dbm.detail.plans.noPlansHint')"
+                placement="centered"
+              />
+            </template>
 
-        <template v-else-if="planEmpty === 'noPlanForQuery'">
-          <DbmStateNote
-            :title="t('dbm.detail.plans.noPlanForQuery')"
-            :hint="t('dbm.detail.plans.noPlanForQueryHint')"
-            placement="centered"
-          />
-        </template>
+            <template v-else-if="planEmpty === 'noPlanForQuery'">
+              <DbmStateNote
+                :title="t('dbm.detail.plans.noPlanForQuery')"
+                :hint="t('dbm.detail.plans.noPlanForQueryHint')"
+                placement="centered"
+              />
+            </template>
 
-        <!-- Good news, not a gap: executed-plan capture is on and running, and
+            <!-- Good news, not a gap: executed-plan capture is on and running, and
              no execution of this query was slow enough to be captured. Must
              never read as a config error. -->
-        <template v-else-if="planEmpty === 'noExecutionCaptured'">
-          <DbmStateNote
-            :title="t('dbm.detail.plans.noExecutionCaptured')"
-            :hint="t('dbm.detail.plans.noExecutionCapturedHint')"
-            placement="centered"
-            data-test="dbm-detail-plans-not-slow"
-          />
-        </template>
+            <template v-else-if="planEmpty === 'noExecutionCaptured'">
+              <DbmStateNote
+                :title="t('dbm.detail.plans.noExecutionCaptured')"
+                :hint="t('dbm.detail.plans.noExecutionCapturedHint')"
+                placement="centered"
+                data-test="dbm-detail-plans-not-slow"
+              />
+            </template>
 
-        <template v-else>
-          <!-- Drift leads the section when it happened; otherwise the caveat
+            <template v-else>
+              <!-- Drift leads the section when it happened; otherwise the caveat
                does, because a single stable shape is NOT an all-clear. -->
-          <OBanner
-            v-if="planDrift === 'drifted'"
-            variant="warning"
-            class="mx-3 mb-2"
-            data-test="dbm-detail-plans-drift"
-          >
-            {{ t("dbm.detail.plans.driftCallout", { count: plans.length }) }}
-          </OBanner>
-          <p v-else class="text-text-muted mx-3 mb-2 text-xs" data-test="dbm-detail-plans-stable">
-            {{ t("dbm.detail.plans.stableCaveat") }}
-          </p>
-
-          <div class="flex flex-col gap-3 p-3 pt-0">
-            <article
-              v-for="plan in plans"
-              :key="plan.rowKey"
-              class="border-border-default rounded-default border"
-              :data-test="`dbm-detail-plan-${plan.planHash}`"
-            >
-              <header
-                class="border-border-default flex flex-wrap items-center gap-x-4 gap-y-1 border-b p-2"
+              <OBanner
+                v-if="planDrift === 'drifted'"
+                variant="warning"
+                class="mx-3 mb-2"
+                data-test="dbm-detail-plans-drift"
               >
-                <span class="text-text-heading font-mono text-xs">{{ plan.planHash }}</span>
-                <!-- Per-row provenance (E-C): only GENERIC rows keep the gap
+                {{ t("dbm.detail.plans.driftCallout", { count: plans.length }) }}
+              </OBanner>
+              <p
+                v-else
+                class="text-text-muted mx-3 mb-2 text-xs"
+                data-test="dbm-detail-plans-stable"
+              >
+                {{ t("dbm.detail.plans.stableCaveat") }}
+              </p>
+
+              <div class="flex flex-col gap-3 p-3 pt-0">
+                <article
+                  v-for="plan in plans"
+                  :key="plan.rowKey"
+                  class="border-border-default rounded-default border"
+                  :data-test="`dbm-detail-plan-${plan.planHash}`"
+                >
+                  <header
+                    class="border-border-default flex flex-wrap items-center gap-x-4 gap-y-1 border-b p-2"
+                  >
+                    <span class="text-text-heading font-mono text-xs">{{ plan.planHash }}</span>
+                    <!-- Per-row provenance (E-C): only GENERIC rows keep the gap
                      tag — they are the never-executed NULL-bound estimate.
                      Executed rows are labelled as what they are instead. -->
-                <OTag
-                  v-if="plan.planSource === 'auto_explain'"
-                  variant="success-soft"
-                  size="xs"
-                  :label="t('dbm.detail.plans.executedLabel')"
-                  :data-test="`dbm-detail-plan-source-executed-${plan.planHash}`"
-                >
-                  <OTooltip side="top" :content="t('dbm.detail.plans.executedTooltip')" />
-                </OTag>
-                <OTag
-                  v-else
-                  type="dataConfidence"
-                  value="gap"
-                  :label="t('dbm.detail.plans.sourceLabel')"
-                  :data-test="`dbm-detail-plan-source-generic-${plan.planHash}`"
-                >
-                  <OTooltip side="top" :content="t('dbm.detail.plans.sourceTooltip')" />
-                </OTag>
-                <!-- No "share of calls" here (W2): it divided this plan's calls
+                    <OTag
+                      v-if="plan.planSource === 'auto_explain'"
+                      variant="success-soft"
+                      size="xs"
+                      :label="t('dbm.detail.plans.executedLabel')"
+                      :data-test="`dbm-detail-plan-source-executed-${plan.planHash}`"
+                    >
+                      <OTooltip side="top" :content="t('dbm.detail.plans.executedTooltip')" />
+                    </OTag>
+                    <OTag
+                      v-else
+                      type="dataConfidence"
+                      value="gap"
+                      :label="t('dbm.detail.plans.sourceLabel')"
+                      :data-test="`dbm-detail-plan-source-generic-${plan.planHash}`"
+                    >
+                      <OTooltip side="top" :content="t('dbm.detail.plans.sourceTooltip')" />
+                    </OTag>
+                    <!-- No "share of calls" here (W2): it divided this plan's calls
                      by a window total summed from a DELTA feed whose first
                      emission per statement carries the entire
                      pg_stat_statements backlog, so the percentage was a
                      proportion of a total that never described the window. -->
-                <span class="text-text-muted text-xs">
-                  {{ t("dbm.detail.plans.firstSeen") }}: {{ formatClock(plan.firstSeen) }}
-                </span>
-                <span class="text-text-muted text-xs">
-                  {{ t("dbm.detail.plans.lastSeen") }}: {{ formatClock(plan.lastSeen) }}
-                </span>
-                <!-- Duration IFF the hit measured one — executed rows only,
+                    <span class="text-text-muted text-xs">
+                      {{ t("dbm.detail.plans.firstSeen") }}: {{ formatClock(plan.firstSeen) }}
+                    </span>
+                    <span class="text-text-muted text-xs">
+                      {{ t("dbm.detail.plans.lastSeen") }}: {{ formatClock(plan.lastSeen) }}
+                    </span>
+                    <!-- Duration IFF the hit measured one — executed rows only,
                      phrased "across N captured executions": the capture is
                      threshold-filtered and possibly sampled, so this is the
                      slow tail of a sample, never "average latency". -->
-                <span
-                  v-if="plan.avgDurationMs !== undefined"
-                  class="text-text-secondary text-xs tabular-nums"
-                  :data-test="`dbm-detail-plan-duration-${plan.planHash}`"
-                >
-                  {{
-                    t("dbm.detail.plans.capturedDurations", {
-                      avg: formatNs(plan.avgDurationMs * 1e6),
-                      max: formatNs((plan.maxDurationMs ?? plan.avgDurationMs) * 1e6),
-                      count: plan.executions ?? 1,
-                    })
-                  }}
-                </span>
-              </header>
+                    <span
+                      v-if="plan.avgDurationMs !== undefined"
+                      class="text-text-secondary text-xs tabular-nums"
+                      :data-test="`dbm-detail-plan-duration-${plan.planHash}`"
+                    >
+                      {{
+                        t("dbm.detail.plans.capturedDurations", {
+                          avg: formatNs(plan.avgDurationMs * 1e6),
+                          max: formatNs((plan.maxDurationMs ?? plan.avgDurationMs) * 1e6),
+                          count: plan.executions ?? 1,
+                        })
+                      }}
+                    </span>
+                  </header>
 
-              <!-- A nested list indented by depth, deliberately not a flame
+                  <!-- A nested list indented by depth, deliberately not a flame
                    graph: a correct readable tree beats a half-built diagram. -->
-              <ol v-if="plan.nodes.length" class="flex flex-col gap-0.5 p-2">
-                <li
-                  v-for="(node, index) in plan.nodes"
-                  :key="`${plan.rowKey}-${index}`"
-                  class="flex items-baseline gap-2 text-xs"
-                  :class="planIndentClass(node.depth)"
-                >
-                  <span class="text-text-heading">{{ raw(node.nodeType) }}</span>
-                  <span v-if="node.relation" class="text-text-secondary">
-                    {{ raw(node.relation) }}
-                  </span>
-                  <span v-if="node.index" class="text-text-secondary font-mono">
-                    {{ raw(node.index) }}
-                  </span>
-                  <span v-if="node.totalCost !== null" class="text-text-muted tabular-nums">
-                    {{ t("dbm.detail.plans.nodeCost", { cost: formatCount(node.totalCost) }) }}
-                  </span>
-                  <!-- est → act, only where the plan measured actuals
+                  <ol v-if="plan.nodes.length" class="flex flex-col gap-0.5 p-2">
+                    <li
+                      v-for="(node, index) in plan.nodes"
+                      :key="`${plan.rowKey}-${index}`"
+                      class="flex items-baseline gap-2 text-xs"
+                      :class="planIndentClass(node.depth)"
+                    >
+                      <span class="text-text-heading">{{ raw(node.nodeType) }}</span>
+                      <span v-if="node.relation" class="text-text-secondary">
+                        {{ raw(node.relation) }}
+                      </span>
+                      <span v-if="node.index" class="text-text-secondary font-mono">
+                        {{ raw(node.index) }}
+                      </span>
+                      <span v-if="node.totalCost !== null" class="text-text-muted tabular-nums">
+                        {{ t("dbm.detail.plans.nodeCost", { cost: formatCount(node.totalCost) }) }}
+                      </span>
+                      <!-- est → act, only where the plan measured actuals
                        (executed, log_analyze on). Estimate-vs-actual skew is
                        the highest-value signal an executed plan adds: it is
                        the root cause of most plan-choice pathologies, and the
                        generic plan cannot express it at all. -->
-                  <span
-                    v-if="node.actualRows !== null"
-                    class="text-text-secondary tabular-nums"
-                    data-test="dbm-detail-plan-est-act"
-                  >
-                    {{
-                      t("dbm.detail.plans.estVsAct", {
-                        est: formatCount(node.planRows ?? 0),
-                        act: formatCount(node.actualRows),
-                      })
-                    }}
-                  </span>
-                </li>
-              </ol>
-              <p v-else class="text-text-muted p-2 text-xs">
-                {{ t("dbm.detail.plans.noTree") }}
-              </p>
-            </article>
-          </div>
-        </template>
-      </DbmSection>
+                      <span
+                        v-if="node.actualRows !== null"
+                        class="text-text-secondary tabular-nums"
+                        data-test="dbm-detail-plan-est-act"
+                      >
+                        {{
+                          t("dbm.detail.plans.estVsAct", {
+                            est: formatCount(node.planRows ?? 0),
+                            act: formatCount(node.actualRows),
+                          })
+                        }}
+                      </span>
+                    </li>
+                  </ol>
+                  <p v-else class="text-text-muted p-2 text-xs">
+                    {{ t("dbm.detail.plans.noTree") }}
+                  </p>
+                </article>
+              </div>
+            </template>
+          </DbmSection>
+        </OTabPanel>
 
-      <!-- Slow samples. The scatter spreads across BOTH
+        <!-- ── Callers and examples ────────────────────────────────────────
+             The trace-vantage evidence, all three blocks of it. They belong
+             together because they share one dependency: the resolved trace
+             stream. The picker below is literally the control for the two
+             tables under it, so it lives on their tab and nowhere else. -->
+        <OTabPanel name="callers" layout="flex-col" class="gap-4">
+          <!-- The two panels below read RAW traces, so they need to know which
+           trace stream this fingerprint lives on — and the queries endpoint does
+           not carry it. With several streams in the org there is no way to tell,
+           and picking one silently would put another stream's callers under this
+           query's headline numbers. So it says so, and asks. -->
+          <!-- The picker exists to disambiguate WHICH trace stream to read. With no
+           trace vantage for this fingerprint there is nothing to pick between —
+           every stream would answer empty — so asking would be busywork. -->
+          <OBanner
+            v-if="traceVantage && streamAmbiguous"
+            variant="warning"
+            class="shrink-0"
+            data-test="dbm-detail-stream-ambiguous"
+          >
+            <div class="flex flex-wrap items-center gap-2">
+              <span>{{ t("dbm.detail.ambiguousStream") }}</span>
+              <OSelect
+                :model-value="pickedStream"
+                :options="streamOptions"
+                width="sm"
+                :placeholder="t('dbm.detail.pickStream')"
+                data-test="dbm-detail-stream-picker"
+                @update:model-value="onStreamPick"
+              />
+            </div>
+          </OBanner>
+
+          <!-- Calling endpoints: who is responsible for this query's load. The
+           per-caller bars answer the share question ("which caller do I go
+           talk to") faster than a number does. -->
+          <!-- Callers are read from raw traces and exist nowhere else. Hidden, not
+           shown as an empty table saying we couldn't tell which part of the
+           application ran this: that sentence is a finding about broken
+           instrumentation, and here nothing was instrumented to begin with. -->
+          <DbmSection
+            v-if="traceVantage"
+            :title="t('dbm.detail.endpointsTitle')"
+            header-align="between"
+            data-test="dbm-detail-endpoints"
+          >
+            <template #hint>
+              <span class="text-text-secondary text-xs">{{ t("dbm.detail.endpointsHint") }}</span>
+            </template>
+            <OTable
+              :data="endpoints"
+              :columns="endpointColumns"
+              row-key="rowKey"
+              :loading="loading"
+              :frame="false"
+              :show-global-filter="false"
+              :page-size="10"
+              table-id="dbm-query-endpoints"
+              data-test="dbm-detail-endpoints-table"
+            >
+              <template #cell-caller="{ row: endpoint }">
+                <div class="flex min-w-0 flex-col">
+                  <span class="text-text-heading truncate text-sm">{{
+                    endpoint.serviceLabel
+                  }}</span>
+                  <span v-if="endpoint.endpoint" class="text-text-secondary truncate text-xs">
+                    {{ endpoint.endpoint }}
+                  </span>
+                </div>
+              </template>
+              <template #cell-calls="{ row: endpoint }">
+                <ODataBarCell
+                  :value="endpoint.calls"
+                  :max="endpointCallsMax"
+                  :display="`${formatCount(endpoint.calls)} · ${formatPercent(endpoint.share)}`"
+                />
+              </template>
+              <template #cell-errors="{ row: endpoint }">
+                <span
+                  class="tabular-nums"
+                  :class="endpoint.errors > 0 ? 'text-status-error-text' : 'text-text-muted'"
+                >
+                  {{ formatCount(endpoint.errors) }}
+                </span>
+              </template>
+              <template #cell-p95_ns="{ row: endpoint }">
+                <span class="tabular-nums">{{ formatNs(endpoint.p95_ns) }}</span>
+              </template>
+              <template #cell-actions="{ row: endpoint }">
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="open-in-new"
+                  :data-test="`dbm-detail-endpoint-traces-${endpoint.rowKey}`"
+                  @click="openEndpointTraces(endpoint)"
+                >
+                  <OTooltip side="left" :content="t('dbm.detail.viewTraces')" />
+                </OButton>
+              </template>
+              <template #empty>
+                <div v-if="!loading" class="text-text-muted p-6 text-center text-sm">
+                  {{ endpointsError ?? t("dbm.detail.noEndpoints") }}
+                </div>
+              </template>
+            </OTable>
+          </DbmSection>
+
+          <!-- Slow samples. The scatter spreads across BOTH
            time and duration so the distribution's shape is visible, not only
            its tail. Every point pivots to its trace. -->
-      <!-- Every sample here is a raw SPAN, and each row's only action is a pivot
+          <!-- Every sample here is a raw SPAN, and each row's only action is a pivot
            to its trace. With no trace vantage there is neither a row nor a
            trace to pivot to. -->
-      <DbmSection
-        v-if="traceVantage"
-        :title="t('dbm.detail.samplesTitle')"
-        header-align="between"
-        data-test="dbm-detail-samples"
-      >
-        <template #hint>
-          <span class="text-text-secondary text-xs">{{ t("dbm.detail.samplesHint") }}</span>
-        </template>
+          <DbmSection
+            v-if="traceVantage"
+            :title="t('dbm.detail.samplesTitle')"
+            header-align="between"
+            data-test="dbm-detail-samples"
+          >
+            <template #hint>
+              <span class="text-text-secondary text-xs">{{ t("dbm.detail.samplesHint") }}</span>
+            </template>
 
-        <div v-if="samples.length" class="h-50 w-full px-3">
-          <ChartRenderer :data="scatterData" @click="onSampleClick" />
-        </div>
-
-        <OTable
-          :data="samples"
-          :columns="sampleColumns"
-          row-key="rowKey"
-          :loading="loading"
-          :frame="false"
-          :show-global-filter="false"
-          :page-size="10"
-          table-id="dbm-query-samples"
-          data-test="dbm-detail-samples-table"
-          @row-click="openSampleTrace"
-        >
-          <template #cell-timestamp="{ row: sample }">
-            <span class="tabular-nums">{{ formatClock(sample.timestamp) }}</span>
-          </template>
-          <template #cell-duration="{ row: sample }">
-            <span class="tabular-nums">{{ formatNs(sample.durationNs) }}</span>
-          </template>
-          <template #cell-status="{ row: sample }">
-            <OTag
-              v-if="sample.isError"
-              type="dataConfidence"
-              value="gap"
-              :label="t('dbm.detail.sampleError')"
-            />
-            <span v-else class="text-text-muted">{{ raw("—") }}</span>
-          </template>
-          <template #cell-actions="{ row: sample }">
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              icon-left="open-in-new"
-              :data-test="`dbm-detail-sample-trace-${sample.rowKey}`"
-              @click.stop="openSampleTrace(sample)"
-            >
-              <OTooltip side="left" :content="t('dbm.detail.viewTrace')" />
-            </OButton>
-          </template>
-          <template #empty>
-            <div v-if="!loading" class="text-text-muted p-6 text-center text-sm">
-              {{ samplesError ?? t("dbm.detail.noSamples") }}
+            <div v-if="samples.length" class="h-50 w-full px-3">
+              <ChartRenderer :data="scatterData" @click="onSampleClick" />
             </div>
-          </template>
-        </OTable>
-      </DbmSection>
+
+            <OTable
+              :data="samples"
+              :columns="sampleColumns"
+              row-key="rowKey"
+              :loading="loading"
+              :frame="false"
+              :show-global-filter="false"
+              :page-size="10"
+              table-id="dbm-query-samples"
+              data-test="dbm-detail-samples-table"
+              @row-click="openSampleTrace"
+            >
+              <template #cell-timestamp="{ row: sample }">
+                <span class="tabular-nums">{{ formatClock(sample.timestamp) }}</span>
+              </template>
+              <template #cell-duration="{ row: sample }">
+                <span class="tabular-nums">{{ formatNs(sample.durationNs) }}</span>
+              </template>
+              <template #cell-status="{ row: sample }">
+                <OTag
+                  v-if="sample.isError"
+                  type="dataConfidence"
+                  value="gap"
+                  :label="t('dbm.detail.sampleError')"
+                />
+                <span v-else class="text-text-muted">{{ raw("—") }}</span>
+              </template>
+              <template #cell-actions="{ row: sample }">
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="open-in-new"
+                  :data-test="`dbm-detail-sample-trace-${sample.rowKey}`"
+                  @click.stop="openSampleTrace(sample)"
+                >
+                  <OTooltip side="left" :content="t('dbm.detail.viewTrace')" />
+                </OButton>
+              </template>
+              <template #empty>
+                <div v-if="!loading" class="text-text-muted p-6 text-center text-sm">
+                  {{ samplesError ?? t("dbm.detail.noSamples") }}
+                </div>
+              </template>
+            </OTable>
+          </DbmSection>
+
+          <!-- Both sections above are trace-gated, so with no trace vantage
+               this panel would be an empty box. The tab is locked instead and
+               its tooltip says why — the same treatment the L2 strip gives a
+               view its build cannot fill. Unreachable in practice; kept so the
+               panel can never render blank if the gate and the lock disagree. -->
+          <DbmStateNote
+            v-if="!traceVantage"
+            :title="t('dbm.detail.tabs.callers')"
+            :hint="t('dbm.detail.tabs.callersLocked')"
+            placement="centered"
+            data-test="dbm-detail-callers-empty"
+          />
+        </OTabPanel>
+      </OTabPanels>
     </div>
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -988,6 +1091,10 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -1008,6 +1115,7 @@ import { useDbmChartTheme } from "@/composables/dbm/useDbmChartTheme";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
+import { resolveQueryDetailTab, type QueryDetailTab } from "@/utils/dbm/queryDetailTabs";
 import useStreams from "@/composables/useStreams";
 import {
   contextRegistry,
@@ -1272,9 +1380,16 @@ const plansError = ref<string | null>(null);
 const plansSection = ref<InstanceType<typeof DbmSection> | null>(null);
 /**
  * The top callout promotes the drift FINDING; the plan evidence stays in its
- * section below, so the action is a jump rather than a second rendering.
+ * own tab, so the action switches tab and THEN scrolls.
+ *
+ * The scroll waits a tick: the panels unmount their inactive children
+ * (`OTabPanel` defaults to `v-if`, not `v-show`), so on the Overview tab the
+ * section this jumps to does not exist yet at click time — scrolling first
+ * would silently do nothing, which looks exactly like a jump nobody clicked.
  */
-const scrollToPlans = () => {
+const scrollToPlans = async () => {
+  selectTab("plans");
+  await nextTick();
   (plansSection.value?.$el as HTMLElement | undefined)?.scrollIntoView({
     behavior: "smooth",
     block: "start",
@@ -1303,6 +1418,78 @@ interface SampleRow {
   isError: boolean;
   statusCode: string;
 }
+
+// ─── Tabs ────────────────────────────────────────────────────────────────────
+
+/**
+ * The active tab, read from the URL rather than held in a `ref`.
+ *
+ * This page is a destination — linked from a span, pasted into incident
+ * channels — so the tab a reader was on has to survive being shared and
+ * reloaded, exactly as the time window and the dimension filters already do.
+ * `?tab=` is the page's own key: `?from=` is the ORIGIN tab of the L2 strip
+ * above and is untouched by any of this.
+ */
+const activeTab = computed<QueryDetailTab>(() => resolveQueryDetailTab(route.query.tab));
+
+/**
+ * `replace`, never `push`: flipping between tabs is looking at one query from
+ * three angles, not three navigations, and pushing would make Back walk the
+ * reader through every tab they glanced at instead of returning them to the
+ * list they came from.
+ */
+const selectTab = (tab: QueryDetailTab) => {
+  if (tab === activeTab.value) return;
+  router.replace({ query: { ...route.query, tab } }).catch(() => {});
+};
+
+const onTabChange = (key: string | number) => {
+  const tab = resolveQueryDetailTab(String(key));
+  if (detailTabs.value.find((entry) => entry.key === tab)?.disabled) return;
+  selectTab(tab);
+};
+
+/**
+ * The three tabs. Callers locks when the trace vantage reported nothing: both
+ * of its sections are trace-gated, so an unlocked tab there opens on an empty
+ * box that reads as "nothing calls this" — which is false, and is the exact
+ * mis-read Rule A exists to prevent. Plans never locks; it is server-vantage
+ * and is the one populated tab on a fleet with no APM.
+ */
+const detailTabs = computed(() => [
+  {
+    key: "overview" as const,
+    label: t("dbm.detail.tabs.overview"),
+    hint: t("dbm.detail.tabs.overviewHint"),
+    disabled: false,
+  },
+  {
+    key: "plans" as const,
+    label: t("dbm.detail.tabs.plans"),
+    hint: t("dbm.detail.tabs.plansHint"),
+    disabled: false,
+  },
+  {
+    key: "callers" as const,
+    label: t("dbm.detail.tabs.callers"),
+    hint: traceVantage.value
+      ? t("dbm.detail.tabs.callersHint")
+      : t("dbm.detail.tabs.callersLocked"),
+    disabled: !traceVantage.value,
+  },
+]);
+
+/**
+ * A reader parked on Callers when the trace vantage drops out — a window
+ * change onto a stretch nothing traced — would be left on a locked tab showing
+ * nothing. Move them to Overview, which always has something to say.
+ */
+watch(
+  () => detailTabs.value.find((tab) => tab.key === activeTab.value)?.disabled,
+  (disabled) => {
+    if (disabled) selectTab("overview");
+  },
+);
 
 /**
  * Where "back" goes: the tab the reader drilled in FROM (`?from=`), not a
