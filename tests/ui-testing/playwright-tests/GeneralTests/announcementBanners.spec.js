@@ -9,10 +9,12 @@
  * `config.isEnterprise === 'true'`. Every test therefore detects the edition
  * from the header button and skips on OSS (mirrors edition-features.spec.js).
  *
- * Each test authors its own uniquely-named banner(s) against the `_meta` org and
- * asserts on that exact message, so parallel workers never collide on a shared
- * name. A single `afterAll` publishes an empty config to `_meta` so leftover
- * banners don't leak into other shards' screenshots.
+ * Each test authors its own uniquely-named banner(s) against the `_meta` org.
+ * The server REPLACES the whole `_meta` config on every save, so the config is a
+ * single global singleton: these tests must run serially (parallel workers would
+ * overwrite each other's banners) and each test resets the config to empty in
+ * `beforeEach` so it starts from a clean slate. A final `afterAll` reset keeps
+ * leftover banners from leaking into other shards' screenshots.
  */
 
 const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -21,19 +23,45 @@ const PageManager = require('../../pages/page-manager.js');
 
 const META_ORG = '_meta';
 
-async function goToMetaSettings(page, pm) {
-  await pm.logoManagementPage.managementOrg(META_ORG);
+/**
+ * Empty the `_meta` announcement config via the API. OSS returns 403 and the
+ * write is swallowed (the suite skips on OSS anyway). `request` is either
+ * `page.request` or a freshly-opened page's request handle.
+ */
+function resetMetaConfig(request) {
+  const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+  const auth = Buffer.from(
+    `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`,
+  ).toString('base64');
+  return request
+    .put(`${baseUrl}/api/_meta/announcements/config`, {
+      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+      data: { banners: [] },
+    })
+    .catch(() => {});
+}
+
+async function goToMetaSettings(page) {
+  // MainLayout selects the org from the `org_identifier` query param on every
+  // load, so this URL is enough to land in the `_meta` context — no flaky
+  // dropdown interaction required.
   await page.goto(`${process.env.ZO_BASE_URL}/web/settings/general?org_identifier=${META_ORG}`);
   await page.waitForLoadState('domcontentloaded');
 }
 
 test.describe('Announcement Banners testcases', () => {
-  test.describe.configure({ mode: 'parallel' });
+  // The `_meta` announcement config is a single global singleton — every save
+  // REPLACES it — so these tests cannot run in parallel without overwriting each
+  // other's banners. Run serially and reset the config per test.
+  test.describe.configure({ mode: 'serial' });
   let pm;
   let isEnterprise;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
+    // Start each test from an empty config so the list round-trip (which asserts
+    // on banner indices) sees only its own banners.
+    await resetMetaConfig(page.request);
     await navigateToBase(page);
     pm = new PageManager(page);
     const edition = await pm.editionFeaturesPage.detectEdition();
@@ -43,20 +71,9 @@ test.describe('Announcement Banners testcases', () => {
 
   test.afterAll(async ({ browser }) => {
     // Reset the _meta announcement config so a leftover "all organizations"
-    // banner never leaks into other shards' screenshots. Basic auth mirrors the
-    // global-setup credential (self-hosted API auth); OSS returns 403 and the
-    // write is swallowed (the suite skips on OSS anyway).
-    const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-    const auth = Buffer.from(
-      `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`,
-    ).toString('base64');
+    // banner never leaks into other shards' screenshots.
     const page = await browser.newPage();
-    await page.request
-      .put(`${baseUrl}/api/_meta/announcements/config`, {
-        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-        data: { banners: [] },
-      })
-      .catch(() => {});
+    await resetMetaConfig(page.request);
     await page.close();
   });
 
@@ -64,7 +81,7 @@ test.describe('Announcement Banners testcases', () => {
     tag: ['@announcement-banners', '@all', '@enterprise', '@P0'],
   }, async ({ page }) => {
     test.skip(!isEnterprise, 'Runs only on Enterprise build');
-    await goToMetaSettings(page, pm);
+    await goToMetaSettings(page);
 
     const message = `E2E banner ${Date.now()}`;
     await pm.announcementBannersPage.openEditor();
@@ -86,7 +103,7 @@ test.describe('Announcement Banners testcases', () => {
     tag: ['@announcement-banners', '@all', '@enterprise', '@P1'],
   }, async ({ page }) => {
     test.skip(!isEnterprise, 'Runs only on Enterprise build');
-    await goToMetaSettings(page, pm);
+    await goToMetaSettings(page);
 
     const message = `E2E dismiss ${Date.now()}`;
     await pm.announcementBannersPage.openEditor();
@@ -112,7 +129,7 @@ test.describe('Announcement Banners testcases', () => {
     tag: ['@announcement-banners', '@all', '@enterprise', '@P1'],
   }, async ({ page }) => {
     test.skip(!isEnterprise, 'Runs only on Enterprise build');
-    await goToMetaSettings(page, pm);
+    await goToMetaSettings(page);
 
     const message = `E2E cta ${Date.now()}`;
     const ctaText = `Status page ${Date.now()}`;
@@ -137,7 +154,7 @@ test.describe('Announcement Banners testcases', () => {
     tag: ['@announcement-banners', '@all', '@enterprise', '@P1'],
   }, async ({ page }) => {
     test.skip(!isEnterprise, 'Runs only on Enterprise build');
-    await goToMetaSettings(page, pm);
+    await goToMetaSettings(page);
 
     const runId = Date.now();
     const infoMsg = `notice ${runId}`;
@@ -170,7 +187,7 @@ test.describe('Announcement Banners testcases', () => {
     await pm.announcementBannersPage.expectLiveBarOrder([warningMsg, infoMsg, promoMsg]);
 
     // Add a critical banner and re-publish: promo must disappear while the rest stay.
-    await goToMetaSettings(page, pm);
+    await goToMetaSettings(page);
     await pm.announcementBannersPage.openEditor();
     await pm.announcementBannersPage.clickAddBanner();
     await pm.announcementBannersPage.fillMessage(criticalMsg);
@@ -190,7 +207,7 @@ test.describe('Announcement Banners testcases', () => {
     tag: ['@announcement-banners', '@all', '@enterprise', '@P1'],
   }, async ({ page }) => {
     test.skip(!isEnterprise, 'Runs only on Enterprise build');
-    await goToMetaSettings(page, pm);
+    await goToMetaSettings(page);
 
     await pm.announcementBannersPage.openEditor();
     await pm.announcementBannersPage.clickAddBanner();
@@ -210,7 +227,7 @@ test.describe('Announcement Banners testcases', () => {
     tag: ['@announcement-banners', '@all', '@enterprise', '@P2'],
   }, async ({ page }) => {
     test.skip(!isEnterprise, 'Runs only on Enterprise build');
-    await goToMetaSettings(page, pm);
+    await goToMetaSettings(page);
 
     const runId = Date.now();
     const firstMsg = `first ${runId}`;
@@ -244,7 +261,7 @@ test.describe('Announcement Banners testcases', () => {
     tag: ['@announcement-banners', '@all', '@enterprise', '@P2'],
   }, async ({ page }) => {
     test.skip(!isEnterprise, 'Runs only on Enterprise build');
-    await goToMetaSettings(page, pm);
+    await goToMetaSettings(page);
 
     const message = `E2E nodismiss ${Date.now()}`;
     await pm.announcementBannersPage.openEditor();
