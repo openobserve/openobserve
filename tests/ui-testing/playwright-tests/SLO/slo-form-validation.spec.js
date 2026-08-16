@@ -22,6 +22,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const {
   seedMinimalStream,
+  seedSloMetric,
   createSloViaApi,
   countDefinition,
   deleteSlosByPrefix,
@@ -253,6 +254,226 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     const shown = (await picker.count()) + (await empty.count()) + (await hint.count());
     expect(shown, 'the alert SLI must present a picker, an empty state, or a hint')
       .toBeGreaterThan(0);
+  });
+
+  // ------------------------------------------------------------ previews
+
+  /**
+   * The COUNT preview, which is a different component from the time-slice one
+   * and was previously untested.
+   *
+   * Asserts a panel renders a CHART: every preview here has distinct empty and
+   * error states, so a root-exists assertion passes against an empty chart.
+   */
+  test('the count preview renders a chart for a valid definition', {
+    tag: ['@P1'],
+  }, async ({ page }) => {
+    await pm.sloFormPage.gotoNew(ORG);
+    await pm.sloFormPage.selectSliType('count');
+    await pm.sloFormPage.selectStream(stream);
+    await pm.sloFormPage.setExpression(
+      pm.sloFormPage.locators.goodExpr, 'status_code < 500',
+    );
+
+    await pm.sloFormPage.waitForCountPreview();
+    await pm.sloFormPage.expectCountPreviewPanelHasData('good');
+  });
+
+  // ------------------------------------------------------------ PromQL
+
+  /**
+   * A PromQL COUNT SLO, created end to end.
+   *
+   * PromQL is only offered for metrics streams — both language toggles are
+   * `v-if="isMetricsStream"` — and `CountSource::PromQl` is two expressions with
+   * no stream and no scope, so this exercises a genuinely different arm of
+   * `wireConfig()` from the SQL count path.
+   */
+  test('creates a PromQL count SLO and it round-trips', {
+    tag: ['@P1', '@promql'],
+  }, async ({ page }, testInfo) => {
+    test.setTimeout(3 * 60 * 1000);
+    const metric = uniqueName(`${workerPrefix(testInfo)}_metric`).toLowerCase();
+    await seedSloMetric(page, metric);
+    const name = uniqueName(workerPrefix(testInfo));
+
+    await pm.sloFormPage.gotoNew(ORG);
+    await pm.sloFormPage.setName(name);
+    await pm.sloFormPage.selectSliType('count');
+    await pm.sloFormPage.selectStreamType('metrics');
+    // Metrics default to PromQL, but select it explicitly so the test does not
+    // silently depend on that default.
+    await pm.sloFormPage.selectCountLanguage('prom_ql');
+
+    // BOTH expressions are required: a missing one fails deserialization.
+    await pm.sloFormPage.setExpression(
+      pm.sloFormPage.locators.promqlGood, `sum(${metric})`,
+    );
+    await pm.sloFormPage.setExpression(
+      pm.sloFormPage.locators.promqlTotal, `count(${metric})`,
+    );
+    await pm.sloFormPage.saveExpectingSuccess();
+
+    await pm.sloListPage.goto(ORG);
+    await pm.sloListPage.expectRowVisible(name);
+
+    await pm.sloListPage.openRow(name);
+    await pm.sloDetailPage.openTab('config');
+    const stored = JSON.stringify(await pm.sloDetailPage.readConfigJson());
+    expect(stored).toContain('prom_ql');
+    expect(stored).toContain(metric);
+  });
+
+  /**
+   * A PromQL TIME-SLICE SLO, created end to end.
+   *
+   * The scope field is removed rather than ignored in this mode — a PromQL plan
+   * is a bare expression with nowhere to put a `WHERE` fragment — so this also
+   * pins that the form does not submit one.
+   */
+  test('creates a PromQL time-slice SLO and it round-trips', {
+    tag: ['@P1', '@promql'],
+  }, async ({ page }, testInfo) => {
+    test.setTimeout(3 * 60 * 1000);
+    const metric = uniqueName(`${workerPrefix(testInfo)}_metric`).toLowerCase();
+    await seedSloMetric(page, metric);
+    const name = uniqueName(workerPrefix(testInfo));
+
+    await pm.sloFormPage.gotoNew(ORG);
+    await pm.sloFormPage.setName(name);
+    await pm.sloFormPage.selectSliType('time_slice');
+    await pm.sloFormPage.selectTimeSliceStreamType('metrics');
+    await pm.sloFormPage.selectTimeSliceLanguage('prom_ql');
+    await pm.sloFormPage.expectScopeHidden();
+    // A PromQL TIME-SLICE still carries stream/stream_type — unlike a PromQL
+    // COUNT, whose source is two bare expressions. Omitting it is a 422 on
+    // `missing field \`stream\``, verified against the API.
+    await pm.sloFormPage.selectTimeSliceStream(metric);
+
+    await pm.sloFormPage.setExpression(
+      pm.sloFormPage.locators.aggregate, `max(${metric})`,
+    );
+    await pm.sloFormPage.selectComparator('<');
+    await pm.sloFormPage.setThreshold(500);
+    await pm.sloFormPage.saveExpectingSuccess();
+
+    await pm.sloListPage.goto(ORG);
+    await pm.sloListPage.expectRowVisible(name);
+
+    await pm.sloListPage.openRow(name);
+    await pm.sloDetailPage.openTab('config');
+    const stored = JSON.stringify(await pm.sloDetailPage.readConfigJson());
+    expect(stored).toContain('prom_ql');
+    expect(stored).toContain(metric);
+  });
+
+  // ------------------------------------------------------- negative / edge
+
+  /**
+   * A definition with no stream cannot measure anything, and the form must say
+   * so rather than saving something inert.
+   */
+  test('saving without a stream is refused', {
+    tag: ['@P1', '@validation', '@negative'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(workerPrefix(testInfo));
+    await pm.sloFormPage.gotoNew(ORG);
+    await pm.sloFormPage.setName(name);
+    await pm.sloFormPage.selectSliType('count');
+    // No stream picked at all.
+    await pm.sloFormPage.save();
+
+    await pm.sloFormPage.expectError();
+    await pm.sloListPage.goto(ORG);
+    await pm.sloListPage.expectRowAbsent(name);
+  });
+
+  /**
+   * A malformed aggregate is only discovered when the query runs, so the preview
+   * is where the user finds out. It must show its ERROR state rather than an
+   * empty chart, which would read as "no data" and send them looking at the
+   * stream instead of the expression.
+   */
+  test('an invalid aggregate surfaces the preview error state', {
+    tag: ['@P1', '@negative'],
+  }, async ({ page }) => {
+    await pm.sloFormPage.gotoNew(ORG);
+    await pm.sloFormPage.selectSliType('time_slice');
+    await pm.sloFormPage.selectTimeSliceStream(stream);
+    await pm.sloFormPage.setExpression(
+      pm.sloFormPage.locators.aggregate, 'this_is_not_a_function(((',
+    );
+    await pm.sloFormPage.selectComparator('<');
+    await pm.sloFormPage.setThreshold(500);
+
+    await expect(
+      page.locator('[data-test="slos-slotimeslicepreview-error"]'),
+      'a broken expression must report an error, not an empty chart',
+    ).toBeVisible({ timeout: 60000 });
+  });
+
+  test('an over-long name is refused with the length constraint', {
+    tag: ['@P2', '@validation', '@negative'],
+  }, async ({ page }) => {
+    await pm.sloFormPage.gotoNew(ORG);
+    await pm.sloFormPage.setName('z'.repeat(300));
+    await pm.sloFormPage.selectSliType('count');
+    await pm.sloFormPage.selectStream(stream);
+    await pm.sloFormPage.setExpression(
+      pm.sloFormPage.locators.goodExpr, 'status_code < 500',
+    );
+    await pm.sloFormPage.save();
+
+    await pm.sloFormPage.expectError(/less than 256 characters/i);
+  });
+
+  /**
+   * Cancel must discard, not save. A cancel that quietly persisted would be the
+   * worst kind of bug: invisible until someone wonders where the SLO came from.
+   */
+  test('cancelling the form creates nothing', {
+    tag: ['@P1', '@negative'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(workerPrefix(testInfo));
+    await pm.sloFormPage.gotoNew(ORG);
+    await pm.sloFormPage.fillCountSlo({ name, stream, goodExpr: 'status_code < 500' });
+    await pm.sloFormPage.cancel();
+
+    await pm.sloListPage.goto(ORG);
+    await pm.sloListPage.expectRowAbsent(name);
+  });
+
+  /**
+   * Targets sit strictly inside (0, 100) — 100 exactly is refused because a
+   * zero error budget makes every burn rate 0 or infinite. The boundary is
+   * worth its own test: an off-by-one here silently permits an unusable SLO.
+   */
+  test('a target of exactly 100 is refused at the boundary', {
+    tag: ['@P2', '@validation', '@negative'],
+  }, async ({ page }, testInfo) => {
+    await pm.sloFormPage.gotoNew(ORG);
+    await pm.sloFormPage.fillCountSlo({
+      name: uniqueName(workerPrefix(testInfo)),
+      stream,
+      goodExpr: 'status_code < 500',
+      target: 100,
+    });
+    await pm.sloFormPage.save();
+    await pm.sloFormPage.expectError(/strictly below 100/i);
+  });
+
+  test('a fractional target just inside the range is accepted', {
+    tag: ['@P2', '@edge'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(workerPrefix(testInfo));
+    await pm.sloFormPage.gotoNew(ORG);
+    await pm.sloFormPage.fillCountSlo({
+      name, stream, goodExpr: 'status_code < 500', target: 99.999,
+    });
+    await pm.sloFormPage.saveExpectingSuccess();
+
+    await pm.sloListPage.goto(ORG);
+    await pm.sloListPage.expectRowVisible(name);
   });
 
   // ------------------------------------------------------------ window / slice

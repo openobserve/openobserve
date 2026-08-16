@@ -22,6 +22,7 @@ called out rather than smoothed over.
 """
 
 import base64
+import json
 import logging
 import os
 import time
@@ -528,6 +529,404 @@ def test_slo_eligible_alerts_endpoint_answers(create_session, base_url, org_id):
     """The picker behind an `alert` SLI must answer even with no eligible alerts."""
     assert create_session.get(
         f"{base_url}api/{org_id}/alerts/slo-eligible").status_code == 200
+
+
+# =============================================================================
+# Update path — the same rules must hold on PUT, not just POST
+# =============================================================================
+
+def _create_and_get(session, base_url, org_id, definition, track):
+    status, message, slo_id = create_slo(session, base_url, org_id, definition, track)
+    assert status == 200, message
+    return slo_id, session.get(f"{base_url}api/{org_id}/slos/{slo_id}").json()
+
+
+@pytest.mark.parametrize("field,value,expected_fragment", [
+    ("target", 150, "strictly below 100"),
+    ("window_secs", 86400, "supported rolling windows"),
+    ("slice_interval_secs", 42, "must be 60 or 300"),
+])
+def test_update_enforces_the_same_validation_as_create(
+        create_session, base_url, org_id, slo_stream, slo_cleanup,
+        field, value, expected_fragment):
+    """Validation is not a create-time-only gate.
+
+    An update path that skipped these would let a valid SLO be edited into an
+    invalid one — the stored definition is what the measurement job reads, so
+    the rules have to hold wherever it can be written.
+    """
+    slo_id, body = _create_and_get(
+        create_session, base_url, org_id,
+        count_definition(unique_name(), slo_stream), slo_cleanup)
+
+    body[field] = value
+    resp = create_session.put(f"{base_url}api/{org_id}/slos/{slo_id}", json=body)
+    assert resp.status_code == 400, f"{field}={value} should be rejected on update"
+    assert expected_fragment in resp.text.lower() or expected_fragment in resp.text
+
+
+def test_update_of_unknown_slo_404s(create_session, base_url, org_id, slo_stream):
+    resp = create_session.put(
+        f"{base_url}api/{org_id}/slos/does-not-exist",
+        json=count_definition(unique_name(), slo_stream),
+    )
+    assert resp.status_code == 404
+
+
+def test_update_can_rename_without_conflicting_with_itself(
+        create_session, base_url, org_id, slo_stream, slo_cleanup):
+    """Saving an SLO under its OWN name must not trip the duplicate check."""
+    slo_id, body = _create_and_get(
+        create_session, base_url, org_id,
+        count_definition(unique_name(), slo_stream), slo_cleanup)
+
+    body["description"] = "unchanged name, new description"
+    resp = create_session.put(f"{base_url}api/{org_id}/slos/{slo_id}", json=body)
+    assert resp.status_code == 200, f"an SLO must not conflict with itself: {resp.text}"
+
+
+def test_update_to_an_existing_name_conflicts(
+        create_session, base_url, org_id, slo_stream, slo_cleanup):
+    """Renaming onto a taken name is still a conflict."""
+    taken = unique_name()
+    create_slo(create_session, base_url, org_id,
+               count_definition(taken, slo_stream), slo_cleanup)
+
+    slo_id, body = _create_and_get(
+        create_session, base_url, org_id,
+        count_definition(unique_name(), slo_stream), slo_cleanup)
+
+    body["name"] = taken
+    resp = create_session.put(f"{base_url}api/{org_id}/slos/{slo_id}", json=body)
+    assert resp.status_code == 409, f"expected conflict, got {resp.status_code}"
+
+
+def test_enable_of_unknown_slo_404s(create_session, base_url, org_id):
+    resp = create_session.put(f"{base_url}api/{org_id}/slos/does-not-exist/enable?value=false")
+    assert resp.status_code == 404
+
+
+# =============================================================================
+# Edge cases — values at and beyond the boundaries
+# =============================================================================
+
+@pytest.mark.parametrize("target", [0.001, 99.999])
+def test_targets_just_inside_the_range_are_accepted(
+        create_session, base_url, org_id, slo_stream, slo_cleanup, target):
+    """The bounds are exclusive, so values a hair inside them must pass."""
+    status, message, _ = create_slo(
+        create_session, base_url, org_id,
+        count_definition(unique_name(), slo_stream, target=target), slo_cleanup)
+    assert status == 200, f"target={target}: {message}"
+
+
+def test_excess_target_precision_is_rejected(
+        create_session, base_url, org_id, slo_stream, slo_cleanup):
+    """S-2 caps the target at 3 decimals.
+
+    Finer would round 99.9994 and 99.9995 onto the same rendered string while
+    meaning different error budgets, so the API refuses rather than silently
+    truncating.
+    """
+    status, message, _ = create_slo(
+        create_session, base_url, org_id,
+        count_definition(unique_name(), slo_stream, target=99.99999), slo_cleanup)
+    assert status == 400, f"expected a precision rejection, got {status}: {message}"
+
+
+@pytest.mark.parametrize("threshold", [0, -1, 1e12])
+def test_finite_thresholds_are_accepted(create_session, base_url, org_id, slo_stream,
+                                        slo_cleanup, threshold):
+    """A threshold is a measurement, not a percentage — zero, negative and very
+    large values are all legitimate for latency, error counts or gauges."""
+    status, message, _ = create_slo(
+        create_session, base_url, org_id,
+        time_slice_definition(unique_name(), slo_stream, threshold=threshold), slo_cleanup)
+    assert status == 200, f"threshold={threshold}: {message}"
+
+
+def test_non_finite_threshold_is_rejected(create_session, base_url, org_id,
+                                          slo_stream, slo_cleanup):
+    """NaN/Infinity cannot be compared against, so they cannot define an SLI.
+
+    Sent as a raw JSON literal because Python's json module emits `NaN`, which
+    is invalid JSON — the server should refuse it either way.
+    """
+    definition = time_slice_definition(unique_name(), slo_stream)
+    payload = json.dumps(definition).replace('"threshold": 500', '"threshold": NaN')
+    resp = create_session.post(
+        f"{base_url}api/{org_id}/slos",
+        data=payload, headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code in (400, 422), f"NaN threshold should be refused: {resp.status_code}"
+
+
+def test_unicode_and_emoji_names_round_trip(create_session, base_url, org_id,
+                                            slo_stream, slo_cleanup):
+    """Names are display text; if they are accepted they must survive storage."""
+    name = f"slo_api_ünïcode_✅_{uuid.uuid4().hex[:6]}"
+    status, message, slo_id = create_slo(
+        create_session, base_url, org_id,
+        count_definition(name, slo_stream), slo_cleanup)
+
+    if status != 200:
+        # A rejection is a defensible product choice — but it must be a clean
+        # 400 with a reason, not a 500 or a silent mangling.
+        assert status == 400, f"unexpected status for a unicode name: {status} {message}"
+        return
+
+    body = create_session.get(f"{base_url}api/{org_id}/slos/{slo_id}").json()
+    assert body["name"] == name, "a stored name must come back byte-identical"
+
+
+def test_name_length_boundary_is_256_inclusive(create_session, base_url, org_id,
+                                               slo_stream, slo_cleanup):
+    """The enforced bound is `len <= 256`; 257 is the first rejection.
+
+    NOTE the copy is off by one: the message reads "less than 256 characters"
+    (src/api/management/src/request/slos/mod.rs:153) but 256 is accepted. Bisected
+    live — 256 -> 200, 257 -> 400. Asserted against the real boundary so this
+    test does not encode the mistake; if the message is corrected, the numbers
+    below still hold.
+    """
+    ok_status, ok_msg, _ = create_slo(
+        create_session, base_url, org_id,
+        count_definition("a" * 256, slo_stream), slo_cleanup)
+    assert ok_status == 200, f"256 chars should be accepted: {ok_msg}"
+
+    over_status, over_msg, _ = create_slo(
+        create_session, base_url, org_id,
+        count_definition("b" * 257, slo_stream), slo_cleanup)
+    assert over_status == 400, f"257 chars should be rejected: {over_msg}"
+
+
+def test_many_tags_are_accepted_and_returned(create_session, base_url, org_id,
+                                             slo_stream, slo_cleanup):
+    tags = [f"tag{i}" for i in range(20)]
+    definition = count_definition(unique_name(), slo_stream)
+    definition["tags"] = tags
+    status, message, slo_id = create_slo(create_session, base_url, org_id,
+                                         definition, slo_cleanup)
+    assert status == 200, message
+    stored = create_session.get(f"{base_url}api/{org_id}/slos/{slo_id}").json()
+    assert sorted(stored.get("tags", [])) == sorted(tags)
+
+
+def test_unknown_stream_is_rejected_or_stored_without_measuring(
+        create_session, base_url, org_id, slo_cleanup):
+    """An SLO over a stream that does not exist cannot measure anything.
+
+    Accepting it is defensible (the stream may appear later), so this pins
+    whichever the build does rather than demanding one — but a 500 is not an
+    acceptable answer to a plausible mistake.
+    """
+    status, message, _ = create_slo(
+        create_session, base_url, org_id,
+        count_definition(unique_name(), "stream_that_does_not_exist_anywhere"), slo_cleanup)
+    assert status in (200, 400, 404, 422), f"unexpected status {status}: {message}"
+
+
+def test_grouped_slo_rejects_a_90_day_window_with_a_one_minute_slice(
+        create_session, base_url, org_id, slo_stream, slo_cleanup):
+    """The two independent caps compose: grouped pins the slice to 300s."""
+    definition = count_definition(unique_name(), slo_stream,
+                                  window_secs=WINDOW_90D, slice_secs=SLICE_1M)
+    definition["group_by"] = ["service"]
+    definition["groups_estimate"] = 3
+    status, message, _ = create_slo(create_session, base_url, org_id,
+                                    definition, slo_cleanup)
+    assert status == 400, message
+    assert "300s slices" in message.lower()
+
+
+def test_list_returns_created_slos(create_session, base_url, org_id, slo_stream, slo_cleanup):
+    """The list endpoint actually contains what was created."""
+    name = unique_name()
+    create_slo(create_session, base_url, org_id,
+               count_definition(name, slo_stream), slo_cleanup)
+    body = create_session.get(f"{base_url}api/{org_id}/slos").json()
+    names = [s.get("name") for s in body.get("list", [])]
+    assert name in names
+
+
+# =============================================================================
+# Alert SLI — source eligibility
+# =============================================================================
+
+def _scheduled_alert(name, stream, destination, *, frequency_min=5, silence=0,
+                     aggregation=None, cron=""):
+    """A scheduled alert, shaped so single fields can be made disqualifying.
+
+    `source_alert_ineligibility` rejects a source that is an SLO alert or
+    composite, not scheduled, grouped, cron-driven, silence-gated, or whose
+    frequency exceeds the SLO's slice interval.
+    """
+    return {
+        "name": name,
+        "stream_type": "logs",
+        "stream_name": stream,
+        "is_real_time": False,
+        "query_condition": {
+            "type": "custom",
+            "conditions": {"version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": []}},
+            "sql": None, "promql": None, "promql_condition": None,
+            "aggregation": aggregation, "vrl_function": None,
+            "search_event_type": None, "multi_time_range": [],
+        },
+        "trigger_condition": {
+            "period": 5, "operator": ">=", "threshold": 1,
+            "frequency": frequency_min,
+            # `is_cron` is derived from frequency_TYPE, not from a non-empty
+            # cron string — setting only the string leaves the alert on its
+            # minute cadence and perfectly eligible.
+            "frequency_type": "cron" if cron else "minutes",
+            "cron": cron,
+            "silence": silence, "timezone": "UTC", "align_time": True,
+        },
+        "destinations": [destination], "context_attributes": {},
+        "row_template": "", "enabled": True,
+    }
+
+
+@pytest.fixture(scope="module")
+def alert_destination(create_session, base_url, org_id):
+    """A template + destination, required before any alert can be saved."""
+    base = f"slo_api_{uuid.uuid4().hex[:8]}"
+    template, destination = f"{base}_tmpl", f"{base}_dest"
+
+    create_session.post(f"{base_url}api/{org_id}/alerts/templates", json={
+        "name": template, "body": '{"text":"{alert_name}"}', "type": "http", "title": "",
+    })
+    resp = create_session.post(f"{base_url}api/{org_id}/alerts/destinations", json={
+        "name": destination, "url": f"{base_url}api/{org_id}/{base}_sink/_json",
+        "method": "post", "template": template, "type": "http",
+    })
+    assert resp.status_code in (200, 409), f"destination create failed: {resp.text}"
+    return destination
+
+
+def _eligibility_row(session, base_url, org_id, alert_id):
+    resp = session.get(f"{base_url}api/{org_id}/alerts/slo-eligible")
+    assert resp.status_code == 200
+    body = resp.json()
+    rows = body if isinstance(body, list) else body.get("list", [])
+    return next((a for a in rows if a.get("alert_id") == alert_id), None)
+
+
+def test_scheduled_alert_is_slo_eligible(create_session, base_url, org_id,
+                                         slo_stream, alert_destination, slo_cleanup):
+    """The baseline: a plain scheduled alert can source an `alert` SLI."""
+    name = unique_name("slo_api_src")
+    resp = create_session.post(
+        f"{base_url}api/v2/{org_id}/alerts?folder=default",
+        json=_scheduled_alert(name, slo_stream, alert_destination),
+    )
+    assert resp.status_code == 200, resp.text
+    alert_id = resp.json()["id"]
+
+    row = _eligibility_row(create_session, base_url, org_id, alert_id)
+    assert row is not None, "the alert must appear in the eligible list"
+    assert row["eligible"] is True, f"expected eligible, got {row}"
+    assert row["frequency_secs"] == 300
+
+    # And it can actually be used as a source.
+    status, message, _ = create_slo(create_session, base_url, org_id, {
+        "name": unique_name(), "description": "alert sli", "sli_type": "alert",
+        "config": {"alert_id": alert_id},
+        "group_by": None, "groups_estimate": None,
+        "window_secs": WINDOW_7D, "slice_interval_secs": SLICE_5M,
+        "target": 99, "tags": [], "enabled": True,
+    }, slo_cleanup)
+    assert status == 200, message
+
+
+@pytest.mark.parametrize("label,kwargs", [
+    ("silence-gated", {"silence": 30}),
+    ("too infrequent", {"frequency_min": 30}),   # 1800s > 300s slice
+    # Six fields (sec min hour dom mon dow) — a 5-field expression is rejected
+    # by the parser before eligibility is ever considered.
+    ("cron-driven", {"cron": "0 */5 * * * *"}),
+])
+def test_ineligible_sources_are_listed_with_a_reason(create_session, base_url, org_id,
+                                                     slo_stream, alert_destination,
+                                                     label, kwargs):
+    """Ineligible alerts are RETURNED rather than filtered out.
+
+    "your alert is not here" is a worse answer than "here is why you cannot pick
+    it" — the picker relies on that, and so does the form's error copy.
+    """
+    name = unique_name(f"slo_api_{label.replace(' ', '_').replace('-', '_')}")
+    resp = create_session.post(
+        f"{base_url}api/v2/{org_id}/alerts?folder=default",
+        json=_scheduled_alert(name, slo_stream, alert_destination, **kwargs),
+    )
+    assert resp.status_code == 200, resp.text
+    alert_id = resp.json()["id"]
+
+    row = _eligibility_row(create_session, base_url, org_id, alert_id)
+    assert row is not None, f"{label}: must still be listed, not filtered out"
+    assert row["eligible"] is False, f"{label}: expected ineligible, got {row}"
+    assert row["reason"], f"{label}: the server must say WHY"
+
+
+def test_alert_sli_rejects_an_unknown_source(create_session, base_url, org_id, slo_cleanup):
+    """An alert_id that does not resolve cannot become an SLO's source."""
+    status, message, _ = create_slo(create_session, base_url, org_id, {
+        "name": unique_name(), "description": "bad source", "sli_type": "alert",
+        "config": {"alert_id": "does-not-exist"},
+        "group_by": None, "groups_estimate": None,
+        "window_secs": WINDOW_7D, "slice_interval_secs": SLICE_5M,
+        "target": 99, "tags": [], "enabled": True,
+    }, slo_cleanup)
+    assert status in (400, 404, 422), f"expected a rejection, got {status}: {message}"
+
+
+# =============================================================================
+# PromQL config shapes
+# =============================================================================
+
+def test_promql_count_needs_both_expressions(create_session, base_url, org_id, slo_cleanup):
+    """`CountSource::PromQl` is exactly two expressions — and BOTH keys must be
+    present even when empty, or deserialization fails before validation can say
+    anything useful."""
+    both = {
+        "name": unique_name(), "description": "promql count", "sli_type": "count",
+        "config": {"source": {"mode": "prom_ql",
+                              "query": {"good": "sum(up)", "total": "count(up)"}}},
+        "group_by": None, "groups_estimate": None,
+        "window_secs": WINDOW_7D, "slice_interval_secs": SLICE_5M,
+        "target": 99, "tags": [], "enabled": True,
+    }
+    status, message, _ = create_slo(create_session, base_url, org_id, both, slo_cleanup)
+    assert status == 200, message
+
+    missing = json.loads(json.dumps(both))
+    missing["name"] = unique_name()
+    del missing["config"]["source"]["query"]["total"]
+    status, message, _ = create_slo(create_session, base_url, org_id, missing, slo_cleanup)
+    assert status == 422, f"a missing expression must fail deserialization: {message}"
+
+
+def test_promql_time_slice_still_requires_a_stream(create_session, base_url, org_id,
+                                                   slo_stream, slo_cleanup):
+    """A PromQL TIME-SLICE keeps stream/stream_type, unlike a PromQL COUNT.
+
+    Easy to get backwards: the count arm's source is two bare expressions with
+    no stream at all, so dropping the stream here looks reasonable and 422s.
+    """
+    definition = time_slice_definition(unique_name(), slo_stream, stream_type="metrics")
+    definition["config"]["query_language"] = "prom_ql"
+    definition["config"]["query"] = "max(up)"
+    status, message, _ = create_slo(create_session, base_url, org_id, definition, slo_cleanup)
+    assert status == 200, message
+
+    without = json.loads(json.dumps(definition))
+    without["name"] = unique_name()
+    del without["config"]["stream"]
+    status, message, _ = create_slo(create_session, base_url, org_id, without, slo_cleanup)
+    assert status == 422, message
+    assert "stream" in message
 
 
 # =============================================================================

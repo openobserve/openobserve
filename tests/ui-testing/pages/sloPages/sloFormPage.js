@@ -342,6 +342,16 @@ export class SloFormPage {
     await this.selectOption(this.locators.timesliceStream, streamName, { filterText: streamName });
   }
 
+  /** Leave the form without saving. */
+  async cancel() {
+    // Cancel sits beside Save in the page header actions; it is the only
+    // control there that is not the save button.
+    await this.page.getByRole('button', { name: /cancel/i }).first().click();
+    await this.page.waitForURL((url) => !/\/slos\/(add|edit)/.test(url.pathname), {
+      timeout: 20000,
+    });
+  }
+
   /**
    * Click Save. Does NOT wait for an outcome — use when a rejection is expected.
    */
@@ -518,6 +528,133 @@ export class SloFormPage {
 
   async expectPreviewGapsVisible() {
     await expect(this.page.locator(this.locators.tsPreviewGaps)).toBeVisible({ timeout: 30000 });
+  }
+
+  // ---------------------------------------------------------- count preview
+
+  /**
+   * The COUNT preview (`SloPreviewChart`), which is a different component from
+   * the time-slice one and mounts on a different condition.
+   *
+   * Panels are keyed `good` / `bad` (SQL) or `good` / `total` (PromQL). As
+   * everywhere in this feature the component's own root is shadowed by the
+   * parent's `data-test`, so the section id is the root.
+   */
+  async waitForCountPreview(timeout = 60000) {
+    const root = this.page.locator(this.locators.previewSection);
+    try {
+      await root.waitFor({ state: 'visible', timeout });
+    } catch {
+      const goodExpr = await this.getExpression(this.locators.goodExpr).catch(() => '<none>');
+      throw new Error(
+        `Count preview never mounted. It needs a stream AND a good expression.\n` +
+        `  good_expr: ${JSON.stringify(String(goodExpr).slice(0, 120))}`,
+      );
+    }
+    await expect(
+      this.page.locator('[data-test="slos-slopreviewchart-good-loading"]'),
+    ).toHaveCount(0, { timeout });
+  }
+
+  /**
+   * A named count-preview panel is rendering data rather than an empty state.
+   *
+   * The two languages render DIFFERENTLY, and the component says why: "PromQL
+   * owns its own request lifecycle, where the SQL branch hands that to the
+   * panel renderer". So:
+   *   SQL     -> `PanelSchemaRenderer` tagged `-<key>-panel`; there is no
+   *              `-chart`, `-loading` or `-error` node at all on this side.
+   *   PromQL  -> `-<key>-loading` / `-error` / `-chart` / `-empty`.
+   * Asserting the PromQL shape against a SQL preview waits forever on a node
+   * that branch never renders.
+   *
+   * Panels are keyed `good` and `bad` for SQL, `good` and `total` for PromQL.
+   */
+  async expectCountPreviewPanelHasData(panel = 'good', { promql = false, timeout = 60000 } = {}) {
+    await expect(
+      this.page.locator(`[data-test="slos-slopreviewchart-${panel}-empty"]`),
+      `the ${panel} panel must not be in its empty state`,
+    ).toHaveCount(0, { timeout });
+
+    if (promql) {
+      await expect(
+        this.page.locator(`[data-test="slos-slopreviewchart-${panel}-error"]`),
+        `the ${panel} panel must not be in an error state`,
+      ).toHaveCount(0, { timeout });
+      await expect(
+        this.page.locator(`[data-test="slos-slopreviewchart-${panel}-chart"]`),
+      ).toBeVisible({ timeout });
+      return;
+    }
+
+    await expect(
+      this.page.locator(`[data-test="slos-slopreviewchart-${panel}-panel"]`),
+      `the ${panel} panel must render its chart, not an empty state`,
+    ).toBeVisible({ timeout });
+  }
+
+  // --------------------------------------------------------- tags / alert SLI
+
+  /** OTagInput commits on Enter — one press per tag. */
+  async addTags(tags) {
+    const field = this.page
+      .locator(`${this.locators.tags} input, ${this.locators.tags} [data-test$="-field"]`)
+      .first();
+    await field.waitFor({ state: 'visible', timeout: 15000 });
+    for (const tag of tags) {
+      await field.fill(tag);
+      await field.press('Enter');
+      await this.page.waitForTimeout(200);
+    }
+  }
+
+  async expectTagVisible(tag) {
+    await expect(this.page.locator(this.locators.tags)).toContainText(tag, { timeout: 10000 });
+  }
+
+  /**
+   * Pick the source alert for an `alert` SLI.
+   *
+   * Options are `{value: alert_id, label: name}` and INELIGIBLE alerts are
+   * listed too — disabled, with the server's rejection reason folded into the
+   * label — so the id is what identifies the row, and the name is only good for
+   * filtering the virtualized list.
+   */
+  async selectAlertSource(alertId, alertName) {
+    await this.selectOption(this.locators.alertSource, alertId, { filterText: alertName });
+  }
+
+  /**
+   * An ineligible alert is offered but disabled, with the reason in its label.
+   *
+   * The name is used to FILTER first: the picker is virtualized, so on an
+   * instance carrying many alerts the wanted row is simply not rendered and the
+   * locator times out even though the option exists.
+   */
+  async expectAlertSourceOptionDisabled(alertId, alertName = null) {
+    await openOSelectDropdown(this.page, this.page.locator(this.locators.alertSource));
+    if (alertName) {
+      const search = this.page.locator('[data-test="slos-addslo-alert-source-search"]');
+      if (await search.count() > 0) {
+        await search.fill(alertName);
+        await this.page.waitForTimeout(400);
+      }
+    }
+    const option = this.page
+      .locator(`[data-test="slos-addslo-alert-source-option"][data-test-value="${alertId}"]`)
+      .first();
+    await option.waitFor({ state: 'visible', timeout: 15000 });
+    const disabled = await option.getAttribute('data-disabled');
+    const ariaDisabled = await option.getAttribute('aria-disabled');
+    expect(
+      disabled !== null || ariaDisabled === 'true',
+      'an ineligible source must be offered but not selectable',
+    ).toBe(true);
+    await this.page.keyboard.press('Escape');
+  }
+
+  async expectAlertSourceHintVisible() {
+    await expect(this.page.locator(this.locators.alertSourceHint)).toBeVisible({ timeout: 15000 });
   }
 }
 

@@ -167,6 +167,45 @@ export class SloAlertsPage {
     await this.page.locator(this.locators.submit).click();
   }
 
+  /**
+   * Open the edit form for a listed alert, found by its name.
+   *
+   * The Edit control is keyed by `alert_id`, which the caller does not have —
+   * the list row is the only place the name and the id appear together, so the
+   * row is located by text and its own Edit button clicked.
+   */
+  async openEditForListedAlert(name) {
+    const row = this.page
+      .locator(`${this.locators.list} li`)
+      .filter({ hasText: name })
+      .first();
+    await row.waitFor({ state: 'visible', timeout: 20000 });
+    await row.locator('[data-test^="slo-alerts-edit-"]').first().click();
+    await expect(this.page.locator(this.locators.form)).toBeVisible({ timeout: 20000 });
+    await this.waitForFormHydration();
+  }
+
+  /**
+   * Block until the alert form has been populated from the stored alert.
+   *
+   * The form renders before its fetch resolves, so for a moment it is mounted
+   * and EMPTY. Reading a field in that window returns "" and looks exactly like
+   * "the stored value was lost" — this was an intermittent failure that only
+   * showed up under load, which is the worst way to learn it.
+   */
+  async waitForFormHydration(timeout = 20000) {
+    const nameField = this.page
+      .locator(`${this.locators.name} [data-test$="-field"]`)
+      .first();
+    await nameField.waitFor({ state: 'visible', timeout });
+    await expect
+      .poll(async () => (await nameField.inputValue()).length, {
+        timeout,
+        message: 'alert form never hydrated (name stayed empty)',
+      })
+      .toBeGreaterThan(0);
+  }
+
   async cancel() {
     await this.page.locator(this.locators.cancel).click();
   }

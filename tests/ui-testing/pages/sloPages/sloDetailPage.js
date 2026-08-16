@@ -231,6 +231,30 @@ export class SloDetailPage {
     }
   }
 
+  /**
+   * The groups tab exists and lists per-group rows.
+   *
+   * The tab itself is `v-if="isGrouped"`, so its presence is already an
+   * assertion that the SLO was stored as grouped.
+   */
+  async expectGroupsTable({ timeout = 30000 } = {}) {
+    await this.openTab('groups');
+    await expect(this.page.locator(this.locators.groupsTable))
+      .toBeVisible({ timeout });
+  }
+
+  /** The tab is absent for an ungrouped SLO — nothing to show. */
+  async expectGroupsTabAbsent() {
+    await expect(this.page.locator(this.locators.tabGroups)).toHaveCount(0);
+  }
+
+  /** An alert-sourced SLO names the alert it measures. */
+  async expectSourceAlertVisible(name = null) {
+    const el = this.page.locator(this.locators.sourceAlert);
+    await expect(el).toBeVisible({ timeout: 30000 });
+    if (name) await expect(el).toContainText(name);
+  }
+
   async expectTitle(name) {
     await expect(this.page.locator(this.locators.title)).toContainText(name, { timeout: 30000 });
   }

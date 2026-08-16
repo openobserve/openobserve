@@ -46,6 +46,47 @@ function baseUrl() {
   return url.endsWith('/') ? url.slice(0, -1) : url;
 }
 
+/** A transient store error worth retrying rather than failing the test on. */
+function isTransientStoreError(status, body) {
+  if (status === 200) return false;
+  return /database is locked|SqlxError|SeaORMError|Execution Error/i.test(String(body ?? ''));
+}
+
+/**
+ * POST with a retry on a transient meta-store error.
+ *
+ * The single-node build keeps metadata in SQLite, which serialises writers. A
+ * few Playwright workers creating SLOs, alerts, destinations and streams at
+ * once can collide and get `database is locked` — a contention signal, not a
+ * product failure, and retrying is exactly the right response. Without this the
+ * suite fails intermittently on an environment characteristic and sends whoever
+ * reads the report looking for a bug that is not there.
+ */
+async function postWithRetry(page, url, data, { attempts = 5, baseDelayMs = 400 } = {}) {
+  let last = null;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const res = await page.request.post(url, {
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      data,
+    });
+    if (res.ok()) return res;
+
+    const body = await res.text().catch(() => '');
+    last = { status: res.status(), body };
+    if (!isTransientStoreError(res.status(), body)) return res;
+
+    // Back off progressively; the lock is held for the length of one write.
+    await page.waitForTimeout(baseDelayMs * attempt);
+    testLogger.debug('retrying after a transient store error', {
+      url, attempt, status: res.status(),
+    });
+  }
+  throw new Error(
+    `Still failing after ${attempts} attempts on a transient store error.\n` +
+    `  ${url}\n  last: HTTP ${last?.status} — ${String(last?.body).slice(0, 200)}`,
+  );
+}
+
 /**
  * Build the seeded records.
  *
@@ -101,9 +142,8 @@ function expectedGoodFraction() {
  */
 async function ingestBatch(page, streamName, records) {
   const org = getOrgIdentifier();
-  const res = await page.request.post(
-    `${baseUrl()}/api/${org}/${streamName}/_json`,
-    { headers: getAuthHeaders(), data: records },
+  const res = await postWithRetry(
+    page, `${baseUrl()}/api/${org}/${streamName}/_json`, records,
   );
   const status = res.status();
   if (status < 200 || status >= 300) {
@@ -337,10 +377,7 @@ function uniqueName(prefix, workerIndex = 0) {
  */
 async function createSloViaApi(page, definition) {
   const org = getOrgIdentifier();
-  const res = await page.request.post(`${baseUrl()}/api/${org}/slos`, {
-    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-    data: definition,
-  });
+  const res = await postWithRetry(page, `${baseUrl()}/api/${org}/slos`, definition);
   if (!res.ok()) {
     const body = await res.text().catch(() => '<unreadable>');
     throw new Error(
@@ -518,10 +555,7 @@ async function seedNotificationDestination(page, baseName) {
   const template = `${baseName}_tmpl`;
   const destination = `${baseName}_dest`;
 
-  const post = (url, data) => page.request.post(url, {
-    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-    data,
-  });
+  const post = (url, data) => postWithRetry(page, url, data);
 
   const tmplRes = await post(`${v1}/alerts/templates`, {
     name: template,
@@ -553,6 +587,140 @@ async function seedNotificationDestination(page, baseName) {
 
   testLogger.info('Notification destination seeded', { destination });
   return destination;
+}
+
+/**
+ * Seed a METRICS stream so the PromQL paths have something to point at.
+ *
+ * PromQL is only offered when `stream_type` is `metrics` (both language toggles
+ * are `v-if="isMetricsStream"`), so the SQL fixtures cannot serve these tests.
+ *
+ * Note the different endpoint AND the different time unit: metrics ingest is
+ * `/ingest/metrics/_json` and reads `_timestamp` in MILLIseconds, where the logs
+ * path takes microseconds. Getting that wrong ingests happily and puts every
+ * point far outside the query range.
+ *
+ * @returns {Promise<string>} the metric name, which is also the stream name
+ */
+async function seedSloMetric(page, metricName, { minutes = 120 } = {}) {
+  const org = getOrgIdentifier();
+  const nowMs = Date.now();
+  const rows = [];
+  for (let i = 0; i < minutes; i++) {
+    rows.push({
+      __name__: metricName,
+      __type__: 'gauge',
+      service: SERVICES[i % SERVICES.length],
+      _timestamp: nowMs - i * 60_000,
+      value: i % 20 === 0 ? BAD_LATENCY_MS : GOOD_LATENCY_MS,
+    });
+  }
+
+  const res = await postWithRetry(
+    page, `${baseUrl()}/api/${org}/ingest/metrics/_json`, rows,
+  );
+  if (!res.ok()) {
+    throw new Error(
+      `Metrics seed failed for "${metricName}": HTTP ${res.status()} — ` +
+      `${await res.text().catch(() => '')}`,
+    );
+  }
+
+  // The picker reads the stream list, so wait for the stream to exist rather
+  // than for the points to be queryable.
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const list = await page.request.get(
+      `${baseUrl()}/api/${org}/streams?type=metrics`, { headers: getAuthHeaders() },
+    );
+    if (list.ok()) {
+      const body = await list.json().catch(() => ({}));
+      if ((body?.list ?? []).some((s) => s.name === metricName)) {
+        testLogger.info('Metrics stream seeded', { metricName, points: rows.length });
+        return metricName;
+      }
+    }
+    await page.waitForTimeout(3000);
+  }
+  throw new Error(`Metrics stream "${metricName}" never appeared in the stream list.`);
+}
+
+/**
+ * Create a scheduled alert that an `alert` SLI may legally point at.
+ *
+ * `source_alert_ineligibility` (config/src/meta/slo/mod.rs) rejects a source
+ * that is an SLO alert or composite, not scheduled, grouped, cron-driven,
+ * silence-gated, or whose frequency exceeds the SLO's slice interval. So this
+ * payload is deliberately: scheduled, ungrouped, no cron, `silence: 0`, and
+ * frequency 5 minutes — equal to the 300s slice, which is the loosest cadence
+ * still allowed.
+ *
+ * @returns {Promise<{alertId: string, name: string}>}
+ */
+async function seedEligibleSourceAlert(page, baseName, destination) {
+  const org = getOrgIdentifier();
+  const stream = `${baseName}_src`;
+  const name = `${baseName}_src_alert`;
+
+  // The alert needs a stream to evaluate against.
+  await ingestBatch(page, stream, [{
+    _timestamp: Math.floor(Date.now() / 1000) * 1_000_000,
+    status_code: 200,
+    latency_ms: GOOD_LATENCY_MS,
+  }]);
+
+  const payload = {
+    name,
+    stream_type: 'logs',
+    stream_name: stream,
+    is_real_time: false,
+    query_condition: {
+      type: 'custom',
+      conditions: {
+        version: 2,
+        conditions: { filterType: 'group', logicalOperator: 'AND', conditions: [] },
+      },
+      sql: null, promql: null, promql_condition: null, aggregation: null,
+      vrl_function: null, search_event_type: null, multi_time_range: [],
+    },
+    trigger_condition: {
+      period: 5, operator: '>=', threshold: 1,
+      frequency: 5, frequency_type: 'minutes', cron: '',
+      // silence 0: a silence-gated source is ineligible.
+      silence: 0, timezone: 'UTC', align_time: true,
+    },
+    destinations: [destination],
+    context_attributes: {}, row_template: '', enabled: true,
+  };
+
+  const res = await postWithRetry(
+    page, `${baseUrl()}/api/v2/${org}/alerts?folder=default`, payload,
+  );
+  if (!res.ok()) {
+    throw new Error(
+      `Could not create source alert "${name}": HTTP ${res.status()} — ` +
+      `${await res.text().catch(() => '')}`,
+    );
+  }
+  const alertId = (await res.json()).id;
+
+  // Confirm the server agrees it is eligible — the rules are the server's, and
+  // a payload that drifts from them would otherwise fail later as an empty picker.
+  const eligible = await page.request.get(
+    `${baseUrl()}/api/${org}/alerts/slo-eligible`, { headers: getAuthHeaders() },
+  );
+  const body = await eligible.json().catch(() => ([]));
+  const list = Array.isArray(body) ? body : (body.list ?? []);
+  const row = list.find((a) => a.alert_id === alertId);
+  if (!row?.eligible) {
+    throw new Error(
+      `Source alert "${name}" was created but is NOT SLO-eligible: ${JSON.stringify(row)}\n` +
+      `Eligibility requires: scheduled, ungrouped, no cron, silence 0, frequency <= slice interval.`,
+    );
+  }
+
+  testLogger.info('Eligible source alert seeded', { name, alertId });
+  return { alertId, name };
 }
 
 /** Delete an SLO by id, tolerating an already-gone one. */
@@ -605,6 +773,8 @@ module.exports = {
   createSloViaApi,
   waitForSloMeasured,
   seedNotificationDestination,
+  seedSloMetric,
+  seedEligibleSourceAlert,
   timeSliceDefinition,
   countDefinition,
   deleteSloById,

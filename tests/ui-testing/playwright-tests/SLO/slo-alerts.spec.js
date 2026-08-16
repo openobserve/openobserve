@@ -226,6 +226,160 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
       .toBeNull();
   });
 
+  /**
+   * The other alert kind. Burn-rate watches the RATE the budget is being spent;
+   * error-budget watches how much is LEFT — different question, different
+   * condition shape, and only the burn-rate one was covered.
+   */
+  test('switching to the error-budget kind is accepted and savable', {
+    tag: ['@P1'],
+  }, async () => {
+    const name = uniqueName(`${PREFIX}_budget`);
+    await pm.sloAlertsPage.clickAdd();
+    await pm.sloAlertsPage.setName(name);
+    await pm.sloAlertsPage.selectKind('error_budget');
+    await pm.sloAlertsPage.selectDestination(shared.destination);
+    await pm.sloAlertsPage.submit();
+
+    await pm.sloAlertsPage.expectAlertListed(name);
+  });
+
+  /**
+   * An existing alert can be reopened and changed.
+   *
+   * The panel row's Edit button is the only way in, and the form is shared with
+   * create — so this also proves it hydrates rather than opening blank.
+   */
+  test('an existing burn-rate alert can be edited', {
+    tag: ['@P1'],
+  }, async ({ page }) => {
+    const name = uniqueName(`${PREFIX}_edit`);
+    await pm.sloAlertsPage.createBurnRateAlert({
+      name, preset: 'mid', destination: shared.destination,
+    });
+    await pm.sloAlertsPage.expectAlertListed(name);
+
+    await pm.sloAlertsPage.openEditForListedAlert(name);
+    // Hydrated, not blank: the stored name is already in the field.
+    expect(await pm.sloAlertsPage.readInput(pm.sloAlertsPage.locators.name)).toBe(name);
+
+    await pm.sloAlertsPage.setDescription('edited by e2e');
+    await pm.sloAlertsPage.submit();
+    await pm.sloAlertsPage.expectAlertListed(name);
+  });
+
+  // -------------------------------------------------------- negative / edge
+
+  /**
+   * A destination is mandatory: an alert nobody hears about is not an alert.
+   * The server says so, and the form must surface that rather than appearing
+   * to succeed.
+   */
+  test('submitting without a destination is refused with the reason', {
+    tag: ['@P1', '@validation', '@negative'],
+  }, async () => {
+    const name = uniqueName(`${PREFIX}_nodest`);
+    await pm.sloAlertsPage.clickAdd();
+    await pm.sloAlertsPage.setName(name);
+    await pm.sloAlertsPage.applyPreset('fast');
+    // No destination selected.
+    await pm.sloAlertsPage.submit();
+
+    await pm.sloAlertsPage.expectFormError(/destination|workflow/i);
+    await pm.sloAlertsPage.expectFormStillOpen();
+  });
+
+  /** Cancel must not create anything. */
+  test('cancelling the alert form creates nothing', {
+    tag: ['@P1', '@negative'],
+  }, async ({ page }) => {
+    const name = uniqueName(`${PREFIX}_cancelled`);
+    await pm.sloAlertsPage.clickAdd();
+    await pm.sloAlertsPage.setName(name);
+    await pm.sloAlertsPage.applyPreset('fast');
+    await pm.sloAlertsPage.selectDestination(shared.destination);
+    await pm.sloAlertsPage.cancel();
+
+    await expect(
+      page.locator(pm.sloAlertsPage.locators.list).getByText(name, { exact: false }),
+    ).toHaveCount(0);
+  });
+
+  /**
+   * Every preset must produce a savable condition.
+   *
+   * The published burn-rate rows assume a fine slice grid and a tight target,
+   * neither of which is guaranteed here — the component clamps and snaps them
+   * for that reason, and a card that cannot be saved would be a trap.
+   */
+  test('every burn-rate preset yields a savable alert', {
+    tag: ['@P1', '@edge'],
+  }, async () => {
+    for (const preset of ['fast', 'mid', 'slow']) {
+      const name = uniqueName(`${PREFIX}_${preset}`);
+      await pm.sloAlertsPage.createBurnRateAlert({
+        name, preset, destination: shared.destination,
+      });
+      await pm.sloAlertsPage.expectAlertListed(name);
+    }
+  });
+
+  /**
+   * The short window must stay strictly inside the long one for every preset —
+   * a burn-rate condition compares a fast signal against a slow one, and an
+   * inverted pair is not a burn-rate rule at all.
+   */
+  test('each preset keeps the short window inside the long one', {
+    tag: ['@P2', '@edge'],
+  }, async () => {
+    for (const preset of ['fast', 'mid', 'slow']) {
+      await pm.sloAlertsPage.clickAdd();
+      await pm.sloAlertsPage.applyPreset(preset);
+
+      const longHours = await pm.sloAlertsPage.readLongHours();
+      const shortMinutes = await pm.sloAlertsPage.readShortMinutes();
+      expect(Number.isFinite(longHours), `${preset}: long window must be a number`).toBe(true);
+      expect(Number.isFinite(shortMinutes), `${preset}: short window must be a number`).toBe(true);
+      expect(shortMinutes * 60, `${preset}: short must be inside long`)
+        .toBeLessThan(longHours * 3600);
+
+      await pm.sloAlertsPage.cancel();
+    }
+  });
+
+  /**
+   * FINDING — duplicate alert names on one SLO are ACCEPTED.
+   *
+   * Probed live: two POSTs with the same name both return 200, where a
+   * duplicate SLO name returns 409. The panel lists alerts by name, so two
+   * identically-named alerts are indistinguishable there, and the Edit control
+   * is keyed by `alert_id` — meaning a user cannot tell which one they are
+   * editing.
+   *
+   * This pins the CURRENT behaviour rather than asserting the rejection the
+   * server does not perform. If alert naming gains a uniqueness rule, this
+   * test fails loudly and should become a rejection assertion.
+   */
+  test('duplicate alert names are currently accepted on one SLO', {
+    tag: ['@P2', '@edge'],
+  }, async ({ page }) => {
+    const name = uniqueName(`${PREFIX}_dup`);
+    await pm.sloAlertsPage.createBurnRateAlert({
+      name, preset: 'fast', destination: shared.destination,
+    });
+    await pm.sloAlertsPage.expectAlertListed(name);
+
+    // Same name again — accepted today.
+    await pm.sloAlertsPage.createBurnRateAlert({
+      name, preset: 'mid', destination: shared.destination,
+    });
+
+    // Both rows exist, which is exactly what makes them indistinguishable.
+    const rows = page.locator(`${pm.sloAlertsPage.locators.list} li`)
+      .filter({ hasText: name });
+    await expect(rows).toHaveCount(2, { timeout: 20000 });
+  });
+
   // ------------------------------------------------------------------- P2
   //
   // The planned "disabled alert shows its disabled tag" test is NOT implemented.

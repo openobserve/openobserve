@@ -422,13 +422,15 @@
   },
   {
     "testfolder": "SLO",
-    "_comment": "SLO lifecycle and form validation. No backfill dependency, so these run parallel and finish in seconds. The REST contract is covered by pytest in tests/api-testing/tests/slos/ \u2014 a pure-API test does not belong in the browser harness (CI enforces this via the pure-API spec flagger).",
+    "_comment": "SLO lifecycle, form validation and the alert SLI type. No backfill dependency, so these run in parallel \u2014 but pinned to 3 workers: at 5 the concurrent SLO/alert/destination writes trip SQLite's 'database is locked' on the single-node meta store. The REST contract is covered by pytest in tests/api-testing/tests/slos/.",
     "actual_folder": "SLO",
     "browser": "chrome",
     "ingest_allowed_upto": "240",
+    "workers": 3,
     "run_files": [
       "slo-crud.spec.js",
-      "slo-form-validation.spec.js"
+      "slo-form-validation.spec.js",
+      "slo-alert-sli.spec.js"
     ],
     "disabled": []
   },
