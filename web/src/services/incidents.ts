@@ -80,9 +80,18 @@ export interface IncidentAlert {
   detected_source?: string | null;
 }
 
+export interface CompositeAlertSummary {
+  id: string;
+  name: string;
+  alert_type: "composite";
+  enabled: boolean;
+  folder_id: string;
+}
+
 export interface IncidentWithAlerts extends Incident {
   alerts: IncidentAlert[];
   triggers: IncidentAlert[];
+  composite_alerts?: CompositeAlertSummary[];
 }
 
 export interface ExternalAlertPayload {

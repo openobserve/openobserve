@@ -259,6 +259,28 @@ async fn update(msg: Message) -> Result<()> {
                 );
             }
         }
+        TriggerModule::CompositeAlert => {
+            // Only sync if the composite alert still exists in this region.
+            if infra::table::alert_composites::get_by_id(conn, &trigger.org, &trigger.module_key)
+                .await
+                .unwrap_or(None)
+                .is_some()
+            {
+                scheduler::push(trigger.clone()).await.map_err(|e| {
+                    let error_msg = format!(
+                        "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
+                        trigger.org, trigger.module, trigger.module_key, e
+                    );
+                    log::error!("{error_msg}");
+                    anyhow::anyhow!(error_msg)
+                })?;
+            } else {
+                log::warn!(
+                    "[SUPER_CLUSTER:sync] Composite alert not found for module_key: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
+            }
+        }
     }
     Ok(())
 }

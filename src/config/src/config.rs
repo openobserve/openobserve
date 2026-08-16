@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 67;
+pub const DB_SCHEMA_VERSION: u64 = 69;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -751,6 +751,7 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub enrichment_table: EnrichmentTable,
     pub slo: Slo,
+    pub alert_composite: AlertComposite,
 }
 
 /// Feature 5 — SLO measurement (`alerts_2.md` §6b).
@@ -810,6 +811,38 @@ pub struct Slo {
         help = "Max distinct (long, short) burn-rate window pairs precomputed per SLO per pass. Alerts share these, so the cost is per SLO, not per alert."
     )]
     pub max_burn_window_pairs: i64,
+}
+
+/// Composite alerts tunables (§19.2).
+///
+/// Writes are on by default; `ZO_ALERT_COMPOSITE_WRITES_ENABLED` is an opt-out
+/// kill-switch for operators who want to disable composite mutation.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct AlertComposite {
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_WRITES_ENABLED",
+        default = true,
+        help = "Enable composite-alert mutation (create/update/move/trigger). Opt-out kill-switch: set to \"false\" to disable."
+    )]
+    pub writes_enabled: bool,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_STALE_K",
+        default = 3,
+        help = "Multiplier on a child's evaluation cadence that marks it stale."
+    )]
+    pub stale_k: i64,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_SWEEP_SECS",
+        default = 300,
+        help = "Composite scheduler sweep interval in seconds."
+    )]
+    pub sweep_secs: i64,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_DEBOUNCE_SECS",
+        default = 15,
+        help = "Minimum seconds between composite evaluations (coalescing debounce)."
+    )]
+    pub debounce_secs: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -2383,7 +2416,13 @@ pub struct Compact {
     pub old_data_min_hours: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
     pub old_data_min_files: i64,
-    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
+    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_MINUTES", default = 120)] // minutes
+    pub delete_files_delay_minutes: i64,
+    #[deprecated(
+        since = "0.92.2",
+        note = "Please use `ZO_COMPACT_DELETE_FILES_DELAY_MINUTES` instead. This ENV will be removed in a future release"
+    )]
+    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 0)] // hours
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
@@ -3841,8 +3880,14 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.max_file_size = 512;
     }
     cfg.compact.max_file_size *= 1024 * 1024;
-    if cfg.compact.delete_files_delay_hours < 1 {
-        cfg.compact.delete_files_delay_hours = 2;
+    if cfg.compact.delete_files_delay_minutes < 1 {
+        cfg.compact.delete_files_delay_minutes = 120;
+    }
+    // Backward compatibility: if the deprecated ZO_COMPACT_DELETE_FILES_DELAY_HOURS is
+    // explicitly set (default is 0, so > 0 means user provided a value), convert to minutes.
+    #[allow(deprecated)]
+    if cfg.compact.delete_files_delay_hours > 0 {
+        cfg.compact.delete_files_delay_minutes = cfg.compact.delete_files_delay_hours * 60;
     }
 
     if cfg.compact.data_retention_interval < 1 {
@@ -4681,12 +4726,14 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
         let mut cfg = Config::default();
         cfg.compact.data_retention_days = 0;
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
+        cfg.compact.delete_files_delay_minutes = 0;
         cfg.compact.data_retention_interval = 0;
         cfg.compact.old_data_interval = 0;
         cfg.compact.old_data_max_days = 0;
@@ -4698,7 +4745,8 @@ mod tests {
         check_compact_config(&mut cfg).unwrap();
         assert_eq!(cfg.compact.interval, 10);
         assert_eq!(cfg.compact.max_file_size, 512 * 1024 * 1024);
-        assert_eq!(cfg.compact.delete_files_delay_hours, 2);
+        assert_eq!(cfg.compact.delete_files_delay_hours, 0);
+        assert_eq!(cfg.compact.delete_files_delay_minutes, 120);
         assert_eq!(cfg.compact.data_retention_interval, 3600);
         assert_eq!(cfg.compact.old_data_interval, 3600);
         assert_eq!(cfg.compact.old_data_max_days, 7);
