@@ -1,0 +1,17 @@
+[
+  { "title": "should move from gate to editor via Build manually without the extension", "action": "new", "verifies": "a valid gate URL enables the CTAs and Build manually lands on the editor without any extension probe" },
+  { "title": "should author a valid journey via Add Step, action/navigate/value and locator commit", "action": "new", "verifies": "Add Step appends blank click steps, fields patch them, and a locator commits on Enter" },
+  { "title": "should block Continue until the first step navigates and element steps name a locator", "action": "new", "verifies": "Continue refuses a non-navigate first step and a locator-less element step" },
+  { "title": "should land on the extension setup checklist when recording without the extension and skip to the editor", "action": "new", "verifies": "Record without the extension shows the setup checklist, and skip reaches the editor" },
+  { "title": "should mutate the journey list via insert-below, duplicate and delete", "action": "new", "verifies": "per-row insert/duplicate/delete actions change the journey list length correctly" },
+  { "title": "should save the check and return to the list", "action": "new", "verifies": "a valid journey with a selected location saves via POST /synthetics and shows the new check in the list (fixme when no location)" },
+  { "title": "should refuse duplicate and last-candidate locator deletions", "action": "new", "verifies": "duplicate and last-candidate locator operations are refused with an inline error" },
+  { "title": "should block Continue on an uncommitted locator draft and pass after Enter", "action": "new", "verifies": "a typed-but-uncommitted locator draft blocks Continue as locatorDraftPending, then passes after Enter" },
+  { "title": "should guard against leaving with unsaved changes", "action": "new", "verifies": "navigating away mid-edit opens the unsaved-changes dialog before leaving" },
+  { "title": "Edit an existing check pre-fills the wizard — data-dependent: needs a seeded check via POST /api/{org}/synthetics (buildCreateBrowserTestPayload has no test-side helper yet)", "action": "new", "verifies": "edit-load path pre-fills the wizard (parked: needs a synthetics API create helper)" },
+  { "title": "Gate → editor via Record when extension installed — requires OpenObserve Recorder extension, not present in CI (CreateBrowserTest.vue:538-545; useSyntheticsRecorder.ts:263-287)", "action": "new", "verifies": "Record with the extension installed goes straight to the editor (extension-only, parked as fixme)" },
+  { "title": "Actual recording captures steps — requires extension startRecording ack (useSyntheticsRecorder.ts:435-473)", "action": "new", "verifies": "a real recording captures steps into the journey (extension-only, parked as fixme)" },
+  { "title": "Replay / preview run — requires extension replay command (useSyntheticsRecorder.ts:694-784)", "action": "new", "verifies": "a replay/preview run executes (extension-only, parked as fixme)" },
+  { "title": "Restore-then-record (record-before / record-from-failure) — requires extension + capability (BrowserJourney.vue:614-707; useSyntheticsRecorder.ts:483-600)", "action": "new", "verifies": "restore-then-record replays the prefix before recording (extension-only, parked as fixme)" },
+  { "title": "Incognito / preflight / replay banners — require extension failure responses (BrowserJourney.vue:1252-1570; replayFailure.ts)", "action": "new", "verifies": "incognito/preflight/replay failure banners render (extension-only, parked as fixme)" }
+]

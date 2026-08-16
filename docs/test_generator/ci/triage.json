@@ -1,0 +1,35 @@
+{
+  "feature_slug": "synthetics-journey-recording",
+  "feature_title": "Synthetics Browser Test Journey Recording",
+  "area": "Synthetics",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "browserJourneyRecording.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Synthetics/browserJourneyRecording.spec.js",
+  "playwright_group": "Synthetics",
+  "source_files": [
+    "web/src/views/synthetics/CreateBrowserTest.vue",
+    "web/src/components/synthetics/journey/BrowserJourney.vue",
+    "web/src/components/synthetics/journey/BrowserJourneyStepEditor.vue",
+    "web/src/components/synthetics/journey/JourneySteps.vue",
+    "web/src/composables/useSyntheticsRecorder.ts",
+    "web/src/utils/synthetics/buildV2Steps.ts",
+    "web/src/utils/synthetics/mapRecordedStep.ts",
+    "web/src/utils/synthetics/replayFailure.ts",
+    "web/src/constants/synthetics.ts",
+    "web/src/types/synthetics.ts",
+    "src/config/src/meta/synthetics.rs"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 38 changed paths are OSS-owned. The frontend changes live under web/src/** (views/synthetics, components/synthetics, composables/useSyntheticsRecorder.ts, utils/synthetics, constants/synthetics, types/synthetics), the backend change is src/config/src/meta/synthetics.rs (OSS config meta), and the rest are scripts/translations + web/src/locales i18n. No path under enterprise/, o2_enterprise/, src/enterprise/, or any o2_* enterprise-owned directory changed (the enterprise synthetics backend o2_enterprise/src/enterprise/synthetics is untouched). No enterprise keyword (SSO/SAML/RBAC/SDR/sensitive-data/logo-management) appears in the changed paths or symbols. Edition = oss.",
+    "skip": "Not skipped. No explicit opt-out (empty trigger_comment.txt, empty feature_hint.txt, and no tests-added/skip label passed in context). The change alters user-facing UI (CreateBrowserTest.vue and the journey step editor), so it is not docs-only, CI-only, or comment/test-data-only.",
+    "e2e": "E2E is warranted: this changes the Synthetics browser-test journey recorder UI. It adds click-type selection (left/right/middle button plus double-click via click_count), hover support in the v2 step vocabulary, 'record before step' and 'record before failed step' capabilities, and extension-version handshake/outdated detection — all user-exercisable interactions in the CreateBrowserTest journey editor that need verifying.",
+    "area": "The bulk of the changes live under web/src/views/synthetics/, web/src/components/synthetics/, web/src/composables/useSyntheticsRecorder.ts, and web/src/utils/synthetics/. The matching Playwright area folder is Synthetics, where sibling browser-test specs would live.",
+    "group": "No existing testfolder covers Synthetics in the checked-out ci-matrix manifests (ci_matrix.ent.json/cloud/env/firefox/scheduled list Logs/Metrics/Traces/Dashboards/Alerts/Pipelines/Streams/Reports/GeneralTests/SDR/Correlation/Workflows/etc., but none named Synthetics). Set to a new 'Synthetics' shard; the Engineer must create it (or extend the OSS base ci_matrix.json if a Synthetics shard already exists there).",
+    "existing_tests": "No Playwright E2E specs in the diff. The changed *.spec.ts files under web/src/** are Vitest unit tests (component/composable/util), not tests/ui-testing/playwright-tests/**/*.spec.js — they are not E2E coverage and do not set existing_tests_in_diff."
+  }
+}

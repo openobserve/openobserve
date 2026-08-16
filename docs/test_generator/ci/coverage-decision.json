@@ -1,0 +1,7 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Synthetics/browserJourneyRecording.spec.js",
+  "existing_tests_considered": [],
+  "needs_registration": true,
+  "rationale": "No Synthetics page object or spec exists anywhere in tests/ui-testing (grep for 'synthetics' only hits unrelated files in dashboard/traces/RUM). This is the first Synthetics E2E spec, so a brand-new spec + area folder are required. Registration note: this repo has no playwright.yml — new specs are registered as shards in tests/ui-testing/ci-matrix/ci_matrix.json (OSS base) and, because the synthetics route tree is enterprise/cloud-gated (useEnterpriseRoutes.ts:174), the ENT overlay ci_matrix.ent.json 'shards' array. A new 'Synthetics' testfolder must be added there, otherwise the spec is never sharded/run. The route only exists when config.isCloud=='true' || config.isEnterprise=='true' AND zoConfig.synthetics_enabled !== false, so on a pure-OSS target the whole file must self-skip cleanly."
+}

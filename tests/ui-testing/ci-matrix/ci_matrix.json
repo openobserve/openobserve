@@ -419,5 +419,15 @@
       "traces-autocomplete-suggestions.spec.js"
     ],
     "disabled": []
+  },
+  {
+    "_comment": "Synthetics browser-test journey recorder. The synthetics route tree is enterprise/cloud-gated (useEnterpriseRoutes.ts:174), so on a pure-OSS target the whole spec self-skips cleanly via an environment probe in beforeEach; on enterprise/cloud it exercises the WIRED authoring paths.",
+    "testfolder": "Synthetics",
+    "actual_folder": "Synthetics",
+    "browser": "chrome",
+    "run_files": [
+      "browserJourneyRecording.spec.js"
+    ],
+    "disabled": []
   }
 ]

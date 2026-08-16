@@ -106,6 +106,7 @@ import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationP
 
 // ===== FUNCTIONS PAGE OBJECTS =====
 const FunctionsPage = require("./functionsPages/functionsPage.js");
+import { SyntheticsJourneyPage } from "./syntheticsPages/browserJourney.js";
 const { ActionScriptsFormValidationPage } = require("./functionsPages/actionScriptsFormValidationPage.js");
 const FunctionsFormValidationPage = require("./functionsPages/functionsFormValidationPage.js");
 
@@ -226,6 +227,9 @@ class PageManager {
     this.functionsPage = new FunctionsPage(page);
     this.actionScriptsFormValidation = new ActionScriptsFormValidationPage(page);
     this.functionsFormValidation = new FunctionsFormValidationPage(page);
+
+    // ===== SYNTHETICS PAGE OBJECT =====
+    this.syntheticsJourneyPage = new SyntheticsJourneyPage(page);
 
     // ===== CIPHER KEYS PAGE OBJECTS =====
     this.cipherKeysFormValidation = new CipherKeysFormValidationPage(page);
