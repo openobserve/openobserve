@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   it would change the page's DOM wholesale, which is the opposite of what a
   dedup is for.
 
-  Two containers, one tile. `standalone` is the client block — a rounded card
-  with a border all round. `attached` is the server block, which sits INSIDE a
+  Two containers, one tile. `standalone` is the client block — a `rounded-surface`
+  card with a border all round. `attached` is the server block, which sits INSIDE a
   `DbmSection` under its heading, so it carries only the rule that separates it
   from that heading.
 -->

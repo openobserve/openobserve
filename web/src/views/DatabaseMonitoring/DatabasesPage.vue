@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="noQueryFigures(row) ? null : formatCount(row.calls)"
             source="client"
             :qualifier-key="CLIENT_OBSERVED"
-            :engine="row.db_system"
+            :engine="engineOf(row)"
             data-test="dbm-databases-calls"
           />
         </template>
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  includes network and pool wait the server never sees (T7). -->
             <span
               class="text-text-label text-3xs"
-              :title="t('dbm.detail.overlap.clientObserved', { engine: row.db_system })"
+              :title="t('dbm.detail.overlap.clientObserved', { engine: engineOf(row) ?? '' })"
               data-test="dbm-databases-load-qualifier"
             >
               {{ t("dbm.list.overlap.clientObserved") }}
@@ -786,6 +786,18 @@ const sortOrder = ref<"asc" | "desc">("desc");
  * reading with no ceiling to divide by, and no reading at all.
  */
 const attentionOf = (row: TableRow) => healthScalar(isBreakdownRow(row) ? undefined : row.metrics);
+
+/**
+ * The engine that reported a row, for the client-observed attribution tooltip.
+ *
+ * Only a database row carries one: a breakdown row is a schema or service
+ * *within* a database, so it has no engine of its own and must not borrow its
+ * parent's — the tooltip would then attribute the figure to something the row
+ * does not name. `undefined` is the honest answer and is what `DbmOverlapValue`
+ * already defaults to.
+ */
+const engineOf = (row: TableRow): string | undefined =>
+  isBreakdownRow(row) ? undefined : row.db_system;
 
 const attentionLabel = (row: TableRow): I18nText => {
   const scalar = attentionOf(row);
