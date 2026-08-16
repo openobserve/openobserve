@@ -1,7 +1,0 @@
-{
-  "group": "Synthetics",
-  "spec_filename": "browserJourneyRecording.spec.js",
-  "create_group": true,
-  "browser": "chrome",
-  "_note": "This repo builds its Playwright matrix from tests/ui-testing/ci-matrix/ci_matrix.json (single source of truth, consumed by .github/scripts/build-ci-matrix.js in playwright.yml). The new 'Synthetics' shard has been added directly to ci_matrix.json; this file is the machine-readable registration record for the PR-back job. No ENT overlay (ci_matrix.ent.json) exists in this OSS checkout — the enterprise repo applies its own overlay on top of the shared base."
-}
