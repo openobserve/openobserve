@@ -962,6 +962,36 @@ pub struct DatabaseMonitoring {
         help = "Join OTel receiver instance metrics (connections, replication lag, cache hit) into the Databases page at read time; off by default"
     )]
     pub instance_metrics: bool,
+    /// Read-time canonicalization of OSS-ingested deadlock rows (A1).
+    ///
+    /// An Open Source build stores a deadlock log line VERBATIM and
+    /// canonicalizes nothing — deadlocks are an Enterprise capability — so an
+    /// enterprise build reading that history finds no `o2_dbm_kind = 'deadlock'`
+    /// row and shows an empty page over real deadlocks. Measured on a real
+    /// stream: 239 deadlock rows, 0 visible. With this on, the deadlocks read
+    /// also projects the raw vendor columns and canonicalizes those rows in
+    /// Rust, using the same canonicalizers the ingest path uses.
+    ///
+    /// Defaults ON, unlike `activity_enabled`/`top_query_enabled`/
+    /// `explain_enabled`/`instance_metrics`. Those gate whether a NEW feed
+    /// starts costing ingest or an extra read; this gates neither. It adds no
+    /// column, no stream, no response field and no storage — it is pure
+    /// interpretation of rows the user already paid for, bounded by the same
+    /// `limit` the read already clamps to 1000. A knob defaulting OFF would
+    /// leave the customer who upgrades still staring at an empty page with no
+    /// way to learn a setting would fill it.
+    ///
+    /// It exists ONLY as a performance escape hatch: on a deployment with a long
+    /// OSS-only history the widened predicate matches many more rows inside the
+    /// requested window, and an operator needs a way to take that back without
+    /// waiting for a release. Same shape as `statement_enabled` — a knob that
+    /// defaults ON because it gates columns, not a feed.
+    #[env_config(
+        name = "ZO_DB_MONITORING_DEADLOCK_READ_FALLBACK",
+        default = true,
+        help = "Canonicalize OSS-ingested (raw) deadlock rows at READ time so they appear on the Deadlocks page; on by default — a performance kill-switch for deployments with a long OSS-only history, not an opt-in"
+    )]
+    pub deadlock_read_fallback: bool,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -5555,6 +5585,24 @@ mod tests {
         assert!(
             !cfg.db_monitoring.instance_metrics,
             "ZO_DB_MONITORING_INSTANCE_METRICS must default OFF (design D-G)"
+        );
+        // A1 · the deadlock read-time fallback. Defaults ON, deliberately unlike
+        // activity/top_query/explain/instance_metrics: those gate whether a new
+        // FEED starts costing ingest or an extra read. This one gates pure
+        // interpretation of rows the user has already paid to store — it adds no
+        // column, no stream and no response field, and is bounded by the same
+        // `limit` the read already clamps.
+        //
+        // Defaulting it OFF would leave the enterprise customer who upgrades
+        // still looking at an empty Deadlocks page, with no way to learn that a
+        // setting would fill it. That is the bug unfixed for everyone who does
+        // not read release notes, which is the majority. It exists as a knob at
+        // all only as a performance escape hatch for a deployment with a long
+        // OSS-only history, where the widened predicate scans more rows.
+        assert!(
+            cfg.db_monitoring.deadlock_read_fallback,
+            "ZO_DB_MONITORING_DEADLOCK_READ_FALLBACK must default ON: it is a \
+             kill-switch for a fix, not an opt-in for a cost"
         );
     }
 
