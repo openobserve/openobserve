@@ -753,9 +753,20 @@ receivers:
   # SQL transcribed VERBATIM from MSSQL_BLOCKING_RECEIVER in dbmShared.ts.
   # Emits the SAME column aliases as the PG and MySQL blocking recipes, which is
   # the whole contract `canonicalize_blocking` reads — no engine-specific parser.
+  #
+  # DSN IS ADO/key=value, NOT `sqlserver://` URL — THIS IS LOAD-BEARING, NOT STYLE.
+  # go-mssqldb accepts both forms, but the URL form runs the value through
+  # net/url, where `#` starts a FRAGMENT. MSSQLPASS is `dbm_Passw0rd#1`
+  # (docker-compose.yml), so the URL form silently truncated to
+  # `sqlserver://sa:dbm_Passw0rd` and every scrape failed with
+  #   parse "sqlserver://sa:dbm_Passw0rd": invalid port ":dbm_Passw0rd" after host
+  # while the collector pipeline still reported healthy. Percent-encoding the `#`
+  # would fix this one password and break on the next special character; key=value
+  # has no fragment/userinfo syntax at all, so it is immune by construction — and
+  # it matches how the PG/MySQL/MariaDB datasources above are already written.
   sqlquery/mssql_blocking:
     driver: sqlserver
-    datasource: "sqlserver://${env:MSSQLUSER}:${env:MSSQLPASS}@${env:MSSQLHOST}:${env:MSSQLPORT}?database=${env:MSSQLDB}"
+    datasource: "server=${env:MSSQLHOST};port=${env:MSSQLPORT};user id=${env:MSSQLUSER};password=${env:MSSQLPASS};database=${env:MSSQLDB}"
     collection_interval: 10s
     queries:
       - sql: |
@@ -809,9 +820,13 @@ receivers:
   # `SET QUOTED_IDENTIFIER ON` IS REQUIRED, NOT STYLE: XML methods fail without it
   # and the sqlqueryreceiver's session does not enable it by default — omit it and
   # every collection errors with msg 1934 while the pipeline looks healthy.
+  #
+  # DSN is ADO/key=value for the same reason as `sqlquery/mssql_blocking` above:
+  # the `#` in MSSQLPASS is a URL fragment delimiter and truncates a
+  # `sqlserver://` DSN. See the full note there before changing this line.
   sqlquery/mssql_deadlocks:
     driver: sqlserver
-    datasource: "sqlserver://${env:MSSQLUSER}:${env:MSSQLPASS}@${env:MSSQLHOST}:${env:MSSQLPORT}?database=${env:MSSQLDB}"
+    datasource: "server=${env:MSSQLHOST};port=${env:MSSQLPORT};user id=${env:MSSQLUSER};password=${env:MSSQLPASS};database=${env:MSSQLDB}"
     collection_interval: 30s
     queries:
       - sql: |
