@@ -3134,6 +3134,106 @@ async fn present_dbm_columns(
         .collect())
 }
 
+// ─── A1 · the RAW presence gate ──────────────────────────────────────────────
+//
+// The A1 read-time fallback projects RAW vendor columns beside the canonical
+// ones, and [`present_dbm_columns`]'s hazard is exactly SYMMETRIC there: naming
+// a column absent from the stream fails the WHOLE query with a 400, not a null
+// column. Measured on a real OSS-ingested stream, all 9 MSSQL raw columns and 3
+// MariaDB ones are absent from the merged schema — so a hardcoded raw
+// projection, which is the obvious implementation, takes the Deadlocks page down
+// on any deployment that never ran those recipes. That is most of them.
+//
+// So the raw side needs its own gate. It needs one MORE thing than the canonical
+// side does, and that is the reason this is a separate function rather than a
+// second call to `present_dbm_columns` with a different array.
+
+/// Which of `candidates` this stream can actually be QUERIED for.
+///
+/// Two independent 400s are being avoided here, and a check that catches only
+/// the first still ships a broken page:
+///
+/// 1. **Absent from the schema.** `unknown field 'x'` — the failure [`present_dbm_columns`]
+///    documents.
+/// 2. **Present in the schema but truncated out of an enabled User-Defined Schema.** *"Field exists
+///    in the stream but not in its User-Defined Schema (UDS)"*
+///    (`src/api/search/src/search/utils.rs`). Past `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` (default
+///    1000) fields, UDS auto-enables and truncates which fields stay queryable — while
+///    `infra::schema::get` keeps returning the FULL merged schema. A gate that consults only the
+///    stored schema therefore passes and then 400s at query time.
+///
+/// Variant 2 is not hypothetical for this design: the DBM stream is a shared
+/// logs stream carrying ordinary log lines (195-283 columns measured on real
+/// deployments), so crossing 1000 is realistic, and the raw vendor columns —
+/// old, and neither FTS nor index fields — are exactly the low-priority names
+/// the auto-enable truncates.
+///
+/// **An empty `uds_fields` means UDS is DISABLED, not "everything truncated".**
+/// The two are the same empty vector on the wire, and conflating them would
+/// degrade every deployment that never enabled UDS — almost all of them — to a
+/// `_timestamp`-only projection that silently shows zero deadlocks. Same
+/// false-verdict shape `present_dbm_columns` refuses for a failed schema read.
+///
+/// Pure, and takes the schema and UDS list rather than reading them, so both
+/// halves are testable without a meta store — the reason
+/// `test_present_dbm_columns_reports_errors_instead_of_empty` had to be
+/// `#[ignore]`d.
+#[cfg(feature = "enterprise")]
+fn queryable_columns(
+    candidates: &[&str],
+    schema: &arrow_schema::Schema,
+    uds_fields: &[String],
+) -> HashSet<String> {
+    candidates
+        .iter()
+        .filter(|f| schema.field_with_name(f).is_ok())
+        .filter(|f| uds_fields.is_empty() || uds_fields.iter().any(|u| u == **f))
+        .map(|f| f.to_string())
+        .collect()
+}
+
+/// The raw deadlock columns this stream can be queried for.
+///
+/// Candidates come from `config`'s shared [`server_vantage::RAW_DEADLOCK_FIELDS`]
+/// and never from a local list: the enterprise canonicalizers that CONSUME these
+/// names cannot see this crate, so a second copy here would drift silently and
+/// the cross-repo contract test
+/// (`every_raw_field_the_oss_read_projects_is_read_by_a_canonicalizer`) would
+/// not be able to see the drift.
+#[cfg(feature = "enterprise")]
+fn raw_deadlock_columns_in(
+    schema: &arrow_schema::Schema,
+    uds_fields: &[String],
+) -> HashSet<String> {
+    queryable_columns(&server_vantage::RAW_DEADLOCK_FIELDS, schema, uds_fields)
+}
+
+/// Read the raw-column gate for one stream.
+///
+/// Propagates `Err` rather than `unwrap_or_default()`, for the reason
+/// [`present_dbm_columns`] spells out at length: an empty set from a DB blip is
+/// indistinguishable from "this stream has no raw deadlock columns", and both
+/// then produce a confident wrong answer — here, an empty Deadlocks page over a
+/// stream full of deadlocks, which is the very bug A1 exists to fix.
+///
+/// The stream SETTINGS read is deliberately not fatal on its own: `get_settings`
+/// returns `Option` and answers `None` both for "no settings" and for a read it
+/// could not serve. `None` is treated as UDS-disabled, which is the same
+/// assumption every other reader in the codebase makes
+/// (`get_stream_setting_defined_schema_fields` maps `None` to an empty vec), and
+/// the failure mode if that assumption is ever wrong is a 400 on the page — loud
+/// — rather than a silent under-report.
+#[cfg(feature = "enterprise")]
+async fn present_raw_deadlock_columns(
+    org_id: &str,
+    stream_name: &str,
+) -> Result<HashSet<String>, anyhow::Error> {
+    let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await?;
+    let settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs).await;
+    let uds = infra::schema::get_stream_setting_defined_schema_fields(&settings);
+    Ok(raw_deadlock_columns_in(&schema, &uds))
+}
+
 // ─── W2.3 · Activity read API ────────────────────────────────────────────────
 
 /// Distinct poll timestamps for one record kind, newest first.
@@ -3406,6 +3506,66 @@ fn state_breakdown(rows: &[Value]) -> Vec<Value> {
         .collect()
 }
 
+/// The A1 raw-deadlock widening, when it is active.
+///
+/// Carries the SCHEMA-GATED raw column set — the output of
+/// [`raw_deadlock_columns_in`], never a hardcoded list — because both halves of
+/// the widening (the projection and the marker predicate) name real columns, and
+/// naming an absent one fails the whole query.
+///
+/// A distinct type rather than a bare `HashSet` so the builder's other two
+/// callers cannot pass one by accident: blocking and activity share the builder
+/// and must be untouched in phase 1.
+///
+/// NOT `#[cfg]`-gated, unlike everything else A1 adds, because activity is an
+/// OSS-owned ungated page that calls the same builder — so the parameter's type
+/// has to exist in both builds. It is inert on OSS: nothing there constructs one
+/// (only the enterprise deadlocks body does), so every OSS caller passes `None`
+/// and the emitted SQL is byte-identical to before A1.
+pub(crate) struct RawDeadlockFallback {
+    /// Raw columns this stream can actually be queried for.
+    pub present: HashSet<String>,
+}
+
+impl RawDeadlockFallback {
+    /// The marker terms for the `WHERE`, restricted to marker columns the stream
+    /// HAS.
+    ///
+    /// Each marker is itself a column, so an ungated term is the same 400 as an
+    /// ungated projection entry — the half of the hazard that lives in the
+    /// predicate. A stream that never saw a MariaDB deadlock has no
+    /// `o2_maria_event` column, and naming it takes the page down.
+    ///
+    /// Values are the fixed `KIND_DEADLOCK` literal from `config`, not user
+    /// input, so there is nothing here to escape; the column names are a
+    /// compile-time whitelist for the same reason [`dbm_event_preds`] documents.
+    fn marker_terms(&self) -> Vec<String> {
+        server_vantage::DEADLOCK_MARKERS
+            .into_iter()
+            .filter(|(col, _)| self.present.contains(*col))
+            .map(|(col, val)| format!("{col} = '{val}'"))
+            .collect()
+    }
+}
+
+/// Everything the builder may project, gated on what the stream actually has.
+///
+/// The two halves travel together because they are answers to the same
+/// question — "which of the columns I want can this stream be queried for" —
+/// and both are schema-gated for the same reason: naming an absent column fails
+/// the WHOLE query.
+pub(crate) struct DbmProjection<'a> {
+    /// Canonical `o2_dbm_*` columns present on the stream.
+    pub present: &'a HashSet<String>,
+    /// The A1 deadlock read-time fallback. `Some` for the DEADLOCKS caller only
+    /// — blocking and activity pass `None` and get byte-identical SQL to what
+    /// they emitted before A1. Widening the shared builder for everyone would
+    /// push raw deadlock columns into their projections: cost with no reader,
+    /// and for blocking a real risk, since its degraded projection already drops
+    /// every row.
+    pub raw: Option<&'a RawDeadlockFallback>,
+}
+
 /// Read canonical server-vantage events of one kind from a LOGS stream.
 pub(crate) fn build_dbm_events_sql(
     stream_name: &str,
@@ -3414,8 +3574,9 @@ pub(crate) fn build_dbm_events_sql(
     end_time: i64,
     preds: &str,
     limit: usize,
-    present: &HashSet<String>,
+    projection: &DbmProjection<'_>,
 ) -> String {
+    let DbmProjection { present, raw } = *projection;
     // An EXPLICIT projection, never `SELECT *`.
     //
     // The recipes export into a stream that also carries ordinary log lines, so
@@ -3432,19 +3593,54 @@ pub(crate) fn build_dbm_events_sql(
     // naming one missing column fails the ENTIRE query with a schema error
     // rather than returning it as null. Gate on the schema, the same way the
     // rollup gates its optional row-count columns.
+    //
+    // A1 widens BOTH halves for the deadlocks caller, and both widenings are
+    // schema-gated for the same reason the canonical projection is. The raw
+    // names come from `RAW_DEADLOCK_FIELDS` (in `config`, shared with the
+    // enterprise canonicalizers that read them) intersected with what this
+    // stream can be queried for — never a hardcoded list, which is the
+    // implementation that 400s the page on any deployment that never ran an
+    // MSSQL or MariaDB-with-locks recipe.
+    //
+    // The two vocabularies are disjoint by construction
+    // (`raw_deadlock_fields_never_overlap_the_canonical_ones` in `config`), so
+    // chaining them cannot name a column twice.
     let cols = std::iter::once("_timestamp")
         .chain(
             server_vantage::ALL_DBM_FIELDS
                 .into_iter()
                 .filter(|f| present.contains(*f)),
         )
+        .chain(
+            server_vantage::RAW_DEADLOCK_FIELDS
+                .into_iter()
+                .filter(|f| raw.is_some_and(|r| r.present.contains(*f))),
+        )
         .collect::<Vec<_>>()
         .join(", ");
+
+    // The kind predicate. Canonical-only by default; for deadlocks with the
+    // fallback active it is OR-ed with the raw markers, which is what makes ONE
+    // query return both populations — no UNION, because this page projects
+    // columns and folds in Rust rather than aggregating in SQL.
+    //
+    // The markers are gated on presence too, and an EMPTY marker set collapses
+    // back to the bare canonical predicate rather than emitting `OR ()`.
+    let kind_pred = {
+        let canonical = format!("{} = '{}'", server_vantage::O2_DBM_KIND, escape_sq(kind),);
+        let markers = raw
+            .map(RawDeadlockFallback::marker_terms)
+            .unwrap_or_default();
+        if markers.is_empty() {
+            canonical
+        } else {
+            format!("({canonical} OR {})", markers.join(" OR "))
+        }
+    };
+
     format!(
-        "SELECT {cols} FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'{preds}\nORDER BY _timestamp DESC\nLIMIT {limit}",
+        "SELECT {cols} FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {kind_pred}{preds}\nORDER BY _timestamp DESC\nLIMIT {limit}",
         escape_ident(stream_name),
-        server_vantage::O2_DBM_KIND,
-        escape_sq(kind),
     )
 }
 
@@ -3537,6 +3733,104 @@ fn deadlock_event_from_row(row: &Value) -> server_vantage::DeadlockEvent {
         victim_side: row
             .get(server_vantage::O2_DBM_VICTIM_SIDE)
             .and_then(server_vantage::as_i64_loose),
+    }
+}
+
+/// Turn ONE stored row into a [`server_vantage::DeadlockEvent`], whichever shape
+/// it is in — the A1 read-time fallback's row-level branch.
+///
+/// **The discriminator is per-ROW, not per-stream.** A deployment that upgraded
+/// OSS → enterprise mid-window has both shapes inside a single query result, so
+/// there is no stream-level mode flag that could decide this.
+///
+/// **This is also the dedup (§4.1).** The two populations are disjoint by
+/// construction: a row either has `o2_dbm_kind = 'deadlock'` or it does not, and
+/// this branches on exactly that, consuming each row exactly once. There is no
+/// path that emits both forms of one row — including for a row that carries BOTH
+/// vocabularies, where the canonical branch wins because those fields were
+/// resolved once already at ingest and re-deriving them would be strictly worse.
+///
+/// A raw row the canonicalizer refuses yields `None` and is DROPPED, not emitted
+/// blank. That is load-bearing for Postgres, which logs a banner entry beside
+/// every DETAIL entry: emitting banners would put a participant-less row on the
+/// page for every PG deadlock and double the visible count.
+///
+/// The residual duplicate risk is not double-EMISSION but double-INGESTION — the
+/// same log line ingested by both an OSS and an enterprise node in a mixed
+/// cluster is two distinct rows, and the fallback makes the previously-invisible
+/// one visible. That duplicate was always there, merely hidden; it resolves once
+/// every node is enterprise.
+#[cfg(feature = "enterprise")]
+fn deadlock_event_for_row(row: &Value) -> Option<server_vantage::DeadlockEvent> {
+    if get_str(row, server_vantage::O2_DBM_KIND) == server_vantage::KIND_DEADLOCK {
+        return Some(deadlock_event_from_row(row));
+    }
+    // Not canonical — hand the raw record to the SAME canonicalizer the ingest
+    // path uses, so a row read back reads exactly as it would have been written.
+    let rec = row.as_object()?;
+    o2_enterprise::enterprise::db_monitoring::deadlock::canonicalize_deadlock_event(rec)
+}
+
+/// Scope filters (`?system=` / `?instance=` / `?database=`) applied in RUST
+/// rather than SQL.
+///
+/// **Why not SQL.** [`dbm_event_preds`] names `o2_dbm_engine` /
+/// `o2_dbm_instance` / `o2_dbm_database`, and a RAW row has none of them —
+/// measured, 0 non-null of 137. Appending those predicates to the widened
+/// `WHERE` silently drops EVERY raw row, so the fallback would appear to work
+/// with no filter and mysteriously under-report with one. The other option,
+/// pushing the filters onto the raw rows' vendor equivalents, means reproducing
+/// `detect_engine`/`detect_instance` — each of which reads several aliases with
+/// fallbacks — in SQL, where it will drift from the Rust it was copied from.
+///
+/// So narrowing moves to the assembled events, where the canonicalizer has
+/// already populated the same three fields on both shapes and ONE filter serves
+/// both. This is the shape the page already had for its free-text `search`
+/// filter, which has always run in Rust after stitching.
+///
+/// **Cost.** Raw rows are no longer narrowed before the `LIMIT`, so a
+/// heavily-filtered query over a wide history scans up to `limit` rows and may
+/// return fewer than `limit` events. Accepted for phase 1 — the page is a
+/// diagnostic, not an exhaustive audit — and it is the main candidate for a
+/// phase-2 refinement.
+///
+/// **An UNKNOWN field does not match.** House rule (`plan_row_to_dto`): an
+/// absent field defaults to the WEAKER claim. "We do not know which engine this
+/// is" is not evidence that it is the one asked for — and it keeps this
+/// agreeing with the SQL predicate it replaces, since `AND o2_dbm_engine = 'x'`
+/// does not match a NULL column either. Without that agreement the same request
+/// would return different rows depending on the kill-switch.
+#[cfg(feature = "enterprise")]
+struct ScopeNarrowing {
+    system: Option<String>,
+    instance: Option<String>,
+    database: Option<String>,
+}
+
+#[cfg(feature = "enterprise")]
+impl ScopeNarrowing {
+    fn new(q: &DeadlocksQuery) -> Self {
+        ScopeNarrowing {
+            system: q.system.clone(),
+            instance: q.instance.clone(),
+            database: q.database().map(str::to_string),
+        }
+    }
+
+    fn matches(&self, ev: &server_vantage::DeadlockEvent) -> bool {
+        // An EMPTY STRING is not a filter, matching `dbm_event_preds`'s own
+        // `filter(|s| !s.is_empty())`. The two must agree, or one request
+        // narrows differently depending on which path serves it.
+        let ok = |want: &Option<String>, got: &Option<String>| match want
+            .as_deref()
+            .filter(|s| !s.is_empty())
+        {
+            None => true,
+            Some(w) => got.as_deref() == Some(w),
+        };
+        ok(&self.system, &ev.engine)
+            && ok(&self.instance, &ev.instance)
+            && ok(&self.database, &ev.database)
     }
 }
 
@@ -4304,14 +4598,65 @@ async fn read_deadlocks_body(
             }
         },
     };
+    // A1 · the read-time fallback over OSS-ingested rows.
+    //
+    // An Open Source build stores a deadlock log line VERBATIM and canonicalizes
+    // nothing, so an enterprise build reading that history finds no
+    // `o2_dbm_kind = 'deadlock'` row and renders an empty page over real
+    // deadlocks — measured on a real stream, 239 deadlock rows and 0 visible.
+    // With the fallback on, the read ALSO projects the raw vendor columns and
+    // canonicalizes those rows here, through the same enterprise canonicalizers
+    // the ingest path uses.
+    //
+    // A failed raw-schema read degrades to `None` rather than failing the
+    // request, and that asymmetry with `present` above is deliberate: `present`
+    // failing means the CANONICAL path would emit content-free rows, which is a
+    // false verdict and must be a 500. The raw gate failing means only that the
+    // fallback cannot run — the canonical path is still correct and complete, so
+    // the honest answer is today's answer, not an error page. The operator sees
+    // the reason in the log.
+    let raw_fallback = if config::get_config().db_monitoring.deadlock_read_fallback {
+        match present_raw_deadlock_columns(org_id, stream).await {
+            Ok(present) => Some(RawDeadlockFallback { present }),
+            Err(e) => {
+                log::warn!(
+                    "[DbMonitoring] deadlocks raw-column read failed for {org_id}/{stream}, \
+                     serving canonical rows only: {e}"
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // SCOPE FILTERS MUST NOT REACH THE RAW ROWS' SQL.
+    //
+    // `dbm_event_preds` names `o2_dbm_engine`/`o2_dbm_instance`/
+    // `o2_dbm_database`, and a raw row has NONE of them — measured, 0 non-null
+    // of 137. Appending those predicates to the widened `WHERE` therefore
+    // silently drops EVERY raw row, so the page would look correct with no
+    // filter and mysteriously under-report with one. The alternative,
+    // reproducing `detect_engine`/`detect_instance`'s multi-alias fallbacks in
+    // SQL, duplicates logic that will drift.
+    //
+    // So when the fallback is active the scope narrowing moves to Rust, applied
+    // to the assembled events of BOTH shapes — the canonicalizer populates the
+    // same three fields on a raw-derived event, so one filter serves both. The
+    // free-text `search` filter already worked this way.
+    let scope = ScopeNarrowing::new(&q);
+    let sql_preds = if raw_fallback.is_some() { "" } else { &preds };
     let sql = build_dbm_events_sql(
         stream,
         server_vantage::KIND_DEADLOCK,
         start_time,
         end_time,
-        &preds,
+        sql_preds,
         limit,
-        &present,
+        &DbmProjection {
+            present: &present,
+            raw: raw_fallback.as_ref(),
+        },
     );
     let rows = match run_events_search(org_id, stream, sql, start_time, end_time).await {
         Ok(rows) => rows,
@@ -4322,12 +4667,33 @@ async fn read_deadlocks_body(
     };
     let row_count = rows.len();
 
+    // Per-ROW branch: canonical rows keep the canonical reader, raw rows go to
+    // the enterprise canonicalizer, and a raw row it refuses (the PG banner) is
+    // dropped rather than emitted blank. Each row is consumed exactly once —
+    // that is the dedup, and it is why no deadlock can appear twice.
     let events: Vec<server_vantage::DeadlockEvent> =
-        rows.iter().map(deadlock_event_from_row).collect();
+        rows.iter().filter_map(deadlock_event_for_row).collect();
     // GAP 2: MySQL logs one entry per transaction side. Without this the tab
     // shows ~2 rows per real deadlock AND splits the sides into different shape
     // groups, so the same bug reads as two unrelated half-sized ones.
+    //
+    // Unchanged by A1: the stitcher is shape-agnostic, keying on canonical
+    // `engine`/`participants`/`victim_side`, which is exactly what the
+    // canonicalizer's output provides. The hardest part of the fallback —
+    // cross-record assembly — was therefore paid for already by the canonical
+    // read path, and the fallback inherits it for free.
     let events = stitch_mysql_deadlocks(events);
+
+    // Scope narrowing, in Rust and AFTER assembly, when the fallback moved it
+    // off the SQL. A no-op when the fallback is inactive, because then the SQL
+    // predicates already applied and every surviving event matches — but running
+    // it unconditionally would be a second, differently-implemented filter on
+    // the same request, so it runs exactly where the SQL one did not.
+    let events: Vec<server_vantage::DeadlockEvent> = if raw_fallback.is_some() {
+        events.into_iter().filter(|e| scope.matches(e)).collect()
+    } else {
+        events
+    };
 
     let needle = q.search.as_deref().unwrap_or("").trim().to_lowercase();
     let events: Vec<server_vantage::DeadlockEvent> = events
@@ -4606,7 +4972,15 @@ async fn read_blocking_body(
         end_time,
         &preds,
         limit,
-        &present,
+        &DbmProjection {
+            present: &present,
+            // Phase 1 is DEADLOCKS ONLY. Blocking needs its own raw-field
+            // mapping via `canonicalize_blocking`, which is engine-agnostic over
+            // recipe-aliased columns — a different detection shape from the
+            // three deadlock markers. Activity is an OSS-owned ungated page and
+            // is not in A1's scope at all.
+            raw: None,
+        },
     );
     let rows = match run_events_search(org_id, stream, sql, start_time, end_time).await {
         Ok(rows) => rows,
@@ -4844,7 +5218,15 @@ async fn read_activity_body(
         end_time,
         &preds,
         limit,
-        &present,
+        &DbmProjection {
+            present: &present,
+            // Phase 1 is DEADLOCKS ONLY. Blocking needs its own raw-field
+            // mapping via `canonicalize_blocking`, which is engine-agnostic over
+            // recipe-aliased columns — a different detection shape from the
+            // three deadlock markers. Activity is an OSS-owned ungated page and
+            // is not in A1's scope at all.
+            raw: None,
+        },
     );
     // ── all five reads CONCURRENTLY ───────────────────────────────────────
     //
@@ -7728,6 +8110,47 @@ mod tests {
             .collect()
     }
 
+    /// The raw-fallback opts for a stream whose queryable raw columns are
+    /// exactly these. Members are checked against the shared vocabulary, so a
+    /// test cannot invent a column the projection would never legitimately name.
+    #[cfg(feature = "enterprise")]
+    fn raw_cols(present: &[&str]) -> RawDeadlockFallback {
+        for f in present {
+            assert!(
+                server_vantage::RAW_DEADLOCK_FIELDS.contains(f),
+                "{f} is not a RAW_DEADLOCK_FIELDS member — the fixture is testing a \
+                 column the gate could never return"
+            );
+        }
+        RawDeadlockFallback {
+            present: present.iter().map(|f| f.to_string()).collect(),
+        }
+    }
+
+    /// Bundle the two projection halves the builder takes.
+    fn proj<'a>(
+        present: &'a HashSet<String>,
+        raw: Option<&'a RawDeadlockFallback>,
+    ) -> DbmProjection<'a> {
+        DbmProjection { present, raw }
+    }
+
+    /// A stream schema with exactly these fields, for the presence gates.
+    ///
+    /// Types are irrelevant to the gates — they only ever ask whether a name
+    /// resolves — so everything is a nullable Utf8. Nullable deliberately: the
+    /// one column DataFusion cannot null-fill is a NON-nullable missing one, and
+    /// nothing the projection may name is allowed to be that.
+    #[cfg(feature = "enterprise")]
+    fn schema_of(fields: &[&str]) -> arrow_schema::Schema {
+        arrow_schema::Schema::new(
+            fields
+                .iter()
+                .map(|f| arrow_schema::Field::new(*f, arrow_schema::DataType::Utf8, true))
+                .collect::<Vec<_>>(),
+        )
+    }
+
     // ── Stream RBAC ─────────────────────────────────────────────────────────
 
     /// On OSS there is no OFGA to consult, so `can_read_stream` must pass
@@ -9497,7 +9920,15 @@ mod tests {
     /// the activity columns here.
     #[test]
     fn test_build_dbm_events_sql_exact() {
-        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &all_cols());
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&all_cols(), None),
+        );
         let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version, o2_dbm_plan_source, o2_dbm_plan_duration_ms, o2_dbm_plan_rows_actual, o2_dbm_relation, o2_dbm_schema, o2_dbm_total_bytes, o2_dbm_heap_bytes, o2_dbm_live_tuples, o2_dbm_dead_tuples, o2_dbm_dead_tup_pct, o2_dbm_mod_since_analyze, o2_dbm_seq_scan_count, o2_dbm_seq_tup_read, o2_dbm_idx_scan_count, o2_dbm_autovacuum_count, o2_dbm_frozen_xid_age, o2_dbm_last_vacuum, o2_dbm_last_autovacuum, o2_dbm_last_analyze, o2_dbm_counters_are_cumulative, o2_dbm_tuples_are_estimated, o2_dbm_index_name, o2_dbm_index_bytes, o2_dbm_idx_tup_read, o2_dbm_idx_tup_fetch, o2_dbm_index_is_unique, o2_dbm_stmt_duration_ms FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
         assert_eq!(sql, expected);
     }
@@ -9514,7 +9945,15 @@ mod tests {
         let mut present = all_cols();
         present.remove(server_vantage::O2_DBM_INSTANCE);
 
-        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &present);
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&present, None),
+        );
         assert!(
             !sql.contains(server_vantage::O2_DBM_INSTANCE),
             "absent column must not be projected"
@@ -9530,7 +9969,15 @@ mod tests {
     /// see `test_present_dbm_columns_reports_errors_instead_of_empty`.
     #[test]
     fn test_build_dbm_events_sql_survives_an_empty_schema() {
-        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &HashSet::new());
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&HashSet::new(), None),
+        );
         assert!(sql.starts_with("SELECT _timestamp FROM"));
     }
 
@@ -9641,6 +10088,898 @@ mod tests {
         }
     }
 
+    // ── A1 · the RAW presence gate (`queryable_columns`) ────────────────────
+    //
+    // `present_dbm_columns` exists because naming an absent column fails the
+    // WHOLE query with a 400 rather than yielding a null column. The A1 fallback
+    // projects RAW vendor columns alongside the canonical ones, and the hazard
+    // is exactly symmetric — measured on a real OSS-ingested stream, all 9 MSSQL
+    // raw columns and 3 MariaDB ones are absent from the merged schema. A
+    // hardcoded raw projection 400s the Deadlocks page on any deployment that
+    // never ran those recipes, which is most of them.
+    //
+    // There is a SECOND variant a naive fix still misses. Past
+    // `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` (default 1000) fields, User-Defined
+    // Schema auto-enables and truncates which fields stay QUERYABLE, while
+    // `infra::schema::get` still returns the full merged schema. A presence
+    // check that consults only the stored schema therefore passes, and the query
+    // then 400s with a different message: "Field exists in the stream but not in
+    // its User-Defined Schema (UDS)". The DBM stream is a shared logs stream
+    // carrying ordinary log lines (195-283 columns measured on real
+    // deployments), so crossing 1000 is realistic, and the raw vendor columns —
+    // old and low-priority — are plausible truncation candidates.
+    //
+    // `queryable_columns` is the pure core of both checks, split out from the
+    // async wrapper so the UDS half is testable without a meta store.
+
+    /// A candidate absent from the schema must be dropped.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_queryable_columns_drops_candidates_absent_from_the_schema() {
+        let schema = schema_of(&["_timestamp", "o2_pg_event", "dl_waiter_pid"]);
+        let got = queryable_columns(
+            &[
+                "o2_pg_event",
+                "dl_waiter_pid",
+                "mssql_spid",
+                "maria_lock_mode",
+            ],
+            &schema,
+            &[],
+        );
+        assert_eq!(
+            got,
+            ["o2_pg_event", "dl_waiter_pid"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<HashSet<String>>(),
+            "a column absent from the schema fails the WHOLE query, so it must not \
+             reach the projection"
+        );
+    }
+
+    /// THE UDS VARIANT. A field present in the stored schema but truncated out
+    /// of an auto-enabled User-Defined Schema is NOT queryable, and naming it
+    /// 400s the page just as an absent one does.
+    ///
+    /// This is the case a schema-only check passes and then fails at query time,
+    /// which is why the gate takes the UDS list as well as the schema.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_queryable_columns_honours_an_enabled_user_defined_schema() {
+        let schema = schema_of(&["_timestamp", "o2_pg_event", "dl_waiter_pid", "dl_query_1"]);
+        // UDS enabled, and it kept only one of the three raw columns.
+        let uds = vec!["_timestamp".to_string(), "o2_pg_event".to_string()];
+
+        let got = queryable_columns(
+            &["o2_pg_event", "dl_waiter_pid", "dl_query_1"],
+            &schema,
+            &uds,
+        );
+        assert_eq!(
+            got,
+            ["o2_pg_event"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<HashSet<String>>(),
+            "`dl_waiter_pid`/`dl_query_1` are in the merged schema but truncated out \
+             of the UDS — naming them returns 'Field exists in the stream but not in \
+             its User-Defined Schema (UDS)' and fails the whole page"
+        );
+    }
+
+    /// An EMPTY UDS list means UDS is not enabled — it must not be read as
+    /// "nothing is queryable".
+    ///
+    /// This is the same false-verdict shape `present_dbm_columns` documents: the
+    /// disabled case and the everything-truncated case are both empty vectors on
+    /// the wire, and treating them alike would degrade every deployment that
+    /// never enabled UDS (i.e. almost all of them) to a `_timestamp`-only
+    /// projection and silently show zero deadlocks.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_queryable_columns_treats_an_empty_uds_as_disabled_not_as_empty() {
+        let schema = schema_of(&["_timestamp", "o2_pg_event", "dl_waiter_pid"]);
+        let got = queryable_columns(&["o2_pg_event", "dl_waiter_pid"], &schema, &[]);
+        assert_eq!(
+            got.len(),
+            2,
+            "an empty defined_schema_fields means UDS is OFF, not that every field \
+             was truncated"
+        );
+    }
+
+    /// The gate is candidate-driven: a schema field nobody asked for must not
+    /// appear, or the projection grows without bound on a 283-column stream.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_queryable_columns_returns_only_what_was_asked_for() {
+        let schema = schema_of(&["_timestamp", "o2_pg_event", "unrelated_log_field"]);
+        let got = queryable_columns(&["o2_pg_event"], &schema, &[]);
+        assert_eq!(got.len(), 1);
+        assert!(!got.contains("unrelated_log_field"));
+    }
+
+    /// The raw gate must be built from the SHARED vocabulary, not a local copy.
+    ///
+    /// `RAW_DEADLOCK_FIELDS` lives in `config` precisely so the enterprise
+    /// canonicalizers and this projection cannot drift; a second literal list
+    /// here would defeat that and the cross-repo contract test could not see it.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_present_raw_deadlock_columns_gates_the_shared_vocabulary() {
+        let schema = schema_of(&[
+            "_timestamp",
+            "o2_pg_event",
+            "dl_waiter_pid",
+            "an_unrelated_field",
+        ]);
+        let got = raw_deadlock_columns_in(&schema, &[]);
+        assert_eq!(
+            got,
+            ["o2_pg_event", "dl_waiter_pid"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<HashSet<String>>()
+        );
+        // Every candidate it considers comes from the shared array.
+        for f in &got {
+            assert!(
+                server_vantage::RAW_DEADLOCK_FIELDS.contains(&f.as_str()),
+                "{f} is not a RAW_DEADLOCK_FIELDS member — the gate is using a local list"
+            );
+        }
+    }
+
+    // ── A1 · the widened deadlocks SQL ──────────────────────────────────────
+
+    /// The whole fallback in one assertion: BOTH shapes in ONE query.
+    ///
+    /// No UNION and no second query — deadlocks projects columns and folds in
+    /// Rust rather than aggregating in SQL, so one widened `WHERE` plus a
+    /// widened projection covers canonical and raw rows together. Verified live:
+    /// a single `OR`-ed predicate returned all 239 raw rows on a stream with 0
+    /// canonical ones.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_deadlock_sql_matches_both_the_canonical_and_the_raw_shape() {
+        let raw = raw_cols(&["o2_pg_event", "o2_my_event", "o2_maria_event", "dl_query_1"]);
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&all_cols(), Some(&raw)),
+        );
+
+        assert!(
+            sql.contains(
+                "(o2_dbm_kind = 'deadlock' OR o2_pg_event = 'deadlock' OR \
+                          o2_my_event = 'deadlock' OR o2_maria_event = 'deadlock')"
+            ),
+            "the canonical predicate must be OR-ed with the markers, not replaced:\n{sql}"
+        );
+        assert!(
+            sql.contains("dl_query_1"),
+            "the raw columns must be projected too, or the canonicalizer gets nothing to read"
+        );
+        assert!(!sql.contains("UNION"), "one query, not two");
+    }
+
+    /// THE §1.3 REGRESSION TEST — the one that would have caught the 400.
+    ///
+    /// On a real OSS-ingested stream all 9 MSSQL raw columns and 3 MariaDB ones
+    /// are ABSENT from the merged schema, and naming an absent column fails the
+    /// WHOLE query with `unknown field 'x'` — a 400 on the entire Deadlocks
+    /// page, not a null column. A hardcoded raw projection is the obvious
+    /// implementation and it breaks the page on most deployments.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_deadlock_sql_never_names_a_raw_column_absent_from_the_stream() {
+        // Exactly the rig's shape: pg present, the three maria lock columns and
+        // every mssql column absent.
+        let raw = raw_cols(&[
+            "o2_pg_event",
+            "o2_my_event",
+            "dl_waiter_pid",
+            "dl_query_1",
+            "my_trx_side",
+        ]);
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&all_cols(), Some(&raw)),
+        );
+
+        for absent in [
+            "maria_lock_mode",
+            "maria_lock_table",
+            "maria_lock_index",
+            "mssql_spid",
+            "mssql_is_victim",
+            "mssql_query",
+        ] {
+            assert!(
+                !sql.contains(absent),
+                "{absent} is absent from this stream — naming it 400s the WHOLE page:\n{sql}"
+            );
+        }
+        assert!(
+            sql.contains("dl_waiter_pid"),
+            "present raw columns still project"
+        );
+    }
+
+    /// The MARKER columns are columns too, so the widened predicate is gated on
+    /// presence exactly like the projection.
+    ///
+    /// A stream that never saw a MariaDB deadlock has no `o2_maria_event`
+    /// column, and naming it in the `WHERE` fails the page just as naming it in
+    /// the `SELECT` would. This is the half of the hazard that lives in the
+    /// predicate rather than the projection, and it is easy to miss because the
+    /// projection half is the one the design calls out.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_deadlock_sql_only_predicates_on_marker_columns_the_stream_has() {
+        let raw = raw_cols(&["o2_my_event", "my_trx_side"]);
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&all_cols(), Some(&raw)),
+        );
+
+        assert!(sql.contains("o2_my_event = 'deadlock'"));
+        assert!(
+            !sql.contains("o2_pg_event"),
+            "an absent marker column in the WHERE fails the page as surely as one in \
+             the SELECT:\n{sql}"
+        );
+        assert!(!sql.contains("o2_maria_event"));
+    }
+
+    /// A stream with NO raw columns at all must fall back to today's exact
+    /// query, not to a malformed `OR ()`.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_deadlock_sql_with_no_raw_markers_present_is_the_unwidened_query() {
+        let none = raw_cols(&[]);
+        let widened = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&all_cols(), Some(&none)),
+        );
+        let today = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&all_cols(), None),
+        );
+        assert_eq!(
+            widened, today,
+            "with no marker column present there is nothing to OR, and an empty \
+             disjunction must not become `OR ()`"
+        );
+    }
+
+    /// THE KILL-SWITCH CONTRACT: off ⇒ byte-identical SQL to today.
+    ///
+    /// `ZO_DB_MONITORING_DEADLOCK_READ_FALLBACK=false` is an escape hatch for a
+    /// deployment whose OSS history makes the widened scan too expensive. An
+    /// escape hatch that still emits the wider query buys nothing, so "off"
+    /// must reach all the way to the emitted bytes — expressed here as the
+    /// `None` opts the disabled path passes.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_kill_switch_restores_byte_identical_sql() {
+        let preds = dbm_event_preds(Some("mysql"), Some("db-1"), Some("shop"));
+        let off = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            &preds,
+            50,
+            &proj(&all_cols(), None),
+        );
+        let expected_kind = format!("AND {} = 'deadlock'", server_vantage::O2_DBM_KIND);
+        assert!(
+            off.contains(&expected_kind),
+            "with the fallback off the predicate is the bare canonical one:\n{off}"
+        );
+        assert!(
+            !off.contains(" OR "),
+            "nothing is OR-ed when it is off:\n{off}"
+        );
+        // Assert on the PROJECTED COLUMN LIST, not on substrings of the whole
+        // statement: several raw names (`database`, `instance`, `body`) are
+        // substrings of canonical column names, so a `contains` over the SQL
+        // text reports a false positive that has nothing to do with the
+        // fallback.
+        let projected: HashSet<&str> = off["SELECT ".len()..off.find(" FROM ").unwrap()]
+            .split(", ")
+            .collect();
+        for raw in server_vantage::RAW_DEADLOCK_FIELDS {
+            assert!(
+                !projected.contains(raw),
+                "raw column {raw} must not be projected with the fallback off:\n{off}"
+            );
+        }
+        // ...and the guarantee that makes it a real kill-switch: turning it ON
+        // over the SAME stream must produce a DIFFERENT query, so "off" is
+        // demonstrably doing something.
+        let on = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            &preds,
+            50,
+            &proj(
+                &all_cols(),
+                Some(&raw_cols(&["o2_my_event", "my_trx_side"])),
+            ),
+        );
+        assert_ne!(
+            on, off,
+            "if on and off emit the same SQL, the knob is inert"
+        );
+    }
+
+    /// The OTHER two callers must be untouched in phase 1.
+    ///
+    /// `build_dbm_events_sql` is shared with blocking (`read_blocking_body`) and
+    /// activity, and widening it for everyone would push raw deadlock columns
+    /// into their projections — cost with no reader, and for blocking a real
+    /// risk, since its degraded projection already drops rows.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_fallback_does_not_reach_the_blocking_or_activity_callers() {
+        let src = include_str!("api.rs");
+        // Only the real code — the test module below calls the builder many
+        // times and matching those would make this vacuous.
+        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+
+        // Every call site, discovered rather than listed: a NEW caller added
+        // without a raw argument is exactly the drift this must catch.
+        let sites: Vec<&str> = code
+            .match_indices("build_dbm_events_sql(")
+            // ...minus the definition itself, which is `fn build_dbm_events_sql(`.
+            .filter(|(i, _)| !code[..*i].ends_with("fn "))
+            .map(|(i, _)| {
+                let rest = &code[i..];
+                &rest[..rest.find(");").expect("call site is closed") + 2]
+            })
+            .collect();
+        assert_eq!(
+            sites.len(),
+            3,
+            "expected the deadlocks / blocking / activity call sites; found \
+             {} — the extractor is broken, or a caller was added without \
+             deciding what it passes for the raw opts",
+            sites.len()
+        );
+
+        // Exactly ONE may be widened, and it must be the deadlocks one.
+        let widened: Vec<&&str> = sites.iter().filter(|s| !s.contains("raw: None")).collect();
+        assert_eq!(
+            widened.len(),
+            1,
+            "exactly ONE caller — deadlocks — may pass the raw opts in phase 1; \
+             blocking and activity must keep passing `raw: None`. Widened: {widened:?}"
+        );
+        assert!(
+            widened[0].contains("KIND_DEADLOCK"),
+            "the widened caller must be deadlocks, not {}",
+            widened[0]
+        );
+        for kind in ["KIND_BLOCKING", "KIND_ACTIVITY"] {
+            let site = sites
+                .iter()
+                .find(|s| s.contains(kind))
+                .unwrap_or_else(|| panic!("no {kind} call site"));
+            assert!(
+                site.contains("raw: None"),
+                "the {kind} caller must pass `raw: None`, or A1 pushes raw deadlock \
+                 columns into a projection with no reader:\n{site}"
+            );
+        }
+    }
+
+    // ── A1 · the row-level branch and the Rust-side scope narrowing ─────────
+
+    /// A CANONICAL row must still go through the canonical reader, unchanged.
+    ///
+    /// The fallback must not become the only path — the canonical reader is the
+    /// one that has been correct all along, and rerouting its rows through the
+    /// canonicalizer would re-derive fields from vendor columns that are not
+    /// even projected on such a row.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_canonical_row_still_uses_the_canonical_reader() {
+        let row = json!({
+            "_timestamp": 1_786_166_303_139_783i64,
+            server_vantage::O2_DBM_KIND: "deadlock",
+            server_vantage::O2_DBM_ENGINE: "mysql",
+            server_vantage::O2_DBM_INSTANCE: "db-1",
+            server_vantage::O2_DBM_VICTIM_SIDE: 2,
+        });
+        let ev = deadlock_event_for_row(&row).expect("a canonical row yields an event");
+        assert_eq!(ev.engine.as_deref(), Some("mysql"));
+        assert_eq!(ev.instance.as_deref(), Some("db-1"));
+        assert_eq!(ev.victim_side, Some(2), "read off the canonical column");
+    }
+
+    /// A RAW row — the whole point — must reach the enterprise canonicalizer.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_raw_row_is_canonicalized_at_read_time() {
+        let row = json!({
+            "_timestamp": 1_786_166_303_139_783i64,
+            "o2_my_event": "deadlock",
+            "my_trx_side": "1",
+            "my_trx_id": "4589",
+            "my_trx_thread": "89",
+            "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
+            "server_address": "db-7.internal:3306",
+        });
+        let ev = deadlock_event_for_row(&row).expect("a raw row must canonicalize at read time");
+        assert_eq!(ev.engine.as_deref(), Some("mysql"));
+        assert_eq!(
+            ev.instance.as_deref(),
+            Some("db-7.internal"),
+            "the instance must be derived, or the event never stitches and never \
+             matches ?instance="
+        );
+        assert_eq!(ev.participants.len(), 1);
+        assert_eq!(ev.participants[0].pid, Some(89));
+        assert_eq!(ev.participants[0].side, Some(1));
+    }
+
+    /// DEDUP (§4.1): a row is used EXACTLY ONCE.
+    ///
+    /// The two populations are disjoint at the row level — a row either carries
+    /// `o2_dbm_kind = 'deadlock'` or it does not. A row carrying BOTH the
+    /// canonical column and its original raw columns (an enterprise-ingested row
+    /// whose raw fields the strip left in place) must therefore take the
+    /// canonical branch only, and never be emitted twice.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_row_with_both_shapes_is_used_exactly_once_canonically() {
+        let both = json!({
+            "_timestamp": 1_786_166_303_139_783i64,
+            // canonical
+            server_vantage::O2_DBM_KIND: "deadlock",
+            server_vantage::O2_DBM_ENGINE: "mariadb",
+            server_vantage::O2_DBM_INSTANCE: "db-canon",
+            // ...and the raw marker plus vendor fields still on the same row
+            "o2_maria_event": "deadlock",
+            "maria_trx_side": "1",
+            "maria_trx_thread": "14",
+            "server_address": "db-raw.internal:3306",
+        });
+        let ev = deadlock_event_for_row(&both).expect("event");
+        assert_eq!(
+            ev.instance.as_deref(),
+            Some("db-canon"),
+            "the CANONICAL branch owns a row that has both shapes — taking the raw \
+             branch would re-derive fields the canonical path already resolved"
+        );
+
+        // ...and over a batch, one row in is one event out.
+        let batch = vec![
+            both,
+            json!({
+                "_timestamp": 1_786_166_303_139_900i64,
+                "o2_pg_event": "deadlock",
+                "dl_waiter_pid": "1071", "dl_waiter2_pid": "1072",
+                "dl_query_1": "UPDATE a SET x = 1", "dl_query_2": "UPDATE b SET y = 2",
+            }),
+        ];
+        let events: Vec<_> = batch.iter().filter_map(deadlock_event_for_row).collect();
+        assert_eq!(events.len(), 2, "two rows, two events — never four");
+    }
+
+    /// A raw row the canonicalizer refuses (the PG banner) is DROPPED, not
+    /// emitted as a content-free event.
+    ///
+    /// Postgres logs a banner and a DETAIL entry per deadlock. Emitting the
+    /// banner would put a participant-less row on the page for every PG
+    /// deadlock, doubling the visible count against 19 real events.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_an_unparsable_raw_row_is_dropped_not_emitted_blank() {
+        let banner = json!({
+            "_timestamp": 1_786_843_262_880_000i64,
+            "o2_pg_event": "deadlock",
+            "pg_pid": "1071",
+            "o2_deadlock_raw": "deadlock detected",
+        });
+        assert!(
+            deadlock_event_for_row(&banner).is_none(),
+            "a banner is not a deadlock — emitting it doubles the PG count"
+        );
+        // A row with no marker at all is likewise nobody's event.
+        assert!(deadlock_event_for_row(&json!({"_timestamp": 1i64, "body": "hi"})).is_none());
+    }
+
+    /// THE CROSS-RECORD ASSEMBLY the fallback inherits for free: raw MySQL
+    /// side + side + verdict must stitch into ONE event with the victim flagged.
+    ///
+    /// This is the case the design calls the hardest in principle and already
+    /// solved in practice — `stitch_mysql_deadlocks` is shape-agnostic, keying
+    /// on canonical `engine`/`participants`/`victim_side`, which is exactly what
+    /// the canonicalizer's output provides. Pinned here because "it should just
+    /// work" is precisely the claim that needs a test.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_raw_mysql_sides_and_verdict_stitch_into_one_flagged_event() {
+        let rows = vec![
+            json!({
+                "_timestamp": 1_786_166_303_139_783i64, "o2_my_event": "deadlock",
+                "my_trx_side": "1", "my_trx_id": "4589", "my_trx_thread": "89",
+                "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
+                "server_address": "db-7:3306",
+            }),
+            json!({
+                "_timestamp": 1_786_166_303_139_834i64, "o2_my_event": "deadlock",
+                "my_trx_side": "2", "my_trx_id": "4678", "my_trx_thread": "82",
+                "my_trx_query": "UPDATE accounts SET balance = balance + 1 WHERE id = 12",
+                "server_address": "db-7:3306",
+            }),
+            // The verdict rides its OWN record — the one whose loss left every
+            // MySQL participant unflagged and the "cancelled by the database"
+            // panel blank.
+            json!({
+                "_timestamp": 1_786_166_303_139_966i64, "o2_my_event": "deadlock",
+                "my_victim_side": "2", "server_address": "db-7:3306",
+            }),
+        ];
+        let events: Vec<_> = rows.iter().filter_map(deadlock_event_for_row).collect();
+        assert_eq!(events.len(), 3, "three raw records before the stitch");
+
+        let stitched = stitch_mysql_deadlocks(events);
+        assert_eq!(
+            stitched.len(),
+            1,
+            "three records are ONE deadlock — without the stitch the tab shows a \
+             deadlock per side and splits the sides into different shape groups"
+        );
+        let ev = &stitched[0];
+        assert_eq!(ev.participants.len(), 2);
+        let victim: Vec<i64> = ev
+            .participants
+            .iter()
+            .filter(|p| p.victim)
+            .filter_map(|p| p.pid)
+            .collect();
+        assert_eq!(
+            victim,
+            vec![82],
+            "the verdict names side 2, so thread 82 is the victim — resolved in the \
+             stitcher's deferred post-pass, not on any single record"
+        );
+        assert_eq!(ev.victim_pid, Some(82));
+    }
+
+    /// A raw PG DETAIL row is self-contained: ONE event, both participants, and
+    /// the stitcher must leave it alone.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_raw_pg_detail_row_yields_one_two_participant_event_unstitched() {
+        let rows = vec![
+            // banner — dropped
+            json!({
+                "_timestamp": 1_786_843_262_880_000i64, "o2_pg_event": "deadlock",
+                "pg_pid": "1071", "o2_deadlock_raw": "deadlock detected",
+            }),
+            // DETAIL — the whole wait cycle
+            json!({
+                "_timestamp": 1_786_843_262_880_000i64, "o2_pg_event": "deadlock",
+                "deadlock_victim_pid": "1071",
+                "dl_waiter_pid": "1071", "dl_waiter2_pid": "1072",
+                "dl_query_1": "UPDATE accounts SET balance = balance - 1 WHERE id = 2",
+                "dl_query_2": "UPDATE accounts SET balance = balance - 1 WHERE id = 1",
+                "pg_db": "dbmlab",
+            }),
+        ];
+        let events: Vec<_> = rows.iter().filter_map(deadlock_event_for_row).collect();
+        assert_eq!(events.len(), 1, "the banner is dropped, the DETAIL is kept");
+
+        let stitched = stitch_mysql_deadlocks(events);
+        assert_eq!(stitched.len(), 1);
+        assert_eq!(
+            stitched[0].participants.len(),
+            2,
+            "PG carries the whole cycle on one entry — merging two of them would \
+             invent a 4-way cycle"
+        );
+        assert_eq!(stitched[0].engine.as_deref(), Some("postgresql"));
+    }
+
+    // ── The Rust-side scope narrowing (§4.3) ────────────────────────────────
+
+    /// A raw-derived event must SURVIVE a scope filter that matches it.
+    ///
+    /// This is the gap the design flags: raw rows have no `o2_dbm_*` scope
+    /// column at all (measured, 0 non-null of 137), so pushing `?system=` to SQL
+    /// drops every one of them — the page looks right with no filter and
+    /// under-reports with one. Narrowing in Rust, after canonicalization, uses
+    /// the engine the canonicalizer derived.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_scope_narrowing_keeps_raw_events_that_match() {
+        let ev = deadlock_event_for_row(&json!({
+            "_timestamp": 1i64, "o2_my_event": "deadlock",
+            "my_trx_side": "1", "my_trx_thread": "89", "my_trx_query": "SELECT 1",
+            "server_address": "db-7.internal:3306", "my_db": "shop",
+        }))
+        .expect("event");
+
+        let by_engine = ScopeNarrowing {
+            system: Some("mysql".into()),
+            instance: None,
+            database: None,
+        };
+        assert!(
+            by_engine.matches(&ev),
+            "the engine was DERIVED by the canonicalizer, so ?system=mysql must \
+             still find this event"
+        );
+        assert!(
+            ScopeNarrowing {
+                system: None,
+                instance: Some("db-7.internal".into()),
+                database: None
+            }
+            .matches(&ev),
+            "the instance is port-stripped by detect_instance and must match that form"
+        );
+        assert!(
+            ScopeNarrowing {
+                system: None,
+                instance: None,
+                database: Some("shop".into())
+            }
+            .matches(&ev)
+        );
+    }
+
+    /// ...and it must EXCLUDE what does not match, or the filter is decorative.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_scope_narrowing_excludes_events_that_do_not_match() {
+        let ev = deadlock_event_for_row(&json!({
+            "_timestamp": 1i64, "o2_my_event": "deadlock",
+            "my_trx_side": "1", "my_trx_thread": "89", "my_trx_query": "SELECT 1",
+            "server_address": "db-7.internal:3306", "my_db": "shop",
+        }))
+        .expect("event");
+
+        for narrowing in [
+            ScopeNarrowing {
+                system: Some("postgresql".into()),
+                instance: None,
+                database: None,
+            },
+            ScopeNarrowing {
+                system: None,
+                instance: Some("other-host".into()),
+                database: None,
+            },
+            ScopeNarrowing {
+                system: None,
+                instance: None,
+                database: Some("billing".into()),
+            },
+        ] {
+            assert!(
+                !narrowing.matches(&ev),
+                "a non-matching scope must exclude the event, or ?system= does nothing"
+            );
+        }
+    }
+
+    /// An event whose field is UNKNOWN is excluded by a filter on that field.
+    ///
+    /// House rule (`plan_row_to_dto`): an absent field defaults to the WEAKER
+    /// claim. "We do not know which engine this is" is not evidence that it is
+    /// the one asked for — and the SQL predicate it replaces would likewise not
+    /// match a NULL column, so this keeps the filtered and unfiltered paths
+    /// answering the same question.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_scope_narrowing_excludes_an_event_with_an_unknown_field() {
+        let untagged = deadlock_event_for_row(&json!({
+            "_timestamp": 1i64, "o2_my_event": "deadlock",
+            "my_trx_side": "1", "my_trx_thread": "89", "my_trx_query": "SELECT 1",
+        }))
+        .expect("event");
+        assert!(untagged.instance.is_none(), "the recipe tagged no instance");
+
+        assert!(
+            !ScopeNarrowing {
+                system: None,
+                instance: Some("db-7".into()),
+                database: None
+            }
+            .matches(&untagged),
+            "unknown is not a match — `AND o2_dbm_instance = 'db-7'` would not \
+             match a NULL either"
+        );
+        // ...but a filter on a field it DOES have still works.
+        assert!(
+            ScopeNarrowing {
+                system: Some("mysql".into()),
+                instance: None,
+                database: None
+            }
+            .matches(&untagged)
+        );
+    }
+
+    /// NO filter means no narrowing — every event survives.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_an_empty_scope_narrowing_keeps_everything() {
+        let ev = deadlock_event_for_row(&json!({
+            "_timestamp": 1i64, "o2_my_event": "deadlock",
+            "my_trx_side": "1", "my_trx_thread": "89", "my_trx_query": "SELECT 1",
+        }))
+        .expect("event");
+        assert!(
+            ScopeNarrowing {
+                system: None,
+                instance: None,
+                database: None
+            }
+            .matches(&ev)
+        );
+        // An EMPTY STRING is not a filter either — the SQL side already treats
+        // it that way (`dbm_event_preds` filters on `!s.is_empty()`), and the two
+        // must agree or the same request narrows differently depending on which
+        // path serves it.
+        assert!(
+            ScopeNarrowing {
+                system: Some(String::new()),
+                instance: Some(String::new()),
+                database: Some(String::new()),
+            }
+            .matches(&ev)
+        );
+    }
+
+    /// The Rust narrowing and the SQL predicate must answer the SAME question.
+    ///
+    /// The canonical path keeps its SQL predicates when the fallback is off, and
+    /// moves to the Rust filter when it is on. If the two disagree, the same
+    /// request returns different rows depending on a kill-switch — so the
+    /// narrowing is checked against a canonical event built the way a
+    /// SQL-filtered row would be.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_rust_narrowing_agrees_with_the_sql_predicate_on_canonical_events() {
+        let canonical = deadlock_event_for_row(&json!({
+            "_timestamp": 1i64,
+            server_vantage::O2_DBM_KIND: "deadlock",
+            server_vantage::O2_DBM_ENGINE: "postgresql",
+            server_vantage::O2_DBM_INSTANCE: "db-1",
+            server_vantage::O2_DBM_DATABASE: "dbmlab",
+        }))
+        .expect("event");
+
+        // The SQL form of the same three filters, for the record.
+        let preds = dbm_event_preds(Some("postgresql"), Some("db-1"), Some("dbmlab"));
+        assert!(preds.contains("o2_dbm_engine = 'postgresql'"));
+
+        assert!(
+            ScopeNarrowing {
+                system: Some("postgresql".into()),
+                instance: Some("db-1".into()),
+                database: Some("dbmlab".into()),
+            }
+            .matches(&canonical),
+            "what the SQL predicate would have kept, the Rust narrowing must keep"
+        );
+        assert!(
+            !ScopeNarrowing {
+                system: Some("mysql".into()),
+                instance: None,
+                database: None
+            }
+            .matches(&canonical),
+            "and what it would have dropped, the Rust narrowing must drop"
+        );
+    }
+
+    /// THE §4.3 REGRESSION GUARD: scope predicates must NOT reach the SQL while
+    /// the fallback is active.
+    ///
+    /// This is the single most dangerous mutation in A1 and the one every
+    /// behavioural test above misses. `dbm_event_preds` names
+    /// `o2_dbm_engine`/`o2_dbm_instance`/`o2_dbm_database`, and a RAW row has
+    /// none of them — measured, 0 non-null of 137. So appending them to the
+    /// widened `WHERE` silently drops EVERY raw row: the page looks correct with
+    /// no filter and under-reports with one, which is the worst shape a bug can
+    /// take because nothing errors and the wrong answer is plausible.
+    ///
+    /// Pinned STRUCTURALLY, in the spirit of
+    /// `test_no_caller_swallows_a_schema_read_error`, because the failure lives
+    /// in the handler's wiring rather than in any pure function: reverting
+    /// `sql_preds` to `&preds` passes every other test in this file while
+    /// restoring the bug exactly. Verified by doing precisely that.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_scope_predicates_never_reach_the_sql_while_the_fallback_is_active() {
+        let src = include_str!("api.rs");
+        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+
+        // The deadlocks call site, discovered from its kind argument.
+        let at = code
+            .find("build_dbm_events_sql(\n        stream,\n        server_vantage::KIND_DEADLOCK,")
+            .expect("the deadlocks call site must exist");
+        let site = &code[at..at + code[at..].find(");").expect("closed") + 2];
+
+        assert!(
+            !site.contains("&preds,"),
+            "the deadlocks read must NOT pass the raw scope predicates straight \
+             through — with the fallback active they name canonical columns a raw \
+             row does not have, and every raw row is silently dropped:\n{site}"
+        );
+        assert!(
+            site.contains("sql_preds,"),
+            "it must pass the fallback-aware predicate string:\n{site}"
+        );
+
+        // ...and that string must actually be emptied when the fallback is on.
+        // Asserted on the binding rather than on a substring of the file, so a
+        // renamed-but-still-wrong version cannot pass.
+        let bind = code
+            .find("let sql_preds =")
+            .map(|i| &code[i..i + code[i..].find(';').expect("statement ends") + 1])
+            .expect("sql_preds must be bound");
+        assert!(
+            bind.contains("raw_fallback.is_some()") && bind.contains("\"\""),
+            "`sql_preds` must be EMPTY when the fallback is active — that is what \
+             moves the narrowing to Rust:\n{bind}"
+        );
+
+        // The other half of the same contract: having removed the SQL narrowing,
+        // the handler MUST apply the Rust one, or the filter silently stops
+        // working altogether.
+        let body_at = code
+            .find("async fn read_deadlocks_body")
+            .or_else(|| code.find("fn read_deadlocks_body"))
+            .expect("the deadlocks body must exist");
+        let body = &code[body_at..];
+        let body = &body[..body.find("\n}\n").unwrap_or(body.len())];
+        assert!(
+            body.contains("scope.matches("),
+            "with the SQL predicates removed the handler must narrow in Rust, or \
+             ?system= / ?instance= / ?database= stop filtering entirely"
+        );
+        assert!(
+            body.contains("raw_fallback.is_some()"),
+            "the Rust narrowing runs exactly where the SQL one did not"
+        );
+    }
+
     /// WHY the error must not be flattened, half one: BLOCKING.
     ///
     /// With an empty column set the projection drops both pid columns, and
@@ -9652,7 +10991,15 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_empty_columns_would_silently_drop_every_blocking_row() {
-        let sql = build_dbm_events_sql("dbm_server", "blocking", 100, 200, "", 50, &HashSet::new());
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            "blocking",
+            100,
+            200,
+            "",
+            50,
+            &proj(&HashSet::new(), None),
+        );
         assert!(!sql.contains(server_vantage::O2_DBM_BLOCKED_PID));
         assert!(!sql.contains(server_vantage::O2_DBM_BLOCKING_PID));
 
@@ -9674,7 +11021,15 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_empty_columns_would_yield_content_free_deadlock_events() {
-        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &HashSet::new());
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&HashSet::new(), None),
+        );
         assert!(!sql.contains(server_vantage::O2_DBM_PARTICIPANTS));
 
         let ev = deadlock_event_from_row(&json!({ "_timestamp": 1_000_000 }));
@@ -9698,7 +11053,15 @@ mod tests {
     /// stays in lockstep with what `from_record` deserializes.
     #[test]
     fn test_build_dbm_events_sql_projects_only_canonical_columns() {
-        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &all_cols());
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            "",
+            50,
+            &proj(&all_cols(), None),
+        );
         assert!(!sql.contains("SELECT *"), "must not select every column");
         assert!(sql.starts_with("SELECT _timestamp, "));
         for field in server_vantage::ALL_DBM_FIELDS {
@@ -9714,7 +11077,15 @@ mod tests {
         assert!(preds.contains("'pg'' OR ''1''=''1'"));
         assert!(!preds.contains("OR '1'='1'"));
 
-        let sql = build_dbm_events_sql("ev\"il", "blocking", 1, 2, &preds, 10, &all_cols());
+        let sql = build_dbm_events_sql(
+            "ev\"il",
+            "blocking",
+            1,
+            2,
+            &preds,
+            10,
+            &proj(&all_cols(), None),
+        );
         assert!(sql.contains("\"ev\"\"il\""), "stream identifier escaped");
     }
 
@@ -10702,7 +12073,7 @@ mod tests {
             200,
             "",
             50,
-            &all_cols(),
+            &proj(&all_cols(), None),
         );
         assert!(sql.contains("o2_dbm_kind = 'activity'"));
         assert!(sql.contains("LIMIT 50"));
