@@ -11191,6 +11191,14 @@
         "assert": "Doğrula",
         "screenshot": "Ekran görüntüsü"
       },
+      "clickTypeLabel": "Tıklama türü",
+      "clickTypeHelp": "Sağ tıklama bir bağlam menüsü açar; çift tıklama iki tıklama gönderir.",
+      "clickTypes": {
+        "left": "Sol tıklama",
+        "right": "Sağ tıklama",
+        "middle": "Orta tıklama",
+        "double": "Çift tıklama"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Yazılacak metin",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "Gizle",
       "incognitoDescription": "Tekrar oynatmalar temiz bir Gizli oturumda çalışır. OpenObserve Kaydedici eklentisinin Gizli modda çalışmak için izne ihtiyacı var.",
       "incognitoTitle": "Gizli pencere açılamıyor",
+      "restoringState": "Durum geri yükleniyor — adım {done} / {total}",
+      "restoreFailed": "Kayıt noktasına ulaşılamadı — adım {step} başarısız",
+      "restoreCancelledWindowClosed": "Kayıt iptal edildi — kaydedici penceresi kapatıldı",
+      "restoreFailedHint": "bu adım geçene kadar yolculuk seçtiğiniz noktaya ulaşamaz",
+      "recordBeforeFailedStep": "Adım {step}'den önce kaydet",
+      "recordingHere": "Buraya kaydediliyor",
+      "recordBeforeStep": "Bu adımdan önce kaydet",
+      "recordBeforeStepHint": "Yolculuğu bu noktaya kadar yeniden oynatın, ardından ondan önce yeni adımlar kaydedin.",
       "insertStepBelow": "Aşağıya adım ekle",
       "journeyHeading": "Yolculuk",
       "noSteps": "Henüz adım yok",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "1–{step} adımlarını yeniden çalıştır",
       "fidelityLabel": "Önizleme tekrarlayamadı",
       "record": "Kaydet",
+      "recordedStepsAdded": "1 adım eklendi — adım {first} | {count} adım eklendi — adımlar {first}–{last}",
       "recordJourney": "Yolculuğu kaydet",
       "recording": "Kaydediliyor",
       "recordingIncognitoInfo": "Ayrı bir gizli pencerede kaydediliyor",

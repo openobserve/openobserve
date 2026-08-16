@@ -11191,6 +11191,14 @@
         "assert": "Prüfen",
         "screenshot": "Screenshot"
       },
+      "clickTypeLabel": "Klicktyp",
+      "clickTypeHelp": "Ein Rechtsklick öffnet ein Kontextmenü; ein Doppelklick sendet zwei Klicks.",
+      "clickTypes": {
+        "left": "Linksklick",
+        "right": "Rechtsklick",
+        "middle": "Mittelklick",
+        "double": "Doppelklick"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Text zum Eingeben",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "Ausblenden",
       "incognitoDescription": "Wiedergaben laufen in einer sauberen Inkognito-Sitzung. Die OpenObserve Recorder-Erweiterung benötigt die Berechtigung, im Inkognito-Modus ausgeführt zu werden.",
       "incognitoTitle": "Inkognito-Fenster kann nicht geöffnet werden",
+      "restoringState": "Zustand wird wiederhergestellt — Schritt {done} von {total}",
+      "restoreFailed": "Der Aufnahmepunkt konnte nicht erreicht werden — Schritt {step} fehlgeschlagen",
+      "restoreCancelledWindowClosed": "Aufnahme abgebrochen — das Aufnahmefenster wurde geschlossen",
+      "restoreFailedHint": "die Reise kann den von dir gewählten Punkt nicht erreichen, bis dieser Schritt abgeschlossen ist",
+      "recordBeforeFailedStep": "Vor Schritt {step} aufnehmen",
+      "recordingHere": "Hier aufnehmen",
+      "recordBeforeStep": "Vor diesem Schritt aufnehmen",
+      "recordBeforeStepHint": "Die Reise bis zu diesem Punkt wiedergeben und dann neue Schritte davor aufnehmen.",
       "insertStepBelow": "Schritt unten einfügen",
       "journeyHeading": "Journey",
       "noSteps": "Noch keine Schritte",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "Schritte 1–{step} erneut ausführen",
       "fidelityLabel": "Die Vorschau konnte nicht reproduzieren",
       "record": "Aufzeichnen",
+      "recordedStepsAdded": "1 Schritt hinzugefügt — Schritt {first} | {count} Schritte hinzugefügt — Schritte {first}–{last}",
       "recordJourney": "Journey aufzeichnen",
       "recording": "Aufzeichnung läuft",
       "recordingIncognitoInfo": "Aufzeichnung in einem separaten Inkognito-Fenster",

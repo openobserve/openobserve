@@ -11191,6 +11191,14 @@
         "assert": "Vérifier",
         "screenshot": "Capture d'écran"
       },
+      "clickTypeLabel": "Type de clic",
+      "clickTypeHelp": "Le clic droit ouvre un menu contextuel ; le double-clic envoie deux clics.",
+      "clickTypes": {
+        "left": "Clic gauche",
+        "right": "Clic droit",
+        "middle": "Clic du milieu",
+        "double": "Double-clic"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Texte à saisir",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "Masquer",
       "incognitoDescription": "Les rejouages s'exécutent dans une session Incognito propre. L'extension OpenObserve Recorder a besoin d'autorisation pour fonctionner en mode Incognito.",
       "incognitoTitle": "Impossible d'ouvrir la fenêtre Incognito",
+      "restoringState": "Restauration de l'état — étape {done} sur {total}",
+      "restoreFailed": "Impossible d'atteindre le point d'enregistrement — l'étape {step} a échoué",
+      "restoreCancelledWindowClosed": "Enregistrement annulé — la fenêtre de l'enregistreur a été fermée",
+      "restoreFailedHint": "le parcours ne peut pas atteindre le point que vous avez choisi tant que cette étape n'est pas passée",
+      "recordBeforeFailedStep": "Enregistrer avant l'étape {step}",
+      "recordingHere": "Enregistrer ici",
+      "recordBeforeStep": "Enregistrer avant cette étape",
+      "recordBeforeStepHint": "Rejouez le parcours jusqu'à ce point, puis enregistrez de nouvelles étapes avant lui.",
       "insertStepBelow": "Insérer une étape en dessous",
       "journeyHeading": "Parcours",
       "noSteps": "Aucune étape pour l'instant",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "Réexécuter les étapes 1–{step}",
       "fidelityLabel": "L'aperçu n'a pas pu reproduire",
       "record": "Enregistrer",
+      "recordedStepsAdded": "1 étape ajoutée — étape {first} | {count} étapes ajoutées — étapes {first}–{last}",
       "recordJourney": "Enregistrer le parcours",
       "recording": "Enregistrement",
       "recordingIncognitoInfo": "Enregistrement dans une fenêtre Incognito séparée",

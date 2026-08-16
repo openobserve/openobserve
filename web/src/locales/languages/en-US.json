@@ -11263,6 +11263,14 @@
         "assert": "Assert",
         "screenshot": "Screenshot"
       },
+      "clickTypeLabel": "Click type",
+      "clickTypeHelp": "Right click opens a context menu; double click sends two clicks.",
+      "clickTypes": {
+        "left": "Left click",
+        "right": "Right click",
+        "middle": "Middle click",
+        "double": "Double click"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Text to type",
@@ -11396,6 +11404,15 @@
       "hideStackTrace": "Hide",
       "incognitoDescription": "Replays run in a clean Incognito session. The OpenObserve Recorder extension needs permission to run in Incognito mode.",
       "incognitoTitle": "Can't open the Incognito window",
+      "restoringState": "Restoring state — step {done} of {total}",
+      "restoreFailed": "Couldn't reach the recording point — step {step} failed",
+      "restoreCancelledWindowClosed": "Recording cancelled — the recorder window was closed",
+      "restoreFailedHint": "the journey can't reach the point you chose until this step passes",
+      "recordBeforeFailedStep": "Record before step {step}",
+      "recordingHere": "Recording here",
+      "recordBeforeStep": "Record before this step",
+      "recordBeforeStepHint": "Replay the journey up to this point, then record new steps before it.",
+      "recordBeforeNeedsNewerExtension": "Update the recorder extension to record from a specific step.",
       "insertStepBelow": "Insert step below",
       "journeyHeading": "Journey",
       "noSteps": "No steps yet",
@@ -11409,6 +11426,7 @@
       "reRunToHere": "Re-run steps 1–{step}",
       "fidelityLabel": "The preview could not reproduce",
       "record": "Record",
+      "recordedStepsAdded": "1 step added — step {first} | {count} steps added — steps {first}–{last}",
       "recordJourney": "Record journey",
       "recording": "Recording",
       "recordingIncognitoInfo": "Recording in a separate incognito window",

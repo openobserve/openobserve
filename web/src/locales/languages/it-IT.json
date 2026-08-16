@@ -11191,6 +11191,14 @@
         "assert": "Verifica",
         "screenshot": "Screenshot"
       },
+      "clickTypeLabel": "Tipo di clic",
+      "clickTypeHelp": "Il clic destro apre un menu contestuale; il doppio clic invia due clic.",
+      "clickTypes": {
+        "left": "Clic sinistro",
+        "right": "Clic destro",
+        "middle": "Clic centrale",
+        "double": "Doppio clic"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Testo da digitare",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "Nascondi",
       "incognitoDescription": "Le riproduzioni vengono eseguite in una sessione anonima pulita. L'estensione OpenObserve Recorder necessita dell'autorizzazione per funzionare in modalità anonima.",
       "incognitoTitle": "Impossibile aprire la finestra anonima",
+      "restoringState": "Ripristino stato — passaggio {done} di {total}",
+      "restoreFailed": "Impossibile raggiungere il punto di registrazione — passaggio {step} non riuscito",
+      "restoreCancelledWindowClosed": "Registrazione annullata — la finestra del registratore è stata chiusa",
+      "restoreFailedHint": "il percorso non può raggiungere il punto scelto finché questo passaggio non viene superato",
+      "recordBeforeFailedStep": "Registra prima del passaggio {step}",
+      "recordingHere": "Registra qui",
+      "recordBeforeStep": "Registra prima di questo passaggio",
+      "recordBeforeStepHint": "Riproduci il percorso fino a questo punto, poi registra nuovi passaggi prima di esso.",
       "insertStepBelow": "Inserisci passaggio sotto",
       "journeyHeading": "Percorso",
       "noSteps": "Ancora nessun passaggio",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "Riesegui passaggi 1–{step}",
       "fidelityLabel": "L'anteprima non è riuscita a riprodurre",
       "record": "Registra",
+      "recordedStepsAdded": "1 passaggio aggiunto — passaggio {first} | {count} passaggi aggiunti — passaggi {first}–{last}",
       "recordJourney": "Registra percorso",
       "recording": "Registrazione",
       "recordingIncognitoInfo": "Registrazione in una finestra anonima separata",

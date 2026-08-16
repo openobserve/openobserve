@@ -11191,6 +11191,14 @@
         "assert": "검증",
         "screenshot": "스크린샷"
       },
+      "clickTypeLabel": "클릭 유형",
+      "clickTypeHelp": "오른쪽 클릭은 상황 메뉴를 열고, 더블 클릭은 두 번의 클릭을 보냅니다.",
+      "clickTypes": {
+        "left": "왼쪽 클릭",
+        "right": "오른쪽 클릭",
+        "middle": "가운데 클릭",
+        "double": "더블 클릭"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "입력할 텍스트",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "숨기기",
       "incognitoDescription": "재생은 깨끗한 시크릿 세션에서 실행됩니다. OpenObserve Recorder 확장 프로그램이 시크릿 모드에서 실행되려면 권한이 필요합니다.",
       "incognitoTitle": "시크릿 창을 열 수 없음",
+      "restoringState": "상태 복원 중 — {done}/{total} 단계",
+      "restoreFailed": "녹화 지점에 도달할 수 없음 — {step} 단계 실패",
+      "restoreCancelledWindowClosed": "녹화 취소됨 — 녹화기 창이 닫힘",
+      "restoreFailedHint": "이 단계가 지나가기 전에는 여정이 선택한 지점에 도달할 수 없습니다",
+      "recordBeforeFailedStep": "단계 {step} 전에 녹화",
+      "recordingHere": "여기서 녹화",
+      "recordBeforeStep": "이 단계 전에 녹화",
+      "recordBeforeStepHint": "여정을 이 지점까지 재생한 후, 그 앞에 새 단계를 녹화하세요.",
       "insertStepBelow": "아래에 단계 삽입",
       "journeyHeading": "여정",
       "noSteps": "아직 단계 없음",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "1–{step} 단계 다시 실행",
       "fidelityLabel": "미리 보기를 재현할 수 없습니다.",
       "record": "녹화",
+      "recordedStepsAdded": "단계 1개 추가됨 — {first} 단계 | 단계 {count}개 추가됨 — {first}–{last} 단계",
       "recordJourney": "여정 녹화",
       "recording": "녹화 중",
       "recordingIncognitoInfo": "별도의 시크릿 창에서 녹화 중",

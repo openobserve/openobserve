@@ -11191,6 +11191,14 @@
         "assert": "アサート",
         "screenshot": "スクリーンショット"
       },
+      "clickTypeLabel": "クリックの種類",
+      "clickTypeHelp": "右クリックでコンテキストメニューが開きます。ダブルクリックでは 2 回のクリックが送信されます。",
+      "clickTypes": {
+        "left": "左クリック",
+        "right": "右クリック",
+        "middle": "中クリック",
+        "double": "ダブルクリック"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "入力するテキスト",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "非表示",
       "incognitoDescription": "リプレイはクリーンなシークレットセッションで実行されます。OpenObserve Recorder拡張機能はシークレットモードで実行するための権限が必要です。",
       "incognitoTitle": "シークレットウィンドウを開けません",
+      "restoringState": "状態を復元中 — ステップ {done} / {total}",
+      "restoreFailed": "録画ポイントに到達できませんでした — ステップ {step} が失敗しました",
+      "restoreCancelledWindowClosed": "録画がキャンセルされました — レコーダーウィンドウが閉じられました",
+      "restoreFailedHint": "このステップが完了するまで、選択した地点にジャーニーは到達できません。",
+      "recordBeforeFailedStep": "ステップ {step} の前に録画",
+      "recordingHere": "ここに録画",
+      "recordBeforeStep": "このステップの前に録画",
+      "recordBeforeStepHint": "この時点までジャーニーを再生し、その前に新しいステップを録画します。",
       "insertStepBelow": "下にステップを挿入",
       "journeyHeading": "ジャーニー",
       "noSteps": "まだステップがありません",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "ステップ1〜{step} を再実行",
       "fidelityLabel": "プレビューを再現できませんでした",
       "record": "録画",
+      "recordedStepsAdded": "1 ステップ追加 — ステップ {first} | {count} ステップ追加 — ステップ {first}–{last}",
       "recordJourney": "ジャーニーを録画",
       "recording": "録画中",
       "recordingIncognitoInfo": "別のシークレットウィンドウで録画中",
