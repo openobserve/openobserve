@@ -422,13 +422,12 @@
   },
   {
     "testfolder": "SLO",
-    "_comment": "SLO lifecycle, REST contract and form validation. No backfill dependency, so these run parallel and finish in about a minute. ingest_allowed_upto is set even though the minimal seed stays inside the 5h default: it removes a latent trap if the fixture ever grows.",
+    "_comment": "SLO lifecycle and form validation. No backfill dependency, so these run parallel and finish in seconds. The REST contract is covered by pytest in tests/api-testing/tests/slos/ \u2014 a pure-API test does not belong in the browser harness (CI enforces this via the pure-API spec flagger).",
     "actual_folder": "SLO",
     "browser": "chrome",
     "ingest_allowed_upto": "240",
     "run_files": [
       "slo-crud.spec.js",
-      "slo-api-validation.spec.js",
       "slo-form-validation.spec.js"
     ],
     "disabled": []
