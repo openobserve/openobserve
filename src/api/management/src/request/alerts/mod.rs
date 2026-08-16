@@ -54,8 +54,8 @@ use crate::{
     models::alerts::{
         requests::{
             AlertBulkEnableRequest, CloneAlertRequestBody, CreateAlertRequestBody,
-            CreateAlertRequestSchema, EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery,
-            MoveAlertsRequestBody, UpdateAlertRequestBody, ValidateCompositeRequestBody,
+            EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
+            UpdateAlertRequestBody, ValidateCompositeRequestBody,
         },
         responses::{
             AlertBulkEnableResponse, AlertGroupLabel, AlertGroupResponseItem,
@@ -98,7 +98,7 @@ pub mod templates;
         ("org_id" = String, Path, description = "Organization name"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if alert folder is not the default folder)"),
       ),
-    request_body(content = inline(CreateAlertRequestSchema), description = "Alert data", content_type = "application/json"),
+    request_body(content = inline(CreateAlertRequestBody), description = "Alert data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
