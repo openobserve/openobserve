@@ -3548,6 +3548,232 @@ impl RawDeadlockFallback {
     }
 }
 
+// ─── A1.1 · the canonicalization boundary ────────────────────────────────────
+//
+// A1 shipped ALWAYS-ON: every deadlocks read widened its SQL with the raw
+// markers and the raw projection and branched per row, forever — including on a
+// deployment that has been enterprise for a year and has not written a raw
+// deadlock row since. The fallback is meant to be TRANSITIONAL: it exists to
+// carry a deployment across its OSS→enterprise upgrade, and once the
+// pre-upgrade window ages out of retention it should cost nothing.
+//
+// So the widening is scoped to the window BEFORE this deployment started
+// canonicalizing. That makes it SELF-LIMITING — no operator action, no date to
+// set, no knob to remember. It narrows on its own as history ages out.
+//
+// This narrows WHICH READS adapt. It does NOT touch a stored row: adapted
+// queries only, permanently (§9). No backfill, no re-canonicalization, no
+// materializing canonical columns into stored rows.
+
+/// The evidence the boundary probe gathers about one requested window.
+///
+/// # The boundary is not the question — presence is
+///
+/// This was designed as "find the timestamp at which canonicalization started,
+/// and widen only before it". Writing the interleaving test collapsed that: the
+/// boundary TIMESTAMP turns out to be **entirely subsumed** by the cheaper
+/// question, and keeping it would have been a bug.
+///
+/// The argument, in the two directions:
+///
+///  - **A raw row is present in the window.** The canonical-only fast path cannot see it, so the
+///    widening is needed — *no matter where the boundary is*. A cluster can run mixed builds or be
+///    downgraded, so raw rows can appear AFTER canonical ones; a boundary-only verdict says
+///    "canonicalization predates this window, go fast" and silently drops them. That is A1
+///    reintroduced, in the code that was supposed to be A1's refinement.
+///  - **No raw row is present in the window.** The widening can surface nothing, so it is pure cost
+///    — *again no matter where the boundary is*, including on a window that entirely predates
+///    canonicalization but happens to hold no deadlock.
+///
+/// In both directions the boundary timestamp changes nothing. So the verdict is
+/// exactly `has_raw_row`, and the honest name for this mechanism is not
+/// "canonicalization boundary" but **"is there anything here the fast path would
+/// miss"**. It delivers the requested property — self-limiting, narrowing on its
+/// own as the pre-upgrade window ages out of retention, no operator action —
+/// because once no raw deadlock row remains in retention no window contains one.
+/// It is strictly MORE self-limiting than a boundary: a canonical-only
+/// deployment pays nothing for windows that predate its upgrade too, which a
+/// boundary test would have widened.
+///
+/// [`earliest_canonical`](Self::earliest_canonical) is therefore retained as an
+/// OBSERVATION, not an input — see [`Self::fallback_needed`].
+///
+/// Both fields are scoped to the REQUESTED window, so answering costs no rows
+/// the main read was not about to scan anyway.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BoundaryProbe {
+    /// `_timestamp` of the earliest CANONICAL deadlock row in the window — the
+    /// point at which this deployment was demonstrably canonicalizing. `None` =
+    /// no canonical row in the window at all.
+    ///
+    /// **Diagnostic only. It is deliberately NOT consulted by the verdict** (the
+    /// doc on [`BoundaryProbe`] shows why it cannot change one), and it is
+    /// deliberately not deleted: it is what makes the "widening on a
+    /// fully-canonicalized window" case legible in a log line when someone asks
+    /// why a read was wide.
+    pub earliest_canonical: Option<i64>,
+    /// Whether the window contains any row carrying a RAW deadlock marker.
+    /// **This alone is the verdict.**
+    pub has_raw_row: bool,
+}
+
+#[cfg(feature = "enterprise")]
+impl BoundaryProbe {
+    /// Does this window need the raw widening?
+    ///
+    /// Exactly [`has_raw_row`](Self::has_raw_row) — the widening is needed when
+    /// and only when the window holds a row the canonical fast path cannot see.
+    /// The [`BoundaryProbe`] doc works through why the boundary timestamp cannot
+    /// move this answer in either direction; `start_time` is taken so that a
+    /// future window-relative rule has a seam to land in without rewriting every
+    /// call site, and is intentionally unused today.
+    ///
+    /// A window that straddles the upgrade is served with the widening on for
+    /// the WHOLE window, never split into a raw half and a canonical half.
+    /// Splitting would have to re-derive the stitch groups across the seam, and
+    /// `merge_mysql_deadlocks` groups by 2 s proximity — so a MySQL deadlock
+    /// whose sides straddle the seam would be torn into two half-sized
+    /// deadlocks. That is exactly the bug GAP 2 exists to prevent, reintroduced
+    /// by an optimization. Widening a window that is 99% canonical is only a
+    /// cost, never a wrong answer: `deadlock_event_for_row` branches PER ROW, so
+    /// a canonical row still takes the canonical reader.
+    ///
+    /// House rule (`plan_row_to_dto`): the ambiguous cases resolve toward
+    /// SHOWING data. A probe that errors is not represented here at all — the
+    /// caller widens without constructing a `BoundaryProbe`, so an unreadable
+    /// window can never be mistaken for an empty one.
+    fn fallback_needed(&self, _start_time: i64) -> bool {
+        self.has_raw_row
+    }
+}
+
+/// SQL for the EARLIEST canonical row of one kind inside the window.
+///
+/// Ordered ASCENDING — deliberately the mirror of [`build_last_seen_sql`], which
+/// is DESC because it wants the latest. Getting this backwards returns the
+/// newest canonical row, which is inside the window by construction, so it would
+/// answer "yes, covered" for every window that has ever seen a canonical row and
+/// silently disable the fallback on the deployments that need it.
+///
+/// Bounded to the REQUESTED window rather than `MIN(_timestamp)` over all
+/// history: the unbounded form is a full scan and would cost more than the
+/// widening it saves. `LIMIT 1` over the same range the main read is about to
+/// scan is the cheapest question that answers the boundary.
+#[cfg(feature = "enterprise")]
+pub(crate) fn build_earliest_canonical_sql(
+    stream_name: &str,
+    kind: &str,
+    start_time: i64,
+    end_time: i64,
+) -> String {
+    format!(
+        "SELECT _timestamp FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'\nORDER BY _timestamp ASC\nLIMIT 1",
+        escape_ident(stream_name),
+        server_vantage::O2_DBM_KIND,
+        escape_sq(kind),
+    )
+}
+
+/// SQL for ANY raw-marker deadlock row inside the window.
+///
+/// Schema-gated exactly like the widening it guards: each marker is a COLUMN,
+/// and naming one absent from the stream fails the WHOLE query with a 400 — so a
+/// probe that hardcodes all four markers takes the page down on precisely the
+/// deployments the fallback exists for.
+///
+/// `None` when the stream has no marker column at all: there is then no query to
+/// run, and no raw row can exist, so the caller reads that as "no raw rows" for
+/// free.
+#[cfg(feature = "enterprise")]
+pub(crate) fn build_raw_deadlock_presence_sql(
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+    raw: &RawDeadlockFallback,
+) -> Option<String> {
+    let markers = raw.marker_terms();
+    if markers.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "SELECT _timestamp FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND ({})\nLIMIT 1",
+        escape_ident(stream_name),
+        markers.join(" OR "),
+    ))
+}
+
+/// Run both boundary probes concurrently and decide whether this window needs
+/// the raw widening.
+///
+/// Errors degrade to the SAFE direction — the pre-A1.1 always-on behaviour —
+/// rather than to an error page: a failed probe means we do not know whether the
+/// window is fully canonicalized, and the house rule is to show data. The cost
+/// of being wrong that way is a wider read; the cost of being wrong the other
+/// way is the empty page over real deadlocks that A1 exists to fix.
+#[cfg(feature = "enterprise")]
+async fn deadlock_window_needs_fallback(
+    org_id: &str,
+    stream: &str,
+    start_time: i64,
+    end_time: i64,
+    raw: &RawDeadlockFallback,
+) -> bool {
+    let Some(raw_sql) = build_raw_deadlock_presence_sql(stream, start_time, end_time, raw) else {
+        // No marker column on this stream, so no raw row can exist. Nothing for
+        // the widening to surface, and we did not even have to ask.
+        return false;
+    };
+    let canonical_sql =
+        build_earliest_canonical_sql(stream, server_vantage::KIND_DEADLOCK, start_time, end_time);
+    // Two independent bounded reads — the same `tokio::join!` shape
+    // `probe_collection` already uses for its pair.
+    let (canonical_rows, raw_rows) = tokio::join!(
+        run_events_search(org_id, stream, canonical_sql, start_time, end_time),
+        run_events_search(org_id, stream, raw_sql, start_time, end_time),
+    );
+    let (canonical_rows, raw_rows) = match (canonical_rows, raw_rows) {
+        (Ok(c), Ok(r)) => (c, r),
+        (c, r) => {
+            let e = c.err().or_else(|| r.err());
+            log::warn!(
+                "[DbMonitoring] deadlock boundary probe failed for {org_id}/{stream}, \
+                 widening the read as before: {e:?}"
+            );
+            return true;
+        }
+    };
+    let probe = BoundaryProbe {
+        // NOT `get_i64`, deliberately: that maps an absent or unparseable value
+        // to 0, and 0 is a valid-looking timestamp at the epoch. The verdict
+        // does not read this field, so today that would be harmless — but it
+        // would silently turn "we could not read the row" into "canonicalization
+        // started in 1970" in the diagnostic below, which is the log line an
+        // operator would be reading precisely when something is wrong.
+        earliest_canonical: canonical_rows
+            .first()
+            .and_then(|r| r.get("_timestamp"))
+            .and_then(Value::as_i64),
+        has_raw_row: !raw_rows.is_empty(),
+    };
+    let needed = probe.fallback_needed(start_time);
+    if needed {
+        // The one question an operator asks about this feature is "why is my
+        // deadlocks read wide?", and the answer is a raw row in the window. The
+        // canonical boundary is logged beside it because the useful follow-up is
+        // "and has this deployment started canonicalizing at all" — a `None`
+        // there on a supposedly-upgraded cluster means ingest is still landing
+        // on an OSS node, which is a different problem with the same symptom.
+        log::debug!(
+            "[DbMonitoring] deadlocks widening for {org_id}/{stream}: a raw \
+             deadlock row is present in the window; earliest canonical row in \
+             window = {:?}",
+            probe.earliest_canonical,
+        );
+    }
+    needed
+}
+
 /// Everything the builder may project, gated on what the stream actually has.
 ///
 /// The two halves travel together because they are answers to the same
@@ -4615,9 +4841,28 @@ async fn read_deadlocks_body(
     // fallback cannot run — the canonical path is still correct and complete, so
     // the honest answer is today's answer, not an error page. The operator sees
     // the reason in the log.
+    //
+    // A1.1 · and it is TRANSITIONAL, not permanent. The widening applies only to
+    // a window that predates the point at which this deployment started
+    // canonicalizing — after that, the canonical fast path only, with no marker
+    // terms, no raw projection and no per-row dispatch. That makes it
+    // self-limiting: as the pre-upgrade window ages out of retention the
+    // fallback stops doing any work, with no operator action and no date to set.
+    // See `BoundaryProbe`.
     let raw_fallback = if config::get_config().db_monitoring.deadlock_read_fallback {
         match present_raw_deadlock_columns(org_id, stream).await {
-            Ok(present) => Some(RawDeadlockFallback { present }),
+            // The kill-switch short-circuits BEFORE the boundary probe, so
+            // turning it off costs nothing at all — the probe never fires.
+            Ok(present) => {
+                let candidate = RawDeadlockFallback { present };
+                if deadlock_window_needs_fallback(org_id, stream, start_time, end_time, &candidate)
+                    .await
+                {
+                    Some(candidate)
+                } else {
+                    None
+                }
+            }
             Err(e) => {
                 log::warn!(
                     "[DbMonitoring] deadlocks raw-column read failed for {org_id}/{stream}, \
@@ -10231,6 +10476,232 @@ mod tests {
         }
     }
 
+    // ── A1.1 · the canonicalization boundary ────────────────────────────────
+    //
+    // The fallback must be TRANSITIONAL, not permanent: it should widen the read
+    // only over the window BEFORE this deployment started canonicalizing. These
+    // pin the decision function that makes that call from two bounded probes.
+
+    /// EDGE CASE (a) — an org that has ONLY raw rows.
+    ///
+    /// No canonical deadlock row exists anywhere in the window, so nothing tells
+    /// us canonicalization had started. The fallback must cover the WHOLE range
+    /// or A1 regresses to the empty page it exists to fix.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_boundary_keeps_the_fallback_on_for_an_all_raw_window() {
+        let probe = BoundaryProbe {
+            earliest_canonical: None,
+            has_raw_row: true,
+        };
+        assert!(
+            probe.fallback_needed(1_000),
+            "a window with raw rows and no canonical row is exactly the A1 case"
+        );
+    }
+
+    /// EDGE CASE (b) — an org that has ONLY canonical rows.
+    ///
+    /// Canonicalization covers the window from its first instant and there is no
+    /// raw row to miss, so the fallback must be INERT: no widening at all. This
+    /// is the entire point of A1.1 — steady-state reads pay nothing.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_boundary_turns_the_fallback_off_for_an_all_canonical_window() {
+        let probe = BoundaryProbe {
+            earliest_canonical: Some(1_000),
+            has_raw_row: false,
+        };
+        assert!(
+            !probe.fallback_needed(1_000),
+            "canonicalization covering the window start with no raw row present \
+             means the fast path is complete"
+        );
+    }
+
+    /// THE FINDING: the boundary TIMESTAMP cannot move the verdict, in either
+    /// direction, at any position relative to the window.
+    ///
+    /// This started as an "is the boundary inclusive at `start_time`" test and
+    /// became the test that killed the boundary. Sweeping the earliest canonical
+    /// row across every interesting position — before the window, exactly at its
+    /// start, one microsecond after, deep inside, and absent altogether — while
+    /// holding `has_raw_row` fixed must not change the answer once. If a future
+    /// change makes it change, the mechanism has silently acquired a
+    /// timestamp-comparison bug of exactly the kind that hides raw rows under
+    /// interleaving.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_boundary_timestamp_never_changes_the_verdict() {
+        let start = 1_000;
+        let positions = [None, Some(500), Some(1_000), Some(1_001), Some(5_000)];
+        for has_raw_row in [true, false] {
+            for earliest_canonical in positions {
+                let probe = BoundaryProbe {
+                    earliest_canonical,
+                    has_raw_row,
+                };
+                assert_eq!(
+                    probe.fallback_needed(start),
+                    has_raw_row,
+                    "the verdict must be exactly `has_raw_row`, but a canonical \
+                     row at {earliest_canonical:?} changed it — with raw rows \
+                     present that HIDES them (A1 reintroduced), and with none \
+                     present it widens a read that can surface nothing"
+                );
+            }
+        }
+    }
+
+    /// A window that STRADDLES the boundary is served with the fallback on for
+    /// the WHOLE window, never split into a raw half and a canonical half.
+    ///
+    /// Splitting would re-derive the stitch groups across the seam, and
+    /// `merge_mysql_deadlocks` groups by 2 s proximity — so a MySQL deadlock
+    /// whose sides straddle the boundary would be torn into two half-sized
+    /// deadlocks. That is precisely the bug GAP 2 exists to prevent.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_boundary_does_not_split_a_straddling_window() {
+        let probe = BoundaryProbe {
+            earliest_canonical: Some(5_000),
+            has_raw_row: true,
+        };
+        assert!(probe.fallback_needed(1_000));
+    }
+
+    /// INTERLEAVING — the reason the OFF verdict needs BOTH conditions.
+    ///
+    /// A cluster can run mixed builds or be downgraded, so raw rows can appear
+    /// AFTER canonical ones. Then canonicalization covers the window start and a
+    /// boundary-only test would say OFF — hiding the interleaved raw rows. The
+    /// verdict therefore also requires that the window contain no raw row.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_boundary_stays_on_when_raw_rows_interleave_after_canonical_ones() {
+        let probe = BoundaryProbe {
+            earliest_canonical: Some(500),
+            has_raw_row: true,
+        };
+        assert!(
+            probe.fallback_needed(1_000),
+            "canonicalization predates the window, but a raw row inside it would \
+             be invisible to the canonical-only fast path"
+        );
+    }
+
+    /// An EMPTY window — no rows of either shape — must not pay for a widening
+    /// that has nothing to find, but must also not claim coverage it cannot
+    /// prove. There is nothing to show either way, so the cheap verdict is the
+    /// honest one.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_boundary_is_inert_on_a_window_with_neither_shape() {
+        let probe = BoundaryProbe {
+            earliest_canonical: None,
+            has_raw_row: false,
+        };
+        assert!(
+            !probe.fallback_needed(1_000),
+            "no raw row in the window means the widening cannot surface anything"
+        );
+    }
+
+    /// The whole win, asserted rather than inspected: with the boundary
+    /// resolving to OFF the emitted SQL is BYTE-IDENTICAL to a read that never
+    /// had a fallback — no marker terms, no raw projection.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_fallback_off_emits_byte_identical_sql_to_no_fallback() {
+        let with_none = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            " AND o2_dbm_engine = 'mysql'",
+            50,
+            &proj(&all_cols(), None),
+        );
+        // What the deadlocks caller now passes when the boundary says the window
+        // is fully canonicalized.
+        let boundary_off: Option<&RawDeadlockFallback> = None;
+        let steady_state = build_dbm_events_sql(
+            "dbm_server",
+            "deadlock",
+            100,
+            200,
+            " AND o2_dbm_engine = 'mysql'",
+            50,
+            &proj(&all_cols(), boundary_off),
+        );
+        assert_eq!(with_none, steady_state);
+
+        // Checked as whole IDENTIFIERS, not substrings: several raw names are
+        // substrings of canonical ones the fast path legitimately projects
+        // (`database` inside `o2_dbm_database`), so a `contains` check reports a
+        // widening that is not there.
+        let named: HashSet<&str> = steady_state
+            .split(|c: char| !(c.is_alphanumeric() || c == '_'))
+            .collect();
+        for (col, _) in server_vantage::DEADLOCK_MARKERS {
+            assert!(
+                !named.contains(col),
+                "a steady-state read must not name the raw marker {col}:\n{steady_state}"
+            );
+        }
+        for f in server_vantage::RAW_DEADLOCK_FIELDS {
+            assert!(
+                !named.contains(f),
+                "a steady-state read must not project the raw column {f}:\n{steady_state}"
+            );
+        }
+    }
+
+    /// The probe SQL asks the cheapest question that answers the boundary:
+    /// the EARLIEST canonical row in the window, one row.
+    ///
+    /// Ordered ASCENDING — the mirror of `build_last_seen_sql`, which is DESC
+    /// because it wants the latest. Getting this backwards returns the newest
+    /// canonical row, which is always inside the window and would answer "yes,
+    /// covered" for every window that has ever seen a canonical row.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_earliest_canonical_probe_sql_is_a_single_ascending_row() {
+        let sql = build_earliest_canonical_sql("dbm_server", "deadlock", 100, 200);
+        assert!(sql.contains("ORDER BY _timestamp ASC"), "{sql}");
+        assert!(sql.contains("LIMIT 1"), "{sql}");
+        assert!(sql.contains("o2_dbm_kind = 'deadlock'"), "{sql}");
+        assert!(
+            sql.contains("_timestamp >= 100 AND _timestamp < 200"),
+            "the probe must be bounded to the REQUESTED window — an unbounded \
+             MIN() over all history costs more than the widening it saves:\n{sql}"
+        );
+    }
+
+    /// The raw probe is schema-gated exactly like the widening it guards.
+    ///
+    /// Each marker is a column, and naming an absent one fails the WHOLE query —
+    /// so a probe that hardcodes all four markers 400s on the very deployments
+    /// the fallback exists for. With NO marker column present there is no query
+    /// to run at all.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_raw_presence_probe_names_only_marker_columns_the_stream_has() {
+        let raw = raw_cols(&["o2_pg_event"]);
+        let sql = build_raw_deadlock_presence_sql("dbm_server", 100, 200, &raw)
+            .expect("one marker present means one probe");
+        assert!(sql.contains("o2_pg_event = 'deadlock'"), "{sql}");
+        assert!(!sql.contains("o2_my_event"), "{sql}");
+        assert!(!sql.contains("o2_recipe"), "{sql}");
+        assert!(sql.contains("LIMIT 1"), "{sql}");
+
+        let none = raw_cols(&[]);
+        assert!(
+            build_raw_deadlock_presence_sql("dbm_server", 100, 200, &none).is_none(),
+            "with no marker column there is nothing to probe for"
+        );
+    }
+
     // ── A1 · the widened deadlocks SQL ──────────────────────────────────────
 
     /// The whole fallback in one assertion: BOTH shapes in ONE query.
@@ -10959,6 +11430,71 @@ mod tests {
             }
             .matches(&canonical),
             "and what it would have dropped, the Rust narrowing must drop"
+        );
+    }
+
+    /// THE A1.1 REGRESSION GUARD: the deadlocks read must CONSULT the boundary,
+    /// not merely have one available.
+    ///
+    /// This is the A1.1 analogue of the scope-predicate guard below, and it was
+    /// written because the corresponding mutation **survived**: replacing the
+    /// whole boundary branch with a bare `Some(RawDeadlockFallback { present })`
+    /// restores the always-on behaviour this change exists to remove, and every
+    /// one of the nine behavioural tests above still passes — because they all
+    /// exercise the pure decision function, and the pure function is still
+    /// perfect. The defect lives in the WIRING, so the guard has to.
+    ///
+    /// What always-on costs, and why it is worth a structural test: every
+    /// deadlocks read on a fully-canonicalized deployment widens its projection
+    /// by up to ~50 raw columns, ORs four marker terms into the `WHERE`, moves
+    /// the scope filters out of SQL so they stop narrowing before the `LIMIT`,
+    /// and dispatches every row through the canonicalizer. Silently — nothing
+    /// errors, the page is correct, and it stays that way forever.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_deadlocks_read_consults_the_boundary_before_widening() {
+        let src = include_str!("api.rs");
+        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+
+        let body_at = code
+            .find("async fn read_deadlocks_body")
+            .or_else(|| code.find("fn read_deadlocks_body"))
+            .expect("the deadlocks body must exist");
+        let body = &code[body_at..];
+        let body = &body[..body.find("\n}\n").unwrap_or(body.len())];
+
+        // The binding that decides whether the widening happens at all.
+        let bind_at = body
+            .find("let raw_fallback =")
+            .expect("`raw_fallback` must be bound in the deadlocks body");
+        let bind = &body[bind_at..];
+        let bind = &bind[..bind.find("\n    };").map(|i| i + 6).unwrap_or(bind.len())];
+
+        assert!(
+            bind.contains("deadlock_window_needs_fallback("),
+            "`raw_fallback` must be gated on the boundary probe — without it the \
+             fallback is always-on again, which is the state A1.1 exists to \
+             end:\n{bind}"
+        );
+        // ...and the gate must be able to answer NO. A call whose result is
+        // discarded reads as wired but is not.
+        assert!(
+            bind.contains("None"),
+            "the boundary gate must have a `None` arm, or it can never turn the \
+             widening off and the probe is pure cost:\n{bind}"
+        );
+        // The kill-switch must still short-circuit BEFORE the probe, so turning
+        // it off costs nothing rather than costing two extra searches.
+        let switch_at = bind
+            .find("deadlock_read_fallback")
+            .expect("the kill-switch must still gate the whole branch");
+        let probe_at = bind
+            .find("deadlock_window_needs_fallback(")
+            .expect("checked above");
+        assert!(
+            switch_at < probe_at,
+            "the kill-switch must be tested BEFORE the boundary probe runs, or \
+             `=false` still pays for two searches per read:\n{bind}"
         );
     }
 
