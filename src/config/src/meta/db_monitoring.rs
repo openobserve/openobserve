@@ -417,38 +417,40 @@ pub const RECOGNIZED_RECIPES: [&str; 11] = [
 // dropped from the projection does not error, it just makes that participant
 // blank.
 
-/// The three filelog markers that identify a deadlock row, and the value each
-/// must equal.
+/// The four markers that identify a deadlock row, and the value each must equal.
 ///
-/// PHASE 1 IS pg/mysql/mariadb ONLY. SQL Server deadlocks are keyed on
-/// `o2_recipe = 'mssql_deadlock'` instead of an `o2_*_event` field, and its 9
-/// raw columns are absent from every stream that could be measured — so the
-/// arm has no fixture anywhere and shipping it would be shipping an untested
-/// projection into the one place (§the absent-column 400) where an untested
-/// projection takes the whole page down. `phase_one_ships_no_mssql_raw_columns`
-/// pins that as a decision.
+/// THE FOURTH IS NOT LIKE THE OTHER THREE. pg/mysql/mariadb arrive via filelog
+/// and are keyed on an `o2_*_event` field whose value is `deadlock`. SQL Server
+/// deadlocks arrive from a **sqlquery recipe** — there is no log line to tag —
+/// so they are keyed on the recipe tag itself, `o2_recipe = 'mssql_deadlock'`.
+/// Writing `KIND_DEADLOCK` in that slot would compile, read naturally, and match
+/// exactly zero rows.
 ///
 /// Each marker is itself a COLUMN, so naming one in the widened `WHERE` on a
 /// stream that lacks it fails the entire query — they are schema-gated exactly
 /// like the projection.
-pub const DEADLOCK_MARKERS: [(&str, &str); 3] = [
+pub const DEADLOCK_MARKERS: [(&str, &str); 4] = [
     ("o2_pg_event", KIND_DEADLOCK),
     ("o2_my_event", KIND_DEADLOCK),
     ("o2_maria_event", KIND_DEADLOCK),
+    ("o2_recipe", "mssql_deadlock"),
 ];
 
-/// Every RAW vendor column the phase-1 deadlock canonicalizers read.
+/// Every RAW vendor column the deadlock canonicalizers read, across all four
+/// engines.
 ///
 /// This is the read-side mirror of `ALL_DBM_FIELDS`, and it carries the SAME
 /// hazard: naming a column absent from the stream schema fails the whole query
 /// with a 400 rather than yielding a null column. On a real OSS-ingested stream
 /// 3 of the MariaDB names below are absent (`maria_lock_mode`,
 /// `maria_lock_table`, `maria_lock_index`) because no MariaDB lock recipe ever
-/// ran there. So this array is a CANDIDATE list, always intersected with the
-/// stream schema before it reaches a projection — never emitted whole.
+/// ran there, and `mssql_query` is absent even on a stream that HAS live SQL
+/// Server deadlocks. So this array is a CANDIDATE list, always intersected with
+/// the stream schema before it reaches a projection — never emitted whole.
 ///
 /// Derived by enumerating the keys the enterprise canonicalizers actually read
-/// (`canonicalize_pg_deadlock`, `canonicalize_innodb_deadlock`). The
+/// (`canonicalize_pg_deadlock`, `canonicalize_innodb_deadlock`,
+/// `canonicalize_mssql_deadlock`). The
 /// `every_raw_field_this_projects_is_read_by_a_canonicalizer` contract test in
 /// `o2_enterprise` pins the two together across the repo boundary — an entry
 /// here that no canonicalizer reads is projected bytes nobody consumes, and a
@@ -463,7 +465,7 @@ pub const DEADLOCK_MARKERS: [(&str, &str); 3] = [
 ///
 /// `_timestamp` is deliberately NOT here — the builder emits it itself, and it
 /// is the one column DataFusion will not null-fill.
-pub const RAW_DEADLOCK_FIELDS: [&str; 57] = [
+pub const RAW_DEADLOCK_FIELDS: [&str; 65] = [
     // ── Dispatch markers (also the widened WHERE's predicate columns) ──
     "o2_pg_event",
     "o2_my_event",
@@ -516,6 +518,31 @@ pub const RAW_DEADLOCK_FIELDS: [&str; 57] = [
     "maria_lock_index",
     "maria_trx_id",
     "maria_message",
+    // ── SQL Server, from the shredded `system_health` graph ──
+    //
+    // ONE ROW PER PARTICIPANT with the victim already resolved inline, so unlike
+    // InnoDB there is no verdict record and nothing to stitch.
+    //
+    // `mssql_query` is listed even though it is ABSENT from the rig's stream
+    // schema: the shred emits it as an empty string for these statements and the
+    // collector drops empty attributes, so the column never materialized. That
+    // is not a reason to omit it — it is precisely the case the schema
+    // intersection exists for, and the canonicalizer does read it (falling back
+    // to `body`, which is where the recipe's `body_column` actually puts the
+    // statement). Trimming the vocabulary to one deployment's observed shape is
+    // the mistake this array's doc warns about for MariaDB.
+    //
+    // `mssql_dl_ts` is deliberately NOT here: the shred copies it onto every row
+    // and it looks projectable, but no canonicalizer reads it — `detect_timestamp`
+    // supplies the event time. See `the_mssql_graph_timestamp_is_not_projected`.
+    "mssql_spid",
+    "mssql_query",
+    "mssql_is_victim",
+    "mssql_app",
+    "mssql_user",
+    "mssql_lock_mode",
+    "mssql_lock_target",
+    "mssql_db",
     // ── Shared detection inputs ──
     //
     // These are not deadlock-specific, but they are how a raw-derived event
@@ -1119,33 +1146,89 @@ mod tests {
         let markers: Vec<&str> = DEADLOCK_MARKERS.iter().map(|(c, _)| *c).collect();
         assert_eq!(
             markers,
-            vec!["o2_pg_event", "o2_my_event", "o2_maria_event"],
-            "phase 1 ships pg/mysql/mariadb only — mssql has no test data anywhere"
+            vec!["o2_pg_event", "o2_my_event", "o2_maria_event", "o2_recipe"],
+            "all four deadlock surfaces ship — the three filelog engines plus the \
+             mssql sqlquery recipe"
         );
-        for (_, val) in DEADLOCK_MARKERS {
-            assert_eq!(val, KIND_DEADLOCK);
+        // The three filelog markers compare against `deadlock`; mssql does NOT.
+        // It is a RECIPE TAG, and its value is the recipe's own name — asserting
+        // KIND_DEADLOCK across all four would be wrong, and writing
+        // `o2_recipe = 'deadlock'` into the widened WHERE would match zero rows
+        // while looking correct.
+        for (col, val) in DEADLOCK_MARKERS {
+            let expected = if col == "o2_recipe" {
+                "mssql_deadlock"
+            } else {
+                KIND_DEADLOCK
+            };
+            assert_eq!(
+                val, expected,
+                "marker {col:?} compares against the wrong value"
+            );
         }
     }
 
-    /// MSSQL is deliberately ABSENT from phase 1.
+    /// MSSQL raw columns SHIP — this pins the arm that replaced phase 1's
+    /// deliberate omission.
     ///
-    /// Its 9 raw columns are absent from every stream that could be measured, so
-    /// the arm would ship unexercised by any fixture. This test is the marker
-    /// that the omission is a decision, not an oversight: adding mssql means
-    /// deleting this test alongside a fixture that exercises it.
+    /// This test used to be `phase_one_ships_no_mssql_raw_columns`, asserting the
+    /// exact opposite: mssql was held back because its raw columns were absent
+    /// from every stream that could be measured, so the arm would have shipped
+    /// unexercised. That is no longer true. A collector DSN bug (the `#` in the
+    /// SQL Server password made `sqlserver://…` truncate at a URL fragment) meant
+    /// the two MSSQL recipes had never produced a row; with the DSN switched to
+    /// key=value form the rig now carries real `mssql_deadlock` rows from real
+    /// error-1205 deadlocks, and the arm has the fixture it was waiting for.
+    ///
+    /// The inverted assertion is the point: it pins the new state so a revert
+    /// cannot silently drop the arm back out.
     #[test]
-    fn phase_one_ships_no_mssql_raw_columns() {
+    fn the_mssql_arm_ships_its_raw_columns_and_marker() {
         let mssql: Vec<&str> = RAW_DEADLOCK_FIELDS
             .into_iter()
             .filter(|f| f.starts_with("mssql_"))
             .collect();
-        assert!(
-            mssql.is_empty(),
-            "mssql raw columns are phase 2 — no fixture exercises them: {mssql:?}"
+        assert_eq!(
+            mssql,
+            vec![
+                "mssql_spid",
+                "mssql_query",
+                "mssql_is_victim",
+                "mssql_app",
+                "mssql_user",
+                "mssql_lock_mode",
+                "mssql_lock_target",
+                "mssql_db",
+            ],
+            "the mssql raw vocabulary is exactly what `canonicalize_mssql_deadlock` \
+             reads — the enterprise contract test pins the other direction"
         );
         assert!(
-            !DEADLOCK_MARKERS.iter().any(|(c, _)| *c == "o2_recipe"),
-            "the o2_recipe/mssql_deadlock marker is phase 2"
+            DEADLOCK_MARKERS
+                .iter()
+                .any(|(c, v)| *c == "o2_recipe" && *v == "mssql_deadlock"),
+            "mssql is detected by its RECIPE TAG, not an o2_*_event field — without \
+             this marker in the widened WHERE not one mssql row is ever fetched"
+        );
+    }
+
+    /// `mssql_dl_ts` must NOT be projected, even though the recipe emits it on
+    /// every row.
+    ///
+    /// It is the shared graph timestamp the shred copies onto each participant,
+    /// and it looks like an obvious thing to project — but no canonicalizer reads
+    /// it: `canonicalize_mssql_deadlock` takes its timestamp from the shared
+    /// `detect_timestamp`. Projecting it would be bytes fetched per row that
+    /// nobody consumes, which is exactly what the enterprise contract test
+    /// `every_raw_field_the_oss_read_projects_is_read_by_a_canonicalizer` fails
+    /// on. Pinned separately here because the reasoning is non-obvious and a
+    /// future reader "fixing an omission" would reintroduce it.
+    #[test]
+    fn the_mssql_graph_timestamp_is_not_projected() {
+        assert!(
+            !RAW_DEADLOCK_FIELDS.contains(&"mssql_dl_ts"),
+            "mssql_dl_ts is read by no canonicalizer — detect_timestamp supplies \
+             the event time"
         );
     }
 }
