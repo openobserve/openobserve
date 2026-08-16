@@ -419,5 +419,31 @@
       "traces-autocomplete-suggestions.spec.js"
     ],
     "disabled": []
+  },
+  {
+    "testfolder": "SLO",
+    "_comment": "SLO lifecycle, REST contract and form validation. No backfill dependency, so these run parallel and finish in about a minute. ingest_allowed_upto is set even though the minimal seed stays inside the 5h default: it removes a latent trap if the fixture ever grows.",
+    "actual_folder": "SLO",
+    "browser": "chrome",
+    "ingest_allowed_upto": "240",
+    "run_files": [
+      "slo-crud.spec.js",
+      "slo-api-validation.spec.js",
+      "slo-form-validation.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "SLO-Measurement",
+    "_comment": "SEPARATE SHARD ON PURPOSE. These two specs seed 8 days of history and then wait for the backfill job, which fills roughly one day-chunk per 40s with ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1. Any spec creating SLOs on the same instance queues behind them and starves the wait, so they must not share a runner with the SLO shard. Both specs are mode:serial and pay the backfill once in beforeAll (~5 min each).",
+    "actual_folder": "SLO",
+    "browser": "chrome",
+    "ingest_allowed_upto": "240",
+    "workers": 1,
+    "run_files": [
+      "slo-timeslice.spec.js",
+      "slo-alerts.spec.js"
+    ],
+    "disabled": []
   }
 ]
