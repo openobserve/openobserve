@@ -2241,9 +2241,6 @@ pub struct Limit {
         help = "max time of transaction will retry"
     )]
     pub meta_transaction_retries: usize,
-    #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
-    // kept for compacting data of the legacy distinct_values_* metadata streams
-    pub distinct_values_hourly: bool,
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
     #[env_config(

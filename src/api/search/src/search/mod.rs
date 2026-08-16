@@ -798,7 +798,7 @@ pub async fn values(
     // values are searched on the original data stream; when the queried field is a
     // secondary index field, the query is automatically served by the tantivy
     // index TopN/Distinct optimization (see IndexOptimizeMode).
-    values_v1(
+    values_inner(
         &org_id,
         stream_type,
         &stream_name,
@@ -987,7 +987,11 @@ pub async fn build_search_request_per_field(
 // Search values on the original data stream. When the queried field is a
 // secondary index field, the query is automatically served by the tantivy
 // index TopN/Distinct optimization (see IndexOptimizeMode).
-async fn values_v1(
+//
+// Historically this was "v1" (full stream search) next to a "v2" that read the
+// distinct_values_* streams; v2 and later the distinct stream switch itself were
+// removed, leaving this as the only implementation.
+async fn values_inner(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
