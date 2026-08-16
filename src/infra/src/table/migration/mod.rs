@@ -161,7 +161,7 @@ mod m20260803_000001_add_destinations_to_incident_integrations;
 mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
 mod m20260809_000001_create_alert_eval_intervals_table;
 mod m20260812_000001_create_composite_alerts;
-mod m20260816_000001_sync_distinct_fields_to_index_fields;
+mod m20260816_000001_reset_distinct_fields_added_ts;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -397,7 +397,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260803_000001_add_destinations_to_incident_integrations::Migration),
             Box::new(m20260809_000001_create_alert_eval_intervals_table::Migration),
             Box::new(m20260812_000001_create_composite_alerts::Migration),
-            Box::new(m20260816_000001_sync_distinct_fields_to_index_fields::Migration),
+            Box::new(m20260816_000001_reset_distinct_fields_added_ts::Migration),
         ]
     }
 }
@@ -431,7 +431,7 @@ mod tests {
             .collect();
         assert_eq!(
             names.last().map(String::as_str),
-            Some("m20260816_000001_sync_distinct_fields_to_index_fields")
+            Some("m20260816_000001_reset_distinct_fields_added_ts")
         );
         assert_eq!(
             names

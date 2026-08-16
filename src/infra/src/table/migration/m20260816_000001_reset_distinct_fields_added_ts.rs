@@ -14,14 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! The `_values` API is served by the tantivy secondary index (TopN/Distinct
-//! collectors) instead of the `distinct_values_*` metadata streams, so every
-//! configured distinct value field must also be a secondary index field. New
-//! settings writes enforce this invariant on save; this migration backfills it
-//! for existing streams so their distinct fields start being indexed without
-//! waiting for the next settings update.
+//! collectors) instead of the `distinct_values_*` metadata streams: distinct
+//! value fields are treated as secondary index fields at read/write time (see
+//! `get_stream_setting_index_fields`), and a field's `added_ts` marks when its
+//! indexing began — files older than it fall back to a normal scan. For
+//! streams configured before this release the fields only start being indexed
+//! at upgrade time, so this migration resets their `added_ts` to now; without
+//! it, older files would wrongly be served from an index that does not
+//! contain these fields.
 
 use config::{
-    ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
     utils::{json, time::now_micros},
 };
@@ -73,43 +75,14 @@ impl MigrationTrait for Migration {
             let Some(mut settings) = schema::unwrap_stream_settings(&stream_schema) else {
                 continue;
             };
-            if !settings.enable_distinct_fields || settings.distinct_value_fields.is_empty() {
-                continue;
-            }
-
-            // fields that cannot be secondary-indexed (full text search keys, partition
-            // keys, reserved columns) are skipped; the values API falls back to a normal
-            // scan for them
-            let cfg = get_config();
-            let reserved = [
-                TIMESTAMP_COL_NAME,
-                cfg.common.column_all.as_str(),
-                ALL_VALUES_COL_NAME,
-                ORIGINAL_DATA_COL_NAME,
-            ];
-            let missing_index = settings
-                .distinct_value_fields
-                .iter()
-                .map(|field| field.name.clone())
-                .filter(|field| {
-                    !settings.index_fields.contains(field)
-                        && !settings.full_text_search_keys.contains(field)
-                        && !settings
-                            .partition_keys
-                            .iter()
-                            .any(|partition| partition.field == *field)
-                        && !reserved.contains(&field.as_str())
-                })
-                .collect::<Vec<_>>();
-            if missing_index.is_empty() {
+            if settings.distinct_value_fields.is_empty() {
                 continue;
             }
 
             let now = now_micros();
-            for field in &missing_index {
-                settings.index_fields_updated_at.insert(field.clone(), now);
+            for field in settings.distinct_value_fields.iter_mut() {
+                field.added_ts = now;
             }
-            settings.index_fields.extend(missing_index);
 
             let mut metadata = stream_schema.metadata.clone();
             metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
@@ -117,8 +90,8 @@ impl MigrationTrait for Migration {
                 metadata.insert("created_at".to_string(), now_micros().to_string());
             }
 
-            if let Err(e) = schema::update_setting(org_id, stream_name, stype, metadata.clone())
-                .await
+            if let Err(e) =
+                schema::update_setting(org_id, stream_name, stype, metadata.clone()).await
             {
                 log::error!("error in updating settings for {org_id}/{stype}/{stream_name} : {e}");
                 return Err(DbErr::Custom(format!(
@@ -138,7 +111,7 @@ impl MigrationTrait for Migration {
                 .await
                 {
                     log::error!(
-                        "error syncing distinct fields to index fields across super cluster {org_id}/{stype}/{stream_name} : {e}"
+                        "error syncing distinct fields added_ts across super cluster {org_id}/{stype}/{stream_name} : {e}"
                     )
                 }
             }

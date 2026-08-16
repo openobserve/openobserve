@@ -388,41 +388,6 @@ fn normalize_stream_settings(settings: &mut StreamSettings) {
         settings.index_fields.extend(missing_index);
     }
 
-    // distinct value fields are served by the tantivy secondary index (TopN/Distinct
-    // collectors), so they must also be secondary index fields. Fields that cannot be
-    // secondary-indexed (full text search keys, partition keys, reserved columns) are
-    // skipped; the values API falls back to a normal scan for them.
-    if settings.enable_distinct_fields {
-        let cfg = get_config();
-        let reserved = [
-            TIMESTAMP_COL_NAME,
-            cfg.common.column_all.as_str(),
-            ALL_VALUES_COL_NAME,
-            ORIGINAL_DATA_COL_NAME,
-        ];
-        let missing_index = settings
-            .distinct_value_fields
-            .iter()
-            .map(|field| field.name.clone())
-            .filter(|field| {
-                !settings.index_fields.contains(field)
-                    && !settings.full_text_search_keys.contains(field)
-                    && !settings
-                        .partition_keys
-                        .iter()
-                        .any(|partition| partition.field == *field)
-                    && !reserved.contains(&field.as_str())
-            })
-            .collect::<Vec<_>>();
-        if !missing_index.is_empty() {
-            let now = now_micros();
-            for field in &missing_index {
-                settings.index_fields_updated_at.insert(field.clone(), now);
-            }
-            settings.index_fields.extend(missing_index);
-        }
-    }
-
     if !settings.index_fields_updated_at.is_empty() {
         let indexed = settings
             .full_text_search_keys
@@ -1052,62 +1017,6 @@ mod tests {
         );
         assert!(!settings.index_fields_updated_at.contains_key("removed"));
         assert_eq!(settings.index_fields_updated_at.get("a"), Some(&100));
-    }
-
-    #[test]
-    fn test_normalize_stream_settings_syncs_distinct_fields_to_index_fields() {
-        use config::meta::stream::{DistinctField, StreamPartition};
-
-        let mut settings = StreamSettings {
-            full_text_search_keys: vec!["fts".to_string()],
-            partition_keys: vec![StreamPartition::new("pk")],
-            distinct_value_fields: vec![
-                DistinctField {
-                    name: "svc".to_string(),
-                    added_ts: 1,
-                },
-                // full text search keys cannot be secondary index fields
-                DistinctField {
-                    name: "fts".to_string(),
-                    added_ts: 1,
-                },
-                // partition keys cannot be secondary index fields
-                DistinctField {
-                    name: "pk".to_string(),
-                    added_ts: 1,
-                },
-                // reserved columns cannot be secondary index fields
-                DistinctField {
-                    name: TIMESTAMP_COL_NAME.to_string(),
-                    added_ts: 1,
-                },
-            ],
-            ..Default::default()
-        };
-
-        normalize_stream_settings(&mut settings);
-
-        assert_eq!(settings.index_fields, vec!["svc"]);
-        assert!(
-            settings
-                .index_fields_updated_at
-                .get("svc")
-                .is_some_and(|value| *value > 0)
-        );
-
-        // no sync when distinct fields are disabled for the stream
-        let mut settings = StreamSettings {
-            enable_distinct_fields: false,
-            distinct_value_fields: vec![DistinctField {
-                name: "svc".to_string(),
-                added_ts: 1,
-            }],
-            ..Default::default()
-        };
-
-        normalize_stream_settings(&mut settings);
-
-        assert!(settings.index_fields.is_empty());
     }
 
     #[test]
