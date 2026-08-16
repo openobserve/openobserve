@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 70;
+pub const DB_SCHEMA_VERSION: u64 = 69;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -217,20 +217,29 @@ pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_bloom_filter_extra_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
+    let cfg = get_config();
+    let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
+        &_DEFAULT_BLOOM_FILTER_FIELDS
+    } else {
+        &[]
+    };
+    let mut fields = chain(
+        default_fields.iter().map(|s| s.to_string()),
+        cfg.common
+            .feature_bloom_filter_extra_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields

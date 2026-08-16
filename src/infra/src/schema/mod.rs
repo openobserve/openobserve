@@ -499,6 +499,10 @@ pub fn get_stream_setting_index_updated_at_for_fields<T: std::borrow::Borrow<Str
     settings: &Option<T>,
     created_at: Option<i64>,
     fields: &[String],
+    // when distinct value fields started being folded into the tantivy index
+    // (get_ttv_distinct_fields_updated_at); files written before it do not
+    // contain distinct-only fields no matter how old their added_ts is
+    distinct_fields_updated_at: i64,
 ) -> i64 {
     if fields.is_empty() {
         return 0;
@@ -530,15 +534,16 @@ pub fn get_stream_setting_index_updated_at_for_fields<T: std::borrow::Borrow<Str
             } else if let Some(added_ts) = settings.as_ref().and_then(|s| {
                 // A field indexed only because it is a distinct value field
                 // (see get_stream_setting_index_fields) is indexed since its
-                // added_ts — the timestamp is reset when distinct fields are
-                // (re-)enabled and by the migration introducing this behavior,
-                // so files older than it fall back to a normal scan.
+                // added_ts — the timestamp is set on add and reset when
+                // distinct fields are (re-)enabled — but never before the
+                // release-wide distinct_fields_updated_at cutoff, so files
+                // older than either fall back to a normal scan.
                 let s = s.borrow();
                 if s.enable_distinct_fields && !s.index_fields.contains(f) {
                     s.distinct_value_fields
                         .iter()
                         .find(|field| field.name == *f)
-                        .map(|field| field.added_ts)
+                        .map(|field| field.added_ts.max(distinct_fields_updated_at))
                 } else {
                     None
                 }
@@ -1344,8 +1349,19 @@ mod tests {
             &Some(settings.clone()),
             Some(created_at),
             &fields,
+            0,
         );
         assert_eq!(result, added_ts);
+
+        // but never before the release-wide distinct fields cutoff
+        let cutoff = added_ts + 1_000_000;
+        let result = get_stream_setting_index_updated_at_for_fields(
+            &Some(settings.clone()),
+            Some(created_at),
+            &fields,
+            cutoff,
+        );
+        assert_eq!(result, cutoff);
 
         // a field also present in index_fields keeps the index semantics
         let settings_both = StreamSettings {
@@ -1356,6 +1372,7 @@ mod tests {
             &Some(settings_both),
             Some(created_at),
             &fields,
+            0,
         );
         assert_eq!(result, 1_750_000_000_000_000);
 
@@ -1368,6 +1385,7 @@ mod tests {
             &Some(settings_disabled),
             Some(created_at),
             &fields,
+            0,
         );
         assert_eq!(result, 1_750_000_000_000_000);
     }
@@ -1388,25 +1406,25 @@ mod tests {
         // no referenced fields -> no cutoff
         let fields = Vec::new();
         let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
         assert_eq!(result, 0);
 
         // a field with its own entry uses it
         let fields = vec!["user_id".to_string()];
         let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
         assert_eq!(result, 1_760_000_000_000_000);
 
         // a field without an entry falls back to the stream-level value
         let fields = vec!["level".to_string()];
         let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
         assert_eq!(result, 1_750_000_000_000_000);
 
         // multiple fields use the max
         let fields = vec!["user_id".to_string(), "level".to_string()];
         let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
         assert_eq!(result, 1_760_000_000_000_000);
 
         // None settings falls back to created_at
@@ -1415,6 +1433,7 @@ mod tests {
             &None::<StreamSettings>,
             Some(created_at),
             &fields,
+            0,
         );
         assert_eq!(result, created_at);
 
@@ -1425,20 +1444,21 @@ mod tests {
         let settings = Some(stream_settings);
         let fields = vec!["trace_id".to_string()];
         let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
         assert_eq!(result, base_time);
         let fields = vec!["service_name".to_string()];
         let result = get_stream_setting_index_updated_at_for_fields(
             &None::<StreamSettings>,
             Some(created_at),
             &fields,
+            0,
         );
         assert_eq!(result, base_time);
 
         // a default field combined with a configured field still uses the max
         let fields = vec!["trace_id".to_string(), "user_id".to_string()];
         let result =
-            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields, 0);
         assert_eq!(result, 1_760_000_000_000_000);
     }
 
