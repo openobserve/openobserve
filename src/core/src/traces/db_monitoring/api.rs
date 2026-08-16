@@ -1240,7 +1240,8 @@ async fn run_stats_search(
     // double-authorize the same request.
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
-    Ok(resp.hits)
+    // A PARTIAL response is not an empty one — see `hits_or_partial_error`.
+    super::hits_or_partial_error(resp, O2_DB_STATS_STREAM)
 }
 
 // ─── Shared handler plumbing ─────────────────────────────────────────────────
@@ -4079,7 +4080,8 @@ async fn run_events_search(
     // check first — it does not authorize itself.
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
-    Ok(resp.hits)
+    // A PARTIAL response is not an empty one — see `hits_or_partial_error`.
+    super::hits_or_partial_error(resp, stream)
 }
 
 // ─── UI-facing DTOs (the API *is* the contract) ──────────────────────────────
@@ -15993,6 +15995,273 @@ mod tests {
         assert!(
             reexport.contains("get_dbm_badges"),
             "the handler must be re-exported, or the router cannot name it"
+        );
+    }
+
+    // ── A partial search result is an ERROR, never an empty page ────────────
+    //
+    // `crate::search::search` answers `Ok` with `is_partial: true` when a leaf
+    // dropped out mid-read (a WAL parquet file rotating under the query is the
+    // one seen live). The hits it carries are an ARBITRARY SUBSET — for a read
+    // whose only surviving leaf contributed nothing, the empty vec. Returning
+    // that as `Ok` makes a torn read indistinguishable from "no rows", which is
+    // the false-verdict shape `present_dbm_columns` refuses for schema reads.
+
+    /// The whole bug in one assertion: partial in, `Err` out.
+    use super::super::hits_or_partial_error;
+
+    #[test]
+    fn test_a_partial_response_is_an_error_not_empty_hits() {
+        let resp = config::meta::search::Response {
+            is_partial: true,
+            function_error: vec!["leaf node left the cluster".into()],
+            ..Default::default()
+        };
+        let err = hits_or_partial_error(resp, "blocking")
+            .expect_err("a partial read must not be reported as a clean result");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("partial"),
+            "the error must name the condition so the page can say what went \
+             wrong, got: {msg}"
+        );
+        assert!(
+            msg.contains("leaf node left the cluster"),
+            "the error must carry `function_error` — it is the only description \
+             of WHY the read tore, got: {msg}"
+        );
+    }
+
+    /// The empty-hits case is the dangerous one, and the one the live rig hit:
+    /// a partial read that returns NO rows is byte-identical to a healthy empty
+    /// window. It must still error.
+    #[test]
+    fn test_a_partial_response_with_no_hits_still_errors() {
+        let resp = config::meta::search::Response {
+            is_partial: true,
+            hits: vec![],
+            ..Default::default()
+        };
+        assert!(
+            hits_or_partial_error(resp, "deadlocks").is_err(),
+            "an EMPTY partial read is the false-'no data' page: it looks exactly \
+             like a healthy empty window and must never be returned as one"
+        );
+    }
+
+    /// A partial read carrying SOME rows is equally a lie — the page would
+    /// render a subset as if it were the whole window.
+    #[test]
+    fn test_a_partial_response_with_some_hits_still_errors() {
+        let resp = config::meta::search::Response {
+            is_partial: true,
+            hits: vec![json!({"_timestamp": 1})],
+            ..Default::default()
+        };
+        assert!(
+            hits_or_partial_error(resp, "queries").is_err(),
+            "a partial read with rows is a SUBSET presented as the whole window"
+        );
+    }
+
+    /// A partial response with no `function_error` must still error, and must
+    /// still say something useful. Nothing guarantees the two travel together.
+    #[test]
+    fn test_a_partial_response_without_a_function_error_still_errors() {
+        let resp = config::meta::search::Response {
+            is_partial: true,
+            function_error: vec![],
+            ..Default::default()
+        };
+        let err = hits_or_partial_error(resp, "activity")
+            .expect_err("`is_partial` alone is sufficient grounds to fail");
+        assert!(
+            err.to_string().contains("activity"),
+            "with no `function_error` to quote, the read's NAME is the only \
+             context the operator gets: {err}"
+        );
+    }
+
+    /// The negative: a clean response is passed through untouched. Without this
+    /// the guard could "pass" by failing everything.
+    #[test]
+    fn test_a_clean_response_passes_its_hits_through() {
+        let resp = config::meta::search::Response {
+            is_partial: false,
+            hits: vec![json!({"a": 1}), json!({"a": 2})],
+            ..Default::default()
+        };
+        let hits = hits_or_partial_error(resp, "blocking").expect("a clean read must succeed");
+        assert_eq!(hits, vec![json!({"a": 1}), json!({"a": 2})]);
+    }
+
+    /// A clean, genuinely EMPTY response stays `Ok` — the honest empty window
+    /// is the case the whole self-diagnosing empty state is built for, and
+    /// erroring on it would replace a good page with a 500.
+    #[test]
+    fn test_a_clean_empty_response_is_still_ok() {
+        let resp = config::meta::search::Response {
+            is_partial: false,
+            hits: vec![],
+            ..Default::default()
+        };
+        let hits = hits_or_partial_error(resp, "deadlocks")
+            .expect("an honest empty window is not an error");
+        assert!(hits.is_empty());
+    }
+
+    /// `function_error` WITHOUT `is_partial` is not this bug and must not be
+    /// turned into one: VRL function errors are per-row notes on an otherwise
+    /// complete read, and failing them would 500 pages that are fine today.
+    #[test]
+    fn test_a_function_error_alone_does_not_fail_a_complete_read() {
+        let resp = config::meta::search::Response {
+            is_partial: false,
+            function_error: vec!["vrl: field missing on 3 rows".into()],
+            hits: vec![json!({"a": 1})],
+            ..Default::default()
+        };
+        assert!(
+            hits_or_partial_error(resp, "blocking").is_ok(),
+            "`is_partial` is the completeness signal; `function_error` alone \
+             describes rows that WERE read"
+        );
+    }
+
+    // ── the WIRING class: every DBM read must go through the guard ──────────
+    //
+    // The two prior bugs in this feature were wiring bugs that every behavioural
+    // test passed — the pure function was right and the call site did not use
+    // it. A correct `hits_or_partial_error` that some search bypasses fixes
+    // nothing, so the guard is asserted STRUCTURALLY, over the source, with call
+    // sites discovered rather than listed.
+
+    /// Every `crate::search::search` in this module hands its response to the
+    /// guard. Discovered, not listed: a NEW read added with a bare `Ok(resp.hits)`
+    /// is exactly the drift this must catch.
+    #[test]
+    fn test_every_dbm_search_routes_through_the_partial_guard() {
+        // EVERY read module, not just this one. `rollup::run_dbm_search` is a
+        // third read harness — it feeds the live tail, the sparklines, the
+        // endpoints endpoint AND the rollup WRITER, where a partial read does
+        // not merely render a wrong page but persists wrong aggregates.
+        let modules = [
+            ("api.rs", include_str!("api.rs")),
+            ("rollup.rs", include_str!("rollup.rs")),
+            ("server_vantage.rs", include_str!("server_vantage.rs")),
+        ];
+        let mut total = 0;
+        for (name, src) in modules {
+            let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+            for (i, _) in code.match_indices("crate::search::search(") {
+                total += 1;
+                // The guard must appear in the lines that consume the response,
+                // before the function's own closing brace.
+                let after = &code[i..];
+                let window = &after[..after.find("\n}\n").map_or(after.len(), |e| e + 3)];
+                assert!(
+                    window.contains("hits_or_partial_error"),
+                    "{name}: this search returns its hits without the partial \
+                     guard — a torn read would render as a clean empty page, or \
+                     persist as a wrong rollup:\n{window}"
+                );
+                assert!(
+                    !window.contains("Ok(resp.hits)"),
+                    "{name}: `Ok(resp.hits)` discards `is_partial`; the response \
+                     must go through `hits_or_partial_error`:\n{window}"
+                );
+            }
+        }
+        assert_eq!(
+            total, 3,
+            "expected the stats, events and rollup read harnesses; found \
+             {total} — a new search was added, and it must decide what it does \
+             with a partial response"
+        );
+    }
+
+    /// The guard is what keeps a partial read from reaching the
+    /// `hits.is_empty()`-gated collection probe — the false `not_collecting`
+    /// alarm. Structural, because the ordering is the property: the main read's
+    /// `Err` must return BEFORE the probe is consulted.
+    ///
+    /// Note `probe_collection` deliberately swallows its own read errors into an
+    /// empty vec (a failed probe must not itself become a verdict), so the probe
+    /// cannot defend this boundary. Only the main read erroring out can.
+    #[test]
+    fn test_a_partial_read_cannot_reach_the_not_collecting_probe() {
+        let src = include_str!("api.rs");
+        let code = &src[..src.find("\n#[cfg(test)]\nmod tests").unwrap_or(src.len())];
+
+        // The gate lives in the pure envelope builders, which receive `hits` as
+        // a PARAMETER — so the property is about the handler bodies that feed
+        // them, not about text adjacent to the gate.
+        let gated: Vec<&str> = [
+            "deadlocks_envelope",
+            "blocking_envelope",
+            "activity_envelope",
+        ]
+        .into_iter()
+        .filter(|f| {
+            code.find(&format!("fn {f}("))
+                .map(|i| code[i..].starts_with(&format!("fn {f}(")))
+                .unwrap_or(false)
+        })
+        .collect();
+        assert_eq!(
+            gated.len(),
+            3,
+            "expected the three `not_collecting` envelopes; found {gated:?} — \
+             the gate moved and this tripwire is now vacuous"
+        );
+        for f in &gated {
+            let i = code.find(&format!("fn {f}(")).unwrap();
+            let body = &code[i..];
+            let body = &body[..body.find("\n}\n").map_or(body.len(), |e| e + 3)];
+            assert!(
+                body.contains("hits.is_empty() && probe.not_collecting()"),
+                "{f} must gate `not_collecting` on empty hits, or this test \
+                 guards nothing"
+            );
+        }
+
+        // Each handler that builds one of those envelopes must take its rows
+        // from a FATAL read. The aggregates beside it (`by_state`, `by_wait`)
+        // deliberately degrade to empty and correctly never feed `hits`.
+        for handler in [
+            "async fn read_deadlocks_body",
+            "async fn read_blocking_body",
+            "async fn read_activity_body",
+        ] {
+            let i = code
+                .find(handler)
+                .unwrap_or_else(|| panic!("{handler} not found — handler renamed?"));
+            let body = &code[i..];
+            let body = &body[..body.find("\n}\n").map_or(body.len(), |e| e + 3)];
+
+            // The row read: the one bound to `rows`, fatal by construction.
+            let read = body
+                .find("let rows = match run_events_search(")
+                .or_else(|| body.find("let rows_fut = run_events_search("))
+                .unwrap_or_else(|| panic!("{handler} has no fatal row read"));
+            let stmt = &body[read..];
+            let stmt = &stmt[..stmt.find(";\n").map_or(stmt.len(), |e| e + 1)];
+            assert!(
+                !stmt.contains("unwrap_or_default()") && !stmt.contains("unwrap_or_else"),
+                "{handler}: the read feeding a `not_collecting` verdict must \
+                 PROPAGATE its error, never absorb it into empty hits — an \
+                 absorbed partial read reports a healthy collector as \
+                 broken:\n{stmt}"
+            );
+        }
+
+        // Propagation is only worth anything if the read DETECTS the tear.
+        // Anchor the two together, so deleting the guard cannot leave this test
+        // passing on the strength of `?` alone.
+        assert!(
+            code.contains("hits_or_partial_error"),
+            "propagating an error the read never raises defends nothing — the \
+             partial guard must exist for this ordering to matter"
         );
     }
 }
