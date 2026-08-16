@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 69;
+pub const DB_SCHEMA_VERSION: u64 = 70;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -212,34 +212,6 @@ pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
             }
         })
         .collect::<Vec<_>>();
-    fields.sort();
-    fields.dedup();
-    fields
-});
-
-const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
-pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let cfg = get_config();
-    let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
-        &_DEFAULT_DISTINCT_FIELDS
-    } else {
-        &[]
-    };
-    let mut fields = chain(
-        default_fields.iter().map(|s| s.to_string()),
-        cfg.common
-            .feature_distinct_extra_fields
-            .split(',')
-            .filter_map(|s| {
-                let s = s.trim();
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s.to_string())
-                }
-            }),
-    )
-    .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -1397,7 +1369,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_FEATURE_DEFAULT_INDEX_FIELDS_ENABLED",
         default = true,
-        help = "When false, the built-in default fields for full text search, secondary index and distinct values are disabled; only the fields from the *_EXTRA_FIELDS ENVs and per-stream settings are used"
+        help = "When false, the built-in default fields for full text search and secondary index are disabled; only the fields from the *_EXTRA_FIELDS ENVs and per-stream settings are used"
     )]
     pub feature_default_index_fields_enabled: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -1410,8 +1382,6 @@ pub struct Common {
         help = "Comma-separated fields to build bloom filter on for all streams, replaces the deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS"
     )]
     pub feature_bloom_filter_extra_fields: String,
-    #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
-    pub feature_distinct_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
     pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
@@ -2271,9 +2241,8 @@ pub struct Limit {
         help = "max time of transaction will retry"
     )]
     pub meta_transaction_retries: usize,
-    #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
-    pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
+    // kept for compacting data of the legacy distinct_values_* metadata streams
     pub distinct_values_hourly: bool,
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
