@@ -11,9 +11,13 @@ Threads:
   pg-deadlock    REAL deadlock: two connections, opposite-order updates, loops
   mysql-oltp     transactions + full scans + slow sort
   mysql-deadlock REAL InnoDB deadlock (1213)
+  mysql-lockpair held row lock + waiter — the blocked state the ALREADY-SHIPPED
+                 sqlquery/mysql_locks recipe reads but had never been run against
   mariadb-deadlock REAL deadlock, IDENTICAL shape to mysql-deadlock so the two
                  error logs differ only by server (settles the single-entry vs
                  split-entry question in dbm-engine-support.md §3)
+  mariadb-lockpair same, for sqlquery/mariadb_locks (INNODB_LOCK_WAITS, which
+                 MariaDB kept and MySQL 8 dropped)
   mssql-lockpair held row lock + waiter — the blocked state the ALREADY-SHIPPED
                  sqlquery/mssql_blocking recipe reads but has never been run
                  against
@@ -416,6 +420,76 @@ def maria_deadlock():
     loop("mariadb-deadlock", once, DEADLOCK_PERIOD + 5)
 
 
+def _innodb_lockpair(label, connect_kwargs, row_id):
+    """Held row lock + a waiter on an InnoDB server (MySQL or MariaDB).
+
+    This manufactures the state the ALREADY-SHIPPED `sqlquery/mysql_locks` and
+    `sqlquery/mariadb_locks` recipes read. Both filter on a lock-wait join that
+    can only return rows while a transaction is genuinely parked waiting for
+    another's row lock, so without this thread those two recipes scrape a
+    permanently empty result set and are never exercised. (Measured before this
+    existed: pg 14 / mssql 110 / mysql 0 / mariadb 0 blocking rows. The MSSQL
+    arm shipped with a broken DSN precisely because no fixture caught it.)
+
+    Timing is bounded by `innodb_lock_wait_timeout`, which this rig sets to 10s
+    (NOT the MySQL default of 50). The holder therefore sleeps 8s: long enough
+    to overlap the 10s receiver scrape interval, short enough that the waiter
+    parks rather than dying with error 1205 — a timed-out waiter rolls back and
+    the lock-wait row vanishes, which is the failure mode to avoid here.
+
+    MySQL and MariaDB share this helper because, unlike the deadlock threads,
+    nothing here is trying to diff the two servers' behaviour — the recipes
+    differ (data_lock_waits vs INNODB_LOCK_WAITS) but the transaction shape that
+    provokes them is identical, so a copy would only invite drift.
+    """
+    holder = pymysql.connect(autocommit=False, **connect_kwargs)
+    waiter = pymysql.connect(autocommit=False, **connect_kwargs)
+    n = {"i": 0}
+
+    def once():
+        n["i"] += 1
+        with tracer.start_as_current_span(f"{label}-lockpair") as sp:
+            sp.set_attribute("workload.scenario", f"{label}-lockpair")
+            hc = holder.cursor()
+            hc.execute(
+                "UPDATE accounts SET balance = balance + 1 WHERE id = %s", (row_id,)
+            )
+
+            def waiting_side():
+                try:
+                    wc = waiter.cursor()
+                    wc.execute(
+                        "UPDATE accounts SET balance = balance - 1 "
+                        "WHERE id = %s /* blocked-waiter */",
+                        (row_id,),
+                    )
+                    waiter.commit()
+                except Exception:  # noqa: BLE001
+                    try:
+                        waiter.rollback()
+                    except Exception:
+                        pass
+
+            t = threading.Thread(target=waiting_side)
+            t.start()
+            time.sleep(8)  # < innodb_lock_wait_timeout (10s); > scrape interval
+            holder.commit()
+            t.join(timeout=30)
+            log(f"[{label}-lockpair] round={n['i']}")
+
+    loop(f"{label}-lockpair", once, 12)
+
+
+def my_lockpair():
+    """MySQL held row lock + waiter. Feeds the `mysql_lock_waits` recipe."""
+    _innodb_lockpair("mysql", MY, 13)
+
+
+def maria_lockpair():
+    """MariaDB held row lock + waiter. Feeds the `mariadb_lock_waits` recipe."""
+    _innodb_lockpair("mariadb", MARIA, 14)
+
+
 def mssql_lockpair():
     """Held row lock + a waiter — the state `sqlquery/mssql_blocking` reads.
 
@@ -533,7 +607,9 @@ THREADS = [
     ("pg-deadlock", pg_deadlock),
     ("mysql-oltp", my_oltp),
     ("mysql-deadlock", my_deadlock),
+    ("mysql-lockpair", my_lockpair),
     ("mariadb-deadlock", maria_deadlock),
+    ("mariadb-lockpair", maria_lockpair),
     ("mssql-lockpair", mssql_lockpair),
     ("mssql-deadlock", mssql_deadlock),
     ("redis", redis_traffic),
