@@ -41,11 +41,7 @@ pub async fn get_ttv_secondary_index_updated_at() -> i64 {
         .await
 }
 
-/// When distinct value fields started being folded into the tantivy index
-/// (see get_stream_setting_index_fields). Initialized to the first access
-/// after the release introducing the behavior, so files written before it —
-/// whose index does not contain the distinct fields — fall back to a normal
-/// scan regardless of how old a field's added_ts is.
+/// when distinct value fields started being folded into the tantivy index
 pub async fn get_ttv_distinct_fields_updated_at() -> i64 {
     *DISTINCT_FIELDS_UPDATED_AT
         .get_or_init(|| {

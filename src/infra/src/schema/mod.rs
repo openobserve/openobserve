@@ -438,14 +438,8 @@ pub fn get_stream_setting_index_fields<T: std::borrow::Borrow<StreamSettings>>(
             let mut fields = settings.index_fields.clone();
             fields.extend(default_fields);
             fields.extend(settings.bloom_filter_fields.clone());
-            // Distinct value fields are served by the tantivy secondary index
-            // (TopN/Distinct collectors), so they are effective index fields
-            // while configured. They are deliberately NOT merged into
-            // `settings.index_fields` — keeping them separate means removing a
-            // distinct field (or disabling distinct fields) cleanly stops its
-            // indexing. Fields that cannot be secondary-indexed (full text
-            // search keys, partition keys, reserved columns) are skipped; the
-            // values API falls back to a normal scan for those.
+            // distinct value fields are secondary index fields while enabled;
+            // fields that cannot be indexed (fts / partition keys / reserved) are skipped
             if settings.enable_distinct_fields && !settings.distinct_value_fields.is_empty() {
                 let cfg = get_config();
                 let reserved = [
@@ -499,9 +493,6 @@ pub fn get_stream_setting_index_updated_at_for_fields<T: std::borrow::Borrow<Str
     settings: &Option<T>,
     created_at: Option<i64>,
     fields: &[String],
-    // when distinct value fields started being folded into the tantivy index
-    // (get_ttv_distinct_fields_updated_at); files written before it do not
-    // contain distinct-only fields no matter how old their added_ts is
     distinct_fields_updated_at: i64,
 ) -> i64 {
     if fields.is_empty() {
@@ -532,12 +523,6 @@ pub fn get_stream_setting_index_updated_at_for_fields<T: std::borrow::Borrow<Str
             {
                 updated_at
             } else if let Some(added_ts) = settings.as_ref().and_then(|s| {
-                // A field indexed only because it is a distinct value field
-                // (see get_stream_setting_index_fields) is indexed since its
-                // added_ts — the timestamp is set on add and reset when
-                // distinct fields are (re-)enabled — but never before the
-                // release-wide distinct_fields_updated_at cutoff, so files
-                // older than either fall back to a normal scan.
                 let s = s.borrow();
                 if s.enable_distinct_fields && !s.index_fields.contains(f) {
                     s.distinct_value_fields

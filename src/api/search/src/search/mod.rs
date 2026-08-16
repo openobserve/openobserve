@@ -795,9 +795,6 @@ pub async fn values(
     };
     let trace_id = get_or_create_trace_id(&headers, &http_span);
 
-    // values are searched on the original data stream; when the queried field is a
-    // secondary index field, the query is automatically served by the tantivy
-    // index TopN/Distinct optimization (see IndexOptimizeMode).
     values_inner(
         &org_id,
         stream_type,
@@ -814,10 +811,8 @@ pub type FieldName = String;
 
 /// Builds a search request per field
 ///
-/// This function builds a search request per field based on the given request and parameters.
-/// The search always runs on the original data stream; when the queried field is a
-/// secondary index field, the query is automatically served by the tantivy index
-/// TopN/Distinct optimization (see IndexOptimizeMode).
+/// The search runs on the original data stream; secondary index fields are
+/// served by the tantivy TopN/Distinct optimization.
 ///
 /// The `no_count` parameter is used to determine if the count is needed or not.
 /// `no_count` is used when only distinct values (sorted in alphabetical order) are needed but not
@@ -984,13 +979,8 @@ pub async fn build_search_request_per_field(
     Ok(requests)
 }
 
-// Search values on the original data stream. When the queried field is a
-// secondary index field, the query is automatically served by the tantivy
-// index TopN/Distinct optimization (see IndexOptimizeMode).
-//
-// Historically this was "v1" (full stream search) next to a "v2" that read the
-// distinct_values_* streams; v2 and later the distinct stream switch itself were
-// removed, leaving this as the only implementation.
+// search values on the original data stream; secondary index fields are
+// served by the tantivy TopN/Distinct optimization
 async fn values_inner(
     org_id: &str,
     stream_type: StreamType,
