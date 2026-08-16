@@ -400,6 +400,153 @@ pub const RECOGNIZED_RECIPES: [&str; 11] = [
     "mariadb_index_stats",
 ];
 
+// ─── A1 · raw deadlock vocabulary (read-time fallback) ───────────────────────
+//
+// Rows ingested by an OSS build carry the RAW vendor fields and no `o2_dbm_*`
+// column at all: OSS stores a deadlock log line verbatim and canonicalizes
+// nothing (deadlocks are an Enterprise capability). An enterprise build reading
+// that history therefore sees zero deadlocks — measured on a real stream, 239
+// deadlock rows and 0 visible on the page.
+//
+// The read-time fallback closes that by ALSO projecting the raw columns and
+// canonicalizing those rows in Rust. Both halves of the vocabulary live here,
+// next to `ALL_DBM_FIELDS`, and NOT in the OSS read API, for the same reason
+// `ALL_DBM_FIELDS` does: the canonicalizers that consume these names are in
+// `o2_enterprise`, which cannot see the OSS crate. A copy on each side of the
+// repo boundary would drift silently, and the drift is invisible — a column
+// dropped from the projection does not error, it just makes that participant
+// blank.
+
+/// The three filelog markers that identify a deadlock row, and the value each
+/// must equal.
+///
+/// PHASE 1 IS pg/mysql/mariadb ONLY. SQL Server deadlocks are keyed on
+/// `o2_recipe = 'mssql_deadlock'` instead of an `o2_*_event` field, and its 9
+/// raw columns are absent from every stream that could be measured — so the
+/// arm has no fixture anywhere and shipping it would be shipping an untested
+/// projection into the one place (§the absent-column 400) where an untested
+/// projection takes the whole page down. `phase_one_ships_no_mssql_raw_columns`
+/// pins that as a decision.
+///
+/// Each marker is itself a COLUMN, so naming one in the widened `WHERE` on a
+/// stream that lacks it fails the entire query — they are schema-gated exactly
+/// like the projection.
+pub const DEADLOCK_MARKERS: [(&str, &str); 3] = [
+    ("o2_pg_event", KIND_DEADLOCK),
+    ("o2_my_event", KIND_DEADLOCK),
+    ("o2_maria_event", KIND_DEADLOCK),
+];
+
+/// Every RAW vendor column the phase-1 deadlock canonicalizers read.
+///
+/// This is the read-side mirror of `ALL_DBM_FIELDS`, and it carries the SAME
+/// hazard: naming a column absent from the stream schema fails the whole query
+/// with a 400 rather than yielding a null column. On a real OSS-ingested stream
+/// 3 of the MariaDB names below are absent (`maria_lock_mode`,
+/// `maria_lock_table`, `maria_lock_index`) because no MariaDB lock recipe ever
+/// ran there. So this array is a CANDIDATE list, always intersected with the
+/// stream schema before it reaches a projection — never emitted whole.
+///
+/// Derived by enumerating the keys the enterprise canonicalizers actually read
+/// (`canonicalize_pg_deadlock`, `canonicalize_innodb_deadlock`). The
+/// `every_raw_field_this_projects_is_read_by_a_canonicalizer` contract test in
+/// `o2_enterprise` pins the two together across the repo boundary — an entry
+/// here that no canonicalizer reads is projected bytes nobody consumes, and a
+/// key a canonicalizer reads that is missing here arrives absent and silently
+/// blanks that field on every fallback event.
+///
+/// The generic detection helpers' inputs (`detect_engine`, `detect_database`,
+/// `detect_instance`) are included: they are how a raw-derived event acquires
+/// the engine/instance/database the Rust-side scope filter and the MySQL stitch
+/// group on, so omitting them would leave every fallback event ungrouped and
+/// unfilterable.
+///
+/// `_timestamp` is deliberately NOT here — the builder emits it itself, and it
+/// is the one column DataFusion will not null-fill.
+pub const RAW_DEADLOCK_FIELDS: [&str; 57] = [
+    // ── Dispatch markers (also the widened WHERE's predicate columns) ──
+    "o2_pg_event",
+    "o2_my_event",
+    "o2_maria_event",
+    // ── Postgres DETAIL entry ──
+    "deadlock_victim_pid",
+    "pg_pid",
+    "dl_waiter_pid",
+    "dl_lock_mode",
+    "dl_lock_target",
+    "dl_p1",
+    "dl_waiter2_pid",
+    "dl_lock_mode2",
+    "dl_lock_target2",
+    "dl_p2",
+    "dl_query_1",
+    "dl_query_2",
+    "pg_app",
+    "pg_user",
+    "pg_txid",
+    "o2_deadlock_raw",
+    "pg_message",
+    // ── InnoDB, MySQL prefix ──
+    "my_trx_side",
+    "my_victim_side",
+    "my_trx_thread",
+    "my_trx_query",
+    "my_trx_user",
+    "my_trx_host",
+    "my_lock_mode",
+    "my_lock_table",
+    "my_lock_index",
+    "my_trx_id",
+    "my_message",
+    // ── InnoDB, MariaDB prefix ──
+    //
+    // Listed in FULL, not trimmed to what one measured stream happened to
+    // contain: on the rig 3 of these (`maria_lock_mode`, `maria_lock_table`,
+    // `maria_lock_index`) are absent from the schema, and the schema
+    // intersection is what handles that. Trimming the vocabulary instead would
+    // bake one deployment's shape into a shared constant.
+    "maria_trx_side",
+    "maria_victim_side",
+    "maria_trx_thread",
+    "maria_trx_query",
+    "maria_trx_user",
+    "maria_trx_host",
+    "maria_lock_mode",
+    "maria_lock_table",
+    "maria_lock_index",
+    "maria_trx_id",
+    "maria_message",
+    // ── Shared detection inputs ──
+    //
+    // These are not deadlock-specific, but they are how a raw-derived event
+    // acquires the `engine` / `database` / `instance` that the Rust-side scope
+    // filter narrows on and that `merge_mysql_deadlocks` groups on. Without
+    // them every fallback event is ungrouped and invisible to `?system=`.
+    //
+    // `detect_engine` additionally PREFIX-SCANS the record's own keys
+    // (`dl_`/`pg_`/`maria_`/`my_`), which works on a read row because a
+    // null-valued column is OMITTED from the JSON row rather than present as
+    // null — so a MySQL row never acquires the `dl_*` keys that would make it
+    // report "postgresql".
+    "db_system_name",
+    "db_system",
+    "o2_recipe",
+    "pg_db",
+    "datname",
+    "db_namespace",
+    "schema_name",
+    "my_db",
+    "database",
+    "server_address",
+    "net_peer_name",
+    "db_instance",
+    "host_name",
+    "instance",
+    // The InnoDB and MSSQL raw-body fallback, and the PG `raw` fallback. Last
+    // resort for `raw` on every arm.
+    "body",
+];
+
 /// The EXPLAIN document, stored as a JSON **string** (Invariant 2, module docs
 /// — a plan is a tree, and the deadlock path already paid for storing one
 /// nested). [`plan_of`] is its tolerant reader.
@@ -900,5 +1047,105 @@ mod tests {
         rec.insert("db_system_name".into(), json!("postgresql"));
         assert_eq!(detect_engine(&rec).as_deref(), Some("postgresql"));
         assert_eq!(as_i64_loose(&json!("7")), Some(7));
+    }
+
+    // ── A1 · the raw deadlock read-time fallback vocabulary ─────────────────
+
+    /// The raw list is a READ-side projection allowlist, and it must never
+    /// overlap the canonical one.
+    ///
+    /// The two are concatenated into one `SELECT` by the deadlocks read
+    /// (`api.rs` `build_dbm_events_sql`). An overlapping member would be named
+    /// TWICE in the same projection, which is a duplicate-column SQL error and
+    /// therefore a 400 on the whole page — the exact failure class this
+    /// vocabulary exists to prevent.
+    #[test]
+    fn raw_deadlock_fields_never_overlap_the_canonical_ones() {
+        use std::collections::HashSet;
+
+        let canonical: HashSet<&str> = ALL_DBM_FIELDS.into_iter().collect();
+        let overlap: Vec<&str> = RAW_DEADLOCK_FIELDS
+            .into_iter()
+            .filter(|f| canonical.contains(f))
+            .collect();
+        assert!(
+            overlap.is_empty(),
+            "a raw column that is also an ALL_DBM_FIELDS member would be projected twice \
+             in one SELECT and 400 the whole page: {overlap:?}"
+        );
+    }
+
+    /// The list must be free of duplicates for the same reason.
+    #[test]
+    fn raw_deadlock_fields_have_no_duplicates() {
+        use std::collections::HashSet;
+
+        let uniq: HashSet<&str> = RAW_DEADLOCK_FIELDS.into_iter().collect();
+        assert_eq!(
+            uniq.len(),
+            RAW_DEADLOCK_FIELDS.len(),
+            "a repeated member is projected twice in one SELECT"
+        );
+    }
+
+    /// `_timestamp` must NOT be a member.
+    ///
+    /// The builder emits it unconditionally as the first projected column, so a
+    /// member here duplicates it — and it is the ONE column DataFusion cannot
+    /// null-fill (OpenObserve rewrites it to `nullable = false` before
+    /// `with_schema`), so it is also the one column whose mishandling is a hard
+    /// exec error rather than a null.
+    #[test]
+    fn raw_deadlock_fields_exclude_the_timestamp_column() {
+        assert!(
+            !RAW_DEADLOCK_FIELDS.contains(&"_timestamp"),
+            "_timestamp is emitted by the builder itself and is non-nullable"
+        );
+    }
+
+    /// The three filelog markers are what DETECTS an un-canonicalized row, and
+    /// each is a real column the raw projection may name — so they are gated on
+    /// schema presence like everything else, and must be part of the raw
+    /// vocabulary.
+    #[test]
+    fn the_deadlock_marker_columns_are_part_of_the_raw_vocabulary() {
+        for (col, _) in DEADLOCK_MARKERS {
+            assert!(
+                RAW_DEADLOCK_FIELDS.contains(&col),
+                "marker column {col:?} is named in the widened WHERE, so it must also be \
+                 schema-gated through RAW_DEADLOCK_FIELDS"
+            );
+        }
+        let markers: Vec<&str> = DEADLOCK_MARKERS.iter().map(|(c, _)| *c).collect();
+        assert_eq!(
+            markers,
+            vec!["o2_pg_event", "o2_my_event", "o2_maria_event"],
+            "phase 1 ships pg/mysql/mariadb only — mssql has no test data anywhere"
+        );
+        for (_, val) in DEADLOCK_MARKERS {
+            assert_eq!(val, KIND_DEADLOCK);
+        }
+    }
+
+    /// MSSQL is deliberately ABSENT from phase 1.
+    ///
+    /// Its 9 raw columns are absent from every stream that could be measured, so
+    /// the arm would ship unexercised by any fixture. This test is the marker
+    /// that the omission is a decision, not an oversight: adding mssql means
+    /// deleting this test alongside a fixture that exercises it.
+    #[test]
+    fn phase_one_ships_no_mssql_raw_columns() {
+        let mssql: Vec<&str> = RAW_DEADLOCK_FIELDS
+            .into_iter()
+            .filter(|f| f.starts_with("mssql_"))
+            .collect();
+        assert!(
+            mssql.is_empty(),
+            "mssql raw columns are phase 2 — no fixture exercises them: {mssql:?}"
+        );
+        assert!(
+            !DEADLOCK_MARKERS.iter().any(|(c, _)| *c == "o2_recipe"),
+            "the o2_recipe/mssql_deadlock marker is phase 2"
+        );
     }
 }
