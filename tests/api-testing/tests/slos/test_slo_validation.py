@@ -85,7 +85,7 @@ def slo_cleanup(create_session, base_url, org_id):
     yield created
     for slo_id in created:
         try:
-            create_session.delete(f"{base_url}api/{org_id}/slos/{slo_id}")
+            delete_slo(create_session, base_url, org_id, slo_id)
         except Exception as exc:  # cleanup must never mask a test result
             logger.debug("cleanup failed for %s: %s", slo_id, exc)
 
@@ -150,6 +150,28 @@ def time_slice_definition(name, stream, comparator="<", threshold=500,
         "tags": ["api-test"],
         "enabled": True,
     }
+
+
+def delete_slo(session, base_url, org_id, slo_id, attempts=5, delay=0.5):
+    """DELETE an SLO, retrying a transient 5xx.
+
+    Observed once in CI under a 599-test run: deleting a freshly-created SLO
+    returned 500, which did not reproduce locally across 12 rapid iterations.
+    The single-node meta store is SQLite and serialises writers, so a 5xx here
+    reads as contention rather than a contract violation.
+
+    Used for SETUP deletes only. Where the delete IS the assertion, the status
+    is checked directly so a genuine regression still fails.
+    """
+    last = None
+    for attempt in range(attempts):
+        resp = session.delete(f"{base_url}api/{org_id}/slos/{slo_id}")
+        if resp.status_code < 500:
+            return resp
+        last = resp
+        logger.debug("delete returned %s, retrying (%s)", resp.status_code, attempt + 1)
+        time.sleep(delay * (attempt + 1))
+    return last
 
 
 def create_slo(session, base_url, org_id, definition, track=None):
@@ -492,8 +514,13 @@ def test_delete_then_second_delete_404s(create_session, base_url, org_id, slo_st
         create_session, base_url, org_id, count_definition(unique_name(), slo_stream))
     assert status == 200, message
 
-    assert create_session.delete(f"{base_url}api/{org_id}/slos/{slo_id}").status_code == 200
-    assert create_session.delete(f"{base_url}api/{org_id}/slos/{slo_id}").status_code == 404
+    # Setup: remove it. Retries a transient 5xx (see delete_slo).
+    first = delete_slo(create_session, base_url, org_id, slo_id)
+    assert first.status_code == 200, f"delete failed: {first.status_code} {first.text}"
+
+    # The contract under test: a second delete must 404, not report success.
+    second = create_session.delete(f"{base_url}api/{org_id}/slos/{slo_id}")
+    assert second.status_code == 404, f"expected 404, got {second.status_code}"
 
 
 def test_description_update_persists(create_session, base_url, org_id, slo_stream, slo_cleanup):
