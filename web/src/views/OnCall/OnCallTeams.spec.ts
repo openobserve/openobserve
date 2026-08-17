@@ -36,15 +36,25 @@ const stubs = {
   // draws rather than a column-def function OTable never calls.
   OTable: {
     name: "OTable",
-    props: ["data", "columns"],
+    props: ["data", "columns", "error"],
     template: `<div>
-      <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
-        <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
-      </div>
-      <slot name='empty' />
+      <slot v-if="error" name='error' />
+      <template v-else>
+        <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
+          <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
+        </div>
+        <slot name='empty' />
+      </template>
     </div>`,
   },
-  OEmptyState: { name: "OEmptyState", template: "<div />" },
+  // Renders its description and action so the error assertions test OUR
+  // wiring rather than the stub swallowing both.
+  OEmptyState: {
+    name: "OEmptyState",
+    props: ["description", "actionLabel"],
+    emits: ["action"],
+    template: `<div>{{ description }}<button @click="$emit('action')">{{ actionLabel }}</button></div>`,
+  },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
   OTooltip: { name: "OTooltip", template: "<span />" },
   OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
@@ -193,4 +203,20 @@ describe("OnCallTeams", () => {
       expect(wrapper.find('[data-test="confirm"]').exists()).toBe(false);
     });
   });
+  /// B8. A toast evaporates; what stayed on screen was "no teams" — the exact
+  /// look of an unconfigured org, on a failed read.
+  it("renders a failed load as an error with retry, never as an empty org", async () => {
+    service.listTeams.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("boom");
+
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    await wrapper.find('[data-test="oncall-teams-error"] button').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(false);
+  });
+
 });

@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <OTable
+        :error="loadError"
       :frame="false"
       :data="filteredTeams"
       :columns="columns"
@@ -106,6 +107,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
+      <template #error>
+        <OEmptyState
+          size="hero"
+          variant="error"
+          illustration="broken-panel"
+          :title="t('oncall.loadTeamsFailed')"
+          :description="loadError ? raw(loadError) : undefined"
+          :action-label="t('oncall.retry')"
+          data-test="oncall-teams-error"
+          @action="fetchTeams"
+        />
+      </template>
+
       <template #empty>
         <OEmptyState
           v-if="!loading"
@@ -165,6 +179,7 @@ const router = useRouter();
 
 const teams = ref<OnCallTeam[]>([]);
 const loading = ref(false);
+const loadError = ref<string | null>(null);
 const search = ref("");
 const formOpen = ref(false);
 const editingTeam = ref<OnCallTeam | null>(null);
@@ -231,11 +246,11 @@ async function fetchTeams() {
     const res = await oncallService.listTeams({ org_identifier: orgId.value });
     teams.value = res.data ?? [];
     await fetchOnCallNow();
+    loadError.value = null;
   } catch (err: any) {
-    toast({
-      variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.loadTeamsFailed"),
-    });
+    // The state, not a toast: a toast evaporates and leaves "no teams" on
+    // screen, which reads as an unconfigured org rather than a failed read.
+    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
   } finally {
     loading.value = false;
   }

@@ -267,4 +267,16 @@ describe("OnCallTeamDetail", () => {
 
     expect(wrapper.findComponent({ name: "OnCallTeamPulse" }).exists()).toBe(true);
   });
+  /// B8. With the load failed, the page below would render a team with no
+  /// members, no schedule and no policy — indistinguishable from one nobody
+  /// configured, on the screen whose job is "would a page land".
+  it("renders a failed load as an error page, not an unconfigured team", async () => {
+    service.getTeam.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-team-detail-error"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OnCallTeamPulse" }).exists()).toBe(false);
+  });
+
 });

@@ -56,6 +56,23 @@
       </OButton>
     </template>
 
+    <!-- A failed load must not fall through to the page below: with nothing
+         fetched it renders a team with no members, no schedule and no policy —
+         the exact look of a team somebody forgot to configure. -->
+    <OContent v-if="loadError" y>
+      <OEmptyState
+        size="hero"
+        variant="error"
+        illustration="broken-panel"
+        :title="t('oncall.loadTeamFailed')"
+        :description="raw(loadError)"
+        :action-label="t('oncall.retry')"
+        data-test="oncall-team-detail-error"
+        @action="fetchAll"
+      />
+    </OContent>
+
+    <template v-else>
     <!-- Who holds the pager, who catches it, how far the ladder reaches, and how
          last week went — the four questions asked before anything else on the
          page. The tabs below are where you go to CHANGE any of them. -->
@@ -334,6 +351,7 @@
         <OnCallOwnership :team-id="teamId" :teams="teams" />
       </OTabPanel>
     </OTabPanels>
+    </template>
 
     <OnCallTeamForm v-model:open="editOpen" :team="team" @saved="onTeamSaved" />
 
@@ -461,6 +479,7 @@ const ruleCount = ref(0);
 // because that is the question the page exists to answer.
 const activeTab = ref("members");
 const loaded = ref(false);
+const loadError = ref<string | null>(null);
 const editOpen = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
@@ -585,6 +604,7 @@ function onAttentionAct(tab: string) {
 }
 
 async function fetchAll() {
+  loadError.value = null;
   const org_identifier = orgId.value;
   const team_id = teamId.value;
   try {
@@ -609,10 +629,11 @@ async function fetchAll() {
     loaded.value = true;
     await Promise.allSettled([fetchRuleCount(), fetchPages(), fetchInsights(), fetchPreview()]);
   } catch (err: any) {
-    toast({
-      variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.loadTeamFailed"),
-    });
+    // The state, not a toast. With the load failed the page below renders a
+    // team with no members, no schedule and no policy — the exact look of a
+    // team somebody forgot to configure, on a screen whose job is to say
+    // whether a page would land.
+    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
   }
 }
 
