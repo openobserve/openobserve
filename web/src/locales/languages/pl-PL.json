@@ -11191,6 +11191,14 @@
         "assert": "Asercja",
         "screenshot": "Zrzut ekranu"
       },
+      "clickTypeLabel": "Typ kliknięcia",
+      "clickTypeHelp": "Kliknięcie prawym przyciskiem otwiera menu kontekstowe; podwójne kliknięcie wysyła dwa kliknięcia.",
+      "clickTypes": {
+        "left": "Lewy klik",
+        "right": "Prawy klik",
+        "middle": "Środkowy klik",
+        "double": "Podwójne kliknięcie"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Tekst do wpisania",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "Ukryj",
       "incognitoDescription": "Odtworzenia są uruchamiane w czystej sesji Incognito. Rozszerzenie Rejestrator OpenObserve wymaga zgody na działanie w trybie incognito.",
       "incognitoTitle": "Nie można otworzyć okna incognito",
+      "restoringState": "Przywracanie stanu — krok {done} z {total}",
+      "restoreFailed": "Nie udało się dotrzeć do punktu nagrywania — krok {step} nie powiódł się",
+      "restoreCancelledWindowClosed": "Nagrywanie anulowane — okno rejestratora zostało zamknięte",
+      "restoreFailedHint": "podróż nie może dotrzeć do wybranego punktu, dopóki ten krok nie zostanie ukończony",
+      "recordBeforeFailedStep": "Nagraj przed krokiem {step}",
+      "recordingHere": "Nagrywanie tutaj",
+      "recordBeforeStep": "Nagraj przed tym krokiem",
+      "recordBeforeStepHint": "Odtwórz podróż do tego punktu, a następnie nagraj nowe kroki przed nim.",
       "insertStepBelow": "Wstaw krok poniżej",
       "journeyHeading": "Podróż",
       "noSteps": "Brak kroków",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "Uruchom ponownie kroki 1–{step}",
       "fidelityLabel": "Podgląd nie mógł odtworzyć",
       "record": "Nagraj",
+      "recordedStepsAdded": "Dodano 1 krok — krok {first} | Dodano {count} kroków — kroki {first}–{last}",
       "recordJourney": "Nagraj podróż",
       "recording": "Nagrywanie",
       "recordingIncognitoInfo": "Nagrywanie w osobnym oknie incognito",

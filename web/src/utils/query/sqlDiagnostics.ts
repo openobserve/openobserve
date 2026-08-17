@@ -280,6 +280,31 @@ function has(set: Set<string>, ...keys: string[]): boolean {
   return keys.some((k) => set.has(k));
 }
 
+/**
+ * True when the LIKE/ILIKE/RLIKE operand closest to the error position is a
+ * bare (unquoted) wildcard pattern, e.g. `uri_path LIKE /api/%`.
+ *
+ * Only a pattern whose first character cannot continue an identifier (e.g.
+ * `LIKE BIN-%`) makes the parser stop on the `%` itself; `LIKE E00%` parses as
+ * the identifier `E00` followed by the modulo operator and fails on whatever
+ * token comes next, so the position alone cannot classify it.
+ *
+ * Quoted patterns, parenthesised expressions and function calls (`LIKE '%a%'`,
+ * `LIKE CONCAT(p, '%')`) are valid operands and never match: the operand must
+ * contain a `%` and no quote or parenthesis at all.
+ */
+function hasUnquotedLikePattern(sql: string, offset: number): boolean {
+  const head = sql.substring(0, offset);
+  let operandStart = -1;
+  for (const m of head.matchAll(/\b(?:I|R)?LIKE\s+/gi)) {
+    operandStart = (m.index ?? 0) + m[0].length;
+  }
+  if (operandStart < 0) return false;
+
+  const operand = sql.substring(operandStart).match(/^\S+/)?.[0] ?? "";
+  return /^[^\s'"`()]*%[^\s'"`()]*$/.test(operand);
+}
+
 // ─── Core message builder ─────────────────────────────────────────────────────
 
 /**
@@ -533,6 +558,13 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
 
   // found ","
   if (found === ",") return MSG.unexpectedComma(loc.line, loc.column);
+
+  // Unquoted LIKE pattern whose first character does not terminate the
+  // identifier — `x LIKE E00%` parses as the identifier E00 followed by the
+  // modulo operator, so the parser fails on a later token and the found === "%"
+  // check above never fires. Checked last, so it only reclassifies errors that
+  // would otherwise be suppressed.
+  if (hasUnquotedLikePattern(sql, offset)) return MSG.badLikePattern;
 
   // Unrecognised unexpected-token shape — suppress to avoid false positives
   return null;

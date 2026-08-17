@@ -11191,6 +11191,14 @@
         "assert": "Проверить",
         "screenshot": "Сделать скриншот"
       },
+      "clickTypeLabel": "Тип клика",
+      "clickTypeHelp": "Правый клик открывает контекстное меню; двойной клик отправляет два клика.",
+      "clickTypes": {
+        "left": "Левый клик",
+        "right": "Правый клик",
+        "middle": "Средний клик",
+        "double": "Двойной клик"
+      },
       "valueLabels": {
         "navigate": "URL",
         "type": "Текст для ввода",
@@ -11324,6 +11332,14 @@
       "hideStackTrace": "Скрыть",
       "incognitoDescription": "Повторы запускаются в чистом сеансе инкогнито. Расширению OpenObserve Recorder нужно разрешение на работу в режиме инкогнито.",
       "incognitoTitle": "Не удается открыть окно инкогнито",
+      "restoringState": "Восстановление состояния — шаг {done} из {total}",
+      "restoreFailed": "Не удалось достичь точки записи — шаг {step} не выполнен",
+      "restoreCancelledWindowClosed": "Запись отменена — окно рекордера было закрыто",
+      "restoreFailedHint": "путь не может достичь выбранной точки, пока этот шаг не пройден",
+      "recordBeforeFailedStep": "Записать перед шагом {step}",
+      "recordingHere": "Запись здесь",
+      "recordBeforeStep": "Записать перед этим шагом",
+      "recordBeforeStepHint": "Воспроизведите путь до этого момента, затем запишите новые шаги перед ним.",
       "insertStepBelow": "Вставить шаг ниже",
       "journeyHeading": "Сценарий",
       "noSteps": "Пока нет шагов",
@@ -11337,6 +11353,7 @@
       "reRunToHere": "Повторить шаги 1–{step}",
       "fidelityLabel": "Не удалось воспроизвести предпросмотр",
       "record": "Записать",
+      "recordedStepsAdded": "1 шаг добавлен — шаг {first} | Шагов добавлено: {count} — шаги {first}–{last}",
       "recordJourney": "Записать сценарий",
       "recording": "Запись",
       "recordingIncognitoInfo": "Запись в отдельном окне инкогнито",
