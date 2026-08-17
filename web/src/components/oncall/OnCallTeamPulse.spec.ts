@@ -280,8 +280,47 @@ describe("OnCallTeamPulse", () => {
 
     const silent = wrapper.find('[data-test="oncall-pulse-reach-silent"]');
     expect(silent.text()).toContain("P4, P5");
-    // Two paging rows plus the silent summary — never one row per priority.
+    // One detailed ladder, one line naming the ones that did not fit, one line
+    // for the silent ones — never one row per priority.
     expect(wrapper.findAll('[data-test^="oncall-pulse-reach-"]')).toHaveLength(3);
+  });
+
+  /// I11: the panel used to draw three ladders and drop the rest without a
+  /// word, so a reader seeing P1, P2 and P5 could not tell whether P3 was
+  /// absent, silent, or merely off the bottom — three different facts sharing
+  /// one blank space. Whatever does not fit is named.
+  it("names the paging priorities it had no room to draw", () => {
+    const wrapper = render({
+      overview: overview({
+        rungs: [
+          { priority: "P1", rungs: 3, pages_anyone: true, ends_with_whole_team: true },
+          { priority: "P2", rungs: 2, pages_anyone: true, ends_with_whole_team: false },
+          { priority: "P3", rungs: 1, pages_anyone: true, ends_with_whole_team: false },
+          { priority: "P4", rungs: 1, pages_anyone: true, ends_with_whole_team: false },
+        ],
+      }),
+    });
+
+    const more = wrapper.find('[data-test="oncall-pulse-reach-more"]');
+    expect(more.text()).toContain("P3, P4");
+    // Named as paging, never as silent: "also page" and "Pages nobody" are
+    // opposite findings and the whole point is telling them apart.
+    expect(more.text()).toContain("also page");
+    expect(wrapper.find('[data-test="oncall-pulse-reach-silent"]').exists()).toBe(false);
+  });
+
+  /// Nothing collapses when everything fits — a summary line for zero hidden
+  /// priorities is a row that says nothing.
+  it("draws no overflow line while every ladder fits", () => {
+    const wrapper = render({
+      overview: overview({
+        rungs: [
+          { priority: "P1", rungs: 3, pages_anyone: true, ends_with_whole_team: true },
+          { priority: "P2", rungs: 2, pages_anyone: true, ends_with_whole_team: false },
+        ],
+      }),
+    });
+    expect(wrapper.find('[data-test="oncall-pulse-reach-more"]').exists()).toBe(false);
   });
 
   /// Server-computed over the window, which is what makes it safe on a tile.

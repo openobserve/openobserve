@@ -139,6 +139,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
         </li>
+        <!-- The priorities that page, but did not fit. Dropping them silently
+             left a panel reading "P1, P2, P5" with no way to tell whether P3
+             was absent, silent, or merely not shown — three different facts
+             wearing one blank space. Named here, so the only thing missing is
+             their detail. -->
+        <li
+          v-if="hiddenReach.length"
+          class="col-span-2 grid grid-cols-subgrid items-baseline"
+          data-test="oncall-pulse-reach-more"
+        >
+          <span class="text-text-secondary text-2xs">{{ hiddenLabel }}</span>
+          <span class="text-text-secondary truncate text-xs">
+            {{ t("oncall.reachAlsoPage") }}
+          </span>
+        </li>
+
         <!-- Every priority that wakes nobody, on one row. Five separate
              "Pages nobody" lines is the same fact five times, and it pushed
              this panel past the height of the three beside it. -->
@@ -434,13 +450,28 @@ const silentLabel = computed<I18nText>(() =>
   raw(silentPriorities.value.map((entry) => entry.priority).join(", ")),
 );
 
-/// The ladders that actually fire, most urgent first. The silent summary takes
-/// the last slot when there is one, so it is never the row that falls off.
+const pagingPriorities = computed(() => reach.value.filter((entry) => entry.pages_anyone));
+
+/// The ladders that actually fire, most urgent first. The two summary lines —
+/// "these also page" and "these page nobody" — take the last rows when they are
+/// needed, so neither is the one that falls off the bottom.
 const visibleReach = computed<TeamRungSummary[]>(() => {
-  const paging = reach.value.filter((entry) => entry.pages_anyone);
-  const budget = silentPriorities.value.length ? MAX_REACH_ROWS - 1 : MAX_REACH_ROWS;
-  return paging.slice(0, Math.max(0, budget));
+  const paging = pagingPriorities.value;
+  const budget = MAX_REACH_ROWS - (silentPriorities.value.length ? 1 : 0);
+  // Everything fits, so nothing is collapsed and no summary row is spent.
+  if (paging.length <= budget) return paging;
+  // One row goes to naming what did not fit; the rest show their ladders.
+  return paging.slice(0, Math.max(0, budget - 1));
 });
+
+/// Priorities that page and were not drawn in full — named, never dropped.
+const hiddenReach = computed<TeamRungSummary[]>(() =>
+  pagingPriorities.value.slice(visibleReach.value.length),
+);
+
+const hiddenLabel = computed<I18nText>(() =>
+  raw(hiddenReach.value.map((entry) => entry.priority).join(", ")),
+);
 
 /// The instant after which this priority stops waking anybody.
 function nobodyAfter(entry: TeamRungSummary): I18nText {

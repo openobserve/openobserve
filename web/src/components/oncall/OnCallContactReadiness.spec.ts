@@ -111,6 +111,86 @@ describe("OnCallContactReadiness", () => {
     expect(wrapper.text()).toContain("no verified contact method is on file");
   });
 
+  /// I4: one reason that stops three people is one finding about the
+  /// deployment, not three findings about three people. Stated once with the
+  /// names it costs; the exact sentence stays on each row's verdict tooltip, so
+  /// nothing is lost by not printing it three times.
+  it("states a shared reason once and names who it stops", () => {
+    const wrapper = render(
+      reachability({
+        members: [
+          member({
+            user_email: "ana@o2.ai",
+            would_a_page_land: false,
+            deliverable_channels: [],
+            why_not: "no verified contact method is on file",
+          }),
+          member({
+            user_email: "bo@o2.ai",
+            would_a_page_land: false,
+            deliverable_channels: [],
+            why_not: "no verified contact method is on file",
+          }),
+        ],
+      }),
+    );
+
+    const cause = wrapper.find('[data-test="oncall-readiness-cause-0"]');
+    expect(cause.text()).toContain("no verified contact method is on file");
+    expect(cause.text()).toContain("ana@o2.ai, bo@o2.ai");
+    // Twice in the cause line, never a third and fourth time down the rows.
+    expect(wrapper.text().match(/no verified contact method is on file/g)).toHaveLength(1);
+  });
+
+  /// A reason only one person has IS a fact about that person — collapsing it
+  /// would move it away from the only name it describes.
+  it("leaves a reason only one person has on that person's row", () => {
+    const wrapper = render(
+      reachability({
+        members: [
+          member({
+            user_email: "ana@o2.ai",
+            would_a_page_land: false,
+            deliverable_channels: [],
+            why_not: "not a user of this org",
+          }),
+        ],
+      }),
+    );
+    expect(wrapper.find('[data-test="oncall-readiness-cause-0"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-readiness-row-ana@o2.ai"]').text()).toContain(
+      "not a user of this org",
+    );
+  });
+
+  /// With no transport, the banner IS the shared reason, and every unreachable
+  /// row is downstream of it — a cause line beneath it would be the same
+  /// sentence a second time.
+  it("does not restate the missing transport as a cause line", () => {
+    const wrapper = render(
+      reachability({
+        smtp_configured: false,
+        members: [
+          member({
+            user_email: "ana@o2.ai",
+            would_a_page_land: false,
+            deliverable_channels: [],
+            why_not: "this deployment has no SMTP transport configured",
+          }),
+          member({
+            user_email: "bo@o2.ai",
+            would_a_page_land: false,
+            deliverable_channels: [],
+            why_not: "this deployment has no SMTP transport configured",
+          }),
+        ],
+      }),
+    );
+    expect(wrapper.find('[data-test="oncall-readiness-cause-0"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-readiness-no-smtp"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("has no SMTP transport configured");
+  });
+
   it("says so when the team has no members", () => {
     const wrapper = render(reachability({ members: [] }));
     expect(wrapper.find('[data-test="oncall-readiness-empty"]').exists()).toBe(true);

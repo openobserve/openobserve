@@ -22,6 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   what this lists. Deliberately NOT "escalate to a sibling team": teams are a
   flat list with no hierarchy, and labelling a handoff that way would tell
   somebody they still hold a page they have just given away.
+
+  No test-page button here on purpose: this card lists the rooms a page is
+  mirrored to, and Contact readiness — the panel directly below, which answers
+  "would a page land, per person" — is where the one honest test belongs. Two
+  buttons with the same label, firing the same request, side by side, read as
+  two different tests.
 -->
 <template>
   <div
@@ -59,23 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </li>
     </ul>
 
-    <!-- The one honest "would this reach anybody" affordance the API offers.
-         `POST .../test-page` reports who it actually got to. -->
-    <OButton
-      variant="outline"
-      size="xs"
-      class="self-start"
-      :loading="testing"
-      data-test="oncall-reach-test-page"
-      @click="emit('test-page')"
-    >
-      {{ t("oncall.contactSendTest") }}
-    </OButton>
   </div>
 </template>
 
 <script setup lang="ts">
-import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 
@@ -83,12 +76,9 @@ withDefaults(
   defineProps<{
     /** `policy.destinations` — names of existing alert Destination rows. */
     destinations?: string[];
-    testing?: boolean;
   }>(),
-  { destinations: () => [], testing: false },
+  { destinations: () => [] },
 );
-
-const emit = defineEmits<{ (e: "test-page"): void }>();
 
 const { t } = useI18nTyped();
 </script>

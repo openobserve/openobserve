@@ -13,7 +13,7 @@
       <OTag
         v-if="loaded"
         type="oncallCoverage"
-        :value="(overview?.covered_now ?? onCallNow.length > 0) ? 'covered' : 'gap'"
+        :value="coverageState"
         size="sm"
         data-test="oncall-team-coverage"
       />
@@ -98,7 +98,11 @@
     </div>
 
     <OContent class="py-2">
-      <OnCallTeamAttention :risks="configRisks" @act="onAttentionAct" />
+      <OnCallTeamAttention
+        :risks="configRisks"
+        :reachability="reachability"
+        @act="onAttentionAct"
+      />
     </OContent>
 
     <!-- What the team HAS been doing, then the chain that decides it: when each
@@ -719,6 +723,33 @@ async function fetchPages() {
 const silentPriorities = computed(
   () => (overview.value?.rungs ?? []).filter((rung) => !rung.pages_anyone).length,
 );
+
+/// Rostered and reachable are two questions, and the chip used to answer only
+/// the first — a green `Covered` sat beside a panel reading "no page can be
+/// delivered to anyone", which tells the reader the team is fine at the exact
+/// moment it is not. Reachability is folded in: if everybody holding the pager
+/// right now would fail to receive a page, the team is rostered, not covered.
+///
+/// Silent when reachability did not load — an unanswered question is not a
+/// finding, and inventing one here would be the same lie in the other
+/// direction.
+const coverageState = computed<"covered" | "gap" | "unreachable">(() => {
+  const covered = overview.value?.covered_now ?? onCallNow.value.length > 0;
+  if (!covered) return "gap";
+
+  const verdicts = reachability.value?.members ?? [];
+  const holders = onCallNow.value
+    .map((slot) => slot.user_email?.toLowerCase())
+    .filter((email): email is string => !!email);
+  const known = holders
+    .map((email) => verdicts.find((member) => member.user_email.toLowerCase() === email))
+    .filter((member) => !!member);
+
+  // Only when the server actually judged the people on call, and judged every
+  // one of them unreachable: one reachable holder means a page still lands.
+  if (known.length && known.every((member) => !member.would_a_page_land)) return "unreachable";
+  return "covered";
+});
 
 /// `total` rather than `risks.length`: the server truncates the list it
 /// returns but reports the real count, and a badge that quietly under-reported

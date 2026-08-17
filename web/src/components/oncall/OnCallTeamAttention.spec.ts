@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
 import i18n from "@/locales";
-import type { ConfigRisk, ConfigRisks } from "@/ts/interfaces/oncall";
+import type { ConfigRisk, ConfigRisks, TeamReachability } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OBanner: { name: "OBanner", template: "<div><slot /><slot name='actions' /></div>" },
@@ -33,9 +33,26 @@ function risk(over: Partial<ConfigRisk> = {}): ConfigRisk {
   return { kind: "priority_pages_nobody", severity: "medium", message: "P4 pages nobody", ...over };
 }
 
-function render(risks: ConfigRisks | null, max?: number) {
+/// Only the field this banner reads: whether the deployment can send at all.
+function reachability(smtp: boolean): TeamReachability {
+  return {
+    team_id: "t",
+    team_name: "Payments",
+    smtp_configured: smtp,
+    members: [],
+    reachable: 0,
+    total: 0,
+    unreachable_members: [],
+  };
+}
+
+function render(risks: ConfigRisks | null, max?: number, reach?: TeamReachability) {
   return mount(OnCallTeamAttention, {
-    props: max === undefined ? { risks } : { risks, max },
+    props: {
+      risks,
+      ...(max === undefined ? {} : { max }),
+      ...(reach === undefined ? {} : { reachability: reach }),
+    },
     global: { plugins: [i18n], stubs },
   });
 }
@@ -90,6 +107,75 @@ describe("OnCallTeamAttention", () => {
     await wrapper.find(`[data-test="oncall-attention-cta-${kind}"]`).trigger("click");
 
     expect(wrapper.emitted("act")?.[0]).toEqual([tab]);
+  });
+
+  /// I4: with no transport configured, the server reports
+  /// `unreachable_on_rung` once per person per priority — eleven printings of
+  /// one deployment-level fact, which then drove a "+3 more" behind it. One
+  /// line, naming who it costs.
+  it("states a missing transport once and names who it affects", () => {
+    const wrapper = render(
+      {
+        team_id: "t",
+        horizon_days: 7,
+        total: 3,
+        risks: [
+          risk({
+            kind: "unreachable_on_rung",
+            severity: "high",
+            message: "ana@o2.ai is on the P1 ladder and no page can reach them — no SMTP",
+            user_email: "ana@o2.ai",
+          }),
+          risk({
+            kind: "unreachable_on_rung",
+            severity: "high",
+            message: "ana@o2.ai is on the P2 ladder and no page can reach them — no SMTP",
+            user_email: "ana@o2.ai",
+          }),
+          risk({
+            kind: "unreachable_on_rung",
+            severity: "high",
+            message: "bo@o2.ai is on the P1 ladder and no page can reach them — no SMTP",
+            user_email: "bo@o2.ai",
+          }),
+        ],
+      },
+      undefined,
+      reachability(false),
+    );
+
+    const rows = wrapper.findAll('[data-test="oncall-attention-unreachable_on_rung"]');
+    expect(rows).toHaveLength(1);
+    // The same person on two ladders is one person who cannot be paged.
+    expect(rows[0].text()).toContain("ana@o2.ai, bo@o2.ai");
+    // Nothing on this screen configures a transport, so there is no CTA to
+    // send somebody to a tab where every control is already correct.
+    expect(wrapper.find('[data-test="oncall-attention-cta-unreachable_on_rung"]').exists()).toBe(
+      false,
+    );
+    // Folded findings must not come back as an overflow count.
+    expect(wrapper.find('[data-test="oncall-attention-more"]').exists()).toBe(false);
+  });
+
+  /// A transport that exists makes each of these a fact about one person, and
+  /// the server's own sentence is what says which person and why.
+  it("keeps per-person findings apart when the transport is fine", () => {
+    const wrapper = render(
+      {
+        team_id: "t",
+        horizon_days: 7,
+        total: 2,
+        risks: [
+          risk({ kind: "unreachable_on_rung", message: "ana has no verified method" }),
+          risk({ kind: "unreachable_on_rung", message: "bo is not an org user" }),
+        ],
+      },
+      2,
+      reachability(true),
+    );
+    const text = wrapper.text();
+    expect(text).toContain("ana has no verified method");
+    expect(text).toContain("bo is not an org user");
   });
 
   /// The server truncates its own list but reports the true total, so a count

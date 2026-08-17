@@ -129,6 +129,82 @@ describe("OnCallTeamDetail", () => {
     expect(wrapper.findComponent({ name: "OTabPanels" }).props("modelValue")).toBe("policy");
   });
 
+  /// I5: rostered and reachable are two questions. A green `Covered` used to
+  /// sit in the header beside a panel reading "no page can be delivered to
+  /// anyone" — the chip answering the first question in a voice that sounded
+  /// like an answer to both.
+  describe("the coverage chip", () => {
+    function onCall(email: string) {
+      service.whoIsOnCall.mockResolvedValue({
+        data: [{ slot: "primary", user_email: email, rotation: "Weekdays" }],
+      } as any);
+    }
+
+    function verdict(email: string, lands: boolean) {
+      service.teamReachability.mockResolvedValue({
+        data: {
+          team_id: "team_1",
+          smtp_configured: lands,
+          members: [
+            {
+              user_email: email,
+              is_org_user: true,
+              mailbox_shaped: true,
+              channels: [],
+              deliverable_channels: lands ? ["email"] : [],
+              configured_but_unverified: [],
+              would_a_page_land: lands,
+            },
+          ],
+          reachable: lands ? 1 : 0,
+          total: 1,
+          unreachable_members: lands ? [] : [email],
+        },
+      } as any);
+    }
+
+    function chip(wrapper: ReturnType<typeof render>) {
+      return wrapper.find('[data-test="oncall-team-coverage"]').text();
+    }
+
+    it("says rostered, not covered, when no page would reach the holder", async () => {
+      onCall("ana@corp.com");
+      verdict("ana@corp.com", false);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(chip(wrapper)).toContain("Rostered, unreachable");
+    });
+
+    it("stays covered while the holder can actually be paged", async () => {
+      onCall("ana@corp.com");
+      verdict("ana@corp.com", true);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(chip(wrapper)).toContain("Covered");
+    });
+
+    /// An unanswered question is not a finding: reachability failing to load
+    /// must not paint the header red.
+    it("does not invent a verdict when reachability did not load", async () => {
+      onCall("ana@corp.com");
+      service.teamReachability.mockResolvedValue({ data: null } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(chip(wrapper)).toContain("Covered");
+    });
+
+    it("still reports a gap when nobody is on call at all", async () => {
+      verdict("ana@corp.com", false);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(chip(wrapper)).toContain("Nobody on call");
+    });
+  });
+
   it("ignores a tab the URL invented", async () => {
     routeParams.tab = "not-a-tab";
     const wrapper = render();

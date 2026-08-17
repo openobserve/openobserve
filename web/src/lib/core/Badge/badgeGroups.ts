@@ -170,14 +170,18 @@ export const BADGE_GROUPS = {
 
   // Whether a team would reach anybody if something broke right now.
   //
-  // Two values on purpose: with the escalation ladder no longer made of six
-  // slots to leave empty, the only coverage question left is binary.
+  // Rostered and reachable are two different questions, and a team can pass the
+  // first while failing the second — somebody is on the rota, and no transport
+  // exists to wake them. A green `Covered` beside "no page can be delivered to
+  // anyone" told the reader the team was fine, so the third value exists to say
+  // which half is true.
   oncallCoverage: {
     mode: "dot",
     shape: "pill",
     values: {
       covered: { variant: "success-soft", labelKey: "oncall.coverage_covered" },
       gap: { variant: "warning-soft", labelKey: "oncall.coverage_gap" },
+      unreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
     },
     fallback: { variant: "default-soft" },
   },

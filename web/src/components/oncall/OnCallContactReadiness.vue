@@ -45,12 +45,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- One `false` here explains every unreachable row beneath it, so it is
          said once at the top rather than repeated against each name. -->
     <OBanner
-      v-if="reachability && !reachability.smtp_configured"
+      v-if="transportMissing"
       variant="warning"
       data-test="oncall-readiness-no-smtp"
     >
       {{ t("oncall.contactNoTransport") }}
     </OBanner>
+
+    <!-- A reason that stops three people is one finding about the deployment,
+         not three findings about three people. Said once, with the names it
+         costs — each row keeps the server's exact sentence on its verdict, so
+         nothing is lost by not printing it three times.
+
+         Suppressed when the transport is missing: the banner above is already
+         that sentence, and every unreachable row is downstream of it. -->
+    <p
+      v-for="(cause, index) in sharedCauses"
+      :key="cause.reason"
+      class="text-text-secondary text-xs"
+      :data-test="`oncall-readiness-cause-${index}`"
+    >
+      {{ causeLine(cause) }}
+    </p>
 
     <p
       v-if="!members.length"
@@ -126,14 +142,75 @@ const members = computed<MemberReachability[]>(() =>
   ),
 );
 
+const transportMissing = computed(
+  () => !!props.reachability && !props.reachability.smtp_configured,
+);
+
+/// How many names a shared cause prints before it starts counting instead. A
+/// list of every unreachable member is the repetition this collapsing exists to
+/// remove, just moved onto one line.
+const MAX_NAMED = 3;
+
+interface SharedCause {
+  reason: string;
+  who: string[];
+}
+
+/// Reasons that stop more than one person. Grouped by the server's sentence
+/// verbatim — never by parsing it — so a deployment-level fact reported per
+/// member ("… is on the P1 ladder and no page can reach them") lands here as
+/// one finding rather than one per name.
+const sharedCauses = computed<SharedCause[]>(() => {
+  // The banner already IS the shared cause when there is no transport, and
+  // every unreachable row is downstream of it.
+  if (transportMissing.value) return [];
+
+  const byReason = new Map<string, string[]>();
+  for (const member of members.value) {
+    if (member.would_a_page_land || !member.why_not) continue;
+    const who = byReason.get(member.why_not) ?? [];
+    who.push(member.user_email);
+    byReason.set(member.why_not, who);
+  }
+  return [...byReason.entries()]
+    .filter(([, who]) => who.length > 1)
+    .map(([reason, who]) => ({ reason, who }));
+});
+
+const sharedReasons = computed(() => new Set(sharedCauses.value.map((cause) => cause.reason)));
+
+/// Whether this row's reason is already stated once above it — either by the
+/// missing-transport banner or by a shared-cause line.
+function isSharedCause(member: MemberReachability): boolean {
+  if (transportMissing.value) return true;
+  return !!member.why_not && sharedReasons.value.has(member.why_not);
+}
+
+function affectedLabel(who: string[]): I18nText {
+  const names = raw(who.slice(0, MAX_NAMED).join(", "));
+  return who.length > MAX_NAMED
+    ? t("oncall.contactAndMore", { names, count: who.length - MAX_NAMED })
+    : t("oncall.contactAffects", { names });
+}
+
+function causeLine(cause: SharedCause): I18nText {
+  return raw(`${cause.reason} · ${String(affectedLabel(cause.who))}`);
+}
+
 /// The channels that WOULD carry a page, or the reason none can. Never a bare
 /// list of every channel the enum knows about — that reads as capability.
+///
+/// A reason stated once above the list is not repeated here: three rows each
+/// carrying the same sentence was most of I4's eleven printings of one fact.
+/// The verdict tag keeps the server's exact words in its tooltip, so the
+/// per-person answer is still one hover away.
 function channelSummary(member: MemberReachability): I18nText {
   if (member.deliverable_channels.length) {
     return raw(
       member.deliverable_channels.map((channel) => String(t(`oncall.channel_${channel}`))).join(", "),
     );
   }
+  if (isSharedCause(member)) return t("oncall.contactNoChannel");
   return raw(member.why_not) || t("oncall.contactNoChannel");
 }
 </script>
