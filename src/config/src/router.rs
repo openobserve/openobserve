@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 32] = [
+const QUERIER_ROUTES: [(&str, usize); 34] = [
     ("config", 0),               // /config
     ("summary", 2),              // /api/{org_id}/summary
     ("organizations", 1),        // /api/organizations
@@ -48,8 +48,10 @@ const QUERIER_ROUTES: [(&str, usize); 32] = [
     ("chat_stream", 3),                       /* /api/{org_id}/ai/chat_stream
                                                * {label_name}/
                                                * values */
-    ("service_streams", 2), // /api/{org_id}/service_streams/...
-    ("node/list", 2),       // /api/_meta/node/list
+    ("discovery", 2),         // /api/{org_id}/discovery
+    ("annotation_queues", 2), // /api/{org_id}/annotation_queues/...
+    ("service_streams", 2),   // /api/{org_id}/service_streams/...
+    ("node/list", 2),         // /api/_meta/node/list
 ];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
@@ -161,6 +163,15 @@ mod tests {
         assert!(is_querier_route("/api/org1/service_streams/_correlate"));
         assert!(is_querier_route("/api/org1/service_streams/_grouped"));
 
+        // AI evaluation reads execute searches and must never fall through to
+        // the default ingester route.
+        assert!(is_querier_route("/api/org1/discovery"));
+        assert!(is_querier_route(
+            "/api/org1/annotation_queues/queue-1/items/item-1"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/annotation_queues/queue-1/items/item-1/reviews"
+        ));
         // Test trace detail routes
         assert!(is_querier_route(
             "/api/org1/default/traces/trace-id/details"
