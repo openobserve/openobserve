@@ -85,12 +85,12 @@ describe("DependencyImpactDialog", () => {
     expect(loadGraph).toHaveBeenCalled();
   });
 
-  it("destination focus: self lane + the alerts using it, no template lane", async () => {
+  it("destination focus: only the alerts lane (no self or destination lane)", async () => {
     mountDialog({ kind: "destination", name: "slack" });
     await flushPromises();
-    expect(document.querySelector('[data-test="dependency-impact-lane-destination"]')).toBeTruthy();
     expect(document.querySelector('[data-test="dependency-impact-lane-alert"]')).toBeTruthy();
-    // No template lane (upstream is not shown).
+    // Neither the removed self/focus lane nor a destinations lane is shown.
+    expect(document.querySelector('[data-test="dependency-impact-lane-destination"]')).toBeFalsy();
     expect(document.querySelector('[data-test="dependency-impact-lane-template"]')).toBeFalsy();
     expect(rowNames()).toEqual(
       expect.arrayContaining([
@@ -101,10 +101,11 @@ describe("DependencyImpactDialog", () => {
     );
   });
 
-  it("template focus: template → destinations → alerts grouped by destination", async () => {
+  it("template focus: destinations → alerts grouped by destination (no template lane)", async () => {
     mountDialog({ kind: "template", name: "tpl-http" });
     await flushPromises();
-    expect(document.querySelector('[data-test="dependency-impact-lane-template"]')).toBeTruthy();
+    // The self/template lane is gone; the flow starts at Destinations.
+    expect(document.querySelector('[data-test="dependency-impact-lane-template"]')).toBeFalsy();
     expect(document.querySelector('[data-test="dependency-impact-lane-destination"]')).toBeTruthy();
     // The alerts lane carries a box grouped by the destination.
     expect(document.querySelector('[data-test="dependency-impact-group-slack"]')).toBeTruthy();

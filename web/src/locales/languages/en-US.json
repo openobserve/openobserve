@@ -6488,8 +6488,6 @@
     "noMatches": "No matches.",
     "laneEmpty": "No alerts",
     "directOverrides": "Uses this template directly",
-    "sectionTemplate": "Template",
-    "sectionDestination": "Destination",
     "sectionDestinations": "Destinations",
     "sectionAlerts": "Alerts",
     "orphanTag": "Unused",

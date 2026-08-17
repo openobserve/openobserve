@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="open"
-    :size="isTemplateFocus ? 'xl' : 'md'"
+    :size="isTemplateFocus ? 'lg' : 'sm'"
     :max-height="86"
     @update:open="(v) => emit('update:open', v)"
   >
@@ -76,48 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div class="flex items-stretch justify-center gap-1" data-test="dependency-impact-flow">
-          <!-- Focus lane: this template / destination. -->
-          <section
-            class="flex max-w-72 min-w-0 flex-1 flex-col"
-            :data-test="`dependency-impact-lane-${focus.kind}`"
-          >
-            <div class="mb-1.5 flex items-center gap-1.5 px-1">
-              <OIcon :name="depKindIcon(focus.kind)" size="sm" :class="stageColor(focus.kind)" />
-              <span class="text-text-secondary text-2xs font-semibold tracking-wide uppercase">
-                {{
-                  focus.kind === "template"
-                    ? t("alert_dependencies.sectionTemplate")
-                    : t("alert_dependencies.sectionDestination")
-                }}
-              </span>
-            </div>
-            <div
-              class="border-border-default bg-surface-panel rounded-surface h-72 overflow-y-auto border p-1.5"
-            >
-              <div
-                v-if="focusNode"
-                class="rounded-default bg-surface-accent"
-                data-test="dependency-impact-self"
-              >
-                <DependencyEntityRow
-                  :node="focusNode"
-                  @open="openInNewTab"
-                  @delete="requestDelete"
-                />
-              </div>
-            </div>
-          </section>
-
           <!-- Destinations lane (template focus only). -->
           <template v-if="isTemplateFocus">
-            <OIcon
-              name="chevron-right"
-              size="md"
-              class="text-text-muted mt-8 shrink-0"
-              aria-hidden="true"
-            />
             <section
-              class="flex max-w-72 min-w-0 flex-1 flex-col"
+              class="flex max-w-96 min-w-0 flex-1 flex-col"
               data-test="dependency-impact-lane-destination"
             >
               <div class="mb-1.5 flex items-center gap-1.5 px-1">
@@ -158,17 +120,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </section>
+            <OIcon
+              name="chevron-right"
+              size="md"
+              class="text-text-muted mt-8 shrink-0"
+              aria-hidden="true"
+            />
           </template>
 
-          <!-- Alerts lane: a box per destination (the group). -->
-          <OIcon
-            name="chevron-right"
-            size="md"
-            class="text-text-muted mt-8 shrink-0"
-            aria-hidden="true"
-          />
+          <!-- Alerts lane: a box per destination (the group). Capped only in the
+               template (multi-lane) layout; on a destination it fills the width so
+               it lines up with the full-width search bar above. -->
           <section
-            class="flex max-w-72 min-w-0 flex-1 flex-col"
+            class="flex min-w-0 flex-1 flex-col"
+            :class="isTemplateFocus ? 'max-w-96' : ''"
             data-test="dependency-impact-lane-alert"
           >
             <div class="mb-1.5 flex items-center gap-1.5 px-1">
@@ -309,7 +274,7 @@ import useDependencyGraph, {
   depKindIcon,
   depKindColor,
 } from "@/composables/alerts/useDependencyGraph";
-import type { DepFocus, DepNode, DepNodeKind } from "@/composables/alerts/useDependencyGraph";
+import type { DepFocus, DepNode } from "@/composables/alerts/useDependencyGraph";
 
 const props = defineProps<{ open: boolean; focus: DepFocus }>();
 const emit = defineEmits<{
@@ -362,7 +327,6 @@ const impactLabel = computed(() => {
   );
   return t("alert_dependencies.impactTemplate", { destinations, alerts });
 });
-const stageColor = (kind: DepNodeKind) => depKindColor({ kind, orphan: false, missing: false });
 
 const nameMatches = (name: string) => {
   const term = search.value.trim().toLowerCase();
