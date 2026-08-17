@@ -308,6 +308,10 @@ impl TantivyResult {
                     if ascend && distinct_values.len() >= limit {
                         break;
                     }
+                    // null values are indexed as empty strings, skip them
+                    if term.is_empty() {
+                        continue;
+                    }
                     distinct_values.push(String::from_utf8(term.to_vec()).unwrap());
                 }
             }
@@ -318,6 +322,10 @@ impl TantivyResult {
                 while let Some((term, _)) = terms.next() {
                     if ascend && distinct_values.len() >= limit {
                         break;
+                    }
+                    // null values are indexed as empty strings, skip them
+                    if term.is_empty() {
+                        continue;
                     }
                     distinct_values.push(String::from_utf8(term.to_vec()).unwrap());
                 }
@@ -392,6 +400,38 @@ mod tests {
                 assert_eq!(candidates, vec![(70, 3), (80, 2)]);
             }
             other => panic!("expected SelectCandidates, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_handle_simple_distinct_skips_null_terms() {
+        use crate::index::{Condition, IndexCondition};
+
+        let mut schema_builder = tantivy::schema::SchemaBuilder::new();
+        let svc_field = schema_builder.add_text_field("svc", tantivy::schema::STRING);
+        let index = tantivy::index::Index::create_in_ram(schema_builder.build());
+        let mut writer = index.writer_with_num_threads(1, 15_000_000).unwrap();
+        // null values are indexed as empty strings (see tantivy_utils index_builder)
+        for svc in ["", "ziox", "", "ingress-nginx"] {
+            writer
+                .add_document(tantivy::doc!(svc_field => svc))
+                .unwrap();
+        }
+        writer.commit().unwrap();
+        let searcher = index.reader().unwrap().searcher();
+
+        let mut condition = IndexCondition::new();
+        condition.add_condition(Condition::All());
+        let result =
+            TantivyResult::handle_simple_distinct(&searcher, &condition, "svc", 10, true).unwrap();
+        match result {
+            TantivyResult::Distinct(values) => {
+                assert_eq!(
+                    values,
+                    HashSet::from(["ingress-nginx".to_string(), "ziox".to_string()])
+                );
+            }
+            other => panic!("expected Distinct, got {other:?}"),
         }
     }
 

@@ -190,6 +190,10 @@ describe("TraceDetails - Missing span_kind Field", () => {
 
     // Mock API to return data without span_kind
     globalThis.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+        () => HttpResponse.json(mockSpansWithoutSpanKind),
+      ),
       http.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
         async ({ request }) => {

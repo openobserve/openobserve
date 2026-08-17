@@ -17,6 +17,11 @@ import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import type { BrowserStep } from "@/types/synthetics";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+// The setup file installs these as the real messages, so a tooltip arrives resolved.
+// Asserting against the file rather than a copy-pasted sentence keeps a wording change
+// from failing a test about behaviour.
+import enUS from "@/locales/languages/en-US.json";
 
 // Set up i18n so OTable sub-components can use useI18n()
 const i18n = createI18n({
@@ -234,6 +239,134 @@ describe("JourneySteps", () => {
       // readonly defaults to false, so buttons should appear
       expect(wrapper.find('[data-test="synthetics-journey-step-insert-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="synthetics-journey-step-delete-btn"]').exists()).toBe(true);
+    });
+  });
+
+  // ── Locked (a replay or a restore is running) ──────────────────────
+  //
+  // Locked is not readonly. Readonly means the journey cannot be edited at all and
+  // the actions do not exist; locked means they exist and are unavailable *right
+  // now*. Hiding them said the wrong thing — the row appeared to lose capabilities
+  // it still has, and the cluster's width vanished with it.
+
+  describe("locked", () => {
+    function mountLocked(locked: boolean) {
+      return mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor", locked },
+        global: { stubs: STUBS },
+      }) as VueWrapper;
+    }
+
+    const ROW_ACTIONS = [
+      "synthetics-journey-step-record-before-btn",
+      "synthetics-journey-step-insert-btn",
+      "synthetics-journey-step-duplicate-btn",
+      "synthetics-journey-step-delete-btn",
+    ];
+
+    it("should keep the row actions on screen while locked", async () => {
+      wrapper = mountLocked(true);
+      await flushPromises();
+
+      for (const action of ROW_ACTIONS) {
+        expect(wrapper.find(`[data-test="${action}"]`).exists(), `${action} left the row`).toBe(
+          true,
+        );
+      }
+      // The cluster itself must not be hidden either — an invisible button is
+      // unreachable while still claiming its place, which is the worst of both.
+      expect(wrapper.find(".invisible").exists(), "the action cluster is still hidden").toBe(false);
+    });
+
+    it("should disable every row action while locked", async () => {
+      wrapper = mountLocked(true);
+      await flushPromises();
+
+      for (const action of ROW_ACTIONS) {
+        expect(
+          wrapper.find(`[data-test="${action}"]`).attributes("disabled"),
+          `${action} is still clickable`,
+        ).toBeDefined();
+      }
+    });
+
+    it("should leave the row actions alone when nothing is running", async () => {
+      wrapper = mountLocked(false);
+      await flushPromises();
+
+      // record-before stays disabled on the FIRST row by its own guardrail, so the
+      // second row is the one that proves the lock is not what disabled them.
+      const rows = wrapper.findAll('[data-test="synthetics-journey-step-insert-btn"]');
+      expect(rows[0].attributes("disabled")).toBeUndefined();
+    });
+  });
+
+  // ── Extension too old to restore ───────────────────────────────────
+  //
+  // The action promises a restore, so an extension that cannot perform one makes it
+  // unhonourable rather than merely slower: the capture would start on a browser that
+  // knows nothing about the prefix, and those steps cannot be filed at the anchor.
+
+  describe("canRecordFrom", () => {
+    /** The second row — the first carries its own disable, so it proves nothing here. */
+    function secondRowRecordBefore(w: VueWrapper) {
+      return w.findAll('[data-test="synthetics-journey-step-record-before-btn"]')[1];
+    }
+
+    function mountWithCapability(canRecordFrom: boolean) {
+      return mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor", canRecordFrom },
+        global: { stubs: STUBS },
+      }) as VueWrapper;
+    }
+
+    it("should disable record-before when the extension cannot restore", async () => {
+      wrapper = mountWithCapability(false);
+      await flushPromises();
+
+      expect(secondRowRecordBefore(wrapper).attributes("disabled")).toBeDefined();
+    });
+
+    it("should leave record-before available when the extension can restore", async () => {
+      wrapper = mountWithCapability(true);
+      await flushPromises();
+
+      expect(secondRowRecordBefore(wrapper).attributes("disabled")).toBeUndefined();
+    });
+
+    // The results-mode caller never passes the prop, and its rows are readonly anyway —
+    // defaulting to false would disable an action nobody had opted out of.
+    it("should treat the capability as present when the prop is omitted", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor" },
+        global: { stubs: STUBS },
+      }) as VueWrapper;
+      await flushPromises();
+
+      expect(secondRowRecordBefore(wrapper).attributes("disabled")).toBeUndefined();
+    });
+
+    /** The tooltip bodies on screen. Read as props: the bubble only renders once open. */
+    function tooltipContents(w: VueWrapper) {
+      return w.findAllComponents(OTooltip).map((c) => c.props("content"));
+    }
+
+    // Disabled, the button cannot say why on its own — a disabled control dispatches no
+    // pointer events, so the reason has to hang off the wrapper around it.
+    it("should explain the outdated extension rather than repeat the action hint", async () => {
+      wrapper = mountWithCapability(false);
+      await flushPromises();
+
+      const contents = tooltipContents(wrapper);
+      expect(contents).toContain(enUS.synthetics.journey.recordBeforeNeedsNewerExtension);
+      expect(contents).not.toContain(enUS.synthetics.journey.recordBeforeStepHint);
+    });
+
+    it("should describe what the action does when it can be honoured", async () => {
+      wrapper = mountWithCapability(true);
+      await flushPromises();
+
+      expect(tooltipContents(wrapper)).toContain(enUS.synthetics.journey.recordBeforeStepHint);
     });
   });
 
@@ -514,6 +647,69 @@ describe("JourneySteps", () => {
       // When name is empty, it should fall back to action label
       const text = wrapper.text();
       expect(text).toContain("Navigate");
+    });
+  });
+
+  // A right or double click is a `click` carrying two extra fields, so keying the
+  // label on the action alone showed the author a plain "Click" for all three.
+  describe("click type in the row label", () => {
+    const labelFor = async (over: Partial<BrowserStep>) => {
+      wrapper = mount(JourneySteps, {
+        props: { data: [makeStep({ name: "", ...over })], mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+      return wrapper.text();
+    };
+
+    it("names a right click and a double click as themselves", async () => {
+      expect(await labelFor({ button: "right" })).toContain("Right click");
+      expect(await labelFor({ clickCount: 2 })).toContain("Double click");
+    });
+
+    it("leaves a plain click reading as Click", async () => {
+      const text = await labelFor({});
+      expect(text).toContain("Click");
+      expect(text).not.toContain("Right click");
+      expect(text).not.toContain("Double click");
+    });
+  });
+
+  // ── Row status spine ─────────────────────────────────────────────
+  //
+  // The 4px left border is the list's one way of saying "look at this row". Asserted
+  // against the REAL OTable, not a stub: BrowserJourney's own tests check what
+  // `getRowStatusColor` RETURNS, which says nothing about whether the table renders it.
+  describe("row status color", () => {
+    it("should render the status spine on a row the callback colours", async () => {
+      const steps = [makeStep({ id: "a" }), makeStep({ id: "b" })];
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: steps,
+          mode: "editor",
+          getRowStatusColor: (row: any) =>
+            row.id === "b" ? "var(--color-status-info-text)" : undefined,
+        },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const marked = wrapper.findAll('[data-status-bar="true"]');
+      expect(marked.length, "the table rendered no status spine at all").toBe(1);
+    });
+
+    it("should render no spine when the callback returns nothing", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: [makeStep({ id: "a" })],
+          mode: "editor",
+          getRowStatusColor: () => undefined,
+        },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-status-bar="true"]').length).toBe(0);
     });
   });
 });

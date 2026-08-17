@@ -24,7 +24,7 @@ use axum::{
 };
 use chrono::Utc;
 use config::{
-    DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
+    META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{
             AgentSearchMode, Request, ResultSchemaResponse, SearchEventType,
@@ -35,7 +35,7 @@ use config::{
         sql::resolve_stream_names,
         stream::StreamType,
     },
-    utils::{base64, json, time::now_micros, util::DISTINCT_STREAM_PREFIX},
+    utils::{base64, json, time::now_micros},
 };
 use db::enrichment_table;
 use error_utils::map_error_to_http_response;
@@ -83,80 +83,6 @@ pub mod search_inspector;
 pub mod search_job;
 pub mod search_stream;
 pub mod utils;
-
-async fn can_use_distinct_stream(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    fields: &[String],
-    query: &config::meta::search::Query,
-    start_time: i64,
-) -> bool {
-    if !matches!(stream_type, StreamType::Logs | StreamType::Traces) {
-        return false;
-    }
-
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
-        .await
-        .unwrap_or_default();
-
-    if !stream_settings.enable_distinct_fields {
-        return false;
-    }
-
-    // all fields which are requested must be in the distinct stream
-    let all_fields_distinct = fields.iter().all(|f| {
-        if DISTINCT_FIELDS.contains(f) {
-            return true;
-        }
-        if f == "count" {
-            // count is reserved field from oo side, so if user has count field
-            // in original stream, it won't actually be in the distinct stream, so
-            // we need to fallback to normal search
-            return false;
-        }
-        stream_settings
-            .distinct_value_fields
-            .iter()
-            .any(|entry| entry.name == *f && entry.added_ts <= start_time)
-    });
-
-    // all the fields used in the query sent must be in the distinct stream
-    #[allow(deprecated)]
-    let query_fields: Vec<String> =
-        match search::sql::Sql::new(&(query.clone().into()), org_id, stream_type, None).await {
-            // if sql is invalid, we let it follow the original search and fail
-            Err(_) => return false,
-            Ok(sql) => {
-                // check if sql contains any filters from which field cannot be inferred.
-                // where clause can contain match_all and a valid field which is in distinct stream
-                // but since there is match_all, we cannot infer the field from the where clause
-                // so we need to return false
-                if sql.has_match_all {
-                    return false;
-                }
-                sql.columns.values().flatten().cloned().collect()
-            }
-        };
-
-    let all_query_fields_distinct = query_fields.iter().all(|f| {
-        if DISTINCT_FIELDS.contains(f) {
-            return true;
-        }
-        if f == "count" {
-            // count is reserved field from oo side, so if user has count field
-            // in original stream, it won't actually be in the distinct stream, so
-            // we need to fallback to normal search
-            return false;
-        }
-        stream_settings
-            .distinct_value_fields
-            .iter()
-            .any(|entry| entry.name == *f && entry.added_ts <= start_time)
-    });
-
-    all_fields_distinct && all_query_fields_distinct
-}
 
 /// SearchStreamData
 
@@ -307,7 +233,6 @@ pub async fn search(
             return map_error_to_http_response(&(e.into()), Some(trace_id));
         }
     };
-
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
         {
@@ -870,13 +795,7 @@ pub async fn values(
     };
     let trace_id = get_or_create_trace_id(&headers, &http_span);
 
-    // originally there was v1 which would to a full stream search
-    // and v2 which would do search on a distinct values stream iff
-    // the queried fields configured accordingly.
-    // Now we simply check if the fields in query are in the distinct stream or not,
-    // and change the search stream to the distinct stream, so we don't need any separate
-    // v2 fucntion.
-    values_v1(
+    values_inner(
         &org_id,
         stream_type,
         &stream_name,
@@ -892,21 +811,10 @@ pub type FieldName = String;
 
 /// Builds a search request per field
 ///
-/// This function builds a search request per field based on the given request and parameters.
-/// Search request can basically be of two types:
-///     1. Search on distinct values stream
-///     2. Search on original data stream
-/// If the field is a distinct field, we will search of the distinct values stream.
-/// Otherwise, we will search on the original data stream.
+/// The search runs on the original data stream; secondary index fields are
+/// served by the tantivy TopN/Distinct optimization.
 ///
-/// The `use_result_cache` parameter is used to determine the projection of the SQL query.
-/// This flag will toggle the resultant requests between streaming aggregations and result cache.
-/// By default, this function will produce an SQL which utilizes `Streaming Aggregations` to send
-/// the results to the client. The SQL will be a simple aggregation query in case streaming
-/// aggregations are used. If `use_result_cache` is set to true, the SQL projection will include a
-/// histogram which will allow the use of result cache.
-///
-/// Another parameter is `no_count` which is used to determine if the count is needed or not.
+/// The `no_count` parameter is used to determine if the count is needed or not.
 /// `no_count` is used when only distinct values (sorted in alphabetical order) are needed but not
 /// the frequency of the values. For example, Dashboards, where we show the values listed in
 /// alphabetical order.
@@ -991,7 +899,7 @@ pub async fn build_search_request_per_field(
         ..Default::default()
     };
 
-    let (sql_where, can_use_distinct_stream) = match req.filter.as_ref() {
+    let sql_where = match req.filter.as_ref() {
         None => {
             if !decoded_sql.is_empty() {
                 query.uses_zo_fn = functions::get_all_transform_keys(org_id)
@@ -1000,54 +908,27 @@ pub async fn build_search_request_per_field(
                     .any(|fn_name| decoded_sql.contains(&format!("{fn_name}(")));
 
                 // pick up where clause from sql
-                let sql_where_from_query = match pickup_where(&decoded_sql) {
+                match pickup_where(&decoded_sql) {
                     Ok(Some(v)) => format!("WHERE {v}"),
                     Ok(None) => "".to_string(),
                     Err(e) => {
                         return Err(Error::other(e));
                     }
-                };
-                let can_use_distinct_stream = can_use_distinct_stream(
-                    org_id,
-                    stream_name,
-                    stream_type,
-                    &fields,
-                    &query,
-                    start_time,
-                )
-                .await;
-                (sql_where_from_query, can_use_distinct_stream)
+                }
             } else {
-                ("".to_string(), false)
+                "".to_string()
             }
         }
         Some(v) => {
             if v.is_empty() {
-                ("".to_string(), false)
+                "".to_string()
             } else {
                 let columns = v.splitn(2, '=').collect::<Vec<_>>();
                 if columns.len() < 2 {
                     return Err(Error::other("Invalid filter format"));
                 }
                 let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
-                let sql_where = format!("WHERE {} IN ('{vals}')", columns[0]);
-
-                // Define the default_sql here
-                let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM \"{stream_name}\"");
-
-                query.sql = format!("{default_sql} {sql_where}");
-
-                let can_use_distinct_stream = can_use_distinct_stream(
-                    org_id,
-                    stream_name,
-                    stream_type,
-                    &fields,
-                    &query,
-                    start_time,
-                )
-                .await;
-
-                (sql_where, can_use_distinct_stream)
+                format!("WHERE {} IN ('{vals}')", columns[0])
             }
         }
     };
@@ -1068,24 +949,6 @@ pub async fn build_search_request_per_field(
         agent_options: None,
     };
 
-    let distinct_prefix = if can_use_distinct_stream {
-        format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
-    } else {
-        "".to_string()
-    };
-
-    let count_fn = if can_use_distinct_stream {
-        "SUM(count)".to_string()
-    } else {
-        "COUNT(*)".to_string()
-    };
-
-    let actual_stream_type = if can_use_distinct_stream {
-        StreamType::Metadata
-    } else {
-        stream_type
-    };
-
     let size = req.query.size;
     let mut requests = Vec::new();
     for field in fields {
@@ -1098,11 +961,11 @@ pub async fn build_search_request_per_field(
         };
         let sql = if no_count {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_key asc limit {size}"
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_key asc limit {size}"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_num desc limit {size}"
+                "SELECT \"{field}\" AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_num desc limit {size}"
             )
         };
 
@@ -1110,17 +973,15 @@ pub async fn build_search_request_per_field(
         req.query.size = size;
         req.query.from = 0;
         req.query.sql = sql;
-        requests.push((req, actual_stream_type, field));
+        requests.push((req, stream_type, field));
     }
 
     Ok(requests)
 }
 
-// If all fields requested in the query AND fields from the
-// sql query in the query are stored in distinct stream,
-// this will search on the distinct stream, otherwise
-// just search on the original data
-async fn values_v1(
+// search values on the original data stream; secondary index fields are
+// served by the tantivy TopN/Distinct optimization
+async fn values_inner(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -1281,17 +1142,6 @@ async fn values_v1(
         query_fn: query_fn.clone(),
         ..Default::default()
     };
-    // check if we can use the distinct stream for this query
-    let use_distinct_stream = can_use_distinct_stream(
-        org_id,
-        stream_name,
-        stream_type,
-        &fields,
-        &req_query,
-        start_time,
-    )
-    .await;
-
     let mut req = config::meta::search::Request {
         query: req_query,
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -1333,31 +1183,13 @@ async fn values_v1(
             sql_where.clone()
         };
 
-        let distinct_prefix;
-        let count_fn;
-        let actual_stream_type;
-
-        if use_distinct_stream {
-            distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
-            // if we are using distinct stream, we have already partially aggregated
-            // the counts, so we need to sum over that field
-            count_fn = "SUM(count)";
-            // distinct_values_* stream is metadata
-            actual_stream_type = StreamType::Metadata;
-        } else {
-            distinct_prefix = "".to_owned();
-            // for non-distinct fields, we need the actual count
-            count_fn = "COUNT(*)";
-            actual_stream_type = stream_type;
-        }
-
         let sql = if no_count {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC, zo_sql_key ASC"
+                "SELECT \"{field}\" AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC, zo_sql_key ASC"
             )
         };
         let mut req = req.clone();
@@ -1371,7 +1203,7 @@ async fn values_v1(
         let search_res = SearchService::cache::search(
             &trace_id,
             org_id,
-            actual_stream_type,
+            stream_type,
             Some(user_id.to_string()),
             &req,
             "".to_string(),

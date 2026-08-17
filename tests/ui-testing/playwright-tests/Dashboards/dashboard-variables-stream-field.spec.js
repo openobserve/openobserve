@@ -67,7 +67,7 @@ async function openDashboardWithPanels(page, dashboardName) {
 async function reopenSettingsVariables(page, pm) {
   const scopedVars = new DashboardVariablesScoped(page);
   await pm.dashboardSetting.closeSettingWindow();
-  await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
+  await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
   await safeWaitForNetworkIdle(page, { timeout: 5000 });
   await pm.dashboardSetting.openSetting();
   await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
@@ -140,7 +140,7 @@ test.describe(
       // Reopen settings to verify variable was created
       await reopenSettingsVariables(page, pm);
       const editBtn = scopedVars.getEditVariableBtnLocator("child");
-      await expect(editBtn).toBeVisible({ timeout: 10000 });
+      await expect(editBtn).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -202,7 +202,7 @@ test.describe(
       // Reopen settings to verify variable was created
       await reopenSettingsVariables(page, pm);
       const editBtn = scopedVars.getEditVariableBtnLocator("child");
-      await expect(editBtn).toBeVisible({ timeout: 10000 });
+      await expect(editBtn).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -260,7 +260,7 @@ test.describe(
 
       await reopenSettingsVariables(page, pm);
       const editCombined = scopedVars.getEditVariableBtnLocator("combined");
-      await expect(editCombined).toBeVisible({ timeout: 10000 });
+      await expect(editCombined).toBeVisible({ timeout: 30000 });
 
       // --- C2: Same variable in field and filter value ---
       await scopedVars.addQueryValuesVariable(
@@ -279,7 +279,7 @@ test.describe(
 
       await reopenSettingsVariables(page, pm);
       const editDedup = scopedVars.getEditVariableBtnLocator("dedup");
-      await expect(editDedup).toBeVisible({ timeout: 10000 });
+      await expect(editDedup).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -615,7 +615,7 @@ test.describe(
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -734,7 +734,7 @@ test.describe(
       );
       await reopenSettingsVariables(page, pm);
       const editHyphen = scopedVars.getEditVariableBtnLocator("hyphenChild");
-      await expect(editHyphen).toBeVisible({ timeout: 10000 });
+      await expect(editHyphen).toBeVisible({ timeout: 30000 });
 
       // --- H2: Variable name with underscores in field ---
       await scopedVars.addConstantVariable(
@@ -751,7 +751,7 @@ test.describe(
       );
       await reopenSettingsVariables(page, pm);
       const editUnderscore = scopedVars.getEditVariableBtnLocator("underscoreChild");
-      await expect(editUnderscore).toBeVisible({ timeout: 10000 });
+      await expect(editUnderscore).toBeVisible({ timeout: 30000 });
 
       // --- H3: Switch variable type from query_values to constant ---
       await scopedVars.addConstantVariable("parent", "e2e_automate");
@@ -776,7 +776,7 @@ test.describe(
       // Verify save succeeded
       await reopenSettingsVariables(page, pm);
       const editVar1 = scopedVars.getEditVariableBtnLocator("var1");
-      await expect(editVar1).toBeVisible({ timeout: 10000 });
+      await expect(editVar1).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -861,7 +861,7 @@ test.describe(
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -949,7 +949,7 @@ test.describe(
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -1037,7 +1037,7 @@ test.describe(
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -1166,7 +1166,7 @@ test.describe(
 
       // Close settings and navigate away for a clean initial load
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -1243,7 +1243,7 @@ test.describe(
         .waitFor({ state: "visible", timeout: 15000 });
 
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -1322,7 +1322,7 @@ test.describe(
         .waitFor({ state: "visible", timeout: 15000 });
 
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });

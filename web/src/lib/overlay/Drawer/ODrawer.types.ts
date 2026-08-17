@@ -148,6 +148,9 @@ export interface DrawerProps {
    * @default undefined  (portals to document.body with fixed positioning)
    */
   portalTarget?: string | HTMLElement | null;
+
+  /** Render the portal in place for a contained drawer surface. Default: false. */
+  inline?: boolean;
 }
 
 export interface DrawerEmits {

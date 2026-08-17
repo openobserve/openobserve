@@ -1581,7 +1581,7 @@
         ],
         "results": [
           [
-            "[\"scraping_pattern\",\"high_freq\"]",
+            "[\"credential_stuffing\"]",
             "2"
           ],
           [
@@ -1589,11 +1589,11 @@
             "2"
           ],
           [
-            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
+            "[\"scraping_pattern\",\"high_freq\"]",
             "2"
           ],
           [
-            "[\"credential_stuffing\"]",
+            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
             "2"
           ]
         ],
@@ -5944,31 +5944,31 @@
         ],
         "results": [
           [
-            "1786629600.0",
+            "1786709040.0",
             "0",
             "performanceMetric",
             "itemPage"
           ],
           [
-            "1786629636.0",
+            "1786709076.0",
             "36000000",
             "performanceMetric",
             "searchPage"
           ],
           [
-            "1786629654.0",
+            "1786709094.0",
             "54000000",
             "performanceMetric",
             "cartPage"
           ],
           [
-            "1786629660.0",
+            "1786709100.0",
             "0",
             "performanceMetric",
             "cartPage"
           ],
           [
-            "1786629672.0",
+            "1786709112.0",
             "12000000",
             "performanceMetric",
             "itemPage"
@@ -7435,13 +7435,13 @@
           [
             "ZONE-3",
             "CC-BETA",
-            "hybrid",
+            "manual",
             "SORT-X1"
           ],
           [
             "ZONE-3",
             "CC-BETA",
-            "manual",
+            "hybrid",
             "SORT-X1"
           ]
         ],

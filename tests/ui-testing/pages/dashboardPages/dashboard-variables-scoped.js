@@ -161,6 +161,9 @@ export default class DashboardVariablesScoped {
       await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     } catch { /* acceptable if timeout */ }
 
+    // Opening the dropdown mid-load is a silent no-op — see waitForVariableIdle.
+    await this.waitForVariableIdle(variableName);
+
     await varTrigger.click();
 
     // Wait for the variable's own inner popover to open
@@ -196,6 +199,10 @@ export default class DashboardVariablesScoped {
       selectedValue = await targetOption.textContent();
       selectedValue = selectedValue?.trim() || null;
     }
+
+    // Nothing may be mid-load when the value commits, or the dependent's reload is
+    // silently dropped and callers asserting on it see nothing — see waitForValuesQuiet.
+    await this.waitForValuesQuiet({ timeout: Math.max(10000, timeout) });
 
     // Click the specified option
     await targetOption.click();
@@ -309,11 +316,15 @@ export default class DashboardVariablesScoped {
 
   /**
    * Wait for add panel button (empty dashboard state)
+   *
+   * 30s to match setupTestDashboard(): renders only after the dashboard GET and
+   * variables init, well after the header createDashboard() waits on.
+   *
    * @param {Object} options - Wait options
-   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   * @param {number} options.timeout - Timeout in ms (default: 30000)
    */
   async waitForAddPanelBtn(options = {}) {
-    const { timeout = 10000 } = options;
+    const { timeout = 30000 } = options;
     await this.page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout });
   }
 
@@ -1636,22 +1647,142 @@ export default class DashboardVariablesScoped {
   }
 
   /**
+   * Block until the variable's in-flight load has finished.
+   *
+   * loadVariableOptions() early-returns while isLoading is true, so a click landing
+   * mid-load is silently dropped. Tracked via the OSpinner (role="status"); idle must
+   * HOLD, as a cascade can start a second load just after the first clears.
+   *
+   * @param {string} variableName - Variable name
+   * @param {Object} options - Wait options
+   * @param {number} options.quietMs - How long idle must hold (default: 1000)
+   * @param {number} options.timeout - Overall budget in ms (default: 30000)
+   */
+  async waitForVariableIdle(variableName, options = {}) {
+    const { quietMs = 1000, timeout = 30000 } = options;
+    const spinner = this.page.locator(
+      `[data-test="variable-selector-${variableName}"] [role="status"]`
+    );
+    const deadline = Date.now() + timeout;
+
+    while (Date.now() < deadline) {
+      await spinner
+        .first()
+        .waitFor({ state: "detached", timeout: Math.max(1000, deadline - Date.now()) })
+        .catch(() => {});
+
+      await this.page.waitForTimeout(quietMs);
+      if ((await spinner.count()) === 0) return;
+    }
+  }
+
+  /**
+   * Arm a wait for a `_values_stream` response, optionally filtered by field.
+   *
+   * The endpoint is a POST with no query string, so field matching reads
+   * request.postData(). Arm before the triggering action, await after; resolves to
+   * null instead of rejecting so callers can branch on "did it fire".
+   *
+   * @param {string[]|null} fields - Only match calls fetching one of these fields (null = any)
+   * @param {Object} options - Options
+   * @param {number} options.timeout - Timeout in ms (default: 30000)
+   * @returns {Promise<import('@playwright/test').Response|null>}
+   */
+  waitForValuesResponse(fields = null, options = {}) {
+    const { timeout = 30000 } = options;
+    return this.page
+      .waitForResponse((response) => {
+        if (!response.url().includes("_values_stream")) return false;
+        if (!fields) return true;
+        try {
+          const body = JSON.parse(response.request().postData() || "null");
+          return (body?.fields || []).some((f) => fields.includes(f));
+        } catch {
+          return false;
+        }
+      }, { timeout })
+      .catch(() => null);
+  }
+
+  /**
+   * Resolve once no `_values_stream` request has been in flight for `quietMs`.
+   *
+   * A cascade only queues when nothing is mid-load (canVariableLoad bails on isLoading).
+   * Counting in-flight requests covers every variable, unlike the parent's spinner
+   * (hidden while its dropdown is open) or a single response wait (can match a sibling).
+   * Decrements on `response`, not `requestfinished` — these are SSE streams.
+   *
+   * @param {Object} options - Options
+   * @param {number} options.quietMs - Required quiet period in ms (default: 1000)
+   * @param {number} options.timeout - Overall budget in ms (default: 20000)
+   * @returns {Promise<boolean>} true if quiet was reached, false if it timed out
+   */
+  async waitForValuesQuiet(options = {}) {
+    const { quietMs = 1000, timeout = 20000 } = options;
+    const isValues = (url) => url.includes("_values_stream");
+
+    let inFlight = 0;
+    let lastActivity = Date.now();
+
+    const onRequest = (request) => {
+      if (isValues(request.url())) {
+        inFlight++;
+        lastActivity = Date.now();
+      }
+    };
+    const onSettled = (reqOrRes) => {
+      if (isValues(reqOrRes.url())) {
+        inFlight = Math.max(0, inFlight - 1);
+        lastActivity = Date.now();
+      }
+    };
+
+    this.page.on("request", onRequest);
+    this.page.on("response", onSettled);
+    this.page.on("requestfailed", onSettled);
+
+    try {
+      const deadline = Date.now() + timeout;
+      while (Date.now() < deadline) {
+        if (inFlight === 0 && Date.now() - lastActivity >= quietMs) return true;
+        await this.page.waitForTimeout(100);
+      }
+      return false;
+    } finally {
+      this.page.off("request", onRequest);
+      this.page.off("response", onSettled);
+      this.page.off("requestfailed", onSettled);
+    }
+  }
+
+  /**
    * Change variable value and monitor dependent variable API calls
    * This function is designed for dependency tests where changing one variable
    * triggers API calls for dependent variables
    *
    * @param {string} variableName - Name of the variable to change
    * @param {Object} options - Configuration options
-   * @param {number} options.optionIndex - Index of option to select (default: 0 for first option)
+   * @param {number} options.optionIndex - Preferred index of option to select (default: 0).
+   *   Clamped into range, then advanced to the first option whose value differs from
+   *   the current selection — re-picking the current value does not cascade.
    * @param {number} options.expectedAPICalls - Expected number of dependent variable API calls (default: 1)
-   * @param {number} options.timeout - Timeout for API monitoring (default: 15000)
-   * @returns {Promise<Object>} - API monitoring result with actualCount, calls, success, etc.
+   * @param {number} options.timeout - Timeout for API monitoring, measured from the moment
+   *   the option is clicked (default: 15000)
+   * @param {string[]} options.dependentFields - Fields queried by the variables expected to
+   *   reload. When supplied, ONLY _values_stream calls for these fields are counted, so
+   *   `expectedAPICalls` means "number of dependent variables" and the parent's own
+   *   dropdown-open request is excluded from the tally.
+   * @param {number} options.optionsTimeout - Budget for the PARENT's own options to render
+   *   before selecting (default: 45000). Separate from `timeout` on purpose.
+   * @returns {Promise<Object>} - API monitoring result with actualCount, matchedCount, calls, success, etc.
    */
   async changeVariableValueAndMonitorDependencies(variableName, options = {}) {
     const {
       optionIndex = 0,
       expectedAPICalls = 1,
-      timeout = 15000
+      timeout = 15000,
+      dependentFields = null,
+      optionsTimeout = 45000
     } = options;
 
     // Dynamic import to avoid circular dependencies
@@ -1664,55 +1795,107 @@ export default class DashboardVariablesScoped {
     // Ensure network is idle before clicking
     await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
-    // Start monitoring for values stream API call BEFORE opening dropdown
-    const valuesStreamPromise = waitForValuesStreamComplete(this.page, timeout);
+    // Opening the dropdown while this variable's own load is still in flight is a
+    // silent no-op — see waitForVariableIdle.
+    await this.waitForVariableIdle(variableName);
 
-    // Start monitoring for dependent variable API calls BEFORE opening dropdown
-    // This ensures we capture any dependent variable updates
-    const apiMonitor = monitorVariableAPICalls(this.page, {
-      expectedCount: expectedAPICalls,
-      timeout: timeout
-    });
+    // Without dependentFields, keep the original semantics: monitor armed pre-open, so
+    // the parent's own request still counts toward expectedAPICalls.
+    let apiMonitor = dependentFields
+      ? null
+      : monitorVariableAPICalls(this.page, {
+          expectedCount: expectedAPICalls,
+          timeout: timeout
+        });
 
-    // Click dropdown trigger to open menu
-    await varDropdown.click();
-
-    // Wait for dropdown menu to open and stabilize — OSelect popover exposes
-    // data-test `${parentDataTest}-popover`. The selector forwards
-    // `variable-selector-<name>-inner` to OSelect, so the popover/options carry
-    // a `variable-selector-<name>-inner-*` prefix.
-    // We confirm the popover opened BEFORE awaiting the stream so we know the
-    // click landed. The stream wait can take time and a concurrent cascade
-    // re-render can detach the trigger (causing the portal to close via
-    // :hide-when-detached). We re-open if that happens.
+    // OSelect popover exposes data-test `${parentDataTest}-popover`. The selector
+    // forwards `variable-selector-<name>-inner` to OSelect, so the popover/options
+    // carry a `variable-selector-<name>-inner-*` prefix.
     const selectorDataTest = `variable-selector-${variableName}-inner`;
     const dropdownMenu = this.page.locator(`[data-test="${selectorDataTest}-popover"]`).first();
-    await dropdownMenu.waitFor({ state: "visible", timeout: 10000 });
-
-    // Wait for the values stream to complete loading options
-    try {
-      await valuesStreamPromise;
-    } catch (error) {
-      throw new Error(`Failed to load variable values for ${variableName}: ${error.message}`);
-    }
-
-    // If a concurrent cascade re-render closed the portal, re-open the dropdown.
-    const isPopoverVisible = await dropdownMenu.isVisible().catch(() => false);
-    if (!isPopoverVisible) {
-      await varDropdown.click();
-      await dropdownMenu.waitFor({ state: "visible", timeout: 10000 });
-    }
-
-    // Wait for options to be present in the dropdown
     const optionLocator = this.page.locator(`[data-test="${selectorDataTest}-option"]`);
-    await optionLocator.first().waitFor({ state: "visible", timeout: 10000 });
 
-    // Get the text of the target option before clicking
-    const targetOption = optionLocator.nth(optionIndex);
+    // Load the PARENT's own options first, on their own budget. Previously this awaited
+    // waitForValuesStreamComplete() on the SAME timeout as the dependency monitor; that
+    // reads the SSE body via CDP, never settles on deployed envs, and burned the whole
+    // budget before any option was clicked. waitForValuesResponse resolves on headers.
+    //
+    // Needs >= 2 options or the value cannot change and nothing cascades; freshly
+    // ingested values can lag, so reopen (forcing a new query) rather than accept one
+    // blank option.
+    const deadline = Date.now() + optionsTimeout;
+    let optionCount = 0;
+    while (Date.now() < deadline) {
+      if (!(await dropdownMenu.isVisible().catch(() => false))) {
+        // Arm the values wait BEFORE the click that triggers it, then await after.
+        const parentValues = this.waitForValuesResponse(null, {
+          timeout: Math.max(5000, deadline - Date.now())
+        });
+        await varDropdown.click();
+        await dropdownMenu.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+        await parentValues;
+      }
+      await optionLocator.first().waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+      optionCount = await optionLocator.count();
+      if (optionCount >= 2) break;
+
+      await this.page.keyboard.press('Escape');
+      await dropdownMenu.waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+      await this.waitForVariableIdle(variableName, { timeout: 10000 });
+    }
+
+    if (optionCount < 2) {
+      throw new Error(
+        `Variable "${variableName}" loaded ${optionCount} option(s) within ${optionsTimeout}ms; ` +
+        `at least 2 are needed to change its value and trigger a dependency reload.`
+      );
+    }
+
+    // Pick an option that actually CHANGES the value — re-selecting the current one does
+    // not cascade. Clamp the index, then walk forward to the first differing value.
+    // data-test-value exists only on virtualized rows, so fall back to text.
+    const currentValue = await varDropdown.getAttribute('data-test-selected-value').catch(() => null);
+    const optionValueAt = async (i) => {
+      const option = optionLocator.nth(i);
+      const value = await option.getAttribute('data-test-value').catch(() => null);
+      if (value !== null) return value;
+      const text = await option.textContent().catch(() => null);
+      return text ? text.trim() : null;
+    };
+
+    let targetIdx = Math.min(Math.max(optionIndex, 0), optionCount - 1);
+    for (let i = 0; i < optionCount; i++) {
+      const idx = (targetIdx + i) % optionCount;
+      if ((await optionValueAt(idx)) !== currentValue) {
+        targetIdx = idx;
+        break;
+      }
+    }
+
+    const targetOption = optionLocator.nth(targetIdx);
     const targetOptionText = await targetOption.textContent().then((t) => (t ? t.trim() : null)).catch(() => null);
 
-    if (!targetOptionText) {
-      throw new Error(`Could not find option at index ${optionIndex} in dropdown for variable: ${variableName}`);
+    // Nothing may still be loading when the new value is committed, or the cascade is
+    // silently dropped (see waitForValuesQuiet). Sibling variables on the dashboard can
+    // still be settling at this point, so gate on all values traffic being quiet rather
+    // than on this variable alone.
+    await this.waitForValuesQuiet({ timeout: Math.max(10000, Math.floor(optionsTimeout / 2)) });
+
+    // Arm before the click so we sync on the values API, not the DOM. The monitor counts
+    // how many dependents fired; this waiter makes the first one a deterministic signal.
+    const dependentResponse = dependentFields
+      ? this.waitForValuesResponse(dependentFields, { timeout })
+      : Promise.resolve(null);
+
+    // When dependentFields is supplied, start monitoring only now so the whole budget
+    // belongs to the cascade and the tally counts dependents rather than the parent's
+    // own request. (Otherwise the monitor was already armed above, pre-open.)
+    if (!apiMonitor) {
+      apiMonitor = monitorVariableAPICalls(this.page, {
+        expectedCount: expectedAPICalls,
+        timeout: timeout,
+        matchFn: (call) => dependentFields.includes(call.field)
+      });
     }
 
     // Click the target option
@@ -1722,15 +1905,19 @@ export default class DashboardVariablesScoped {
     await dropdownMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
 
     // Wait for any dependent variable API calls to complete
+    const firstDependentResponse = await dependentResponse;
     const apiResult = await apiMonitor;
 
     // Verify the value actually changed by checking the trigger's selected value
-    const currentValue = await varDropdown.getAttribute('data-test-selected-value').catch(() => '');
+    const currentValueAfter = await varDropdown.getAttribute('data-test-selected-value').catch(() => '');
 
     return {
       ...apiResult,
+      // True when a dependent variable actually re-queried after the change — the
+      // deterministic "the cascade happened" signal, independent of the call tally.
+      dependentResponded: firstDependentResponse !== null,
       selectedValue: targetOptionText,
-      currentValue: currentValue,
+      currentValue: currentValueAfter,
       variableName: variableName
     };
   }
@@ -2200,8 +2387,10 @@ export default class DashboardVariablesScoped {
   async verifyVariableHasOptions(variableName, options = {}) {
     const { timeout = 10000 } = options;
 
-    // Open variable dropdown via the OSelect trigger
+    // Open variable dropdown via the OSelect trigger. Gate on idle first: a click
+    // landing mid-load opens the popover but never fetches (see waitForVariableIdle).
     const selector = this.page.locator(`[data-test="variable-selector-${variableName}-inner-trigger"]`);
+    await this.waitForVariableIdle(variableName);
     await selector.click();
 
     // Wait for dropdown menu
@@ -2291,13 +2480,15 @@ export default class DashboardVariablesScoped {
    * @param {string} variableName - Variable name
    */
   async editVariable(variableName) {
+    // The row renders only after the drawer opens AND the dashboard fetch resolves,
+    // which under parallel load lands past 10s — use the same 30s as setupTestDashboard.
     const editBtn = this.page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`);
-    await editBtn.waitFor({ state: "visible", timeout: 10000 });
+    await editBtn.waitFor({ state: "visible", timeout: 30000 });
     await editBtn.click();
 
     // Wait for form to be visible
     const nameInput = this.page.locator(SELECTORS.VARIABLE_NAME);
-    await nameInput.waitFor({ state: "visible", timeout: 10000 });
+    await nameInput.waitFor({ state: "visible", timeout: 15000 });
   }
 
   /**

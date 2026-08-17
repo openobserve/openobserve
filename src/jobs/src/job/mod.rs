@@ -401,6 +401,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     _ = infra::db::tantivy_index::get_ttv_timestamp_updated_at().await;
     // check tantivy secondary index update time
     _ = infra::db::tantivy_index::get_ttv_secondary_index_updated_at().await;
+    if let Err(e) = infra::db::trace_time_index::initialize(
+        config::get_config().common.trace_time_index_enabled,
+    )
+    .await
+    {
+        log::warn!("failed to initialize trace time index coverage marker: {e}");
+    }
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]

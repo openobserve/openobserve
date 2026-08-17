@@ -13,43 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Cluster-coordinator events for the synthetics in-memory caches.
-//!
-//! Each node keeps its own copy of the synthetics configuration caches
-//! (`table::synthetics_checks`, `synthetics_locations`, `synthetics_probe_tokens`,
-//! `synthetics_agents`). A write only clears the cache on the node that
-//! performed it, so without a cross-node signal every other node keeps serving
-//! the old value until its TTL expires.
-//!
-//! This module is that signal, modelled on [`super::alerts`] and
-//! [`super::pipelines`]: writers call an `emit_*` function after committing to
-//! the database, and every node runs [`watch`], which invalidates the matching
-//! cache entry the moment the event arrives.
-//!
-//! # Key layout
-//!
-//! One watch prefix, with a `kind` segment so a single watcher serves all four
-//! caches:
-//!
-//! ```text
-//! /synthetics/check/{org_id}/{synthetics_id}   one check definition changed
-//! /synthetics/location/all                     the location registry changed
-//! /synthetics/token/{org_id}                   an org's probe tokens changed
-//! /synthetics/agent/{agent_id}                 one agent re-registered
-//! ```
-//!
-//! `location` and `token` events are coarse on purpose. Both back whole-set
-//! caches that are cheap to rebuild (tens of rows), so naming the exact row
-//! would add parsing for no benefit.
-//!
-//! # Why the handler lives here rather than being passed in
-//!
-//! [`super::alerts::watch_events`] takes callbacks because its handler lives in
-//! the `db` crate, which `infra` cannot reference. The synthetics caches are in
-//! `infra::table`, the same crate as this module, so [`watch`] calls the
-//! invalidation functions directly — same pattern, one less layer of
-//! indirection.
-
 use crate::{db::Event, errors::Error};
 
 pub const SYNTHETICS_WATCHER_PREFIX: &str = "/synthetics/";

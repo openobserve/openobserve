@@ -202,8 +202,16 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // webinar-dismiss: Inline text-link style for the webinar top bar banner dismiss button
   "webinar-dismiss": [
     "bg-transparent border-0 text-promo-webinar-link underline font-bold text-compact whitespace-nowrap",
-    "!h-auto !p-0",
+    "h-auto! p-0!",
     "enabled:hover:text-promo-webinar-link-hover",
+    "disabled:opacity-60",
+  ].join(" "),
+  // banner-dismiss: Inline text-link style for the actions inside an OBanner bar.
+  // Inherits the banner's own text color so it reads correctly on every variant.
+  "banner-dismiss": [
+    "bg-transparent border-0 text-inherit underline font-bold text-compact whitespace-nowrap",
+    "h-auto! p-0!",
+    "enabled:hover:opacity-80",
     "disabled:opacity-60",
   ].join(" "),
   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
