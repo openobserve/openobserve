@@ -30,7 +30,12 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
+import { hclLanguage } from "./hclLanguage";
 import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBlock.types";
+
+// highlight.js has no HCL grammar of its own, so `lang="hcl"` is registered here
+// — once per module, not per instance — and behaves like a built-in from then on.
+if (!hljs.getLanguage("hcl")) hljs.registerLanguage("hcl", hclLanguage);
 
 const { t } = useI18nTyped();
 
@@ -173,11 +178,18 @@ const onCopy = () => {
         </OButton>
       </div>
     </div>
+    <!-- `text-syntax-text!` — the `!` is load-bearing.
+         `highlight.js/styles/github-dark.css` is imported globally (by O2AIChat)
+         and its unlayered `.hljs { color }` beats anything in @layer utilities,
+         so without it every token hljs leaves unclassed renders in the dark
+         theme's pale grey, unreadable on the light syntax surface.
+         Tag and content stay on one line: Vue preserves whitespace inside
+         <pre>, so a newline here would indent the first line of code. -->
     <pre
       class="o2-code-pre"
       :class="wrap ? 'o2-code-pre--wrap' : ''"
       :style="preStyle"
-    ><code class="hljs text-syntax-text" v-html="highlighted"></code></pre>
+    ><code class="hljs text-syntax-text!" v-html="highlighted"></code></pre>
   </div>
 </template>
 
