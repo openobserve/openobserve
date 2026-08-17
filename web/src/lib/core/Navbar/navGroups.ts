@@ -62,7 +62,8 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
  *     Billings, AI, IAM, Management).
  *   • link + subnav — a tile that navigates to a main page on click AND surfaces
  *     a section nav on hover. Produced by NAV_GROUPS (Reliability → /alerts,
- *     Data → /streams, Dashboards → /dashboards) and by any NAV_SUBNAV entry.
+ *     Data → /streams, Dashboards → /dashboards, Infra → /traces/databases) and
+ *     by any NAV_SUBNAV entry.
  *   • pure group    — a flyout with no page of its own (click toggles it).
  *     Supported by the renderer but not emitted by any current entry.
  *
@@ -75,9 +76,13 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
  */
 
 /**
- * A rail group: a tile that gathers several destinations under one label.
- * Clicking the tile navigates to `parentLink` (its first/primary destination)
- * and hovering reveals the full submenu — i.e. it renders as a link+subnav tile.
+ * A rail group: a tile that gathers destinations under one label. Clicking the
+ * tile navigates to `parentLink` (its first/primary destination) and hovering
+ * reveals the full submenu — i.e. it renders as a link+subnav tile.
+ *
+ * Two shapes: a COLLAPSING group folds existing top-level tiles into itself
+ * (`absorbs`), while a `standalone` group introduces a new rail section for
+ * pages that never had a tile of their own.
  */
 export interface NavGroupDef {
   key: string;
@@ -96,6 +101,26 @@ export interface NavGroupDef {
    */
   placeAfter?: string;
   pinBottom?: boolean;
+  /**
+   * Emit this group even though it absorbs nothing and may hold a single child.
+   *
+   * Normally a group must absorb ≥1 present rail item and keep ≥2 children,
+   * because it EXISTS to fold items that already have their own tiles — a
+   * one-item flyout would just duplicate the tile it replaced. Infra is the
+   * other shape: it is a NEW rail section that introduces a home for pages
+   * which never had a top-level tile, so there is nothing to absorb and, until
+   * a second section lands beside Database Monitoring, nothing to fold.
+   *
+   * Deliberately opt-in per group rather than a relaxed global rule: the ≥2
+   * rule still protects every collapsing group from degenerating into a
+   * pointless flyout when its members are hidden.
+   *
+   * This does NOT bypass `requires` filtering — a standalone group whose
+   * children all filter out still emits nothing (see `groupNavLinks`), and a
+   * group whose children are all `gate`d out is dropped by ONavGroup so the
+   * rail never shows a tile with an empty flyout.
+   */
+  standalone?: boolean;
 }
 
 export const NAV_GROUPS: NavGroupDef[] = [
@@ -201,6 +226,67 @@ export const NAV_GROUPS: NavGroupDef[] = [
     ],
   },
   {
+    key: "infra",
+    titleKey: "menu.infra",
+    icon: "dns",
+    // The tile lands on Database Monitoring — today its only destination, and
+    // the one that stays correct as the section grows, since a new Infra page
+    // would be added after it rather than in front of it.
+    parentLink: "/traces/databases",
+    // Nothing to absorb: Infra is a NEW rail section, not a fold of existing
+    // tiles. Database Monitoring only ever lived inside the Traces flyout, so
+    // no top-level item disappears when Infra appears — hence `standalone`,
+    // which is also what lets it render as a single-child group for now.
+    absorbs: [],
+    standalone: true,
+    // Directly after Traces. Infra reads the same telemetry from the
+    // infrastructure side that Traces reads from the request side, so the two
+    // sit together; and this is where a user who knew Database Monitoring as a
+    // Traces flyout child will look for it first.
+    placeAfter: "traces",
+    children: [
+      // Moved here from the Traces flyout. The routes are always registered
+      // (the guard redirects when the feature is off), so the `gate` is what
+      // keeps the link out of the menu — and, because it is Infra's only child,
+      // what keeps the Infra TILE off the rail entirely (ONavGroup renders
+      // nothing when no child survives gating).
+      //
+      // ONE entry, not two: Databases and Top queries are two views of the same
+      // dataset over the same scope, so they are in-page tabs (DbmSectionTabs)
+      // rather than sibling destinations. Two flat rail children implied two
+      // unrelated pages and made the scope look like it reset between them.
+      // `activeOnRoutes` keeps this entry lit on the tab routes and on the
+      // query detail page, which are not nav children of their own.
+      {
+        titleKey: "menu.databases",
+        icon: "database",
+        name: "dbmDatabases",
+        gate: "databaseMonitoring",
+        // EVERY in-page tab, not just the first two. Deadlocks and Blocked
+        // queries are DbmSectionTabs destinations with no nav child of their
+        // own, so omitting them unlit the Databases entry the moment the user
+        // opened either tab — the nav said they had left the section they were
+        // still standing in.
+        //
+        // The last three are enterprise-only and their route guards bounce an
+        // OSS reader to `dbmDatabases`, so on that build these entries simply
+        // never match — this list only decides WHICH ROUTE keeps the entry lit,
+        // never whether a route is reachable. Keeping them unconditional keeps
+        // one list for both builds; the gate lives in the route, as it does for
+        // the section itself.
+        activeOnRoutes: [
+          "dbmQueries",
+          "dbmSamples",
+          "dbmQueryDetail",
+          "dbmActivity",
+          "dbmDeadlocks",
+          "dbmBlocking",
+          "dbmTableHealth",
+        ],
+      },
+    ],
+  },
+  {
     key: "experience",
     titleKey: "menu.experience",
     icon: "devices",
@@ -254,43 +340,15 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       name: "traces",
       tab: "services-catalog",
     },
-    // Database Monitoring aggregates the database spans already inside these
-    // traces, so it belongs on this flyout rather than on a rail tile of its
-    // own. The routes are always registered (the guard redirects when the
-    // feature is off), so the `gate` is what keeps the link out of the menu.
+    // Databases is NOT here — it moved to the Infra group (see NAV_GROUPS).
+    // It sat on this flyout while Database Monitoring was read as a view over
+    // the database spans inside these traces. It is not: it reads the database
+    // server's own statistics, so it stands up without a single trace and is a
+    // destination for a DBA who never opens Traces. Filing it under Traces made
+    // it findable only by someone already looking at request traffic.
     //
-    // ONE entry, not two: Databases and Top queries are two views of the same
-    // dataset over the same scope, so they are in-page tabs (DbmSectionTabs)
-    // rather than sibling destinations. Two flat rail children implied two
-    // unrelated pages and made the scope look like it reset between them.
-    // `activeOnRoutes` keeps this entry lit on the tab routes and on the query
-    // detail page, which are not nav children of their own.
-    {
-      titleKey: "menu.databases",
-      icon: "database",
-      name: "dbmDatabases",
-      gate: "databaseMonitoring",
-      // EVERY in-page tab, not just the first two. Deadlocks and Blocked
-      // queries are DbmSectionTabs destinations with no nav child of their
-      // own, so omitting them unlit the Databases entry the moment the user
-      // opened either tab — the nav said they had left the section they were
-      // still standing in.
-      //
-      // The last three are enterprise-only and their route guards bounce an OSS
-      // reader to `dbmDatabases`, so on that build these entries simply never
-      // match — this list only decides WHICH ROUTE keeps the entry lit, never
-      // whether a route is reachable. Keeping them unconditional keeps one
-      // list for both builds; the gate lives in the route, as it does for the
-      // section itself.
-      activeOnRoutes: [
-        "dbmQueries",
-        "dbmQueryDetail",
-        "dbmActivity",
-        "dbmDeadlocks",
-        "dbmBlocking",
-        "dbmTableHealth",
-      ],
-    },
+    // Traces keeps its flyout regardless — Traces / Service Graph / Service
+    // Catalog remain three views of the same trace data.
   ],
 };
 
@@ -307,17 +365,26 @@ export function groupNavLinks(
 ): RailEntry[] {
   const presentNames = new Set(links.map((l) => l.name));
 
-  // Activate a group only when it has ≥1 present absorbed item AND ≥1 child
-  // (after `requires` filtering). `router.hasRoute`/`gate` filtering of children
-  // happens later, in the component.
+  // Activate a COLLAPSING group only when it has ≥1 present absorbed item AND
+  // ≥2 children (after `requires` filtering): such a group exists to fold tiles
+  // that already stand on their own, so with nothing absorbed there is no fold
+  // to make, and with one child the flyout would merely duplicate its own tile.
+  //
+  // A `standalone` group is the other shape — a new rail section whose pages
+  // never had a top-level tile (Infra). It absorbs nothing by definition and
+  // may legitimately hold a single child, so it only has to keep ≥1 child.
+  // `router.hasRoute`/`gate` filtering of children happens later, in the
+  // component, which drops the whole tile when nothing survives.
   const groupChildren = new Map<string, SubnavChild[]>();
   const absorbedToGroup = new Map<string, NavGroupDef>();
   for (const def of NAV_GROUPS) {
     const children = def.children.filter((c) => !c.requires || presentNames.has(c.requires));
     const hasAbsorbed = def.absorbs.some((n) => presentNames.has(n));
-    // A single-child "group" is pointless (the flyout would duplicate the tile),
-    // so only collapse into a group when ≥2 children remain after filtering.
-    if (children.length < 2 || !hasAbsorbed) continue;
+    if (def.standalone) {
+      if (children.length === 0) continue;
+    } else if (children.length < 2 || !hasAbsorbed) {
+      continue;
+    }
     groupChildren.set(def.key, children);
     for (const n of def.absorbs) absorbedToGroup.set(n, def);
   }
@@ -335,9 +402,15 @@ export function groupNavLinks(
   // it. The anchor is a top-level item `name` or another group's `key`; it only
   // counts when that item is present / that group is active, so a group whose
   // anchor never materialises falls back to default placement.
+  //
+  // Iterate NAV_GROUPS, not the absorbed-item map: a `standalone` group absorbs
+  // nothing and so never appears in that map, and `placeAfter` is the ONLY
+  // placement it has — missing it here would drop it to the safety-net append at
+  // the foot of the rail. The `groupChildren` guard already skips inactive
+  // groups, so this is identical to the old iteration for collapsing groups.
   const anchorExists = (anchor: string) => presentNames.has(anchor) || groupChildren.has(anchor);
   const emitAfter = new Map<string, string[]>();
-  for (const def of absorbedToGroup.values()) {
+  for (const def of NAV_GROUPS) {
     if (!groupChildren.has(def.key)) continue;
     if (def.placeAfter && anchorExists(def.placeAfter)) {
       const list = emitAfter.get(def.placeAfter) ?? [];

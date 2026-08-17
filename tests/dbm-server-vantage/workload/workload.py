@@ -617,15 +617,56 @@ THREADS = [
 
 if __name__ == "__main__":
     log("workload starting:", ", ".join(n for n, _ in THREADS))
-    ts = []
-    for name, fn in THREADS:
+
+    # SUPERVISED START — NOT STYLE, THIS IS THE `mssql_*`-ZERO-ROWS BUG FIX.
+    #
+    # Every worker calls its driver's connect() once, at function entry, OUTSIDE
+    # the retrying `loop()` body. So a connect() that raises kills the thread for
+    # the lifetime of the container, permanently and silently: the process stays
+    # up (the supervisor loop below is the main thread), the container stays
+    # "healthy", and only the periodic "alive; threads: N / 12" line records it.
+    #
+    # That is exactly what happened on 2026-08-17T03:55:28. The compose stack was
+    # recreated and the workload won the race against Docker's embedded DNS, so
+    # all ELEVEN database threads died within 2s of start:
+    #   psycopg2.OperationalError: could not translate host name "postgres" ...
+    #   ... Name or service not known            (x198 across pg/mysql/maria/mssql)
+    # Only `redis` survived, because redis-py resolves lazily inside the loop.
+    # The stack then ran for 44 minutes at "threads: 1 / 12" emitting NO database
+    # traffic at all, while every container reported healthy — and MSSQL was the
+    # engine where that showed up as total absence, because unlike PG/MySQL its
+    # recipes are the ONLY source of `mssql_*` rows (there is no native mssql
+    # receiver in the pipeline, just sqlquery/mssql_blocking + _deadlocks, both of
+    # which can only return rows while the workload is actively holding a lock).
+    #
+    # `depends_on: condition: service_healthy` does NOT prevent this: it gates on
+    # the DB containers, not on the workload's own DNS resolver being ready.
+    # So supervise instead of trusting a one-shot start — restart any worker that
+    # dies, and the transient-DNS case self-heals within one 30s tick.
+    live: dict[str, threading.Thread] = {}
+
+    def spawn(name, fn):
         t = threading.Thread(target=fn, name=name, daemon=True)
         t.start()
-        ts.append(t)
+        live[name] = t
+
+    for name, fn in THREADS:
+        spawn(name, fn)
         time.sleep(0.5)
+
     try:
         while True:
             time.sleep(30)
-            log("alive; threads:", sum(1 for t in ts if t.is_alive()), "/", len(ts))
+            dead = [n for n, f in THREADS if not live[n].is_alive()]
+            for name in dead:
+                fn = dict(THREADS)[name]
+                log(f"[supervisor] thread {name} is dead — restarting")
+                spawn(name, fn)
+            log(
+                "alive; threads:",
+                sum(1 for t in live.values() if t.is_alive()),
+                "/",
+                len(THREADS),
+            )
     except KeyboardInterrupt:
         STOP.set()

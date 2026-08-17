@@ -89,17 +89,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </p>
 
-    <div class="mt-px flex flex-wrap gap-1.5">
+    <!-- The per-side copy is ICON-ONLY, and that is the whole resolution of the
+         two-Copy problem. This column's statement and the incident summary
+         below are genuinely different payloads, so neither capability can be
+         dropped — but two adjacent buttons both reading "Copy" made the user
+         choose between labels that did not distinguish them. Exactly ONE
+         labelled Copy survives (the incident summary, on the fix band); this
+         one keeps its function and states its scope in a tooltip, where it
+         cannot compete for the same word. -->
+    <div class="mt-px flex flex-wrap items-center gap-1.5">
       <OButton
         v-for="action in actions"
         :key="action.id"
         variant="outline"
-        size="sm"
+        :size="action.iconOnly ? 'icon-sm' : 'sm'"
         :icon-left="action.icon"
         :data-test="`${dataTest}-${action.id}`"
         @click="emit('action', action.id)"
       >
-        {{ action.label }}
+        <template v-if="!action.iconOnly">{{ action.label }}</template>
+        <OTooltip v-if="action.iconOnly" side="bottom" :content="action.label" />
       </OButton>
     </div>
   </div>
@@ -111,6 +120,7 @@ import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { DeadlockParticipant } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
@@ -126,6 +136,17 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ (e: "action", id: string): void }>();
+
+/**
+ * One row action. `iconOnly` is what keeps a second "Copy" off this column —
+ * the label survives as the tooltip rather than as competing button text.
+ */
+interface DbmDeadlockSideAction {
+  id: string;
+  icon: IconName;
+  label: I18nText;
+  iconOnly?: boolean;
+}
 
 const { t } = useI18nTyped();
 
@@ -170,10 +191,18 @@ const rawLock = computed<I18nText | null>(() => {
  * they would silently copy an empty string or navigate to a 400. The engine
  * decides how much it tells us, so this genuinely varies per participant.
  */
-const actions = computed<{ id: string; icon: IconName; label: I18nText }[]>(() => {
-  const out: { id: string; icon: IconName; label: I18nText }[] = [];
+const actions = computed<DbmDeadlockSideAction[]>(() => {
+  const out: DbmDeadlockSideAction[] = [];
   if (props.participant.query) {
-    out.push({ id: "copy", icon: "content-copy", label: t("dbm.deadlocks.detail.copy") });
+    // Icon-only: see the template. Its label becomes the tooltip, and it names
+    // the SCOPE ("this side's statement") rather than repeating the bare verb
+    // the incident-summary button already owns.
+    out.push({
+      id: "copy",
+      icon: "content-copy",
+      label: t("dbm.deadlocks.detail.copySqlTooltip"),
+      iconOnly: true,
+    });
     out.push({
       id: "top-queries",
       icon: "filter-list",

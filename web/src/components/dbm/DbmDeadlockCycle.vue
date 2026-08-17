@@ -177,11 +177,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`${dataTest}-ask-ai`"
         @click="emit('ask-ai')"
       />
-      <!-- Labelled by PAYLOAD, not destination. This sits beside a per-side
-           "Copy SQL", and "Copy for Slack" named where to paste rather than
-           what you get — leaving two adjacent buttons that both read as
-           "Copy". The tooltip states the scope difference the labels alone
-           cannot carry. -->
+      <!-- The ONE labelled Copy in this view. It used to say "Copy for Slack",
+           naming a destination rather than the payload, while a per-side
+           "Copy SQL" sat inches away — two buttons competing for the same verb
+           with neither label settling which one you wanted. The per-side action
+           is icon-only now (see DbmDeadlockSide), so this button can be plain
+           "Copy" and its tooltip carries the scope: the whole incident. -->
       <OButton
         variant="primary"
         size="sm"
@@ -191,7 +192,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="emit('copy-summary')"
       >
         {{ t("dbm.deadlocks.detail.copyForSlack") }}
-        <OTooltip side="top" :content="t('dbm.deadlocks.detail.copyForSlackHint')" />
+        <!-- `bottom`, matching the identically-shaped Copy button on Query
+             detail and the rest of the DBM toolbar controls. Both render the
+             bare label "Copy" and explain the payload on hover, so opening on
+             opposite sides made one control read as two. -->
+        <OTooltip side="bottom" :content="t('dbm.deadlocks.detail.copyForSlackHint')" />
       </OButton>
     </div>
   </div>

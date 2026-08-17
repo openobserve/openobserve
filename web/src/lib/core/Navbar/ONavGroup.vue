@@ -37,7 +37,10 @@ const openGroupKey = moduleRef<string | null>(null);
  *
  * The flyout mirrors the target page's own section nav: same labels, icons and
  * category grouping. Children navigate by route `name` and are gated by
- * `router.hasRoute` so feature-gated sub-pages never show a dead link. It is
+ * `router.hasRoute` plus their `gate` predicate so feature-gated sub-pages never
+ * show a dead link — and when NO child survives that filtering, the tile itself
+ * does not render (see `hasVisibleChildren`), so a fully-gated section leaves no
+ * empty tile behind. It is
  * teleported to <body> (escapes the rail's overflow clip), styled like O2's
  * native dropdown, and positioned flush against the rail's right edge.
  */
@@ -120,6 +123,16 @@ const visibleChildren = computed(() =>
     return true;
   }),
 );
+
+// A group with no surviving child is not a group — it is an empty tile that
+// opens nothing. `open()` already refuses to show an empty flyout, which on its
+// own leaves a dead tile the user can click into a page they are not entitled
+// to. Suppressing the whole tile is what makes a `gate` on the LAST child gate
+// the section itself: Infra holds only Database Monitoring, so on a build with
+// `database_monitoring_enabled` off, Infra must vanish rather than sit there
+// inert. Collapsing groups reach this too — every child hidden means the tile
+// has nothing left to offer.
+const hasVisibleChildren = computed(() => visibleChildren.value.length > 0);
 
 // Flatten into render rows, inserting a category header whenever the category
 // changes (mirrors the sub-page's grouped section nav). Items with no category
@@ -394,6 +407,7 @@ function onChildMouseenter(event: MouseEvent) {
 
 <template>
   <div
+    v-if="hasVisibleChildren"
     ref="wrapperRef"
     :data-test="`nav-group-${groupKey}`"
     class="nav-group relative shrink-0"
