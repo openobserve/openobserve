@@ -37,6 +37,7 @@ use rayon::slice::ParallelSliceMut;
 use tokio::sync::mpsc;
 
 mod storage;
+mod tsid_series_index;
 mod wal;
 
 type Context = (SessionContext, Arc<Schema>, ScanStats, bool);

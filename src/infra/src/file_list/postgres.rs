@@ -18,7 +18,7 @@ use std::{collections::HashMap as stdHashMap, sync::LazyLock as Lazy};
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
 use config::{
-    RwHashSet, get_config,
+    FileFormat, RwHashSet, get_config,
     meta::stream::{
         FileKey, FileListBookKeepMode, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats,
         StreamType,
@@ -542,7 +542,19 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .inc();
 
         let cfg = get_config();
-        let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
+        // Size-split TSID-major files carry their share of the logical
+        // uncompressed input size in `original_size`. That value can be much
+        // larger than the physical file target, so include all files while a
+        // closed hour is being converted. The compactor recognizes an hour
+        // made entirely of finalized TSID-major files and leaves it alone.
+        let max_size = if stream_type == StreamType::Metrics
+            && cfg.compact.metrics_tsid_major_enabled
+            && cfg.common.file_format.for_stream(stream_type) == FileFormat::Parquet
+        {
+            i64::MAX
+        } else {
+            cfg.compact.max_file_size as i64 * 95 / 100
+        };
         let sql = r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list

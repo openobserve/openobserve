@@ -22,9 +22,12 @@ use config::{
     FileFormat,
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
-    meta::stream::{
-        FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
-        StreamType,
+    meta::{
+        promql::{format_tsid_major_file_name, is_tsid_major_file_name, to_tsid_series_index_name},
+        stream::{
+            FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StorageType,
+            StreamType,
+        },
     },
     metrics,
     utils::{
@@ -60,6 +63,33 @@ use tokio::{
 };
 
 use super::worker::{MergeBatch, MergeSender};
+
+fn metrics_tsid_major_enabled(stream_type: StreamType) -> bool {
+    let cfg = get_config();
+    stream_type == StreamType::Metrics
+        && cfg.compact.metrics_tsid_major_enabled
+        && cfg.common.file_format.for_stream(stream_type) == FileFormat::Parquet
+}
+
+fn needs_tsid_layout_rewrite(stream_type: StreamType, files: &[FileKey]) -> bool {
+    if !metrics_tsid_major_enabled(stream_type) {
+        return false;
+    }
+    files.iter().any(|file| {
+        FileFormat::from_extension(&file.key) != Some(FileFormat::Parquet)
+            || !is_tsid_major_file_name(&file.key)
+    })
+}
+
+/// Return true once a closed metrics hour already consists entirely of valid
+/// size-bounded TSID-major files. Re-running the hour-end job must not merge
+/// those files again: their record-batch boundaries already implement the
+/// configured logical original-size target.
+fn is_finalized_size_split_tsid_major(stream_type: StreamType, files: &[FileKey]) -> bool {
+    metrics_tsid_major_enabled(stream_type)
+        && !files.is_empty()
+        && !needs_tsid_layout_rewrite(stream_type, files)
+}
 
 /// Generate merging job by stream
 /// 1. get offset from db
@@ -469,13 +499,29 @@ pub async fn merge_by_stream(
             #[cfg(not(feature = "enterprise"))]
             let skip_group_files = false;
 
-            if files_with_size.len() <= 1 && !skip_group_files {
+            // A closed metrics hour must be globally sorted before writing
+            // size-based TSID-major files. The writer applies
+            // ZO_COMPACT_MAX_FILE_SIZE to logical original size at
+            // record-batch boundaries; using it here as an input-group limit
+            // would sort only fragments.
+            let finalize_tsid_major_hour =
+                metrics_tsid_major_enabled(stream_type) && !is_incremental && !skip_group_files;
+
+            if finalize_tsid_major_hour
+                && is_finalized_size_split_tsid_major(stream_type, &files_with_size)
+            {
+                return Ok(vec![]);
+            }
+
+            let rewrite_single_tsid_layout = files_with_size.len() == 1
+                && needs_tsid_layout_rewrite(stream_type, &files_with_size);
+            if files_with_size.len() <= 1 && !skip_group_files && !rewrite_single_tsid_layout {
                 return Ok(vec![]);
             }
 
             // group files need to merge
             let mut batch_groups = Vec::new();
-            if skip_group_files {
+            if skip_group_files || finalize_tsid_major_hour {
                 batch_groups.push(MergeBatch {
                     batch_id: 0,
                     org_id: org_id.clone(),
@@ -520,7 +566,11 @@ pub async fn merge_by_stream(
                 // NOT seal this remainder: more files will arrive in the still-open hour, and
                 // sealing now would force re-merging it later (write amplification). Carry it
                 // to the next round; the scheduled hour-end pass seals whatever is left.
-                if new_file_list.len() > 1 && !is_incremental {
+                if !is_incremental
+                    && (new_file_list.len() > 1
+                        || (new_file_list.len() == 1
+                            && needs_tsid_layout_rewrite(stream_type, &new_file_list)))
+                {
                     batch_groups.push(MergeBatch {
                         batch_id: batch_groups.len(),
                         org_id: org_id.clone(),
@@ -691,7 +741,9 @@ pub async fn merge_files(
     #[cfg(not(feature = "enterprise"))]
     let is_match_downsampling_rule = false;
 
-    if files_with_size.len() <= 1 && !is_match_downsampling_rule {
+    let rewrite_single_tsid_layout =
+        files_with_size.len() == 1 && needs_tsid_layout_rewrite(stream_type, files_with_size);
+    if files_with_size.len() <= 1 && !is_match_downsampling_rule && !rewrite_single_tsid_layout {
         return Ok((Vec::new(), Vec::new()));
     }
 
@@ -699,11 +751,14 @@ pub async fn merge_files(
     let mut new_compressed_file_size = 0;
     let mut new_file_list = Vec::new();
     let cfg = get_config();
+    let merge_complete_tsid_major_batch =
+        metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
     for file in files_with_size.iter() {
         if (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
             || new_compressed_file_size + file.meta.compressed_size
                 > cfg.compact.max_file_size as i64)
             && !is_match_downsampling_rule
+            && !merge_complete_tsid_major_batch
         {
             break;
         }
@@ -719,7 +774,9 @@ pub async fn merge_files(
             .inc_by(file.meta.original_size as u64);
     }
     // no files need to merge
-    if new_file_list.len() <= 1 && !is_match_downsampling_rule {
+    let rewrite_single_tsid_layout =
+        new_file_list.len() == 1 && needs_tsid_layout_rewrite(stream_type, &new_file_list);
+    if new_file_list.len() <= 1 && !is_match_downsampling_rule && !rewrite_single_tsid_layout {
         return Ok((Vec::new(), Vec::new()));
     }
 
@@ -735,7 +792,9 @@ pub async fn merge_files(
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
-    if new_file_list.len() <= 1 && !is_match_downsampling_rule {
+    let rewrite_single_tsid_layout =
+        new_file_list.len() == 1 && needs_tsid_layout_rewrite(stream_type, &new_file_list);
+    if new_file_list.len() <= 1 && !is_match_downsampling_rule && !rewrite_single_tsid_layout {
         return Ok((Vec::new(), retain_file_list));
     }
 
@@ -845,8 +904,13 @@ pub async fn merge_files(
         target_partitions: 2,
     };
 
+    // Once TSID-major files exist, an input batch can contain both the legacy
+    // timestamp-major layout and the new layout. Do not advertise a timestamp
+    // ordering in that case: the merge query supplies the authoritative sort.
+    let metrics_tsid_major_requested =
+        metrics_tsid_major_enabled(stream_type) && !is_match_downsampling_rule;
     let tables = match TableBuilder::new()
-        .sorted_by_time(true)
+        .sorted_by_time(!metrics_tsid_major_requested)
         .build(session, files.clone(), schema.clone())
         .await
     {
@@ -959,9 +1023,18 @@ pub async fn merge_files(
         MergeParquetResult::Multiple {
             bufs,
             file_metas,
+            mut series_indexes,
             file_format,
         } => {
-            for (buf, file_meta) in bufs.into_iter().zip(file_metas) {
+            if series_indexes
+                .as_ref()
+                .is_some_and(|indexes| indexes.len() != bufs.len())
+            {
+                return Err(anyhow::anyhow!(
+                    "merge_parquet_files returned mismatched TSID series indexes"
+                ));
+            }
+            for (index, (buf, file_meta)) in bufs.into_iter().zip(file_metas).enumerate() {
                 let mut new_file_meta = file_meta;
                 new_file_meta.compressed_size = buf.len() as i64;
                 if new_file_meta.compressed_size == 0 {
@@ -971,7 +1044,17 @@ pub async fn merge_files(
                 }
 
                 let id = ider::generate_file_name();
-                let new_file_key = format!("{prefix}/{id}{}", file_format.extension());
+                let file_name = if series_indexes.is_some() {
+                    if file_format != FileFormat::Parquet {
+                        return Err(anyhow::anyhow!(
+                            "TSID-major output must use Parquet, got {file_format}"
+                        ));
+                    }
+                    format_tsid_major_file_name(&id)
+                } else {
+                    format!("{id}{}", file_format.extension())
+                };
+                let new_file_key = format!("{prefix}/{file_name}");
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
@@ -989,6 +1072,34 @@ pub async fn merge_files(
                     storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
                 } else {
                     storage::put(&account, &new_file_key, buf.clone()).await?;
+                }
+
+                if let Some(series_index) = series_indexes
+                    .as_mut()
+                    .and_then(|indexes| indexes.get_mut(index))
+                    .map(std::mem::take)
+                {
+                    let series_index_key =
+                        to_tsid_series_index_name(&new_file_key).ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "TSID series index has no indexed layout marker: {new_file_key}"
+                            )
+                        })?;
+                    let series_index = Bytes::from(series_index);
+                    if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
+                        storage::put_with_compliance(
+                            &account,
+                            &series_index_key,
+                            series_index.clone(),
+                        )
+                        .await?;
+                    } else {
+                        storage::put(&account, &series_index_key, series_index.clone()).await?;
+                    }
+                    log::debug!(
+                        "[COMPACTOR:WORKER:{thread_id}] wrote TSID series index {series_index_key}, size: {}",
+                        series_index.len()
+                    );
                 }
 
                 if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {

@@ -2360,6 +2360,12 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
+    #[env_config(
+        name = "ZO_METRICS_TSID_MAJOR_ENABLED",
+        default = false,
+        help = "Write compacted Parquet metrics ordered by (__hash__, _timestamp), split them at ZO_COMPACT_MAX_FILE_SIZE logical-size boundaries, and create per-file series-index sidecars. This experimental layout only affects newly compacted metrics files."
+    )]
+    pub metrics_tsid_major_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(

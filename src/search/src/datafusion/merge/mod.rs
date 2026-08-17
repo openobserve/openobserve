@@ -18,7 +18,10 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use config::{
     FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
-    meta::stream::{FileMeta, StreamType},
+    meta::{
+        promql::HASH_LABEL,
+        stream::{FileMeta, StreamType},
+    },
     utils::{
         parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
         util::is_trace_time_index_stream,
@@ -31,7 +34,10 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
-use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
+use parquet::{
+    arrow::{AsyncArrowWriter, async_writer::AsyncFileWriter},
+    file::metadata::KeyValue,
+};
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
@@ -50,6 +56,7 @@ use crate::datafusion::{
 
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
+mod tsid_major;
 #[cfg(feature = "enterprise")]
 use {
     crate::datafusion::merge::downsampling::merge_parquet_files_with_downsampling,
@@ -66,6 +73,7 @@ pub enum MergeParquetResult {
     Multiple {
         bufs: Vec<Vec<u8>>,
         file_metas: Vec<FileMeta>,
+        series_indexes: Option<Vec<Vec<u8>>>,
         file_format: FileFormat,
     },
 }
@@ -83,6 +91,11 @@ pub async fn merge_parquet_files(
     let cfg = get_config();
 
     let file_format = merge_output_file_format(stream_type, is_ingester, cfg.common.file_format);
+    let metrics_tsid_major = !is_ingester
+        && stream_type == StreamType::Metrics
+        && cfg.compact.metrics_tsid_major_enabled
+        && file_format == FileFormat::Parquet
+        && schema.field_with_name(HASH_LABEL).is_ok();
 
     #[cfg(feature = "enterprise")]
     if stream_type == StreamType::Metrics && !is_ingester {
@@ -111,6 +124,8 @@ pub async fn merge_parquet_files(
     } else if stream_type == StreamType::Filelist {
         // for file list we do not have timestamp, so we instead sort by min ts of entries
         "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
+    } else if metrics_tsid_major {
+        format!("SELECT * FROM tbl ORDER BY {HASH_LABEL} ASC, {TIMESTAMP_COL_NAME} ASC")
     } else {
         format!("SELECT * FROM tbl ORDER BY {TIMESTAMP_COL_NAME} DESC")
     };
@@ -118,7 +133,7 @@ pub async fn merge_parquet_files(
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id("merge_parquet_files")
-        .sorted_by_time(true)
+        .sorted_by_time(!metrics_tsid_major)
         .build(get_config().limit.datafusion_min_partition_num)
         .await?;
     // register union table
@@ -162,6 +177,29 @@ pub async fn merge_parquet_files(
         }
         Ok(())
     });
+
+    if metrics_tsid_major {
+        let (bufs, file_metas, series_indexes) = tsid_major::write_files(
+            &schema,
+            bloom_filter_fields,
+            &metadata,
+            cfg.compact.max_file_size,
+            &mut rx,
+            read_task,
+        )
+        .await?;
+        log::debug!(
+            "merge_parquet_files wrote {} size-bounded TSID-major files in {} ms",
+            bufs.len(),
+            start.elapsed().as_millis()
+        );
+        return Ok(MergeParquetResult::Multiple {
+            bufs,
+            file_metas,
+            series_indexes: Some(series_indexes),
+            file_format,
+        });
+    }
 
     let buf = match file_format {
         FileFormat::Parquet => {
@@ -290,8 +328,8 @@ async fn write_vortex(
         .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
 }
 
-pub fn append_metadata(
-    writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
+pub fn append_metadata<W: AsyncFileWriter>(
+    writer: &mut AsyncArrowWriter<W>,
     file_meta: &FileMeta,
 ) -> Result<()> {
     writer.append_key_value_metadata(KeyValue::new(

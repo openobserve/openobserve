@@ -16,7 +16,10 @@
 //! Delayed deletion of compacted files.
 
 use config::{
-    meta::stream::{FileKey, FileMeta},
+    meta::{
+        promql::to_tsid_series_index_name,
+        stream::{FileKey, FileMeta},
+    },
     utils::inverted_index::to_tantivy_name,
 };
 use infra::{file_list as infra_file_list, storage};
@@ -79,6 +82,29 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
             log::error!("[COMPACTOR] delete files from storage failed: {e}");
             return Err(e.into());
         }
+    }
+
+    // TSID-major files own an Arrow IPC sidecar with per-series row
+    // ranges. It is intentionally absent from file_list, so derive and delete
+    // it together with the parent Parquet object.
+    let series_index_files = files
+        .iter()
+        .filter_map(|file| {
+            to_tsid_series_index_name(&file.file).map(|path| (file.account.to_string(), path))
+        })
+        .collect::<Vec<_>>();
+    if !series_index_files.is_empty()
+        && let Err(e) = storage::del(
+            series_index_files
+                .iter()
+                .map(|file| (file.0.as_str(), file.1.as_str()))
+                .collect::<Vec<_>>(),
+        )
+        .await
+        && !e.to_string().to_lowercase().contains("not found")
+    {
+        log::error!("[COMPACTOR] delete TSID series index files failed: {e}");
+        return Err(e.into());
     }
 
     // delete flattened files from storage

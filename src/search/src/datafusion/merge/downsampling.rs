@@ -129,6 +129,7 @@ pub async fn merge_parquet_files_with_downsampling(
     Ok(MergeParquetResult::Multiple {
         bufs,
         file_metas,
+        series_indexes: None,
         file_format,
     })
 }

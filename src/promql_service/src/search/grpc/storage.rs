@@ -46,7 +46,7 @@ use search::{
 use search_service::match_source;
 use tracing::Instrument;
 
-use crate::search::grpc::Context;
+use crate::search::grpc::{Context, tsid_series_index};
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
@@ -216,12 +216,39 @@ pub(crate) async fn create_context(
         use_inverted_index: true,
     });
 
-    // search tantivy index
+    // Search the TSID-major sidecar at the same stage as Tantivy: both attach
+    // physical row selections to FileKey before the metrics table is built.
     let mut idx_took = 0;
     let mut is_add_filter_back = true;
+    let series_index_applied = match tsid_series_index::search(
+        query.as_ref(),
+        &mut files,
+        schema.as_ref(),
+        &matchers,
+        target_partitions,
+    )
+    .await
+    {
+        Ok(Some(took)) => {
+            idx_took = took;
+            true
+        }
+        Ok(None) => false,
+        Err(error) => {
+            log::warn!(
+                "[trace_id {trace_id}] promql->search->storage: TSID series-index query failed, falling back to Tantivy/full scan: {error}"
+            );
+            false
+        }
+    };
+
+    // Search Tantivy only when the complete file set cannot use `.sidx`.
     let (index_condition, is_full_convert) =
         convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
-    if !index_condition.conditions.is_empty() && cfg.search.inverted_index_enabled {
+    if !series_index_applied
+        && !index_condition.conditions.is_empty()
+        && cfg.search.inverted_index_enabled
+    {
         (idx_took, is_add_filter_back,..) =
             tantivy_search(query.clone(), &mut files, Some(index_condition), None)
                 .await

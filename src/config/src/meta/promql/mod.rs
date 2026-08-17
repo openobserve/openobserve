@@ -77,6 +77,62 @@ pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
 
+const TSID_MAJOR_FILE_PREFIX: &str = "tsid-major-v3-";
+pub const TSID_SERIES_INDEX_ROW_START: &str = "__oo_sidx_row_start";
+pub const TSID_SERIES_INDEX_ROW_COUNT: &str = "__oo_sidx_row_count";
+
+/// Format a size-bounded Parquet metrics file ordered by
+/// `(__hash__, _timestamp)`. Every such file owns a sibling `.sidx` sidecar.
+pub fn format_tsid_major_file_name(id: &str) -> String {
+    format!("{TSID_MAJOR_FILE_PREFIX}{id}.parquet")
+}
+
+pub fn is_tsid_major_file_name(path: &str) -> bool {
+    path.rsplit('/')
+        .next()
+        .and_then(|file_name| file_name.strip_prefix(TSID_MAJOR_FILE_PREFIX))
+        .and_then(|id| id.strip_suffix(".parquet"))
+        .is_some_and(|id| !id.is_empty())
+}
+
+/// Return the sibling series-index object for a TSID-major Parquet file.
+pub fn to_tsid_series_index_name(path: &str) -> Option<String> {
+    if !is_tsid_major_file_name(path) {
+        return None;
+    }
+    path.strip_suffix(".parquet")
+        .map(|path| format!("{path}.sidx"))
+}
+
+#[cfg(test)]
+mod tsid_major_tests {
+    use super::*;
+
+    #[test]
+    fn recognizes_tsid_major_file_name_and_sidecar() {
+        let name = format_tsid_major_file_name("456");
+        assert_eq!(name, "tsid-major-v3-456.parquet");
+        assert!(is_tsid_major_file_name(&name));
+        assert!(is_tsid_major_file_name(&format!(
+            "files/default/metrics/test/2026/08/13/10/{name}"
+        )));
+        assert_eq!(
+            to_tsid_series_index_name(&format!("files/default/{name}")),
+            Some("files/default/tsid-major-v3-456.sidx".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_other_tsid_layouts_and_formats() {
+        assert!(!is_tsid_major_file_name(
+            "tsid-range-v3-b04-p000a-x.parquet"
+        ));
+        assert!(!is_tsid_major_file_name("tsid-major-v1-x.parquet"));
+        assert!(!is_tsid_major_file_name("tsid-major-v3-x.vortex"));
+        assert!(!is_tsid_major_file_name("tsid-major-v3-.parquet"));
+    }
+}
+
 pub fn get_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
     let mut metadata: Metadata = match crate::utils::json::from_str(metadata) {
