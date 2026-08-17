@@ -105,8 +105,6 @@ pub async fn merge_parquet_files(
 
     // get all sorted data
     let sql = if stream_type == StreamType::Metadata && is_trace_time_index_stream(stream_name) {
-        // session_id is an attribute of the trace, not part of the key; MAX ignores
-        // NULLs, so a batch without the attribute never clobbers a known value.
         format!(
             "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, trace_id, MAX(session_id) AS session_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM tbl GROUP BY trace_id ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
