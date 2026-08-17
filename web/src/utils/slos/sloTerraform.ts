@@ -32,7 +32,11 @@ import {
 } from "@/utils/terraform/hcl";
 
 export interface SloTerraformOptions {
-  /** Alert folder the SLO lives in. Emitted only when it is not the default. */
+  /**
+   * Folder the SLO lives in, emitted only when it is not the default. SLOs share
+   * the alert folder namespace; OpenObserve has no separate SLO folder type,
+   * which is why the provider documents `folder_id` as an alert folder.
+   */
   folderId?: string;
 }
 

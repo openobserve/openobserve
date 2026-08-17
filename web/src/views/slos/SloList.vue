@@ -488,11 +488,21 @@ const slosTerraform = computed(() =>
 
 async function fetchSloForExport(id: string): Promise<Record<string, unknown> | null> {
   const res = await sloService.get(org.value, id);
-  const slo = (res.data?.slo ?? res.data) as Record<string, unknown> | undefined;
-  if (!slo?.name) return null;
-  // The id identifies the SLO this was read from, not the one a config creates.
-  const { id: _id, ...rest } = slo;
-  return rest;
+  const body = (res.data ?? {}) as Record<string, unknown>;
+  if (!body.name) return null;
+  // The endpoint flattens the definition alongside `status`, its live
+  // measurement, and carries counters the server assigns. None of that describes
+  // the SLO, and the id belongs to the one this was read from rather than the one
+  // a configuration creates, so an export keeps only the definition.
+  const {
+    id: _id,
+    status: _status,
+    definition_generation: _generation,
+    groups_estimate: _estimate,
+    groups_reserved: _reserved,
+    ...definition
+  } = body;
+  return definition;
 }
 
 async function openExport(items: SloListItem[]) {

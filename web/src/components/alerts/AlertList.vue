@@ -2929,7 +2929,11 @@ export default defineComponent({
         const alerts = await Promise.all(
           selectedAlerts.value.map((alert: any) => fetchAlertForExport(alert.alert_id)),
         );
-        alertsToExport.value = alerts.filter(Boolean);
+        const usable = alerts.filter(Boolean);
+        // Every fetch coming back empty is a failure, not an export of nothing:
+        // without this the dialog opens on a blank definition.
+        if (!usable.length) throw new Error("empty export payload");
+        alertsToExport.value = usable;
         showExportDialog.value = true;
       } catch (error) {
         console.error("Error exporting alerts:", error);
