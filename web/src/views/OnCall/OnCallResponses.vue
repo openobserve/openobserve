@@ -505,7 +505,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="truncated || escalationCapped" #bottom>
         <span class="text-text-secondary flex flex-wrap gap-x-3 text-xs">
           <span v-if="truncated" data-test="oncall-responses-truncated">
-            {{ t("oncall.listTruncated", { count: responses.length, total: totalCount }) }}
+            {{
+              totalCount !== null
+                ? t("oncall.listTruncated", { count: responses.length, total: totalCount })
+                : t("oncall.listTruncatedNoTotal", { count: responses.length })
+            }}
           </span>
           <span v-if="escalationCapped" data-test="oncall-escalation-capped">
             {{ t("oncall.escalationDetailCapped", { count: ESCALATION_DETAIL_LIMIT }) }}
@@ -627,7 +631,7 @@ const expandedCauses = ref<CauseGroup[]>([]);
 const expandedLoading = ref(false);
 const causeAnalytics = ref<CauseAnalytics | null>(null);
 const teamsAvailable = ref(true);
-const totalCount = ref(0);
+const totalCount = ref<number | null>(null);
 const truncated = ref(false);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
@@ -1231,16 +1235,19 @@ async function fetchResponses() {
 }
 
 /// Best-effort: the real total only matters when the list is truncated, and a
-/// server without the counter must not break the screen.
+/// server without the counter must not break the screen. Without it the total
+/// is UNKNOWN — §G.5 is explicit that the list endpoint has no total and the
+/// loaded length must never stand in for one. "The first 2000 of 2000" on a
+/// truncated list is a lie exactly when the number matters.
 async function refreshTotal() {
   try {
     const res = await oncallService.countResponses({
       org_identifier: orgId.value,
       include_resolved: includeResolved.value,
     });
-    totalCount.value = res.data?.count ?? responses.value.length;
+    totalCount.value = res.data?.count ?? null;
   } catch {
-    totalCount.value = responses.value.length;
+    totalCount.value = null;
   }
 }
 
