@@ -264,6 +264,24 @@ export interface OnCallSchedule {
 }
 
 /**
+ * "I am away 20 Aug – 3 Sep." Org-wide, not per team — being away is a fact
+ * about a person, and a per-team row is the one somebody forgets to write
+ * twice. The resolver skips an away member and moves ONLY their turn.
+ */
+export interface Unavailability {
+  id: string;
+  org_id: string;
+  user_email: string;
+  /** Micros, inclusive. */
+  start_at: number;
+  /** Micros, exclusive — somebody back on the 3rd is on call on the 3rd. */
+  end_at: number;
+  reason?: string | null;
+  created_by: string;
+  created_at: number;
+}
+
+/**
  * The slot a rotation, cover or ladder rung belongs to. Absent means
  * {@link DEFAULT_SLOT} — every rotation written before slots existed is the
  * team's primary, and reading it any other way would silently rewire a stored

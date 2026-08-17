@@ -147,6 +147,25 @@
             data-test="oncall-schedule-members"
             @update:model-value="(v: unknown) => setMembers(active as Rotation, v as string[])"
           />
+
+          <!-- Catching this while somebody is still looking at the rotation is
+               the entire value; catching it at 3am is not. The rota will pass
+               the shift on — the warning is that the order will not be the one
+               being written here. -->
+          <p
+            v-for="clash in awayClashes"
+            :key="clash.id"
+            class="text-status-warning-text text-sm"
+            :data-test="`oncall-schedule-away-${clash.user_email}`"
+          >
+            {{
+              t("oncall.rotationMemberAway", {
+                who: raw(clash.user_email),
+                from: raw(shortDate(clash.start_at)),
+                to: raw(shortDate(clash.end_at)),
+              })
+            }}
+          </p>
         </section>
 
         <section class="flex flex-col gap-4">
@@ -258,6 +277,7 @@ import type {
   OnCallTeamMember,
   Rotation,
   ScheduleEditorIntent,
+  Unavailability,
 } from "@/ts/interfaces/oncall";
 import { DEFAULT_SLOT, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -342,6 +362,38 @@ const dirty = computed(
 /// A rotation the user has not saved yet: the drawer says "Add", and its empty
 /// preview is expected rather than a fault.
 const isNew = ref(false);
+
+/// Absences over the editing horizon, fetched when the drawer opens. A
+/// failure leaves the list empty and the warning off — a false "Ana is away"
+/// would get a working rotation rewritten.
+const ABSENCE_HORIZON_DAYS = 30;
+const editorAbsences = ref<Unavailability[]>([]);
+watch(editing, async (isOpen) => {
+  if (!isOpen) return;
+  try {
+    const now = Date.now() * 1000;
+    const res = await oncallService.listUnavailability({
+      org_identifier: orgId.value,
+      from: now,
+      to: now + ABSENCE_HORIZON_DAYS * 86_400_000_000,
+    });
+    editorAbsences.value = res.data ?? [];
+  } catch {
+    editorAbsences.value = [];
+  }
+});
+
+/// One line per chosen member with an absence in the horizon.
+const awayClashes = computed(() => {
+  const chosen = new Set((active.value?.members ?? []).map((m) => m.toLowerCase()));
+  return editorAbsences.value.filter((a) => chosen.has(a.user_email.toLowerCase()));
+});
+
+function shortDate(micros: number): string {
+  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(
+    new Date(micros / 1000),
+  );
+}
 
 function editRotation(rotation: Rotation) {
   active.value = rotation;

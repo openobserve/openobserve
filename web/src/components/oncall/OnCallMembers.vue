@@ -70,7 +70,34 @@
         <span v-else class="text-text-muted text-sm">{{ t("oncall.notInRotation") }}</span>
       </template>
 
+      <!-- The rota already SKIPS an away member; this says so where the
+           people are listed, before somebody asks why the order changed. -->
+      <template #cell-away="{ row }">
+        <span v-if="awayOf(row.user_email)" class="flex flex-wrap items-center gap-1">
+          <OTag variant="warning-soft" size="sm" :data-test="`oncall-members-away-${row.id}`">
+            {{ awayLabel(awayOf(row.user_email)!) }}
+          </OTag>
+          <OButton
+            variant="ghost"
+            size="icon-xs"
+            icon-left="close"
+            :aria-label="t('oncall.awayRemove')"
+            :data-test="`oncall-members-away-remove-${row.id}`"
+            @click.stop="removeAbsence(awayOf(row.user_email)!)"
+          />
+        </span>
+        <span v-else class="text-text-muted text-sm">{{ ABSENT }}</span>
+      </template>
+
       <template #cell-actions="{ row }">
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="event"
+          :aria-label="t('oncall.awayMark')"
+          :data-test="`oncall-members-mark-away-${row.id}`"
+          @click.stop="openAway(row.user_email)"
+        />
         <OButton
           variant="ghost"
           size="icon-sm"
@@ -93,6 +120,55 @@
 
     <!-- The obvious next question after adding people is "so who is primary?",
          and the answer lives one tab over. -->
+    <ODialog
+      v-model="awayOpen"
+      :title="t('oncall.awayTitle')"
+      data-test="oncall-members-away-dialog"
+    >
+      <div class="flex flex-col gap-3">
+        <span class="flex items-center gap-2">
+          <OUserCell v-if="awayEmail" :value="awayEmail" />
+        </span>
+        <p class="text-text-muted text-sm">{{ t("oncall.awayHint") }}</p>
+        <OInput
+          v-model="awayFrom"
+          type="datetime-local"
+          :label="t('oncall.awayFrom')"
+          data-test="oncall-members-away-from"
+        />
+        <OInput
+          v-model="awayTo"
+          type="datetime-local"
+          :label="t('oncall.awayTo')"
+          :help-text="t('oncall.awayToHint')"
+          data-test="oncall-members-away-to"
+        />
+        <OInput
+          v-model="awayReason"
+          :label="t('oncall.awayReason')"
+          :placeholder="t('oncall.awayReasonPlaceholder')"
+          data-test="oncall-members-away-reason"
+        />
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <OButton variant="outline" size="sm-action" @click="awayOpen = false">
+            {{ t("oncall.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="awaySaving"
+            :disabled="!awayFrom || !awayTo"
+            data-test="oncall-members-away-save"
+            @click="saveAbsence"
+          >
+            {{ t("oncall.awaySave") }}
+          </OButton>
+        </div>
+      </template>
+    </ODialog>
+
     <p class="text-text-muted text-xs" data-test="oncall-members-next-step">
       {{ t("oncall.membersNextStep") }}
     </p>
@@ -114,7 +190,10 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
-import type { OnCallTeamMember, Rotation } from "@/ts/interfaces/oncall";
+import type { OnCallTeamMember, Rotation, Unavailability } from "@/ts/interfaces/oncall";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { ABSENT } from "@/composables/useSloFormat";
+import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const props = defineProps<{
@@ -136,6 +215,102 @@ function rotationOf(email: string): string | null {
   );
 }
 
+/// The window worth marking: an absence sixty days out is real but not this
+/// table's news. Fetched org-wide and filtered to this team's emails.
+const ABSENCE_WINDOW_DAYS = 60;
+const absences = ref<Unavailability[]>([]);
+const awayOpen = ref(false);
+const awayEmail = ref("");
+const awayFrom = ref("");
+const awayTo = ref("");
+const awayReason = ref("");
+const awaySaving = ref(false);
+
+async function fetchAbsences() {
+  try {
+    const now = Date.now() * 1000;
+    const res = await oncallService.listUnavailability({
+      org_identifier: orgId.value,
+      from: now,
+      to: now + ABSENCE_WINDOW_DAYS * 86_400_000_000,
+    });
+    absences.value = res.data ?? [];
+  } catch {
+    absences.value = [];
+  }
+}
+
+/// The absence worth a chip: current first, else the next upcoming one.
+function awayOf(email: string): Unavailability | null {
+  const mine = absences.value
+    .filter((a) => a.user_email.toLowerCase() === email.toLowerCase())
+    .sort((a, b) => a.start_at - b.start_at);
+  return mine[0] ?? null;
+}
+
+function awayLabel(absence: Unavailability): I18nText {
+  const fmt = (micros: number) =>
+    new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(
+      new Date(micros / 1000),
+    );
+  return Date.now() * 1000 >= absence.start_at
+    ? t("oncall.awayUntil", { date: raw(fmt(absence.end_at)) })
+    : t("oncall.awayWindow", { from: raw(fmt(absence.start_at)), to: raw(fmt(absence.end_at)) });
+}
+
+function openAway(email: string) {
+  awayEmail.value = email;
+  awayFrom.value = "";
+  awayTo.value = "";
+  awayReason.value = "";
+  awayOpen.value = true;
+}
+
+async function saveAbsence() {
+  awaySaving.value = true;
+  try {
+    await oncallService.createUnavailability({
+      org_identifier: orgId.value,
+      data: {
+        user_email: awayEmail.value,
+        start_at: new Date(awayFrom.value).getTime() * 1000,
+        end_at: new Date(awayTo.value).getTime() * 1000,
+        ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
+      },
+    });
+    awayOpen.value = false;
+    toast({ variant: "success", message: t("oncall.awaySaved") });
+    await fetchAbsences();
+    // The rota moves the away person's turn, so the schedule tab's answer
+    // just changed too.
+    emit("changed");
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.awaySaveFailed"),
+    });
+  } finally {
+    awaySaving.value = false;
+  }
+}
+
+async function removeAbsence(absence: Unavailability) {
+  try {
+    await oncallService.deleteUnavailability({
+      org_identifier: orgId.value,
+      unavailability_id: absence.id,
+    });
+    toast({ variant: "success", message: t("oncall.awayRemoved") });
+    await fetchAbsences();
+    emit("changed");
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.awayRemoveFailed"),
+    });
+  }
+}
+
 const columns = computed<OTableColumnDef<OnCallTeamMember>[]>(() => [
   {
     id: "person",
@@ -149,6 +324,13 @@ const columns = computed<OTableColumnDef<OnCallTeamMember>[]>(() => [
     header: t("oncall.inRotation"),
     accessorFn: (row: OnCallTeamMember) => rotationOf(row.user_email) ?? "",
     sortable: true,
+  },
+  {
+    id: "away",
+    header: t("oncall.awayColumn"),
+    accessorFn: (row: OnCallTeamMember) => (awayOf(row.user_email) ? 1 : 0),
+    sortable: true,
+    size: 200,
   },
   {
     id: "actions",
@@ -271,5 +453,8 @@ async function removeMember(member: OnCallTeamMember) {
   }
 }
 
-onMounted(fetchOrgUsers);
+onMounted(() => {
+  fetchOrgUsers();
+  fetchAbsences();
+});
 </script>

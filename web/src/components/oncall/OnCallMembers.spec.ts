@@ -24,8 +24,14 @@ import store from "@/test/unit/helpers/store";
 import type { OnCallTeamMember } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({
-  default: { addMembers: vi.fn(),
-    setSchedule: vi.fn(), removeMember: vi.fn() },
+  default: {
+    addMembers: vi.fn(),
+    setSchedule: vi.fn(),
+    removeMember: vi.fn(),
+    listUnavailability: vi.fn(),
+    createUnavailability: vi.fn(),
+    deleteUnavailability: vi.fn(),
+  },
 }));
 vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
 
@@ -52,6 +58,11 @@ const stubs = {
     </div>`,
   },
   OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
+  ODialog: {
+    name: "ODialog",
+    props: ["modelValue"],
+    template: "<div v-if='modelValue'><slot /><slot name='footer' /></div>",
+  },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
@@ -105,6 +116,7 @@ function member(email: string): OnCallTeamMember {
 
 describe("OnCallMembers", () => {
   beforeEach(() => {
+    oncall.listUnavailability.mockResolvedValue({ data: [] } as any);
     vi.clearAllMocks();
     users.orgUsers.mockResolvedValue({ data: { data: ORG_USERS } } as any);
     oncall.addMembers.mockResolvedValue({ data: [] } as any);
@@ -236,4 +248,51 @@ describe("OnCallMembers", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-members-add-everyone"]').exists()).toBe(false);
   });
+  /// C5/C6: the rota already SKIPS an away member; the table says so where
+  /// the people are listed, before somebody asks why the order changed.
+  describe("absences", () => {
+    const member = { id: "m1", team_id: "team_1", user_email: "ana@o2.ai" };
+
+    it("chips a member whose absence overlaps the window", async () => {
+      const now = Date.now() * 1000;
+      oncall.listUnavailability.mockResolvedValue({
+        data: [
+          {
+            id: "u1",
+            org_id: "default",
+            user_email: "ana@o2.ai",
+            start_at: now - 1,
+            end_at: now + 86_400_000_000,
+            created_by: "ana@o2.ai",
+            created_at: now,
+          },
+        ],
+      } as any);
+      const wrapper = render([member]);
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-members-away-m1"]').exists()).toBe(true);
+    });
+
+    it("records an absence for the chosen person and tells the schedule", async () => {
+      oncall.createUnavailability.mockResolvedValue({ data: {} } as any);
+      const wrapper = render([member]);
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
+      await wrapper.find('[data-test="oncall-members-away-from"]').setValue("2026-09-01T09:00");
+      await wrapper.find('[data-test="oncall-members-away-to"]').setValue("2026-09-08T09:00");
+      await wrapper.find('[data-test="oncall-members-away-save"]').trigger("click");
+      await flushPromises();
+
+      expect(oncall.createUnavailability).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ user_email: "ana@o2.ai" }),
+        }),
+      );
+      // The rota moves the away person's turn — the schedule tab's answer
+      // changed with it.
+      expect(wrapper.emitted("changed")).toBeTruthy();
+    });
+  });
+
 });

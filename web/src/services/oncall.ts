@@ -22,6 +22,7 @@ import type {
   TeamReachability,
   RoutingPreview,
   RoutingConfig,
+  Unavailability,
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
@@ -320,6 +321,51 @@ const oncall = {
     ),
 
   /// Answers "where would this route?" without waiting for an alert to fire.
+  /// Org-scoped, deliberately not per team. All three params optional; both
+  /// bounds filter to absences overlapping [from, to).
+  listUnavailability: ({
+    org_identifier,
+    user_email,
+    from,
+    to,
+  }: {
+    org_identifier: string;
+    user_email?: string;
+    from?: number;
+    to?: number;
+  }) => {
+    const params: Record<string, string | number> = {};
+    if (user_email) params.user_email = user_email;
+    if (from !== undefined) params.from = from;
+    if (to !== undefined) params.to = to;
+    return http().get<Unavailability[]>(
+      `/api/${org_identifier}/oncall/unavailability`,
+      Object.keys(params).length ? { params } : undefined,
+    );
+  },
+
+  /// `user_email` omitted means the caller's own absence — the common case,
+  /// and the one that must not need an administrator.
+  createUnavailability: ({
+    org_identifier,
+    data,
+  }: {
+    org_identifier: string;
+    data: { user_email?: string; start_at: number; end_at: number; reason?: string };
+  }) =>
+    http().post<Unavailability>(`/api/${org_identifier}/oncall/unavailability`, data),
+
+  deleteUnavailability: ({
+    org_identifier,
+    unavailability_id,
+  }: {
+    org_identifier: string;
+    unavailability_id: string;
+  }) =>
+    http().delete(
+      `/api/${org_identifier}/oncall/unavailability/${encodeURIComponent(unavailability_id)}`,
+    ),
+
   /// The org's catch-all. Always 200 — an org that never set one answers
   /// with nulls, not a 404.
   getRoutingConfig: ({ org_identifier }: { org_identifier: string }) =>
