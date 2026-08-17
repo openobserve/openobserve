@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 
 use openobserve_core::llm_evaluations::{
     datasets::{DatasetItemSource, DatasetSnapshotFilter},
+    experiment_dispersion::{DimensionDispersion, RowDispersion},
     experiment_evidence::{ExperimentApplicabilityPreview, ExperimentScorerApplicabilityPreview},
     experiment_results::{
         ExperimentAggregateSummary, ExperimentProgress, ExperimentResultScore,
@@ -463,6 +464,12 @@ pub struct ExperimentRowDetailResponseBody {
     pub expected_output: Option<Value>,
     pub trials: Vec<ExperimentResultSlotBody>,
     pub score_summaries: Vec<ExperimentScoreSummaryBody>,
+    /// Per-dimension trial dispersion for this case. Empty for a single-trial
+    /// Experiment, which has no disagreement to report.
+    pub dispersion: Vec<ExperimentDimensionDispersionBody>,
+    /// Trial the drawer opens on: the one farthest from the mean or majority in
+    /// this case's most dispersed dimension.
+    pub outlier_trial_index: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -493,6 +500,77 @@ pub struct ExperimentResultsResponseBody {
     pub skip_summary: ExperimentSkipSummaryBody,
     pub score_summaries: Vec<ExperimentScoreSummaryBody>,
     pub aggregate_summary: ExperimentAggregateSummaryBody,
+    /// Trial dispersion for the cases on this page, always measured over the
+    /// Experiment's full evidence so paging never splits a case's trials.
+    pub row_dispersions: Vec<ExperimentRowDispersionBody>,
+    pub dispersion_summary: ExperimentDispersionSummaryBody,
+}
+
+#[derive(Debug, Clone, Default, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentDispersionSummaryBody {
+    /// The "N cases unstable" card, counted over every pinned case.
+    pub high_dispersion_row_count: u64,
+    /// Normalized dispersion a case must exceed to be flagged.
+    pub threshold: f64,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentDimensionDispersionBody {
+    pub scorer_id: String,
+    pub scorer_version: i32,
+    pub trial_count: u64,
+    /// Type-aware consensus over the trials: a numeric mean, a majority
+    /// boolean or category, or `mixed` when the largest shares tie.
+    pub consensus: Value,
+    /// Raw standard deviation in the dimension's own units, numeric only.
+    pub raw_std: Option<f64>,
+    /// Internal cross-dimension key in `[0, 1]`. Absent when the dimension
+    /// declares no valid range, which also keeps it out of row flagging.
+    pub normalized: Option<f64>,
+    pub outlier_trial_index: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentRowDispersionBody {
+    pub row_id: String,
+    pub logical_id: String,
+    pub dimensions: Vec<ExperimentDimensionDispersionBody>,
+    /// Largest normalized dispersion across this case's dimensions. This is the
+    /// key the result table flags and sorts by.
+    pub max_normalized: Option<f64>,
+    pub high: bool,
+    pub outlier_trial_index: Option<u32>,
+}
+
+impl From<DimensionDispersion> for ExperimentDimensionDispersionBody {
+    fn from(value: DimensionDispersion) -> Self {
+        Self {
+            scorer_id: value.scorer_id,
+            scorer_version: value.scorer_version,
+            trial_count: value.trial_count,
+            consensus: serde_json::to_value(&value.dispersion.consensus)
+                .unwrap_or(serde_json::Value::Null),
+            raw_std: value.dispersion.raw_std,
+            normalized: value.dispersion.normalized,
+            outlier_trial_index: value.outlier_trial_index,
+        }
+    }
+}
+
+impl From<RowDispersion> for ExperimentRowDispersionBody {
+    fn from(value: RowDispersion) -> Self {
+        Self {
+            row_id: value.row_id,
+            logical_id: value.logical_id,
+            dimensions: value.dimensions.into_iter().map(Into::into).collect(),
+            max_normalized: value.max_normalized,
+            high: value.high,
+            outlier_trial_index: value.outlier_trial_index,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, ToSchema)]
