@@ -69,7 +69,7 @@ pub struct DiscoveryItemResponseBody {
     pub trace_id: Option<String>,
     pub session_id: Option<String>,
     pub ref_timestamp: i64,
-    pub source_stream: Option<String>,
+    pub source_stream: String,
     /// Derived quality: `issue` for one unhealthy dimension and `multiple` for
     /// two or more unhealthy dimensions.
     pub quality: String,
@@ -217,7 +217,7 @@ mod tests {
                 trace_id: Some("trace-1".to_string()),
                 session_id: None,
                 ref_timestamp: 123,
-                source_stream: Some("traces".to_string()),
+                source_stream: "traces".to_string(),
                 quality: DiscoveryQuality::Issue,
                 issue_count: 1,
                 context: Some(serde_json::json!({
