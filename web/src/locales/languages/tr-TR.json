@@ -372,6 +372,12 @@
       "action": "Yeni rapor",
       "actionDesc": "Kontrol paneli teslimatı planlayın"
     },
+    "noVariables": {
+      "title": "Henüz değişken yok",
+      "description": "Bu panoyu etkileşimli hale getirmek için bir değişken ekleyin — panelleri ad alanı, pod ve daha fazlasına göre filtreleyin.",
+      "action": "Değişken ekle",
+      "actionDesc": "Pano değişkeni oluştur"
+    },
     "noQueries": {
       "title": "Çalışan sorgu yok",
       "description": "Şu anda aktif sorgu yok. Uzun süren sorgular çalışırken burada görünecektir."
@@ -437,7 +443,8 @@
       "pipelineHistory": "pipeline geçmişi",
       "regexPatterns": "regex desenleri",
       "monitors": "izleyiciler",
-      "modelPricing": "model fiyatlandırma tanımları"
+      "modelPricing": "model fiyatlandırma tanımları",
+      "variables": "değişkenler"
     },
     "demo": {
       "pageTitle": "Boş durumlar — inceleme için tam set",
@@ -3628,6 +3635,7 @@
     "variableScopeHelp": "Genel seçilmişse değişkenler tüm sekmelere ve panellere uygulanacaktır.",
     "newTab": "Sekme Ekle",
     "editTab": "Sekmeyi Düzenle",
+    "tabPanelCount": "{count} panel | {count} panel",
     "generalSettingsTitle": "Genel Ayarlar",
     "tabSettingsTitle": "Sekmeler Ayarları",
     "addGeneralSettings": "General",
@@ -4650,6 +4658,7 @@
       "variables": "Değişkenler",
       "tabsCount": "{n} Sekme",
       "panelsCount": "{n} Panel",
+      "dependsOn": "Bağlı olduğu: {names}",
       "variablesDependencyGraph": "Değişken Bağımlılık Grafiği",
       "scope": "Kapsam",
       "deletedTab": "Silinen Sekme",
@@ -4661,7 +4670,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "Pano başarıyla güncellendi.",
-      "updationFailed": "Pano güncelleme başarısız"
+      "updationFailed": "Pano güncelleme başarısız",
+      "dynamicFiltersHelp": "Panellerin üzerine geçici bir filtre satırı ekler.",
+      "appliesToEveryone": "Bu ayarlar bu panoya erişebilen herkesle paylaşılır.",
+      "saveChanges": "Değişiklikleri kaydet"
     },
     "addDashboardPage": {
       "addedSuccessfully": "Pano başarıyla eklendi.",

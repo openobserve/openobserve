@@ -372,6 +372,12 @@
       "action": "Nouveau rapport",
       "actionDesc": "Planifier la livraison d'un tableau de bord"
     },
+    "noVariables": {
+      "title": "Aucune variable pour le moment",
+      "description": "Ajoutez une variable pour rendre ce tableau de bord interactif — filtrez les panneaux par espace de noms, pod, etc.",
+      "action": "Ajouter une variable",
+      "actionDesc": "Créer une variable de tableau de bord"
+    },
     "noQueries": {
       "title": "Aucune requête en cours",
       "description": "Il n'y a aucune requête active pour le moment. Les requêtes de longue durée apparaîtront ici pendant leur exécution."
@@ -437,7 +443,8 @@
       "pipelineHistory": "historique du pipeline",
       "regexPatterns": "modèles regex",
       "monitors": "superviseurs",
-      "modelPricing": "définitions de tarification de modèle"
+      "modelPricing": "définitions de tarification de modèle",
+      "variables": "variables"
     },
     "demo": {
       "pageTitle": "États vides — ensemble complet à examiner",
@@ -3632,6 +3639,7 @@
     "variableScopeHelp": "Les variables seront appliquées à tous les onglets et panneaux si l'option globale est sélectionnée.",
     "newTab": "Ajouter un onglet",
     "editTab": "Modifier l'onglet",
+    "tabPanelCount": "{count} panneau | {count} panneaux",
     "generalSettingsTitle": "Réglages généraux",
     "tabSettingsTitle": "Paramètres des onglets",
     "addGeneralSettings": "Général",
@@ -4654,6 +4662,7 @@
       "variables": "Variables",
       "tabsCount": "{n} onglet(s)",
       "panelsCount": "{n} panneau(x)",
+      "dependsOn": "Dépend de : {names}",
       "variablesDependencyGraph": "Graphe de dépendance des variables",
       "scope": "Portée",
       "deletedTab": "Onglet supprimé",
@@ -4665,7 +4674,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "Tableau de bord mis à jour avec succès.",
-      "updationFailed": "Échec de la mise à jour du tableau de bord"
+      "updationFailed": "Échec de la mise à jour du tableau de bord",
+      "dynamicFiltersHelp": "Ajoute une ligne de filtre ad hoc au-dessus des panneaux.",
+      "appliesToEveryone": "Ces paramètres sont partagés avec toutes les personnes ayant accès à ce tableau de bord.",
+      "saveChanges": "Enregistrer les modifications"
     },
     "addDashboardPage": {
       "addedSuccessfully": "Tableau de bord ajouté avec succès.",

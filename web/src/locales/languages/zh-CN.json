@@ -372,6 +372,12 @@
       "action": "新报告",
       "actionDesc": "安排仪表板交付"
     },
+    "noVariables": {
+      "title": "尚无变量",
+      "description": "添加变量以让此仪表盘可交互 — 按命名空间、Pod 等筛选面板。",
+      "action": "添加变量",
+      "actionDesc": "创建仪表盘变量"
+    },
     "noQueries": {
       "title": "没有正在运行的查询",
       "description": "目前没有活跃的查询。长时间运行的查询将在运行时显示在此处。"
@@ -437,7 +443,8 @@
       "pipelineHistory": "管道历史记录",
       "regexPatterns": "正则表达式模式",
       "monitors": "监控器",
-      "modelPricing": "模型定价定义"
+      "modelPricing": "模型定价定义",
+      "variables": "变量"
     },
     "demo": {
       "pageTitle": "空状态 — 完整集合供审查",
@@ -3648,6 +3655,7 @@
     "variableScopeHelp": "如果选择了全局变量，则变量将应用于所有选项卡和面板。",
     "newTab": "添加选项卡",
     "editTab": "编辑选项卡",
+    "tabPanelCount": "{count} 面板 | {count} 面板",
     "generalSettingsTitle": "通用设置",
     "tabSettingsTitle": "选项卡设置",
     "addGeneralSettings": "基本设置",
@@ -4670,6 +4678,7 @@
       "variables": "变量",
       "tabsCount": "{n} 个选项卡",
       "panelsCount": "{n} 个面板",
+      "dependsOn": "依赖：{names}",
       "variablesDependencyGraph": "变量依赖关系图",
       "scope": "作用域",
       "deletedTab": "已删除选项卡",
@@ -4681,7 +4690,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "仪表盘更新成功。",
-      "updationFailed": "仪表盘更新失败。"
+      "updationFailed": "仪表盘更新失败。",
+      "dynamicFiltersHelp": "在面板上方添加一个临时筛选行。",
+      "appliesToEveryone": "这些设置与所有可访问此仪表盘的人共享。",
+      "saveChanges": "保存更改"
     },
     "addDashboardPage": {
       "addedSuccessfully": "仪表盘添加成功。",

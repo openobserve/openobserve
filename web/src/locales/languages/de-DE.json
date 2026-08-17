@@ -372,6 +372,12 @@
       "action": "Neuer Bericht",
       "actionDesc": "Planen Sie eine Dashboard-Lieferung"
     },
+    "noVariables": {
+      "title": "Noch keine Variablen",
+      "description": "Fügen Sie eine Variable hinzu, um dieses Dashboard interaktiv zu gestalten – filtern Sie Panels nach Namespace, Pod und mehr.",
+      "action": "Variable hinzufügen",
+      "actionDesc": "Dashboard-Variable erstellen"
+    },
     "noQueries": {
       "title": "Keine laufenden Abfragen",
       "description": "Derzeit gibt es keine aktiven Abfragen. Abfragen mit langer Laufzeit werden hier angezeigt, während sie ausgeführt werden."
@@ -437,7 +443,8 @@
       "pipelineHistory": "Pipeline-Verlauf",
       "regexPatterns": "Regex-Muster",
       "monitors": "Monitore",
-      "modelPricing": "Modell-Preisdefinitionen"
+      "modelPricing": "Modell-Preisdefinitionen",
+      "variables": "Variablen"
     },
     "demo": {
       "pageTitle": "Leere Zustände — vollständiger Satz zur Überprüfung",
@@ -3629,6 +3636,7 @@
     "variableScopeHelp": "Variablen werden auf alle Tabs und Panels angewendet, wenn Global ausgewählt ist.",
     "newTab": "Tab hinzufügen",
     "editTab": "Tab bearbeiten",
+    "tabPanelCount": "{count} Panel | {count} Panels",
     "generalSettingsTitle": "Allgemeine Einstellungen",
     "tabSettingsTitle": "Einstellungen für Tabs",
     "addGeneralSettings": "Allgemeines",
@@ -4651,6 +4659,7 @@
       "variables": "Variablen",
       "tabsCount": "{n} Tabs",
       "panelsCount": "{n} Panels",
+      "dependsOn": "Abhängig von: {names}",
       "variablesDependencyGraph": "Variablen-Abhängigkeitsgraph",
       "scope": "Bereich",
       "deletedTab": "Gelöschter Tab",
@@ -4662,7 +4671,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "Dashboard erfolgreich aktualisiert.",
-      "updationFailed": "Dashboard-Aktualisierung fehlgeschlagen"
+      "updationFailed": "Dashboard-Aktualisierung fehlgeschlagen",
+      "dynamicFiltersHelp": "Fügt eine Ad-hoc-Filterzeile über den Panels hinzu.",
+      "appliesToEveryone": "Diese Einstellungen werden mit allen geteilt, die auf dieses Dashboard zugreifen können.",
+      "saveChanges": "Änderungen speichern"
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard erfolgreich hinzugefügt.",

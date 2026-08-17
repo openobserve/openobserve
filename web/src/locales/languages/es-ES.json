@@ -372,6 +372,12 @@
       "action": "Nuevo informe",
       "actionDesc": "Programe la entrega de un panel"
     },
+    "noVariables": {
+      "title": "No hay variables todavía",
+      "description": "Agrega una variable para hacer este tablero interactivo — filtra los paneles por namespace, pod y más.",
+      "action": "Agregar variable",
+      "actionDesc": "Crear una variable de tablero"
+    },
     "noQueries": {
       "title": "No hay consultas en ejecución",
       "description": "No hay consultas activas en este momento. Las consultas de larga duración aparecerán aquí mientras se ejecuten."
@@ -435,7 +441,8 @@
       "pipelineHistory": "historial de pipelines",
       "regexPatterns": "patrones de expresiones regulares",
       "monitors": "monitores",
-      "modelPricing": "definiciones de precios de modelos"
+      "modelPricing": "definiciones de precios de modelos",
+      "variables": "variables"
     },
     "demo": {
       "pageTitle": "Estados vacíos — conjunto completo para revisión",
@@ -3627,6 +3634,7 @@
     "variableScopeHelp": "Las variables se aplicarán a todas las pestañas y paneles si se selecciona global.",
     "newTab": "Agregar pestaña",
     "editTab": "Editar pestaña",
+    "tabPanelCount": "{count} panel | {count} paneles",
     "generalSettingsTitle": "Ajustes generales",
     "tabSettingsTitle": "Configuración de pestañas",
     "addGeneralSettings": "General",
@@ -4649,6 +4657,7 @@
       "variables": "Variables",
       "tabsCount": "{n} pestañas",
       "panelsCount": "{n} paneles",
+      "dependsOn": "Depende de: {names}",
       "variablesDependencyGraph": "Gráfico de dependencias de variables",
       "scope": "Ámbito",
       "deletedTab": "Pestaña eliminada",
@@ -4660,7 +4669,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "Panel actualizado correctamente.",
-      "updationFailed": "Error al actualizar el panel"
+      "updationFailed": "Error al actualizar el panel",
+      "dynamicFiltersHelp": "Agrega una fila de filtro ad-hoc sobre los paneles.",
+      "appliesToEveryone": "Estos ajustes se comparten con todos los que pueden acceder a este tablero.",
+      "saveChanges": "Guardar cambios"
     },
     "addDashboardPage": {
       "addedSuccessfully": "Panel agregado correctamente.",

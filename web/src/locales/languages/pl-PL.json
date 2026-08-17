@@ -372,6 +372,12 @@
       "action": "Nowy raport",
       "actionDesc": "Zaplanuj dostawę pulpitu nawigacyjnego"
     },
+    "noVariables": {
+      "title": "Brak zmiennych",
+      "description": "Dodaj zmienną, aby ten pulpit był interaktywny — filtruj panele według przestrzeni nazw, podów i innych.",
+      "action": "Dodaj zmienną",
+      "actionDesc": "Utwórz zmienną pulpitu"
+    },
     "noQueries": {
       "title": "Brak działających zapytań",
       "description": "Obecnie nie ma aktywnych zapytań. Długotrwałe zapytania pojawią się tutaj, gdy będą wykonywane."
@@ -435,7 +441,8 @@
       "pipelineHistory": "historia potoku",
       "regexPatterns": "wzorce regex",
       "monitors": "monitory",
-      "modelPricing": "definicje cen modeli"
+      "modelPricing": "definicje cen modeli",
+      "variables": "zmienne"
     },
     "demo": {
       "pageTitle": "Stany puste — pełny zestaw do przeglądu",
@@ -3622,6 +3629,7 @@
     "variableScopeHelp": "Zmienne zostaną zastosowane do wszystkich zakładek i paneli, jeśli wybrano globalny.",
     "newTab": "Dodaj zakładkę",
     "editTab": "Edytuj zakładkę",
+    "tabPanelCount": "{count} panel | {count} paneli",
     "generalSettingsTitle": "Ustawienia ogólne",
     "tabSettingsTitle": "Ustawienia zakładek",
     "addGeneralSettings": "Ogólne",
@@ -4643,6 +4651,7 @@
       "variables": "Zmienne",
       "tabsCount": "{n} zakładki",
       "panelsCount": "{n} panele",
+      "dependsOn": "Zależy od: {names}",
       "variablesDependencyGraph": "Graf zależności zmiennych",
       "scope": "Zakres",
       "deletedTab": "Usunięta zakładka",
@@ -4654,7 +4663,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "Dashboard zaktualizowany pomyślnie.",
-      "updationFailed": "Aktualizacja dashboardu nie powiodła się"
+      "updationFailed": "Aktualizacja dashboardu nie powiodła się",
+      "dynamicFiltersHelp": "Dodaje wiersz filtra ad hoc nad panelami.",
+      "appliesToEveryone": "Te ustawienia są udostępniane wszystkim, którzy mają dostęp do tego pulpitu.",
+      "saveChanges": "Zapisz zmiany"
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard dodany pomyślnie.",
