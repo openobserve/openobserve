@@ -103,12 +103,17 @@ test.describe("Report Folders", () => {
     await pm.reportFoldersPage.clickFolderTab(FOLDER_B);
     await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
 
-    // Move it back to default
+    // Move it back to default — later serial tests expect REPORT_A there.
     await pm.reportFoldersPage.searchReports(REPORT_A);
     await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
     await pm.reportFoldersPage.openMoveDialog(REPORT_A);
     await pm.reportFoldersPage.selectMoveDestination('default');
+    await pm.reportFoldersPage.expectMoveButtonEnabled();
     await pm.reportFoldersPage.clickMove();
+
+    // Confirm it landed before handing off to the next test.
+    await pm.reportFoldersPage.clickFolderTab('default');
+    await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
 
     testLogger.info('Report moved to another folder and back successfully');
   });
