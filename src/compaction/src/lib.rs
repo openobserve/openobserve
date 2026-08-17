@@ -398,19 +398,19 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
 }
 
 /// compactor delay delete files run steps:
-/// 1. get pending deleted files from file_list_deleted table, created_at > 2 hours
+/// 1. get pending deleted files from file_list_deleted table, created_at > configured delay
 /// 2. delete files from storage
 pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     let now = Utc::now();
     let time_max =
-        now - Duration::try_hours(get_config().compact.delete_files_delay_hours).unwrap();
+        now - Duration::try_minutes(get_config().compact.delete_files_delay_minutes).unwrap();
     let time_max = Utc
         .with_ymd_and_hms(
             time_max.year(),
             time_max.month(),
             time_max.day(),
             time_max.hour(),
-            0,
+            time_max.minute(),
             0,
         )
         .unwrap();
