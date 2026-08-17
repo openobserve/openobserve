@@ -49,6 +49,7 @@ const CODE_LINE_HEIGHT = 1.55;
 const props = withDefaults(defineProps<CodeBlockProps>(), {
   wrap: false,
   copyable: true,
+  lineNumbers: false,
   dataTest: "code-block",
 });
 
@@ -109,6 +110,20 @@ const highlightOne = (code: string, lang?: string): string => {
 };
 // Highlights the DISPLAYED code (masked or real) — copy still uses the real `code`.
 const highlighted = computed(() => highlightOne(displayCode.value, props.lang));
+
+// Wrapping breaks the one-number-per-row assumption a gutter rests on, so the
+// two features are exclusive rather than quietly misaligned.
+const showLineNumbers = computed(() => props.lineNumbers && !props.wrap);
+
+// One number per visible line, as a single pre-formatted string: the gutter is
+// then one text node the browser lays out on the same leading as the code, with
+// no per-line wrapper elements to keep in sync with the highlighted markup.
+// A trailing newline gets no number — it is the end of the last line, not a line.
+const lineNumberText = computed(() => {
+  if (!showLineNumbers.value) return "";
+  const lines = displayCode.value.replace(/\n$/, "").split("\n").length;
+  return Array.from({ length: lines }, (_, i) => String(i + 1)).join("\n");
+});
 
 const onCopy = () => {
   copyToClipboard(props.code, t, {
@@ -187,9 +202,14 @@ const onCopy = () => {
          <pre>, so a newline here would indent the first line of code. -->
     <pre
       class="o2-code-pre"
-      :class="wrap ? 'o2-code-pre--wrap' : ''"
+      :class="[wrap ? 'o2-code-pre--wrap' : '', showLineNumbers ? 'o2-code-pre--numbered' : '']"
       :style="preStyle"
-    ><code class="hljs text-syntax-text!" v-html="highlighted"></code></pre>
+    ><span
+      v-if="showLineNumbers"
+      class="o2-code-gutter bg-syntax-bg text-syntax-comment sticky left-0 tabular-nums select-none"
+      aria-hidden="true"
+      :data-test="`${dataTest}-line-numbers`"
+    >{{ lineNumberText }}</span><code class="hljs text-syntax-text!" v-html="highlighted"></code></pre>
   </div>
 </template>
 
@@ -233,6 +253,22 @@ const onCopy = () => {
   font-size: inherit;
   line-height: inherit;
   padding: 0;
+}
+
+/* Line-number gutter. A flex row rather than a floated or absolutely-placed
+   column, so the numbers cannot overlap the code at any width, and `sticky` keeps
+   them in view while a long line scrolls sideways underneath — which is also why
+   the gutter carries the block's own background. */
+.o2-code-pre--numbered {
+  display: flex;
+}
+
+.o2-code-gutter {
+  flex: none;
+  padding-right: 1rem;
+  text-align: right;
+  /* Muted rather than hidden: the numbers are for reference, not for reading. */
+  opacity: 0.65;
 }
 
 /* Wrapped mode: break anywhere, because a long SQL string can be one

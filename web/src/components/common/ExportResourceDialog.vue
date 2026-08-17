@@ -156,6 +156,7 @@ function download() {
             chrome="editor"
             :filename="`${baseName}.json`"
             :max-lines="22"
+            line-numbers
             :data-test="`${dataTest}-json`"
           />
         </OTabPanel>
@@ -195,6 +196,7 @@ function download() {
                 chrome="editor"
                 :filename="`${baseName}.tf`"
                 :max-lines="22"
+                line-numbers
                 :data-test="`${dataTest}-terraform`"
               />
             </template>
