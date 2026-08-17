@@ -117,8 +117,13 @@
         <OTabPanel name="overview">
           <OContent y>
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div class="lg:col-span-2">
+              <div class="flex flex-col gap-6 lg:col-span-2">
                 <OnCallEscalation v-if="escalation" :progress="escalation" :events="events" />
+                <OnCallDeliveryLedger
+                  :records="deliveries"
+                  :total="deliveriesTotal"
+                  :loading="deliveriesLoading"
+                />
               </div>
 
               <!-- Same key/value grid the rest of the app uses for a details
@@ -409,6 +414,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
+import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
 import OnCallEscalation from "@/components/oncall/OnCallEscalation.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -418,6 +424,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -435,6 +442,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
 import oncallService from "@/services/oncall";
 import type {
+  DeliveryRecord,
   CauseGroup,
   EscalationProgress,
   OnCallResponse,
@@ -654,6 +662,7 @@ async function fetchResponse() {
     await fetchHandoffTargets();
     await fetchPriorCauses();
     await fetchEscalation();
+    await fetchDeliveries();
   } catch (err: any) {
     toast({
       variant: "error",
@@ -857,6 +866,30 @@ async function fetchPriorCauses() {
 
 // Context, like the history: a failure here must not stop somebody acting on
 // the page in front of them.
+const deliveries = ref<DeliveryRecord[]>([]);
+const deliveriesTotal = ref(0);
+const deliveriesLoading = ref(false);
+
+/// The receipt beside the claim: the timeline says "paged ana", the ledger
+/// says whether the transport took it. A failure leaves the panel empty with
+/// its own empty state — the rest of the page still answers its questions.
+async function fetchDeliveries() {
+  deliveriesLoading.value = true;
+  try {
+    const res = await oncallService.listDeliveries({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+    });
+    deliveries.value = res.data?.deliveries ?? [];
+    deliveriesTotal.value = res.data?.total ?? 0;
+  } catch {
+    deliveries.value = [];
+    deliveriesTotal.value = 0;
+  } finally {
+    deliveriesLoading.value = false;
+  }
+}
+
 async function fetchEscalation() {
   try {
     const res = await oncallService.escalationProgress({
