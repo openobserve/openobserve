@@ -5,6 +5,8 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+use std::collections::HashSet;
+
 use axum::{
     extract::{Path, Query},
     response::Response,
@@ -14,6 +16,7 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
     llm_evaluations::{
+        experiment_dispersion::{self, NormalizationSpans},
         experiment_results,
         experiments::{self, ExperimentError},
     },
@@ -28,11 +31,11 @@ use crate::{
         },
         experiments::{
             CloneExperimentRequestBody, CreateExperimentRequestBody, CreateExperimentResponseBody,
-            ExperimentDetailQuery, ExperimentDetailResponseBody, ExperimentPreviewQuery,
-            ExperimentPreviewResponseBody, ExperimentResponseBody, ExperimentResultPaginationBody,
-            ExperimentResultsResponseBody, ExperimentRowDetailResponseBody,
-            ExperimentRowNavigationBody, ExperimentRowSnapshotBody, ListExperimentsResponseBody,
-            RetryExperimentSlotRequestBody,
+            ExperimentDetailQuery, ExperimentDetailResponseBody, ExperimentDispersionSummaryBody,
+            ExperimentPreviewQuery, ExperimentPreviewResponseBody, ExperimentResponseBody,
+            ExperimentResultPaginationBody, ExperimentResultsResponseBody,
+            ExperimentRowDetailResponseBody, ExperimentRowNavigationBody,
+            ExperimentRowSnapshotBody, ListExperimentsResponseBody, RetryExperimentSlotRequestBody,
         },
     },
 };
@@ -262,6 +265,16 @@ pub async fn get_experiment(
     {
         return MetaHttpResponse::bad_request("Invalid Experiment result pagination");
     }
+    // Dispersion normalizes against each dimension's declared range, so the
+    // pinned Score Configs are part of reading a result page honestly.
+    let score_configs = match infra::table::score_configs::get_all_by_org(&org_id).await {
+        Ok(configs) => configs,
+        Err(error) => {
+            log::error!("[Experiment] failed to load Score Configs for {experiment_id}: {error}");
+            return MetaHttpResponse::internal_error("Failed to load Experiment results");
+        }
+    };
+    let spans = NormalizationSpans::from_configs(&score_configs);
     let results = match openobserve_core::llm_evaluations::experiment_runner::results_page(
         &experiment,
         result_page,
@@ -286,6 +299,31 @@ pub async fn get_experiment(
                 &summary.task_progress,
                 &summary.scoring_progress,
             );
+            // Measured over the whole Experiment, then narrowed to this page:
+            // a case's trials can straddle a page boundary, and half a case's
+            // trials would understate how much it disagreed with itself.
+            let dispersions = experiment_dispersion::row_dispersions(
+                &results.summary_rows,
+                &summary_scores,
+                &scorers,
+                &spans,
+            );
+            let dispersion_summary = ExperimentDispersionSummaryBody {
+                high_dispersion_row_count: experiment_dispersion::high_dispersion_row_count(
+                    &dispersions,
+                ),
+                threshold: experiment_dispersion::HIGH_DISPERSION_THRESHOLD,
+            };
+            let page_rows = results
+                .slots
+                .iter()
+                .map(|slot| slot.row_id.clone())
+                .collect::<HashSet<_>>();
+            let row_dispersions = dispersions
+                .into_iter()
+                .filter(|row| page_rows.contains(&row.row_id))
+                .map(Into::into)
+                .collect();
             let slots =
                 experiment_results::result_slots(results.slots, &executions, &scores, &scorers);
             ExperimentResultsResponseBody {
@@ -313,6 +351,8 @@ pub async fn get_experiment(
                     .map(Into::into)
                     .collect(),
                 aggregate_summary: aggregate_summary.into(),
+                row_dispersions,
+                dispersion_summary,
             }
         }
         Err(error) => {
@@ -503,6 +543,25 @@ pub async fn get_experiment_row(
     let score_summaries =
         experiment_results::row_result_summary(row.slots.len(), &scorers, &executions, &row.scores)
             .score_summaries;
+    let score_configs = match infra::table::score_configs::get_all_by_org(&org_id).await {
+        Ok(configs) => configs,
+        Err(error) => {
+            log::error!("[Experiment] failed to load Score Configs for row {row_id}: {error}");
+            return MetaHttpResponse::internal_error("Failed to load Experiment row");
+        }
+    };
+    let dispersion = experiment_dispersion::row_dispersions(
+        &experiments::row_keys(&row.slots),
+        &row.scores,
+        &scorers,
+        &NormalizationSpans::from_configs(&score_configs),
+    )
+    .into_iter()
+    .next();
+    let outlier_trial_index = dispersion.as_ref().and_then(|row| row.outlier_trial_index);
+    let dispersion = dispersion
+        .map(|row| row.dimensions.into_iter().map(Into::into).collect())
+        .unwrap_or_default();
     let first_slot = row
         .slots
         .first()
@@ -528,6 +587,8 @@ pub async fn get_experiment_row(
             .map(Into::into)
             .collect(),
         score_summaries: score_summaries.into_iter().map(Into::into).collect(),
+        dispersion,
+        outlier_trial_index,
     };
     MetaHttpResponse::json(response)
 }

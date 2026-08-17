@@ -63,6 +63,13 @@ pub struct ExperimentComparisonDimensionBody {
     pub normalized: bool,
     pub baseline_sample_count: u64,
     pub candidate_sample_count: u64,
+    /// Normalized trial dispersion per side, present only where the side ran
+    /// more than one trial and the dimension has a normalized key.
+    pub baseline_dispersion: Option<f64>,
+    pub candidate_dispersion: Option<f64>,
+    /// The delta is smaller than the trial noise on both sides. Render it
+    /// de-emphasized with a `~`; the bucket it belongs to is unaffected.
+    pub within_noise: bool,
     pub assignment: ExperimentComparisonAssignmentBody,
 }
 
@@ -171,6 +178,9 @@ impl From<domain::ExperimentComparisonDimension> for ExperimentComparisonDimensi
             normalized: value.normalized,
             baseline_sample_count: value.baseline_sample_count,
             candidate_sample_count: value.candidate_sample_count,
+            baseline_dispersion: value.baseline_dispersion,
+            candidate_dispersion: value.candidate_dispersion,
+            within_noise: value.within_noise,
             assignment: value.assignment.into(),
         }
     }
