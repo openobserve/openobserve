@@ -21,6 +21,7 @@ pub enum ExperimentComparisonBucketBody {
     Regressed,
     Improved,
     Unchanged,
+    Inconclusive,
     New,
     Missing,
 }
@@ -39,6 +40,7 @@ pub enum ExperimentComparisonAssignmentBody {
     Regressed,
     Improved,
     Unchanged,
+    Descriptive,
     BaselineOnly,
     CandidateOnly,
     Unavailable,
@@ -52,6 +54,13 @@ pub struct ExperimentComparisonDimensionBody {
     pub baseline: Option<f64>,
     pub candidate: Option<f64>,
     pub delta: Option<f64>,
+    /// Change in the better direction; positive always means improved.
+    pub oriented_delta: Option<f64>,
+    /// Whether this dimension declares a Comparison Policy and can vote.
+    pub gating: bool,
+    /// Whether `orientedDelta` is a fraction of the configured range rather
+    /// than raw units, which is how the threshold should be read.
+    pub normalized: bool,
     pub baseline_sample_count: u64,
     pub candidate_sample_count: u64,
     pub assignment: ExperimentComparisonAssignmentBody,
@@ -76,6 +85,7 @@ pub struct ExperimentComparisonCountsBody {
     pub regressed: u64,
     pub improved: u64,
     pub unchanged: u64,
+    pub inconclusive: u64,
     pub new: u64,
     pub missing: u64,
 }
@@ -88,6 +98,8 @@ pub struct ExperimentComparisonSummaryDimensionBody {
     pub baseline: Option<f64>,
     pub candidate: Option<f64>,
     pub delta: Option<f64>,
+    pub gating: bool,
+    pub normalized: bool,
     pub baseline_sample_count: u64,
     pub candidate_sample_count: u64,
     pub comparable_row_count: u64,
@@ -115,6 +127,7 @@ impl From<domain::ExperimentComparisonBucket> for ExperimentComparisonBucketBody
             domain::ExperimentComparisonBucket::Regressed => Self::Regressed,
             domain::ExperimentComparisonBucket::Improved => Self::Improved,
             domain::ExperimentComparisonBucket::Unchanged => Self::Unchanged,
+            domain::ExperimentComparisonBucket::Inconclusive => Self::Inconclusive,
             domain::ExperimentComparisonBucket::New => Self::New,
             domain::ExperimentComparisonBucket::Missing => Self::Missing,
         }
@@ -137,6 +150,7 @@ impl From<domain::ExperimentComparisonAssignment> for ExperimentComparisonAssign
             domain::ExperimentComparisonAssignment::Regressed => Self::Regressed,
             domain::ExperimentComparisonAssignment::Improved => Self::Improved,
             domain::ExperimentComparisonAssignment::Unchanged => Self::Unchanged,
+            domain::ExperimentComparisonAssignment::Descriptive => Self::Descriptive,
             domain::ExperimentComparisonAssignment::BaselineOnly => Self::BaselineOnly,
             domain::ExperimentComparisonAssignment::CandidateOnly => Self::CandidateOnly,
             domain::ExperimentComparisonAssignment::Unavailable => Self::Unavailable,
@@ -152,6 +166,9 @@ impl From<domain::ExperimentComparisonDimension> for ExperimentComparisonDimensi
             baseline: value.baseline,
             candidate: value.candidate,
             delta: value.delta,
+            oriented_delta: value.oriented_delta,
+            gating: value.gating,
+            normalized: value.normalized,
             baseline_sample_count: value.baseline_sample_count,
             candidate_sample_count: value.candidate_sample_count,
             assignment: value.assignment.into(),
@@ -168,6 +185,7 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
             regressed: value.counts.regressed,
             improved: value.counts.improved,
             unchanged: value.counts.unchanged,
+            inconclusive: value.counts.inconclusive,
             new: value.counts.new,
             missing: value.counts.missing,
         };
@@ -187,6 +205,8 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
                     baseline: dimension.baseline,
                     candidate: dimension.candidate,
                     delta: dimension.delta,
+                    gating: dimension.gating,
+                    normalized: dimension.normalized,
                     baseline_sample_count: dimension.baseline_sample_count,
                     candidate_sample_count: dimension.candidate_sample_count,
                     comparable_row_count: dimension.comparable_row_count,

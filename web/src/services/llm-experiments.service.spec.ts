@@ -44,6 +44,7 @@ describe("llmExperimentsService", () => {
           regressed: 1,
           improved: 0,
           unchanged: 0,
+          inconclusive: 0,
           new: 1,
           missing: 1,
         },
@@ -54,6 +55,9 @@ describe("llmExperimentsService", () => {
             baseline: 0.8,
             candidate: 0.6,
             delta: -0.2,
+            oriented_delta: -0.2,
+            gating: true,
+            normalized: true,
             baseline_sample_count: 2,
             candidate_sample_count: 1,
             comparable_row_count: 1,
@@ -83,7 +87,15 @@ describe("llmExperimentsService", () => {
       baselineId: "baseline",
       candidateId: "candidate",
       counts: { commonRows: 1, new: 1, missing: 1 },
-      dimensions: [{ baselineSampleCount: 2, candidateSampleCount: 1 }],
+      dimensions: [
+        {
+          baselineSampleCount: 2,
+          candidateSampleCount: 1,
+          orientedDelta: -0.2,
+          gating: true,
+          normalized: true,
+        },
+      ],
       rows: [{ logicalId: "case-1", baselineRowId: "row-v1", candidateRowId: "row-v2" }],
     });
   });

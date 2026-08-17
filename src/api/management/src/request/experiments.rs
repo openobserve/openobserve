@@ -409,14 +409,25 @@ pub async fn compare_experiments(
             }
         };
     use openobserve_core::llm_evaluations::experiment_comparison::{
-        CompareExperimentsInput, ComparisonEvidence, compare_experiments,
+        CompareExperimentsInput, ComparisonEvidence, ComparisonPolicy, compare_experiments,
     };
+    // Comparison Policies orient every Score dimension. Without one a dimension
+    // is descriptive and cannot mark a row improved or regressed.
+    let score_configs = match infra::table::score_configs::get_all_by_org(&org_id).await {
+        Ok(configs) => configs,
+        Err(error) => {
+            log::error!("[Experiment] failed to load Score Configs for comparison: {error}");
+            return MetaHttpResponse::internal_error("Failed to compare Experiments");
+        }
+    };
+    let policy = ComparisonPolicy::from_configs(&score_configs);
     MetaHttpResponse::json(ExperimentComparisonResponseBody::from(compare_experiments(
         CompareExperimentsInput {
             baseline_id: baseline.id,
             candidate_id: candidate.id,
             dataset_id: baseline.dataset_id,
             threshold,
+            policy: &policy,
             baseline: ComparisonEvidence {
                 slots: &baseline_slots,
                 executions: &baseline_results.executions,

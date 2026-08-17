@@ -212,10 +212,22 @@ export interface ExperimentScoreSummary {
   value: Record<string, unknown> | null;
 }
 
-export type ExperimentComparisonBucket = "regressed" | "improved" | "unchanged" | "new" | "missing";
+export type ExperimentComparisonBucket =
+  | "regressed"
+  | "improved"
+  | "unchanged"
+  | "inconclusive"
+  | "new"
+  | "missing";
 
 export type ExperimentComparisonAssignment =
-  "regressed" | "improved" | "unchanged" | "baseline_only" | "candidate_only" | "unavailable";
+  | "regressed"
+  | "improved"
+  | "unchanged"
+  | "descriptive"
+  | "baseline_only"
+  | "candidate_only"
+  | "unavailable";
 
 export interface ExperimentComparisonDimension {
   name: string;
@@ -223,6 +235,12 @@ export interface ExperimentComparisonDimension {
   baseline: number | null;
   candidate: number | null;
   delta: number | null;
+  /** Change in the better direction; positive always means improved. */
+  orientedDelta: number | null;
+  /** Whether the dimension declares a comparison policy and can vote. */
+  gating: boolean;
+  /** Whether orientedDelta is a fraction of the configured range, not raw units. */
+  normalized: boolean;
   baselineSampleCount: number;
   candidateSampleCount: number;
   assignment: ExperimentComparisonAssignment;
@@ -255,6 +273,7 @@ export interface ExperimentComparison {
     regressed: number;
     improved: number;
     unchanged: number;
+    inconclusive: number;
     new: number;
     missing: number;
   };
@@ -516,6 +535,9 @@ function normalizeComparisonDimension(input: any): ExperimentComparisonDimension
     baseline: value(input, "baseline", "baseline", null),
     candidate: value(input, "candidate", "candidate", null),
     delta: value(input, "delta", "delta", null),
+    orientedDelta: value(input, "orientedDelta", "oriented_delta", null),
+    gating: Boolean(value(input, "gating", "gating", false)),
+    normalized: Boolean(value(input, "normalized", "normalized", false)),
     baselineSampleCount: Number(value(input, "baselineSampleCount", "baseline_sample_count", 0)),
     candidateSampleCount: Number(value(input, "candidateSampleCount", "candidate_sample_count", 0)),
     assignment: input?.assignment,
@@ -537,6 +559,7 @@ export function normalizeExperimentComparison(input: any): ExperimentComparison 
       regressed: Number(counts.regressed ?? 0),
       improved: Number(counts.improved ?? 0),
       unchanged: Number(counts.unchanged ?? 0),
+      inconclusive: Number(counts.inconclusive ?? 0),
       new: Number(counts.new ?? 0),
       missing: Number(counts.missing ?? 0),
     },
