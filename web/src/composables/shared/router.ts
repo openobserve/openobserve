@@ -274,7 +274,7 @@ const useRoutes = () => {
       component: ServiceGraphView,
       meta: {
         keepAlive: true,
-        title: "Service Graph",
+        titleKey: "menu.serviceGraph",
       },
       beforeEnter(to: any, from: any, next: any) {
         // Enterprise-only, mirroring the nav flyout's `enterprise` gate. An OSS
@@ -292,7 +292,7 @@ const useRoutes = () => {
       component: ServicesCatalogView,
       meta: {
         keepAlive: true,
-        title: "Service Catalog",
+        titleKey: "menu.services",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -653,7 +653,7 @@ const useRoutes = () => {
       name: "editAlert",
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
-        title: "Edit Alert",
+        titleKey: "routeTitles.editAlert",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

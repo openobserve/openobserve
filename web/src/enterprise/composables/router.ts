@@ -116,19 +116,19 @@ const useEnvRoutes = () => {
           path: "discovery",
           name: "aiDiscovery",
           component: AIDiscoveryPage,
-          meta: { title: "Discovery", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.discovery", keepAlive: false },
         },
         {
           path: "queues",
           name: "aiQueues",
           component: AIQueuesPage,
-          meta: { title: "Queues", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.queues", keepAlive: false },
         },
         {
           path: "queues/:id",
           name: "aiQueueDetail",
           component: AIQueueDetailPage,
-          meta: { title: "Queue", keepAlive: false },
+          meta: { titleKey: "routeTitles.aiQueueDetail", keepAlive: false },
         },
         // The Workbench is a MODE of a queue, not a sibling page — it sits under
         // the queue it reviews so "back" lands on the queue, not the list.
@@ -136,19 +136,19 @@ const useEnvRoutes = () => {
           path: "queues/:id/review",
           name: "aiQueueWorkbench",
           component: AIQueueWorkbenchPage,
-          meta: { title: "Queue Review", keepAlive: false },
+          meta: { titleKey: "routeTitles.aiQueueReview", keepAlive: false },
         },
         {
           path: "datasets",
           name: "aiDatasets",
           component: AIDatasetsPage,
-          meta: { title: "Datasets", keepAlive: false },
+          meta: { titleKey: "aiObservability.nav.datasets", keepAlive: false },
         },
         {
           path: "datasets/:id",
           name: "aiDatasetDetail",
           component: AIDatasetDetailPage,
-          meta: { title: "Dataset", keepAlive: false },
+          meta: { titleKey: "routeTitles.aiDatasetDetail", keepAlive: false },
         },
         {
           path: "evaluations",
