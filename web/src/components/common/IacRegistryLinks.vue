@@ -21,17 +21,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   tells a reader the exported configuration applies to either tool.
 -->
 <script setup lang="ts">
+import { computed } from "vue";
+
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import opentofuLogo from "@/assets/images/common/opentofu.svg";
+import opentofuLogoDark from "@/assets/images/common/opentofu_dark.svg";
 import terraformLogo from "@/assets/images/common/terraform.svg";
+import { useTheme } from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 withDefaults(defineProps<{ dataTest?: string }>(), { dataTest: "iac-registry-links" });
 
 const { t } = useI18nTyped();
+const { isDark } = useTheme();
 
-const REGISTRIES = [
+// Brand artwork, so the variant is chosen here rather than with `dark:` classes:
+// a second element toggled by `hidden` / `dark:inline-flex` loses to the display
+// utility OIcon's own root carries — Tailwind emits `.inline-flex` after
+// `.hidden`, so both marks rendered at once.
+//
+// OpenTofu ships two: the amber-only silhouette is the on-dark mark and washes
+// out on a light surface, so light mode gets the outlined variant that carries
+// its own definition. Terraform's purple works on either canvas.
+const REGISTRIES = computed(() => [
   {
     key: "terraform",
     name: raw("Terraform Registry"),
@@ -41,10 +54,10 @@ const REGISTRIES = [
   {
     key: "opentofu",
     name: raw("OpenTofu Registry"),
-    icon: `img:${opentofuLogo}`,
+    icon: `img:${isDark.value ? opentofuLogoDark : opentofuLogo}`,
     url: "https://search.opentofu.org/provider/openobserve/openobserve/latest",
   },
-];
+]);
 </script>
 
 <template>

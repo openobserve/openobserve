@@ -26,6 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="shield-alert-outline"
     >
       <template #actions>
+        <!-- The provider behind the Terraform export tab, which is otherwise
+             only discoverable once the export dialog is already open. -->
+        <IacRegistryLinks data-test="alert-list-iac-registries" />
         <!-- Import button -->
         <OButton
           :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
@@ -76,18 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right: Table -->
         <div class="h-full min-w-0 flex-1">
           <div class="bg-card-glass-bg flex h-full flex-col">
-            <div
-              class="border-border-default flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2"
-            >
+            <div class="border-border-default shrink-0 border-b px-3 py-2">
               <AppTabs
                 :tabs="alertTabs"
                 :active-tab="activeTab"
                 size="sm"
                 @update:active-tab="onAlertTabChange"
               />
-              <!-- The provider behind the Terraform export tab, which is
-                   otherwise only discoverable once the dialog is already open. -->
-              <IacRegistryLinks data-test="alert-list-iac-registries" />
             </div>
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
