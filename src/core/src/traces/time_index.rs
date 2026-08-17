@@ -199,7 +199,10 @@ async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String
             });
     const LOOKUP_FIELDS: [&str; 2] = ["trace_id", "session_id"];
     let missing_lookup_field = LOOKUP_FIELDS.iter().any(|field| {
-        !index_settings.bloom_filter_fields.iter().any(|f| f == field)
+        !index_settings
+            .bloom_filter_fields
+            .iter()
+            .any(|f| f == field)
             || !index_settings.index_fields.iter().any(|f| f == field)
     });
     let needs_settings_update = missing_lookup_field
@@ -207,7 +210,11 @@ async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String
         || index_settings.extended_retention_days != source_settings.extended_retention_days;
     if needs_settings_update {
         for field in LOOKUP_FIELDS {
-            if !index_settings.bloom_filter_fields.iter().any(|f| f == field) {
+            if !index_settings
+                .bloom_filter_fields
+                .iter()
+                .any(|f| f == field)
+            {
                 index_settings.bloom_filter_fields.push(field.to_string());
             }
             if !index_settings.index_fields.iter().any(|f| f == field) {
@@ -410,10 +417,7 @@ mod tests {
             10_000_000_000,
             20_000_000_000,
         )]);
-        assert_eq!(
-            records[0].session_id.as_deref(),
-            Some("high-precedence")
-        );
+        assert_eq!(records[0].session_id.as_deref(), Some("high-precedence"));
     }
 
     #[test]

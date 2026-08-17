@@ -187,9 +187,7 @@ async fn query_window(
     if start_time >= end_time {
         return Ok(WindowResult::Miss);
     }
-    let remaining = context
-        .deadline
-        .saturating_duration_since(Instant::now());
+    let remaining = context.deadline.saturating_duration_since(Instant::now());
     if remaining.is_zero() {
         return Ok(WindowResult::TimedOut);
     }

@@ -400,12 +400,7 @@ mod tests {
             vec![
                 Arc::new(Int64Array::from(vec![100, 110, 120, 130])),
                 Arc::new(StringArray::from(vec!["a", "a", "b", "a"])),
-                Arc::new(StringArray::from(vec![
-                    None,
-                    Some("session-a"),
-                    None,
-                    None,
-                ])),
+                Arc::new(StringArray::from(vec![None, Some("session-a"), None, None])),
                 Arc::new(Int64Array::from(vec![100, 90, 120, 80])),
                 Arc::new(Int64Array::from(vec![101, 115, 125, 140])),
             ],
@@ -477,8 +472,7 @@ mod tests {
                     trace_ids.value(index).to_string(),
                     (
                         timestamps.value(index),
-                        (!session_ids.is_null(index))
-                            .then(|| session_ids.value(index).to_string()),
+                        (!session_ids.is_null(index)).then(|| session_ids.value(index).to_string()),
                         min_ts.value(index),
                         max_ts.value(index),
                     ),
@@ -489,7 +483,6 @@ mod tests {
         assert_eq!(rows["a"], (100, Some("session-a".to_string()), 80, 140));
         assert_eq!(rows["b"], (120, None, 120, 125));
     }
-
 
     #[tokio::test]
     async fn test_write_vortex_carries_file_meta() {

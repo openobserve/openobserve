@@ -33,9 +33,7 @@ use openobserve_core::auth::UserEmail;
 use search_service as SearchService;
 use tracing::{Instrument, Span};
 
-use super::time_index::{
-    check_stream_permission, parse_optional_time_range, union_ranges,
-};
+use super::time_index::{check_stream_permission, parse_optional_time_range, union_ranges};
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
     search::error_utils::map_error_to_http_response,
@@ -184,4 +182,3 @@ pub async fn get_trace_details(
         .get_or_insert(effective_range.end_time);
     Json(response).into_response()
 }
-

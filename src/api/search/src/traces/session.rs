@@ -552,17 +552,22 @@ pub async fn get_session_details(
     // Resolve the session through the time index first: it yields the
     // session's full range plus its member traces, independent of the
     // caller's window.
-    let index_result =
-        match super::time_index::query_session(&org_id, &stream_name, &session_id, hint_ts).await
-        {
-            Ok(result) => result,
-            Err(e) => {
-                log::error!(
-                    "[trace_id {trace_id}] session time index query failed for {org_id}/{stream_name}: {e}"
-                );
-                None
-            }
-        };
+    let index_result = match super::time_index::query_session(
+        &org_id,
+        &stream_name,
+        &session_id,
+        hint_ts,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            log::error!(
+                "[trace_id {trace_id}] session time index query failed for {org_id}/{stream_name}: {e}"
+            );
+            None
+        }
+    };
     let effective_range = match super::time_index::union_ranges(
         caller_range,
         index_result.as_ref().map(|result| result.range),
