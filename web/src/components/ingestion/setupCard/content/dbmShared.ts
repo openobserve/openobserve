@@ -64,6 +64,38 @@ export const DBM_CONTRIB_VERSION = "0.158.0";
 export const DBM_SERVER_STREAM = "dbm_server";
 
 /**
+ * TLS ON THE SQLQUERY DATASOURCES: the shipped default is `sslmode=require`.
+ *
+ * These strings are copied verbatim into a config that connects to a PRODUCTION
+ * database carrying a password, so the default cannot be the setting that sends
+ * that password in clear text. `require` encrypts the session without demanding
+ * a CA bundle on the collector host, which is the strongest mode that works on
+ * an unmodified managed instance (RDS, Cloud SQL and Azure all accept it), and
+ * it is what a DBA expects to see in a monitoring connection string.
+ *
+ * The downgrade path, for a local or dev instance whose server was built
+ * without TLS: change `sslmode=require` to `sslmode=disable`. Postgres rejects
+ * a `require` connection to a non-TLS server outright, so the failure is loud
+ * ("server does not support SSL") rather than a silent clear-text session.
+ * Upgrade paths, for an instance with a CA you can pin: `verify-ca` or
+ * `verify-full`, both of which additionally need `sslrootcert=` pointing at the
+ * certificate file on the COLLECTOR host.
+ *
+ * All three Postgres `sqlquery` datasources below carry the SAME mode. They are
+ * separate template literals, so changing one and not the others ships a config
+ * where two receivers are encrypted and one is not — Postgres.spec.ts asserts
+ * the shipped config contains no `sslmode=disable` anywhere, for that reason.
+ *
+ * STILL OPEN, deliberately not changed in this pass: the receiver-native events
+ * block sets `tls: { insecure: true }`, which is the same exposure by a
+ * different key. It is left alone because `insecure: false` on the OTel
+ * postgresqlreceiver requires a usable CA path on the collector host, so
+ * flipping it would break every copyable config that works today rather than
+ * degrade loudly the way a datasource mode does. Tracked as its own change with
+ * its own verification.
+ */
+
+/**
  * Postgres blocking chains, from `pg_stat_activity` + `pg_blocking_pids()`.
  *
  * This is a SAMPLER, not an event log: it lists who is waiting right now, so a
@@ -73,7 +105,7 @@ export const DBM_SERVER_STREAM = "dbm_server";
  */
 const PG_BLOCKING_RECEIVER = `  sqlquery/pg_blocking:
     driver: postgres
-    datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=disable"
+    datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=require"
     collection_interval: 10s
     queries:
       - sql: |
@@ -643,7 +675,7 @@ const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
  */
 const PG_TABLE_STATS_RECEIVER = `  sqlquery/pg_table_stats:
     driver: postgres
-    datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=disable"
+    datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=require"
     collection_interval: 60s
     queries:
       - sql: |
@@ -706,7 +738,7 @@ const PG_TABLE_STATS_RECEIVER = `  sqlquery/pg_table_stats:
  */
 const PG_INDEX_STATS_RECEIVER = `  sqlquery/pg_index_stats:
     driver: postgres
-    datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=disable"
+    datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=require"
     collection_interval: 60s
     queries:
       - sql: |
@@ -1313,8 +1345,12 @@ export const PG_DBM_AUTO_EXPLAIN_CONF = `# OPTIONAL: capture the plans Postgres 
 # comma list; dropping pg_stat_statements from it kills server top queries.
 shared_preload_libraries = 'pg_stat_statements,auto_explain'
 # Log the executed plan of any statement slower than this. Volume control, NOT
-# a cost control: instrumentation is armed before the statement runs.
-auto_explain.log_min_duration = '1s'
+# a cost control: instrumentation is armed before the statement runs, so
+# lowering this writes more without costing more, and raising it saves log
+# volume without saving executor overhead — that is sample_rate's job.
+# 2s is the production starting point this step's guidance recommends; lower it
+# once you have watched p99 for a full business cycle.
+auto_explain.log_min_duration = '2s'
 # The parser reads JSON — other formats are silently unparseable.
 auto_explain.log_format = json
 # Real row counts and a real total duration. This is the knob with executor
@@ -1329,9 +1365,16 @@ auto_explain.log_timing = off
 auto_explain.log_buffers = on
 # One plan per statement inside function bodies — off unless you live in PL/pgSQL.
 auto_explain.log_nested_statements = off
-# THE actual cost control on a busy primary: 0.01 = 1% of statements pay for
-# instrumentation. Start low in production, widen deliberately.
-auto_explain.sample_rate = 1.0
+# THE actual cost control on a busy primary, and the ONE line to raise
+# deliberately rather than by default: 0.01 = 1% of statements pay for the
+# instrumentation log_analyze arms. Published overhead for analyze-on capture
+# ranges from ~2% to a factor of 2 depending on workload and clock cost, so the
+# safe value is the shipped one and widening is a decision with a measurement
+# behind it (run pg_test_timing first — see log_timing above).
+#
+# 1.0 means EVERY statement considered pays. That is a diagnosis window on an
+# instance you are actively investigating, never a monitoring default.
+auto_explain.sample_rate = 0.01
 # Exact plan-to-query join key: stamps the server's queryid on every log line.
 compute_query_id = on
 log_line_prefix = '%m [%p] %q%u@%d app=%a vxid=%v txid=%x line=%l qid=%Q '`;

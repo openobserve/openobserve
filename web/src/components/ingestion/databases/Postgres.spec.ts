@@ -555,6 +555,75 @@ describe("postgresCard builder", () => {
   });
 
   /**
+   * THE PASTE-IN VALUE IS THE ADVICE. This step's prose, its `note`, and the
+   * comment directly above each line all tell a DBA to start at
+   * `sample_rate = 0.01` and `log_min_duration = '2s'` on a busy primary — and
+   * the config SHIPPED `1.0` and `'1s'`, so the line a reader copies armed
+   * instrumentation on 100% of statements while the text beside it said 1%.
+   *
+   * That is the failure this pins: not a wrong number, but a config whose
+   * values contradict their own guidance. `sample_rate` is the one that costs —
+   * with `log_analyze = on` every statement CONSIDERED pays, not only the ones
+   * logged, and published overhead for analyze-on capture runs from ~2% to a
+   * factor of 2 depending on workload and clock cost. A monitoring default must
+   * be the safe end of that range; 1.0 is a diagnosis window, not a default.
+   *
+   * Asserted against the recommendation text itself so the two cannot drift
+   * apart again — the previous bug was invisible precisely because nothing
+   * compared the value to the sentence above it.
+   */
+  it("ships auto_explain values that match the advice printed beside them", () => {
+    const card = postgresCard(SUBS);
+    const step = card.steps.find((s) => s.id === "dbm-auto-explain")!;
+    const conf = step.code!.raw;
+
+    // The cost control, at the safe end. NOT 1.0.
+    expect(conf).toContain("auto_explain.sample_rate = 0.01");
+    expect(conf).not.toContain("auto_explain.sample_rate = 1.0");
+    // The volume control, at the production starting point the note names.
+    expect(conf).toContain("auto_explain.log_min_duration = '2s'");
+    // The most expensive knob stays off; the note and the conf must agree.
+    expect(conf).toContain("auto_explain.log_timing = off");
+
+    // The step's own note is the contract the values above are keeping.
+    expect(step.note).toMatch(/sample_rate = 0\.01/);
+    expect(step.note).toMatch(/log_min_duration = '2s'/);
+  });
+
+  /**
+   * THE CONNECTION STRING IS THE ADVICE TOO. Every `sqlquery` datasource in the
+   * DBM config is pasted verbatim into a config that connects to a PRODUCTION
+   * database and carries a password on the wire. `sslmode=disable` shipped as
+   * the copyable default sends that password, and every row of
+   * `pg_stat_activity` it reads back, in clear text — and it does so silently,
+   * because a disabled-TLS connection succeeds exactly like an encrypted one.
+   *
+   * `require` is the strongest mode that needs no CA bundle on the collector
+   * host, so it works unmodified against managed instances, and it fails LOUDLY
+   * ("server does not support SSL") against a server without TLS rather than
+   * quietly downgrading. The downgrade for a local instance is documented
+   * beside the value.
+   *
+   * Asserted across the WHOLE generated config rather than per-receiver: the
+   * three Postgres datasources are separate template literals, so the failure
+   * this pins is two of them being fixed and the third being missed.
+   */
+  it("ships every sqlquery datasource with TLS required, not disabled", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    const datasources = config.split("\n").filter((l) => l.includes("datasource:"));
+    // Guard the extractor: an empty list would make the assertions vacuous.
+    expect(datasources.length).toBeGreaterThanOrEqual(3);
+
+    expect(config).not.toContain("sslmode=disable");
+    for (const line of datasources) {
+      expect(line).toContain("sslmode=require");
+    }
+  });
+
+  /**
    * THE %Q LOCKSTEP (T6). The optional auto_explain step rewrites
    * log_line_prefix to carry `qid=%Q` — the server's own queryid, the exact
    * join key that survives `= ANY($1)` driver rewrites and >16 KB truncation,

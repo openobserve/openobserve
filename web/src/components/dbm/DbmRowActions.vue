@@ -43,7 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`${dataTest}-${action.id}`"
       @click.stop="emit('action', action.id)"
     >
-      <OTooltip side="top" :content="action.label" />
+      <!-- `left`, the convention for an icon-only action in a table's trailing
+           cell — it opens INTO the row rather than over the row above, and it
+           is what the other right-edge row actions already use (the
+           open-in-new buttons on Slowest calls and Query detail). These
+           buttons carry no label, so the tooltip is the only thing naming
+           them; where it opens is the difference between reading it and
+           covering the row you are pointing at. -->
+      <OTooltip side="left" :content="action.label" />
     </OButton>
   </div>
 </template>

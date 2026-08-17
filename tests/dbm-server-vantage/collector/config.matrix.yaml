@@ -927,7 +927,12 @@ receivers:
   # ============================================================================
   filelog/pg:
     include: [/pglogs/postgresql*.log]
-    start_at: beginning
+    # `end`, NOT `beginning`: these log files carry DAYS of history (the pg log
+    # alone is tens of GB), and a fresh collector with `beginning` spends hours
+    # replaying 2026-08-08 before it reaches today — which reads as "the
+    # statement feed is broken" when it is merely far behind. The matrix orgs
+    # want CURRENT data, so tail from the end.
+    start_at: end
     storage: file_storage/o2dbm
     multiline:
       line_start_pattern: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+ \['
@@ -1101,7 +1106,12 @@ receivers:
   # ---- MySQL error log: InnoDB deadlock records (innodb_print_all_deadlocks=ON) ----
   filelog/mysql:
     include: [/mysqllogs/error.log]
-    start_at: beginning
+    # `end`, NOT `beginning`: these log files carry DAYS of history (the pg log
+    # alone is tens of GB), and a fresh collector with `beginning` spends hours
+    # replaying 2026-08-08 before it reaches today — which reads as "the
+    # statement feed is broken" when it is merely far behind. The matrix orgs
+    # want CURRENT data, so tail from the end.
+    start_at: end
     storage: file_storage/o2dbm
     multiline:
       line_start_pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
@@ -1179,7 +1189,12 @@ receivers:
   # it, so the rig produced zero o2_maria_event records.
   filelog/mariadb:
     include: [/mariadblogs/error.log]
-    start_at: beginning
+    # `end`, NOT `beginning`: these log files carry DAYS of history (the pg log
+    # alone is tens of GB), and a fresh collector with `beginning` spends hours
+    # replaying 2026-08-08 before it reaches today — which reads as "the
+    # statement feed is broken" when it is merely far behind. The matrix orgs
+    # want CURRENT data, so tail from the end.
+    start_at: end
     storage: file_storage/o2dbm
     multiline:
       line_start_pattern: '^\d{4}-\d{2}-\d{2} +\d{1,2}:\d{2}:\d{2} '
@@ -1282,44 +1297,162 @@ processors:
         statements:
           - set(attributes["o2_vantage"], "server")
 
+  # ------------------------------------------------------------------ MATRIX ONLY
+  # memory_limiter: the guard the shared config.yaml LACKS, and the reason this
+  # single collector can safely fan out to four backends where four separate
+  # collectors OOM-killed each other (and took dbm-sv-mssql with them).
+  #
+  # Without it, a backend that stops answering (measured: 28,308 "sending queue is
+  # full" events on dbm-sv-collector-oss when host.docker.internal:5080 DNS timed
+  # out) makes the collector buffer instead of shed, and it grew to 2.06 GiB while
+  # an identical sibling sat at 95 MiB. memory_limiter forces backpressure into the
+  # receivers instead, so the process plateaus.
+  #
+  # Limits sized for THIS host: 7.653 GiB Docker VM, baseline rig ~3.3 GiB resident.
+  # MEASURED, not guessed. Both settings were run for several minutes:
+  #   limit_mib 768  + spike 192  -> steady 1.05-1.16 GiB RSS, ~1577 refusals/3min
+  #   limit_mib 1536 + spike 384  -> steady 1.80-1.85 GiB RSS, ~993  refusals/2min
+  # Raising the limit did NOT stop the shedding -- it only moved the plateau up.
+  # That is the tell: this collector is CPU-bound, not memory-starved. It ran at
+  # 130-190% CPU in both configurations, so the queue backs up because the 17
+  # receivers + filter + 10 exporters cannot keep pace on this host, and the extra
+  # GiB just buys a bigger buffer in front of the same bottleneck.
+  #
+  # 768/192 is therefore the RIGHT setting, not the timid one: it holds the same
+  # throughput in ~1 GiB less RSS, which is exactly the headroom the four-collector
+  # design did not have when it OOM-killed dbm-sv-mssql. Note limit_mib governs the
+  # Go HEAP; RSS additionally carries runtime overhead and receiver buffers, which
+  # is why 768 presents as ~1.1 GiB.
+  #
+  # The refusals are backpressure, not data loss the rig cares about: DBM only needs
+  # each org to be scraped continuously, and every org still lands rows (verified).
+  # If you need zero shedding, the fix is fewer receivers or more CPU, not more RAM.
+  #
+  # It MUST be first in every pipeline's processor list (OTel docs): a limiter
+  # placed after the batcher never sees the data that is actually accumulating.
+  memory_limiter/matrix:
+    check_interval: 1s
+    limit_mib: 3072
+    spike_limit_mib: 768
+
 exporters:
-  otlphttp/o2_logs:
-    logs_endpoint: ${env:O2_ENDPOINT}/api/${env:O2_ORG}/v1/logs
+  # ------------------------------------------------------------------ MATRIX FAN-OUT
+  # ONE collector, FOUR orgs. The org appeared in exactly one place in the shared
+  # config -- the exporter URL -- so running four collectors duplicated all 17
+  # receivers (4x the scrape load on five databases) purely to vary that URL.
+  # OTel pipelines take a LIST of exporters, so the fan-out belongs here.
+  #
+  # WHY HARDCODED, not ${env:...}: org AND endpoint now differ PER EXPORTER, so a
+  # single ${env:O2_ORG}/${env:O2_ENDPOINT} pair cannot express them. Eight distinct
+  # env vars would work but would put the matrix definition -- which orgs exist and
+  # which backend each lives on -- outside the file that defines the pipelines,
+  # where a typo in a run script silently feeds the wrong org. This file IS the
+  # matrix; the orgs are literals so the mapping is reviewable in one place.
+  # Only O2_AUTH stays an env var (it is a credential, identical for all four).
+  #
+  # The camelCase in o_noTraces / e_noTraces is EXACT and load-bearing -- O2 org
+  # ids are case-sensitive, and o_notraces is a different (empty) org.
+  #
+  # sending_queue is BOUNDED and explicitly NON-persistent here. The shared config
+  # leaves it at defaults and the `storage:` key is absent, so it was never actually
+  # persisted -- file_storage/o2dbm only checkpoints filelog read offsets (verified:
+  # both state volumes are 76 KB and hold only receiver_filelog_* files). The 2 GiB
+  # growth was the IN-MEMORY queue plus unbounded retry. Capping queue_size and
+  # giving retry_on_failure a max_elapsed_time makes a dead backend shed data on a
+  # bounded timer instead of buffering forever -- correct for a test rig, where
+  # fresh data matters and a 5-minute gap does not.
+  otlphttp/e_traces_logs:
+    logs_endpoint: http://host.docker.internal:5090/api/e_traces/v1/logs
     headers:
       Authorization: Basic ${env:O2_AUTH}
       stream-name: dbm_server
     tls: { insecure: true }
-    retry_on_failure: { enabled: true }
-  otlphttp/o2_metrics:
-    metrics_endpoint: ${env:O2_ENDPOINT}/api/${env:O2_ORG}/v1/metrics
+    sending_queue: { enabled: true, num_consumers: 8, queue_size: 5000 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+  otlphttp/e_noTraces_logs:
+    logs_endpoint: http://host.docker.internal:5090/api/e_noTraces/v1/logs
     headers:
       Authorization: Basic ${env:O2_AUTH}
+      stream-name: dbm_server
     tls: { insecure: true }
-    retry_on_failure: { enabled: true }
-  otlphttp/o2_traces:
-    traces_endpoint: ${env:O2_ENDPOINT}/api/${env:O2_ORG}/v1/traces
+    sending_queue: { enabled: true, num_consumers: 8, queue_size: 5000 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+  otlphttp/o_traces_logs:
+    logs_endpoint: http://host.docker.internal:5080/api/o_traces/v1/logs
     headers:
       Authorization: Basic ${env:O2_AUTH}
+      stream-name: dbm_server
     tls: { insecure: true }
-    retry_on_failure: { enabled: true }
+    sending_queue: { enabled: true, num_consumers: 8, queue_size: 5000 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+  otlphttp/o_noTraces_logs:
+    logs_endpoint: http://host.docker.internal:5080/api/o_noTraces/v1/logs
+    headers:
+      Authorization: Basic ${env:O2_AUTH}
+      stream-name: dbm_server
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 8, queue_size: 5000 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+
+  otlphttp/e_traces_metrics:
+    metrics_endpoint: http://host.docker.internal:5090/api/e_traces/v1/metrics
+    headers: { Authorization: "Basic ${env:O2_AUTH}" }
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 2, queue_size: 200 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+  otlphttp/e_noTraces_metrics:
+    metrics_endpoint: http://host.docker.internal:5090/api/e_noTraces/v1/metrics
+    headers: { Authorization: "Basic ${env:O2_AUTH}" }
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 2, queue_size: 200 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+  otlphttp/o_traces_metrics:
+    metrics_endpoint: http://host.docker.internal:5080/api/o_traces/v1/metrics
+    headers: { Authorization: "Basic ${env:O2_AUTH}" }
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 2, queue_size: 200 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+  otlphttp/o_noTraces_metrics:
+    metrics_endpoint: http://host.docker.internal:5080/api/o_noTraces/v1/metrics
+    headers: { Authorization: "Basic ${env:O2_AUTH}" }
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 2, queue_size: 200 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+
+  # TRACES: only TWO exporters exist. There is deliberately no o_noTraces /
+  # e_noTraces traces exporter anywhere in this file -- see the traces pipeline.
+  otlphttp/e_traces_traces:
+    traces_endpoint: http://host.docker.internal:5090/api/e_traces/v1/traces
+    headers: { Authorization: "Basic ${env:O2_AUTH}" }
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 2, queue_size: 200 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+  otlphttp/o_traces_traces:
+    traces_endpoint: http://host.docker.internal:5080/api/o_traces/v1/traces
+    headers: { Authorization: "Basic ${env:O2_AUTH}" }
+    tls: { insecure: true }
+    sending_queue: { enabled: true, num_consumers: 2, queue_size: 200 }
+    retry_on_failure: { enabled: true, max_elapsed_time: 300s }
+
   debug:
     verbosity: basic
-  # RAW EVIDENCE SINK. Writes OTLP-JSON, one JSON object per line, so the
-  # postgresql/mysql receiver events can be proven present without a live
-  # OpenObserve. Bind-mounted to ./captures/raw on the host. Rotation is
-  # deliberately unset (= off) so a run produces one greppable file.
+  # RAW EVIDENCE SINK -- see shared config. The path is OPENED, never CREATED: the
+  # /rawout directory must exist on the host before start or the collector dies in
+  # seconds with `failed to start "file/raw_events" exporter: ... no such file`.
   file/raw_events:
     path: /rawout/receiver-events.jsonl
-  # Raw-evidence sink for the RECIPES pipeline, written AFTER filter/dbm — so a
-  # row in this file is a row that SURVIVED the shipped filter. That is the
-  # proof the auto_explain branch needs: its silent failure shape is a tag left
-  # at "other" being dropped by the filter while the collector reports healthy.
+  # DETACHED from the logs pipeline on purpose -- rotation is off and it measured
+  # ~90 GB/hour against these databases, enough to fill the disk. Do not re-attach.
   file/raw_recipes:
     path: /rawout/recipe-rows.jsonl
 
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
+  # Kept: this checkpoints filelog READ OFFSETS (receiver_filelog_pg/mysql/mariadb),
+  # which is what stops a collector restart from re-tailing whole database logs. It
+  # does NOT back the sending queue -- no exporter references `storage:` -- so it was
+  # never the source of the unbounded growth.
   file_storage/o2dbm:
     directory: /var/lib/otelcol
     create_directory: true
@@ -1330,23 +1463,19 @@ service:
     logs:
       level: info
   pipelines:
-    # SERVER VANTAGE / receiver-native events. Split onto its own pipeline purely
-    # so the raw-evidence file holds ONLY db.server.query_sample and
-    # db.server.top_query, undiluted by the sqlquery recipes and filelog tailing.
-    # Both pipelines export to the same `dbm_server` stream in O2.
+    # Identical receivers/processors to the shared config; the ONLY change is that
+    # each exporter list now names one exporter per org.
     logs/receiver_events:
       receivers: [postgresql, mysql]
-      processors: [transform/tag_source, resource/ident, batch]
-      exporters: [otlphttp/o2_logs, file/raw_events]
-    # SERVER VANTAGE: recipes + log tailing.
-    #
-    # filter/dbm runs here and NOT on logs/receiver_events above: that pipeline
-    # carries db.server.query_sample / db.server.top_query records, which are
-    # receiver-native and carry no o2_recipe tag, so the filter would drop every
-    # one of them and delete the rig's raw-evidence sink. The shipped config has
-    # only this pipeline, and this is the one it filters.
-    #
-    # ORDER MATTERS: filter first, so the dropped records never reach the batcher.
+      processors: [memory_limiter/matrix, transform/tag_source, resource/ident, batch]
+      exporters:
+        [
+          otlphttp/e_traces_logs,
+          otlphttp/e_noTraces_logs,
+          otlphttp/o_traces_logs,
+          otlphttp/o_noTraces_logs,
+          file/raw_events,
+        ]
     logs:
       receivers:
         [
@@ -1368,19 +1497,42 @@ service:
           filelog/mysql,
           filelog/mariadb,
         ]
-      processors: [filter/dbm, transform/tag_source, resource/ident, batch]
-      # `file/raw_recipes` is DETACHED by default. It has no rotation (see its
-      # definition) and writes every surviving row, which measured ~90 GB/hour
-      # against these databases — enough to fill a dev machine's disk within
-      # hours and break unrelated builds. Re-attach it only for a short, watched
-      # run when you need the survived-the-filter evidence, then detach again.
-      exporters: [otlphttp/o2_logs]
+      # memory_limiter FIRST, then filter/dbm before the batcher (order from the
+      # shared config: dropped records must never reach the batcher).
+      processors: [memory_limiter/matrix, filter/dbm, transform/tag_source, resource/ident, batch]
+      # file/raw_recipes stays DETACHED -- see its definition.
+      exporters:
+        [
+          otlphttp/e_traces_logs,
+          otlphttp/e_noTraces_logs,
+          otlphttp/o_traces_logs,
+          otlphttp/o_noTraces_logs,
+        ]
     metrics:
       receivers: [postgresql, mysql, otlp]
-      processors: [resource/ident, batch]
-      exporters: [otlphttp/o2_metrics]
-    # CLIENT VANTAGE: workload spans
+      processors: [memory_limiter/matrix, resource/ident, batch]
+      exporters:
+        [
+          otlphttp/e_traces_metrics,
+          otlphttp/e_noTraces_metrics,
+          otlphttp/o_traces_metrics,
+          otlphttp/o_noTraces_metrics,
+        ]
+    # CLIENT VANTAGE: workload spans.
+    #
+    # THIS IS WHERE THE TRACES / NO-TRACES DIMENSION IS ENFORCED. Exactly two
+    # exporters are listed, and no *_noTraces traces exporter is even defined in
+    # this file, so a span has no route to e_noTraces or o_noTraces. It is a
+    # structural guarantee, not a filter that could be misconfigured: with four
+    # separate collectors the separation depended on network aliases (a
+    # *_noTraces collector merely had no alias, so nothing could reach its OTLP
+    # port) -- an ambient property that any stray OTLP client on the network could
+    # break. Here the absence of the exporter is the guarantee.
+    #
+    # NOTE the asymmetry with `metrics` above, which DOES include the otlp receiver
+    # and fans out to all four: workload OTLP metrics are not the traces dimension,
+    # only spans are.
     traces:
       receivers: [otlp]
-      processors: [resource/ident, batch]
-      exporters: [otlphttp/o2_traces]
+      processors: [memory_limiter/matrix, resource/ident, batch]
+      exporters: [otlphttp/e_traces_traces, otlphttp/o_traces_traces]

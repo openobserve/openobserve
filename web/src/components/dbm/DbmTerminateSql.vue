@@ -47,7 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`${dataTest}-copy`"
       @click.stop="copy"
     >
-      <OTooltip side="top" :content="tooltip" />
+      <!-- `left`, like every other icon-only action in a table row's trailing
+           cells — this one sits directly beside the row's action buttons on
+           Blocked queries, and the two opening on different sides read as
+           unrelated controls. -->
+      <OTooltip side="left" :content="tooltip" />
     </OButton>
   </div>
 </template>

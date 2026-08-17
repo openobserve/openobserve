@@ -65,7 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dbm.detail.copySummary") }}
         <OTooltip side="bottom" :content="t('dbm.detail.copySummaryHint')" />
       </OButton>
-      <DbmRefreshButton :loading="loading" data-test="dbm-detail-refresh" @refresh="load" />
+      <DbmRefreshButton
+        :loading="loading"
+        :last-run-at="lastRunAt"
+        data-test="dbm-detail-refresh"
+        @refresh="load"
+      />
     </template>
 
     <div class="flex flex-col gap-4 pt-3">
@@ -1398,6 +1403,8 @@ const scrollToPlans = async () => {
 const samples = ref<SampleRow[]>([]);
 const samplesError = ref<string | null>(null);
 const loading = ref(false);
+/** When this page's data last landed — what the refresh control reports. */
+const lastRunAt = ref<number | null>(null);
 
 const org = computed(() => store.state.selectedOrganization?.identifier as string);
 
@@ -2260,7 +2267,15 @@ const load = async () => {
       ]);
     }
   } finally {
-    if (!requestSeq.isStale(token)) loading.value = false;
+    // Only the load that still owns the page may clear the spinner or stamp
+    // the clock — an older one doing either would report "done" over a fetch
+    // still in flight. This page keeps its own envelope rather than
+    // `useDbmListPage`'s (it is a detail view, not a list), so the timestamp
+    // is set here for the same reason and on the same terms.
+    if (!requestSeq.isStale(token)) {
+      loading.value = false;
+      lastRunAt.value = Date.now();
+    }
   }
 };
 

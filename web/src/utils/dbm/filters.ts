@@ -39,7 +39,13 @@ import { raw, type I18nText } from "@/types/i18n";
  * Dropdown options from whatever values the current response carries —
  * deduplicated, blanks dropped, `raw` because a data value is not prose.
  */
-export const optionsFrom = (values: (string | undefined)[]): { value: string; label: I18nText }[] =>
+// `null` is accepted alongside `undefined` because the server-vantage rows
+// spell an absent dimension as `null` (`db_instance: string | null`), and the
+// fallback lists are unioned into these options. The runtime filter below
+// already drops both — only the type was narrower than the behaviour.
+export const optionsFrom = (
+  values: (string | null | undefined)[],
+): { value: string; label: I18nText }[] =>
   [...new Set(values.filter((v): v is string => !!v))].map((value) => ({
     value,
     label: raw(value),

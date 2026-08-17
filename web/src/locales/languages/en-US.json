@@ -1224,6 +1224,7 @@
     "navigationLink": "Navigation link",
     "ariaCurrentPage": "{label} - Current page",
     "ariaWithNotifications": "{label} ({count} notifications)",
+    "infra": "Infra",
     "databases": "Databases",
     "topQueries": "Top Queries"
   },
@@ -14913,6 +14914,7 @@
   "dbm": {
     "common": {
       "reload": "Refresh",
+      "lastRefreshed": "Last refreshed {age}",
       "loadFailed": "Could not load database data. Try again, or narrow the time range."
     },
     "ai": {
@@ -15281,7 +15283,7 @@
       "sampleError": "Failed",
       "viewTrace": "See the request →",
       "viewTraces": "See example traces",
-      "copySummary": "Copy for Slack",
+      "copySummary": "Copy",
       "copySummaryHint": "Every number here is already on this page — this just writes the sentence, so minute 13 of an incident produces a message instead of nothing.",
       "summaryCopied": "Summary copied",
       "summaryCopyFailed": "Could not copy the summary.",
@@ -15397,12 +15399,12 @@
         "samplesHintUnknown": "The slowest individual database calls in this window.",
         "deadlocks": "Deadlocks",
         "blocked": "Blocked queries",
-        "deadlocksHint": "Deadlocks your databases reported",
-        "blockedHint": "Sessions waiting on a lock right now",
+        "deadlocksHint": "Deadlocks your databases reported.",
+        "blockedHint": "Sessions waiting on a lock right now.",
         "activity": "Activity",
-        "activityHint": "Sessions your databases are running right now",
+        "activityHint": "Sessions your databases are running right now.",
         "tableHealth": "Table health",
-        "tableHealthHint": "Table size, bloat and vacuum state (PostgreSQL only)",
+        "tableHealthHint": "Table size, bloat and vacuum state (PostgreSQL only).",
         "deadlocksLocked": "Deadlocks is an Enterprise feature. Upgrade to see which queries deadlocked against each other, and why. The other database tabs work on every plan.",
         "blockedLocked": "Blocked queries is an Enterprise feature. Upgrade to see which sessions are waiting on a lock and what is holding it. The other database tabs work on every plan.",
         "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan."
@@ -15412,6 +15414,8 @@
       "title": "Slowest calls",
       "subtitle": "The slowest individual database calls in this window, across every database and query — as their callers measured them, finished calls only",
       "subtitleServer": "The slowest statements your databases completed in this window, measured inside the database",
+      "logOffTitle": "Your databases are not logging slow statements yet",
+      "logOffDescription": "Nothing traced these calls, so we asked the databases for their own slowest statements — and they log none. This list comes from the slow-query log, which is off by default (log_min_duration_statement in PostgreSQL, long_query_time in MySQL). Top queries can still show you what runs most, because it reads the counter tables instead.",
       "searchPlaceholder": "Search query text, service or database…",
       "columns": {
         "query": "Query",
@@ -15518,7 +15522,7 @@
         "fixTitle": "The fix is in your code, not the database.",
         "fixBody": "These two statements touch {object} rows in opposite order. Make both sides update in the same order — lowest id first — and this pair can no longer deadlock.",
         "fixGeneric": "Both sides hold what the other wants. Make every transaction take these locks in the same order and this pair can no longer deadlock.",
-        "copyForSlack": "Copy incident summary",
+        "copyForSlack": "Copy",
         "occurrencesTitle": "All {count} times this pair deadlocked",
         "occurrencesHint": "Select a point to load that one above",
         "lostLabel": "{pid} lost",
@@ -15531,12 +15535,13 @@
         "partialTitle": "Only one side of this deadlock reached us",
         "partialBody": "MySQL writes each side of a deadlock as a separate log entry. The partner entry has not arrived — it may fall outside this window, or the log may have been rotated between the two. What is shown is real; the other statement is simply missing.",
         "copyHint": "Copies just this side's statement.",
+        "copySqlTooltip": "Copy this side's statement",
         "copyForSlackHint": "Both statements, how often this pair has deadlocked and when it last happened — written as a message you can paste into a channel or a ticket."
       },
       "storm": {
         "title": "Deadlock storm.",
         "body": "{count} in this window — normally none.",
-        "copyForSlack": "Copy for Slack",
+        "copyForSlack": "Copy",
         "biasWarning": "Expect the Top queries tab to look calmer than reality right now. A cancelled query still finishes, but the ones queued behind these locks haven't — so call counts there are lower than what your users are experiencing."
       },
       "summary": {
