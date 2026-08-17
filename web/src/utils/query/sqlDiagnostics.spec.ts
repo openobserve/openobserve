@@ -295,6 +295,13 @@ describe("buildContextualSqlMessage", () => {
     ["LIKE unquoted, stops on %", "SELECT * FROM t WHERE x LIKE BIN-% AND y = 1", "single quotes"],
     ["LIKE unquoted, stops later", "SELECT * FROM t WHERE x LIKE E00% ORDER BY y", "single quotes"],
     ["LIKE unquoted path", "SELECT * FROM t WHERE x LIKE /api/% ORDER BY y", "single quotes"],
+    // Unquoting a pattern that contains a space leaves the wildcard in the
+    // token after the operand: 'GET %' → GET %
+    [
+      "LIKE unquoted, space before %",
+      "SELECT * FROM t WHERE log LIKE GET % AND y = 1",
+      "single quotes",
+    ],
     ["NOT LIKE unquoted", "SELECT * FROM t WHERE x NOT LIKE Malicious% AND y = 1", "single quotes"],
     // A quoted pattern is valid — a later error must keep its own message
     ["AND incomplete after valid LIKE", "SELECT * FROM t WHERE x LIKE '%a%' AND", "AND"],
@@ -315,6 +322,14 @@ describe("buildContextualSqlMessage", () => {
     ["OFFSET incomplete", "SELECT * FROM t LIMIT 10 OFFSET", "OFFSET"],
     ["open paren", "SELECT * FROM t WHERE (", "parenthesis"],
     ["missing WHERE", "SELECT * FROM default service_name='payment'", "WHERE"],
+    // Missing WHERE reported past the condition's start — the parser stops on
+    // the AND / the call's own paren, not on a comparison operator
+    [
+      "missing WHERE before match_all",
+      "SELECT * FROM \"default\" match_all('error') AND x = 1",
+      "WHERE",
+    ],
+    ["missing WHERE after table alias", 'SELECT * FROM "default" a a.latency_ms > 100', "WHERE"],
     ["missing AND/OR", "SELECT * FROM t WHERE x=1 AND y=2 z=3", "operator"],
     ["bad LIKE %", "SELECT * FROM t WHERE x LIKE %foo%", "LIKE"],
     ["unmatched )", "SELECT * FROM t WHERE (x = 1))", "parenthesis"],
