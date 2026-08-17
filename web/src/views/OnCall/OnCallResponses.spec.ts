@@ -646,6 +646,38 @@ describe("OnCallResponses", () => {
     });
   });
 
+  /// §G.8.1: the entry fetch is the capability probe — 404 (feature off) and
+  /// 403 "Not Supported" (OSS build) both mean on-call is not available here.
+  /// A fact about the deployment: no error tone, no retry, no setup checklist
+  /// telling a build that cannot page to create teams.
+  describe("when the deployment has no on-call at all", () => {
+    it.each([
+      { response: { status: 404, data: {} } },
+      { response: { status: 403, data: { message: "Not Supported" } } },
+    ])("renders the calm not-available state, never an error (%#)", async (rejection) => {
+      service.listResponses.mockRejectedValue(rejection);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-responses-unavailable"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+    });
+
+    /// The same status with the permission message is a different fact — a
+    /// viewer without the grant must not be told the product does not exist.
+    it("keeps 403 Forbidden an error, not an absence", async () => {
+      service.listResponses.mockRejectedValue({
+        response: { status: 403, data: { message: "Forbidden" } },
+      });
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-responses-unavailable"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OTable" }).props("error")).toBe("Forbidden");
+    });
+  });
+
   /// B6: a transient 500 was previously presented as "this page does not
   /// exist", with nothing to click.
   describe("when the list cannot be loaded", () => {

@@ -45,6 +45,7 @@ import ChevronRight from "~icons/material-symbols/chevron-right";
 import Close from "~icons/material-symbols/close";
 import Backup from "~icons/material-symbols/backup-outline";
 import Cloud from "~icons/material-symbols/cloud-outline";
+import CloudOff from "~icons/material-symbols/cloud-off-outline";
 import Code from "~icons/material-symbols/code";
 import CompareArrows from "~icons/material-symbols/compare-arrows";
 import ContentCopy from "~icons/material-symbols/content-copy-outline";
@@ -384,6 +385,7 @@ export const iconRegistry = {
   "chevron-right": ChevronRight,
   close: Close,
   cloud: Cloud,
+  "cloud-off": CloudOff,
   code: Code,
   "compare-arrows": CompareArrows,
   "content-copy": ContentCopy,

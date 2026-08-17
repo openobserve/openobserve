@@ -32,6 +32,7 @@ import {
   formatMinuteOfDay,
   groupBySubject,
   isEscalating,
+  isOnCallUnavailable,
   isRotationValid,
   isSnoozed,
   isStaffed,
@@ -1050,5 +1051,36 @@ describe("compareRulePrecedence", () => {
       "service=alpha",
       "service=beta",
     ]);
+  });
+});
+
+/// §G.8.1: the entry fetch is the capability probe, and only two shapes mean
+/// "not available here". Everything else must stay an error, or a permission
+/// denial and a dead server would silently render as a calm "not available".
+describe("isOnCallUnavailable", () => {
+  const http = (status: number, message?: string) => ({
+    response: { status, data: message ? { message } : {} },
+  });
+
+  it("reads a bare 404 as the feature flag being off", () => {
+    expect(isOnCallUnavailable(http(404))).toBe(true);
+  });
+
+  it("reads 403 'Not Supported' as an OSS build", () => {
+    expect(isOnCallUnavailable(http(403, "Not Supported"))).toBe(true);
+  });
+
+  /// G.8.2's permission failure uses the same status with a different message.
+  /// Conflating them would tell a viewer without the grant that the product
+  /// does not exist.
+  it("keeps 403 'Forbidden' a permission denial, not an absence", () => {
+    expect(isOnCallUnavailable(http(403, "Forbidden"))).toBe(false);
+    expect(isOnCallUnavailable(http(403))).toBe(false);
+  });
+
+  it("keeps server failures and network errors as errors", () => {
+    expect(isOnCallUnavailable(http(500, "boom"))).toBe(false);
+    expect(isOnCallUnavailable(new Error("network down"))).toBe(false);
+    expect(isOnCallUnavailable(undefined)).toBe(false);
   });
 });

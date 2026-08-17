@@ -913,3 +913,22 @@ export function identityDimensions(dimensions: Record<string, string>): Record<s
     Object.entries(dimensions).filter(([name]) => IDENTITY_DIMENSION_IDS.has(name)),
   );
 }
+
+/**
+ * §G.8.1/§H.0: there is no capability endpoint — a view's entry fetch IS the
+ * probe. A bare 404 means `O2_ONCALL_ENABLED` is off and the routes were never
+ * registered; a 403 whose message is "Not Supported" means an OSS build. Both
+ * read as "on-call is not available here", and the difference is deliberately
+ * never surfaced to the user.
+ *
+ * Apply to a view's ENTRY fetch only. A 404 on a resource GET is a missing
+ * record, and a 403 "Forbidden" is a permission denial — both real errors that
+ * must keep rendering as errors.
+ */
+export function isOnCallUnavailable(err: unknown): boolean {
+  const response = (err as { response?: { status?: number; data?: { message?: string } } })
+    ?.response;
+  if (!response) return false;
+  if (response.status === 404) return true;
+  return response.status === 403 && /not supported/i.test(response.data?.message ?? "");
+}

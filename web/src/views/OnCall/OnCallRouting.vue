@@ -36,10 +36,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="account-tree"
     scroll
   >
+    <!-- §G.8.1: the entry fetch is the capability probe. 404 (feature off) and
+         403 "Not Supported" (OSS build) both mean on-call is not available
+         here — a fact about the deployment, not a failure, so no error tone,
+         no retry, and no hint of which of the two it was. -->
+    <OEmptyState
+      v-if="unavailable"
+      size="hero"
+      icon="cloud-off"
+      :title="t('oncall.notAvailableTitle')"
+      :description="t('oncall.notAvailableDescription')"
+      data-test="oncall-routing-unavailable"
+    />
+
     <!-- A transient 500 is not "this org has no rules" — say it failed and
          offer the way back. -->
     <OEmptyState
-      v-if="loadError"
+      v-else-if="loadError"
       size="hero"
       variant="error"
       illustration="broken-panel"
@@ -226,7 +239,12 @@ import type {
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { identityDimensions, normalizeDimensionValue, ownershipPath } from "@/utils/oncall";
+import {
+  identityDimensions,
+  isOnCallUnavailable,
+  normalizeDimensionValue,
+  ownershipPath,
+} from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -242,6 +260,7 @@ const preview = ref<RoutingPreview | null>(null);
 
 const loaded = ref(false);
 const loadError = ref("");
+const unavailable = ref(false);
 const signalsError = ref(false);
 const loadingRules = ref(false);
 const loadingSignals = ref(false);
@@ -313,6 +332,11 @@ async function fetchAll() {
     const res = await oncallService.listTeams({ org_identifier: orgId.value });
     teams.value = res.data ?? [];
   } catch (err) {
+    // The probe answered "not here" — that is a deployment fact, not a failure.
+    if (isOnCallUnavailable(err)) {
+      unavailable.value = true;
+      return;
+    }
     loadError.value = errorText(err);
     loaded.value = true;
     return;

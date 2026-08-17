@@ -214,6 +214,35 @@ describe("OnCallRouting", () => {
     expect(rulesPanel(wrapper).exists()).toBe(true);
   });
 
+  /// §G.8.1: 404 = feature flag off, 403 "Not Supported" = OSS build. Both are
+  /// a fact about the deployment — never an error state, never a retry, and
+  /// the two must be indistinguishable on screen.
+  it("renders 404 and 403-Not-Supported as the same calm not-available state", async () => {
+    for (const rejection of [
+      { response: { status: 404, data: {} } },
+      { response: { status: 403, data: { message: "Not Supported" } } },
+    ]) {
+      service.listTeams.mockRejectedValue(rejection);
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-routing-unavailable"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-routing-error"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-routing-content"]').exists()).toBe(false);
+    }
+  });
+
+  /// The same status with the permission message stays an error — a viewer
+  /// without the grant must not be told the product does not exist.
+  it("keeps 403 Forbidden an error, not an absence", async () => {
+    service.listTeams.mockRejectedValue({
+      response: { status: 403, data: { message: "Forbidden" } },
+    });
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-error"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-routing-unavailable"]').exists()).toBe(false);
+  });
+
   /// Nothing can own or be paged before a team exists — routing starts there.
   it("points an org with no teams at the Teams screen", async () => {
     service.listTeams.mockResolvedValue({ data: [] } as any);

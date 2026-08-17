@@ -53,6 +53,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
+    <!-- §G.8.1: the entry fetch is the capability probe. 404 (feature off) and
+         403 "Not Supported" (OSS build) both mean on-call is not available on
+         this deployment — a fact, not a failure. No error tone, no retry, and
+         no hint of which of the two it was. -->
+    <OEmptyState
+      v-if="unavailable"
+      size="hero"
+      icon="cloud-off"
+      :title="t('oncall.notAvailableTitle')"
+      :description="t('oncall.notAvailableDescription')"
+      data-test="oncall-responses-unavailable"
+    />
+
     <!-- Setup is answered from live data, so it survives past "no teams": a
          team with nobody in its rotation pages nobody, and the calm empty
          state below would call that healthy. -->
@@ -70,7 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          is anything waiting on a person, and would a page reach anyone. Hidden
          while the checklist is up, because neither means anything on an org
          that cannot page at all. -->
-    <OContent v-if="!showChecklist" class="grid grid-cols-1 gap-2 pt-2 pb-1 xl:grid-cols-3">
+    <OContent
+      v-if="!showChecklist && !unavailable"
+      class="grid grid-cols-1 gap-2 pt-2 pb-1 xl:grid-cols-3"
+    >
       <OnCallAttentionCard
         :unacked="attention.unacked"
         :escalating="attention.escalating"
@@ -88,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OContent>
 
     <OTable
+      v-if="!unavailable"
       :frame="false"
       :data="rows"
       :columns="columns"
@@ -586,6 +603,7 @@ import {
   groupBySubject,
   isDeliverableChannel,
   isEscalating,
+  isOnCallUnavailable,
   isSnoozed,
   nextHandover,
   priorityTone,
@@ -635,6 +653,9 @@ const totalCount = ref<number | null>(null);
 const truncated = ref(false);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
+/// §G.8.1: 404 or 403 "Not Supported" from the entry fetch — on-call is not
+/// available on this deployment. A fact about the build, never an error.
+const unavailable = ref(false);
 const search = ref("");
 const teamFilter = ref("all");
 const priorityFilter = ref("all");
@@ -1228,6 +1249,13 @@ async function fetchResponses() {
     loaded.value = true;
     await refreshTotal();
   } catch (err) {
+    // §G.8.1: the probe said "not here". Leaving `loaded` false keeps the
+    // setup checklist away too — a build that cannot page must not be told
+    // to create teams.
+    if (isOnCallUnavailable(err)) {
+      unavailable.value = true;
+      return;
+    }
     loadError.value = errorMessage(err) || String(t("oncall.loadResponsesFailed"));
   } finally {
     loading.value = false;
@@ -1395,6 +1423,9 @@ async function fetchCauseAnalytics() {
 
 async function refreshAll() {
   await fetchResponses();
+  // The probe answered "not here" — every further call would 404/403 the
+  // same way, so stop asking.
+  if (unavailable.value) return;
   await fetchContext();
   await fetchTeamContext();
   await Promise.allSettled([fetchEscalationProgress(), fetchCauseAnalytics()]);
