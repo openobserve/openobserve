@@ -765,19 +765,17 @@
      The title strip at the top of every chart panel (dashboard panels via
      PanelContainer's `dashboard-panel-bar`, metrics-explorer cards, the SLO
      charts). THE one knob for that band — change it here and every chart header
-     moves. Deliberately darker than surface-panel (grey-50) and grey-100: the
-     panel body is white, and both of those land at ~1.05-1.09:1 against it —
-     below the point where the band reads as a header at all. grey-200 gives
-     1.26:1.
+     moves. A deliberately light tint (grey-100): softer than the previous
+     grey-200 so the header reads as a gentle band rather than a heavy fill. The
+     grey-300 divider still carries the header/body separation on its own, so the
+     lighter fill does not lose the edge.
 
-     THE FILL AND ITS DIVIDER MOVE TOGETHER. The bar cannot use border-default
-     (grey-200) at this fill, because that IS the fill — 1.00:1, and the bottom
-     edge disappears entirely. That is why the bar owns a border token of its
-     own, one step darker than the fill; darkening one without the other is the
-     mistake this pair exists to prevent. */
-  --color-panel-bar-bg: var(--color-grey-200);
-  /* One step below the fill (1.18:1 against it), so the header/body edge stays
-     readable. NOT border-default — see above. */
+     THE FILL AND ITS DIVIDER MOVE TOGETHER — the divider must stay darker than
+     the fill (never border-default at grey-200, which would match a heavier fill
+     1.00:1 and vanish). At this lighter fill grey-300 sits comfortably above it. */
+  --color-panel-bar-bg: var(--color-grey-100);
+  /* Darker than the fill so the header/body edge stays readable. NOT
+     border-default — see above. */
   --color-panel-bar-border: var(--color-grey-300);
 
   /* ── Banner (OBanner) ──────────────────────────────────── */

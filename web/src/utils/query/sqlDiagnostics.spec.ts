@@ -103,6 +103,36 @@ type Mutation = {
   apply: (sql: string) => { broken: string; expectedFragment: string } | null;
 };
 
+/**
+ * Offset of the first `WHERE` keyword that sits at parenthesis depth 0 and
+ * outside any string literal — i.e. a statement-level filter, not one nested in
+ * `FILTER (WHERE …)`, a subquery, or a CTE body. null when there is none.
+ */
+function findStatementLevelWhere(sql: string): number | null {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < sql.length; i++) {
+    const c = sql[i];
+    if (quote) {
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === "`") quote = c;
+    else if (c === "(") depth++;
+    else if (c === ")") depth--;
+    else if (
+      depth === 0 &&
+      (c === "W" || c === "w") &&
+      /^where$/i.test(sql.slice(i, i + 5)) &&
+      !/\w/.test(sql[i - 1] ?? "") &&
+      !/\w/.test(sql[i + 5] ?? "")
+    ) {
+      return i;
+    }
+  }
+  return null;
+}
+
 const mutations: Mutation[] = [
   {
     name: "truncate_after_AND",
@@ -166,8 +196,12 @@ const mutations: Mutation[] = [
   {
     name: "remove_WHERE_keyword",
     apply: (sql) => {
-      if (!/\bWHERE\s+\w/i.test(sql)) return null;
-      const broken = sql.replace(/\bWHERE\s+/, "");
+      const m = findStatementLevelWhere(sql);
+      if (m === null) return null;
+      const rest = sql.slice(m + 5);
+      if (!/^\s+[a-zA-Z_]\w*(\.\w+)?\s*([=<>!]|(IS|IN|LIKE|ILIKE|RLIKE|NOT|BETWEEN)\b)/i.test(rest))
+        return null;
+      const broken = sql.slice(0, m) + rest.replace(/^\s+/, " ");
       if (!parseError(broken)) return null; // mutation produced valid SQL
       return { broken, expectedFragment: "WHERE" };
     },
@@ -175,9 +209,10 @@ const mutations: Mutation[] = [
   {
     name: "unquote_like_pattern",
     apply: (sql) => {
-      const m = sql.match(/\bLIKE\s+'([^'%][^']*%[^']*)'/i);
+      const re = /\bLIKE\s+'([^'%\s][^'\s]*%[^'\s]*)'(?=\s|$)/i;
+      const m = sql.match(re);
       if (!m) return null;
-      const broken = sql.replace(/\bLIKE\s+'([^'%][^']*%[^']*)'/, `LIKE ${m[1]}`);
+      const broken = sql.replace(re, `LIKE ${m[1]}`);
       if (!parseError(broken)) return null;
       return { broken, expectedFragment: "LIKE" };
     },
@@ -474,15 +509,7 @@ describe("validateSql — mutation detection on broken queries", () => {
     truncate_after_GROUP: { rate: 0.99 },
     truncate_after_HAVING: { rate: 0.99 },
     truncate_after_LIMIT: { rate: 0.97 },
-    // tightened missingWhere guard: ambiguous patterns suppressed; expanded query set lowers rate
-    remove_WHERE_keyword: { rate: 0.8 },
-    // Rated again: hasUnquotedLikePattern reads the operand out of the source
-    // text, so the shapes that lex as valid SQL — LIKE E00%, LIKE /api/%,
-    // LIKE Android% — are classified even though the parser stops somewhere
-    // unrelated. `col LIKE other_col` stays untouched: the operand must carry a
-    // % wildcard. This was a count (minSpecific: 6) while only `found === "%"`
-    // was localizable, which is why every LIKE query a backend PR added diluted
-    // the ratio — 6/12, then 6/13 after #13808, then 6/14 after #13810.
+    remove_WHERE_keyword: { rate: 0.85 },
     unquote_like_pattern: { rate: 0.9 },
     drop_AND_between_conditions: { rate: 0.9 },
     // Complex-construct mutations
