@@ -47,6 +47,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </span>
 
+    <!-- Server-side filters, offered only where the host wants the whole
+         queue worked (the org screen). `landing` splits the two emergencies
+         the row tags name; `include_dismissed` swaps the outstanding worklist
+         for the raw historical record. -->
+    <span v-if="filterable" class="flex flex-wrap items-center gap-3" data-test="oncall-unrouted-filters">
+      <OToggleGroup
+        :model-value="landing || 'both'"
+        @update:model-value="setLanding"
+      >
+        <OToggleGroupItem value="both" size="sm" data-test="oncall-unrouted-filter-both">
+          {{ t("oncall.unroutedFilterBoth") }}
+        </OToggleGroupItem>
+        <OToggleGroupItem value="nobody" size="sm" data-test="oncall-unrouted-filter-nobody">
+          {{ t("oncall.unroutedPagedNobody") }}
+        </OToggleGroupItem>
+        <OToggleGroupItem
+          value="default_team"
+          size="sm"
+          data-test="oncall-unrouted-filter-default"
+        >
+          {{ t("oncall.unroutedFilterDefault") }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+
+      <OSwitch
+        :model-value="includeDismissed"
+        :label="t('oncall.unroutedShowDismissed')"
+        data-test="oncall-unrouted-show-dismissed"
+        @update:model-value="setIncludeDismissed"
+      />
+    </span>
+
     <OInnerLoading v-if="loading" showing />
 
     <!-- Silence here is the good outcome, so it gets a sentence rather than an
@@ -60,8 +92,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="signal in signals"
         :key="signal.id"
         class="border-border-subtle flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-2 last:border-b-0"
+        :class="signal.dismissed_at ? 'opacity-60' : ''"
         :data-test="`oncall-unrouted-row-${signal.id}`"
       >
+        <!-- Dismissing stamps the field and keeps the row — the evidence that
+             a page fell through is worth more than a tidy table. -->
+        <OTag
+          v-if="signal.dismissed_at"
+          variant="default-soft"
+          size="sm"
+          class="shrink-0"
+          :data-test="`oncall-unrouted-dismissed-${signal.id}`"
+        >
+          {{ t("oncall.unroutedDismissedTag") }}
+        </OTag>
         <span class="flex min-w-0 flex-col gap-0.5">
           <span class="text-text-heading truncate text-sm font-medium">{{ titleOf(signal) }}</span>
           <!-- The dimensions a rule would be written against, and nothing
@@ -129,14 +173,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { ref } from "vue";
+
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import type { UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { dimensionsSentence, identityDimensions } from "@/utils/oncall";
+
+export interface UnroutedFilters {
+  landing?: "default_team" | "nobody";
+  include_dismissed: boolean;
+}
 
 const props = withDefaults(
   defineProps<{
@@ -145,19 +199,50 @@ const props = withDefaults(
     teamName?: string;
     /** Resolves `defaulted_team_id` to a name the operator recognises. */
     teams?: { id: string; name: string }[];
+    /** Offer the server-side filters. The host owns the fetch, so a change is
+     *  emitted rather than applied — the filtering is the endpoint's. */
+    filterable?: boolean;
     loading?: boolean;
     claiming?: boolean;
   }>(),
-  { signals: () => [], teamName: "", teams: () => [], loading: false, claiming: false },
+  {
+    signals: () => [],
+    teamName: "",
+    teams: () => [],
+    filterable: false,
+    loading: false,
+    claiming: false,
+  },
 );
 
 const emit = defineEmits<{
   (e: "claim", signal: UnroutedSignal): void;
   (e: "claim-all", signals: UnroutedSignal[]): void;
   (e: "dismiss", signal: UnroutedSignal): void;
+  (e: "change-filters", filters: UnroutedFilters): void;
 }>();
 
 const { t } = useI18nTyped();
+
+const landing = ref<"" | "default_team" | "nobody">("");
+const includeDismissed = ref(false);
+
+function announceFilters() {
+  emit("change-filters", {
+    ...(landing.value ? { landing: landing.value } : {}),
+    include_dismissed: includeDismissed.value,
+  });
+}
+
+function setLanding(value: unknown) {
+  landing.value = value === "default_team" || value === "nobody" ? value : "";
+  announceFilters();
+}
+
+function setIncludeDismissed(value: unknown) {
+  includeDismissed.value = !!value;
+  announceFilters();
+}
 
 /// The alert's own title when the server captured one. Its `description` is
 /// the fallback because the empty-path case reads nothing like the normal one,

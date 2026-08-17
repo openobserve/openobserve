@@ -562,14 +562,22 @@ const oncall = {
   unroutedSignals: ({
     org_identifier,
     include_dismissed,
+    landing,
     limit,
   }: {
     org_identifier: string;
+    /** Off = the outstanding worklist: dismissed entries are out, and so are
+     *  entries an ownership rule written since would now catch. */
     include_dismissed?: boolean;
+    /** Which of the queue's two emergencies. Absent = both. The server widens
+     *  an unrecognised value to "both" rather than 400ing — this is a screen
+     *  somebody opened to see what is broken. */
+    landing?: "default_team" | "nobody";
     limit?: number;
   }) => {
     const params: Record<string, string | number | boolean> = {};
     if (include_dismissed) params.include_dismissed = true;
+    if (landing) params.landing = landing;
     if (limit !== undefined) params.limit = limit;
     return http().get<UnroutedSignal[]>(
       `/api/${org_identifier}/oncall/unrouted`,

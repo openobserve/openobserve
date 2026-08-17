@@ -64,7 +64,7 @@ const stubs = {
   },
   OnCallUnroutedQueue: {
     name: "OnCallUnroutedQueue",
-    props: ["signals", "loading"],
+    props: ["signals", "loading", "teams", "filterable"],
     template: "<div />",
   },
   OnCallDefaultTeamCard: {
@@ -241,6 +241,24 @@ describe("OnCallRouting", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-routing-error"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-routing-unavailable"]').exists()).toBe(false);
+  });
+
+  /// The queue's filters are the server's — a change refetches with the params
+  /// rather than sieving rows the client already has.
+  it("refetches the queue with the announced filters", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    unrouted(wrapper).vm.$emit("change-filters", {
+      landing: "nobody",
+      include_dismissed: true,
+    });
+    await flushPromises();
+    expect(service.unroutedSignals).toHaveBeenLastCalledWith({
+      org_identifier: ORG,
+      landing: "nobody",
+      include_dismissed: true,
+    });
   });
 
   /// Nothing can own or be paged before a team exists — routing starts there.

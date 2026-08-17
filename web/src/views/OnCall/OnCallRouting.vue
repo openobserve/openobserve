@@ -110,9 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else
         :signals="signals"
         :teams="teams"
+        filterable
         :loading="loadingSignals"
         @claim="openClaim"
         @dismiss="dismissSignal"
+        @change-filters="onFiltersChange"
       />
     </div>
 
@@ -222,6 +224,7 @@ import OnCallOwnershipRules from "@/components/oncall/OnCallOwnershipRules.vue";
 import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
 import type { SimulatorQuery } from "@/components/oncall/OnCallRoutingSimulator.vue";
 import OnCallUnroutedQueue from "@/components/oncall/OnCallUnroutedQueue.vue";
+import type { UnroutedFilters } from "@/components/oncall/OnCallUnroutedQueue.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -358,11 +361,24 @@ async function fetchRules() {
   }
 }
 
+/// The filtering is the endpoint's, not a client-side sieve: include_dismissed
+/// also drops entries a since-written rule would now catch, which no client
+/// can compute.
+const signalFilters = ref<UnroutedFilters>({ include_dismissed: false });
+
+function onFiltersChange(filters: UnroutedFilters) {
+  signalFilters.value = filters;
+  fetchSignals();
+}
+
 async function fetchSignals() {
   loadingSignals.value = true;
   signalsError.value = false;
   try {
-    const res = await oncallService.unroutedSignals({ org_identifier: orgId.value });
+    const res = await oncallService.unroutedSignals({
+      org_identifier: orgId.value,
+      ...signalFilters.value,
+    });
     signals.value = res.data ?? [];
   } catch {
     signalsError.value = true;

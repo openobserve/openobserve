@@ -26,6 +26,23 @@ const stubs = {
   OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
   OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: { name: "OButton", template: "<button><slot /></button>" },
+  OToggleGroup: {
+    name: "OToggleGroup",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: "<div><slot /></div>",
+  },
+  OToggleGroupItem: {
+    name: "OToggleGroupItem",
+    props: ["value"],
+    template: "<button><slot /></button>",
+  },
+  OSwitch: {
+    name: "OSwitch",
+    props: ["modelValue", "label"],
+    emits: ["update:modelValue"],
+    template: `<button :aria-checked="!!modelValue" @click="$emit('update:modelValue', !modelValue)" />`,
+  },
 };
 
 function signal(over: Partial<UnroutedSignal> = {}): UnroutedSignal {
@@ -122,6 +139,39 @@ describe("OnCallUnroutedQueue", () => {
     expect(wrapper.find('[data-test="oncall-unrouted-defaulted-s1"]').text()).toContain(
       "team_gone",
     );
+  });
+
+  /// The filtering is the SERVER'S — include_dismissed also drops entries a
+  /// since-written rule would now catch, which no client can compute. So the
+  /// component only announces what was chosen; the host refetches.
+  it("announces filter choices for the host to refetch with", async () => {
+    const wrapper = mount(OnCallUnroutedQueue, {
+      props: { signals: [signal()], filterable: true },
+      global: { plugins: [i18n, store], stubs },
+    });
+
+    await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "nobody");
+    expect(wrapper.emitted("change-filters")?.[0][0]).toEqual({
+      landing: "nobody",
+      include_dismissed: false,
+    });
+
+    await wrapper.find('[data-test="oncall-unrouted-show-dismissed"]').trigger("click");
+    expect(wrapper.emitted("change-filters")?.[1][0]).toEqual({
+      landing: "nobody",
+      include_dismissed: true,
+    });
+  });
+
+  it("offers no filters unless the host asks for them", () => {
+    expect(render().find('[data-test="oncall-unrouted-filters"]').exists()).toBe(false);
+  });
+
+  /// Dismissing stamps the field and keeps the row — the evidence that a page
+  /// fell through is worth more than a tidy table.
+  it("marks a dismissed row as dismissed instead of hiding its history", () => {
+    const wrapper = render([signal({ dismissed_at: 1_700_000_000_000_000 })]);
+    expect(wrapper.find('[data-test="oncall-unrouted-dismissed-s1"]').exists()).toBe(true);
   });
 
   /// The org screen hosts the queue with no team of its own: a claim starts by
