@@ -29,6 +29,9 @@ pub struct Model {
     pub completed_at: Option<i64>,
     pub lifecycle_version: i64,
     pub retry_count: i32,
+    /// When the runner last confirmed every score pointer for this Experiment
+    /// resolved terminal. `NULL` keeps it in the recovery sweep.
+    pub scores_settled_at: Option<i64>,
     pub idempotency_key: Option<String>,
     pub created_by: String,
     pub created_at: i64,

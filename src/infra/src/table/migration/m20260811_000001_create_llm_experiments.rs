@@ -113,6 +113,13 @@ fn create_statement() -> TableCreateStatement {
                 .not_null()
                 .default(0),
         )
+        // Nullable with no backfill on purpose: an Experiment starts unsettled,
+        // gets swept once, and settles on that first pass.
+        .col(
+            ColumnDef::new(LlmExperiments::ScoresSettledAt)
+                .big_integer()
+                .null(),
+        )
         .col(
             ColumnDef::new(LlmExperiments::IdempotencyKey)
                 .string_len(255)
@@ -151,6 +158,7 @@ enum LlmExperiments {
     CompletedAt,
     LifecycleVersion,
     RetryCount,
+    ScoresSettledAt,
     IdempotencyKey,
     CreatedBy,
     CreatedAt,
@@ -172,6 +180,7 @@ mod tests {
         assert!(sql.contains("\"completed_at\" bigint NULL"));
         assert!(sql.contains("\"lifecycle_version\" bigint NOT NULL DEFAULT 0"));
         assert!(sql.contains("\"retry_count\" integer NOT NULL DEFAULT 0"));
+        assert!(sql.contains("\"scores_settled_at\" bigint NULL"));
         assert!(!sql.contains("updated_at"));
         assert!(!sql.contains("updated_by"));
     }
