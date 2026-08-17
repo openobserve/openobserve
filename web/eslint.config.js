@@ -7,6 +7,14 @@ import prettier from "eslint-plugin-prettier";
 import vuePrettierSkipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 import cypress from "eslint-plugin-cypress";
 import vueI18n from "@intlify/eslint-plugin-vue-i18n";
+// Deep import: the plugin does not re-export its utils. It declares no `exports`
+// map so this resolves, and a path change in a future 4.x fails loudly at load.
+import {
+  getLocaleMessages,
+  isStaticLiteral,
+  getStaticLiteralValue,
+  skipTSAsExpression,
+} from "@intlify/eslint-plugin-vue-i18n/dist/utils/index.js";
 import fs from "fs";
 
 // Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue/.ts
@@ -254,6 +262,39 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
   },
 };
 
+// @intlify's no-missing-keys hardcodes /^(\$t|t|\$tc|tc)$/ with `schema: []`, so it
+// cannot be told about gt(). A typo'd gt() key otherwise ships and renders its raw
+// path. Resolution is delegated to the plugin so both rules stay in step.
+noLegacyO2Tokens.rules["no-missing-gt-keys"] = {
+  meta: {
+    type: "problem",
+    docs: { description: "Check gt() keys exist in the configured locale messages" },
+    schema: [],
+    messages: {
+      missing: "gt(\"{{key}}\") is missing: '{{path}}' does not exist in localization messages.",
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        if (!node.callee || node.callee.type !== "Identifier" || node.callee.name !== "gt") return;
+        // Unwrap, or `gt("x" as I18nKey)` becomes a way to opt out of the check.
+        const arg = skipTSAsExpression(node.arguments[0]);
+        if (!isStaticLiteral(arg)) return; // dynamic keys are unresolvable here
+        const key = getStaticLiteralValue(arg);
+        if (!key) return;
+        // no-missing-keys owns the "localeDir unset" diagnostic; don't double-report.
+        const localeMessages = getLocaleMessages(context, { ignoreMissingSettingsError: true });
+        if (localeMessages.isEmpty()) return;
+        const missingPath = localeMessages.findMissingPath(String(key));
+        if (missingPath) {
+          context.report({ node: arg, messageId: "missing", data: { key, path: missingPath } });
+        }
+      },
+    };
+  },
+};
+
 // Read .gitignore to use as ignore patterns
 const gitignore = fs.existsSync(".gitignore")
   ? fs
@@ -350,6 +391,8 @@ export default [
         },
       ],
       "local/no-bare-bound-text-props": "error",
+      // The gt() half of the key contract; no-missing-keys above covers t().
+      "local/no-missing-gt-keys": "error",
       //
       // Vanilla useI18n().t() returns an unbranded `string`, which would silently
       // void every I18nText check in the file. useI18nTyped() is the same composer
@@ -509,6 +552,7 @@ export default [
     rules: {
       "no-restricted-imports": "off",
       "@intlify/vue-i18n/no-missing-keys": "off",
+      "local/no-missing-gt-keys": "off",
     },
   },
   {
