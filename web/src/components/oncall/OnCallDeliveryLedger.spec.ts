@@ -43,6 +43,29 @@ describe("OnCallDeliveryLedger", () => {
     expect(text).toContain("Failed");
   });
 
+  /// B10: a room post is a broadcast, not a fallback for reaching a person —
+  /// a failed one never means the page failed, because nobody was being
+  /// reached. Chat and webhook resolve to a room (the engine's own
+  /// is_broadcast split); they render under their own header, and a failed
+  /// post must not say "Failed" in the same voice as a failed page.
+  it("keeps room posts out of the per-person receipt", () => {
+    const wrapper = render([
+      row(),
+      row({ recipient: "Platform channel", channel: "webhook", delivered: false }),
+    ]);
+    expect(wrapper.find('[data-test="oncall-deliveries-posts-1"]').exists()).toBe(true);
+    const post = wrapper.find('[data-test="oncall-delivery-post-1-0"]');
+    expect(post.text()).toContain("Platform channel");
+    expect(post.text()).toContain("Post failed — nobody was being reached");
+    expect(post.text()).not.toContain("Failed");
+    // The person rows hold exactly one entry — the broadcast did not join them.
+    expect(wrapper.find('[data-test="oncall-delivery-row-1-1"]').exists()).toBe(false);
+  });
+
+  it("draws no room-post section when nothing broadcast", () => {
+    expect(render([row()]).find('[data-test="oncall-deliveries-posts-1"]').exists()).toBe(false);
+  });
+
   /// One run needs no header — "Run 1" over everything is a header with no
   /// question behind it.
   it("draws no run boundary while the ladder has climbed once", () => {

@@ -68,6 +68,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("oncall.rungReachedNobodyRetrying") }}
           </OTag>
+          <!-- B9's other "nobody": a rung whose targets resolved to no one.
+               The ladder does the OPPOSITE thing about it — an empty rung is
+               consumed and advanced past at once, a lost rung is retried — so
+               the two must not share a tag. -->
+          <OTag
+            v-else-if="emptyRungs.has(rung.after_micros)"
+            variant="warning-soft"
+            size="sm"
+            :data-test="`oncall-escalation-rung-empty-${rung.after_micros}`"
+          >
+            {{ t("oncall.rungMatchedNobody") }}
+          </OTag>
         </li>
       </ol>
       <p v-else class="text-text-muted text-sm" data-test="oncall-escalation-none">
@@ -110,6 +122,28 @@ const unreachedRungs = computed(() => {
   return new Set(
     pages
       .filter((e) => (e.ladder_run ?? 1) === run && e.delivered === false)
+      .map((e) => e.rung_micros ?? 0),
+  );
+});
+
+/// Rungs whose targets resolved to NO ONE — the other "nobody" (B9), told
+/// apart structurally rather than by parsing the body: a reached or lost rung
+/// always writes per-send delivery entries; an empty rung writes only its
+/// page line, because there was never anyone to attempt.
+const emptyRungs = computed(() => {
+  const currentRun = Math.max(1, ...props.events.map((e) => e.ladder_run ?? 1));
+  const inRun = props.events.filter((e) => (e.ladder_run ?? 1) === currentRun);
+  const attempted = new Set(
+    inRun.filter((e) => e.kind === "delivery").map((e) => e.rung_micros ?? 0),
+  );
+  return new Set(
+    inRun
+      .filter(
+        (e) =>
+          e.kind === "page" &&
+          e.delivered !== false &&
+          !attempted.has(e.rung_micros ?? 0),
+      )
       .map((e) => e.rung_micros ?? 0),
   );
 });

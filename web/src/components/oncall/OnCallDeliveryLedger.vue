@@ -35,7 +35,7 @@
         </span>
 
         <div
-          v-for="(row, index) in group.rows"
+          v-for="(row, index) in group.people"
           :key="index"
           class="border-border-subtle flex flex-wrap items-center gap-2 border-b py-1.5 last:border-b-0"
           :data-test="`oncall-delivery-row-${group.run}-${index}`"
@@ -52,6 +52,35 @@
           </span>
           <OTimeCell :value="row.at" unit="us" class="ms-auto" />
         </div>
+
+        <!-- B10: a room post is a broadcast, not a fallback for reaching a
+             person — it fires once per rung outside the recipient loop, and a
+             broadcast that fails never marks the rung as a delivery failure,
+             because nobody was being reached. Folding these into the rows
+             above would report a page as undelivered when the page landed
+             fine. Chat and webhook resolve to a destination the whole team
+             watches; that split is the engine's own (`is_broadcast`). -->
+        <template v-if="group.posts.length">
+          <span class="text-text-label text-xs" :data-test="`oncall-deliveries-posts-${group.run}`">
+            {{ t("oncall.deliveriesRoomPosts") }}
+          </span>
+          <div
+            v-for="(row, index) in group.posts"
+            :key="`post-${index}`"
+            class="border-border-subtle flex flex-wrap items-center gap-2 border-b py-1.5 last:border-b-0"
+            :data-test="`oncall-delivery-post-${group.run}-${index}`"
+          >
+            <OTag :variant="row.delivered ? 'success-soft' : 'warning-soft'" size="sm">
+              {{ row.delivered ? t("oncall.roomPosted") : t("oncall.roomPostFailed") }}
+            </OTag>
+            <!-- A room, not a person — a user cell would imply an inbox. -->
+            <span class="text-text-body text-sm">{{ raw(row.recipient ?? "") }}</span>
+            <OTag v-if="row.channel" variant="default-soft" size="sm">
+              {{ t(`oncall.channel_${row.channel}`) }}
+            </OTag>
+            <OTimeCell :value="row.at" unit="us" class="ms-auto" />
+          </div>
+        </template>
       </div>
 
       <!-- The server truncates; the count must not pretend otherwise. -->
@@ -70,8 +99,8 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
-import type { DeliveryRecord } from "@/ts/interfaces/oncall";
-import { useI18nTyped } from "@/types/i18n";
+import type { Channel, DeliveryRecord } from "@/ts/interfaces/oncall";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = withDefaults(
@@ -86,6 +115,11 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 
+/// The engine's own split (`is_broadcast`): chat and webhook resolve to a
+/// destination the whole team watches; everything else to one person's inbox,
+/// handset or screen. Typed on the record — never parsed from the recipient.
+const BROADCAST_CHANNELS = new Set<Channel>(["chat", "webhook"]);
+
 /// Newest run first — the current climb is the one being worked; the previous
 /// team's sends are context underneath it.
 const groups = computed(() => {
@@ -97,6 +131,10 @@ const groups = computed(() => {
   }
   return [...byRun.entries()]
     .sort((a, b) => b[0] - a[0])
-    .map(([run, rows]) => ({ run, rows }));
+    .map(([run, rows]) => ({
+      run,
+      people: rows.filter((row) => !row.channel || !BROADCAST_CHANNELS.has(row.channel)),
+      posts: rows.filter((row) => !!row.channel && BROADCAST_CHANNELS.has(row.channel)),
+    }));
 });
 </script>

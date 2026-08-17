@@ -144,4 +144,45 @@ describe("OnCallEscalation", () => {
     expect(wrapper.find('[data-test="oncall-escalation-rung-lost-0"]').exists()).toBe(false);
   });
 
+  /// B9's other "nobody": a rung whose targets resolved to no one. The ladder
+  /// does the OPPOSITE thing about it — an empty rung is consumed and advanced
+  /// past at once; a lost rung keeps its place and is retried — so the two
+  /// must carry different tags. Told apart structurally: a rung that attempted
+  /// anyone writes per-send delivery entries; an empty rung writes only its
+  /// page line.
+  it("marks an empty rung differently from a lost one", () => {
+    const wrapper = render(
+      {
+        fired: [
+          { after_micros: 0, at: 1, targets: ["on-call now"] },
+          { after_micros: 300_000_000, at: 2, targets: ["next on call"] },
+        ],
+      },
+      [
+        // Rung 0: matched nobody at all — page line only, no delivery rows.
+        { kind: "page", at: 1, actor: "o2-engine", body: "nobody matched on_call_now", rung_micros: 0 },
+        // Rung +5m: had a person, every send failed — the lost marker.
+        { kind: "delivery", at: 2, actor: "o2-engine", body: "email to bo failed", rung_micros: 300_000_000, recipient: "bo@o2.ai", channel: "email", delivered: false },
+        { kind: "page", at: 2, actor: "o2-engine", body: "could not reach bo@o2.ai", rung_micros: 300_000_000, delivered: false },
+      ],
+    );
+    expect(wrapper.find('[data-test="oncall-escalation-rung-empty-0"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-escalation-rung-lost-0"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-escalation-rung-lost-300000000"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-escalation-rung-empty-300000000"]').exists()).toBe(false);
+  });
+
+  /// A rung that reached people writes delivery rows, so it earns neither tag.
+  it("puts no nobody-tag on a rung that landed", () => {
+    const wrapper = render(
+      { fired: [{ after_micros: 0, at: 1, targets: ["ana@o2.ai"] }] },
+      [
+        { kind: "delivery", at: 1, actor: "o2-engine", body: "email delivered to ana", rung_micros: 0, recipient: "ana@o2.ai", channel: "email", delivered: true },
+        { kind: "page", at: 1, actor: "o2-engine", body: "paged ana@o2.ai", rung_micros: 0 },
+      ],
+    );
+    expect(wrapper.find('[data-test="oncall-escalation-rung-empty-0"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-escalation-rung-lost-0"]').exists()).toBe(false);
+  });
+
 });
