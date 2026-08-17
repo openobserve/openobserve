@@ -18,7 +18,7 @@ import enLocale from "@/locales/languages/en-US.json";
 const t = ((key: string, named?: Record<string, unknown>) => {
   const msg = key.split(".").reduce<any>((a, k) => (a == null ? a : a[k]), enLocale as any);
   if (typeof msg !== "string") return key;
-  return named ? msg.replace(/{(w+)}/g, (_m: string, k: string) => String(named[k] ?? "")) : msg;
+  return named ? msg.replace(/{(\w+)}/g, (_m: string, k: string) => String(named[k] ?? "")) : msg;
 }) as any;
 
 // Mock Vue lifecycle hooks to avoid warnings

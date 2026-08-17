@@ -40,7 +40,9 @@ export interface AICategory {
 const realCategories: AICategory[] = [
   {
     slug: "frameworks",
-    name: gt("ingestion.setupCard.aiCategoryFrameworks"),
+    get name() {
+      return gt("ingestion.setupCard.aiCategoryFrameworks");
+    },
     integrations: [
       {
         slug: "agno",
@@ -291,7 +293,9 @@ const realCategories: AICategory[] = [
   },
   {
     slug: "model-providers",
-    name: gt("ingestion.setupCard.aiCategoryModelProviders"),
+    get name() {
+      return gt("ingestion.setupCard.aiCategoryModelProviders");
+    },
     integrations: [
       {
         slug: "anthropic-python",
@@ -447,7 +451,9 @@ const realCategories: AICategory[] = [
   },
   {
     slug: "gateways",
-    name: gt("ingestion.setupCard.aiCategoryGateways"),
+    get name() {
+      return gt("ingestion.setupCard.aiCategoryGateways");
+    },
     integrations: [
       {
         slug: "anannas",
@@ -496,7 +502,9 @@ const realCategories: AICategory[] = [
   },
   {
     slug: "no-code",
-    name: gt("ingestion.setupCard.aiCategoryNoCode"),
+    get name() {
+      return gt("ingestion.setupCard.aiCategoryNoCode");
+    },
     integrations: [
       {
         slug: "codename-goose",
@@ -551,7 +559,9 @@ const realCategories: AICategory[] = [
   },
   {
     slug: "analytics",
-    name: gt("ingestion.setupCard.aiCategoryAnalytics"),
+    get name() {
+      return gt("ingestion.setupCard.aiCategoryAnalytics");
+    },
     integrations: [
       {
         slug: "mixpanel",
@@ -578,7 +588,9 @@ const realCategories: AICategory[] = [
   },
   {
     slug: "tools",
-    name: gt("ingestion.setupCard.aiCategoryTools"),
+    get name() {
+      return gt("ingestion.setupCard.aiCategoryTools");
+    },
     integrations: [
       {
         slug: "claude-code",
@@ -729,7 +741,16 @@ const buildCategory = (slug: string): AICategory | null => {
   const real = realCategories.find((c) => c.slug === slug);
   if (real) {
     const remaining = real.integrations.filter((i) => !claimedRouteNames.has(i.routeName));
-    return { slug: real.slug, name: real.name, integrations: [...cards, ...remaining] };
+    // Forward the getter rather than reading it: this runs at module scope, so
+    // `name: real.name` would resolve the translation once at import and freeze
+    // the label to whichever locale happened to be loaded then.
+    return {
+      slug: real.slug,
+      get name() {
+        return real.name;
+      },
+      integrations: [...cards, ...remaining],
+    };
   }
   if (!cards.length) return null;
   return {
