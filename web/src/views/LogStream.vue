@@ -810,7 +810,7 @@ export default defineComponent({
           : s === "empty"
             ? "var(--color-grey-400)"
             : "var(--color-success-500)";
-      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
     // ── Org-wide stream footprint (summary strip) ────────────────────────────

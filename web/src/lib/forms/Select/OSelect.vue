@@ -1556,7 +1556,7 @@ const fieldWidthClass = computed(() => {
                                 >
                                 <span
                                   v-if="filteredOptions[vRow.index].badge"
-                                  class="rounded-default shrink-0 border border-solid"
+                                  class="rounded-default text-status-positive border-status-positive shrink-0 border border-solid"
                                   :class="[
                                     filteredOptions[vRow.index].badgeTitle
                                       ? 'cursor-help'
@@ -1566,12 +1566,7 @@ const fieldWidthClass = computed(() => {
                                       : 'text-3xs px-1 py-px leading-tight font-medium',
                                   ]"
                                   :title="filteredOptions[vRow.index].badgeTitle"
-                                  :style="
-                                    filteredOptions[vRow.index].badgeStyle ?? {
-                                      color: 'var(--color-status-positive)',
-                                      borderColor: 'var(--color-status-positive)',
-                                    }
-                                  "
+                                  :style="filteredOptions[vRow.index].badgeStyle"
                                   >{{ filteredOptions[vRow.index].badge }}</span
                                 >
                               </span>

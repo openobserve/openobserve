@@ -543,7 +543,7 @@ export default defineComponent({
                 : s === "P4"
                   ? "var(--color-blue-500)"
                   : "var(--color-grey-400)";
-      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
     // Freezing and the Vuex dispatch are both idempotent, so this is safe to

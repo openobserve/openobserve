@@ -209,6 +209,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="delete" size="sm" />
             </OButton>
           </template>
+          <template #cell-used_by="{ row }">
+            <DependencyUsageCell
+              :graph="depGraph"
+              :focus="{ kind: 'template', name: row.name }"
+              @deleted="refreshTemplates"
+            />
+          </template>
           <template v-if="selectedTemplates.length > 0" #bottom>
             <span class="text-text-secondary text-xs">
               {{ selectedTemplates.length }} {{ t("alert_templates.selected") }}
@@ -277,6 +284,10 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
+import DependencyUsageCell from "./DependencyUsageCell.vue";
+import useDependencyGraph, {
+  invalidateDependencyGraphCache,
+} from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -288,6 +299,7 @@ const store = useStore();
 const { t } = useI18nTyped();
 const router = useRouter();
 const { track } = useReo();
+const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
 const templates: Ref<Template[]> = ref([]);
 const columns: OTableColumnDef[] = [
   {
@@ -298,11 +310,21 @@ const columns: OTableColumnDef[] = [
     meta: { align: "left", autoWidth: true },
   },
   {
+    id: "used_by",
+    header: t("alert_dependencies.usedByColumn"),
+    cell: " ",
+    sortable: false,
+    resizable: true,
+    hideable: true,
+    size: 200,
+    meta: { align: "left" },
+  },
+  {
     id: "actions",
     header: t("alert_templates.actions"),
     isAction: true,
     pinned: "right",
-    size: 150,
+    size: 160,
     meta: { align: "center", actionCount: 4 },
   },
 ];
@@ -390,7 +412,15 @@ const getTemplates = (force = false) => {
       fetching,
       force,
     })
-    .then(() => {})
+    .then(() => {
+      // Kept out of `apply`, which runs again for the cached paint: rebuilding
+      // the graph is three more list calls. Only a forced read can have changed
+      // it — every add/edit/delete reloads with force — so a plain mount leaves
+      // the graph's own cache to answer, and the "Used by" counts still follow
+      // every write.
+      if (force) invalidateDependencyGraphCache();
+      loadDepGraph(org);
+    })
     .catch((err) => {
       dismiss();
       if (err.response.status !== 403) {
@@ -635,7 +665,8 @@ const bulkDeleteTemplates = () => {
 
       selectedTemplates.value = [];
       confirmBulkDelete.value = false;
-      getTemplates();
+      // Forced: a cached reload would bring the deleted templates back.
+      getTemplates(true);
     })
     .catch((err: any) => {
       const errorMessage =

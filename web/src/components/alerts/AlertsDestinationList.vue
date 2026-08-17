@@ -238,6 +238,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </template>
+
+          <template #cell-used_by="{ row }">
+            <DependencyUsageCell
+              :graph="depGraph"
+              :focus="{ kind: 'destination', name: row.name }"
+              @deleted="refreshDestinations"
+            />
+          </template>
         </OTable>
       </div>
     </OPageLayout>
@@ -292,6 +300,10 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
+import DependencyUsageCell from "./DependencyUsageCell.vue";
+import useDependencyGraph, {
+  invalidateDependencyGraphCache,
+} from "@/composables/alerts/useDependencyGraph";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -329,11 +341,13 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OPageLayout,
+    DependencyUsageCell,
   },
   setup() {
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18nTyped();
+    const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
     const { getAllActions } = useActions();
     const { track } = useReo();
 
@@ -391,11 +405,21 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "used_by",
+        header: t("alert_dependencies.usedByColumn"),
+        cell: " ",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 200,
+        meta: { align: "left" },
+      },
+      {
         id: "actions",
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
-        size: 120,
+        size: 130,
         meta: { align: "center", actionCount: 3 },
       },
     ];
@@ -503,7 +527,15 @@ export default defineComponent({
           fetching,
           force,
         })
-        .then(() => {})
+        .then(() => {
+          // Kept out of `apply`, which runs again for the cached paint:
+          // rebuilding the graph is three more list calls. Only a forced read
+          // can have changed it — every add/edit/delete reloads with force — so
+          // a plain mount leaves the graph's own cache to answer, and the
+          // "Used by" counts still follow every write.
+          if (force) invalidateDependencyGraphCache();
+          loadDepGraph(org);
+        })
         .catch((err) => {
           if (err.response.status != 403) {
             toast({
@@ -784,7 +816,8 @@ export default defineComponent({
         }
 
         selectedDestinations.value = [];
-        getDestinations();
+        // Forced: a post-write reload, and it is what rebuilds the "Used by" graph.
+        getDestinations(true);
       } catch (error: any) {
         dismiss();
         const errorMessage =
@@ -835,6 +868,7 @@ export default defineComponent({
     ]);
     return {
       t,
+      depGraph,
       showDestinationEditor,
       destinations,
       columns,
