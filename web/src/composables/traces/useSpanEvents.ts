@@ -89,9 +89,12 @@ export type SpanEventSeverity = "error" | "warning" | "info";
  * is why the halo could be dropped for the saturated tiers and not just for
  * info.
  *
- * The dark-mode info value is deliberately weaker than the light one (30% vs
- * 50%): a white overlay on a dark canvas reads far brighter than a black overlay
- * on a white one, and at parity the marker layer lit up a dark trace.
+ * The two themes' info values are not mirrors of each other, and should not be
+ * "corrected" into a matching pair. Dark mode needs a markedly stronger overlay:
+ * span bars carry mid-luminance saturated service colours, and a weak white
+ * overlay barely shifts a mid-tone fill, so at parity with light mode the tick
+ * washed out rather than reading. The exact alphas live in component.css and
+ * dark.css, each with the reasoning for its own side.
  */
 export const SEVERITY_MARKER_CLASS: Record<SpanEventSeverity, string> = {
   error: "bg-badge-error-solid-bg",

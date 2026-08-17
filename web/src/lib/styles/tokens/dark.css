@@ -331,12 +331,14 @@
   --color-badge-blue-soft-text: var(--color-blue-400);
 
   /* trace event markers: invert the luminance modifier for dark surfaces.
-     Weaker than light mode's 50%, not symmetric with it. A white overlay on a
-     dark canvas reads far brighter than a black overlay on a white one, and the
-     tick overhangs the span bar, so part of every mark lands on --d-base where
-     50% white glowed. 30% keeps the mark legible on both the bar and the row
-     without the marker layer lighting up a dark trace. */
-  --color-trace-event-info: color-mix(in srgb, var(--color-white) 30%, transparent);
+     Deliberately STRONGER than the light value, not its mirror. Span bars carry
+     mid-luminance saturated service colours, and a weak white overlay barely
+     shifts a mid-tone fill — at parity with light mode the tick washed out
+     instead of reading. A high alpha pushes it to a near-solid light mark that
+     separates from both a saturated bar and the near-black row behind it.
+     The trade is deliberate: this far up, the mark is no longer really a
+     translucent modifier, it is a light tick. Legibility wins over purity. */
+  --color-trace-event-info: color-mix(in srgb, var(--color-white) 70%, transparent);
 
   /* Editor bracket-pair colorization — Monaco vs-dark defaults */
   --color-bracket-1: #ffd700;

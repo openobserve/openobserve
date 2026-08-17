@@ -439,10 +439,11 @@
 
   /* Trace span-event markers */
   /* Achromatic: the waterfall bar is filled with an arbitrary per-service
-     colour, so a hue-based marker can vanish on a same-hue bar. A 50% alpha
-     black darkens whatever is beneath it, holding contrast against any fill.
-     Error and warning keep their badge hues — there the colour is semantic. */
-  --color-trace-event-info: color-mix(in srgb, var(--color-black) 50%, transparent);
+     colour, so a hue-based marker can vanish on a same-hue bar. An alpha black
+     darkens whatever is beneath it, holding contrast against any fill.
+     Error and warning keep their badge hues — there the colour is semantic.
+     The dark override is NOT the mirror of this value — see dark.css. */
+  --color-trace-event-info: color-mix(in srgb, var(--color-black) 40%, transparent);
 
   /* Bracket-pair colorization — Monaco rainbow brackets (vs light) */
   --color-bracket-1: #0431fa;
