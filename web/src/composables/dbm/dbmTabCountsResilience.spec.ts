@@ -453,3 +453,72 @@ describe("the badge fan-out is scoped by every filter the reader set", () => {
     expect(service.getBadges, "an unchanged tab switch must not refetch").toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * A capped read renders as a FLOOR, not a population.
+ *
+ * `/table_health` caps its rows and now discloses it, like the deadlocks and
+ * blocking reads always did. The fold took `total` as a bare number, so a
+ * fleet with 400 relations printed a stable `100` — a ceiling shown as a
+ * total, and a stably wrong one: it reads the same today and tomorrow while
+ * the real number moves, which looks like a measurement that is not changing
+ * rather than one that is not being taken.
+ */
+describe("a capped table-health read is a claim, not a total", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearDbmTabCounts();
+  });
+
+  it("renders a truncated count with the + disclosure", async () => {
+    service.getBadges.mockResolvedValueOnce({
+      data: { ...envelope(), table_health: { total: 100, truncated: true } },
+    });
+    const { counts, load } = useDbmTabCounts();
+    await load("acme", RANGE, WINDOW);
+
+    expect(badgeCount(counts.value.tableHealthCount)).toBe("100+");
+  });
+
+  it("renders an uncapped count plainly", async () => {
+    service.getBadges.mockResolvedValueOnce({
+      data: { ...envelope(), table_health: { total: 8, truncated: false } },
+    });
+    const { counts, load } = useDbmTabCounts();
+    await load("acme", RANGE, WINDOW);
+
+    expect(badgeCount(counts.value.tableHealthCount)).toBe("8");
+  });
+});
+
+/**
+ * TableHealthPage must not undo the disclosure it just received.
+ *
+ * The page publishes its own count into the shared snapshot, so a bare
+ * `hits.length` there overwrites the shell's claim with the same undisclosed
+ * cap — and its table told OTable the count was exact while every sibling
+ * passes `:total-count-exact="!truncated"`.
+ */
+describe("TableHealthPage carries the cap through", () => {
+  const src = readFileSync(
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../views/DatabaseMonitoring/TableHealthPage.vue",
+    ),
+    "utf8",
+  );
+
+  it("records whether its own read was capped", () => {
+    expect(src, "the page must read the API's truncated flag").toMatch(
+      /truncated\.value = Boolean\(data\.truncated\)/,
+    );
+  });
+
+  it("publishes its count as a claim that can render 100+", () => {
+    expect(src).toContain("countClaim(");
+  });
+
+  it("tells the table the count is a floor when the read was capped", () => {
+    expect(src).toContain(':total-count-exact="!truncated"');
+  });
+});

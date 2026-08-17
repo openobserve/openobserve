@@ -8164,6 +8164,7 @@ async fn read_table_health_body(
         &hits,
         stream,
         q.system.as_deref().unwrap_or(""),
+        limit,
         want_indexes.then_some((index_hits.as_slice(), index_read_failed)),
     ))
 }
@@ -8178,12 +8179,22 @@ pub(crate) fn table_health_envelope(
     hits: &[Value],
     stream: &str,
     engine_filter: &str,
+    // The row cap the read ran under, so the envelope can disclose whether it
+    // was reached — `total` is otherwise a ceiling printed as a population.
+    limit: usize,
     index_section: Option<(&[Value], bool)>,
 ) -> Value {
     let mut body = json!({
         "hits": hits,
         "stream": stream,
         "total": hits.len(),
+        // A CAPPED read is a floor, not a population — the same disclosure the
+        // deadlocks and blocking reads make. Without it the Table health badge
+        // printed the cap as a total: a fleet with 400 relations rendered a
+        // stable `100`, which reads as a measurement that is not changing
+        // rather than one that is not being taken. `badgeCount` renders a
+        // disclosed cap as `100+`.
+        "truncated": hits.len() >= limit,
         // ── the honesty contract, stated by the API ───────────────────────
         //
         // `seq_scan`, `idx_scan` and `autovacuum_count` come from
@@ -15340,7 +15351,7 @@ mod tests {
         // Asserted on the real JSON: [`table_health_envelope`] is the pure
         // shape assembly the body fn itself calls.
         let hits = vec![json!({"relation": "orders", "total_bytes": 1000i64})];
-        let env = table_health_envelope(&hits, "dbm_server", "postgresql", None);
+        let env = table_health_envelope(&hits, "dbm_server", "postgresql", 100, None);
         let body = env.as_object().expect("the envelope is a JSON object");
 
         for key in ["counters_are_cumulative", "tuples_are_estimated"] {
@@ -15363,7 +15374,7 @@ mod tests {
         // its own cumulative disclosure plus the read-failed flag — an empty
         // index list must not be able to wear "we could not read" as a costume.
         let with_indexes =
-            table_health_envelope(&hits, "dbm_server", "postgresql", Some((&[], true)));
+            table_health_envelope(&hits, "dbm_server", "postgresql", 100, Some((&[], true)));
         for key in [
             "index_hits",
             "index_total",
@@ -16050,6 +16061,36 @@ mod tests {
     /// answering one question. A dimension a slice does not accept is simply
     /// not sent to it, which is honest rather than lossy: the Overview tab
     /// cannot narrow by namespace either.
+    /// A CAPPED READ MUST SAY SO.
+    ///
+    /// `/table_health` returns `total: hits.len()` and no `truncated` flag at
+    /// all, while every sibling that caps discloses it with
+    /// `rows.len() >= limit`. Measured live: `?limit=100` answers `total: 100`
+    /// and `?limit=500` answers `total: 500` — the number is the row cap, not
+    /// the population, and it is the number the Table health BADGE prints. So
+    /// a fleet with 400 relations rendered a stable `100`, which reads as a
+    /// measurement that is not changing rather than one that is not being
+    /// taken. `badgeCount` already renders a capped claim as `100+`; it was
+    /// never given one to render.
+    #[test]
+    fn test_table_health_discloses_its_row_cap() {
+        let src = include_str!("api.rs");
+        let start = src
+            .find("async fn read_table_health_body")
+            .expect("table health body reader must exist");
+        let end = src[start..]
+            .find("\n/// GET /{org_id}/traces/db_monitoring/table_health")
+            .map(|i| start + i)
+            .unwrap_or_else(|| (start + 6000).min(src.len()));
+        let body = &src[start..end];
+
+        assert!(
+            body.contains("\"truncated\""),
+            "table_health must disclose whether its read hit the row cap — the \
+             badge prints this number as a population"
+        );
+    }
+
     #[test]
     fn test_badges_forwards_each_dimension_to_the_slices_that_accept_it() {
         let src = include_str!("api.rs");

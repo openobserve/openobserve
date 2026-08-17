@@ -69,15 +69,21 @@ const PAGES: [string, string][] = [
  * gained or lost a cap without this table being updated fails there rather than
  * silently skipping its honesty assertion.
  *
- * Databases, Queries and Table health are absent because their list reads are
- * aggregations, not row-limited event reads: they carry no `truncated` in the
- * payload that feeds the table.
+ * Databases and Queries are absent because their list reads are aggregations,
+ * not row-limited event reads: they carry no `truncated` in the payload that
+ * feeds the table.
+ *
+ * Table health IS capped, despite reading like an aggregation. Measured
+ * against the live endpoint, `?limit=100` answers `total: 100` and
+ * `?limit=500` answers `total: 500` — the number is the row cap, and the
+ * response now discloses it like the event reads do.
  */
 const CAPPED = new Set([
   "ActivityPage.vue",
   "BlockedQueriesPage.vue",
   "DeadlocksPage.vue",
   "SamplesPage.vue",
+  "TableHealthPage.vue",
 ]);
 
 /**
