@@ -261,6 +261,34 @@ describe("OnCallRouting", () => {
     });
   });
 
+  /// Reported from the browser: "add rule does nothing — there is no save and
+  /// no cancel". Every other test here stubs ODialog, so all of them stayed
+  /// green while the real dialog rendered no footer at all: the call site
+  /// passed `primary-label`, ODialog declares `primaryButtonLabel`, unknown
+  /// props fall through as attributes, and `hasFooter` saw nothing.
+  ///
+  /// This one mounts the REAL dialog. It is the only assertion in the file
+  /// that can fail when the prop NAMES are wrong rather than their values.
+  it("opens a real dialog with a working Save and Cancel", async () => {
+    const { default: ODialog } = await import("@/lib/overlay/Dialog/ODialog.vue");
+    const wrapper = mount(OnCallRouting, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, ODialog } },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    rulesPanel(wrapper).vm.$emit("add");
+    await flushPromises();
+
+    // Teleported to the body, so the assertion has to look there.
+    const dialogHtml = document.body.innerHTML;
+    expect(dialogHtml).toContain("o-dialog-primary-btn");
+    expect(dialogHtml).toContain("o-dialog-secondary-btn");
+    expect(dialogHtml).toContain("Save rule");
+
+    wrapper.unmount();
+  });
+
   /// Nothing can own or be paged before a team exists — routing starts there.
   it("points an org with no teams at the Teams screen", async () => {
     service.listTeams.mockResolvedValue({ data: [] } as any);

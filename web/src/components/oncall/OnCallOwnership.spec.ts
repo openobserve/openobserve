@@ -357,4 +357,31 @@ describe("OnCallOwnership", () => {
     });
   });
 
+  /// The team tab's half of the same browser report: "add rule does nothing —
+  /// no save, no cancel". Every other test in this file stubs ODialog and so
+  /// could not see it; this one mounts the real component, where a wrong prop
+  /// NAME renders no footer rather than a wrong-looking one.
+  it("opens a real dialog with a working Save and Cancel", async () => {
+    const { default: ODialog } = await import("@/lib/overlay/Dialog/ODialog.vue");
+    const wrapper = mount(OnCallOwnership, {
+      props: {
+        teamId: "team_1",
+        teams: [
+          { id: "team_1", org_id: "default", name: "Platform", timezone: "UTC", created_at: 0, updated_at: 0 },
+        ],
+      },
+      global: { plugins: [i18n, store], stubs: { ...stubs, ODialog } },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    wrapper.findComponent({ name: "OnCallOwnershipRules" }).vm.$emit("add");
+    await flushPromises();
+
+    const dialogHtml = document.body.innerHTML;
+    expect(dialogHtml).toContain("o-dialog-primary-btn");
+    expect(dialogHtml).toContain("o-dialog-secondary-btn");
+
+    wrapper.unmount();
+  });
 });
