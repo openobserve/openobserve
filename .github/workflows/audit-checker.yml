@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: taiki-e/install-action@v2.85.10
+      - uses: taiki-e/install-action@v2.85.13
         with:
           tool: cargo-audit
       - name: run cargo audit
