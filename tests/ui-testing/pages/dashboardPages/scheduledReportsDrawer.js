@@ -30,7 +30,12 @@ export class ScheduledReportsDrawerPage {
     // `tr` qualifier keeps the drag-handle button (`o2-table-row-drag-handle`,
     // OTableBodyRow.vue:247) out of the prefix match.
     this.rows = this.container.locator('tr[data-test^="o2-table-row-"]');
-    this.emptyState = this.container.locator('[data-test="no-data-message"]');
+    // ScheduledDashboards now renders the shared OEmptyState through OTable's
+    // empty slot. Scope through the table wrapper so this cannot match another
+    // empty state elsewhere in the drawer/page.
+    this.emptyState = this.table
+      .locator('[data-test="o2-table-empty"]')
+      .locator('[data-test="o2-empty-state"]');
     this.loadingBanner = this.container.locator('[data-test="o2-table-loading-banner"]');
 
     // AppTabs renders `tab-<value>`; values are "cached" / "shared"
