@@ -36,33 +36,23 @@ export class SloDetailPage {
     return {
       title: '[data-test="slos-slodetail-title"]',
       notFound: '[data-test="slos-slodetail-not-found"]',
-      health: '[data-test="slos-slodetail-health"]',
       stats: '[data-test="slos-slodetail-stats"]',
       tabs: '[data-test="slos-slodetail-tabs"]',
       edit: '[data-test="slos-slodetail-edit"]',
-      newAlert: '[data-test="slos-slodetail-new-alert"]',
-      burndown: '[data-test="slos-slodetail-burndown"]',
       groupsTable: '[data-test="slos-slodetail-groups-table"]',
-      alertRibbon: '[data-test="slos-slodetail-alert-ribbon"]',
       sourceAlert: '[data-test="slos-slodetail-source-alert"]',
       frozenBanner: '[data-test="slos-slodetail-frozen-banner"]',
 
       // Stat tiles
       statSli: '[data-test="slos-slodetail-stat-sli"]',
       statTarget: '[data-test="slos-slodetail-stat-target"]',
-      statBudget: '[data-test="slos-slodetail-stat-budget"]',
-      statBurn: '[data-test="slos-slodetail-stat-burn"]',
       statExhaust: '[data-test="slos-slodetail-stat-exhaust"]',
       statCoverage: '[data-test="slos-slodetail-stat-coverage"]',
 
       // Tabs
-      tabTrend: '[data-test="slos-slodetail-tab-trend"]',
       tabGroups: '[data-test="slos-slodetail-tab-groups"]',
-      tabAlerts: '[data-test="slos-slodetail-tab-alerts"]',
-      tabConfig: '[data-test="slos-slodetail-tab-config"]',
 
       // Config summary
-      configSummary: '[data-test="slos-sloconfigsummary"]',
       configJson: '[data-test="slos-sloconfigsummary-json"]',
 
       // Burndown panels.
@@ -73,7 +63,6 @@ export class SloDetailPage {
       // attribute overrides the child root's own. The per-panel selectors below
       // are inner elements and keep their own ids.
       burndownRoot: '[data-test="slos-slodetail-burndown"]',
-      burndownSparse: '[data-test="slos-sloburndownchart-sparse"]',
     };
   }
 
@@ -97,10 +86,6 @@ export class SloDetailPage {
 
   async clickEdit() {
     await this.page.locator(this.locators.edit).click();
-  }
-
-  async clickNewAlert() {
-    await this.page.locator(this.locators.newAlert).click();
   }
 
   // -------------------------------------------------------------- stat reading
@@ -130,54 +115,6 @@ export class SloDetailPage {
     return m ? Number(m[1]) : null;
   }
 
-  async readBurnRate() {
-    const text = await this._statText(this.locators.statBurn);
-    if (text.includes(ABSENT)) return null;
-    const m = text.match(/([\d.]+)/);
-    return m ? Number(m[1]) : null;
-  }
-
-  async readBudgetRemaining() {
-    const text = await this._statText(this.locators.statBudget);
-    if (text.includes(ABSENT)) return null;
-    const m = text.match(/(-?[\d.]+)\s*%/);
-    return m ? Number(m[1]) : null;
-  }
-
-  /**
-   * Poll until the backend has measured this SLO, or fail with a diagnosis.
-   *
-   * A new SLO is measured by the BACKFILL job, which walks the window backwards
-   * one chunk (default 1 day) per scheduler tick (default 10s). A 7-day window
-   * therefore needs roughly 70s plus query time before the SLI stops being an
-   * em dash. Callers pay this once in beforeAll, never per test.
-   */
-  async waitForMeasuredSli({ timeout = 240000, pollMs = 5000 } = {}) {
-    const deadline = Date.now() + timeout;
-    let lastCoverage = null;
-
-    while (Date.now() < deadline) {
-      await this.page.reload();
-      await this.page.waitForLoadState('domcontentloaded');
-      const sli = await this.readSli().catch(() => null);
-      if (sli !== null) {
-        testLogger.info('SLO measured', { sli });
-        return sli;
-      }
-      lastCoverage = await this.readCoverage().catch(() => null);
-      await this.page.waitForTimeout(pollMs);
-    }
-
-    throw new Error(
-      `SLO never produced a measured SLI within ${timeout}ms (last coverage: ${lastCoverage ?? 'unknown'}%).\n` +
-      `The SLI stayed at "${ABSENT}", meaning the SLO is frozen rather than slow.\n` +
-      `Likely causes, in order:\n` +
-      `  1. Coverage below ZO_SLO_MIN_COVERAGE (default 0.9) — the seed does not fill the window.\n` +
-      `  2. Backdated rows were rejected (ZO_INGEST_ALLOWED_UPTO, default 5h).\n` +
-      `  3. The scheduler is not running backfill jobs.`,
-    );
-  }
-
   // ---------------------------------------------------------------- assertions
 
   async expectDetailVisible() {
@@ -192,12 +129,6 @@ export class SloDetailPage {
 
   async expectFrozenBanner() {
     await expect(this.page.locator(this.locators.frozenBanner)).toBeVisible({ timeout: 30000 });
-  }
-
-  async expectConfigFieldContains(key, value) {
-    const field = this.page.locator(this.configField(key));
-    await expect(field).toBeVisible({ timeout: 20000 });
-    await expect(field).toContainText(String(value));
   }
 
   /**
@@ -253,6 +184,27 @@ export class SloDetailPage {
     const el = this.page.locator(this.locators.sourceAlert);
     await expect(el).toBeVisible({ timeout: 30000 });
     if (name) await expect(el).toContainText(name);
+  }
+
+  /** The target tile shows the configured objective. */
+  async expectTargetShown(target) {
+    const tile = this.page.locator(this.locators.statTarget);
+    await tile.waitFor({ state: 'visible', timeout: 30000 });
+    await expect(tile).toContainText(String(target));
+  }
+
+  /**
+   * Time-to-exhaust reads as absent, not as a duration.
+   *
+   * It is derived from the burn rate, so before measurement there is nothing to
+   * derive it from — a number here would be invented.
+   */
+  async expectTimeToExhaustAbsent() {
+    const text = await this._statText(this.locators.statExhaust);
+    expect(
+      text.includes(ABSENT),
+      `time-to-exhaust must read as absent before measurement, got ${JSON.stringify(text)}`,
+    ).toBe(true);
   }
 
   async expectTitle(name) {

@@ -739,18 +739,41 @@ def test_many_tags_are_accepted_and_returned(create_session, base_url, org_id,
     assert sorted(stored.get("tags", [])) == sorted(tags)
 
 
-def test_unknown_stream_is_rejected_or_stored_without_measuring(
+def test_unknown_stream_is_accepted_but_never_measures(
         create_session, base_url, org_id, slo_cleanup):
     """An SLO over a stream that does not exist cannot measure anything.
 
-    Accepting it is defensible (the stream may appear later), so this pins
-    whichever the build does rather than demanding one — but a 500 is not an
-    acceptable answer to a plausible mistake.
+    Observed on this build: the create is **accepted** (200). That is defensible
+    — the stream may appear later — so the test pins that behaviour AND the
+    consequence that matters: the SLO must report no measurement rather than
+    inventing one. An SLO over a missing stream that showed 100% would be the
+    same class of bug as the #13761 time-slice regression.
+
+    Deliberately not written as `status in (200, 400, 404, 422)`: only a 500
+    could fail that, so it could not detect a regression from "accepted" to
+    "silently measured" — or the reverse.
     """
-    status, message, _ = create_slo(
+    name = unique_name()
+    status, message, slo_id = create_slo(
         create_session, base_url, org_id,
-        count_definition(unique_name(), "stream_that_does_not_exist_anywhere"), slo_cleanup)
-    assert status in (200, 400, 404, 422), f"unexpected status {status}: {message}"
+        count_definition(name, "stream_that_does_not_exist_anywhere"), slo_cleanup)
+
+    if status != 200:
+        # A rejection is the other defensible choice — but it must be a clean
+        # 4xx naming the problem, never a 500.
+        assert status in (400, 404, 422), f"unexpected status {status}: {message}"
+        assert message, "a rejection must carry a reason"
+        return
+
+    body = create_session.get(f"{base_url}api/{org_id}/slos/{slo_id}").json()
+    assert body["name"] == name
+
+    status_obj = body.get("status")
+    if status_obj is not None:
+        assert status_obj.get("sli") is None, (
+            "an SLO over a non-existent stream must not report an SLI — "
+            f"got {status_obj.get('sli')}"
+        )
 
 
 def test_grouped_slo_rejects_a_90_day_window_with_a_one_minute_slice(

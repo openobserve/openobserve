@@ -30,15 +30,10 @@ export class SloFormPage {
       name: '[data-test="slos-addslo-name"]',
       description: '[data-test="slos-addslo-description"]',
       tags: '[data-test="slos-addslo-tags"]',
-      sliType: '[data-test="slos-addslo-sli-type"]',
       sliTypeDescription: '[data-test="slos-addslo-sli-type-description"]',
       target: '[data-test="slos-addslo-target"]',
-      window: '[data-test="slos-addslo-window"]',
-      slice: '[data-test="slos-addslo-slice"]',
       sliceNote: '[data-test="slos-addslo-slice-note"]',
       groupBy: '[data-test="slos-addslo-group-by"]',
-      groupByLocked: '[data-test="slos-addslo-group-by-locked"]',
-      groupsEstimate: '[data-test="slos-addslo-groups-estimate"]',
       save: '[data-test="slos-addslo-save"]',
       error: '[data-test="slos-addslo-error"]',
       regenWarning: '[data-test="slos-addslo-regen-warning"]',
@@ -46,18 +41,14 @@ export class SloFormPage {
       // Count SLI
       streamType: '[data-test="slos-addslo-stream-type"]',
       stream: '[data-test="slos-addslo-stream"]',
-      countLanguage: '[data-test="slos-addslo-count-language"]',
-      scope: '[data-test="slos-addslo-scope"]',
       goodExpr: '[data-test="slos-addslo-good-expr"]',
       promqlGood: '[data-test="slos-addslo-promql-good"]',
       promqlTotal: '[data-test="slos-addslo-promql-total"]',
-      countPromqlHint: '[data-test="slos-addslo-count-promql-hint"]',
       previewSection: '[data-test="slos-addslo-preview-section"]',
 
       // Time-slice SLI
       timesliceStreamType: '[data-test="slos-addslo-timeslice-stream-type"]',
       timesliceStream: '[data-test="slos-addslo-timeslice-stream"]',
-      timesliceLanguage: '[data-test="slos-addslo-timeslice-language"]',
       aggregate: '[data-test="slos-addslo-aggregate"]',
       comparator: '[data-test="slos-addslo-comparator"]',
       threshold: '[data-test="slos-addslo-threshold"]',
@@ -68,9 +59,7 @@ export class SloFormPage {
       // Alert SLI
       alertSource: '[data-test="slos-addslo-alert-source"]',
       alertSourceEmpty: '[data-test="slos-addslo-alert-source-empty"]',
-      alertSourceError: '[data-test="slos-addslo-alert-source-error"]',
       alertSourceHint: '[data-test="slos-addslo-alert-source-hint"]',
-      alertPreviewSection: '[data-test="slos-addslo-alert-preview-section"]',
 
       // Time-slice preview.
       //
@@ -81,12 +70,9 @@ export class SloFormPage {
       // child selectors below are on inner elements and are unaffected.
       tsPreviewRoot: '[data-test="slos-addslo-timeslice-preview-section"]',
       tsPreviewTally: '[data-test="slos-slotimeslicepreview-tally"]',
-      tsPreviewChart: '[data-test="slos-slotimeslicepreview-chart"]',
       tsPreviewGaps: '[data-test="slos-slotimeslicepreview-gaps"]',
-      tsPreviewEmpty: '[data-test="slos-slotimeslicepreview-empty"]',
       tsPreviewError: '[data-test="slos-slotimeslicepreview-error"]',
       tsPreviewLoading: '[data-test="slos-slotimeslicepreview-loading"]',
-      tsPreviewRange: '[data-test="slos-slotimeslicepreview-range"]',
     };
   }
 
@@ -472,10 +458,6 @@ export class SloFormPage {
   }
 
   // -------------------------------------------------------------- assertions
-
-  async expectFormVisible() {
-    await expect(this.page.locator(this.locators.title)).toBeVisible();
-  }
 
   async expectError(pattern) {
     const err = this.page.locator(this.locators.error);

@@ -28,7 +28,6 @@ export class SloAlertsPage {
       add: '[data-test="slo-alerts-add"]',
       empty: '[data-test="slo-alerts-empty"]',
       error: '[data-test="slo-alerts-error"]',
-      disabledTag: '[data-test="slo-alerts-disabled-tag"]',
 
       // Form
       form: '[data-test="slo-alert-form"]',
@@ -36,29 +35,18 @@ export class SloAlertsPage {
       description: '[data-test="slo-alert-form-description"]',
       frequency: '[data-test="slo-alert-form-frequency"]',
       silence: '[data-test="slo-alert-form-silence"]',
-      targets: '[data-test="slo-alert-form-targets"]',
       submit: '[data-test="slo-alert-form-submit"]',
       cancel: '[data-test="slo-alert-form-cancel"]',
       formError: '[data-test="slo-alert-form-error"]',
 
       // Condition
-      conditionSlo: '[data-test="slos-sloalertcondition-slo"]',
-      conditionKind: '[data-test="slos-sloalertcondition-kind"]',
-      conditionOperator: '[data-test="slos-sloalertcondition-operator"]',
       conditionCritical: '[data-test="slos-sloalertcondition-critical"]',
       conditionLong: '[data-test="slos-sloalertcondition-long"]',
       conditionShort: '[data-test="slos-sloalertcondition-short"]',
 
       // Preview
       previewRoot: '[data-test="slos-sloalertpreview-root"]',
-      previewPanel: '[data-test="slos-sloalertpreview-panel"]',
-      previewBand: '[data-test="slos-sloalertpreview-band"]',
-      previewLegend: '[data-test="slos-sloalertpreview-legend"]',
-      previewTally: '[data-test="slos-sloalertpreview-tally"]',
       previewLoading: '[data-test="slos-sloalertpreview-loading"]',
-      previewEmpty: '[data-test="slos-sloalertpreview-empty"]',
-      previewError: '[data-test="slos-sloalertpreview-error"]',
-      previewWouldFreeze: '[data-test="slos-sloalertpreview-would-freeze"]',
     };
   }
 
@@ -157,6 +145,20 @@ export class SloAlertsPage {
     await card.click();
     await expect(card).toHaveAttribute('aria-pressed', 'true', { timeout: 10000 });
     testLogger.info('Burn-rate preset applied', { key });
+  }
+
+  /**
+   * The burn-rate comparison operator.
+   *
+   * An OSelect: the value sits on the trigger where that branch renders
+   * `data-test-selected-value`, and only in the rendered label otherwise — read
+   * both, the same way sloFormPage does.
+   */
+  async readOperator() {
+    const trigger = this.page.locator('[data-test="slos-sloalertcondition-operator-trigger"]');
+    const attr = await trigger.getAttribute('data-test-selected-value').catch(() => null);
+    if (attr) return attr.trim();
+    return ((await trigger.textContent().catch(() => '')) ?? '').trim();
   }
 
   async readLongHours() { return Number(await this.readInput(this.locators.conditionLong)); }
@@ -311,28 +313,6 @@ export class SloAlertsPage {
   async expectPresetActive(key) {
     await expect(this.page.locator(this.presetCard(key)))
       .toHaveAttribute('aria-pressed', 'true', { timeout: 10000 });
-  }
-
-  /**
-   * The preview must settle into a REAL state, never merely exist.
-   *
-   * Every preview in this feature renders distinct -band / -empty / -error
-   * nodes, so asserting the root alone would pass against an empty chart.
-   */
-  async expectPreviewHasData() {
-    await this.waitForPreview();
-    await expect(this.page.locator(this.locators.previewError)).toHaveCount(0);
-    await expect(this.page.locator(this.locators.previewBand)).toBeVisible({ timeout: 30000 });
-  }
-
-  async expectWouldFreeze() {
-    await this.waitForPreview();
-    await expect(this.page.locator(this.locators.previewWouldFreeze))
-      .toBeVisible({ timeout: 30000 });
-  }
-
-  async expectDisabledTag() {
-    await expect(this.page.locator(this.locators.disabledTag)).toBeVisible({ timeout: 20000 });
   }
 
   /** The form must still be open — a rejected submit must not close it. */

@@ -25,15 +25,11 @@ export class SloListPage {
       refresh: '[data-test="slos-slolist-refresh"]',
       table: '[data-test="slos-slolist-table"]',
       stats: '[data-test="slos-slolist-stats"]',
-      typeFilter: '[data-test="slos-slolist-type-filter"]',
       deleteDialog: '[data-test="slos-slolist-delete-dialog"]',
       deleteConfirm: '[data-test="slos-slolist-delete-confirm"]',
       deleteAlertCount: '[data-test="slos-slolist-delete-alert-count"]',
       deleteAlertCountLoading: '[data-test="slos-slolist-delete-alert-count-loading"]',
       deleteAlertCountUnknown: '[data-test="slos-slolist-delete-alert-count-unknown"]',
-      moveDialog: '[data-test="slos-slolist-move-dialog"]',
-      moveConfirm: '[data-test="slos-slolist-move-confirm"]',
-      moveSelected: '[data-test="slos-slolist-move-selected"]',
     };
   }
 
@@ -50,10 +46,6 @@ export class SloListPage {
     await this.page.goto(`/web/slos?org_identifier=${orgId}`);
     await expect(this.page.locator(this.locators.title)).toBeVisible({ timeout: 30000 });
     testLogger.navigation('SLO list');
-  }
-
-  async clickNew() {
-    await this.page.locator(this.locators.newButton).click();
   }
 
   async refresh() {
@@ -93,10 +85,6 @@ export class SloListPage {
 
   async clickEdit(name) {
     await this.page.locator(this.editButton(name)).click();
-  }
-
-  async toggleEnabled(name) {
-    await this.page.locator(this.toggleButton(name)).click();
   }
 
   /** Open the delete confirmation without confirming it. */
@@ -198,22 +186,6 @@ export class SloListPage {
     await expect(this.page.locator(this.locators.deleteAlertCountUnknown)).toHaveCount(0);
   }
 
-  /** Used where the SLO genuinely has dependent alerts. */
-  async expectDeleteDialogShowsAlertCount() {
-    const dialog = this.page.locator(this.locators.deleteDialog);
-    await expect(dialog).toBeVisible({ timeout: 15000 });
-    await expect(
-      this.page.locator(this.locators.deleteAlertCountLoading),
-    ).toHaveCount(0, { timeout: 20000 });
-    // Either a real count or an explicit "unknown" — both are valid outcomes,
-    // but the dialog must say which rather than leaving the field blank.
-    const known = this.page.locator(this.locators.deleteAlertCount);
-    const unknown = this.page.locator(this.locators.deleteAlertCountUnknown);
-    const shown = (await known.count()) + (await unknown.count());
-    expect(shown, 'delete dialog must report dependent-alert count or say it is unknown')
-      .toBeGreaterThan(0);
-  }
-
   /**
    * Click a health stat tile, which doubles as a filter.
    *
@@ -225,12 +197,6 @@ export class SloListPage {
     await tile.waitFor({ state: 'visible', timeout: 20000 });
     await tile.click();
     await this.page.waitForTimeout(500);
-  }
-
-  async expectStatVisible(key) {
-    await expect(
-      this.page.locator(`[data-test="slos-slolist-stat-${key}"]`),
-    ).toBeVisible({ timeout: 20000 });
   }
 
   async closeDialogIfOpen() {

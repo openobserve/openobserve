@@ -24,6 +24,7 @@ const {
   createSloViaApi,
   countDefinition,
   deleteSlosByPrefix,
+  deleteFixturesByPrefix,
   uniqueName,
 } = require('../utils/slo-seed.js');
 
@@ -58,6 +59,8 @@ test.describe('SLO CRUD lifecycle', { tag: ['@slo', '@sloCrud', '@all'] }, () =>
     const context = await browser.newContext();
     const page = await context.newPage();
     await deleteSlosByPrefix(page, `${workerPrefix(testInfo)}_`).catch(() => {});
+    // SLOs first (they may reference the destination), then everything else.
+    await deleteFixturesByPrefix(page, `${workerPrefix(testInfo)}_`).catch(() => {});
     await context.close();
   });
 
@@ -65,7 +68,7 @@ test.describe('SLO CRUD lifecycle', { tag: ['@slo', '@sloCrud', '@all'] }, () =>
 
   test('SLO list page loads with title, table and New button', {
     tag: ['@P0', '@smoke'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloListPage.goto(ORG);
     await pm.sloListPage.expectListVisible();
   });
@@ -377,6 +380,41 @@ test.describe('SLO CRUD lifecycle', { tag: ['@slo', '@sloCrud', '@all'] }, () =>
     await pm.sloListPage.expectRowAbsent(countName);
   });
 
+  /**
+   * The detail view must echo the target the SLO was configured with.
+   *
+   * The target is the promise; a detail page showing a different one would
+   * misreport whether the SLO is being met, and nothing else on the page would
+   * contradict it.
+   */
+  test('the detail stats echo the configured target', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const stream = uniqueName(`${workerPrefix(testInfo)}_stream`);
+    const name = uniqueName(workerPrefix(testInfo));
+    await seedMinimalStream(page, stream);
+    const slo = await createSloViaApi(page, countDefinition({ name, stream, target: 97.5 }));
+
+    await pm.sloDetailPage.goto(ORG, slo.id);
+    await pm.sloDetailPage.expectTargetShown('97.5');
+  });
+
+  /**
+   * Time-to-exhaust is derived from the burn rate, so it cannot exist before
+   * anything has been measured — it must read as absent, not as a duration.
+   */
+  test('time-to-exhaust is absent on an unmeasured SLO', {
+    tag: ['@P2', '@edge'],
+  }, async ({ page }, testInfo) => {
+    const stream = uniqueName(`${workerPrefix(testInfo)}_stream`);
+    const name = uniqueName(workerPrefix(testInfo));
+    await seedMinimalStream(page, stream);
+    const slo = await createSloViaApi(page, countDefinition({ name, stream }));
+
+    await pm.sloDetailPage.goto(ORG, slo.id);
+    await pm.sloDetailPage.expectTimeToExhaustAbsent();
+  });
+
   // -------------------------------------------------------- negative / edge
 
   /**
@@ -520,7 +558,7 @@ test.describe('SLO CRUD lifecycle', { tag: ['@slo', '@sloCrud', '@all'] }, () =>
 
   test('an unknown SLO id renders the not-found state', {
     tag: ['@P2'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloDetailPage.goto(ORG, 'definitely-not-a-real-slo-id');
     await pm.sloDetailPage.expectNotFound();
   });

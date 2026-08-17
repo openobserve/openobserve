@@ -21,6 +21,7 @@ const {
   waitForSloMeasured,
   timeSliceDefinition,
   deleteSlosByPrefix,
+  deleteFixturesByPrefix,
   uniqueName,
   LATENCY_THRESHOLD_MS,
 } = require('../utils/slo-seed.js');
@@ -40,7 +41,9 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
   test.beforeAll(async ({ browser }) => {
     // See the note in slo-timeslice.spec.js: seeding plus a backfill wait
     // exceeds the config's 3-minute test timeout, which also bounds hooks.
-    test.setTimeout(25 * 60 * 1000);
+    // One backfill wait (capped at 10 min by waitForSloMeasured) plus seeding.
+    // See the note in slo-timeslice.spec.js on why this is not 25 minutes.
+    test.setTimeout(12 * 60 * 1000);
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -79,7 +82,14 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
   test.afterAll(async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
-    await deleteSlosByPrefix(page, PREFIX).catch(() => {});
+    // Trailing separator matters: `deleteSlosByPrefix` matches with startsWith,
+    // and this PREFIX is a strict prefix of slo-alert-sli's ('e2e_slo_alertsli').
+    // Without it this sweep deletes that spec's SLOs whenever both run on one
+    // instance — which is exactly what `npx playwright test playwright-tests/SLO`
+    // does locally.
+    await deleteSlosByPrefix(page, `${PREFIX}_`).catch(() => {});
+    // SLOs first (they may reference the destination), then everything else.
+    await deleteFixturesByPrefix(page, `${PREFIX}_`).catch(() => {});
     await context.close();
   });
 
@@ -140,6 +150,12 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
     // Every offered card must be savable: the backend caps burn rate at
     // 100/(100 - target), and the presets clamp to it rather than offering a trap.
     expect(critical).toBeGreaterThan(0);
+
+    // And the comparison itself must be set: a burn-rate rule fires when the
+    // measured rate goes ABOVE the threshold, so an unset or inverted operator
+    // would make the alert either silent or permanently firing.
+    const operator = await pm.sloAlertsPage.readOperator();
+    expect(['>', '>='], `unexpected burn-rate operator: ${operator}`).toContain(operator);
   });
 
   /**
@@ -252,7 +268,7 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
    */
   test('an existing burn-rate alert can be edited', {
     tag: ['@P1'],
-  }, async ({ page }) => {
+  }, async () => {
     const name = uniqueName(`${PREFIX}_edit`);
     await pm.sloAlertsPage.createBurnRateAlert({
       name, preset: 'mid', destination: shared.destination,

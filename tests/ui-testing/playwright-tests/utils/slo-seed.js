@@ -505,10 +505,16 @@ function countDefinition({
  *
  * @returns {Promise<object>} the measured status
  */
-async function waitForSloMeasured(page, sloId, { timeout = 600_000, pollMs = 5000 } = {}) {
+async function waitForSloMeasured(page, sloId, {
+  timeout = 600_000,
+  pollMs = 5000,
+  stallMs = 180_000,
+} = {}) {
   const org = getOrgIdentifier();
   const deadline = Date.now() + timeout;
   let last = null;
+  let bestCoverage = -1;
+  let lastProgressAt = Date.now();
 
   while (Date.now() < deadline) {
     const res = await page.request.get(`${baseUrl()}/api/${org}/slos/${sloId}`, {
@@ -525,6 +531,31 @@ async function waitForSloMeasured(page, sloId, { timeout = 600_000, pollMs = 500
           sloId, sli: status.sli, coverage: status.coverage,
         });
         return status;
+      }
+
+      // Fail fast ONLY when backfill never starts.
+      //
+      // Coverage climbing then pausing is normal and expected: backfill runs
+      // with concurrency 1, so an SLO queued behind another shows no movement
+      // for as long as the one ahead takes. Treating that as a stall is a false
+      // positive — it fired exactly that way on a run where coverage sat at
+      // 28.6% while the previous spec's SLOs finished.
+      //
+      // Coverage still at zero, on the other hand, means nothing has been
+      // measured at all, which is what the two causes below actually look like.
+      const coverage = Number(status?.coverage ?? -1);
+      if (coverage > bestCoverage) {
+        bestCoverage = coverage;
+        lastProgressAt = Date.now();
+      } else if (bestCoverage <= 0 && Date.now() - lastProgressAt > stallMs) {
+        throw new Error(
+          `SLO ${sloId} backfill NEVER STARTED: coverage still 0 after ` +
+          `${Math.round(stallMs / 1000)}s.\n` +
+          `Last status: ${JSON.stringify(last)}\n` +
+          `Nothing has been measured at all, which means either the seed does not reach the\n` +
+          `window (ZO_INGEST_ALLOWED_UPTO, default 5h — rows older than that are dropped while\n` +
+          `ingestion still answers 200) or the scheduler is not running backfill jobs.`,
+        );
       }
     }
     await page.waitForTimeout(pollMs);
@@ -723,6 +754,93 @@ async function seedEligibleSourceAlert(page, baseName, destination) {
   return { alertId, name };
 }
 
+/**
+ * Remove the non-SLO artefacts a run leaves behind: streams, metrics streams and
+ * notification destinations (plus their templates).
+ *
+ * `deleteSlosByPrefix` only removes SLOs. On an ephemeral CI runner the rest is
+ * harmless — the whole instance is discarded — but pointed at a persistent
+ * environment the suite would accumulate a stream and a destination per run.
+ *
+ * Best-effort throughout: cleanup must never mask a test result, and a
+ * half-deleted fixture is better than a failed teardown hiding a real failure.
+ */
+async function deleteFixturesByPrefix(page, prefix) {
+  const org = getOrgIdentifier();
+  const base = baseUrl();
+  const headers = getAuthHeaders();
+
+  const tryDelete = async (url) => {
+    try { await page.request.delete(url, { headers }); } catch { /* best effort */ }
+  };
+
+  // Streams, both logs and metrics.
+  for (const type of ['logs', 'metrics']) {
+    try {
+      const res = await page.request.get(`${base}/api/${org}/streams?type=${type}`, { headers });
+      if (!res.ok()) continue;
+      const body = await res.json().catch(() => ({}));
+      for (const stream of body?.list ?? []) {
+        if (typeof stream?.name === 'string' && stream.name.startsWith(prefix)) {
+          await tryDelete(`${base}/api/${org}/streams/${stream.name}?type=${type}`);
+        }
+      }
+    } catch { /* best effort */ }
+  }
+
+  // ALERTS FIRST, and this one is not merely hygiene.
+  //
+  // A scheduled alert whose source stream has been deleted keeps being picked up
+  // every scheduler cycle, fails with "Stream not found", and is retried forever.
+  // The SLO backfill lane shares the scheduler's worker budget, so a pile of
+  // permanently-failing alert triggers STARVES backfill — observed directly: a
+  // long-lived instance accumulated enough of them that SLO coverage stopped
+  // advancing past the first day-chunk and the measurement specs timed out.
+  // Leaving alerts behind therefore breaks later runs, not just tidiness.
+  try {
+    const res = await page.request.get(
+      `${base}/api/v2/${org}/alerts?folder=default&page_size=200`, { headers },
+    );
+    if (res.ok()) {
+      const body = await res.json().catch(() => ({}));
+      for (const a of body?.list ?? []) {
+        if (typeof a?.name === 'string' && a.name.startsWith(prefix)) {
+          const id = a.alert_id ?? a.id;
+          if (id) await tryDelete(`${base}/api/v2/${org}/alerts/${id}`);
+        }
+      }
+    }
+  } catch { /* best effort */ }
+
+  // Destinations before templates: a template in use by a destination cannot be
+  // removed, so the order is load-bearing rather than cosmetic.
+  try {
+    const res = await page.request.get(`${base}/api/${org}/alerts/destinations`, { headers });
+    if (res.ok()) {
+      const body = await res.json().catch(() => ([]));
+      for (const d of (Array.isArray(body) ? body : body.list ?? [])) {
+        if (typeof d?.name === 'string' && d.name.startsWith(prefix)) {
+          await tryDelete(`${base}/api/${org}/alerts/destinations/${d.name}`);
+        }
+      }
+    }
+  } catch { /* best effort */ }
+
+  try {
+    const res = await page.request.get(`${base}/api/${org}/alerts/templates`, { headers });
+    if (res.ok()) {
+      const body = await res.json().catch(() => ([]));
+      for (const t of (Array.isArray(body) ? body : body.list ?? [])) {
+        if (typeof t?.name === 'string' && t.name.startsWith(prefix)) {
+          await tryDelete(`${base}/api/${org}/alerts/templates/${t.name}`);
+        }
+      }
+    }
+  } catch { /* best effort */ }
+
+  testLogger.debug('fixture cleanup swept', { prefix });
+}
+
 /** Delete an SLO by id, tolerating an already-gone one. */
 async function deleteSloById(page, sloId) {
   const org = getOrgIdentifier();
@@ -779,4 +897,5 @@ module.exports = {
   countDefinition,
   deleteSloById,
   deleteSlosByPrefix,
+  deleteFixturesByPrefix,
 };

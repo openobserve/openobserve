@@ -28,6 +28,7 @@ const {
   createSloViaApi,
   countDefinition,
   deleteSlosByPrefix,
+  deleteFixturesByPrefix,
   uniqueName,
 } = require('../utils/slo-seed.js');
 
@@ -66,6 +67,8 @@ test.describe('SLO alert SLI', { tag: ['@slo', '@sloAlertSli', '@all'] }, () => 
     const context = await browser.newContext();
     const page = await context.newPage();
     await deleteSlosByPrefix(page, `${workerPrefix(testInfo)}_`).catch(() => {});
+    // SLOs first (they may reference the destination), then everything else.
+    await deleteFixturesByPrefix(page, `${workerPrefix(testInfo)}_`).catch(() => {});
     await context.close();
   });
 
@@ -92,7 +95,7 @@ test.describe('SLO alert SLI', { tag: ['@slo', '@sloAlertSli', '@all'] }, () => 
    */
   test('creates an alert-sourced SLO through the form', {
     tag: ['@P0', '@smoke'],
-  }, async ({ page }, testInfo) => {
+  }, async ({}, testInfo) => {
     const name = uniqueName(workerPrefix(testInfo));
 
     await pm.sloFormPage.gotoNew(ORG);
@@ -110,7 +113,7 @@ test.describe('SLO alert SLI', { tag: ['@slo', '@sloAlertSli', '@all'] }, () => 
 
   test('the stored definition carries only the alert id', {
     tag: ['@P0'],
-  }, async ({ page }, testInfo) => {
+  }, async ({}, testInfo) => {
     const name = uniqueName(workerPrefix(testInfo));
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.setName(name);
@@ -139,7 +142,7 @@ test.describe('SLO alert SLI', { tag: ['@slo', '@sloAlertSli', '@all'] }, () => 
    */
   test('detail view names the source alert', {
     tag: ['@P1'],
-  }, async ({ page }, testInfo) => {
+  }, async ({}, testInfo) => {
     const name = uniqueName(workerPrefix(testInfo));
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.setName(name);

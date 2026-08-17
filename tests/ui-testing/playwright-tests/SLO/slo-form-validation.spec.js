@@ -26,6 +26,7 @@ const {
   createSloViaApi,
   countDefinition,
   deleteSlosByPrefix,
+  deleteFixturesByPrefix,
   uniqueName,
 } = require('../utils/slo-seed.js');
 
@@ -58,6 +59,8 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     const context = await browser.newContext();
     const page = await context.newPage();
     await deleteSlosByPrefix(page, `${workerPrefix(testInfo)}_`).catch(() => {});
+    // SLOs first (they may reference the destination), then everything else.
+    await deleteFixturesByPrefix(page, `${workerPrefix(testInfo)}_`).catch(() => {});
     await context.close();
   });
 
@@ -65,7 +68,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
 
   test('an empty name surfaces the server’s name constraint in the form', {
     tag: ['@P0', '@validation'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloFormPage.gotoNew(ORG);
     // Everything else valid, so the name is unambiguously the rejected field.
     await pm.sloFormPage.selectSliType('count');
@@ -80,7 +83,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
 
   test('an out-of-range target surfaces the reason, not a generic failure', {
     tag: ['@P0', '@validation'],
-  }, async ({ page }, testInfo) => {
+  }, async ({}, testInfo) => {
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.fillCountSlo({
       name: uniqueName(workerPrefix(testInfo)),
@@ -128,7 +131,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
    */
   test('a blank good expression is rejected and the form stays open', {
     tag: ['@P1', '@validation'],
-  }, async ({ page }, testInfo) => {
+  }, async ({}, testInfo) => {
     const name = uniqueName(workerPrefix(testInfo));
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.setName(name);
@@ -153,7 +156,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
    */
   test('correcting a rejected save succeeds and clears the error', {
     tag: ['@P1', '@validation'],
-  }, async ({ page }, testInfo) => {
+  }, async ({}, testInfo) => {
     const name = uniqueName(workerPrefix(testInfo));
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.fillCountSlo({
@@ -267,7 +270,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
    */
   test('the count preview renders a chart for a valid definition', {
     tag: ['@P1'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.selectSliType('count');
     await pm.sloFormPage.selectStream(stream);
@@ -375,7 +378,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
    */
   test('saving without a stream is refused', {
     tag: ['@P1', '@validation', '@negative'],
-  }, async ({ page }, testInfo) => {
+  }, async ({}, testInfo) => {
     const name = uniqueName(workerPrefix(testInfo));
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.setName(name);
@@ -407,14 +410,14 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     await pm.sloFormPage.setThreshold(500);
 
     await expect(
-      page.locator('[data-test="slos-slotimeslicepreview-error"]'),
+      page.locator(pm.sloFormPage.locators.tsPreviewError),
       'a broken expression must report an error, not an empty chart',
     ).toBeVisible({ timeout: 60000 });
   });
 
   test('an over-long name is refused with the length constraint', {
     tag: ['@P2', '@validation', '@negative'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.setName('z'.repeat(300));
     await pm.sloFormPage.selectSliType('count');
@@ -433,7 +436,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
    */
   test('cancelling the form creates nothing', {
     tag: ['@P1', '@negative'],
-  }, async ({ page }, testInfo) => {
+  }, async ({}, testInfo) => {
     const name = uniqueName(workerPrefix(testInfo));
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.fillCountSlo({ name, stream, goodExpr: 'status_code < 500' });
@@ -450,7 +453,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
    */
   test('a target of exactly 100 is refused at the boundary', {
     tag: ['@P2', '@validation', '@negative'],
-  }, async ({ page }, testInfo) => {
+  }, async ({}, testInfo) => {
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.fillCountSlo({
       name: uniqueName(workerPrefix(testInfo)),
@@ -464,7 +467,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
 
   test('a fractional target just inside the range is accepted', {
     tag: ['@P2', '@edge'],
-  }, async ({ page }, testInfo) => {
+  }, async ({}, testInfo) => {
     const name = uniqueName(workerPrefix(testInfo));
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.fillCountSlo({
@@ -480,7 +483,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
 
   test('all three rolling windows are selectable', {
     tag: ['@P1'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloFormPage.gotoNew(ORG);
     for (const secs of [604800, 2592000, 7776000]) {
       await pm.sloFormPage.selectWindow(secs);
@@ -489,7 +492,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
 
   test('both slice intervals are selectable while ungrouped', {
     tag: ['@P1'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.selectSliType('count');
     await pm.sloFormPage.expectSliceOptionEnabled(60);

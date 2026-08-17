@@ -33,6 +33,7 @@ const {
   timeSliceDefinition,
   timeSliceGroundTruth,
   deleteSlosByPrefix,
+  deleteFixturesByPrefix,
   uniqueName,
   LATENCY_THRESHOLD_MS,
 } = require('../utils/slo-seed.js');
@@ -61,7 +62,11 @@ test.describe('SLO time-slice measurement', { tag: ['@slo', '@sloTimeSlice', '@a
     // backfill wait for each. Exceeding it tears the context down mid-wait and
     // surfaces as "Target page, context or browser has been closed", which
     // looks like a crash rather than a timeout.
-    test.setTimeout(25 * 60 * 1000);
+    // Budget: two backfill waits capped at 10 min each by waitForSloMeasured,
+    // plus seeding. 25 minutes only ever bought time for a stalled job to burn
+    // the whole shard before failing — and in mode:'serial' that takes every
+    // test with it. Sized to the waits it actually contains.
+    test.setTimeout(20 * 60 * 1000);
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -110,7 +115,11 @@ test.describe('SLO time-slice measurement', { tag: ['@slo', '@sloTimeSlice', '@a
   test.afterAll(async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
-    await deleteSlosByPrefix(page, PREFIX).catch(() => {});
+    // Trailing separator for the same reason as the other specs: startsWith
+    // matching makes a bare prefix greedy.
+    await deleteSlosByPrefix(page, `${PREFIX}_`).catch(() => {});
+    // SLOs first (they may reference the destination), then everything else.
+    await deleteFixturesByPrefix(page, `${PREFIX}_`).catch(() => {});
     await context.close();
   });
 
@@ -127,7 +136,7 @@ test.describe('SLO time-slice measurement', { tag: ['@slo', '@sloTimeSlice', '@a
    */
   test('time-slice SLO reports a measured SLI strictly between 0 and 100', {
     tag: ['@P0', '@regression'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloDetailPage.goto(ORG, shared.sloLt.id);
     const sli = await pm.sloDetailPage.readSli();
 
@@ -152,7 +161,7 @@ test.describe('SLO time-slice measurement', { tag: ['@slo', '@sloTimeSlice', '@a
    */
   test('complementary comparators produce complementary SLIs, neither at a rail', {
     tag: ['@P0', '@regression'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloDetailPage.goto(ORG, shared.sloLt.id);
     const sliLt = await pm.sloDetailPage.readSli();
 
@@ -249,7 +258,7 @@ test.describe('SLO time-slice measurement', { tag: ['@slo', '@sloTimeSlice', '@a
 
   test('preview tally reports good, measured and SLI for a valid aggregate', {
     tag: ['@P1'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.selectSliType('time_slice');
     await pm.sloFormPage.selectTimeSliceStream(shared.stream);
@@ -371,7 +380,7 @@ test.describe('SLO time-slice measurement', { tag: ['@slo', '@sloTimeSlice', '@a
 
   test('PromQL time-slice hides the scope field and shows the absent-metric note', {
     tag: ['@P1'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.selectSliType('time_slice');
     // The language toggle is `v-if="isMetricsStream"` — PromQL is only offered
@@ -396,7 +405,7 @@ test.describe('SLO time-slice measurement', { tag: ['@slo', '@sloTimeSlice', '@a
    */
   test('switching query language clears the other shape\'s fields', {
     tag: ['@P2'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.selectSliType('count');
     // Metrics: the only stream type that offers the language toggle at all.
@@ -421,7 +430,7 @@ test.describe('SLO time-slice measurement', { tag: ['@slo', '@sloTimeSlice', '@a
 
   test('the 1-minute slice is disabled once the SLO is grouped', {
     tag: ['@P2'],
-  }, async ({ page }) => {
+  }, async () => {
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.selectSliType('time_slice');
     await pm.sloFormPage.selectTimeSliceStream(shared.stream);
