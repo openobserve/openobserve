@@ -319,6 +319,18 @@ describe("EvidencePanel", () => {
     const w = mountPanel({ truncated: true });
     expect(w.find('[data-test="synthetics-evidence-truncated"]').exists()).toBe(true);
   });
+
+  it("offers a wrap toggle", () => {
+    const w = mountPanel();
+    expect(w.find('[data-test="synthetics-evidence-wrap-btn"]').exists()).toBe(true);
+  });
+
+  it("wraps the table only once the toggle is on", async () => {
+    const w = mountPanel();
+    expect(w.findComponent(EvidenceEvents).props("wrap")).toBe(false);
+    await w.find('[data-test="synthetics-evidence-wrap-btn"]').trigger("click");
+    expect(w.findComponent(EvidenceEvents).props("wrap")).toBe(true);
+  });
 });
 
 describe("EvidencePanel view filter", () => {

@@ -228,4 +228,17 @@ describe("EvidenceEvents", () => {
     await w.find('[data-test="o2-table-expand-1"]').trigger("click");
     expect(w.findAllComponents(EvidenceEventDetail)).toHaveLength(2);
   });
+
+  it("passes wrap through to the table", () => {
+    expect(mountEvents({ wrap: true }).findComponent(OTable).props("wrap")).toBe(true);
+    expect(mountEvents({ wrap: false }).findComponent(OTable).props("wrap")).toBe(false);
+  });
+
+  it("drops its own truncate when wrapping, which OTable's wrap cannot undo", () => {
+    const off = mountEvents({ wrap: false });
+    const on = mountEvents({ wrap: true });
+    const sel = '[data-test="synthetics-evidence-events-message"]';
+    expect(off.find(sel).classes()).toContain("truncate");
+    expect(on.find(sel).classes()).not.toContain("truncate");
+  });
 });

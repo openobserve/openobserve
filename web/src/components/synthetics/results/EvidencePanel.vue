@@ -44,6 +44,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import {
   EVIDENCE_ERROR_MESSAGE,
@@ -113,6 +114,8 @@ const VIEW_GROUPS: Record<EvidenceView, EvidenceGroup["kind"][]> = {
 
 const view = ref<EvidenceView>("all");
 const firstPartyOnly = ref(false);
+/** Local, not persisted: the drawer is transient and closes with the run. */
+const wrapContent = ref(false);
 
 const loading = computed(() => props.status === "loading" || props.status === "idle");
 const loadError = computed(() => (props.status === "error" ? props.error : null));
@@ -331,6 +334,17 @@ const views = computed(() => [
             class="ml-2"
             data-test="synthetics-evidence-first-party"
           />
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            class="ml-auto"
+            :active="wrapContent"
+            data-test="synthetics-evidence-wrap-btn"
+            @click="wrapContent = !wrapContent"
+          >
+            <OIcon name="wrap-text" size="sm" />
+            <OTooltip :content="t('search.messageWrapContent')" />
+          </OButton>
         </div>
 
         <!-- One table for the view. Rows come from the shared component, so the
@@ -343,6 +357,7 @@ const views = computed(() => [
           mode="panel"
           :filtered="!!stepFilter"
           :origin-ts="originTs"
+          :wrap="wrapContent"
           @clear-filters="emit('clear-step-filter')"
         />
       </template>

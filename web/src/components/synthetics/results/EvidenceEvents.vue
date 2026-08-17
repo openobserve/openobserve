@@ -68,8 +68,13 @@ const props = withDefaults(
      * put a 200 at +0ms next to the 503 that preceded it.
      */
     originTs?: number | null;
+    /**
+     * Long URLs and console messages wrap instead of truncating. Panel only —
+     * the inline step list is five short rows inside a card.
+     */
+    wrap?: boolean;
   }>(),
-  { filtered: false, originTs: null },
+  { filtered: false, originTs: null, wrap: false },
 );
 
 const emit = defineEmits<{ (e: "clear-filters"): void }>();
@@ -249,6 +254,7 @@ function rowTitle(e: EvidenceEvent): string {
     :sorting="isPanel ? 'client' : 'none'"
     :show-global-filter="false"
     :dense="true"
+    :wrap="wrap"
     :bordered="true"
     :default-columns="false"
     :fill-height="false"
@@ -310,7 +316,11 @@ function rowTitle(e: EvidenceEvent): string {
           class="text-status-error-text shrink-0"
           aria-hidden="true"
         />
-        <span class="text-text-body min-w-0 flex-1 truncate font-mono text-xs">
+        <span
+          class="text-text-body min-w-0 flex-1 font-mono text-xs"
+          :class="wrap ? 'break-all whitespace-normal' : 'truncate'"
+          data-test="synthetics-evidence-events-message"
+        >
           {{ shortUrl(row.url) || row.text || row.message || row.kind }}
         </span>
       </div>
@@ -318,7 +328,8 @@ function rowTitle(e: EvidenceEvent): string {
 
     <template v-if="isPanel" #cell-step="{ row }">
       <span
-        class="text-text-secondary truncate text-xs"
+        class="text-text-secondary text-xs"
+        :class="wrap ? 'break-all whitespace-normal' : 'truncate'"
         :title="row.stepName ?? ''"
         data-test="synthetics-evidence-events-step"
       >
