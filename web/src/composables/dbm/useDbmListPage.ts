@@ -30,7 +30,7 @@
  * and `defineOptions` (which must stay in the SFC for `<keep-alive :include>`).
  */
 
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -43,6 +43,7 @@ import { useDbmRequestSeq, type DbmRequestSeq } from "@/composables/dbm/useDbmRe
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import { useDbmScopeSyncScope } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmTabCountsContext, type DbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
+import type { BadgeCount, DbmTabCountKey } from "@/composables/dbm/useDbmTabCounts";
 import { claimedCount, dbmHttpError } from "@/utils/dbm/format";
 
 export interface DbmListPageOptions {
@@ -105,6 +106,24 @@ export interface DbmRunOptions {
   /** Runs after a non-stale load settles, on success and failure alike —
    *  empty-state probes, scroll restoration. */
   settled?: () => void | Promise<void>;
+  /**
+   * The badges this page counts better than the shared fan-out can.
+   *
+   * Declared here rather than substituted into the page's own `tabCounts`
+   * copy, because a substitution is only visible while the reader is STANDING
+   * on the page that made it: Overview's exact fleet union read `6` on
+   * Overview and the fan-out's rawer number on every sibling tab. The same
+   * badge reading two different ways depending on where you stand is the bug
+   * this exists to close.
+   *
+   * Publishing it to the shared snapshot instead means every tab paints the
+   * best number anyone has measured. The getter returns `undefined` for "no
+   * better number yet" (typically while loading, or before the first read
+   * lands), which leaves the shared value alone — the same convention
+   * `withOwnCount` used, so the pages' existing expressions move over
+   * unchanged.
+   */
+  ownCounts?: readonly { key: DbmTabCountKey; value: () => BadgeCount | undefined }[];
 }
 
 export function useDbmListPage(options: DbmListPageOptions) {
@@ -127,6 +146,21 @@ export function useDbmListPage(options: DbmListPageOptions) {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const search = ref("");
+
+  /**
+   * When this page's data last landed, epoch milliseconds — what the refresh
+   * control reports as "last refreshed".
+   *
+   * Set from the load envelope rather than by each page, so every tab gets the
+   * timestamp without nine copies of the same assignment, and none can forget
+   * it. Written on SUCCESS only: a failed load replaced nothing, and stamping
+   * it would age-reset the reading over rows from the previous window while the
+   * error banner says the refresh did not happen.
+   *
+   * `null` until the first successful load, which the control renders as no
+   * staleness verdict at all rather than as a stale one.
+   */
+  const lastRunAt = ref<number | null>(null);
 
   const org = computed(() => (store.state?.selectedOrganization?.identifier as string) ?? "");
   const dbmEnabled = computed(() => Boolean(store.state?.zoConfig?.database_monitoring_enabled));
@@ -154,6 +188,10 @@ export function useDbmListPage(options: DbmListPageOptions) {
 
     try {
       await fetcher(token);
+      // Only the load that still owns the page may stamp the clock. A
+      // superseded fetch finishing late would otherwise report ITS completion
+      // as the age of rows the newer load is about to replace.
+      if (!requestSeq.isStale(token)) lastRunAt.value = Date.now();
     } catch (err: unknown) {
       // A superseded request's failure is not this page's failure — surfacing
       // it would blank a table the newer load is about to fill.
@@ -227,6 +265,32 @@ export function useDbmListPage(options: DbmListPageOptions) {
   // it on return and reload ONLY if it actually moved.
   useDbmScopeSyncScope({ route, scope, reload: () => void options.load() });
 
+  // Publish this page's own badge into the SHARED snapshot whenever it
+  // changes, so the number is on the strip from every tab and not only from
+  // here. A `watch` rather than a call inside the page's `tabCounts` computed:
+  // a computed must not have side effects, and the page stays mounted (its
+  // refs live) under keep-alive, so the value is published exactly when it is
+  // learned.
+  //
+  // Both the watcher AND its first read are set up in `onMounted`, never during
+  // setup. These getters close over refs the PAGE declares, and every page
+  // calls this composable in the same `const { … } = useDbmListPage({…})` whose
+  // destructuring binds several of them — so ANY read during setup happens
+  // while those bindings are still in their temporal dead zone and throws
+  // `Cannot access 'loading' before initialization`. That includes `watch`
+  // itself: it evaluates a getter source once, immediately, to collect the
+  // dependencies it must track, so even without `immediate` it is an eager
+  // read.
+  //
+  // Registering inside `onMounted` costs nothing — the page has not loaded
+  // yet, so the first value would have been `undefined` regardless — and it
+  // frees every page from having to order its declarations around this call.
+  onMounted(() => {
+    for (const { key, value } of options.ownCounts ?? []) {
+      watch(value, (next) => tabCountsContext.publishOwnCount(key, next), { immediate: true });
+    }
+  });
+
   return {
     scope,
     requestSeq,
@@ -234,6 +298,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
     loading,
     error,
     search,
+    lastRunAt,
     org,
     dbmEnabled,
     queryCount,

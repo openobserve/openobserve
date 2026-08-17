@@ -74,6 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             search-data-test="dbm-deadlocks-search"
             @search="load"
           >
+            <DbmScopeFilters
+              class="min-w-0 flex-1"
+              :filters="dimensionFilters"
+              @clear="clearScope"
+            />
             <!-- What a ROW means. Not a data-processing mode — the reader is
                  choosing between "name the bug" and "give me a timestamp". -->
             <OToggleGroup v-model="grouping" class="shrink-0" data-test="dbm-deadlocks-grouping">
@@ -92,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar-trailing>
           <DbmRefreshButton
             :loading="loading"
+            :last-run-at="lastRunAt"
             data-test="dbm-deadlocks-refresh"
             @refresh="onRefresh"
           />
@@ -129,6 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="copyStormSummary()"
               >
                 {{ t("dbm.deadlocks.storm.copyForSlack") }}
+                <!-- The label is the bare word "Copy", so what lands on the
+                     clipboard has to be said somewhere. Its twin inside the
+                     expansion (DbmDeadlockCycle) already explained itself; this
+                     one did not, and the two do the same job. -->
+                <OTooltip side="bottom" :content="t('dbm.deadlocks.detail.copyForSlackHint')" />
               </OButton>
             </template>
           </OBanner>
@@ -333,7 +344,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :aria-label="t('dbm.deadlocks.detail.showAbove')"
                         :data-test="`dbm-deadlocks-event-${point.id}`"
                         @click.stop="selectEvent(row, point.id)"
-                      ></button>
+                      >
+                        <!-- The dot carried an `aria-label` and nothing else,
+                             so a screen reader knew what it did and a sighted
+                             mouse user did not: an unlabelled 8px circle with
+                             no hover text. Same string, now reaching both. -->
+                        <OTooltip side="top" :content="t('dbm.deadlocks.detail.showAbove')" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -390,6 +407,7 @@ import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
+import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
@@ -412,8 +430,9 @@ import dbMonitoringService, {
   type DeadlockParticipant,
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
+import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { useDbmScopeFilters } from "@/composables/dbm/useDbmScopeFilters";
 import { createDbmContextProvider } from "@/composables/contextProviders";
 import { copyToClipboard } from "@/utils/clipboard";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
@@ -460,6 +479,7 @@ const {
   loading,
   error,
   search,
+  lastRunAt,
   org,
   dbmEnabled,
   queryCount,
@@ -467,7 +487,22 @@ const {
   run,
   onRefresh,
   onDateChange,
-} = useDbmListPage({ load: () => load(), context: () => dbmContext });
+} = useDbmListPage({
+  load: () => load(),
+  context: () => dbmContext,
+  syncUrl: () => syncUrl(),
+  // This page's event total, from the read it actually performed under its own
+  // filters — published so the badge reads the same from every tab.
+  // `undefined` until this page has actually read: `eventCount` starts at 0,
+  // and publishing that pre-load zero would stamp "no deadlocks" over the
+  // shell's real count on every tab. See dbmTabCountsResilience.spec.ts.
+  ownCounts: [
+    {
+      key: "deadlockCount",
+      value: () => (lastRunAt.value === null ? undefined : eventCount.value),
+    },
+  ],
+});
 
 const events = shallowRef<DeadlockEvent[]>([]);
 const eventCount = ref(0);
@@ -491,9 +526,8 @@ const readUpTo = ref<number | null>(null);
  * so a capped read renders `65+`, but this page's own badge states the total
  * it loaded and `truncated` is already disclosed beside the table.
  */
-const tabCounts = computed(() =>
-  tabCountProps(withOwnCount(tabCountsContext.counts.value, "deadlockCount", eventCount.value)),
-);
+/** Every badge, from the shell's shared snapshot — this page's own included. */
+const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 const grouping = ref<string>("pairs");
 /** Which event of a pair the expansion is showing, by pair key. */
@@ -1043,9 +1077,71 @@ const copyStormSummary = () => {
 const onEmptyAction = (id: string) => {
   if (id === "widen") {
     setPeriod("1d");
-    router.replace({ query: { ...route.query, ...queryParams.value } }).catch(() => {});
+    // Through the page's own `syncUrl` rather than a hand-rolled replace, so
+    // widening the window carries the scope filters along with the range —
+    // the inline version wrote only the range and dropped them.
+    syncUrl();
     load();
   }
+};
+
+// ─── Filters ─────────────────────────────────────────────────────────────────
+
+// The three dimensions `/deadlocks` accepts, seeded from the URL so scope
+// carried in from a sibling tab actually applies. This page ALREADY wrote
+// `system` into the URL on both drill-outs (see `onRowAction` /
+// `onParticipantAction`) while ignoring it on arrival — so it produced scoped
+// links it could not itself honour. Reading it here closes that loop.
+const {
+  filters: dimensionFilters,
+  requestParams: scopeParams,
+  queryParams: scopeQuery,
+  clear: clearScopeModels,
+} = useDbmScopeFilters({
+  query: route.query,
+  // Re-read on activation: this page is kept alive, so its setup-time seed
+  // above goes stale the moment a sibling tab changes the scope.
+  liveQuery: () => route.query,
+  // Adopting a sibling tab's scope changes the chip; only this changes the rows.
+  onScopeAdopted: () => void load(),
+  // Options come from the EVENTS, not the table rows: `DeadlockRow` drops
+  // `db_namespace` in both builders, so deriving from the rendered rows would
+  // silently offer an empty schema select.
+  options: () => ({
+    system: events.value.map((e) => e.db_system),
+    instance: events.value.map((e) => e.db_instance),
+    namespace: events.value.map((e) => e.db_namespace),
+  }),
+  apply: () => {
+    syncUrl();
+    load();
+  },
+});
+
+const clearScope = () => {
+  clearScopeModels();
+  search.value = "";
+  syncUrl();
+  load();
+};
+
+/**
+ * Mirror the scope into the URL so it survives a tab switch, a reload and a
+ * paste into someone else's chat window. Replace rather than push: a filter
+ * change is not a navigation the back button should have to walk through.
+ */
+const syncUrl = () => {
+  router
+    .replace({
+      name: route.name as string,
+      query: {
+        ...route.query,
+        ...queryParams.value,
+        ...scopeQuery.value,
+        search: search.value || undefined,
+      },
+    })
+    .catch(() => {});
 };
 
 const load = () =>
@@ -1055,6 +1151,7 @@ const load = () =>
         startTime: current.value.startTime,
         endTime: current.value.endTime,
         search: search.value || undefined,
+        ...scopeParams.value,
       });
 
       // A newer search or window already owns the page.

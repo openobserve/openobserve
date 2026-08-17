@@ -272,13 +272,16 @@ describe("the zero-trace fallback counts what the tabs actually show", () => {
   });
 
   /**
-   * An org with nothing anywhere claims nothing anywhere.
+   * An org with nothing anywhere prints zero everywhere — because everything
+   * ANSWERED. Both server members are present and empty, so the database's own
+   * lists were read and held nothing; that is a measurement, and the strip
+   * states it rather than going blank beside its populated siblings.
    *
-   * The two OVERLAP badges go blank (D6/L2 — a zero from one of two feeds is
-   * not a population), while `databaseCount` is not an overlap measure and
-   * keeps printing its measured zero.
+   * The withheld-zero rule (D6/L2) still governs the arms above, where a
+   * server member is `null` (fired-and-failed) or absent (never fired) — there
+   * a vantage genuinely did not answer and must not claim a count.
    */
-  it("withholds both overlap badges when the databases report nothing either", async () => {
+  it("prints a server zero on both overlap badges when the databases report nothing either", async () => {
     badgesAnswer({
       ...fullEnvelope(),
       queries: { total: 0 },
@@ -287,8 +290,9 @@ describe("the zero-trace fallback counts what the tabs actually show", () => {
       server_samples: { hits: [], truncated: false },
     });
     const counts = await fetchDbmTabCounts("acme", WINDOW);
-    expect(badgeCount(counts.queryCount)).toBeNull();
-    expect(badgeCount(counts.sampleCallsCount)).toBeNull();
+    expect(badgeCount(counts.queryCount)).toBe("0");
+    expect(badgeCount(counts.sampleCallsCount)).toBe("0");
+    expect(countVantage(counts.queryCount)).toBe("server");
     expect(counts.databaseCount).toBe(0);
   });
 });
@@ -364,11 +368,20 @@ describe("a failed slice blanks its own badge and nothing else", () => {
     },
   );
 
-  /** A total request failure is every-member-lost: all nulls, all `[]`. */
-  it("folds a rejected request to the empty snapshot", async () => {
+  /**
+   * A total request failure REJECTS rather than folding to a row of `null`s.
+   *
+   * The two are different answers and used to be indistinguishable: a member
+   * `null` is "this slice could not be read", while a dead request is "nothing
+   * was learned at all". Folding the second into the first let `load` write
+   * blanks over badges that already held real numbers, which is the badge
+   * vanishing on tab switch. The caller decides what a dead request means,
+   * because only it knows whether anything was known before — see
+   * `dbmTabCountsResilience.spec.ts`.
+   */
+  it("rejects when the request itself failed, rather than claiming zero", async () => {
     service.getBadges.mockRejectedValue(new Error("boom"));
-    const counts = await fetchDbmTabCounts("acme", WINDOW);
-    expect(counts).toEqual(emptyDbmTabCounts());
+    await expect(fetchDbmTabCounts("acme", WINDOW)).rejects.toThrow("boom");
   });
 
   /** The same guarantee before anything has been fetched at all. */
@@ -620,15 +633,22 @@ describe("an empty vantage withholds its overlap badge (D6/L2)", () => {
     server_samples: { hits: [], total: 0, truncated: false },
   });
 
+  // A server member that is PRESENT AND EMPTY is a measurement: the database's
+  // own list was read and held nothing. Both vantages answered, so `0` is the
+  // honest count — and a blank badge beside populated siblings reads as "this
+  // tab is broken", which is what a reader reported. The withheld-zero rule
+  // still governs every arm where a vantage did NOT answer (see the two
+  // `toBeNull` cases above, where the server member is `null` or absent).
   it.each([["queryCount"], ["sampleCallsCount"]])(
-    "%s is blank, never a qualified 0, when no vantage saw anything",
+    "%s prints a server 0 once the database's own list has answered and is empty",
     async (badge) => {
       badgesAnswer(emptyBothVantages());
       const counts = await fetchDbmTabCounts("dbm_notraces", WINDOW);
       const value = counts[badge as keyof typeof counts];
-      expect(value).toBeNull();
-      // What the strip would PRINT. `"0"` here is the reported symptom.
-      expect(badgeCount(value as never)).toBeNull();
+      expect(badgeCount(value as never)).toBe("0");
+      // The zero carries the vantage that actually counted it, so the strip
+      // qualifies it rather than printing a bare, unattributed number.
+      expect(countVantage(value as never)).toBe("server");
     },
   );
 
@@ -700,5 +720,61 @@ describe("an empty vantage withholds its overlap badge (D6/L2)", () => {
     expect(countVantage(counts.queryCount)).toBe("client");
     expect(claimedCount(counts.sampleCallsCount)).toBe(1200);
     expect(countVantage(counts.sampleCallsCount)).toBe("client");
+  });
+});
+
+/**
+ * The Activity badge read 0 (blank) on a tab whose table was visibly full.
+ *
+ * ActivityPage overrides `activityCount` with its OWN `sampleTotal`, derived
+ * from the state breakdown it loaded. But `activitySampleTotal` returns `null`
+ * for an empty breakdown — which is true before the page's first load resolves,
+ * and true again on a window whose breakdown comes back `[]` while the row
+ * sample does not. Verified live: `oss_traces` answers `hits: 100` with
+ * `by_state: []`, and the shared `/badges` envelope carries the same shape.
+ *
+ * `null` is an assertion of unknown, so `withOwnCount` lets it WIN — stamping
+ * "we cannot count" over a shared snapshot that had counted perfectly well.
+ * The page must publish `undefined` ("I have no better number") instead, which
+ * is the same convention DatabasesPage uses via `loading ? undefined : …`.
+ */
+describe("the Activity badge does not blank a good shared count", () => {
+  const overrideAs = (own: number | null | undefined) =>
+    tabCountProps(
+      withOwnCount({ ...emptyDbmTabCounts(), activityCount: 389 }, "activityCount", own),
+    ).activityCount;
+
+  /** The unsampled-breakdown case, which is what the reader actually hit. */
+  it("keeps the shared count when the page's own breakdown is empty", () => {
+    // What `activitySampleTotal([])` yields, coalesced as the page now does.
+    const sampleTotal: number | null = null;
+    expect(overrideAs(sampleTotal ?? undefined)).toBe(389);
+  });
+
+  /** A real breakdown still wins — the override is not being disabled. */
+  it("still prefers the page's own count once it has one", () => {
+    expect(overrideAs(389)).toBe(389);
+    expect(overrideAs(12)).toBe(12);
+  });
+
+  /**
+   * A genuinely-measured zero must still be publishable: `0` is a number, not
+   * an absence, so `??` must not swallow it into the shared count.
+   */
+  it("lets a measured zero through", () => {
+    const sampleTotal: number | null = 0;
+    expect(overrideAs(sampleTotal ?? undefined)).toBe(0);
+  });
+
+  /**
+   * The page must not hand `null` to the override any more — and it must
+   * PUBLISH the count rather than substitute it into its own copy, so the
+   * badge reads the same from every tab. See dbmTabCountsResilience.spec.ts.
+   */
+  it("ActivityPage publishes its count, coalescing its null first", () => {
+    const source = readFileSync(join(here, "ActivityPage.vue"), "utf8");
+    expect(source).toContain(
+      'ownCounts: [{ key: "activityCount", value: () => sampleTotal.value ?? undefined }]',
+    );
   });
 });

@@ -46,6 +46,8 @@ import {
 
 import {
   emptyDbmTabCounts,
+  type BadgeCount,
+  type DbmTabCountKey,
   type DbmTabCounts,
   type DbmTabCountsLoadOptions,
 } from "@/composables/dbm/useDbmTabCounts";
@@ -65,6 +67,20 @@ export interface DbmTabCountsContext {
    * it cannot accidentally request a window other than the one on screen.
    */
   refresh: (options?: DbmTabCountsLoadOptions) => void;
+  /**
+   * Publish a count THIS page measured better than the shared fan-out could,
+   * so every tab paints it.
+   *
+   * Each page used to substitute its own badge into its own copy of the
+   * snapshot, which made a refined count visible only while standing on the
+   * page that produced it — Overview's exact fleet union read `6` on Overview
+   * and the fan-out's rawer number on every sibling. Publishing puts it in the
+   * shared snapshot instead, so the same badge reads the same everywhere.
+   *
+   * `undefined` means "no better number yet" and is ignored, so a page can
+   * call this from a watcher without guarding the not-yet-loaded case.
+   */
+  publishOwnCount: (key: DbmTabCountKey, value: BadgeCount | undefined) => void;
 }
 
 const DBM_TAB_COUNTS: InjectionKey<DbmTabCountsContext> = Symbol("dbmTabCounts");
@@ -86,4 +102,5 @@ export const useDbmTabCountsContext = (): DbmTabCountsContext =>
   inject(DBM_TAB_COUNTS, {
     counts: shallowReadonly(shallowRef(emptyDbmTabCounts())),
     refresh: () => {},
+    publishOwnCount: () => {},
   });

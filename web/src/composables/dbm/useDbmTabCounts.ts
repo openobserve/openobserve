@@ -191,6 +191,25 @@ export const emptyDbmTabCounts = (): DbmTabCounts => ({
   blockingSamples: [],
 });
 
+/**
+ * The reader's scope, as the badges request takes it.
+ *
+ * Every dimension the pages can filter on — not `system` alone, which is what
+ * this used to be. The server forwards each to exactly the slices whose
+ * endpoint accepts it, so a badge counts what its tab would show; a dimension
+ * missing HERE could never reach any of them.
+ */
+export interface DbmCountFilters {
+  system?: string | null;
+  instance?: string | null;
+  namespace?: string | null;
+  env?: string | null;
+  service?: string | null;
+}
+
+/** The dimensions, in the order the cache key lists them. */
+export const DBM_COUNT_FILTER_KEYS = ["system", "instance", "namespace", "env", "service"] as const;
+
 /** The window, as the endpoints take it. */
 interface DbmCountWindow {
   startTime: number;
@@ -233,31 +252,38 @@ export const dbmTabCountsKey = (
  * response shapes, member by member.
  *
  * Exported for the spec, which needs to assert the fold (a null member gives
- * `null` and `[]`) without standing up the caching layer around it. Never
- * rejects: a failed request folds to the empty snapshot, which
- * `worthKeeping` then declines to cache.
+ * `null` and `[]`) without standing up the caching layer around it.
+ *
+ * REJECTS when the request itself failed. A per-member `null` means "this
+ * slice could not be read" and is folded normally; a dead request means
+ * nothing at all was learned, and the two must stay distinguishable — folding
+ * the second into a row of `null`s let it overwrite badges that had real
+ * numbers. See the `catch` below.
  */
 export const fetchDbmTabCounts = async (
   org: string,
   window: DbmCountWindow,
-  filters: { system?: string | null } = {},
+  filters: DbmCountFilters = {},
 ): Promise<DbmTabCounts> => {
-  let badges: BadgesResponse;
-  try {
-    // `system` narrows the slices that accept it (databases, queries and the
-    // server fallbacks) — the server applies it exactly as the six-read
-    // fan-out did, so it rides the one request rather than per-endpoint.
-    const response = await dbMonitoringService.getBadges(
-      org,
-      filters.system ? { ...window, system: filters.system } : window,
-    );
-    badges = response.data;
-  } catch {
-    // The whole request failed, so nothing is known — every count `null`,
-    // every payload `[]`. The six-read fan-out could lose members one at a
-    // time; a one-request total failure is the all-members-lost case.
-    return emptyDbmTabCounts();
+  // Deliberately UNCAUGHT. A failed request propagates to the caller instead
+  // of folding to the empty snapshot: resolving with a row of `null`s made a
+  // dead request indistinguishable from a successful read that counted
+  // nothing, so `load` wrote those blanks over numbers it already had — the
+  // badges vanishing on a tab switch that this whole module exists to prevent.
+  // Only the caller knows whether anything was known before, so only it can
+  // decide what a dead request means.
+  //
+  // The reader's WHOLE scope rides this one request. The server forwards each
+  // dimension to exactly the slices whose endpoint accepts it, so a badge
+  // counts what its tab would show — sending `system` alone (what this did)
+  // left four of the five filters unable to reach any badge.
+  const scope: Record<string, string> = {};
+  for (const key of DBM_COUNT_FILTER_KEYS) {
+    const value = filters[key];
+    if (value) scope[key] = value;
   }
+  const response = await dbMonitoringService.getBadges(org, { ...window, ...scope });
+  const badges: BadgesResponse = response.data;
 
   const { databases, queries, activity, deadlocks, blocking, table_health: tableHealth } = badges;
 
@@ -330,6 +356,14 @@ export const fetchDbmTabCounts = async (
     if (sq?.hits?.length) counts.queryCount = countClaim(sq.hits.length, sq.truncated, "server");
     if (ss?.hits?.length)
       counts.sampleCallsCount = countClaim(ss.hits.length, ss.truncated, "server");
+    // A PRESENT-AND-EMPTY server answer is a measurement, not an absence: the
+    // database's own list was read and it held nothing. D6/L2 withhold a zero
+    // because an UNMEASURED vantage must not claim one — but here both
+    // vantages answered, so `0` is the honest count and a blank badge reads as
+    // "this tab is broken" beside its populated siblings. Only this arm may
+    // print it; a `null` member (fired-and-failed) still claims nothing.
+    if (sq && !sq.hits?.length) counts.queryCount = countClaim(0, false, "server");
+    if (ss && !ss.hits?.length) counts.sampleCallsCount = countClaim(0, false, "server");
     // Overview: identity only, no request at all — distinct instances the
     // server vantage NAMES, from rows already in hand (the same sources the
     // fleet page's own union reads). This can undercount an instance known
@@ -379,6 +413,51 @@ const worthKeeping = (counts: DbmTabCounts): boolean =>
   counts.blockedCount !== null ||
   counts.tableHealthCount !== null;
 
+/** The seven count fields, as distinct from the snapshot's array payloads. */
+const COUNT_KEYS = [
+  "databaseCount",
+  "queryCount",
+  "sampleCallsCount",
+  "activityCount",
+  "deadlockCount",
+  "blockedCount",
+  "tableHealthCount",
+] as const;
+
+/**
+ * Carry a badge the PREVIOUS snapshot answered across a slice that just
+ * failed.
+ *
+ * `null` means "we could not count", and that is honest about the read — but
+ * it is the wrong thing to PAINT when the same badge held a real number a
+ * moment ago over a window the reader has not questioned. The strip is a
+ * navigation aid: a badge that blinks out because one hop 500'd reads as "this
+ * tab is empty", which is a stronger and more misleading claim than showing
+ * the last number that was actually measured.
+ *
+ * Applied per FIELD, not per snapshot, so a degraded envelope shows the fresh
+ * numbers for every slice that answered and the carried ones only where a
+ * slice did not. A measured `0` is an ANSWER and overwrites normally — only
+ * `null`, which is exactly "unknown", defers to what came before.
+ *
+ * The arrays are deliberately NOT carried. `sessions` and `blockingSamples`
+ * are rendered as ROWS by TableHealthPage's rules, and showing the previous
+ * window's rows beside the current window's table is a different and worse
+ * lie than an empty list.
+ */
+const carryForward = (next: DbmTabCounts, previous: DbmTabCounts | null): DbmTabCounts => {
+  if (!previous) return next;
+  const merged = { ...next };
+  for (const key of COUNT_KEYS) {
+    if (merged[key] === null && previous[key] !== null) {
+      // Same field on both sides, so the union of the count types lines up;
+      // TS cannot see that through a dynamic key.
+      (merged[key] as DbmTabCounts[typeof key]) = previous[key] as DbmTabCounts[typeof key];
+    }
+  }
+  return merged;
+};
+
 /**
  * Snapshots already fetched, and fan-outs still in flight.
  *
@@ -414,9 +493,16 @@ export interface DbmTabCountsSource {
     org: string,
     range: DbmRange,
     window: DbmCountWindow,
-    filters?: { system?: string | null },
+    filters?: DbmCountFilters,
     options?: DbmTabCountsLoadOptions,
   ) => Promise<void>;
+  /**
+   * Publish a count this page measured better than the shared fan-out could,
+   * so every tab paints it — not just the tab that produced it.
+   *
+   * `undefined` means "no better number yet" and is ignored.
+   */
+  publishOwnCount: (key: DbmTabCountKey, value: BadgeCount | undefined) => void;
 }
 
 /**
@@ -440,21 +526,43 @@ export function useDbmTabCounts(): DbmTabCountsSource {
    */
   let latest = 0;
 
+  /**
+   * Which window the currently-published page overrides describe.
+   *
+   * A page publishes what IT measured, and that is only true of the window it
+   * measured over. Stamping the key when a snapshot lands lets a window change
+   * discard those overrides on its own, so no page has to remember to retract
+   * what it taught the strip.
+   */
+  let publishedKey: string | null = null;
+
   const load = async (
     org: string,
     range: DbmRange,
     window: DbmCountWindow,
-    filters: { system?: string | null } = {},
+    filters: DbmCountFilters = {},
     options: DbmTabCountsLoadOptions = {},
   ): Promise<void> => {
     if (!org) return;
-    const key = dbmTabCountsKey(org, range, [filters.system]);
+    const key = dbmTabCountsKey(
+      org,
+      range,
+      DBM_COUNT_FILTER_KEYS.map((k) => filters[k]),
+    );
     const token = (latest += 1);
 
     if (!options.force) {
       const held = settled.get(key);
       if (held) {
-        counts.value = held;
+        // Returning to a window we already answered. If the snapshot on screen
+        // describes THIS window, it may carry counts a page published since —
+        // Overview's exact fleet union, say — and replacing it with the cached
+        // fan-out would throw those away and blink the badge back to the rawer
+        // number. Serving the cached value is right only when the window moved.
+        if (publishedKey !== key) {
+          counts.value = held;
+          publishedKey = key;
+        }
         return;
       }
     }
@@ -490,36 +598,71 @@ export function useDbmTabCounts(): DbmTabCountsSource {
       // A newer window already owns the snapshot. Writing here would paint the
       // superseded window's numbers beside the current window's table.
       if (token !== latest) return;
-      counts.value = value;
+      // A slice that failed inside an otherwise-good envelope keeps the number
+      // the last snapshot had for it, rather than blanking a badge the reader
+      // watched moments ago. Everything that answered is this window's.
+      counts.value = carryForward(value, counts.value);
+      // The window this snapshot describes now owns the published overrides;
+      // anything a page taught us about the PREVIOUS window is stale and must
+      // not be painted beside these numbers.
+      publishedKey = key;
     } catch {
-      // `fetchDbmTabCounts` resolves even on request failure, so it cannot
-      // reject — this guards transport-layer surprises only. Leave the
-      // previous snapshot alone rather than blanking every badge over one
-      // error; the counts stay whatever the last successful answer was, and
-      // nothing was cached.
+      // The request died, so nothing was learned. Leave the previous snapshot
+      // alone rather than blanking every badge over one error — a strip that
+      // empties on a transient failure reads as seven quiet tabs. Nothing was
+      // cached either, so the next attempt is a real one.
     } finally {
       if (token === latest) loading.value = false;
     }
   };
 
-  return { counts: shallowReadonly(counts), loading: readonly(loading), load };
+  /**
+   * Publish a count a PAGE measured better than the shared fan-out could.
+   *
+   * The strip is rendered by whichever page is on screen, and each page
+   * substituted its own badge into its OWN copy of the snapshot. That made a
+   * refined count visible only while standing on the page that produced it:
+   * Overview's exact fleet union showed `6` on Overview and the fan-out's
+   * rawer number on every sibling tab — one badge reading two ways depending
+   * on where the reader stood, which is the reported bug.
+   *
+   * Publishing writes it into the SHARED snapshot instead, so every tab paints
+   * the best number anyone has. The page keeps computing it; only where it
+   * lands changed.
+   *
+   * `undefined` means "I have no better number" and is ignored — the same
+   * convention `withOwnCount` uses, so a page can call this unconditionally
+   * from a computed without guarding the not-yet-loaded case. `null` is NOT
+   * that: it is a page asserting it cannot count, and it wins.
+   */
+  const publishOwnCount = (key: DbmTabCountKey, value: BadgeCount | undefined): void => {
+    if (value === undefined) return;
+    if (counts.value[key] === value) return;
+    counts.value = { ...counts.value, [key]: value };
+  };
+
+  return {
+    counts: shallowReadonly(counts),
+    loading: readonly(loading),
+    load,
+    publishOwnCount,
+  };
 }
 
-/** The seven count fields, as distinct from the snapshot's array payloads. */
-type DbmTabCountKey =
-  | "databaseCount"
-  | "queryCount"
-  | "sampleCallsCount"
-  | "activityCount"
-  | "deadlockCount"
-  | "blockedCount"
-  | "tableHealthCount";
+/**
+ * The seven count fields, as distinct from the snapshot's array payloads.
+ *
+ * Derived from `COUNT_KEYS` rather than spelled twice: `carryForward` iterates
+ * that list, and a field named in one and not the other would be carried but
+ * not typed (or typed but silently never carried).
+ */
+export type DbmTabCountKey = (typeof COUNT_KEYS)[number];
 
 /**
  * A badge as `DbmSectionTabs` accepts it: a plain number, a claim that can
  * render `65+`, or `null` for a count we do not have.
  */
-type BadgeCount = DbmCountClaim | number | null;
+export type BadgeCount = DbmCountClaim | number | null;
 
 /** The seven badge props, as the tab strip takes them. */
 export type DbmTabCountProps = Record<DbmTabCountKey, BadgeCount>;

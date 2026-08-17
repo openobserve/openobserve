@@ -68,6 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             search-data-test="dbm-blocked-search"
             @search="load"
           >
+            <DbmScopeFilters
+              class="min-w-0 flex-1"
+              :filters="dimensionFilters"
+              @clear="clearScope"
+            />
             <!-- Which question the table answers. Defaults to "who's stuck". -->
             <OToggleGroup
               v-model="perspective"
@@ -89,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar-trailing>
           <DbmRefreshButton
             :loading="loading"
+            :last-run-at="lastRunAt"
             data-test="dbm-blocked-refresh"
             @refresh="onRefresh"
           />
@@ -401,6 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 defineOptions({ name: "DbmBlockedQueriesPage" });
 
 import { computed, ref, shallowRef } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
@@ -408,6 +415,7 @@ import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEm
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
+import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
@@ -428,8 +436,9 @@ import dbMonitoringService, {
   type BlockingSample,
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
+import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { useDbmScopeFilters } from "@/composables/dbm/useDbmScopeFilters";
 import { createDbmContextProvider } from "@/composables/contextProviders";
 import { copyToClipboard } from "@/utils/clipboard";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
@@ -455,6 +464,8 @@ import { DBM_STATUS_TONES } from "@/utils/dbm/tones";
 
 const { t } = useI18nTyped();
 const store = useStore();
+const route = useRoute();
+const router = useRouter();
 
 // This page is a route root, so MainLayout's `@sendToAiChat` binding is on it
 // directly — no re-emit chain needed.
@@ -466,12 +477,13 @@ const emit = defineEmits<{
 // the shell's badge snapshot, refresh/date-change handlers, the load envelope
 // and the AI-context registry lifecycle. See useDbmListPage.
 const {
-  scope: { range, current },
+  scope: { range, current, queryParams },
   requestSeq,
   tabCountsContext,
   loading,
   error,
   search,
+  lastRunAt,
   org,
   dbmEnabled,
   queryCount,
@@ -479,7 +491,20 @@ const {
   run,
   onRefresh,
   onDateChange,
-} = useDbmListPage({ load: () => load(), context: () => dbmContext });
+} = useDbmListPage({
+  load: () => load(),
+  context: () => dbmContext,
+  syncUrl: () => syncUrl(),
+  // The wait total this page loaded, published so the badge reads the same
+  // from every tab rather than only while standing here.
+  // `undefined` until this page has actually read — see DeadlocksPage.
+  ownCounts: [
+    {
+      key: "blockedCount",
+      value: () => (lastRunAt.value === null ? undefined : waitingCount.value),
+    },
+  ],
+});
 
 /**
  * Whether this page is describing NOW or a stretch of the past.
@@ -512,9 +537,8 @@ const sampleInterval = ref<number | null>(null);
  * render `65+`, but this badge states the total the page loaded and
  * `truncated` is already disclosed beside the table.
  */
-const tabCounts = computed(() =>
-  tabCountProps(withOwnCount(tabCountsContext.counts.value, "blockedCount", waitingCount.value)),
-);
+/** Every badge, from the shell's shared snapshot — this page's own included. */
+const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 /** "My query is hanging" is how the incident arrives, so this is the default. */
 const perspective = ref<string>(DEFAULT_BLOCKING_PERSPECTIVE);
@@ -978,6 +1002,63 @@ const onRowAction = (id: string, row: BlockedRow) => {
   }
 };
 
+// ─── Filters ─────────────────────────────────────────────────────────────────
+
+// The three dimensions `/blocking` accepts, seeded from the URL so scope
+// carried in from a sibling tab actually applies here.
+const {
+  filters: dimensionFilters,
+  requestParams: scopeParams,
+  queryParams: scopeQuery,
+  clear: clearScopeModels,
+} = useDbmScopeFilters({
+  query: route.query,
+  // Re-read on activation: this page is kept alive, so its setup-time seed
+  // above goes stale the moment a sibling tab changes the scope.
+  liveQuery: () => route.query,
+  // Adopting a sibling tab's scope changes the chip; only this changes the rows.
+  onScopeAdopted: () => void load(),
+  // Options come from the raw SAMPLES: `BlockedRow` drops `db_namespace` in
+  // both perspectives, and `BlockingChain` names its fields differently, so
+  // the samples are the only ref carrying all three dimensions — and they are
+  // the union source both perspectives are built from.
+  options: () => ({
+    system: samples.value.map((s) => s.db_system),
+    instance: samples.value.map((s) => s.db_instance),
+    namespace: samples.value.map((s) => s.db_namespace),
+  }),
+  apply: () => {
+    syncUrl();
+    load();
+  },
+});
+
+const clearScope = () => {
+  clearScopeModels();
+  search.value = "";
+  syncUrl();
+  load();
+};
+
+/**
+ * Mirror the scope into the URL so it survives a tab switch, a reload and a
+ * paste into someone else's chat window. Replace rather than push: a filter
+ * change is not a navigation the back button should have to walk through.
+ */
+const syncUrl = () => {
+  router
+    .replace({
+      name: route.name as string,
+      query: {
+        ...route.query,
+        ...queryParams.value,
+        ...scopeQuery.value,
+        search: search.value || undefined,
+      },
+    })
+    .catch(() => {});
+};
+
 const load = () =>
   run(
     async (token) => {
@@ -985,6 +1066,7 @@ const load = () =>
         startTime: current.value.startTime,
         endTime: current.value.endTime,
         search: search.value || undefined,
+        ...scopeParams.value,
       });
 
       // A newer search or window already owns the page.

@@ -71,12 +71,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('dbm.activity.searchPlaceholder')"
             :debounce="400"
             search-data-test="dbm-activity-search"
-          />
+          >
+            <DbmScopeFilters
+              class="min-w-0 flex-1"
+              :filters="dimensionFilters"
+              @clear="clearScope"
+            />
+          </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
           <DbmRefreshButton
             :loading="loading"
+            :last-run-at="lastRunAt"
             data-test="dbm-activity-refresh"
             @refresh="onRefresh"
           />
@@ -314,6 +321,7 @@ import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEm
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
+import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -330,8 +338,9 @@ import dbMonitoringService, {
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmQueryDetailHop } from "@/composables/dbm/useDbmQueryDetailHop";
-import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
+import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { useDbmScopeFilters } from "@/composables/dbm/useDbmScopeFilters";
 import { useDbmSearchEmpty } from "@/composables/dbm/useDbmSearchEmpty";
 import {
   activityCountClaim,
@@ -361,7 +370,8 @@ const router = useRouter();
 
 // The shared list-page spine: scope from the URL, the request-sequence guard,
 // the shell's badge snapshot, refresh/date-change handlers and the load
-// envelope. See useDbmListPage.
+// envelope. This page's own `syncUrl` rides the date change so the three
+// dimension filters survive in the URL. See useDbmListPage.
 const {
   scope: { range, current, queryParams },
   requestSeq,
@@ -369,6 +379,7 @@ const {
   loading,
   error,
   search,
+  lastRunAt,
   org,
   dbmEnabled,
   queryCount,
@@ -376,7 +387,27 @@ const {
   run,
   onRefresh,
   onDateChange,
-} = useDbmListPage({ load: () => load() });
+} = useDbmListPage({
+  load: () => load(),
+  syncUrl: () => syncUrl(),
+  // The override is not cosmetic. `sampleTotal` is derived from the breakdown
+  // this page loaded under its own filters and refresh, so it is both fresher
+  // than the shared snapshot and the number the rows below actually correspond
+  // to.
+  //
+  // But it only overrides when it HAS a number. `sampleTotal` is `null` whenever
+  // `stateBuckets` is empty — which is true before the first load resolves, and
+  // true again on a window whose breakdown came back `[]` while the row sample
+  // did not (live: oss_traces answers `hits: 100` with `by_state: []`). `null` is
+  // an assertion of unknown, and publishing it would blank the badge — stamping
+  // "we cannot count" over a shared snapshot that had counted perfectly well, on
+  // a tab whose table is visibly full.
+  //
+  // `undefined` is the "I have no better number" signal instead, so the shared
+  // fan-out's answer stands until this page has one of its own. Same convention,
+  // and the same reason, as DatabasesPage's `loading ? undefined : …`.
+  ownCounts: [{ key: "activityCount", value: () => sampleTotal.value ?? undefined }],
+});
 
 /**
  * Whether the page is describing NOW or a stretch of the past. A relative range
@@ -394,18 +425,8 @@ const logLinesSeen = ref<number | null>(null);
 const sampledAt = ref<number | null>(null);
 const sampleInterval = ref<number | null>(null);
 
-/**
- * The sibling badges, from the shell's shared fan-out, plus THIS tab's own
- * count in place of the shared one.
- *
- * The override is not cosmetic. `sampleTotal` is derived from the breakdown
- * this page loaded under its own filters and refresh, so it is both fresher
- * than the shared snapshot and the number the rows below actually correspond
- * to.
- */
-const tabCounts = computed(() =>
-  tabCountProps(withOwnCount(tabCountsContext.counts.value, "activityCount", sampleTotal.value)),
-);
+/** Every badge, from the shell's shared snapshot — this page's own included. */
+const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 /**
  * SESSION SAMPLES in the window, from the SQL aggregate. Not a distinct-session
@@ -769,12 +790,72 @@ const onRowClick = (row: ActivityTableRow) => {
   });
 };
 
+// ─── Filters ─────────────────────────────────────────────────────────────────
+
+// The three dimensions `/activity` accepts, seeded from the URL so scope
+// carried in from Overview or Top queries actually applies here. Every change
+// publishes to the URL BEFORE reloading — the composable owns the handler, so
+// no entry can forget the URL half. See useDbmScopeFilters.
+const {
+  filters: dimensionFilters,
+  requestParams: scopeParams,
+  queryParams: scopeQuery,
+  clear: clearScopeModels,
+} = useDbmScopeFilters({
+  query: route.query,
+  // Re-read on activation: this page is kept alive, so its setup-time seed
+  // above goes stale the moment a sibling tab changes the scope.
+  liveQuery: () => route.query,
+  // Adopting a sibling tab's scope changes the chip; only this changes the rows.
+  onScopeAdopted: () => void load(),
+  // Options come from the SESSION rows, which carry all three dimensions —
+  // `allRows` is the same population before the search narrows it.
+  options: () => ({
+    system: allRows.value.map((r) => r.db_system),
+    instance: allRows.value.map((r) => r.db_instance),
+    namespace: allRows.value.map((r) => r.db_namespace),
+  }),
+  apply: () => {
+    syncUrl();
+    load();
+  },
+});
+
+const clearScope = () => {
+  clearScopeModels();
+  search.value = "";
+  syncUrl();
+  load();
+};
+
+/**
+ * Mirror the scope into the URL so it survives a tab switch, a reload and a
+ * paste into someone else's chat window. Replace rather than push: a filter
+ * change is not a navigation the back button should have to walk through.
+ */
+const syncUrl = () => {
+  router
+    .replace({
+      name: route.name as string,
+      query: {
+        ...route.query,
+        ...queryParams.value,
+        ...scopeQuery.value,
+        // Search is a refinement too: a link restoring the scope chips but
+        // dropping the search term reopens a different table than the shared one.
+        search: search.value || undefined,
+      },
+    })
+    .catch(() => {});
+};
+
 const load = () =>
   run(
     async (token) => {
       const { data } = await dbMonitoringService.getActivity(org.value, {
         startTime: current.value.startTime,
         endTime: current.value.endTime,
+        ...scopeParams.value,
       });
 
       // A newer window or refresh already owns the page.

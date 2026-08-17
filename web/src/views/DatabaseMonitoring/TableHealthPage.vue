@@ -206,22 +206,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar>
-          <OSearchInput
-            v-model="search"
-            :debounce="400"
-            clearable
+          <DbmTableToolbar
+            v-model:search="search"
             :placeholder="t('dbm.tableHealth.searchPlaceholder')"
-            data-test="dbm-table-health-search"
-          />
+            :debounce="400"
+            search-data-test="dbm-table-health-search"
+          >
+            <DbmScopeFilters
+              class="min-w-0 flex-1"
+              :filters="dimensionFilters"
+              @clear="clearScope"
+            />
+          </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
-          <!-- The search box here is a bare full-width input rather than the
-               fixed-width one inside a flex row the other tables use, so this
-               button is not competing for space and never carried `shrink-0`. -->
           <DbmRefreshButton
             :loading="loading"
-            :shrink="false"
+            :last-run-at="lastRunAt"
             data-test="dbm-table-health-refresh"
             @refresh="onRefresh"
           />
@@ -296,11 +298,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 defineOptions({ name: "DbmTableHealthPage" });
 
 import { computed, ref, shallowRef } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 import DbmDisclosureLine from "@/components/dbm/DbmDisclosureLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
+import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -310,12 +314,13 @@ import OTable from "@/lib/core/Table/OTable.vue";
 // and would make this the first DBM view reaching across a plugin boundary.
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
+import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { useDbmScopeFilters } from "@/composables/dbm/useDbmScopeFilters";
 import { useDbmSearchEmpty } from "@/composables/dbm/useDbmSearchEmpty";
 import {
   scanCountDisclosure,
@@ -341,23 +346,46 @@ import { formatDurationMs } from "@/utils/dbm/activity";
 import { DBM_SOFT_TONES, DBM_TONE_ICONS } from "@/utils/dbm/tones";
 
 const { t } = useI18nTyped();
+const route = useRoute();
+const router = useRouter();
 
 // The shared list-page spine: scope from the URL, the request-sequence guard,
 // the shell's badge snapshot, refresh/date-change handlers and the load
-// envelope. `syncUrl: null` — this page deliberately never writes the URL,
-// though it still adopts it on keep-alive return. See useDbmListPage.
+// envelope. See useDbmListPage.
+//
+// This page used to pass `syncUrl: null` — it read the URL but never wrote it.
+// That was defensible while it had no filters of its own: there was nothing to
+// publish beyond the range. Now that it carries scope, silence would be a bug:
+// the reader's engine/database pick would apply to the table but vanish from
+// the URL, so a tab switch or a shared link would reopen an unfiltered page
+// while the chip had promised otherwise.
 const {
-  scope: { range, current },
+  scope: { range, current, queryParams },
   requestSeq,
   tabCountsContext,
   loading,
   error,
   search,
+  lastRunAt,
   org,
   run,
   onRefresh,
   onDateChange,
-} = useDbmListPage({ load: () => load(), syncUrl: null });
+} = useDbmListPage({
+  load: () => load(),
+  syncUrl: () => syncUrl(),
+  // The relations this page actually loaded, published so the badge reads the
+  // same from every tab rather than only while standing here.
+  // `undefined` until this page has actually read. `tableHealthCount` is
+  // `null` before the rows land, and `null` is an assertion of unknown that
+  // would BLANK the shell's real count rather than defer to it.
+  ownCounts: [
+    {
+      key: "tableHealthCount",
+      value: () => (lastRunAt.value === null ? undefined : (tableHealthCount.value ?? undefined)),
+    },
+  ],
+});
 
 const hits = shallowRef<TableHealthRow[]>([]);
 const coverage = ref<TableHealthCoverage>("unknown");
@@ -369,11 +397,8 @@ const tuplesAreEstimated = ref(false);
  * count in place of the shared one. `tableHealthCount` is defined below, off
  * the relations this page actually loaded.
  */
-const tabCounts = computed(() =>
-  tabCountProps(
-    withOwnCount(tabCountsContext.counts.value, "tableHealthCount", tableHealthCount.value),
-  ),
-);
+/** Every badge, from the shell's shared snapshot — this page's own included. */
+const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 const allRows = computed(() => tableHealthRows(hits.value));
 
@@ -579,6 +604,72 @@ const recommendationRule = (rec: DbmRecommendation) => {
   return t(key as Parameters<typeof t>[0], params);
 };
 
+// ─── Filters ─────────────────────────────────────────────────────────────────
+
+/**
+ * TWO dimensions, not three. `/table_health` takes no `namespace`: the feed
+ * carries no database at all (the recipe reads per-database catalogs and never
+ * names one), so a schema select here would return nothing for every value a
+ * reader could pick. That is DatabasesPage's rule — only the dimensions the
+ * endpoint ACTUALLY accepts are offered — and `useDbmScopeFilters` enforces it,
+ * withholding `namespace` from the request as well as from the toolbar.
+ *
+ * A `namespace` carried in the URL from a sibling tab still SURVIVES a visit
+ * here (see the composable's `queryParams`), so stepping through the tabs does
+ * not silently strip the reader's scope.
+ */
+const {
+  filters: dimensionFilters,
+  requestParams: scopeParams,
+  queryParams: scopeQuery,
+  clear: clearScopeModels,
+} = useDbmScopeFilters({
+  query: route.query,
+  // Re-read on activation: this page is kept alive, so its setup-time seed
+  // above goes stale the moment a sibling tab changes the scope.
+  liveQuery: () => route.query,
+  // Adopting a sibling tab's scope changes the chip; only this changes the rows.
+  onScopeAdopted: () => void load(),
+  dimensions: ["instance", "system"],
+  // The rows spell these `engine`/`instance`, not `db_system`/`db_instance` —
+  // this feed's own vocabulary. The filter KEYS stay `system`/`instance`
+  // because those are what the endpoint and the URL are named.
+  options: () => ({
+    system: hits.value.map((h) => h.engine),
+    instance: hits.value.map((h) => h.instance),
+  }),
+  apply: () => {
+    syncUrl();
+    load();
+  },
+});
+
+const clearScope = () => {
+  clearScopeModels();
+  search.value = "";
+  syncUrl();
+  load();
+};
+
+/**
+ * Mirror the scope into the URL so it survives a tab switch, a reload and a
+ * paste into someone else's chat window. Replace rather than push: a filter
+ * change is not a navigation the back button should have to walk through.
+ */
+const syncUrl = () => {
+  router
+    .replace({
+      name: route.name as string,
+      query: {
+        ...route.query,
+        ...queryParams.value,
+        ...scopeQuery.value,
+        search: search.value || undefined,
+      },
+    })
+    .catch(() => {});
+};
+
 const load = () =>
   run(
     async (token) => {
@@ -589,6 +680,7 @@ const load = () =>
         startTime: current.value.startTime,
         endTime: current.value.endTime,
         includeIndexes: true,
+        ...scopeParams.value,
       });
 
       if (requestSeq.isStale(token)) return;
