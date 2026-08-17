@@ -35,7 +35,7 @@ def _ingest(client: OpenObserveClient, stream: str, records: list[dict]) -> None
 
 
 @pytest.fixture(scope="session")
-def panel_streams(client: OpenObserveClient) -> tuple[str, str]:
+def panel_streams(client: OpenObserveClient) -> Generator[tuple[str, str], None, None]:
     """Two streams holding the query-agent warehouse dataset: (primary, secondary).
 
     Uses `build_dataset()` at its default size on purpose: the expected row counts
@@ -46,8 +46,9 @@ def panel_streams(client: OpenObserveClient) -> tuple[str, str]:
     The secondary stream carries `stream_offset=7` — same timestamps, rotated
     field values — which is what the corpus's cross-stream CTE joins expect.
 
-    The PID suffix keeps repeat runs against a shared environment from stacking
-    data into the same stream.
+    Both streams are dropped on teardown. The PID suffix only prevents *collisions*
+    between concurrent runs — without an explicit delete, every run would strand
+    10 000 records on the server, which adds up fast on a shared environment.
     """
     stream = f"dashboard_panel_{BASE_TS}_{os.getpid()}"
     stream2 = f"dashboard_panel2_{BASE_TS}_{os.getpid()}"
@@ -104,7 +105,21 @@ def panel_streams(client: OpenObserveClient) -> tuple[str, str]:
             msg=f"{target}: ingested records never became searchable",
         )
     logger.info("%s and %s are searchable", stream, stream2)
-    return stream, stream2
+
+    yield stream, stream2
+
+    for target in (stream, stream2):
+        try:
+            resp = client.streams.delete(target)
+            if resp.status_code not in (200, 204, 404):
+                logger.warning(
+                    "stream cleanup for %s returned %s: %s",
+                    target,
+                    resp.status_code,
+                    resp.text[:200],
+                )
+        except Exception as e:
+            logger.warning("stream cleanup failed for %s: %s", target, e)
 
 
 @pytest.fixture(scope="session")
@@ -138,6 +153,15 @@ def panel_dashboard(client: OpenObserveClient) -> Generator[str, None, None]:
     dashboard_id = resp.json()["v8"]["dashboardId"]
     yield dashboard_id
     try:
-        client.dashboards.delete(dashboard_id)
+        # A non-2xx delete leaks a dashboard just as surely as an exception does,
+        # so check the status too rather than only catching throws.
+        resp = client.dashboards.delete(dashboard_id)
+        if resp.status_code not in (200, 204, 404):
+            logger.warning(
+                "dashboard cleanup for %s returned %s: %s",
+                dashboard_id,
+                resp.status_code,
+                resp.text[:200],
+            )
     except Exception as e:
         logger.warning("panel_dashboard cleanup failed for %s: %s", dashboard_id, e)
