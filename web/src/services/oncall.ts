@@ -26,9 +26,11 @@ import type {
   OnCallResponse,
   OnCallResponseEvent,
   OnCallSchedule,
+  PresetDescriptor,
   OnCallSlot,
   OnCallTeam,
   OnCallTeamMember,
+  L0Policy,
   PolicyFinalAction,
   PriorityRung,
   Rotation,
@@ -118,6 +120,30 @@ const oncall = {
       { params: { user_email } },
     ),
 
+  /// The four shapes, each carrying its own form schema. Render from the
+  /// response, never from the docs — a fifth preset must appear unaided.
+  listSchedulePresets: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<PresetDescriptor[]>(`/api/${org_identifier}/oncall/schedule-presets`),
+
+  /// A FULL REPLACE of the team's rotations, exactly like PUT /schedule —
+  /// confirm before applying over an existing schedule. The result is an
+  /// ordinary rotation set with nothing preset-specific stored: a preset is a
+  /// starting point, not a mode. 400s name the offending field; surface the
+  /// message verbatim.
+  applySchedulePreset: ({
+    org_identifier,
+    team_id,
+    data,
+  }: {
+    org_identifier: string;
+    team_id: string;
+    data: Record<string, unknown> & { preset: string };
+  }) =>
+    http().post<OnCallSchedule>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/schedule/from-preset`,
+      data,
+    ),
+
   getSchedule: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
     http().get<OnCallSchedule | null>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/schedule`,
@@ -171,6 +197,9 @@ const oncall = {
       p1_parallel?: boolean;
       p4_pages?: boolean;
       final_action?: PolicyFinalAction;
+      /** Absent = unchanged. Only send when the user touched the L0 panel —
+       *  editing rungs must not silently un-configure the gate. */
+      l0?: L0Policy;
     };
   }) =>
     http().put<OnCallPolicy>(

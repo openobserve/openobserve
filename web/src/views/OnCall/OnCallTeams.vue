@@ -87,12 +87,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           value="gap"
           size="sm"
         />
-        <span v-else class="flex flex-wrap items-center gap-1">
-          <OUserCell
+        <!-- One entry PER SLOT: two bare emails joined by a space read as one
+             long address, and said nothing about which pool each holds. -->
+        <span v-else class="flex flex-col gap-0.5">
+          <span
             v-for="slot in onCallByTeam[row.id]"
             :key="slot.user_email"
-            :value="slot.user_email"
-          />
+            class="flex flex-wrap items-center gap-1.5"
+          >
+            <OUserCell :value="slot.user_email" />
+            <OTag
+              v-if="slot.slot && !sameSlot(slot.slot, DEFAULT_SLOT)"
+              variant="default-soft"
+              size="sm"
+              :data-test="`oncall-teams-slot-${row.id}-${slot.slot}`"
+            >
+              {{ raw(slot.slot) }}
+            </OTag>
+          </span>
         </span>
       </template>
 
@@ -104,6 +116,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('oncall.deleteTeam')"
           :data-test="`oncall-team-delete-${row.id}`"
           @click.stop="teamToDelete = row"
+        />
+      </template>
+
+      <template v-if="notAvailable" #empty>
+        <OEmptyState
+          size="hero"
+          icon="cloud-off"
+          :title="t('oncall.notAvailableTitle')"
+          :description="t('oncall.notAvailableDescription')"
+          data-test="oncall-teams-not-available"
         />
       </template>
 
@@ -170,7 +192,9 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import oncallService from "@/services/oncall";
 import type { OnCallSlot, OnCallTeam } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isOnCallUnavailable } from "@/utils/oncall";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18nTyped();
@@ -180,6 +204,7 @@ const router = useRouter();
 const teams = ref<OnCallTeam[]>([]);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
+const notAvailable = ref(false);
 const search = ref("");
 const formOpen = ref(false);
 const editingTeam = ref<OnCallTeam | null>(null);
@@ -247,7 +272,15 @@ async function fetchTeams() {
     teams.value = res.data ?? [];
     await fetchOnCallNow();
     loadError.value = null;
+    notAvailable.value = false;
   } catch (err: any) {
+    // Feature-off (404) and OSS (403 "Not Supported") are the same calm fact,
+    // not an error: nothing failed and there is nothing to retry. §G.8.1 —
+    // the teams list IS the capability probe.
+    if (isOnCallUnavailable(err)) {
+      notAvailable.value = true;
+      return;
+    }
     // The state, not a toast: a toast evaporates and leaves "no teams" on
     // screen, which reads as an unconfigured org rather than a failed read.
     loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");

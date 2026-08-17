@@ -217,6 +217,7 @@ import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
+import { DELIVERABLE_CHANNELS } from "@/utils/oncall";
 import { formatInZone, nextHandover, upcomingShifts, winningRotation } from "@/utils/oncall";
 
 const props = withDefaults(
@@ -323,7 +324,12 @@ const holderChannels = computed<ChannelReadiness[]>(() => {
   const member = props.reachability?.members.find(
     (candidate) => candidate.user_email.toLowerCase() === email,
   );
-  return member?.channels ?? [];
+  // Only channels a Notifier can send. "✗ SMS ✗ Push" implied a fixable
+  // problem with this person's setup; the truth is the transport does not
+  // exist yet, which is not a per-member fact and not this panel's news.
+  return (member?.channels ?? []).filter((entry) =>
+    (DELIVERABLE_CHANNELS as readonly string[]).includes(entry.channel),
+  );
 });
 
 function channelLabel(entry: ChannelReadiness): I18nText {

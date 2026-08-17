@@ -210,6 +210,49 @@ export interface Rotation {
   restrictions?: TimeWindow[];
 }
 
+/**
+ * `GET /oncall/schedule-presets`. The catalogue carries its own form schema —
+ * `follow_the_sun` advertises `min: 2, max: 4` itself, so nothing about the
+ * shapes is hardcoded client-side and a fifth preset appears with no UI
+ * change. Build the form from THIS, never from the docs.
+ */
+export type PresetInputKind =
+  | "group"
+  | "group_list"
+  | "day_of_week"
+  | "day_list"
+  | "minute_of_day"
+  | "timezone"
+  | "duration_micros"
+  | "text"
+  | "member_list";
+
+export interface PresetInput {
+  /** The JSON key, exactly as the request body spells it. */
+  field: string;
+  kind: PresetInputKind;
+  label: string;
+  description: string;
+  required: boolean;
+  min?: number;
+  max?: number;
+  /** What the server uses when the field is absent, already in wire shape. */
+  default?: unknown;
+  /** For `group` and `group_list`: the fields each group carries. */
+  fields?: PresetInput[];
+}
+
+export interface PresetDescriptor {
+  id: string;
+  /** What to call it on a button. */
+  name: string;
+  /** One line: what applying it builds. */
+  description: string;
+  /** The layers it generates, highest priority first. */
+  layers: string[];
+  inputs: PresetInput[];
+}
+
 export interface OnCallSchedule {
   id: string;
   org_id: string;
@@ -271,6 +314,56 @@ export interface PriorityRung {
 /** What happens when the ladder runs out and nobody has acknowledged. */
 export type PolicyFinalAction = "notify_default_team" | "stop";
 
+/** How the L0 agent relates to paging at one severity. */
+export type L0Mode =
+  /** The agent runs alongside a page that has already gone out. */
+  | "parallel"
+  /** The page is held for the triage budget, or until the verdict lands. */
+  | "gate"
+  /** The agent investigates and nobody is paged. */
+  | "only";
+
+/**
+ * Per-severity modes, keyed by the UPPERCASE strings the wire uses
+ * (`#[serde(rename = "P1")]`) — beside rung priorities that are integers.
+ * Both forms in one policy object; this is not a mistake (API-FOR-UI §H).
+ */
+export interface L0Modes {
+  /** Pinned `parallel` server-side — holding a critical page behind a model
+   *  is not a setting the product offers. The server 400s anything else. */
+  P1: L0Mode;
+  P2: L0Mode;
+  P3: L0Mode;
+  /** Covers P4 AND P5 — neither pages a human, so neither has a gate to set.
+   *  Pinned `only`; the server 400s anything else. */
+  P4: L0Mode;
+}
+
+/**
+ * A team's L0 block, as `l0_json` stores it. Ships with every auto-created
+ * policy. There is deliberately no downgrade knob for severity: the ratchet
+ * (promotion only) is an invariant of the engine, not a team preference.
+ */
+export interface L0Policy {
+  mode: L0Modes;
+  /** Seconds a gated page is held. Valid 30–600; the server REFUSES values
+   *  outside the range rather than clamping — validate before sending. */
+  triage_budget_seconds: number;
+  allow_promotion: boolean;
+  /** How far one verdict may raise a severity, so a P4 cannot become a P1 in
+   *  a single hop. */
+  max_promotion_steps: number;
+  /** About one notification's channels, never about the record's severity. */
+  allow_downgrade: boolean;
+  /** Opt-in. Until enabled, a Suppress verdict is recorded as a
+   *  recommendation and the page still goes out. */
+  allow_suppress: boolean;
+}
+
+/** The bounds the server enforces on `triage_budget_seconds`. */
+export const L0_BUDGET_MIN_SECONDS = 30;
+export const L0_BUDGET_MAX_SECONDS = 600;
+
 export interface OnCallPolicy {
   id: string;
   org_id: string;
@@ -285,6 +378,8 @@ export interface OnCallPolicy {
   /** How many full passes the ladder runs before `final_action`. 1 = once; there is no zero. */
   repeat_count?: number;
   final_action?: PolicyFinalAction;
+  /** Absent on a PUT means UNCHANGED — only send when the user touched it. */
+  l0?: L0Policy;
 }
 
 export interface SubjectRef {

@@ -110,6 +110,16 @@
     >
       {{ t("oncall.addRotation") }}
     </OButton>
+    <!-- The escape from hand-building follow-the-sun out of restriction
+         windows: pick a shape, confirm, edit the ordinary rotations it made. -->
+    <OButton
+      variant="ghost"
+      size="sm-action"
+      data-test="oncall-rail-presets"
+      @click="emit('presets')"
+    >
+      {{ t("oncall.railStartPreset") }}
+    </OButton>
   </aside>
 </template>
 
@@ -148,6 +158,7 @@ const emit = defineEmits<{
   override: [name: string];
   duplicate: [name: string];
   add: [];
+  presets: [];
 }>();
 
 const { t } = useI18nTyped();

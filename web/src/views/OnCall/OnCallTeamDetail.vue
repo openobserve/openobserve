@@ -59,7 +59,17 @@
     <!-- A failed load must not fall through to the page below: with nothing
          fetched it renders a team with no members, no schedule and no policy —
          the exact look of a team somebody forgot to configure. -->
-    <OContent v-if="loadError" y>
+    <OContent v-if="oncallUnavailable" y>
+      <OEmptyState
+        size="hero"
+        icon="cloud-off"
+        :title="t('oncall.notAvailableTitle')"
+        :description="t('oncall.notAvailableDescription')"
+        data-test="oncall-team-detail-not-available"
+      />
+    </OContent>
+
+    <OContent v-else-if="loadError" y>
       <OEmptyState
         size="hero"
         variant="error"
@@ -270,6 +280,7 @@
                 @add="openScheduleEditor({ mode: 'new' })"
                 @override="coverOpen = true"
                 @duplicate="openScheduleEditor({ mode: 'duplicate', name: $event })"
+                @presets="presetsOpen = true"
               />
 
               <OnCallScheduleTimeline
@@ -281,6 +292,14 @@
                 @fill-gap="onFillGap"
               />
             </div>
+
+            <OnCallSchedulePresets
+              v-model:open="presetsOpen"
+              :team-id="teamId"
+              :members="members"
+              :has-schedule="!!schedule?.rotations?.length"
+              @applied="onScheduleSaved"
+            />
 
             <!-- Drawer only: the read view stays underneath. Swapping the tab
                  into a separate editing mode meant "Add rotation" first landed
@@ -385,6 +404,7 @@ import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
 import OnCallRotationRail from "@/components/oncall/OnCallRotationRail.vue";
 import OnCallGapBanner from "@/components/oncall/OnCallGapBanner.vue";
+import OnCallSchedulePresets from "@/components/oncall/OnCallSchedulePresets.vue";
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
 import OnCallContactReadiness from "@/components/oncall/OnCallContactReadiness.vue";
@@ -424,6 +444,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isOnCallUnavailable } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const { t } = useI18nTyped();
@@ -464,6 +485,7 @@ function openScheduleEditor(intent: ScheduleEditorIntent) {
 }
 
 const coverOpen = ref(false);
+const presetsOpen = ref(false);
 const coverSaving = ref(false);
 const coverGap = ref<{ from: number; to: number } | null>(null);
 const editingPolicy = ref(false);
@@ -480,6 +502,7 @@ const ruleCount = ref(0);
 const activeTab = ref("members");
 const loaded = ref(false);
 const loadError = ref<string | null>(null);
+const oncallUnavailable = ref(false);
 const editOpen = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
@@ -629,6 +652,12 @@ async function fetchAll() {
     loaded.value = true;
     await Promise.allSettled([fetchRuleCount(), fetchPages(), fetchInsights(), fetchPreview()]);
   } catch (err: any) {
+    // Entry fetch ONLY: a 404 on a specific team id past this point is a
+    // missing record, not a missing feature.
+    if (isOnCallUnavailable(err)) {
+      oncallUnavailable.value = true;
+      return;
+    }
     // The state, not a toast. With the load failed the page below renders a
     // team with no members, no schedule and no policy — the exact look of a
     // team somebody forgot to configure, on a screen whose job is to say
