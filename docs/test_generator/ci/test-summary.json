@@ -1,0 +1,8 @@
+[
+  { "title": "should publish a critical banner and render it for a non-meta org", "action": "new", "verifies": "an operator-authored critical banner persists and renders above the toolbar for a non-meta org" },
+  { "title": "should keep a dismissed banner hidden across reload", "action": "new", "verifies": "dismissing a banner hides it immediately and persists across a page reload via localStorage" },
+  { "title": "should reject an empty message with a client-side validation error", "action": "new", "verifies": "the dialog refuses an empty message and stays open without adding a banner" },
+  { "title": "should reject a non-http(s) CTA link with a client-side validation error", "action": "new", "verifies": "a javascript: CTA URL is rejected client-side and the banner is not added" },
+  { "title": "should order banners by severity and suppress promo while critical is active", "action": "new", "verifies": "live banners render severity-descending and a promo banner is suppressed while a critical banner is active, then appears once critical is removed" },
+  { "title": "should return 403 for non-meta org config access and 200 for the live read", "action": "new", "verifies": "the authoring config endpoint is forbidden for non-meta orgs while the live read stays open" }
+]

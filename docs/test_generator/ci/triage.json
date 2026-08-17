@@ -1,0 +1,31 @@
+{
+  "feature_slug": "announcement-banners",
+  "feature_title": "Announcement Banners",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "announcementBanners.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/announcementBanners.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/AnnouncementBanners.vue",
+    "web/src/components/settings/AnnouncementBannerDialog.vue",
+    "web/src/components/settings/General.vue",
+    "web/src/components/announcements/AnnouncementBanner.vue",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/composables/useAnnouncementBanners.ts",
+    "web/src/services/announcements.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Classified 'both'. The diff's changed paths span enterprise-owned locations (o2_enterprise/src/enterprise/announcements/meta.rs, mod.rs, and o2_enterprise/src/enterprise/mod.rs) alongside OSS paths (src/handler/http/request/announcements/, src/common/utils/auth.rs, and the whole web/src/ UI layer). The enterprise crate holds the storage/normalization/resolution logic; OSS carries the HTTP handler scaffolding (empty/forbidden without the enterprise feature) plus the full frontend. Per spec, a combined OSS+ENT sister pair is 'both', and edition never triggers a skip.",
+    "skip": "Not skipped. No explicit opt-out exists (feature_hint.txt and trigger_comment.txt are both empty; no tests-added label was passed). The change is clearly user-facing: it adds a live announcement strip to MainLayout and a full authoring surface under Settings > General.",
+    "e2e": "E2E is warranted. A new user-exercisable UI flow exists on both sides: an operator authors a banner (Add/Edit dialog with severity, schedule, dismissibility, CTA and org targeting; Publish), and every org member sees it rendered at the top of the app with dismiss and CTA interactions. These are behaviors only a browser-level test can verify end-to-end.",
+    "area": "Area is GeneralTests. The feature is a global/settings concern rather than a Logs/Metrics/Traces/etc. signal feature; the entry point is the General settings page and the live bar lives in the shared MainLayout. Sibling global/settings specs (theme-management, logoManagement, cipherKeys, languageTranslation, ingestion-config, landingPage) already live in the GeneralTests folder.",
+    "group": "playwright_group is 'GeneralTests'. It is the closest existing matrix shard — it already holds the settings/global UI specs (logoManagement, cipherKeys, theme-management, languageTranslation) and the workflow maps it to the playwright-tests/GeneralTests directory without an alias.",
+    "existing_tests": "No E2E specs in the diff. The only test files added are Vitest unit specs (web/src/components/settings/*.spec.ts, web/src/composables/useAnnouncementBanners.spec.ts, web/src/utils/announcementOrder.spec.ts) — these are unit coverage, not Playwright E2E specs under tests/ui-testing/playwright-tests/, so they do not set existing_tests_in_diff and are not E2E coverage of the new feature."
+  }
+}

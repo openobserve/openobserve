@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/announcementBanners.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/logoManagement.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/theme-management.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/cipherKeys.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/correlationSettings.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers announcement banners. A grep for announcement/banner across tests/ui-testing/playwright-tests/ returns only unrelated usages (VRL warning banners in Dashboards, PNG warning banner in Reports, alert error banner in RegressionSet). The feature is a new global/settings surface (Settings > General authoring drawer + live strip in MainLayout) and belongs in GeneralTests, which already hosts sibling global/settings specs. The new spec must also be appended to the GeneralTests run_files list in .github/workflows/playwright.yml."
+}
