@@ -418,7 +418,7 @@ describe("SpanBlock", () => {
     // row-background text colour over an arbitrary service colour — every long
     // span rendered an unreadable duration. It now goes above the bar, into the
     // empty band the row's `items-end` leaves there.
-    it("lifts the label above the bar when neither side has room", async () => {
+    it("lifts the label above the bar when it does not fit after it", async () => {
       const el = wrapper.find('[data-test="span-block"]').element;
       Object.defineProperty(el, "clientWidth", {
         configurable: true,
@@ -426,14 +426,36 @@ describe("SpanBlock", () => {
       });
       await wrapper.vm.onResize();
 
-      // leftPosition = 0, spanWidth ≈ 91.72% of 100px → no room after the bar,
-      // and none before it either since the bar starts at 0.
+      // leftPosition = 0, spanWidth ≈ 91.72% of 100px → the bar ends at 91.72px
+      // and the 60px label cannot follow it inside a 100px row.
       const style = wrapper.vm.getDurationStyle();
 
       expect(style).not.toHaveProperty("right");
       expect(style.top).toBe("-1rem");
-      expect(style.left).toBe(`${100 - 60}px`);
+      // Right-aligned to the bar's end: 91.72 - 60.
+      expect(parseFloat(style.left)).toBeCloseTo(31.72, 1);
       expect(wrapper.vm.labelAboveBar).toBe(true);
+    });
+
+    // The lifted label tracks the bar's own right edge, not the container's, so
+    // it still reads as this bar's duration when the bar stops short of the edge.
+    it("right-aligns the lifted label to the bar's end, not the container's", async () => {
+      // 80% of the trace in a 300px row: the bar ends at 240px, and 240 + 6 + 60
+      // = 306 overflows, so the label lifts. It must land at 180px — ending with
+      // the bar at 240 — rather than at the container's 240px right-alignment.
+      await wrapper.setProps({ span: { ...mockSpan, durationUs: 280297 } });
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 300 });
+      await wrapper.vm.onResize();
+      await flushPromises();
+
+      const style = wrapper.vm.getDurationStyle();
+
+      expect(wrapper.vm.spanWidth).toBe(80);
+      expect(wrapper.vm.labelAboveBar).toBe(true);
+      expect(parseFloat(style.left)).toBeCloseTo(180, 1);
+      // Ends with the bar, well short of the container's own right edge.
+      expect(parseFloat(style.left) + 60).toBeLessThan(300);
     });
 
     // The band above the bar is only free because the bar row sits at the bottom
@@ -488,8 +510,8 @@ describe("SpanBlock", () => {
     // the left-aligned branch and got clipped by `overflow-hidden`.
     it("moves the label off a bar the gutter would push out of the container", async () => {
       // 329350 / 350372 → spanWidth 94.00%, so the bar ends at 940px of 1000px.
-      // Label at 946px + 60px wide = 1006px, past the container's edge. The bar
-      // starts at 0, so there is no room on its left either — it goes above.
+      // Label at 946px + 60px wide = 1006px, past the container's edge, so it
+      // lifts and right-aligns to the bar's end at 940.
       await wrapper.setProps({ span: { ...mockSpan, durationUs: 329350 } });
       const el = wrapper.find('[data-test="span-block"]').element;
       Object.defineProperty(el, "clientWidth", { configurable: true, value: 1000 });
@@ -497,16 +519,18 @@ describe("SpanBlock", () => {
       await flushPromises();
 
       expect(wrapper.vm.spanWidth).toBe(94);
-      expect(wrapper.vm.getDurationStyle().left).toBe(`${1000 - 60}px`);
+      expect(parseFloat(wrapper.vm.getDurationStyle().left)).toBeCloseTo(940 - 60, 1);
       expect(wrapper.vm.labelAboveBar).toBe(true);
     });
 
-    // The case the screenshot showed: a long bar that starts partway in. There is
-    // no room after its right edge, but plenty before its left, so the label goes
-    // there rather than on top of the bar. This is the branch that keeps the
-    // label off the bar for every span except one covering the whole trace.
-    it("places the label before a long bar that starts partway in", async () => {
-      // Start 30% in and run to the container's right edge.
+    // The case the screenshot showed. There IS room to the left of a bar like
+    // this, and an earlier revision used it — but that split long spans between
+    // two treatments on a margin of a pixel or two, so neighbouring rows of
+    // similar length disagreed about where the label belonged. Every bar with no
+    // room after it now lifts, whatever is to its left.
+    it("lifts a long bar's label rather than tucking it into the space on the left", async () => {
+      // Starts 30% in and runs to the container's right edge, so there is ~234px
+      // free on the left — more than the 66px the label would need there.
       await wrapper.setProps({
         span: {
           ...mockSpan,
@@ -520,12 +544,13 @@ describe("SpanBlock", () => {
       await flushPromises();
 
       const barStartPx = wrapper.vm.leftPosition * 10;
-      const labelLeft = parseFloat(wrapper.vm.getDurationStyle().left);
+      const style = wrapper.vm.getDurationStyle();
 
-      // Entirely to the left of the bar, and still on screen.
-      expect(labelLeft).toBeGreaterThanOrEqual(0);
-      expect(labelLeft + 60).toBeLessThanOrEqual(barStartPx);
-      expect(wrapper.vm.labelAboveBar).toBe(false);
+      expect(barStartPx).toBeGreaterThan(66);
+      expect(wrapper.vm.labelAboveBar).toBe(true);
+      expect(style.top).toBe("-1rem");
+      // Above the bar's end, not tucked in before its start.
+      expect(parseFloat(style.left)).toBeGreaterThan(barStartPx);
     });
   });
 

@@ -384,19 +384,22 @@ export default defineComponent({
     );
 
     /**
-     * Places the duration label, in priority order: after the bar, else before
-     * it, else inside its right end.
+     * Places the duration label: after the bar when it fits there, above the bar
+     * when it does not.
      *
-     * The rule is "is there room", not "where does the bar start". The previous
-     * version pinned the label to `right: 0` whenever it would not fit after the
-     * bar — but a bar that does not leave room after itself is a bar that
-     * reaches the container's right edge, so `right: 0` printed the label *on
-     * top of the bar*, in row-background text colour over an arbitrary service
-     * colour. Every long span rendered an unreadable duration.
+     * The rule is "is there room after the bar", not "where does the bar start".
+     * The original version pinned the label to `right: 0` whenever it would not
+     * fit after the bar — but a bar that does not leave room after itself is a
+     * bar that reaches the container's right edge, so `right: 0` printed the
+     * label *on top of the bar*, in row-background text colour over an arbitrary
+     * service colour. Every long span rendered an unreadable duration.
      *
-     * Falling back to the bar's left side first keeps the label off the bar in
-     * every case except a span that spans essentially the whole trace, where
-     * neither side has room and the label has to go inside.
+     * Deliberately only two positions. Squeezing the label into the space to the
+     * left of a long bar also works geometrically, but it splits long spans
+     * between two different treatments on a margin of a pixel or two, so
+     * neighbouring rows of similar length disagree about where their label
+     * belongs. One fallback keeps every long bar's label in the same place
+     * relative to its bar.
      */
     const getDurationStyle = () => {
       const style: any = {
@@ -422,29 +425,30 @@ export default defineComponent({
           ? barStartPx + 19 + BAR_LABEL_GUTTER_PX
           : barEndPx + BAR_LABEL_GUTTER_PX;
 
-      // Both fallbacks below are room comparisons, and there is no room to
-      // compare against until the container has been measured. Unmeasured, they
-      // all fail and would drive every label inside the bar at a negative
-      // offset — off-screen — so take the ordinary after-the-bar position and
-      // let the resize observer place it properly once a width exists.
+      // The fallback below is a room comparison, and there is no room to compare
+      // against until the container has been measured. Unmeasured, it fails and
+      // would lift every label above its bar at a negative offset — off-screen —
+      // so take the ordinary after-the-bar position and let the resize observer
+      // place it properly once a width exists.
       if (!(spanBlockWidth.value > 0) || afterBarPx + labelWidth <= spanBlockWidth.value) {
         style.left = afterBarPx + "px";
         return style;
       }
 
-      const beforeBarPx = barStartPx - BAR_LABEL_GUTTER_PX - labelWidth;
-      if (beforeBarPx >= 0) {
-        style.left = beforeBarPx + "px";
-        return style;
-      }
-
-      // No room on either side, so stop looking sideways and go up. The 16px
-      // band above the bar is empty — the bar row sits at the bottom of the
-      // 30px row — and putting the label there keeps it on the row background
-      // at full width, where an inset label would have sat on the span's own
-      // colour and hidden 60px of the bar it describes.
+      // No room after the bar, so stop looking sideways and go up. The 16px band
+      // above the bar is empty — the bar row sits at the bottom of the 30px row
+      // — so the label lands on the row background at full contrast and hides
+      // none of the bar it describes.
+      //
+      // Right-aligned to the bar's own end rather than to the container, so it
+      // still reads as belonging to this bar when the bar stops short of the
+      // edge. Clamped so it can neither run off the left nor past the right.
       style.top = BAR_LABEL_ABOVE_REM;
-      style.left = spanBlockWidth.value - labelWidth + "px";
+      style.left =
+        Math.min(
+          Math.max(barEndPx - labelWidth, 0),
+          Math.max(spanBlockWidth.value - labelWidth, 0),
+        ) + "px";
       labelAboveBar.value = true;
       return style;
     };
