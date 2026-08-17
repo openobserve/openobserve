@@ -77,24 +77,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex items-stretch justify-center gap-1" data-test="dependency-impact-flow">
           <!-- Focus lane: this template / destination. -->
-          <section class="flex min-w-0 max-w-72 flex-1 flex-col" :data-test="`dependency-impact-lane-${focus.kind}`">
+          <section
+            class="flex max-w-72 min-w-0 flex-1 flex-col"
+            :data-test="`dependency-impact-lane-${focus.kind}`"
+          >
             <div class="mb-1.5 flex items-center gap-1.5 px-1">
               <OIcon :name="depKindIcon(focus.kind)" size="sm" :class="stageColor(focus.kind)" />
               <span class="text-text-secondary text-2xs font-semibold tracking-wide uppercase">
-                {{ focus.kind === "template" ? t("alert_dependencies.sectionTemplate") : t("alert_dependencies.sectionDestination") }}
+                {{
+                  focus.kind === "template"
+                    ? t("alert_dependencies.sectionTemplate")
+                    : t("alert_dependencies.sectionDestination")
+                }}
               </span>
             </div>
-            <div class="border-border-default bg-surface-panel rounded-surface h-72 overflow-y-auto border p-1.5">
-              <div v-if="focusNode" class="rounded-default bg-surface-accent" data-test="dependency-impact-self">
-                <DependencyEntityRow :node="focusNode" @open="openInNewTab" @delete="requestDelete" />
+            <div
+              class="border-border-default bg-surface-panel rounded-surface h-72 overflow-y-auto border p-1.5"
+            >
+              <div
+                v-if="focusNode"
+                class="rounded-default bg-surface-accent"
+                data-test="dependency-impact-self"
+              >
+                <DependencyEntityRow
+                  :node="focusNode"
+                  @open="openInNewTab"
+                  @delete="requestDelete"
+                />
               </div>
             </div>
           </section>
 
           <!-- Destinations lane (template focus only). -->
           <template v-if="isTemplateFocus">
-            <OIcon name="chevron-right" size="md" class="text-text-muted mt-8 shrink-0" aria-hidden="true" />
-            <section class="flex min-w-0 max-w-72 flex-1 flex-col" data-test="dependency-impact-lane-destination">
+            <OIcon
+              name="chevron-right"
+              size="md"
+              class="text-text-muted mt-8 shrink-0"
+              aria-hidden="true"
+            />
+            <section
+              class="flex max-w-72 min-w-0 flex-1 flex-col"
+              data-test="dependency-impact-lane-destination"
+            >
               <div class="mb-1.5 flex items-center gap-1.5 px-1">
                 <OIcon name="location-on" size="sm" class="text-info" />
                 <span class="text-text-secondary text-2xs font-semibold tracking-wide uppercase">
@@ -102,12 +127,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OTag type="countChip" value="neutral">{{ chain.destinations.length }}</OTag>
               </div>
-              <div class="border-border-default bg-surface-panel rounded-surface h-72 space-y-1 overflow-y-auto border p-1.5">
+              <div
+                class="border-border-default bg-surface-panel rounded-surface h-72 space-y-1 overflow-y-auto border p-1.5"
+              >
                 <div
                   v-if="!filteredDestinations.length"
                   class="text-text-muted flex h-full items-center justify-center px-2 text-center text-xs"
                 >
-                  {{ search ? t("alert_dependencies.noMatches") : t("alert_dependencies.laneEmpty") }}
+                  {{
+                    search ? t("alert_dependencies.noMatches") : t("alert_dependencies.laneEmpty")
+                  }}
                 </div>
                 <div
                   v-for="d in filteredDestinations"
@@ -132,8 +161,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <!-- Alerts lane: a box per destination (the group). -->
-          <OIcon name="chevron-right" size="md" class="text-text-muted mt-8 shrink-0" aria-hidden="true" />
-          <section class="flex min-w-0 max-w-72 flex-1 flex-col" data-test="dependency-impact-lane-alert">
+          <OIcon
+            name="chevron-right"
+            size="md"
+            class="text-text-muted mt-8 shrink-0"
+            aria-hidden="true"
+          />
+          <section
+            class="flex max-w-72 min-w-0 flex-1 flex-col"
+            data-test="dependency-impact-lane-alert"
+          >
             <div class="mb-1.5 flex items-center gap-1.5 px-1">
               <OIcon name="shield-alert-outline" size="sm" class="text-status-positive" />
               <span class="text-text-secondary text-2xs font-semibold tracking-wide uppercase">
@@ -141,7 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <OTag type="countChip" value="neutral">{{ chain.alerts.length }}</OTag>
             </div>
-            <div class="border-border-default bg-surface-panel rounded-surface h-72 overflow-y-auto border p-1.5">
+            <div
+              class="border-border-default bg-surface-panel rounded-surface h-72 overflow-y-auto border p-1.5"
+            >
               <div
                 v-if="alertsEmpty"
                 class="text-text-muted flex h-full items-center justify-center px-2 text-center text-xs"
@@ -176,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Only the destination header drives the box highlight, so
                        hovering a single alert never lights up the whole box. -->
                   <div
-                    class="text-text-secondary mb-0.5 flex cursor-pointer items-center gap-1 px-1 text-2xs font-medium"
+                    class="text-text-secondary text-2xs mb-0.5 flex cursor-pointer items-center gap-1 px-1 font-medium"
                     @mouseenter="hoveredDest = g.dest.id"
                     @mouseleave="hoveredDest = null"
                     @click="scrollToGroup(g.dest)"
@@ -201,7 +240,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Alerts that reference the template directly (overrides). -->
                 <div v-if="directAlerts.length" data-test="dependency-impact-direct">
-                  <div class="text-text-secondary flex items-center gap-1 px-1.5 pt-1 text-2xs font-medium">
+                  <div
+                    class="text-text-secondary text-2xs flex items-center gap-1 px-1.5 pt-1 font-medium"
+                  >
                     <OIcon name="bolt" size="xs" class="text-text-muted shrink-0" />
                     {{ t("alert_dependencies.directOverrides") }}
                   </div>
@@ -308,7 +349,11 @@ const entityName = computed(() => focusNode.value?.name ?? props.focus.name ?? "
 // Header subtitle: what this entity is used by, downstream. A template names its
 // destinations + alerts; a destination names its alerts.
 const impactLabel = computed(() => {
-  const alerts = t("alert_dependencies.usedBy", { count: chain.value.alerts.length }, chain.value.alerts.length);
+  const alerts = t(
+    "alert_dependencies.usedBy",
+    { count: chain.value.alerts.length },
+    chain.value.alerts.length,
+  );
   if (!isTemplateFocus.value) return t("alert_dependencies.impactDestination", { alerts });
   const destinations = t(
     "alert_dependencies.countDestinations",
@@ -363,14 +408,17 @@ const destsOfAlert = computed(() => {
   return m;
 });
 const hoveredAlertDests = computed(() =>
-  hoveredAlert.value ? (destsOfAlert.value.get(hoveredAlert.value) ?? new Set<string>()) : new Set<string>(),
+  hoveredAlert.value
+    ? (destsOfAlert.value.get(hoveredAlert.value) ?? new Set<string>())
+    : new Set<string>(),
 );
 
 // Highlight is hover-driven, nothing sticks. A destination CARD lights up when
 // hovered directly or when one of its alerts is hovered; the alert BOX fills only
 // when the destination itself is hovered (so hovering a single alert never fills
 // the whole box).
-const isDestHighlighted = (id: string) => hoveredDest.value === id || hoveredAlertDests.value.has(id);
+const isDestHighlighted = (id: string) =>
+  hoveredDest.value === id || hoveredAlertDests.value.has(id);
 const isBoxFilled = (id: string) => hoveredDest.value === id;
 
 // Group-box elements, keyed by destination id, so a click can scroll the alerts
@@ -392,7 +440,10 @@ const openInNewTab = (n: DepNode) => {
   const org_identifier = org();
   let route;
   if (n.kind === "destination") {
-    route = { name: "alertDestinations", query: { action: "update", name: n.name, org_identifier } };
+    route = {
+      name: "alertDestinations",
+      query: { action: "update", name: n.name, org_identifier },
+    };
   } else if (n.kind === "template") {
     route = { name: "alertTemplates", query: { action: "update", name: n.name, org_identifier } };
   } else if (n.kind === "alert" && n.alertId) {
@@ -439,7 +490,9 @@ const performDelete = async () => {
   } catch (err: any) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("alert_dependencies.deleteFailedToast", { name: n.name }),
+      message:
+        raw(err?.response?.data?.message) ||
+        t("alert_dependencies.deleteFailedToast", { name: n.name }),
     });
   }
 };

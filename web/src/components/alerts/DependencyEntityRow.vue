@@ -35,7 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :content="node.enabled ? t('alert_dependencies.enabled') : t('alert_dependencies.paused')"
       />
     </span>
-    <OIcon v-else :name="depKindIcon(node.kind)" size="sm" class="shrink-0" :class="depKindColor(node)" />
+    <OIcon
+      v-else
+      :name="depKindIcon(node.kind)"
+      size="sm"
+      class="shrink-0"
+      :class="depKindColor(node)"
+    />
 
     <span class="text-compact min-w-0 flex-1 truncate">
       {{ node.name }}

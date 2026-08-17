@@ -218,7 +218,11 @@ export interface DepCounts {
 // Per-kind icon + colour for a dependency node — the single source shared by the
 // "where used" rows and the list "Used by" column so a kind reads the same in both.
 export const depKindIcon = (kind: DepNodeKind): string =>
-  kind === "template" ? "description" : kind === "destination" ? "location-on" : "shield-alert-outline";
+  kind === "template"
+    ? "description"
+    : kind === "destination"
+      ? "location-on"
+      : "shield-alert-outline";
 
 export const depKindColor = (node: Pick<DepNode, "kind" | "orphan" | "missing">): string => {
   if (node.missing) return "text-status-negative";

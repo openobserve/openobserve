@@ -34,7 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("alert_dependencies.missingTag") }}
     </OTag>
 
-    <OTag v-else-if="isUnused" type="countChip" value="neutral" :data-test="`used-by-${key}-unused`">
+    <OTag
+      v-else-if="isUnused"
+      type="countChip"
+      value="neutral"
+      :data-test="`used-by-${key}-unused`"
+    >
       {{ t("alert_dependencies.orphanTag") }}
     </OTag>
 
@@ -96,7 +101,11 @@ const badges = computed(() => {
       label: t("alert_dependencies.countDestinations", { count: c.destinations }, c.destinations),
     });
   if (c.alerts)
-    out.push({ kind: "alert", count: c.alerts, label: t("alert_dependencies.usedBy", { count: c.alerts }, c.alerts) });
+    out.push({
+      kind: "alert",
+      count: c.alerts,
+      label: t("alert_dependencies.usedBy", { count: c.alerts }, c.alerts),
+    });
   return out;
 });
 
@@ -104,7 +113,8 @@ const badges = computed(() => {
 // template but zero alerts still reads "Unused". An entity with no neighbours at
 // all falls here too.
 const isUnused = computed(
-  () => loaded.value && !isMissing.value && (!!summary.value.node?.orphan || badges.value.length === 0),
+  () =>
+    loaded.value && !isMissing.value && (!!summary.value.node?.orphan || badges.value.length === 0),
 );
 
 const kindColor = (kind: DepNodeKind) => depKindColor({ kind, orphan: false, missing: false });
