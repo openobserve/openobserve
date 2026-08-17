@@ -519,7 +519,7 @@ fn flap_dampening_micros() -> i64 {
 /// outlives the thing it escalates is a page waiting to fire at nobody.
 #[cfg(feature = "enterprise")]
 async fn handle_oncall_escalation_triggers(
-    mut trigger: db::scheduler::Trigger,
+    trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     use config::utils::time::now_micros;
     use o2_enterprise::enterprise::oncall;
@@ -542,10 +542,33 @@ async fn handle_oncall_escalation_triggers(
     // of the same ladder. A test passes one in.
     match oncall::escalation::tick(&trigger.org, &response_id, None, now_micros()).await? {
         Some(next_run_at) => {
-            trigger.next_run_at = next_run_at;
-            trigger.status = db::scheduler::TriggerStatus::Waiting;
-            trigger.retries = 0;
-            db::scheduler::update_trigger(trigger, true, "").await?;
+            // Re-read before writing back. `tick` persists to *this row's*
+            // `data` while it runs — the transport retry budget and the L0
+            // analysis cache both live there — so writing back the copy we
+            // read before the tick silently discards everything it just
+            // saved.
+            //
+            // What that cost: `attempts_for` read a budget that was reset to
+            // zero on every tick, so a rung whose sends all failed asked for
+            // "retry, attempt 1 of 4" forever. One dead SMTP server produced
+            // 138 retries of the same rung on one record, the ladder never
+            // advanced past it, and nobody further up was ever paged.
+            //
+            // Only the scheduling fields are ours to set; `data` belongs to
+            // the engine. Falling back to the stale copy on a read failure
+            // keeps the timer alive, which is the safe direction — a lost
+            // timer is a page that never happens.
+            let mut row = db::scheduler::get(
+                &trigger.org,
+                db::scheduler::TriggerModule::OncallEscalation,
+                &response_id,
+            )
+            .await
+            .unwrap_or(trigger);
+            row.next_run_at = next_run_at;
+            row.status = db::scheduler::TriggerStatus::Waiting;
+            row.retries = 0;
+            db::scheduler::update_trigger(row, true, "").await?;
         }
         None => {
             db::scheduler::delete(
