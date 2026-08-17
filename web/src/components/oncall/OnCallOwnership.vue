@@ -45,6 +45,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @remove="(rule) => (ruleToDelete = rule)"
     />
 
+    <!-- Tier 4 of routing: the explicitly nominated catch-all. Nothing is
+         auto-created — a fresh org has none — so the unset state is the
+         warning, sitting directly above the queue it would drain. -->
+    <div
+      class="border-border-default rounded-surface flex flex-col gap-2 border px-4 py-3"
+      data-test="oncall-default-team-card"
+    >
+      <span class="flex flex-wrap items-baseline gap-x-2">
+        <OText variant="panel-title">{{ t("oncall.defaultTeamTitle") }}</OText>
+        <OText variant="meta">{{ t("oncall.defaultTeamHint") }}</OText>
+      </span>
+
+      <p
+        v-if="routingConfig && !routingConfig.default_team_id"
+        class="text-status-warning-text text-sm"
+        data-test="oncall-default-team-unset"
+      >
+        {{ t("oncall.defaultTeamUnset") }}
+      </p>
+
+      <span class="flex flex-wrap items-center gap-2">
+        <span class="w-64">
+          <OSelect
+            :model-value="draftDefaultTeam"
+            :options="defaultTeamOptions"
+            :placeholder="t('oncall.defaultTeamPlaceholder')"
+            data-test="oncall-default-team-select"
+            @update:model-value="(v: unknown) => (draftDefaultTeam = String(v))"
+          />
+        </span>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :loading="savingDefault"
+          :disabled="!defaultTeamDirty"
+          data-test="oncall-default-team-save"
+          @click="saveDefaultTeam"
+        >
+          {{ t("oncall.save") }}
+        </OButton>
+      </span>
+    </div>
+
     <OnCallUnroutedQueue
       :signals="signals"
       :team-name="teamName"
@@ -158,6 +201,7 @@ import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.v
 import type { SimulatorQuery } from "@/components/oncall/OnCallRoutingSimulator.vue";
 import OnCallUnroutedQueue from "@/components/oncall/OnCallUnroutedQueue.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -167,6 +211,7 @@ import oncallService from "@/services/oncall";
 import type {
   OnCallTeam,
   OwnershipRuleStats,
+  RoutingConfig,
   RoutingPreview,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
@@ -182,6 +227,56 @@ const store = useStore();
 const rules = ref<OwnershipRuleStats[]>([]);
 const signals = ref<UnroutedSignal[]>([]);
 const aliases = ref<{ id: string; display?: string }[]>([]);
+
+const routingConfig = ref<RoutingConfig | null>(null);
+/// `""` means "none" in the picker; the wire value is null. One vocabulary
+/// per layer, converted at the save.
+const draftDefaultTeam = ref("");
+const savingDefault = ref(false);
+
+const defaultTeamOptions = computed(() => [
+  { label: t("oncall.defaultTeamNone"), value: "" },
+  ...props.teams.map((team) => ({ label: raw(team.name), value: team.id })),
+]);
+
+const defaultTeamDirty = computed(
+  () => draftDefaultTeam.value !== (routingConfig.value?.default_team_id ?? ""),
+);
+
+/// Always 200 — an org that never nominated answers with nulls. A failure
+/// leaves the card unset-looking rather than breaking the tab, and unset is
+/// the honest reading of "could not load" here: neither claims a catch-all.
+async function fetchRoutingConfig() {
+  try {
+    const res = await oncallService.getRoutingConfig({ org_identifier: orgId.value });
+    routingConfig.value = res.data ?? null;
+    draftDefaultTeam.value = res.data?.default_team_id ?? "";
+  } catch {
+    routingConfig.value = null;
+  }
+}
+
+async function saveDefaultTeam() {
+  savingDefault.value = true;
+  try {
+    const res = await oncallService.setRoutingConfig({
+      org_identifier: orgId.value,
+      data: { default_team_id: draftDefaultTeam.value || null },
+    });
+    routingConfig.value = res.data ?? null;
+    draftDefaultTeam.value = res.data?.default_team_id ?? "";
+    toast({
+      variant: "success",
+      message: draftDefaultTeam.value
+        ? t("oncall.defaultTeamSaved")
+        : t("oncall.defaultTeamCleared"),
+    });
+  } catch (err) {
+    failed(err, t("oncall.defaultTeamSaveFailed"));
+  } finally {
+    savingDefault.value = false;
+  }
+}
 const preview = ref<RoutingPreview | null>(null);
 
 const loadingRules = ref(false);
@@ -452,5 +547,6 @@ onMounted(() => {
   fetchRules();
   fetchSignals();
   fetchAliases();
+  fetchRoutingConfig();
 });
 </script>

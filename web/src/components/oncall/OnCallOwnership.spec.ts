@@ -33,6 +33,8 @@ vi.mock("@/services/oncall", () => ({
     unroutedSignals: vi.fn(),
     dismissUnroutedSignal: vi.fn(),
     testPage: vi.fn(),
+    getRoutingConfig: vi.fn(),
+    setRoutingConfig: vi.fn(),
   },
 }));
 
@@ -109,6 +111,9 @@ async function typePair(wrapper: Wrapper, name: string, value: string) {
 
 describe("OnCallOwnership", () => {
   beforeEach(() => {
+    service.getRoutingConfig.mockResolvedValue({
+      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
+    } as any);
     vi.clearAllMocks();
     service.ownershipStats.mockResolvedValue({ data: { rules: [], total: 0 } } as any);
     service.unroutedSignals.mockResolvedValue({ data: [] } as any);
@@ -287,4 +292,69 @@ describe("OnCallOwnership", () => {
     await flushPromises();
     expect(unrouted(wrapper).props("signals")).toEqual([]);
   });
+  /// C10 — tier 4 of routing. Nothing auto-creates a default, so the unset
+  /// state IS the warning: without a nomination an unowned signal pages
+  /// nobody, and it lands in the queue this card sits directly above.
+  describe("the default team", () => {
+    async function renderLoaded() {
+      const wrapper = render();
+      await flushPromises();
+      return wrapper;
+    }
+
+    it("warns when no default team is nominated", async () => {
+      const wrapper = await renderLoaded();
+      expect(wrapper.find('[data-test="oncall-default-team-unset"]').exists()).toBe(true);
+    });
+
+    it("shows the nomination and stops warning once one exists", async () => {
+      service.getRoutingConfig.mockResolvedValue({
+        data: { org_id: "default", default_team_id: "team_1", default_team_name: "Platform", updated_at: 1 },
+      } as any);
+      const wrapper = await renderLoaded();
+      expect(wrapper.find('[data-test="oncall-default-team-unset"]').exists()).toBe(false);
+    });
+
+    it("nominates a team", async () => {
+      service.setRoutingConfig.mockResolvedValue({
+        data: { org_id: "default", default_team_id: "team_1", default_team_name: "Platform", updated_at: 1 },
+      } as any);
+      const wrapper = await renderLoaded();
+
+      wrapper
+        .findComponent('[data-test="oncall-default-team-select"]')
+        .vm.$emit("update:modelValue", "team_1");
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-default-team-save"]').trigger("click");
+      await flushPromises();
+
+      expect(service.setRoutingConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { default_team_id: "team_1" } }),
+      );
+    });
+
+    /// Clearing sends null, not "" — the picker's empty string is a UI
+    /// vocabulary the wire never sees.
+    it("clears by sending null", async () => {
+      service.getRoutingConfig.mockResolvedValue({
+        data: { org_id: "default", default_team_id: "team_1", default_team_name: "Platform", updated_at: 1 },
+      } as any);
+      service.setRoutingConfig.mockResolvedValue({
+        data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 2 },
+      } as any);
+      const wrapper = await renderLoaded();
+
+      wrapper
+        .findComponent('[data-test="oncall-default-team-select"]')
+        .vm.$emit("update:modelValue", "");
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-default-team-save"]').trigger("click");
+      await flushPromises();
+
+      expect(service.setRoutingConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { default_team_id: null } }),
+      );
+    });
+  });
+
 });

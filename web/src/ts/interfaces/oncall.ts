@@ -837,6 +837,22 @@ export interface InventoryNode {
  * firing: an unowned alert firing every minute is one missing rule, not four
  * hundred problems.
  */
+/**
+ * `GET/PUT /oncall/routing/config` — the org's nominated catch-all.
+ *
+ * Nothing auto-creates one: a fresh org has none, deliberately, and an
+ * operator nominates one of their OWN teams. `default_team_name` is resolved
+ * server-side so the screen never joins against the team list to draw one
+ * label — or leaves it blank when the team is one the caller has not loaded.
+ */
+export interface RoutingConfig {
+  org_id: string;
+  default_team_id: string | null;
+  default_team_name: string | null;
+  /** Micros. `0` when never set. */
+  updated_at: number;
+}
+
 export interface UnroutedSignal {
   id: string;
   org_id: string;
@@ -853,6 +869,9 @@ export interface UnroutedSignal {
   last_priority?: number | null;
   /** Dismissed entries stay for the record — deleting them loses the evidence. */
   dismissed_at?: number | null;
+  /** Set when the nominated default team absorbed this signal — the row is a
+   *  routing gap that PAGED somebody, versus one that paged nobody. */
+  defaulted_team_id?: string | null;
   /**
    * The server's own one-line summary (`UnroutedSignal::describe()`), sent
    * beside the structured fields rather than instead of them. Rendered as-is:

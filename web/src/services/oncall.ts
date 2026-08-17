@@ -21,6 +21,7 @@ import type {
   TeamOverview,
   TeamReachability,
   RoutingPreview,
+  RoutingConfig,
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
@@ -290,6 +291,22 @@ const oncall = {
     ),
 
   /// Answers "where would this route?" without waiting for an alert to fire.
+  /// The org's catch-all. Always 200 — an org that never set one answers
+  /// with nulls, not a 404.
+  getRoutingConfig: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<RoutingConfig>(`/api/${org_identifier}/oncall/routing/config`),
+
+  /// Nominate (`{default_team_id}`) or clear (`{default_team_id: null}`).
+  /// 404s when the team is not in THIS org — the id lives in a shared table,
+  /// and storing another tenant's would start paging strangers.
+  setRoutingConfig: ({
+    org_identifier,
+    data,
+  }: {
+    org_identifier: string;
+    data: { default_team_id: string | null };
+  }) => http().put<RoutingConfig>(`/api/${org_identifier}/oncall/routing/config`, data),
+
   previewRouting: ({
     org_identifier,
     data,
