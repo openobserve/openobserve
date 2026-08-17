@@ -781,6 +781,18 @@ pub struct BrowserStepV2 {
     pub value: Option<String>,
     #[serde(default)]
     pub key: Option<String>,
+    /// Mouse button for a click step. `None` means "left".
+    ///
+    /// Playwright 1.56's action picker offers "Right click" as an explicit
+    /// choice, so a right click is a deliberate recording rather than an
+    /// accident of which mouse button happened to fire. Every journey stored
+    /// before that omits the field, which is why it is optional with a defined
+    /// default rather than a schema version bump.
+    #[serde(default)]
+    pub button: Option<String>,
+    /// How many clicks a click step performs. `None` means one.
+    #[serde(default)]
+    pub click_count: Option<u32>,
     #[serde(default)]
     pub files: Option<Vec<String>>,
     #[serde(default)]
@@ -1172,22 +1184,26 @@ fn validate_net_retry_budget(
 /// The complete v2 action vocabulary — exactly Playwright's recorder action
 /// model, minus what a check cannot use.
 ///
-/// Deliberately excludes `hover`, `scroll`, `wait`/`waitFor` and `screenshot`:
-/// upstream `ActionName` has no counterpart for any of them, so the recorder
-/// never emitted one and the extension player could never replay one. They
-/// entered journeys only through the manual step editor, and using one aborted
-/// replay entirely. `type` and `keydown` are dropped as redundant aliases of
-/// `fill` and `press`.
+/// Deliberately excludes `scroll`, `wait`/`waitFor` and `screenshot`: upstream
+/// `ActionName` has no counterpart for any of them, so the recorder never
+/// emitted one and the extension player could never replay one. They entered
+/// journeys only through the manual step editor, and using one aborted replay
+/// entirely. `type` and `keydown` are dropped as redundant aliases of `fill`
+/// and `press`.
+///
+/// `hover` joined in Playwright 1.56, which added it to the recorder action
+/// model and made it reachable from the action picker. It is executed by
+/// `Locator.hover` in the probe and `Frame.hover` in the extension player.
 ///
 /// Because this set is drawn from Playwright's own model, every stored v2 step
 /// is executable by both the probe and the extension player by construction.
 const V2_STEP_ACTIONS: &[&str] = &[
-    "navigate", "click", "fill", "press", "select", "check", "uncheck", "upload", "assert",
+    "navigate", "click", "hover", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
 
 /// v2 actions that operate on an element and therefore need a locator.
 const V2_ELEMENT_ACTIONS: &[&str] = &[
-    "click", "fill", "press", "select", "check", "uncheck", "upload", "assert",
+    "click", "hover", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
 
 /// The closed set of assertion kinds (spec P5.1).
@@ -1843,8 +1859,8 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
 
         if !V2_STEP_ACTIONS.contains(&step.action.as_str()) {
             return Err(format!(
-                "config.steps[{i}]: action '{}' is not valid (valid: {}). hover, scroll, wait \
-                 and screenshot have no equivalent in the recorder's action model and cannot be \
+                "config.steps[{i}]: action '{}' is not valid (valid: {}). scroll, wait and \
+                 screenshot have no equivalent in the recorder's action model and cannot be \
                  replayed; type and keydown are aliases of fill and press.",
                 step.action,
                 V2_STEP_ACTIONS.join(", ")
@@ -1922,6 +1938,24 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
             return Err(format!(
                 "config.steps[{i}]: '{}' step requires a 'value'",
                 step.action
+            ));
+        }
+
+        if let Some(button) = &step.button
+            && !matches!(button.as_str(), "left" | "middle" | "right")
+        {
+            return Err(format!(
+                "config.steps[{i}].button: must be left, middle or right, got '{button}'"
+            ));
+        }
+
+        // Capped at 3 rather than left open: the recorder only ever emits 1 or 2,
+        // and an unbounded count is a way to hold a page's event loop open.
+        if let Some(count) = step.click_count
+            && !(1..=3).contains(&count)
+        {
+            return Err(format!(
+                "config.steps[{i}].click_count: must be 1..=3, got {count}"
             ));
         }
 
@@ -2783,10 +2817,10 @@ mod tests {
     }
 
     #[test]
-    fn test_v2_accepts_exactly_the_nine_action_vocabulary() {
+    fn test_v2_accepts_exactly_the_ten_action_vocabulary() {
         let (locs, brs, devs) = allowed();
         for action in [
-            "click", "fill", "press", "select", "check", "uncheck", "upload",
+            "click", "hover", "fill", "press", "select", "check", "uncheck", "upload",
         ] {
             let mut step = v2_click_step();
             step["action"] = serde_json::json!(action);
@@ -2803,20 +2837,74 @@ mod tests {
     }
 
     #[test]
+    fn test_v2_accepts_hover_as_an_element_action() {
+        // Playwright 1.56 added hover to the recorder action model, reachable from
+        // the action picker, and the probe executes it with Locator.hover. The
+        // vocabulary comment claiming upstream has no counterpart stopped being true.
+        let (locs, brs, devs) = allowed();
+        let mut step = v2_click_step();
+        step["action"] = serde_json::json!("hover");
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+        assert!(
+            s.validate(&locs, &brs, &devs, true).is_ok(),
+            "hover should be accepted: {:?}",
+            s.validate(&locs, &brs, &devs, true)
+        );
+    }
+
+    #[test]
+    fn test_v2_validates_button_and_click_count() {
+        let (locs, brs, devs) = allowed();
+
+        for button in ["left", "middle", "right"] {
+            let mut step = v2_click_step();
+            step["button"] = serde_json::json!(button);
+            let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));
+            assert!(
+                s.validate(&locs, &brs, &devs, true).is_ok(),
+                "{button} should be accepted"
+            );
+        }
+
+        let mut bad = v2_click_step();
+        bad["button"] = serde_json::json!("sideways");
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), bad]));
+        assert!(
+            s.validate(&locs, &brs, &devs, true)
+                .unwrap_err()
+                .contains("button")
+        );
+
+        for count in [0, 9] {
+            let mut bad = v2_click_step();
+            bad["click_count"] = serde_json::json!(count);
+            let s = v2_synthetic(serde_json::json!([v2_nav_step(), bad]));
+            assert!(
+                s.validate(&locs, &brs, &devs, true)
+                    .unwrap_err()
+                    .contains("click_count"),
+                "click_count {count} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_v2_step_without_button_or_click_count_still_validates() {
+        // Backward compatibility: every journey stored before these fields existed
+        // omits them, and must remain valid with no migration. This is what lets
+        // them ship without a schema version bump.
+        let (locs, brs, devs) = allowed();
+        let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
     fn test_v2_rejects_retired_actions() {
         // Upstream Playwright's recorder action model has no counterpart for any
         // of these, so the recorder never emitted one and the player could never
         // replay one. `type`/`keydown` are redundant aliases of fill/press.
         let (locs, brs, devs) = allowed();
-        for action in [
-            "hover",
-            "scroll",
-            "wait",
-            "waitFor",
-            "screenshot",
-            "type",
-            "keydown",
-        ] {
+        for action in ["scroll", "wait", "waitFor", "screenshot", "type", "keydown"] {
             let mut step = v2_click_step();
             step["action"] = serde_json::json!(action);
             let s = v2_synthetic(serde_json::json!([v2_nav_step(), step]));

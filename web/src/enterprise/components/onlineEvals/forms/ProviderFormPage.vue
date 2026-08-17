@@ -140,7 +140,9 @@
           <div class="mb-3">
             <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
               {{ t("onlineEvals.provider.apiKeyLabel") }}
-              <span v-if="mode === 'create'" class="text-status-error-text ml-0.5">*</span>
+              <span v-if="mode === 'create' && apiKeyRequired" class="text-status-error-text ml-0.5"
+                >*</span
+              >
             </div>
             <OFormInput
               name="apiKey"
@@ -226,6 +228,9 @@ const form = useOForm<ProviderForm>({
   onSubmit: save,
 });
 const formValues = form.useStore((s: any) => s.values as ProviderForm);
+const apiKeyRequired = computed(() =>
+  ["openai", "deepseek", "anthropic"].includes(formValues.value.providerType),
+);
 
 const providerTypeOptions = computed(() => [
   { label: raw("OpenAI"), value: "openai" },

@@ -373,8 +373,8 @@ export default defineComponent({
         from = spanStart - 60_000_000; // -1 min in µs
         to = spanEnd + 3_600_000_000; // +1 hr in µs
       } else {
-        from = props.trace_start_time - 10000000;
-        to = props.trace_end_time + 10000000;
+        from = props.trace_start_time;
+        to = props.trace_end_time;
       }
 
       router.push({

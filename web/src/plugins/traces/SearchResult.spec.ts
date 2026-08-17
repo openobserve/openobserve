@@ -279,6 +279,23 @@ describe("SearchResult", () => {
       expect(wrapper.vm.expandRowDetail).toBeDefined();
       expect(typeof wrapper.vm.expandRowDetail).toBe("function");
     });
+
+    it("uses the exact aggregated trace range without padding", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      const trace = mockSearchObj.data.queryResults.hits[0];
+
+      wrapper.vm.expandRowDetail(trace);
+
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            from: trace.trace_start_time,
+            to: trace.trace_end_time,
+          }),
+        }),
+      );
+      push.mockRestore();
+    });
   });
 
   describe("Time boxed search", () => {

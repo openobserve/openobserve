@@ -30,7 +30,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
-const { findAlertId, getAlert, deleteAlerts } = require('../utils/alerts-api-helpers.js');
+const { findAlertId, getAlert, deleteAlerts, seedAlertFixtures, DEST } = require('../utils/alerts-api-helpers.js');
 
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
 const TEST_STREAM = 'e2e_automate';
@@ -57,6 +57,9 @@ test.describe('Alerts — priority, tags & additional variables', {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
+        // Seed a self-delivering dogfood destination (idempotent) so the save
+        // never depends on a destination created by a parallel spec.
+        await seedAlertFixtures(page);
     });
 
     test.afterEach(async ({ page }) => {
@@ -100,7 +103,7 @@ test.describe('Alerts — priority, tags & additional variables', {
         // Destination is required before the form will submit; it lives on the "Alert Rules"
         // tab, NOT Advanced — switch back first, otherwise the select is not in the DOM.
         await pm.alertsPage.openConditionTab();
-        await pm.alertsPage.selectFirstDestination();
+        await pm.alertsPage.selectDestinationByName(DEST);
 
         // Save, asserting on the API response rather than a toast.
         const savePromise = page
@@ -136,7 +139,7 @@ test.describe('Alerts — priority, tags & additional variables', {
 
         // Destination is required to submit; it lives on the "Alert Rules" tab, not Advanced.
         await pm.alertsPage.openConditionTab();
-        await pm.alertsPage.selectFirstDestination();
+        await pm.alertsPage.selectDestinationByName(DEST);
 
         const savePromise = page
             .waitForResponse((r) => r.url().includes('/alerts') && r.request().method() === 'POST', { timeout: 45000 })

@@ -258,6 +258,10 @@ export default class ChartTypeSelector {
     // hidden and the wait burns its full timeout on an element that can no longer
     // become visible — the "15 x locator resolved to hidden" failure signature.
     // Re-hover on every attempt so a re-render costs one retry, not the whole call.
+    // The click stays INSIDE the loop for the same reason: a re-render between the check
+    // and the click drops :hover again, so the click burns its full timeout. Keeping
+    // hover -> check -> click together costs one retry instead of the call; break on
+    // success means the field is never added twice.
     const maxAttempts = 3;
     let lastError;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -265,6 +269,7 @@ export default class ChartTypeSelector {
         await fieldItem.first().waitFor({ state: "visible", timeout: 10000 });
         await fieldItem.first().hover({ timeout: 5000 });
         await button.waitFor({ state: "visible", timeout: 5000 });
+        await button.click({ timeout: 5000 });
         break;
       } catch (e) {
         lastError = e;
@@ -272,7 +277,6 @@ export default class ChartTypeSelector {
       }
     }
 
-    await button.click();
     await searchInput.fill(""); // Clear the search input
   }
 

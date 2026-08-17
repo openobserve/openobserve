@@ -37,7 +37,8 @@ use {
         ai::{
             agent::meta::Role,
             client::{
-                DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE, get_agent_client,
+                DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
+                SESSION_OWNER_UNAVAILABLE, get_agent_client, is_session_owner_unavailable,
             },
         },
         common::config::get_config as get_o2_config,
@@ -62,6 +63,15 @@ fn get_agent_type(context: &serde_json::Value) -> &'static str {
     } else {
         DEFAULT_AGENT_TYPE
     }
+}
+
+/// Whether `val` is a well-formed session id: the id is client-supplied and ends
+/// up in outbound URLs and, under HA, as the routing key.
+///
+/// The length check pins it to the hyphenated form — `Uuid::try_parse` also
+/// accepts the braced, URN and simple forms, and a URN carries `:` into the URL.
+fn is_valid_session_id(val: &str) -> bool {
+    val.len() == 36 && uuid::Uuid::try_parse(val).is_ok()
 }
 
 /// Extract headers from the request that match the configured passthrough patterns.
@@ -328,16 +338,52 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             },
         };
 
-        // Query agent with headers
-        // TODO: Once RcaAgentClient.query_with_headers() method is available, pass headers
-        // For now, passthrough_headers are collected but not passed to maintain compatibility
-        let _headers_to_forward = if passthrough_headers.is_empty() {
+        // Forward the session id: without it every call load-balances to an
+        // arbitrary replica, which finds no session and starts a new one.
+        let mut forward_headers = std::collections::HashMap::new();
+        if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            && let Ok(val) = session_id.to_str()
+        {
+            if is_valid_session_id(val) {
+                forward_headers.insert(
+                    X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+                    val.to_string(),
+                );
+            } else {
+                return MetaHttpResponse::bad_request("Invalid session id");
+            }
+        }
+
+        // No otel span is opened here, so pass the caller's traceparent through
+        // unchanged and the agent's spans still join the request's trace.
+        if let Some(traceparent) = &auth_data.traceparent
+            && !traceparent.is_empty()
+        {
+            forward_headers.insert("traceparent".to_string(), traceparent.clone());
+        }
+
+        if let Some(user_agent) = parts.headers.get("user-agent")
+            && let Ok(val) = user_agent.to_str()
+        {
+            forward_headers.insert("user-agent".to_string(), val.to_string());
+        }
+
+        // Merged last and never overriding, so a passthrough pattern matching
+        // one of the above cannot displace it — as on the stream path.
+        for (key, value) in passthrough_headers {
+            forward_headers.entry(key).or_insert(value);
+        }
+
+        let headers_to_forward = if forward_headers.is_empty() {
             None
         } else {
-            Some(passthrough_headers)
+            Some(&forward_headers)
         };
 
-        match client.query(agent_type, query_req, &auth_str).await {
+        match client
+            .query_with_headers(agent_type, query_req, &auth_str, headers_to_forward)
+            .await
+        {
             Ok(response) => {
                 // QueryResponse has a `response: String` field
                 let prompt_response = PromptResponse {
@@ -515,13 +561,16 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
         && let Ok(val) = session_id.to_str()
     {
-        if val.len() == 36 && val.chars().filter(|&c| c == '-').count() == 4 {
+        if is_valid_session_id(val) {
             forward_headers.insert(
                 X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
                 val.to_string(),
             );
         } else {
+            // Rejected, not dropped: dropping it would land the turn on an
+            // arbitrary replica, which reads as the assistant forgetting.
             log::warn!("[trace_id:{}] Invalid session ID format: {}", trace_id, val);
+            return MetaHttpResponse::bad_request("Invalid session id");
         }
     }
 
@@ -804,10 +853,19 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                         "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
                          Agent query failed: {e}"
                     );
-                    let error_event = serde_json::json!({
+                    // The stream already returned 200, so carry a machine-readable
+                    // code the UI can tell apart from a hard failure. Two producers:
+                    // a locally detected unreachable owner (typed), and o2-ai's 409
+                    // body, which arrives here as text.
+                    let msg = e.to_string();
+                    let mut error_event = serde_json::json!({
                         "type": "error",
-                        "error": format!("Agent query failed: {}", e)
+                        "error": format!("Agent query failed: {}", msg)
                     });
+                    if is_session_owner_unavailable(&e) || msg.contains(SESSION_OWNER_UNAVAILABLE) {
+                        error_event["code"] = serde_json::json!(SESSION_OWNER_UNAVAILABLE);
+                        error_event["recoverable"] = serde_json::json!(true);
+                    }
                     yield Ok(bytes::Bytes::from(format!("data: {}\n\n", error_event)));
                     // End span on error path too
                     if let Some(span_cx) = otel_chat_span {
@@ -899,16 +957,19 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
 
     let mut forward_headers = std::collections::HashMap::new();
 
-    // Forward session ID if present
+    // Rejected rather than dropped, as on the stream path: feedback is recorded
+    // on the owning replica, so an unroutable id files it against the wrong chat.
     if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
         && let Ok(val) = session_id.to_str()
-        && val.len() == 36
-        && val.chars().filter(|&c| c == '-').count() == 4
     {
-        forward_headers.insert(
-            X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
-            val.to_string(),
-        );
+        if is_valid_session_id(val) {
+            forward_headers.insert(
+                X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+                val.to_string(),
+            );
+        } else {
+            return MetaHttpResponse::bad_request("Invalid session id");
+        }
     }
 
     // Parse JSON body
@@ -1000,6 +1061,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     ),
     responses(
         (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Invalid session ID, malformed body, or AI agent not configured", body = Object),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
     ),
     extensions(
@@ -1034,21 +1096,22 @@ pub async fn confirm_action(
             }
         };
 
+        // Validate before the id reaches an outbound URL: this path interpolates
+        // a caller-supplied path segment straight in.
+        if !is_valid_session_id(&session_id) {
+            return MetaHttpResponse::bad_request("Invalid session id");
+        }
+
         // Extract user auth from headers to pass to the agent
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
 
         // Agent uses Authorization header directly - no need to inject user_token into body
         let forward_bytes = body_bytes;
 
-        // Forward the confirmation to the agent's /confirm endpoint
-        let confirm_url = format!(
-            "{}/confirm/{}",
-            o2_cfg.ai.agent_url.trim_end_matches('/'),
-            session_id
-        );
-
+        // The client builds and routes the confirm URL itself: it must reach the
+        // replica holding the paused turn, not whichever one the LB picks.
         match client
-            .confirm_action(&confirm_url, forward_bytes.to_vec(), &auth_str)
+            .confirm_action(&session_id, forward_bytes.to_vec(), &auth_str)
             .await
         {
             Ok(resp) => {
@@ -1095,6 +1158,52 @@ pub async fn confirm_action(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_valid_session_ids_are_accepted() {
+        assert!(is_valid_session_id("01234567-89ab-cdef-0123-456789abcdef"));
+        // UUID v7 as minted by the frontend, and case-insensitive hex.
+        assert!(is_valid_session_id("0195A1B2-C3D4-7E5F-8A9B-0C1D2E3F4A5B"));
+    }
+
+    #[test]
+    fn test_shape_only_lookalikes_are_rejected() {
+        // 36 chars with 4 hyphens — passed the old length+count check.
+        assert!(!is_valid_session_id("----zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"));
+        // Right characters, hyphens in the wrong places.
+        assert!(!is_valid_session_id(
+            "0123456-789ab-cdef-0123-456789abcdeff"
+        ));
+    }
+
+    #[test]
+    fn test_non_hyphenated_uuid_forms_are_rejected() {
+        // `Uuid::try_parse` accepts all of these; the length check keeps them
+        // out. The URN form would carry a `:` into the confirm URL.
+        assert!(!is_valid_session_id(
+            "urn:uuid:01234567-89ab-cdef-0123-456789abcdef"
+        ));
+        assert!(!is_valid_session_id(
+            "{01234567-89ab-cdef-0123-456789abcdef}"
+        ));
+        assert!(!is_valid_session_id("0123456789abcdef0123456789abcdef"));
+    }
+
+    #[test]
+    fn test_url_unsafe_session_ids_are_rejected() {
+        // The confirm handler interpolates this into an outbound URL.
+        assert!(!is_valid_session_id("../../etc/passwd"));
+        assert!(!is_valid_session_id("01234567-89ab-cdef-0123-456789abcde/"));
+    }
+
+    #[test]
+    fn test_wrong_length_session_ids_are_rejected() {
+        assert!(!is_valid_session_id(""));
+        assert!(!is_valid_session_id("01234567-89ab-cdef-0123-456789abcde"));
+        assert!(!is_valid_session_id(
+            "01234567-89ab-cdef-0123-456789abcdeff"
+        ));
+    }
 
     #[test]
     fn test_extract_passthrough_headers_exact_match() {
