@@ -416,9 +416,9 @@ describe("SpanBlock", () => {
     // container's right edge. A bar that leaves no room after itself is a bar
     // that reaches that edge, so the label was printed on top of the bar in
     // row-background text colour over an arbitrary service colour — every long
-    // span rendered an unreadable duration. It is now inset from the right edge
-    // and flagged so the contrast treatment applies.
-    it("insets the label inside the bar when neither side has room", async () => {
+    // span rendered an unreadable duration. It now goes above the bar, into the
+    // empty band the row's `items-end` leaves there.
+    it("lifts the label above the bar when neither side has room", async () => {
       const el = wrapper.find('[data-test="span-block"]').element;
       Object.defineProperty(el, "clientWidth", {
         configurable: true,
@@ -431,8 +431,23 @@ describe("SpanBlock", () => {
       const style = wrapper.vm.getDurationStyle();
 
       expect(style).not.toHaveProperty("right");
-      expect(style.left).toBe(`${100 - 60 - 6}px`);
-      expect(wrapper.vm.labelInsideBar).toBe(true);
+      expect(style.top).toBe("-1rem");
+      expect(style.left).toBe(`${100 - 60}px`);
+      expect(wrapper.vm.labelAboveBar).toBe(true);
+    });
+
+    // The band above the bar is only free because the bar row sits at the bottom
+    // of the 30px span row. Beside the bar the label stays centred on it, so the
+    // lift must not leak into the ordinary positions.
+    it("keeps the label centred on the bar wherever it fits beside it", async () => {
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 2000 });
+      await wrapper.vm.onResize();
+
+      const style = wrapper.vm.getDurationStyle();
+
+      expect(style.top).toBe("-0.25rem");
+      expect(wrapper.vm.labelAboveBar).toBe(false);
     });
   });
 
@@ -474,7 +489,7 @@ describe("SpanBlock", () => {
     it("moves the label off a bar the gutter would push out of the container", async () => {
       // 329350 / 350372 → spanWidth 94.00%, so the bar ends at 940px of 1000px.
       // Label at 946px + 60px wide = 1006px, past the container's edge. The bar
-      // starts at 0, so there is no room on its left either — it goes inside.
+      // starts at 0, so there is no room on its left either — it goes above.
       await wrapper.setProps({ span: { ...mockSpan, durationUs: 329350 } });
       const el = wrapper.find('[data-test="span-block"]').element;
       Object.defineProperty(el, "clientWidth", { configurable: true, value: 1000 });
@@ -482,8 +497,8 @@ describe("SpanBlock", () => {
       await flushPromises();
 
       expect(wrapper.vm.spanWidth).toBe(94);
-      expect(wrapper.vm.getDurationStyle().left).toBe(`${1000 - 60 - 6}px`);
-      expect(wrapper.vm.labelInsideBar).toBe(true);
+      expect(wrapper.vm.getDurationStyle().left).toBe(`${1000 - 60}px`);
+      expect(wrapper.vm.labelAboveBar).toBe(true);
     });
 
     // The case the screenshot showed: a long bar that starts partway in. There is
@@ -510,78 +525,60 @@ describe("SpanBlock", () => {
       // Entirely to the left of the bar, and still on screen.
       expect(labelLeft).toBeGreaterThanOrEqual(0);
       expect(labelLeft + 60).toBeLessThanOrEqual(barStartPx);
-      expect(wrapper.vm.labelInsideBar).toBe(false);
+      expect(wrapper.vm.labelAboveBar).toBe(false);
     });
   });
 
-  describe("duration label contrast when it sits inside the bar", () => {
-    /** Drives the label into the bar by making the container too narrow. */
-    const forceLabelInsideBar = async (w: any) => {
+  describe("duration label lifted above the bar", () => {
+    /** Squeezes the container until neither side of the bar has room. */
+    const forceLabelAboveBar = async (w: any) => {
       const el = w.find('[data-test="span-block"]').element;
       Object.defineProperty(el, "clientWidth", { configurable: true, value: 100 });
       await w.vm.onResize();
       await flushPromises();
     };
 
-    // Inside the bar the label is on the span's own colour, drawn from an
-    // arbitrary per-service palette — so the text colour has to follow that
-    // colour's luminance, not the theme. A pale bar needs black text in dark mode
-    // just as much as in light.
-    it("uses dark text on a pale bar", async () => {
-      const localWrapper = mount(SpanBlock, {
-        props: {
-          span: { ...mockSpan, style: { ...mockSpan.style, color: "#ffe0a3" } },
-          baseTracePosition: mockBaseTracePosition,
-          spanDimensions: mockSpanDimensions,
-          spanData: mockSpanData,
-        },
-        global: { plugins: [i18n, router, mockStore] },
-      });
-      await forceLabelInsideBar(localWrapper);
+    // The label goes onto the row background rather than onto the span's colour,
+    // so it needs no contrast treatment and hides none of the bar. The flag is
+    // exposed on the element so the position is observable from the DOM.
+    it("flags the lifted label and offsets it clear of the bar", async () => {
+      await forceLabelAboveBar(wrapper);
 
-      const label = localWrapper.find('[data-test="span-block-duration"]');
-      expect(label.attributes("data-label-inside-bar")).toBe("true");
-      expect(label.classes()).toContain("text-black");
+      const label = wrapper.find('[data-test="span-block-duration"]');
 
-      localWrapper.unmount();
+      expect(label.attributes("data-label-above-bar")).toBe("true");
+      expect(label.attributes("style")).toContain("top: -1rem");
     });
 
-    it("uses light text on a dark bar", async () => {
-      const localWrapper = mount(SpanBlock, {
-        props: {
-          span: { ...mockSpan, style: { ...mockSpan.style, color: "#1f3a5f" } },
-          baseTracePosition: mockBaseTracePosition,
-          spanDimensions: mockSpanDimensions,
-          spanData: mockSpanData,
-        },
-        global: { plugins: [i18n, router, mockStore] },
-      });
-      await forceLabelInsideBar(localWrapper);
-
-      expect(localWrapper.find('[data-test="span-block-duration"]').classes()).toContain(
-        "text-white",
-      );
-
-      localWrapper.unmount();
-    });
-
-    // Outside the bar the label is on the row, where the inherited colour is
-    // already correct — forcing white or black there would break one theme.
-    it("adds no contrast class while the label is outside the bar", async () => {
+    it("does not flag a label that fits beside the bar", async () => {
       const el = wrapper.find('[data-test="span-block"]').element;
       Object.defineProperty(el, "clientWidth", { configurable: true, value: 2000 });
       await wrapper.vm.onResize();
       await flushPromises();
 
-      const label = wrapper.find('[data-test="span-block-duration"]');
+      expect(
+        wrapper.find('[data-test="span-block-duration"]').attributes("data-label-above-bar"),
+      ).toBe("false");
+    });
 
-      expect(label.attributes("data-label-inside-bar")).toBe("false");
-      expect(label.classes()).not.toContain("text-black");
-      expect(label.classes()).not.toContain("text-white");
+    // Regression: the flag is a side effect of the placement function, so a stale
+    // `true` would keep a label floating above a bar that had since shrunk enough
+    // to sit beside it. Rows are virtualized and resize as the sidebar opens.
+    it("drops the lift once the bar shrinks enough to fit beside it", async () => {
+      await forceLabelAboveBar(wrapper);
+      expect(wrapper.vm.labelAboveBar).toBe(true);
+
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: 2000 });
+      await wrapper.vm.onResize();
+      await flushPromises();
+
+      expect(wrapper.vm.labelAboveBar).toBe(false);
+      expect(wrapper.vm.getDurationStyle().top).toBe("-0.25rem");
     });
 
     // Regression: every room comparison fails against an unmeasured container,
-    // which drove the label inside the bar at a negative offset — off-screen —
+    // which lifted the label above the bar at a negative offset — off-screen —
     // on every row before its first resize. Rows are virtualized and remount on
     // scroll, so this was the state each one rendered in first.
     it("falls back to the after-the-bar position before the row is measured", () => {
@@ -589,7 +586,8 @@ describe("SpanBlock", () => {
       const style = wrapper.vm.getDurationStyle();
 
       expect(parseFloat(style.left)).toBeGreaterThanOrEqual(0);
-      expect(wrapper.vm.labelInsideBar).toBe(false);
+      expect(style.top).toBe("-0.25rem");
+      expect(wrapper.vm.labelAboveBar).toBe(false);
     });
   });
 

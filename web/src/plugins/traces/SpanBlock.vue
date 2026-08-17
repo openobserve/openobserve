@@ -97,8 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             zIndex: 1,
           }"
           class="absolute flex items-center text-xs transition-all duration-500 ease-[ease]"
-          :class="durationLabelClass"
-          :data-label-inside-bar="labelInsideBar"
+          :data-label-above-bar="labelAboveBar"
           data-test="span-block-duration"
         >
           <div>
@@ -114,7 +113,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
-import { getContrastTextColor } from "@/utils/traces/traceColors";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import {
@@ -152,10 +150,24 @@ const BAR_LABEL_GUTTER_PX = 6;
  * 4/3 line-height, i.e. 1rem = 16px. Centring 16px on 8px needs
  * (8 - 16) / 2 = -4px = -0.25rem.
  *
- * The right-aligned branch keeps its own -0.3125rem; it was already written
- * against this 8px box.
+ * Applies to both positions beside the bar. The one case that does not use it
+ * is the fallback above the bar — see BAR_LABEL_ABOVE_REM.
  */
 const BAR_LABEL_TOP_REM = "-0.25rem";
+
+/**
+ * Vertical offset that lifts the duration label into the band above the bar.
+ *
+ * Used only when neither side of the bar has room. The label's containing block
+ * is the 8px bar row, which sits at the bottom of the 30px span row (the row is
+ * `items-end` with `pb-1.5`), so the 16px above it is empty. A 16px line box at
+ * -1rem fills exactly that band and is not clipped by the row's `overflow-hidden`.
+ *
+ * The event-marker ticks reach 2px above the bar, so they and the label's line
+ * box share 2px. That overlap lands in the line box's descender space, below the
+ * glyphs of a duration string, which has no descenders.
+ */
+const BAR_LABEL_ABOVE_REM = "-1rem";
 
 /*
  * Tick height is `h-3` (12px) in the markup above — 1.5x this surface's 8px span
@@ -227,24 +239,10 @@ export default defineComponent({
     const durationStyle = ref({});
 
     /**
-     * True when the duration label had to be placed inside the bar, because the
+     * True when the duration label had to be lifted above the bar, because the
      * span is wide enough that neither side of it has room.
      */
-    const labelInsideBar = ref(false);
-
-    /**
-     * Text colour for the duration label.
-     *
-     * Outside the bar the label sits on the row and inherits the normal colour.
-     * Inside it, the label is on the span's own colour — drawn from an arbitrary
-     * per-service palette — so the choice has to follow that colour's luminance
-     * rather than the theme: a pale bar needs black text in dark mode too.
-     */
-    const durationLabelClass = computed(() => {
-      if (!labelInsideBar.value) return "";
-      const barColor = props.span?.style?.color || DEFAULT_SPAN_COLOR;
-      return getContrastTextColor(barColor) === "black" ? "text-black" : "text-white";
-    });
+    const labelAboveBar = ref(false);
     const { t } = useI18nTyped();
 
     const leftPosition = ref(0);
@@ -406,9 +404,9 @@ export default defineComponent({
       };
 
       // Reset first: this is recomputed on resize and on window changes, and a
-      // latched flag would keep the contrast treatment after the bar shrank
-      // enough for the label to move back off it.
-      labelInsideBar.value = false;
+      // latched flag would keep the label above the bar after it shrank enough
+      // to sit beside it again.
+      labelAboveBar.value = false;
 
       const onePercent = Number((spanBlockWidth.value / 100).toFixed(2));
       const labelWidth = 60;
@@ -440,12 +438,14 @@ export default defineComponent({
         return style;
       }
 
-      // Nowhere outside the bar to put it: inset from the container's right edge
-      // so the label sits inside the bar's own right end. `labelInsideBar` drives
-      // the contrast treatment, because at this point the text is on the span's
-      // colour rather than on the row.
-      style.left = spanBlockWidth.value - labelWidth - BAR_LABEL_GUTTER_PX + "px";
-      labelInsideBar.value = true;
+      // No room on either side, so stop looking sideways and go up. The 16px
+      // band above the bar is empty — the bar row sits at the bottom of the
+      // 30px row — and putting the label there keeps it on the row background
+      // at full width, where an inset label would have sat on the span's own
+      // colour and hidden 60px of the bar it describes.
+      style.top = BAR_LABEL_ABOVE_REM;
+      style.left = spanBlockWidth.value - labelWidth + "px";
+      labelAboveBar.value = true;
       return style;
     };
 
@@ -479,8 +479,7 @@ export default defineComponent({
       store,
       onSpanHover,
       durationStyle,
-      durationLabelClass,
-      labelInsideBar,
+      labelAboveBar,
       searchObj,
       DEFAULT_SPAN_COLOR,
       eventClusters,
