@@ -803,32 +803,32 @@ describe("SpanBlock", () => {
       expect(markers()[0].classes()).toContain("before:w-2.5");
     });
 
-    // The span bar is filled with an arbitrary per-service colour, so a
-    // saturated 2px tick can land invisibly on a same-hue bar. Error and
-    // warning get a ring to separate them from it.
-    it("outlines a saturated tick so it stays visible on any service colour", async () => {
+    // A ring is 1px on all four sides, so on a 3px tick it is 40% of the width
+    // and most of the area — and `ring-surface-base` is opaque where the
+    // achromatic info fill is not, so the outline out-shouted the mark and the
+    // marker read as a bordered box. No tier carries one now: separation comes
+    // from luminance (info), overhang (error) and hue (warning).
+    it("carries no ring on any tier, so the fill is the whole mark", async () => {
       await setEvents([
         { name: "boom", level: "ERROR", _timestamp: eventNsAt(0.2) },
-        { name: "hmm", level: "WARN", _timestamp: eventNsAt(0.8) },
+        { name: "hmm", level: "WARN", _timestamp: eventNsAt(0.5) },
+        { name: "fyi", level: "INFO", _timestamp: eventNsAt(0.8) },
       ]);
 
-      expect(markers()).toHaveLength(2);
+      expect(markers()).toHaveLength(3);
       for (const marker of markers()) {
-        expect(marker.classes()).toEqual(expect.arrayContaining(["ring-1", "ring-surface-base"]));
+        expect(marker.classes()).not.toContain("ring-1");
+        expect(marker.classes()).not.toContain("ring-surface-base");
       }
     });
 
-    // A ring is 1px on all four sides of a 2px tick — half its width, ~62% of
-    // its area — and `ring-surface-base` is opaque while the achromatic info
-    // fill is not. On an info tick the ring out-contrasts the mark it outlines,
-    // and it reads as a bordered box rather than a tick. Luminance already
-    // separates info from any fill, so it carries no ring.
-    it("gives the achromatic info tick no ring", async () => {
-      await setEvents([{ name: "fyi", level: "INFO", _timestamp: eventNsAt(0.4) }]);
+    // The tick is 3px on both DOM surfaces, and MARKER_MIN_SPACING_PX is derived
+    // from that width — the two are one decision, so a change here without a
+    // matching change there reintroduces the overlap clustering prevents.
+    it("renders the tick at the shared 3px width", async () => {
+      await setEvents([{ name: "a", _timestamp: eventNsAt(0.4) }]);
 
-      expect(markers()[0].attributes("data-event-severity")).toBe("info");
-      expect(markers()[0].classes()).not.toContain("ring-1");
-      expect(markers()[0].classes()).not.toContain("ring-surface-base");
+      expect(markers()[0].classes()).toContain("w-0.75");
     });
 
     // Regression: 55.1% of default-stream events were hidden behind a neighbour.

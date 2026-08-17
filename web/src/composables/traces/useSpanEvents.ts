@@ -76,17 +76,19 @@ export type SpanEventSeverity = "error" | "warning" | "info";
  * bar; a 50%-alpha modifier holds contrast against any fill. Error and warning
  * keep their hues, where the colour is semantic.
  *
- * The halo (`ring-1 ring-surface-base`) is therefore carried per tier, not by
- * every marker. A ring is 1px on all four sides of a 2px-wide tick, so it is
- * half the mark's width and ~62% of its area — and `ring-surface-base` is
- * opaque while the achromatic info fill is not. On an info tick the ring would
- * out-contrast the mark it is supposed to outline. Error and warning need it
- * because a saturated fill can land on a same-hue bar with nothing separating
- * them; info does not, because luminance already does that job.
+ * No tier carries a halo. `ring-1 ring-surface-base` was tried and removed: a
+ * ring is 1px on all four sides, so on a 3px tick it is 40% of the width and
+ * most of the area, and it is opaque where the achromatic info fill is not — the
+ * outline out-shouted the mark it was outlining, and the marker read as a
+ * bordered box rather than a tick. Separation now comes from the marker's own
+ * form instead: info from luminance (an alpha modifier over whatever is
+ * beneath), error from overhanging the bar (see `MARKER_HEIGHT_CLASS` in
+ * SpanBlock), and warning from hue alone — which is the weakest of the three and
+ * the one to revisit first if a service colour defeats it.
  */
 export const SEVERITY_MARKER_CLASS: Record<SpanEventSeverity, string> = {
-  error: "bg-badge-error-solid-bg ring-1 ring-surface-base",
-  warning: "bg-badge-warning-solid-bg ring-1 ring-surface-base",
+  error: "bg-badge-error-solid-bg",
+  warning: "bg-badge-warning-solid-bg",
   info: "bg-trace-event-info",
 };
 
@@ -280,11 +282,15 @@ export const summarizeSpanEvents = (
  * Minimum on-screen distance, in CSS pixels, between two marker centres before
  * they are treated as one cluster.
  *
- * Derived from the marker's own width plus a gutter. Jaeger buckets at a fixed
- * 0.2% of the timeline; at the measured 882px waterfall width that is 1.76px —
- * narrower than the marker, so a fixed percentage would still overlap. Working
- * in pixels also keeps the rule correct when the sidebar opens and the timeline
- * resizes.
+ * Derived from the marker's own width plus a gutter: a tick is 3px wide, so this
+ * leaves a 3px gap between neighbours. Jaeger buckets at a fixed 0.2% of the
+ * timeline; at the measured 882px waterfall width that is 1.76px — narrower than
+ * the marker, so a fixed percentage would still overlap. Working in pixels also
+ * keeps the rule correct when the sidebar opens and the timeline resizes.
+ *
+ * Keep this in step with the tick width (`w-0.75` on both DOM surfaces): the two
+ * numbers are one decision, and a wider tick with an unchanged spacing would
+ * reintroduce the overlap clustering exists to prevent.
  */
 export const MARKER_MIN_SPACING_PX = 6;
 
