@@ -236,12 +236,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
-              <DependencyChainPopover
-                :focus="{ kind: 'destination', name: row.name }"
-                @deleted="getDestinations"
-                @open="onOpenDependency"
-              />
             </div>
+          </template>
+
+          <template #cell-used_by="{ row }">
+            <DependencyUsageCell
+              :graph="depGraph"
+              :focus="{ kind: 'destination', name: row.name }"
+              @deleted="getDestinations"
+            />
           </template>
         </OTable>
       </div>
@@ -297,8 +300,10 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
-import DependencyChainPopover from "./DependencyChainPopover.vue";
-import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
+import DependencyUsageCell from "./DependencyUsageCell.vue";
+import useDependencyGraph, {
+  invalidateDependencyGraphCache,
+} from "@/composables/alerts/useDependencyGraph";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -336,12 +341,13 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OPageLayout,
-    DependencyChainPopover,
+    DependencyUsageCell,
   },
   setup() {
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18nTyped();
+    const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
     const { getAllActions } = useActions();
     const { track } = useReo();
 
@@ -399,12 +405,22 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "used_by",
+        header: t("alert_dependencies.usedByColumn"),
+        cell: " ",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 200,
+        meta: { align: "left" },
+      },
+      {
         id: "actions",
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
-        size: 160,
-        meta: { align: "center", actionCount: 4 },
+        size: 130,
+        meta: { align: "center", actionCount: 3 },
       },
     ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
@@ -500,8 +516,10 @@ export default defineComponent({
           resultTotal.value = res.data.length;
           destinations.value = res.data;
           // Any destination add/edit/delete lands here on refresh — drop the
-          // shared dependency-graph cache so the next popover open is current.
+          // shared dependency-graph cache and rebuild it so the "Used by" counts
+          // (and the impact dialog) are current.
           invalidateDependencyGraphCache();
+          loadDepGraph(store.state.selectedOrganization.identifier);
           updateRoute();
         })
         .catch((err) => {
@@ -533,13 +551,6 @@ export default defineComponent({
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);
-    };
-    // A destination opened from its own dependency popover: open the native editor
-    // in-place (same as the row's edit action) — a route push can't, we're already
-    // on this route.
-    const onOpenDependency = (node: { name: string }) => {
-      const destination = getDestinationByName(node.name);
-      if (destination) editDestination(destination);
     };
     const editDestination = (destination: any) => {
       if (!destination) {
@@ -833,11 +844,11 @@ export default defineComponent({
     ]);
     return {
       t,
+      depGraph,
       showDestinationEditor,
       destinations,
       columns,
       editDestination,
-      onOpenDependency,
       getImageURL,
       loading,
       conformDeleteDestination,

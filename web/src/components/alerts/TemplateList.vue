@@ -208,10 +208,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="delete" size="sm" />
             </OButton>
-            <DependencyChainPopover
+          </template>
+          <template #cell-used_by="{ row }">
+            <DependencyUsageCell
+              :graph="depGraph"
               :focus="{ kind: 'template', name: row.name }"
               @deleted="getTemplates"
-              @open="onOpenDependency"
             />
           </template>
           <template v-if="selectedTemplates.length > 0" #bottom>
@@ -282,8 +284,10 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
-import DependencyChainPopover from "./DependencyChainPopover.vue";
-import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
+import DependencyUsageCell from "./DependencyUsageCell.vue";
+import useDependencyGraph, {
+  invalidateDependencyGraphCache,
+} from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -295,6 +299,7 @@ const store = useStore();
 const { t } = useI18nTyped();
 const router = useRouter();
 const { track } = useReo();
+const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
 const templates: Ref<Template[]> = ref([]);
 const columns: OTableColumnDef[] = [
   {
@@ -305,12 +310,22 @@ const columns: OTableColumnDef[] = [
     meta: { align: "left", autoWidth: true },
   },
   {
+    id: "used_by",
+    header: t("alert_dependencies.usedByColumn"),
+    cell: " ",
+    sortable: false,
+    resizable: true,
+    hideable: true,
+    size: 200,
+    meta: { align: "left" },
+  },
+  {
     id: "actions",
     header: t("alert_templates.actions"),
     isAction: true,
     pinned: "right",
-    size: 190,
-    meta: { align: "center", actionCount: 5 },
+    size: 160,
+    meta: { align: "center", actionCount: 4 },
   },
 ];
 const showTemplateEditor = ref(false);
@@ -383,8 +398,10 @@ const getTemplates = () => {
       resultTotal.value = res.data.length;
       templates.value = res.data;
       // Any template add/edit/delete lands here on refresh — drop the shared
-      // dependency-graph cache so the next popover open reflects the change.
+      // dependency-graph cache and rebuild it so the "Used by" counts (and the
+      // impact dialog) reflect the change.
       invalidateDependencyGraphCache();
+      loadDepGraph(store.state.selectedOrganization.identifier);
       updateRoute();
     })
     .catch((err) => {
@@ -452,13 +469,6 @@ const editTemplate = (template: any = null) => {
 };
 const resetEditingTemplate = () => {
   editingTemplate.value = null;
-};
-// A template opened from its own dependency popover: open the native editor
-// in-place (same as the row's edit action) — a route push can't, we're already
-// on this route.
-const onOpenDependency = (node: { name: string }) => {
-  const template = getTemplateByName(node.name);
-  if (template) editTemplate(template);
 };
 const cloneTemplate = (template: any) => {
   track("Button Click", {

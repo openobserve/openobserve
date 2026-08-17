@@ -502,10 +502,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     aria-hidden="true"
                     @click.stop="showDeleteDialogFn({ row })"
                   />
-                  <DependencyChainPopover
-                    :focus="{ kind: 'alert', alertId: row.alert_id, name: row.name }"
-                    @deleted="onDependencyDeleted"
-                  />
                   <ODropdown>
                     <template #trigger>
                       <OButton
@@ -825,7 +821,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
-import DependencyChainPopover from "./DependencyChainPopover.vue";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
@@ -864,7 +859,6 @@ export default defineComponent({
     ImportAlert,
     FolderList,
     MoveAcrossFolders,
-    DependencyChainPopover,
     OToggleGroup,
     OToggleGroupItem,
     OInput,
@@ -1428,8 +1422,8 @@ export default defineComponent({
           header: t("alerts.actions"),
           isAction: true,
           sortable: false,
-          size: 190,
-          meta: { align: "center", cellClass: "actions-column", actionCount: 5 },
+          size: 160,
+          meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
         },
       ];
 
@@ -1574,7 +1568,8 @@ export default defineComponent({
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
       // The alerts list is refreshed after every alert mutation — drop the shared
-      // dependency-graph cache so the next popover open reflects the change.
+      // dependency-graph cache so the destination/template impact dialogs reflect
+      // the change on next open.
       invalidateDependencyGraphCache();
       if (query) {
         //here we reset the filteredResults before fetching the filtered alerts

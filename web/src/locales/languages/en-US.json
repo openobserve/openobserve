@@ -6294,10 +6294,8 @@
     "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
   },
   "alert_dependencies": {
-    "searchPlaceholder": "Search",
     "actionOpen": "Open",
     "actionDelete": "Delete",
-    "viewDependencies": "View dependencies",
     "deleteTitle": "Delete {name}?",
     "deleteMessage": "This permanently removes it. Deletion is blocked if an alert or destination still uses it.",
     "deletedToast": "{name} deleted",
@@ -6305,14 +6303,23 @@
     "loading": "Building dependency graph…",
     "failedToLoad": "Failed to load dependencies: {error}",
     "usedBy": "{count} alert | {count} alerts",
-    "pageRange": "{from}–{to} of {total}",
+    "countDestinations": "{count} destination | {count} destinations",
+    "usedByColumn": "Used by",
+    "searchPlaceholder": "Search",
     "noDependencies": "No dependencies.",
     "noMatches": "No matches.",
-    "sectionTemplates": "Templates",
+    "laneEmpty": "No alerts",
+    "directOverrides": "Uses this template directly",
+    "sectionTemplate": "Template",
+    "sectionDestination": "Destination",
     "sectionDestinations": "Destinations",
     "sectionAlerts": "Alerts",
     "orphanTag": "Unused",
-    "missingTag": "Missing"
+    "missingTag": "Missing",
+    "enabled": "Enabled",
+    "paused": "Paused",
+    "impactTemplate": "Used by {destinations} · {alerts}",
+    "impactDestination": "Used by {alerts}"
   },
   "alert_templates": {
     "exportTemplate": "Export Template",

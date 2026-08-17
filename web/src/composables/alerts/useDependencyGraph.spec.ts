@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { useDependencyGraph, buildFocusChain } from "@/composables/alerts/useDependencyGraph";
+import {
+  useDependencyGraph,
+  buildFocusChain,
+  focusSummary,
+  depKindIcon,
+  depKindColor,
+} from "@/composables/alerts/useDependencyGraph";
 import type { DepNode } from "@/composables/alerts/useDependencyGraph";
 
 const { buildGraph } = useDependencyGraph();
@@ -170,5 +176,67 @@ describe("buildFocusChain", () => {
     expect(slack.usageCount).toBe(2);
     // …and its chain entry now records the focused alert rather than being empty.
     expect(slack.alerts.map((n) => n.name)).toEqual(["cpu"]);
+  });
+});
+
+describe("focusSummary", () => {
+  const graph = buildGraph(
+    [
+      { alert_id: "a1", name: "cpu", destinations: ["slack"], enabled: true },
+      { alert_id: "a2", name: "mem", destinations: ["slack"], enabled: false },
+      { alert_id: "a3", name: "disk", destinations: ["pager"], enabled: true },
+    ],
+    [
+      { name: "slack", type: "http", template: "tpl-http" },
+      { name: "pager", type: "http", template: "tpl-http" },
+      { name: "lonely", type: "email" },
+    ],
+    [{ name: "tpl-http", type: "http" }],
+  );
+
+  it("counts a destination's neighbours (alerts + template), excluding itself", () => {
+    const { node, counts } = focusSummary(graph, { kind: "destination", name: "slack" });
+    expect(node?.name).toBe("slack");
+    expect(counts).toEqual({ templates: 1, destinations: 0, alerts: 2 });
+  });
+
+  it("counts a template's neighbours (destinations + alerts), excluding itself", () => {
+    const { counts } = focusSummary(graph, { kind: "template", name: "tpl-http" });
+    expect(counts).toEqual({ templates: 0, destinations: 2, alerts: 3 });
+  });
+
+  it("counts an alert's neighbours (destination + template), excluding itself", () => {
+    const { counts } = focusSummary(graph, { kind: "alert", alertId: "a1", name: "cpu" });
+    expect(counts).toEqual({ templates: 1, destinations: 1, alerts: 0 });
+  });
+
+  it("marks an orphan destination (no alerts) and keeps zero counts", () => {
+    const { node, counts } = focusSummary(graph, { kind: "destination", name: "lonely" });
+    expect(node?.orphan).toBe(true);
+    expect(counts.alerts).toBe(0);
+  });
+});
+
+describe("dependency kind helpers", () => {
+  it("maps each kind to its icon", () => {
+    expect(depKindIcon("template")).toBe("description");
+    expect(depKindIcon("destination")).toBe("location-on");
+    expect(depKindIcon("alert")).toBe("shield-alert-outline");
+  });
+
+  it("colours by state first, then kind", () => {
+    expect(depKindColor({ kind: "destination", orphan: false, missing: true })).toBe(
+      "text-status-negative",
+    );
+    expect(depKindColor({ kind: "destination", orphan: true, missing: false })).toBe(
+      "text-status-warning",
+    );
+    expect(depKindColor({ kind: "destination", orphan: false, missing: false })).toBe("text-info");
+    expect(depKindColor({ kind: "alert", orphan: false, missing: false })).toBe(
+      "text-status-positive",
+    );
+    expect(depKindColor({ kind: "template", orphan: false, missing: false })).toBe(
+      "text-text-secondary",
+    );
   });
 });

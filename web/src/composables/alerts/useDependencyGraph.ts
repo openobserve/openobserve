@@ -208,6 +208,52 @@ export function buildFocusChain(graph: DepGraph, focus: DepFocus): FocusChain {
   };
 }
 
+/** Counts of an entity's chain neighbours, by kind, EXCLUDING the entity itself. */
+export interface DepCounts {
+  templates: number;
+  destinations: number;
+  alerts: number;
+}
+
+// Per-kind icon + colour for a dependency node — the single source shared by the
+// "where used" rows and the list "Used by" column so a kind reads the same in both.
+export const depKindIcon = (kind: DepNodeKind): string =>
+  kind === "template" ? "description" : kind === "destination" ? "location-on" : "shield-alert-outline";
+
+export const depKindColor = (node: Pick<DepNode, "kind" | "orphan" | "missing">): string => {
+  if (node.missing) return "text-status-negative";
+  if (node.orphan) return "text-status-warning";
+  return node.kind === "destination"
+    ? "text-info"
+    : node.kind === "alert"
+      ? "text-status-positive"
+      : "text-text-secondary";
+};
+
+/** The focus entity's node plus its chain-neighbour counts, in one pass. */
+export interface FocusSummary {
+  node: DepNode | null;
+  counts: DepCounts;
+}
+
+// Everything the "Used by" cell needs: the entity's own node (for its
+// orphan/missing state) and its chain-neighbour counts (what the popover shows),
+// minus the entity itself. Reuses buildFocusChain so the column and the popover
+// can never disagree.
+export function focusSummary(graph: DepGraph, focus: DepFocus): FocusSummary {
+  const chain = buildFocusChain(graph, focus);
+  const selfId = chain.focusNode?.id ?? null;
+  const notSelf = (n: DepNode) => n.id !== selfId;
+  return {
+    node: chain.focusNode,
+    counts: {
+      templates: chain.templates.filter(notSelf).length,
+      destinations: chain.destinations.filter(notSelf).length,
+      alerts: chain.alerts.filter(notSelf).length,
+    },
+  };
+}
+
 const tplId = (name: string) => `template:${name}`;
 const dstId = (name: string) => `destination:${name}`;
 const alrId = (id: string) => `alert:${id}`;
