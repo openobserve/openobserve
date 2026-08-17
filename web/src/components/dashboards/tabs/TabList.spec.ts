@@ -177,6 +177,32 @@ describe("TabList", () => {
       );
     });
 
+    it("shows a panel-count badge per tab, excluding section headers", () => {
+      const dashboard = {
+        ...mockDashboardData,
+        tabs: [
+          {
+            tabId: "tab1",
+            name: "First Tab",
+            // Two real panels + one section header → count should be 2.
+            panels: [{ id: "p1" }, { o2SectionHeader: true, id: "h1" }, { id: "p2" }],
+          },
+        ],
+      };
+      wrapper = createWrapper({ dashboardData: dashboard });
+
+      const badge = wrapper.find('[data-test="dashboard-tab-tab1-panel-count"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe("2");
+    });
+
+    it("shows 0 on a tab with no panels", () => {
+      wrapper = createWrapper();
+      const badge = wrapper.find('[data-test="dashboard-tab-tab1-panel-count"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe("0");
+    });
+
     it("should display tab names correctly", () => {
       wrapper = createWrapper();
 
@@ -247,7 +273,8 @@ describe("TabList", () => {
         expect(classes).toContain("whitespace-nowrap");
         expect(classes).toContain("overflow-hidden");
         expect(classes).toContain("text-ellipsis");
-        expect(classes).toContain("w-full");
+        // flex-1 (was w-full) so the name shares the row with the panel-count badge.
+        expect(classes).toContain("flex-1");
       });
     });
   });
