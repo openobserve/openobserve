@@ -65,6 +65,7 @@ pub use response::{
 pub use rotation::{
     AwayShift, CoverageSegment, DEFAULT_SLOT, GridError, MAX_AWAY_SHIFTS, MAX_GRID_MICROS,
     MAX_GRID_SEGMENTS, MAX_SLOT_CHARS, MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_MINUTE,
+    SECONDARY_SLOT, SOURCE_DEFAULT,
     MICROS_PER_WEEK, OVERRIDE_ROTATION_NAME, OnCallSlot, Rotation, RotationError, ScheduleOverride,
     TimeWindow, Unavailability, away_assignments, covering_override, covering_override_in_slot,
     everyone_in_slot, everyone_on_schedule, is_unavailable, next_on_call, next_on_call_in_slot,

@@ -470,6 +470,11 @@ pub fn build(
             anchor_micros: anchor,
             priority,
             restrictions,
+            // Presets are layers over one position, so none of them derives a
+            // second slot, and a preset is a deliberate choice rather than a
+            // default the system staffed.
+            secondary_slot: None,
+            source: None,
             starts_at: None,
             ends_at: None,
             secondary_offset: None,

@@ -47,6 +47,13 @@ use utoipa::ToSchema;
 /// them as anything else would change what stored data means.
 pub const DEFAULT_SLOT: &str = "primary";
 
+/// The name the auto-staffed rotation gives its derived second position.
+///
+/// A convention rather than an enum — a slot is any string an operator likes —
+/// but the default has to pick one, and this is the word every escalation
+/// policy and every screen already uses.
+pub const SECONDARY_SLOT: &str = "secondary";
+
 /// The longest slot name that will be stored. A slot is a label on a screen and
 /// a key in a ladder, not a place to put a sentence.
 pub const MAX_SLOT_CHARS: usize = 64;
@@ -228,7 +235,44 @@ pub struct Rotation {
     /// option.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secondary_offset: Option<u32>,
+
+    /// The slot this rotation's **derived** second position staffs, if it is a
+    /// slot at all.
+    ///
+    /// One roster, two positions: `slot` is filled by whoever is on shift, and
+    /// this one by whoever sits [`Rotation::resolved_secondary_offset`]
+    /// handovers ahead. They are distinct **by construction**, because the
+    /// offset is at least one — which is the guarantee two independent
+    /// rotations in two slots cannot make. Nothing cross-checks those, so the
+    /// same person can hold both at once and the ladder pages them twice.
+    ///
+    /// Declaring it is what makes the position *addressable*: `slots()` reports
+    /// it, so a cover can name it, `on_call_in_slot` resolves it, and a rung can
+    /// page it. Undeclared, the same person is still computed — as
+    /// `next_on_call` — but there is nothing to write a cover against, which is
+    /// the whole of the complaint this field answers.
+    ///
+    /// Absent is exactly the behaviour before this existed, and it is skipped on
+    /// the wire, so every schedule stored without it round-trips unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secondary_slot: Option<String>,
+
+    /// Where this rotation came from. `Some("default")` marks the one the
+    /// system staffed when the team first had members.
+    ///
+    /// Exists because auto-staffing costs a screen the signal it used to read
+    /// absence with: a team with no schedule row and a team with a rotation
+    /// nobody chose look identical once one is always written. The marker lets
+    /// a UI say "default rotation — everyone in turn, customise" instead of
+    /// implying somebody designed it.
+    ///
+    /// Cleared by any edit: once a human has touched it, it is theirs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
+
+/// The value [`Rotation::source`] carries for a rotation nobody chose.
+pub const SOURCE_DEFAULT: &str = "default";
 
 /// How far behind the primary the derived secondary sits, for a roster of
 /// `len`, when the rotation has not said.
@@ -281,6 +325,13 @@ pub enum RotationError {
     /// turning a stale number into a coverage gap. That case is clamped at
     /// resolution instead. Zero cannot arrive that way; it can only be typed.
     ZeroSecondaryOffset,
+    /// A rotation named its own slot as the one its derived position staffs.
+    ///
+    /// Two people, one place: the slot would resolve to whoever is on shift
+    /// *and* to whoever is an offset ahead, and a rung naming it would page it
+    /// twice. Refused rather than resolved by precedence, because there is no
+    /// reading of it that the author could have meant.
+    SecondarySlotIsItsOwn(String),
 }
 
 impl std::fmt::Display for RotationError {
@@ -306,6 +357,10 @@ impl std::fmt::Display for RotationError {
             Self::ZeroSecondaryOffset => f.write_str(
                 "a secondary offset of 0 would make the secondary the person already on call; use 1 for a shadow-then-lead rotation, or leave it unset for half the roster",
             ),
+            Self::SecondarySlotIsItsOwn(s) => write!(
+                f,
+                "rotation staffs slot `{s}` and also names it as its secondary, so the slot would resolve to two people at once; give the secondary its own name",
+            ),
         }
     }
 }
@@ -326,6 +381,8 @@ impl Rotation {
             starts_at: None,
             ends_at: None,
             secondary_offset: None,
+            secondary_slot: None,
+            source: None,
         }
     }
 
@@ -339,6 +396,20 @@ impl Rotation {
     /// shadow-then-lead shape.
     pub fn with_secondary_offset(mut self, offset: u32) -> Self {
         self.secondary_offset = Some(offset);
+        self
+    }
+
+    /// The same rotation, with its derived second position declared as a slot
+    /// of its own — one roster filling two places.
+    pub fn deriving(mut self, slot: impl Into<String>) -> Self {
+        self.secondary_slot = Some(slot.into());
+        self
+    }
+
+    /// The same rotation, marked as the one the system staffed rather than one
+    /// somebody chose.
+    pub fn from_default(mut self) -> Self {
+        self.source = Some(SOURCE_DEFAULT.to_string());
         self
     }
 
@@ -403,6 +474,17 @@ impl Rotation {
         }
         if self.secondary_offset == Some(0) {
             return Err(RotationError::ZeroSecondaryOffset);
+        }
+        if let Some(derived) = &self.secondary_slot {
+            if derived.trim().is_empty() || derived.chars().count() > MAX_SLOT_CHARS {
+                return Err(RotationError::BadSlot(derived.clone()));
+            }
+            // Staffing both positions of one slot from one roster would put two
+            // different people in the same place and let the ladder page the
+            // slot twice, which is the failure this field exists to prevent.
+            if same_slot(derived, &self.slot) {
+                return Err(RotationError::SecondarySlotIsItsOwn(derived.clone()));
+            }
         }
         let mut seen = std::collections::HashSet::with_capacity(self.members.len());
         for m in &self.members {
@@ -820,6 +902,22 @@ pub fn slots(rotations: &[Rotation]) -> Vec<String> {
             out.push(r.slot.clone());
         }
     }
+    // Declared derived positions, after the slots something staffs directly —
+    // a rotation that fills a slot itself outranks one that derives it, and
+    // ordering them second is what makes that true without a special case at
+    // every call site.
+    //
+    // Only when the roster can actually fill it: a one-person rotation has no
+    // next, so declaring the slot would manufacture a permanent coverage gap
+    // out of a team that is fine.
+    for r in rotations.iter().filter(|r| r.validate().is_ok()) {
+        if let Some(derived) = &r.secondary_slot
+            && r.members.len() >= 2
+            && !out.iter().any(|s| same_slot(s, derived))
+        {
+            out.push(derived.clone());
+        }
+    }
     if let Some(pos) = out.iter().position(|s| same_slot(s, DEFAULT_SLOT))
         && pos > 0
     {
@@ -970,9 +1068,43 @@ pub fn on_call_in_slot(
     if let Some(ov) = covering_override_in_slot(overrides, slot, at) {
         return Some(ov.user_email.clone());
     }
-    winning_rotation_in_slot(rotations, slot, at, tz)
-        .and_then(|r| r.available_member_at(at, tz, unavailability))
-        .map(str::to_string)
+    if let Some(r) = winning_rotation_in_slot(rotations, slot, at, tz) {
+        return r
+            .available_member_at(at, tz, unavailability)
+            .map(str::to_string);
+    }
+    // Nothing staffs this slot directly. It may still be a *declared derived*
+    // position — one roster filling two places — in which case the answer is
+    // the person an offset ahead on the rotation that declared it.
+    //
+    // Deliberately after the direct lookup, so a real rotation always wins:
+    // declaring a derived slot must never quietly displace one somebody
+    // staffed on purpose.
+    derived_holder(rotations, overrides, unavailability, slot, at, tz)
+}
+
+/// The person filling a slot that some rotation *derives* rather than staffs.
+///
+/// Delegates to [`next_on_call_in_slot`] against the declaring rotation's own
+/// slot, so this position inherits every exclusion that one already makes: the
+/// coverer of the primary cannot also be the secondary, and away members are
+/// walked past rather than paged on a beach.
+fn derived_holder(
+    rotations: &[Rotation],
+    overrides: &[ScheduleOverride],
+    unavailability: &[Unavailability],
+    slot: &str,
+    at: i64,
+    tz: chrono_tz::Tz,
+) -> Option<String> {
+    let owner = rotations.iter().find(|r| {
+        r.secondary_slot
+            .as_deref()
+            .is_some_and(|d| same_slot(d, slot))
+            && r.validate().is_ok()
+            && r.applies_at(at, tz)
+    })?;
+    next_on_call_in_slot(rotations, overrides, unavailability, &owner.slot, at, tz)
 }
 
 /// The person the rotation in force hands over to next.
@@ -1697,6 +1829,8 @@ mod tests {
             starts_at: None,
             ends_at: None,
             secondary_offset: None,
+            secondary_slot: None,
+            source: None,
         };
         assert_eq!(r.member_at(ANCHOR, TZ), Some("ana@o2.ai"));
         assert_eq!(r.member_at(ANCHOR + 8 * MICROS_PER_HOUR, TZ), Some("bob@o2.ai"));
@@ -1873,6 +2007,8 @@ mod tests {
             starts_at: None,
             ends_at: None,
             secondary_offset: None,
+            secondary_slot: None,
+            source: None,
         }
     }
 
@@ -2146,6 +2282,8 @@ mod tests {
             starts_at: None,
             ends_at: None,
             secondary_offset: None,
+            secondary_slot: None,
+            source: None,
         }
     }
 
@@ -2307,6 +2445,8 @@ mod tests {
             starts_at: None,
             ends_at: None,
             secondary_offset: None,
+            secondary_slot: None,
+            source: None,
         }
     }
 
@@ -3234,6 +3374,8 @@ mod tests {
             starts_at: None,
             ends_at: None,
             secondary_offset: None,
+            secondary_slot: None,
+            source: None,
         };
         let rotations = vec![
             layer("APAC", "apac@o2.ai", 30, Some(window(0, 8))),
@@ -3386,6 +3528,156 @@ mod tests {
             everyone_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ),
             vec!["eve@o2.ai".to_string(), "bob@o2.ai".to_string()],
             "and one slot can still be named on its own"
+        );
+    }
+
+    /// The whole point of the field: an ordinary team — one pool, anybody can
+    /// be primary, somebody else is secondary — gets a secondary that is a
+    /// real slot, without maintaining the same people in two lists.
+    #[test]
+    fn test_a_declared_derived_slot_is_staffed_from_the_same_roster() {
+        let rotations = vec![
+            Rotation::weekly(
+                "Platform",
+                vec![
+                    "ana@o2.ai".into(),
+                    "bob@o2.ai".into(),
+                    "cy@o2.ai".into(),
+                    "dee@o2.ai".into(),
+                ],
+                ANCHOR,
+            )
+            .deriving("secondary"),
+        ];
+        // offset = max(1, 4/2) = 2, so the secondary is two handovers ahead.
+        assert_eq!(
+            on_call_in_slot(&rotations, &[], &[], DEFAULT_SLOT, ANCHOR, TZ).as_deref(),
+            Some("ana@o2.ai")
+        );
+        assert_eq!(
+            on_call_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ).as_deref(),
+            Some("cy@o2.ai"),
+            "the derived position is now addressable by slot name"
+        );
+        assert_eq!(
+            slots(&rotations),
+            vec!["primary".to_string(), "secondary".to_string()],
+            "and it is reported, which is what lets a cover name it"
+        );
+    }
+
+    /// Distinct **by construction**, which is the guarantee two independent
+    /// rotations in two slots cannot make — nothing cross-checks those, so the
+    /// same person can hold both and the ladder pages them twice.
+    #[test]
+    fn test_a_derived_slot_can_never_be_the_person_already_on_call() {
+        for len in 2..12usize {
+            let members: Vec<String> = (0..len).map(|i| format!("m{i}@o2.ai")).collect();
+            let rotations =
+                vec![Rotation::weekly("Team", members, ANCHOR).deriving("secondary")];
+            for shift in 0..len as i64 {
+                let at = ANCHOR + shift * MICROS_PER_WEEK;
+                let primary = on_call_in_slot(&rotations, &[], &[], DEFAULT_SLOT, at, TZ);
+                let secondary = on_call_in_slot(&rotations, &[], &[], "secondary", at, TZ);
+                assert!(primary.is_some() && secondary.is_some(), "len={len}");
+                assert_ne!(primary, secondary, "len={len} shift={shift}");
+            }
+        }
+    }
+
+    /// A cover on the derived slot behaves like a cover anywhere else — which
+    /// is the complaint this whole field answers, since it used to be refused.
+    #[test]
+    fn test_the_derived_slot_can_be_covered() {
+        let rotations = vec![
+            Rotation::weekly(
+                "Platform",
+                vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cy@o2.ai".into()],
+                ANCHOR,
+            )
+            .deriving("secondary"),
+        ];
+        let overrides = vec![ScheduleOverride {
+            id: "ov1".into(),
+            org_id: "default".into(),
+            team_id: "t1".into(),
+            slot: Some("secondary".into()),
+            user_email: "zoe@o2.ai".into(),
+            covering_for: None,
+            start_at: ANCHOR - MICROS_PER_HOUR,
+            end_at: ANCHOR + MICROS_PER_HOUR,
+            reason: None,
+            created_by: "root@o2.ai".into(),
+            created_at: ANCHOR,
+        }];
+        assert_eq!(
+            on_call_in_slot(&rotations, &overrides, &[], "secondary", ANCHOR, TZ).as_deref(),
+            Some("zoe@o2.ai"),
+            "a cover beats the derived holder, exactly as it beats a rostered one"
+        );
+        assert_eq!(
+            on_call_in_slot(&rotations, &overrides, &[], DEFAULT_SLOT, ANCHOR, TZ).as_deref(),
+            Some("ana@o2.ai"),
+            "and covering one slot does not disturb the other"
+        );
+    }
+
+    /// A rotation that staffs a slot directly outranks one that derives it, so
+    /// declaring a derived slot can never quietly displace a real pool.
+    #[test]
+    fn test_a_real_rotation_beats_a_derived_one_for_the_same_slot() {
+        let rotations = vec![
+            Rotation::weekly(
+                "Platform",
+                vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+                ANCHOR,
+            )
+            .deriving("secondary"),
+            Rotation::weekly("Seniors", vec!["eve@o2.ai".into()], ANCHOR).in_slot("secondary"),
+        ];
+        assert_eq!(
+            on_call_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ).as_deref(),
+            Some("eve@o2.ai")
+        );
+    }
+
+    /// A one-person rotation has no next, so declaring the slot would invent a
+    /// permanent coverage gap out of a team that is fine.
+    #[test]
+    fn test_a_one_person_rotation_declares_no_derived_slot() {
+        let rotations =
+            vec![Rotation::weekly("Solo", vec!["ana@o2.ai".into()], ANCHOR).deriving("secondary")];
+        assert_eq!(slots(&rotations), vec!["primary".to_string()]);
+        assert_eq!(
+            on_call_in_slot(&rotations, &[], &[], "secondary", ANCHOR, TZ),
+            None
+        );
+    }
+
+    /// Two people, one place. There is no reading of it the author meant.
+    #[test]
+    fn test_a_rotation_cannot_derive_its_own_slot() {
+        let r = Rotation::weekly("Team", vec!["a@o2.ai".into(), "b@o2.ai".into()], ANCHOR)
+            .deriving("Primary");
+        assert!(matches!(
+            r.validate(),
+            Err(RotationError::SecondarySlotIsItsOwn(_))
+        ));
+        assert!(r.validate().unwrap_err().to_string().contains("two people at once"));
+    }
+
+    /// Absent means exactly what it always meant, and stays off the wire, so
+    /// every schedule stored before this existed round-trips unchanged.
+    #[test]
+    fn test_an_undeclared_derived_slot_changes_nothing() {
+        let r = Rotation::weekly("Team", vec!["a@o2.ai".into(), "b@o2.ai".into()], ANCHOR);
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(!json.contains("secondary_slot"), "{json}");
+        assert!(!json.contains("source"), "{json}");
+        assert_eq!(slots(std::slice::from_ref(&r)), vec!["primary".to_string()]);
+        assert_eq!(
+            on_call_in_slot(std::slice::from_ref(&r), &[], &[], "secondary", ANCHOR, TZ),
+            None
         );
     }
 
