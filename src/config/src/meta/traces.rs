@@ -80,10 +80,10 @@ pub mod session {
         session_id: &str,
         ingest_cutoff_us: Option<i64>,
     ) -> String {
-        let escaped_session_id = escape_sql_string(session_id);
+        let quoted_session_id = quote_sql_string(session_id);
         let predicate = session_columns
             .iter()
-            .map(|column| format!("{} = '{}'", quote_identifier(column), escaped_session_id))
+            .map(|column| format!("{} = {}", quote_identifier(column), quoted_session_id))
             .collect::<Vec<_>>()
             .join(" OR ");
         format!(
@@ -128,7 +128,7 @@ pub mod session {
     pub fn trace_id_predicate(trace_ids: &[String]) -> String {
         let values = trace_ids
             .iter()
-            .map(|trace_id| format!("'{}'", escape_sql_string(trace_id)))
+            .map(|trace_id| quote_sql_string(trace_id))
             .collect::<Vec<_>>()
             .join(", ");
         format!("{} IN ({values})", quote_identifier("trace_id"))
@@ -150,6 +150,10 @@ pub mod session {
 
     pub fn quote_identifier(value: &str) -> String {
         format!("\"{}\"", value.replace('"', "\"\""))
+    }
+
+    pub fn quote_sql_string(value: &str) -> String {
+        format!("'{}'", escape_sql_string(value))
     }
 
     pub fn escape_sql_string(value: &str) -> String {

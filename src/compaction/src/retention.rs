@@ -233,6 +233,26 @@ fn generate_time_ranges_for_deletion(
     time_ranges_for_deletion
 }
 
+/// Split `[start, end)` into one `(start_date, end_date)` pair per day, only for the days fully
+/// covered by the range, the day `end` falls into is still within the retention period.
+fn generate_deletion_dates(start: i64, end: i64) -> Vec<(String, String)> {
+    let mut dates = Vec::new();
+    let mut start = start;
+    while start + day_micros(1) <= end {
+        let time_range_start = Utc
+            .timestamp_nanos(start * 1000)
+            .format("%Y-%m-%d")
+            .to_string();
+        start += day_micros(1); // increase one day
+        let time_range_end = Utc
+            .timestamp_nanos(start * 1000)
+            .format("%Y-%m-%d")
+            .to_string();
+        dates.push((time_range_start, time_range_end));
+    }
+    dates
+}
+
 /// Generate delete jobs for the stream based on the stream settings
 pub async fn generate_retention_job(
     lifecycle_end: &DateTime<Utc>,
@@ -302,7 +322,7 @@ pub async fn generate_retention_job(
     let created_at_micros = created_at.timestamp_micros();
     for time_range in final_deletion_time_ranges {
         // check the min_date again in this range because of the extended retention days
-        let mut start = if time_range.start <= created_at_micros {
+        let start = if time_range.start <= created_at_micros {
             created_at_micros
         } else {
             // check the min_date again maybe there is no data in this range
@@ -324,20 +344,7 @@ pub async fn generate_retention_job(
             created_at.timestamp_micros()
         };
         // generate jobs by date
-        while start < time_range.end {
-            let time_range_start = Utc
-                .timestamp_nanos(start * 1000)
-                .format("%Y-%m-%d")
-                .to_string();
-            start += day_micros(1); // increase one day
-            let time_range_end = Utc
-                .timestamp_nanos(start * 1000)
-                .format("%Y-%m-%d")
-                .to_string();
-            if time_range_start >= time_range_end {
-                continue;
-            }
-
+        for (time_range_start, time_range_end) in generate_deletion_dates(start, time_range.end) {
             let (_key, created) = db::compact::retention::delete_stream(
                 org_id,
                 stream_type,
@@ -725,6 +732,7 @@ async fn handle_delete_by_date_done(
 
 #[cfg(test)]
 mod tests {
+    use config::utils::time::parse_str_to_timestamp_micros;
     use itertools::Itertools;
 
     use super::*;
@@ -741,6 +749,56 @@ mod tests {
         let res =
             generate_retention_job(&lifecycle_end, org_id, stream_type, stream_name, &[]).await;
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_generate_deletion_dates_keeps_the_day_of_the_retention_boundary() {
+        // the boundary falls in the middle of 2026-08-06, so that day must not be deleted
+        let dates = generate_deletion_dates(
+            parse_str_to_timestamp_micros("2026-08-03T00:00:00Z").unwrap(),
+            parse_str_to_timestamp_micros("2026-08-06T04:52:42Z").unwrap(),
+        );
+        assert_eq!(
+            dates,
+            vec![
+                ("2026-08-03".to_string(), "2026-08-04".to_string()),
+                ("2026-08-04".to_string(), "2026-08-05".to_string()),
+                ("2026-08-05".to_string(), "2026-08-06".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_generate_deletion_dates_with_day_aligned_end() {
+        let dates = generate_deletion_dates(
+            parse_str_to_timestamp_micros("2026-08-03T00:00:00Z").unwrap(),
+            parse_str_to_timestamp_micros("2026-08-05T00:00:00Z").unwrap(),
+        );
+        assert_eq!(
+            dates,
+            vec![
+                ("2026-08-03".to_string(), "2026-08-04".to_string()),
+                ("2026-08-04".to_string(), "2026-08-05".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_generate_deletion_dates_less_than_a_day() {
+        assert!(
+            generate_deletion_dates(
+                parse_str_to_timestamp_micros("2026-08-06T00:00:00Z").unwrap(),
+                parse_str_to_timestamp_micros("2026-08-06T04:52:42Z").unwrap(),
+            )
+            .is_empty()
+        );
+        assert!(
+            generate_deletion_dates(
+                parse_str_to_timestamp_micros("2026-08-06T00:00:00Z").unwrap(),
+                parse_str_to_timestamp_micros("2026-08-05T00:00:00Z").unwrap(),
+            )
+            .is_empty()
+        );
     }
 
     #[tokio::test]

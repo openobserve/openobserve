@@ -71,13 +71,22 @@ pub enum SloError {
     /// unique index fails the whole statement without naming the loser, so
     /// this carries no name — and nothing moved.
     MoveNameConflict,
+    /// One of the generated alerts is still an operand of a composite. The
+    /// cascade is preflighted, so neither the SLO nor any sibling alert moved.
+    AlertCascadeConflict(String),
+    /// The shared composite graph lock could not be acquired or released.
+    TemporarilyUnavailable(String),
     Db(String),
 }
 
 impl std::fmt::Display for SloError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Validation(m) | Self::Budget(m) | Self::Db(m) => write!(f, "{m}"),
+            Self::Validation(m)
+            | Self::Budget(m)
+            | Self::AlertCascadeConflict(m)
+            | Self::TemporarilyUnavailable(m)
+            | Self::Db(m) => write!(f, "{m}"),
             Self::NotFound => write!(f, "SLO not found"),
             Self::DuplicateName(n) => {
                 write!(f, "an SLO named \"{n}\" already exists in this folder")
@@ -872,14 +881,28 @@ pub async fn delete(org: &str, id: &str) -> Result<bool, SloError> {
     let dependents = infra::table::alerts::list_alerts_by_slo(db, org, id)
         .await
         .map_err(|e| SloError::Db(e.to_string()))?;
-    for (alert_id, name) in plan_alert_cascade(&dependents) {
-        if let Err(e) = crate::alerts::alert::delete_by_id(db, org, alert_id).await {
-            // Best-effort, matching the rest of this teardown: a stuck alert
-            // must not strand the SLO half-deleted.
-            log::warn!("[slo] could not delete alert \"{name}\" with SLO {id}: {e}");
-        } else {
-            log::info!("[slo] deleted alert \"{name}\" along with SLO {id}");
-        }
+    let cascade = plan_alert_cascade(&dependents);
+    let alert_ids = cascade
+        .iter()
+        .map(|(alert_id, _)| *alert_id)
+        .collect::<Vec<_>>();
+    if let Err(error) = crate::alerts::alert::delete_many_for_cascade(db, org, &alert_ids).await {
+        use crate::alerts::alert::AlertError;
+        return Err(match error {
+            AlertError::AlertReferencedByComposites { parents } => {
+                SloError::AlertCascadeConflict(format!(
+                    "one or more generated alerts are referenced by {} composite alert(s)",
+                    parents.len()
+                ))
+            }
+            AlertError::CompositeGraphLockUnavailable(message) => {
+                SloError::TemporarilyUnavailable(message)
+            }
+            other => SloError::Db(other.to_string()),
+        });
+    }
+    for (_, name) in cascade {
+        log::info!("[slo] deleted alert \"{name}\" along with SLO {id}");
     }
 
     let now = now_micros() / 1_000_000;

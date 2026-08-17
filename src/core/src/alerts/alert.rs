@@ -273,6 +273,16 @@ pub enum AlertError {
     )]
     AlertSourceOfSlos { slos: String },
 
+    #[error("this alert is referenced by one or more composite alerts")]
+    AlertReferencedByComposites {
+        /// Captured while holding the organization graph lock. HTTP callers
+        /// filter this snapshot through current folder RBAC before returning it.
+        parents: Vec<CompositeParentReference>,
+    },
+
+    #[error("composite graph lock unavailable: {0}")]
+    CompositeGraphLockUnavailable(String),
+
     /// S-16 PR 4. Save-time validation only holds at save time: an edit to the
     /// source alert can break the SLI's eligibility invariants (§5.1, §5.4)
     /// afterwards, with no signal, leaving the SLO frozen forever on a config
@@ -1203,30 +1213,139 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
 /// again the moment it resumes, and by then the source would be gone.
 ///
 /// Deliberately a wrapper rather than a check inside [`delete_by_id`]: org
-/// teardown deletes SLOs first and then every alert in the org
-/// (`org_cleanup::step_delete_db_resources`), and a guard on the shared
-/// primitive would let one surviving SLO row stall the whole teardown. The
-/// cascade in `slo::service::delete` needs the unguarded primitive for the same
-/// reason.
-///
-/// Scope, stated exactly: this covers deletion **by id**, which is every alert
-/// delete endpoint. It does not cover `DELETE /streams/{name}?delete_all=true`,
-/// which sweeps a stream's alerts through `db::alerts::alert::delete_by_name`
-/// and reaches neither this function nor [`delete_by_id`] — so it already
-/// bypasses the run-state and ledger teardown too. That is a pre-existing gap
-/// in the stream path, not one this guard opens.
+/// teardown is the one explicit bypass and deletes the entire composite graph
+/// before ordinary alerts. SLO and stream cascades use
+/// [`delete_many_for_cascade`], which applies the composite-reference guard to
+/// the complete target set without applying the dependent-SLO guard.
 pub async fn delete_by_id_user<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), AlertError> {
-    let dependents = crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
-        .await
-        .map_err(|e| AlertError::InfraError(infra::errors::Error::Message(e.to_string())))?;
-    if let Some(refusal) = delete_blocked_by(&dependents) {
-        return Err(refusal);
+    let locker = lock_composite_graph(org_id).await?;
+    let result = async {
+        ensure_alerts_not_referenced(conn, org_id, &[alert_id]).await?;
+        let dependents =
+            crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
+                .await
+                .map_err(|e| {
+                    AlertError::InfraError(infra::errors::Error::Message(e.to_string()))
+                })?;
+        if let Some(refusal) = delete_blocked_by(&dependents) {
+            return Err(refusal);
+        }
+        delete_by_id(conn, org_id, alert_id).await
     }
-    delete_by_id(conn, org_id, alert_id).await
+    .await;
+    finish_graph_locked(result, locker).await
+}
+
+/// A readable parent snapshot captured by the guarded-delete service.
+///
+/// Keeping IDs and folders here (instead of formatting only names into the
+/// error string) lets the HTTP boundary reveal only parents the caller may
+/// currently read and report the rest as a hidden count.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompositeParentReference {
+    pub alert_id: String,
+    pub name: String,
+    pub folder_id: String,
+}
+
+/// Delete every ordinary-alert member of an internal cascade.
+///
+/// All reverse-reference checks happen while holding the same graph lock used
+/// by composite mutations, and every target is checked before the first delete.
+/// This is intentionally distinct from [`delete_by_id_user`]: an SLO deleting
+/// its generated alerts and a stream deleting its alerts must not trip the
+/// dependent-SLO guard, but they must honor composite references.
+pub(crate) async fn delete_many_for_cascade<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_ids: &[Ksuid],
+) -> Result<(), AlertError> {
+    if alert_ids.is_empty() {
+        return Ok(());
+    }
+    let locker = lock_composite_graph(org_id).await?;
+    let result = async {
+        ensure_alerts_not_referenced(conn, org_id, alert_ids).await?;
+        for alert_id in alert_ids {
+            delete_by_id(conn, org_id, *alert_id).await?;
+        }
+        Ok(())
+    }
+    .await;
+    finish_graph_locked(result, locker).await
+}
+
+async fn lock_composite_graph(
+    org_id: &str,
+) -> Result<super::composite_graph_lock::CompositeGraphGuard, AlertError> {
+    super::composite_graph_lock::lock(org_id)
+        .await
+        .map_err(|error| AlertError::CompositeGraphLockUnavailable(error.to_string()))
+}
+
+async fn finish_graph_locked<T>(
+    result: Result<T, AlertError>,
+    locker: super::composite_graph_lock::CompositeGraphGuard,
+) -> Result<T, AlertError> {
+    let unlock = locker
+        .release()
+        .await
+        .map_err(|error| AlertError::CompositeGraphLockUnavailable(error.to_string()));
+    match result {
+        Ok(value) => {
+            unlock?;
+            Ok(value)
+        }
+        Err(error) => {
+            if let Err(unlock_error) = unlock {
+                log::error!(
+                    "failed to release composite graph lock after delete refusal: {unlock_error}"
+                );
+            }
+            Err(error)
+        }
+    }
+}
+
+async fn ensure_alerts_not_referenced<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_ids: &[Ksuid],
+) -> Result<(), AlertError> {
+    let mut parents = Vec::new();
+    for alert_id in alert_ids {
+        parents.extend(
+            infra::table::alert_composites::list_parents(
+                conn,
+                org_id,
+                infra::table::alert_composites::ChildKind::Alert,
+                &alert_id.to_string(),
+            )
+            .await
+            .map_err(|error| {
+                AlertError::InfraError(infra::errors::Error::Message(error.to_string()))
+            })?,
+        );
+    }
+    if parents.is_empty() {
+        return Ok(());
+    }
+    parents.sort_by(|left, right| left.id.cmp(&right.id));
+    parents.dedup_by(|left, right| left.id == right.id);
+    Err(AlertError::AlertReferencedByComposites {
+        parents: parents
+            .into_iter()
+            .map(|parent| CompositeParentReference {
+                alert_id: parent.id,
+                name: parent.name,
+                folder_id: parent.folder_id,
+            })
+            .collect(),
+    })
 }
 
 /// The refusal a delete owes the SLOs measuring from this alert, or `None` when
@@ -1676,19 +1795,15 @@ pub async fn delete_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<(), AlertError> {
-    if db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
+    let alert = db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
         .await
-        .is_err()
-    {
-        return Err(AlertError::AlertNotFound);
-    }
-    match db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, name).await {
-        Ok(_) => {
-            remove_ownership(org_id, "alerts", Authz::new(name)).await;
-            Ok(())
-        }
-        Err(e) => Err(e.into()),
-    }
+        .map_err(|_| AlertError::AlertNotFound)?
+        .ok_or(AlertError::AlertNotFound)?;
+    let alert_id = alert.id.ok_or(AlertError::AlertNotFound)?;
+    let client = infra::db::ORM_CLIENT
+        .get_or_init(infra::db::connect_to_orm)
+        .await;
+    delete_by_id_user(client, org_id, alert_id).await
 }
 
 /// Enables an alert.
@@ -3506,7 +3621,7 @@ pub(super) fn to_float(val: &Value) -> f64 {
     }
 }
 #[cfg(not(feature = "enterprise"))]
-async fn permitted_alerts(
+pub async fn permitted_alerts(
     _org_id: &str,
     _user_id: Option<&str>,
     _folder_id: Option<&str>,
@@ -3515,7 +3630,7 @@ async fn permitted_alerts(
 }
 
 #[cfg(feature = "enterprise")]
-async fn permitted_alerts(
+pub async fn permitted_alerts(
     org_id: &str,
     user_id: Option<&str>,
     folder_id: Option<&str>,

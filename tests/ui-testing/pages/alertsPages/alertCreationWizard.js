@@ -1211,18 +1211,22 @@ export class AlertCreationWizard {
     }
 
     async _selectAlertType(typeName) {
-        const alertTypeSelect = this.page.locator(this.locators.alertTypeSelect);
-        await alertTypeSelect.waitFor({ state: 'visible', timeout: 5000 });
-        await alertTypeSelect.click();
+        // The v3 wizard uses an OToggleGroup of tabs, one per alert type
+        // (add-alert-type-tab-<value>), rather than a dropdown + popover.
+        const valueMap = {
+            Scheduled: 'false',
+            'Real-time': 'true',
+            Realtime: 'true',
+            Anomaly: 'anomaly',
+            'Anomaly Detection': 'anomaly',
+            Composite: 'composite',
+        };
+        const value = valueMap[typeName] ?? typeName.toLowerCase();
+        const tab = this.page.locator(`[data-test="add-alert-type-tab-${value}"]`);
+        await tab.waitFor({ state: 'visible', timeout: 5000 });
+        await tab.click();
         await this.page.waitForTimeout(500);
-        // Use flexible text matching — the option text is "Realtime" (no hyphen) in English locale
-        // Map "Real-time" to "Realtime" for the dropdown display text
-        const displayName = typeName === 'Real-time' ? 'Realtime' : typeName;
-        const alertTypeOption = this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: displayName }).first();
-        await alertTypeOption.waitFor({ state: 'visible', timeout: 5000 });
-        await alertTypeOption.click();
-        await this.page.waitForTimeout(500);
-        testLogger.info('Selected alert type', { typeName, displayName });
+        testLogger.info('Selected alert type', { typeName, value });
     }
 
     async _switchToTab(tabName) {

@@ -29,7 +29,7 @@ use axum::{
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    DISTINCT_FIELDS, O2_INGEST_TS_COL_NAME, TIMESTAMP_COL_NAME, get_config,
+    O2_INGEST_TS_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::alert::Alert,
         gen_ai::GenAiAgentMappingConfig,
@@ -38,7 +38,7 @@ use config::{
         stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros, util::DISTINCT_STREAM_PREFIX},
+    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
 use ingestion_common::IngestUser;
@@ -58,6 +58,7 @@ pub mod inferred;
 pub mod otel;
 pub mod service_graph;
 pub mod session;
+pub mod time_index;
 
 #[cfg(feature = "cloud")]
 use ::stream::get_stream;
@@ -75,9 +76,6 @@ use crate::{
         write_file,
     },
     logs::O2IngestJsonData,
-    metadata::{
-        MetadataItem, MetadataType, distinct_values::DvItem, trace_list_index::TraceListItem, write,
-    },
     traces::otel::{OtelIngestionProcessor, is_llm_trace},
 };
 
@@ -1420,10 +1418,6 @@ async fn write_traces(
     )
     .await;
 
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Traces)
-        .await
-        .unwrap_or_default();
-
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let partition_time_level = get_partition_time_level(StreamType::Traces);
     if stream_schema.has_partition_keys {
@@ -1477,53 +1471,17 @@ async fn write_traces(
     let record_schema = Arc::new(record_schema);
     let schema_key = record_schema.hash_key();
 
+    if let Err(e) = time_index::write(org_id, stream_name, &json_data).await {
+        metrics::TRACE_TIME_INDEX_OPERATIONS
+            .with_label_values(&[org_id, "write", "error"])
+            .inc();
+        log::error!("[TRACE_TIME_INDEX] failed to write index for {org_id}/{stream_name}: {e}");
+    }
+
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-    let mut distinct_values = Vec::with_capacity(16);
-    let mut trace_index_values = Vec::with_capacity(json_data.len());
 
     // Start write data
     for (timestamp, record_val) in json_data {
-        // get service_name
-        let service_name = record_val
-            .get("service_name")
-            .map(json::get_string_value)
-            .unwrap_or_default();
-        // get distinct_value item
-        if stream_settings.enable_distinct_fields {
-            let mut map = Map::new();
-            for field in DISTINCT_FIELDS.iter().chain(
-                stream_settings
-                    .distinct_value_fields
-                    .iter()
-                    .map(|f| &f.name),
-            ) {
-                if let Some(val) = record_val.get(field) {
-                    map.insert(field.clone(), val.clone());
-                }
-            }
-            if !map.is_empty() {
-                distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Traces,
-                    stream_name: stream_name.to_string(),
-                    value: map,
-                }));
-            }
-        }
-
-        // build trace metadata
-        let trace_id = record_val
-            .get("trace_id")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-        trace_index_values.push(MetadataItem::TraceListIndexer(TraceListItem {
-            _timestamp: timestamp,
-            stream_name: stream_name.to_string(),
-            service_name: service_name.to_string(),
-            trace_id,
-        }));
-
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts
             && triggers.len() < alerts.len()
@@ -1595,23 +1553,6 @@ async fn write_traces(
         log::error!("Error while writing traces: {e}");
         std::io::Error::other(e.to_string())
     })?;
-
-    // send distinct_values
-    if !distinct_values.is_empty()
-        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
-        && stream_settings.enable_distinct_fields
-        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
-    {
-        log::error!("Error while writing distinct values: {e}");
-    }
-
-    // send trace metadata
-    if cfg.common.traces_list_index_enabled
-        && !trace_index_values.is_empty()
-        && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
-    {
-        log::error!("Error while writing trace_index values: {e}");
-    }
 
     // only one trigger per request
     evaluate_trigger(triggers).await;

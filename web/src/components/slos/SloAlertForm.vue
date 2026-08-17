@@ -152,8 +152,8 @@ const form = reactive({
     operator: ">",
     critical: null as number | null,
     warning: null as number | null,
-    long_window_secs: null as number | null,
-    short_window_secs: null as number | null,
+    long_window_secs: 3600,
+    short_window_secs: snapWindow(300),
   } as Record<string, any>,
 });
 
@@ -228,6 +228,13 @@ const loadDestinations = () => {
       destinationOptions.value = [];
     });
 };
+
+function snapWindow(secs: number): number {
+  const slice = props.slo.slice_interval_secs ?? 0;
+  if (slice <= 0) return secs;
+  const onGrid = Math.round(secs / slice) * slice;
+  return Math.max(onGrid, 2 * slice);
+}
 
 onMounted(async () => {
   loadDestinations();

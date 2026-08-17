@@ -94,7 +94,13 @@ impl From<AlertError> for Response {
             // name them, so the 409 body says what to change.
             AlertError::CreateAlreadyExists
             | AlertError::AlertSourceOfSlos { .. }
+            | AlertError::AlertReferencedByComposites { .. }
             | AlertError::AlertSourceEditBreaksSlos { .. } => MetaHttpResponse::conflict(value),
+            AlertError::CompositeGraphLockUnavailable(_) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(MetaHttpResponse::error(StatusCode::SERVICE_UNAVAILABLE, value)),
+            )
+                .into_response(),
             AlertError::CreateFolderNotFound
             | AlertError::MoveDestinationFolderNotFound
             | AlertError::AlertNotFound

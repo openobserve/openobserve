@@ -26,6 +26,8 @@ const QUERIER_ROUTES: [(&str, usize); 32] = [
     ("traces/session", 3),       // /api/{org_id}/{stream_name}/traces/session
     ("traces/user", 3),          // /api/{org_id}/{stream_name}/traces/user
     ("dag", 5),                  // /api/{org_id}/{stream_name}/traces/{trace_id}/dag
+    ("details", 5),              // /api/{org_id}/{stream_name}/traces/{trace_id}/details
+    ("time_range", 5),           // /api/{org_id}/{stream_name}/traces/{trace_id}/time_range
     ("clusters", 1),             // /api/clusters
     ("query_manager", 2),        // /api/{org_id}/query_manager/...
     ("_search", 2),              // /api/{org_id}/_search
@@ -169,6 +171,12 @@ mod tests {
         ));
         assert!(is_querier_route(
             "/api/org1/annotation_queues/queue-1/items/item-1/reviews"
+        // Test trace detail routes
+        assert!(is_querier_route(
+            "/api/org1/default/traces/trace-id/details"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/default/traces/trace-id/time_range"
         ));
     }
 

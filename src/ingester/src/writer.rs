@@ -25,7 +25,9 @@ use std::{
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
-    MEM_TABLE_INDIVIDUAL_STREAMS, get_config, metrics,
+    MEM_TABLE_INDIVIDUAL_STREAMS, get_config,
+    meta::stream::StreamType,
+    metrics,
     stats::MemorySize,
     utils::hash::{Sum64, gxhash},
 };
@@ -406,7 +408,9 @@ impl Writer {
         let processed_batch = self.preprocess_batch(entries)?;
 
         let cfg = get_config();
-        if !cfg.common.wal_write_queue_enabled {
+        if self.key.stream_type.as_ref() == StreamType::Metadata.as_str()
+            || !cfg.common.wal_write_queue_enabled
+        {
             return self.consume_processed(processed_batch, fsync).await;
         }
 
