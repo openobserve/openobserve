@@ -255,11 +255,26 @@ describe("EvidenceEvents", () => {
     expect(cols.find((c) => c.id === "duration")?.meta?.align).toBe("right");
   });
 
-  it("lets the panel sort by step, the other axis of the run", () => {
-    const cols = mountEvents({ mode: "panel" }).findComponent(OTable).props("columns") as Array<
-      Record<string, any>
-    >;
-    expect(cols.find((c) => c.id === "step")?.sortable).toBe(true);
+  it("actually reorders rows when the Step header is clicked", async () => {
+    // Non-alphabetical to start, so a working sort visibly moves rows rather
+    // than leaving an order that happened to already match.
+    const w = mountEvents({
+      events: [
+        ev({ stepName: "Zebra crossing" }),
+        ev({ stepName: "Apple pay" }),
+        ev({ stepName: "Mango lassi" }),
+      ],
+      mode: "panel",
+    });
+    const stepText = () =>
+      w.findAll('[data-test="synthetics-evidence-events-step"]').map((c) => c.text());
+    expect(stepText()).toEqual(["Zebra crossing", "Apple pay", "Mango lassi"]);
+
+    await w
+      .find('[data-test="o2-table-th-step"] [data-test="o2-table-th-sort-trigger"]')
+      .trigger("click");
+
+    expect(stepText()).toEqual(["Apple pay", "Mango lassi", "Zebra crossing"]);
   });
 
   it("labels the footer count instead of leaving a bare number", () => {

@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   EvidenceEventDetail — the full record for ONE evidence event.
 
   Purely presentational: one prop in, no emits, no fetching. `EvidenceEvents`
-  truncates a row's URL and drops fields like stack trace and resource type to
-  keep the table scannable; this renders what that row could not, meant for the
-  table's row-expansion slot.
+  truncates a row's URL unless wrap is on, and always drops fields like stack
+  trace and resource type to keep the table scannable; this renders what that
+  row could not, meant for the table's row-expansion slot.
 -->
 
 <script setup lang="ts">

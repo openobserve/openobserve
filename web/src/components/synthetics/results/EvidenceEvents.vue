@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Two modes:
     inline — inside a step expansion: no step column (the step IS the context),
              no pagination, shrink to content
-    panel  — the run-level Evidence tab: step column, client pagination
+    panel  — the run-level Evidence tab: step column, client pagination, row
+             expansion for the full event detail, an optional wrap toggle, and
+             a labelled footer count
 
   One row definition for both surfaces, so a change to a row is a change to
   both. This component owns the OTable configuration and renders cell content
@@ -142,6 +144,7 @@ const columns = computed<OTableColumnDef<EvidenceRow>[]>(() => [
           header: t("synthetics.evidence.colStep"),
           size: 240,
           sortable: true,
+          accessorFn: (row: EvidenceRow) => row.stepName ?? "",
         },
       ]
     : []),
