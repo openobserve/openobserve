@@ -1735,7 +1735,7 @@ export default defineComponent({
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
-  box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
+  box-shadow: var(--shadow-glow-drag-geom) color-mix(in srgb, var(--color-black) 15%, transparent);
 }
 
 .displayDiv :deep(.grid-stack .grid-stack-item.ui-resizable-resizing) {

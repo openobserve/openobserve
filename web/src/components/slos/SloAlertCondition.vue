@@ -74,8 +74,8 @@
             class="rounded-default focus-visible:ring-accent/40 cursor-pointer border p-3 text-left transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
             :class="
               isActivePreset(p)
-                ? 'border-accent ring-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] ring-1 ring-inset'
-                : 'border-border-default hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+                ? 'border-accent ring-accent bg-card-glass-tint-soft ring-1 ring-inset'
+                : 'border-border-default hover:border-accent hover:bg-card-glass-tint-subtle'
             "
             :aria-pressed="isActivePreset(p)"
             :data-test="`slos-sloalertcondition-preset-${p.key}`"

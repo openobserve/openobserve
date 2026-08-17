@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :cache-pct="cacheRatio"
                     >
                       <span
-                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors hover:border-[color-mix(in_srgb,var(--color-text-heading)_25%,var(--color-border-default))] hover:bg-[color-mix(in_srgb,var(--color-text-heading)_8%,var(--color-surface-base))]"
+                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors"
                         @click="jumpToTurn(chip.n)"
                         >{{ chip.label }}</span
                       >
@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <!-- collapsed header (click to expand) -->
                       <div
-                        class="grid cursor-pointer grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 px-3 py-[0.6rem] hover:bg-[color-mix(in_srgb,var(--color-text-heading)_3%,var(--color-surface-base))]"
+                        class="hover:bg-surface-tint-neutral-faint grid cursor-pointer grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 px-3 py-[0.6rem]"
                         :data-test="`session-turn-header-${trace.traceId}`"
                         @click="toggleTurn(trace.traceId)"
                       >
@@ -437,8 +437,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-bold tabular-nums"
                           :class="
                             trace.status === 'error'
-                              ? 'text-error-500 bg-[color-mix(in_srgb,var(--color-error-500)_15%,transparent)]'
-                              : 'text-status-success-text bg-[color-mix(in_srgb,var(--color-success-500)_15%,transparent)]'
+                              ? 'text-error-500 bg-error-500/15'
+                              : 'text-status-success-text bg-success-500/15'
                           "
                         >
                           {{ originalTurnIndex(trace.traceId) + 1 }}
@@ -710,11 +710,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span v-for="(row, i) in toolHotspots" :key="row.name" class="contents">
                     <button
-                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      class="rounded-default hover:bg-text-heading/4 flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left"
                       @click="jumpToTurn(originalTurnIndex(row.topTraceId) + 1)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -792,11 +792,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side="right"
                   >
                     <button
-                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      class="rounded-default hover:bg-text-heading/4 flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left"
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -845,11 +845,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side="right"
                   >
                     <button
-                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      class="rounded-default hover:bg-text-heading/4 flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left"
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -1066,8 +1066,7 @@ function cacheInputDenominator(d: SessionDetail): number {
 function kpiCardClass(variant?: "danger"): string {
   const base =
     "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-sm";
-  if (variant === "danger")
-    return `${base} bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))] border-[color-mix(in_srgb,var(--color-error-500)_35%,var(--color-border-default))]`;
+  if (variant === "danger") return `${base} bg-surface-tint-error border-border-tint-error`;
   return `${base} bg-surface-base border-border-default`;
 }
 
@@ -1632,10 +1631,7 @@ function turnRowClass(trace: SessionTraceRow): string {
   const n = originalTurnIndex(trace.traceId) + 1;
   // Status is conveyed by a subtle surface tint (red for errors) instead of a
   // coloured left border — keeps the row chrome flat, matching the KPI tiles.
-  const surface =
-    trace.status === "error"
-      ? "bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))]"
-      : "bg-surface-base";
+  const surface = trace.status === "error" ? "bg-surface-tint-error" : "bg-surface-base";
   const flash = flashTurn.value === n ? " ring-2 ring-accent" : "";
   return `rounded-default border border-border-default ${surface} overflow-hidden${flash}`;
 }

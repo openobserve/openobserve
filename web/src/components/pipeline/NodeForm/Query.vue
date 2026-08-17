@@ -31,12 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="scheduledPipelineRef?.toggleAIChat()"
         data-test="menu-link-ai-item"
-        class="bg-[image:var(--color-gradient-ai-subtle)]! transition-[background,box-shadow] duration-300 hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]"
-        :class="
-          store.state.isAiChatEnabled
-            ? 'ai-btn-active bg-[image:var(--color-gradient-ai-subtle)]!'
-            : ''
-        "
+        class="bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 hover:shadow-md"
+        :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-gradient-ai-subtle!' : ''"
       >
         <img
           :src="scheduledPipelineRef?.getBtnLogo"

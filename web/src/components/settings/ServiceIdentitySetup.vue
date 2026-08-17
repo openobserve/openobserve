@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Customize link -->
                   <a
-                    class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg inline-flex cursor-pointer items-center gap-1 border px-2 py-0.5 text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+                    class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg hover:bg-badge-blue-ol-border/18 inline-flex cursor-pointer items-center gap-1 border px-2 py-0.5 text-xs font-semibold no-underline transition-[background]"
                     @click.prevent="emit('navigate-to-aliases', 'service')"
                   >
                     {{ t("settings.correlation.customizeFieldMappings") }}
@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="mb-3 text-xs" :class="'text-text-secondary'">
                 {{ t("settings.serviceIdentitySetup.workloadTrackedHelp") }}
                 <a
-                  class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+                  class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg hover:bg-badge-blue-ol-border/18 mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background]"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
                   >{{ t("settings.serviceIdentitySetup.goToFieldAliases") }}</a
                 >
@@ -554,7 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-xs" :class="'text-text-secondary'">
             {{ t("settings.serviceIdentitySetup.discoveredPatternsHelp") }}
             <a
-              class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+              class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg hover:bg-badge-blue-ol-border/18 mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background]"
               @click.prevent="emit('navigate-to-services')"
               >{{ t("settings.serviceIdentitySetup.goToServices") }}</a
             >

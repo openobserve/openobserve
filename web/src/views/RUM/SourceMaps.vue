@@ -112,9 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="w-full"
       >
         <template #expansion="{ row }">
-          <div
-            class="bg-surface-base border-t border-(--color-border-default,var(--color-border-default)) p-3"
-          >
+          <div class="bg-surface-base border-border-default border-t p-3">
             <div class="mb-2 text-sm font-medium">
               {{ t("rum.sourceMapFilesCount", { count: row.files.length }) }}
             </div>

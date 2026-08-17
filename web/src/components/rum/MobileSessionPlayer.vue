@@ -300,7 +300,7 @@ onBeforeUnmount(() => {
             class="absolute -bottom-1.25 -ml-px cursor-pointer"
             :class="
               event.frustration_types?.length
-                ? 'h-4.5 w-[0.1875rem] shadow-[0_0_0.25rem_var(--color-badge-orange-solid-bg)]'
+                ? 'ring-badge-orange-solid-bg h-4.5 w-[0.1875rem] ring-2'
                 : 'h-3.75 w-0.5'
             "
             :style="{ left: `${markerLeftPct(event)}%`, background: markerColor(event) }"

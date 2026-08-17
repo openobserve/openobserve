@@ -657,10 +657,10 @@ export default defineComponent({
    they can only be reached with :deep() and cannot be expressed as utilities.
    keep(scrollbar) — ::-webkit-scrollbar pseudo-elements have no utility form.
    keep(complex-state) — .is-empty is toggled imperatively by the input handlers,
-   so the placeholder :before has no Tailwind variant. */
+   so the placeholder ::before has no Tailwind variant. */
 
 /* Placeholder for the empty contenteditable */
-.rich-text-input.is-empty:before {
+.rich-text-input.is-empty::before {
   content: attr(data-placeholder);
   color: var(--color-text-placeholder);
   pointer-events: none;

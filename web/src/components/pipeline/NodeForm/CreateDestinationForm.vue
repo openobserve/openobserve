@@ -49,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="destType in destinationTypes"
                 :key="destType.value"
                 :data-test="`destination-type-card-${destType.value}`"
-                class="destination-type-card group rounded-default hover:border-card-glass-border relative flex min-h-30 cursor-pointer flex-col items-center justify-center border-2 px-3 py-5 [transition:all_0.3s_ease] hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-status-info-text)_15%,transparent)]"
+                class="destination-type-card group rounded-default hover:border-card-glass-border hover:shadow-status-info-text/15 relative flex min-h-30 cursor-pointer flex-col items-center justify-center border-2 px-3 py-5 [transition:all_0.3s_ease] hover:-translate-y-0.5 hover:shadow-md"
                 :class="
                   destinationType === destType.value
-                    ? 'selected border-card-glass-border bg-status-info-bg shadow-[0_0.25rem_1rem_color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)]'
+                    ? 'selected border-card-glass-border bg-status-info-bg shadow-status-info-text/20 shadow-lg'
                     : 'border-border-default bg-surface-base'
                 "
                 @click="form.setFieldValue('destination_type', destType.value)"

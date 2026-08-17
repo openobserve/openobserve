@@ -161,8 +161,7 @@ const pivotTotalStyle = computed<Record<string, any>>(() => {
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     backgroundColor: "var(--color-table-cell-bg)",
     // Same left-edge separator as the header, so it runs down the whole column.
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the sticky total-column separator shadow would bloom if it scaled with text
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 });
 
@@ -224,15 +223,13 @@ const cellStyle = computed(() => {
     base.position = "sticky";
     base.left = `${pinOffset.value}px`;
     base.zIndex = 1;
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
-    base.boxShadow = "2px 0 4px -2px var(--color-border-default)";
+    base.boxShadow = "var(--shadow-sticky-left)";
   }
   if (isPinned.value === "right") {
     base.position = "sticky";
     base.right = `${pinOffset.value}px`;
     base.zIndex = 1;
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
-    base.boxShadow = "-2px 0 4px -2px var(--color-border-default)";
+    base.boxShadow = "var(--shadow-sticky-right)";
   }
   const extra = props.getCellStyle?.({
     columnId: props.cell.column.id,

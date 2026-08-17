@@ -178,6 +178,7 @@ const MSG = {
 
   // Unexpected token
   missingWhere: (col: string) => mi("sqlEditor.diagnostics.missingWhere", { col }),
+  missingWhereBefore: (expr: string) => mi("sqlEditor.diagnostics.missingWhereBefore", { expr }),
   missingOperator: (word: string) => mi("sqlEditor.diagnostics.missingOperator", { word }),
   unexpectedIdent: (word: string) => mi("sqlEditor.diagnostics.unexpectedIdent", { word }),
   get badLikePattern() {
@@ -380,6 +381,10 @@ function has(set: Set<string>, ...keys: string[]): boolean {
  * Quoted patterns, parenthesised expressions and function calls (`LIKE '%a%'`,
  * `LIKE CONCAT(p, '%')`) are valid operands and never match: the operand must
  * contain a `%` and no quote or parenthesis at all.
+ *
+ * A pattern that contains a space (`LIKE 'GET %'` unquoted becomes
+ * `LIKE GET %`) lexes as an identifier followed by a bare `%`, so the wildcard
+ * lands in the token after the operand — that shape counts too.
  */
 function hasUnquotedLikePattern(sql: string, offset: number): boolean {
   const head = sql.substring(0, offset);
@@ -389,8 +394,62 @@ function hasUnquotedLikePattern(sql: string, offset: number): boolean {
   }
   if (operandStart < 0) return false;
 
-  const operand = sql.substring(operandStart).match(/^\S+/)?.[0] ?? "";
-  return /^[^\s'"`()]*%[^\s'"`()]*$/.test(operand);
+  const rest = sql.substring(operandStart);
+  const operand = rest.match(/^\S+/)?.[0] ?? "";
+  if (/^[^\s'"`()]*%[^\s'"`()]*$/.test(operand)) return true;
+  // `LIKE GET %` — bare operand whose wildcard is the next token
+  return /^[^\s'"`(),]+\s+%/.test(rest);
+}
+
+/**
+ * True when a filter expression follows the table reference with no WHERE
+ * keyword between them, e.g. `FROM "default" re_match(log, 'x') AND y = 1`
+ * or `FROM "default" a a.latency_ms > 100`.
+ *
+ * The parser reports these at the token where the text stops being a plausible
+ * table reference — the `AND`, or the inner `(` of the call — which is several
+ * tokens past where the condition actually started, so the token at the error
+ * position alone cannot classify them.
+ *
+ * Returns the first identifier of that expression (used to name the problem in
+ * the message), or null when the text between FROM and the error is not that
+ * shape — including every case where a clause keyword intervenes, which means
+ * the parser was past the FROM clause and the failure is something else.
+ */
+function filterExpressionAfterFrom(sql: string, offset: number): string | null {
+  const head = sql.substring(0, offset);
+  let fromEnd = -1;
+  for (const m of head.matchAll(/\bFROM\b/gi)) {
+    fromEnd = (m.index ?? 0) + m[0].length;
+  }
+  if (fromEnd < 0) return null;
+
+  const segment = sql.substring(fromEnd, offset);
+  if (
+    /\b(?:SELECT|WHERE|GROUP|HAVING|ORDER|LIMIT|OFFSET|JOIN|ON|USING|UNION|EXCEPT|INTERSECT|WINDOW)\b/i.test(
+      segment,
+    )
+  ) {
+    return null;
+  }
+
+  // Table reference (quoted or bare, optional alias) followed by more text.
+  const parts = segment.match(
+    /^\s*(?:"[^"]*"|`[^`]*`|[a-zA-Z_$][\w$]*)(?:\s+(?:AS\s+)?[a-zA-Z_$][\w$]*)?\s+(\S[\s\S]*)$/,
+  );
+  if (!parts) return null;
+
+  const rest = parts[1].trim();
+  // Neither a comparison nor a function call can legally follow a table
+  // reference — both mean the WHERE keyword was dropped.
+  const startsComparison =
+    /^[a-zA-Z_$][\w$]*(?:\.[\w$]+)*\s*(?:=|!=|<>|<=|>=|<|>|\b(?:IS|IN|NOT|LIKE|ILIKE|RLIKE|BETWEEN)\b)/i.test(
+      rest,
+    );
+  const startsCall = /^[a-zA-Z_$][\w$]*\s*\(/.test(rest);
+  if (!startsComparison && !startsCall) return null;
+
+  return rest.match(/^[a-zA-Z_$][\w$]*(?:\.[\w$]+)*/)?.[0] ?? null;
 }
 
 // ─── Core message builder ─────────────────────────────────────────────────────
@@ -622,6 +681,18 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
     if (isBareIdent && atErrorIsOperator) {
       return MSG.missingWhere(tokenBefore);
     }
+    // Same mistake, reported one token earlier: with a table alias in play
+    // (`FROM "default" a a.latency_ms > 100`) the error lands on the condition's
+    // own column, so the operator is one identifier further along.
+    const conditionStart = atErrorStr.match(
+      /^[a-zA-Z_$][\w$]*(?:\.[\w$]+)*(?=\s*(?:=|!=|<>|<=|>=|<|>|\b(?:IS|IN|NOT|LIKE|ILIKE|RLIKE|BETWEEN)\b))/i,
+    )?.[0];
+    if (isBareIdent && conditionStart) return MSG.missingWhereBefore(conditionStart);
+    // Or reported further along: the condition starts right after the table
+    // reference, so the error lands on the AND / the call's own parenthesis
+    // rather than on the operator.
+    const expr = filterExpressionAfterFrom(sql, offset);
+    if (expr) return MSG.missingWhereBefore(expr);
     // Not a recognisable missing-WHERE pattern — fall through to suppression
   }
 
