@@ -151,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         :show-global-filter="false"
         table-id="dbm-table-health"
+        :total-count-exact="!truncated"
         persist-columns
         :column-visibility="defaultColumnVisibility"
         data-test="dbm-table-health-table"
@@ -341,7 +342,7 @@ import {
   type DbmRecommendation,
   type IndexHealthRow,
 } from "@/utils/dbm/recommendations";
-import { formatCount } from "@/utils/dbm/format";
+import { countClaim, formatCount } from "@/utils/dbm/format";
 import { formatDurationMs } from "@/utils/dbm/activity";
 import { DBM_SOFT_TONES, DBM_TONE_ICONS } from "@/utils/dbm/tones";
 
@@ -388,6 +389,7 @@ const {
 });
 
 const hits = shallowRef<TableHealthRow[]>([]);
+const truncated = ref(false);
 const coverage = ref<TableHealthCoverage>("unknown");
 const countersAreCumulative = ref(false);
 const tuplesAreEstimated = ref(false);
@@ -414,7 +416,11 @@ const rows = computed(() => {
 });
 
 /** This tab's own badge: relations reported, not the row-limited render. */
-const tableHealthCount = computed(() => (hits.value.length ? hits.value.length : null));
+// A CLAIM, so a capped read renders `100+` rather than printing the cap as
+// the population — the same disclosure the deadlocks and blocking badges make.
+const tableHealthCount = computed(() =>
+  hits.value.length ? countClaim(hits.value.length, truncated.value) : null,
+);
 
 const searchHidEverything = useDbmSearchEmpty(search, allRows, rows);
 
@@ -686,6 +692,9 @@ const load = () =>
       if (requestSeq.isStale(token)) return;
 
       hits.value = data.hits ?? [];
+      // The read caps at `limit`; without this the count below is a ceiling
+      // printed as a population.
+      truncated.value = Boolean(data.truncated);
       coverage.value = data.engine_coverage ?? "unknown";
       countersAreCumulative.value = Boolean(data.counters_are_cumulative);
       tuplesAreEstimated.value = Boolean(data.tuples_are_estimated);

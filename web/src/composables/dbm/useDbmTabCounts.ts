@@ -153,7 +153,7 @@ export interface DbmTabCounts {
    * no Postgres is honest — the badge must not claim zero tables for an engine
    * the recipe never queries.
    */
-  tableHealthCount: number | null;
+  tableHealthCount: DbmCountClaim | number | null;
   /**
    * The activity state breakdown, kept alongside `activityCount` because
    * DatabasesPage renders the buckets themselves and not only their sum.
@@ -324,7 +324,12 @@ export const fetchDbmTabCounts = async (
     blockedCount: blocking
       ? countClaim(blocking.total ?? blocking.hits?.length ?? 0, blocking.truncated)
       : null,
-    tableHealthCount: tableHealth ? (tableHealth.total ?? tableHealth.hits?.length ?? 0) : null,
+    // A CLAIM, like the deadlocks and blocking counts: the read caps at
+    // `limit` and discloses it, so a full page renders `100+` rather than
+    // printing the cap as the population.
+    tableHealthCount: tableHealth
+      ? countClaim(tableHealth.total ?? tableHealth.hits?.length ?? 0, tableHealth.truncated)
+      : null,
     // `[]` on failure, never `undefined`. A consumer iterates these directly.
     activityStates: activity ? (activity.by_state ?? []) : [],
     sessions: activity ? (activity.hits ?? []) : [],

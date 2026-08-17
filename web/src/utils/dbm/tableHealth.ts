@@ -97,6 +97,12 @@ export interface TableHealthResponse {
   hits: TableHealthRow[];
   stream: string;
   total: number;
+  /**
+   * Whether the read hit its row cap, so `total` is a FLOOR rather than the
+   * population — the same disclosure the deadlocks and blocking reads make.
+   * Without it the badge printed the cap as a total.
+   */
+  truncated?: boolean;
   /** The API's own statement that the counters are lifetime totals. */
   counters_are_cumulative: boolean;
   /** The API's own statement that the tuple counts are estimates. */

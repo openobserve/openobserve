@@ -125,7 +125,9 @@ describe("the one badges request answers every tab's badge at once", () => {
       activityCount: 7,
       deadlockCount: { count: 90, complete: false },
       blockedCount: { count: 100, complete: false },
-      tableHealthCount: 12,
+      // A claim, not a bare number: the read caps at `limit` and now discloses
+      // it, so a full page renders `12+` rather than printing the cap as a total.
+      tableHealthCount: { count: 12, complete: true },
     });
   });
 
@@ -333,7 +335,7 @@ describe("a failed slice blanks its own badge and nothing else", () => {
     expect(counts.activityCount).toBeNull();
     expect(counts.databaseCount).toBe(3);
     expect(badgeCount(counts.queryCount)).toBe("42");
-    expect(counts.tableHealthCount).toBe(12);
+    expect(badgeCount(counts.tableHealthCount)).toBe("12");
   });
 
   /**
