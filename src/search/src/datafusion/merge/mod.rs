@@ -105,8 +105,16 @@ pub async fn merge_parquet_files(
 
     // get all sorted data
     let sql = if stream_type == StreamType::Metadata && is_trace_time_index_stream(stream_name) {
+        // session_id is an attribute of the trace, not part of the key; MAX ignores
+        // NULLs, so a batch without the attribute never clobbers a known value.
+        // Files written before the column existed lack it in the schema.
+        let session_select = if schema.field_with_name("session_id").is_ok() {
+            ", MAX(session_id) AS session_id"
+        } else {
+            ""
+        };
         format!(
-            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, trace_id, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM tbl GROUP BY trace_id ORDER BY {TIMESTAMP_COL_NAME} DESC"
+            "SELECT MIN({TIMESTAMP_COL_NAME}) AS {TIMESTAMP_COL_NAME}, trace_id{session_select}, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM tbl GROUP BY trace_id ORDER BY {TIMESTAMP_COL_NAME} DESC"
         )
     } else if stream_type == StreamType::Filelist {
         // for file list we do not have timestamp, so we instead sort by min ts of entries
@@ -317,7 +325,7 @@ pub fn append_metadata(
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{Int64Array, StringArray};
+    use arrow::array::{Array, Int64Array, StringArray};
     use arrow_schema::{DataType, Field, Schema};
     use bytes::Bytes;
     use datafusion::datasource::MemTable;
@@ -391,6 +399,7 @@ mod tests {
         let schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("trace_id", DataType::Utf8, false),
+            Field::new("session_id", DataType::Utf8, true),
             Field::new("min_ts", DataType::Int64, false),
             Field::new("max_ts", DataType::Int64, false),
         ]));
@@ -399,6 +408,12 @@ mod tests {
             vec![
                 Arc::new(Int64Array::from(vec![100, 110, 120, 130])),
                 Arc::new(StringArray::from(vec!["a", "a", "b", "a"])),
+                Arc::new(StringArray::from(vec![
+                    None,
+                    Some("session-a"),
+                    None,
+                    None,
+                ])),
                 Arc::new(Int64Array::from(vec![100, 90, 120, 80])),
                 Arc::new(Int64Array::from(vec![101, 115, 125, 140])),
             ],
@@ -458,20 +473,79 @@ mod tests {
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap();
+        let session_ids = batch
+            .column_by_name("session_id")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
         let rows = (0..batch.num_rows())
             .map(|index| {
                 (
                     trace_ids.value(index).to_string(),
                     (
                         timestamps.value(index),
+                        (!session_ids.is_null(index))
+                            .then(|| session_ids.value(index).to_string()),
                         min_ts.value(index),
                         max_ts.value(index),
                     ),
                 )
             })
             .collect::<std::collections::HashMap<_, _>>();
-        assert_eq!(rows["a"], (100, 80, 140));
-        assert_eq!(rows["b"], (120, 120, 125));
+        // MAX(session_id) ignores NULLs: trace a keeps the one known session.
+        assert_eq!(rows["a"], (100, Some("session-a".to_string()), 80, 140));
+        assert_eq!(rows["b"], (120, None, 120, 125));
+    }
+
+    #[tokio::test]
+    async fn test_trace_time_index_merge_supports_files_without_session_column() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("trace_id", DataType::Utf8, false),
+            Field::new("min_ts", DataType::Int64, false),
+            Field::new("max_ts", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![100, 110])),
+                Arc::new(StringArray::from(vec!["a", "a"])),
+                Arc::new(Int64Array::from(vec![100, 90])),
+                Arc::new(Int64Array::from(vec![101, 115])),
+            ],
+        )
+        .unwrap();
+        let table = Arc::new(MemTable::try_new(schema.clone(), vec![vec![batch]]).unwrap());
+
+        let merged = merge_parquet_files(
+            StreamType::Metadata,
+            "trace_time_index_test",
+            schema,
+            vec![table],
+            &[],
+            FileMeta {
+                min_ts: 90,
+                max_ts: 115,
+                records: 2,
+                ..Default::default()
+            },
+            true,
+        )
+        .await
+        .unwrap();
+        let MergeParquetResult::Single { buf, .. } = merged else {
+            panic!("trace time index merge must produce a single parquet file");
+        };
+        let batches = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(buf))
+            .unwrap()
+            .build()
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        let batch = arrow::compute::concat_batches(&batches[0].schema(), &batches).unwrap();
+        assert_eq!(batch.num_rows(), 1);
+        assert!(batch.column_by_name("session_id").is_none());
     }
 
     #[tokio::test]

@@ -35,6 +35,7 @@ const HOUR_MICROS: i64 = 3_600_000_000;
 pub struct TraceTimeIndexRecord {
     pub timestamp: i64,
     pub trace_id: String,
+    pub session_id: Option<String>,
     pub min_ts: i64,
     pub max_ts: i64,
 }
@@ -56,13 +57,34 @@ fn hour_start(timestamp: i64) -> i64 {
     timestamp - timestamp.rem_euclid(HOUR_MICROS)
 }
 
+fn resolve_session_id(record: &Map<String, Value>) -> Option<&str> {
+    config::meta::traces::session::SESSION_ID_COLUMNS
+        .iter()
+        .find_map(|column| {
+            record
+                .get(*column)
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        })
+}
+
 pub fn generate_records(records: &[(i64, Map<String, Value>)]) -> Vec<TraceTimeIndexRecord> {
+    let mut sessions: HashMap<&str, &str> = HashMap::new();
     let mut aggregated: HashMap<(i64, String), TraceTimeIndexRecord> = HashMap::new();
 
     for (_, record) in records {
         let Some(trace_id) = record.get("trace_id").and_then(Value::as_str) else {
             continue;
         };
+        // The first non-empty session value in the request wins for the whole
+        // trace; the map is stamped onto the records only after the loop, so
+        // hour buckets created before the session was seen get it too.
+        if !sessions.contains_key(trace_id)
+            && let Some(session_id) = resolve_session_id(record)
+        {
+            sessions.insert(trace_id, session_id);
+        }
         let Some(start_ns) = record.get("start_time").map(json::get_int_value) else {
             continue;
         };
@@ -97,6 +119,16 @@ pub fn generate_records(records: &[(i64, Map<String, Value>)]) -> Vec<TraceTimeI
         }
     }
 
+    // Backfill over the aggregated records — at most two per trace, far fewer
+    // than the spans.
+    if !sessions.is_empty() {
+        for record in aggregated.values_mut() {
+            record.session_id = sessions
+                .get(record.trace_id.as_str())
+                .map(|session_id| (*session_id).to_string());
+        }
+    }
+
     aggregated.into_values().collect()
 }
 
@@ -113,6 +145,7 @@ fn merge_record(
         .or_insert_with(|| TraceTimeIndexRecord {
             timestamp,
             trace_id: trace_id.to_string(),
+            session_id: None,
             min_ts,
             max_ts,
         });
@@ -125,6 +158,7 @@ fn index_schema() -> Schema {
     Schema::new(vec![
         Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
         Field::new("trace_id", DataType::Utf8, false),
+        Field::new("session_id", DataType::Utf8, true),
         Field::new("min_ts", DataType::Int64, false),
         Field::new("max_ts", DataType::Int64, false),
     ])
@@ -135,9 +169,11 @@ async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String
     let schema_cache = infra::schema::get_cache(org_id, &index_stream, StreamType::Metadata)
         .await
         .map_err(|e| Error::Message(format!("load trace time index schema: {e}")))?;
-    let is_new = !schema_cache.fields_map().contains_key(TIMESTAMP_COL_NAME);
+    let fields_map = schema_cache.fields_map();
+    let needs_schema_merge =
+        !fields_map.contains_key(TIMESTAMP_COL_NAME) || !fields_map.contains_key("session_id");
 
-    if is_new {
+    if needs_schema_merge {
         let expected = index_schema();
         crate::db::schema::merge(
             org_id,
@@ -161,32 +197,22 @@ async fn ensure_index_stream(org_id: &str, source_stream: &str) -> Result<String
                 enable_distinct_fields: false,
                 ..Default::default()
             });
-    let needs_settings_update = !index_settings
-        .bloom_filter_fields
-        .iter()
-        .any(|field| field == "trace_id")
-        || !index_settings
-            .index_fields
-            .iter()
-            .any(|field| field == "trace_id")
+    const LOOKUP_FIELDS: [&str; 2] = ["trace_id", "session_id"];
+    let missing_lookup_field = LOOKUP_FIELDS.iter().any(|field| {
+        !index_settings.bloom_filter_fields.iter().any(|f| f == field)
+            || !index_settings.index_fields.iter().any(|f| f == field)
+    });
+    let needs_settings_update = missing_lookup_field
         || index_settings.data_retention != source_settings.data_retention
         || index_settings.extended_retention_days != source_settings.extended_retention_days;
     if needs_settings_update {
-        if !index_settings
-            .bloom_filter_fields
-            .iter()
-            .any(|field| field == "trace_id")
-        {
-            index_settings
-                .bloom_filter_fields
-                .push("trace_id".to_string());
-        }
-        if !index_settings
-            .index_fields
-            .iter()
-            .any(|field| field == "trace_id")
-        {
-            index_settings.index_fields.push("trace_id".to_string());
+        for field in LOOKUP_FIELDS {
+            if !index_settings.bloom_filter_fields.iter().any(|f| f == field) {
+                index_settings.bloom_filter_fields.push(field.to_string());
+            }
+            if !index_settings.index_fields.iter().any(|f| f == field) {
+                index_settings.index_fields.push(field.to_string());
+            }
         }
         index_settings.data_retention = source_settings.data_retention;
         index_settings.extended_retention_days = source_settings.extended_retention_days.clone();
@@ -222,6 +248,9 @@ pub async fn write(
         let mut value = Map::new();
         value.insert(TIMESTAMP_COL_NAME.to_string(), record.timestamp.into());
         value.insert("trace_id".to_string(), record.trace_id.into());
+        if let Some(session_id) = record.session_id {
+            value.insert("session_id".to_string(), session_id.into());
+        }
         value.insert("min_ts".to_string(), record.min_ts.into());
         value.insert("max_ts".to_string(), record.max_ts.into());
         let partition = get_write_partition_key(
@@ -328,5 +357,108 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].min_ts, 5_000_000);
         assert_eq!(records[0].max_ts, 30_000_000);
+    }
+
+    fn span_with_session(
+        trace_id: &str,
+        session: &[(&str, &str)],
+        start_ns: i64,
+        end_ns: i64,
+    ) -> (i64, Map<String, Value>) {
+        let (ts, mut value) = span(trace_id, start_ns, end_ns);
+        for (column, session_id) in session {
+            value.insert(column.to_string(), (*session_id).into());
+        }
+        (ts, value)
+    }
+
+    #[test]
+    fn records_without_session_attribute_have_no_session_id() {
+        let records = generate_records(&[span("trace", 10_000_000_000, 20_000_000_000)]);
+        assert_eq!(records[0].session_id, None);
+    }
+
+    #[test]
+    fn session_id_is_carried_on_all_records_of_the_trace() {
+        // Only one span carries the attribute; the cross-hour trace still gets it
+        // on both hour-bucket records.
+        let records = generate_records(&[
+            span_with_session(
+                "trace",
+                &[("session_id", "session-a")],
+                3_500_000_000_000,
+                3_500_100_000_000,
+            ),
+            span("trace", 3_400_000_000_000, 3_700_000_000_000),
+        ]);
+        assert_eq!(records.len(), 2);
+        assert!(
+            records
+                .iter()
+                .all(|record| record.session_id.as_deref() == Some("session-a"))
+        );
+    }
+
+    #[test]
+    fn session_column_precedence_follows_the_configured_order() {
+        let records = generate_records(&[span_with_session(
+            "trace",
+            &[
+                ("llm_session_id", "low-precedence"),
+                ("session_id", "high-precedence"),
+            ],
+            10_000_000_000,
+            20_000_000_000,
+        )]);
+        assert_eq!(
+            records[0].session_id.as_deref(),
+            Some("high-precedence")
+        );
+    }
+
+    #[test]
+    fn empty_session_values_are_treated_as_absent() {
+        let records = generate_records(&[span_with_session(
+            "trace",
+            &[("session_id", "  "), ("gen_ai_conversation_id", "conv-1")],
+            10_000_000_000,
+            20_000_000_000,
+        )]);
+        assert_eq!(records[0].session_id.as_deref(), Some("conv-1"));
+    }
+
+    #[test]
+    fn first_non_empty_session_in_the_request_wins() {
+        let records = generate_records(&[
+            span_with_session(
+                "trace",
+                &[("session_id", "first")],
+                10_000_000_000,
+                20_000_000_000,
+            ),
+            span_with_session(
+                "trace",
+                &[("session_id", "second")],
+                10_000_000_000,
+                20_000_000_000,
+            ),
+        ]);
+        assert_eq!(records[0].session_id.as_deref(), Some("first"));
+    }
+
+    #[test]
+    fn traces_resolve_sessions_independently() {
+        let mut records = generate_records(&[
+            span_with_session(
+                "trace-a",
+                &[("session_id", "session-a")],
+                10_000_000_000,
+                20_000_000_000,
+            ),
+            span("trace-b", 10_000_000_000, 20_000_000_000),
+        ]);
+        records.sort_by(|a, b| a.trace_id.cmp(&b.trace_id));
+        assert_eq!(records[0].session_id.as_deref(), Some("session-a"));
+        assert_eq!(records[1].session_id, None);
     }
 }
