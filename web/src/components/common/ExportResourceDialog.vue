@@ -26,18 +26,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import type { I18nText } from "@/types/i18n";
 import type { TerraformExport } from "@/utils/terraform/hcl";
-import { computed, ref, watch } from "vue";
+import { computed, defineAsyncComponent, ref, watch } from "vue";
 
-import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import terraformLogo from "@/assets/images/common/terraform.svg";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { copyToClipboard } from "@/utils/clipboard";
 import { downloadFile } from "@/utils/dom";
+
+// The app's Monaco wrapper, async like every other consumer so the editor is not
+// in the bundle for users who never open an export. It brings what a read-only
+// viewer of a whole file needs and a static block cannot: soft wrapping instead
+// of clipped lines, a real gutter, folding, find, and a layout that follows the
+// dialog rather than a fixed line count.
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 const props = withDefaults(
   defineProps<{
@@ -102,6 +110,15 @@ const skippedNames = computed(() =>
     .join(", "),
 );
 
+// Monaco owns no copy affordance of its own, and selecting a long file by hand is
+// exactly what a reader should not have to do.
+function copy() {
+  copyToClipboard(code.value, t, {
+    successMessage: t("common.copySuccess"),
+    errorMessage: t("common.copyContentError"),
+  });
+}
+
 function download() {
   if (!hasCode.value) return;
   const written = downloadFile(
@@ -148,61 +165,80 @@ function download() {
         />
       </OTabs>
 
-      <OTabPanels v-model="format">
-        <OTabPanel name="json">
-          <OCodeBlock
-            :code="json"
-            lang="json"
-            chrome="editor"
-            :filename="`${baseName}.json`"
-            :max-lines="22"
-            line-numbers
-            :data-test="`${dataTest}-json`"
+      <template v-if="isTerraform">
+        <OBanner
+          v-if="!hasCode"
+          variant="warning"
+          icon="warning-amber"
+          dense
+          :content="t('common.exportTerraformEmpty')"
+          :data-test="`${dataTest}-terraform-empty`"
+        />
+        <template v-else>
+          <OBanner
+            v-if="skippedNames"
+            variant="warning"
+            icon="warning-amber"
+            dense
+            :content="t('common.exportTerraformSkipped', { names: skippedNames })"
+            :data-test="`${dataTest}-terraform-skipped`"
           />
-        </OTabPanel>
+          <OBanner
+            v-if="terraform.droppedFields.length"
+            variant="info"
+            icon="info-outline"
+            dense
+            :content="
+              t('common.exportTerraformDropped', { fields: terraform.droppedFields.join(', ') })
+            "
+            :data-test="`${dataTest}-terraform-dropped`"
+          />
+        </template>
+      </template>
 
-        <OTabPanel name="terraform">
-          <div class="flex flex-col gap-2">
-            <OBanner
-              v-if="!hasCode"
-              variant="warning"
-              icon="warning-amber"
-              dense
-              :content="t('common.exportTerraformEmpty')"
-              :data-test="`${dataTest}-terraform-empty`"
-            />
-            <template v-else>
-              <OBanner
-                v-if="skippedNames"
-                variant="warning"
-                icon="warning-amber"
-                dense
-                :content="t('common.exportTerraformSkipped', { names: skippedNames })"
-                :data-test="`${dataTest}-terraform-skipped`"
-              />
-              <OBanner
-                v-if="terraform.droppedFields.length"
-                variant="info"
-                icon="info-outline"
-                dense
-                :content="
-                  t('common.exportTerraformDropped', { fields: terraform.droppedFields.join(', ') })
-                "
-                :data-test="`${dataTest}-terraform-dropped`"
-              />
-              <OCodeBlock
-                :code="terraform.hcl"
-                lang="hcl"
-                chrome="editor"
-                :filename="`${baseName}.tf`"
-                :max-lines="22"
-                line-numbers
-                :data-test="`${dataTest}-terraform`"
-              />
-            </template>
-          </div>
-        </OTabPanel>
-      </OTabPanels>
+      <!-- The height lives here, not on the editor: CodeQueryEditor's root already
+           carries `h-full`, and Tailwind emits `.h-full` after an arbitrary
+           `h-[…]`, so a height passed down would lose the cascade and collapse to
+           zero. The container owns a definite height and the editor fills it. -->
+      <div
+        v-if="hasCode"
+        class="rounded-default border-border-default flex h-[50vh] min-h-0 min-w-0 flex-col overflow-hidden border"
+      >
+        <!-- The filename is the one piece of chrome worth keeping from the static
+             block: it says what the download will be called. -->
+        <div
+          class="border-border-default bg-surface-panel flex shrink-0 items-center gap-2 border-b py-1 pr-1 pl-3"
+        >
+          <OIcon :name="isTerraform ? terraformIcon : 'data-object'" size="xs" />
+          <span class="font-mono text-xs font-semibold opacity-75">{{ fileName }}</span>
+          <div class="flex-1" />
+          <OButton
+            variant="ghost"
+            size="icon-xs-sq"
+            icon-left="content-copy"
+            :aria-label="t('common.copy')"
+            :data-test="`${dataTest}-copy-btn`"
+            @click="copy"
+          >
+            <OTooltip :content="t('common.copy')" side="top" />
+          </OButton>
+        </div>
+
+        <!-- Keyed by format so switching tabs remounts the editor: the wrapper
+             loads a language's Monaco contribution on mount and never swaps it
+             afterwards, so one shared instance would keep the first tab's
+             highlighting. The remount also guarantees a fresh layout. -->
+        <QueryEditor
+          :key="format"
+          :editor-id="`${dataTest}-editor-${format}`"
+          class="min-h-0 min-w-0 flex-1"
+          :query="code"
+          :language="isTerraform ? 'hcl' : 'json'"
+          read-only
+          :show-auto-complete="false"
+          :data-test="`${dataTest}-${format}`"
+        />
+      </div>
     </div>
   </ODialog>
 </template>

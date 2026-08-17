@@ -684,6 +684,11 @@ export default defineComponent({
         await import("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js");
       }
 
+      // Terraform / OpenTofu configuration, e.g. the alert and SLO exports.
+      if (props.language === "hcl") {
+        await import("monaco-editor/esm/vs/basic-languages/hcl/hcl.contribution.js");
+      }
+
       if (props.language === "python") {
         await import("monaco-editor/esm/vs/basic-languages/python/python.contribution.js");
       }
