@@ -39,6 +39,7 @@ from support.panel_queries import (
     panel_type_for,
     query_window,
     render_sql,
+    result_set_mismatch,
     row_count_is_comparable,
 )
 
@@ -111,12 +112,17 @@ def test_nested_match_all_panel(
 ):
     """A CTE/subquery `match_all` query runs correctly as a dashboard panel.
 
-    Two assertions carry the weight, and they are the two things #13808 broke:
+    Three assertions carry the weight:
 
     * the cardinality matches the DuckDB oracle exactly;
-    * the projection survives — every column the oracle proves is non-NULL
-      appears somewhere in the result set (the bug returned 200 with columns
-      dropped entirely).
+    * every cell matches the oracle (float-tolerant, order-insensitive) — without
+      this, a regression returning right-shaped rows with wrong values passes;
+    * the projection survives — every column the oracle proves is non-NULL appears
+      somewhere in the result set. This is what #13808 broke: 200 OK, columns
+      silently dropped.
+
+    Histogram cases skip the first two: their bucket timestamps are anchored to a
+    BASE_TS that differs between the oracle run and this one.
     """
     stream, stream2 = panel_streams
     sql = render_sql(query, stream, stream2)
@@ -149,6 +155,13 @@ def test_nested_match_all_panel(
             assert len(hits) == expected_rows, (
                 f"{query_id} ({family}): dashboard path returned {len(hits)} rows, "
                 f"oracle expects {expected_rows}"
+            )
+            # Row count and projection alone would pass a regression that returned
+            # correctly-shaped rows holding wrong values — which is the bug class
+            # this corpus exists to pin down. Compare the cells too.
+            mismatch = result_set_mismatch(hits, query)
+            assert mismatch is None, (
+                f"{query_id} ({family}): dashboard path disagrees with the oracle — {mismatch}"
             )
         elif expected_rows:
             assert hits, f"{query_id} ({family}) returned no rows through the dashboard path"

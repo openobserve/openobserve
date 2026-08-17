@@ -45,7 +45,9 @@ __all__ = [
     "panel_type_for",
     "query_window",
     "render_sql",
+    "result_set_mismatch",
     "row_count_is_comparable",
+    "values_equal",
     "write_with_fresh_hash",
 ]
 
@@ -234,6 +236,59 @@ def expected_non_null_columns(query: dict) -> list[str]:
         for i, col in enumerate(columns)
         if any(str(row[i]) not in ("", "None") for row in results)
     ]
+
+
+def values_equal(a: str, b: str, rel_tol: float = 0.05) -> bool:
+    """Compare two result cells the way the query-agent comparator does.
+
+    Cross-engine float aggregates (AVG, STDDEV) differ in their least-significant
+    digits because summation order differs, so numerics compare within a relative
+    tolerance while strings, integers and timestamps compare exactly.
+
+    NULL renders as "" from OpenObserve and "None" from DuckDB; both mean empty.
+    """
+    if a == b:
+        return True
+    if (a == "" and b == "None") or (a == "None" and b == ""):
+        return True
+    try:
+        fa, fb = float(a), float(b)
+    except (TypeError, ValueError):
+        return False
+    return abs(fa - fb) / max(abs(fa), abs(fb), 1.0) < rel_tol
+
+
+def result_set_mismatch(hits: list[dict], query: dict, rel_tol: float = 0.05) -> str | None:
+    """First disagreement between live hits and the oracle, or None if they agree.
+
+    Both sides are sorted before comparison, matching the query-agent comparator:
+    the corpus pins the result *multiset*, not row order, so a query whose ORDER BY
+    ties arbitrarily does not fail spuriously.
+
+    Returns a message rather than raising, so the caller owns the assertion and can
+    add its own context.
+    """
+    columns = query["expected"]["columns"]
+    got = sorted([str(hit.get(col, "")) for col in columns] for hit in hits)
+    want = sorted([str(cell) for cell in row] for row in query["expected"]["results"])
+
+    if len(got) != len(want):
+        return f"row count {len(got)} != oracle {len(want)}"
+
+    for i, (got_row, want_row) in enumerate(zip(got, want, strict=True)):
+        # Checked explicitly rather than left to zip: a short oracle row would
+        # otherwise truncate the comparison and hide a real mismatch.
+        if len(got_row) != len(want_row):
+            return (
+                f"row {i} has {len(got_row)} columns, oracle row has {len(want_row)}"
+            )
+        for j, (got_cell, want_cell) in enumerate(zip(got_row, want_row, strict=True)):
+            if not values_equal(got_cell, want_cell, rel_tol):
+                return (
+                    f"row {i} column {j} ('{columns[j]}'): "
+                    f"got {got_cell!r}, oracle {want_cell!r}"
+                )
+    return None
 
 
 def row_count_is_comparable(query_id: str, query: dict) -> bool:
