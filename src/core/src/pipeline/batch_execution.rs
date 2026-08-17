@@ -3521,6 +3521,7 @@ mod tests {
     /// records on, one receiver per requested child (so the test can assert what got
     /// forwarded), a throwaway error channel, and - if requested - an inputs/replay
     /// channel, all bundled into a ready-to-use `ProcessChannels`.
+    #[allow(clippy::type_complexity)]
     fn build_test_channels(
         num_children: usize,
         with_inputs_channel: bool,
