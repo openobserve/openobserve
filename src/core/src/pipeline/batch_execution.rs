@@ -2147,8 +2147,6 @@ async fn process_condition_node(
             None
         };
 
-        let record_copy = record.clone();
-
         // value must be flattened before condition params can take effect
         if !flattened && !record.is_null() && record.is_object() {
             let flatten_timer = Instant::now();
@@ -2208,7 +2206,7 @@ async fn process_condition_node(
                 &mut channels.child_senders,
                 PipelineItem {
                     idx,
-                    record: record_copy,
+                    record,
                     flattened,
                 },
                 "ConditionNode",
