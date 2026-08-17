@@ -1,0 +1,16 @@
+src/api/management/src/models/alerts/requests.rs
+src/api/management/src/models/alerts/responses.rs
+src/api/management/src/request/alerts/mod.rs
+web/src/components/alerts/AlertList.vue
+web/src/components/alerts/AlertsDestinationList.vue
+web/src/components/alerts/DependencyEntityRow.vue
+web/src/components/alerts/DependencyImpactDialog.spec.ts
+web/src/components/alerts/DependencyImpactDialog.vue
+web/src/components/alerts/DependencyUsageCell.spec.ts
+web/src/components/alerts/DependencyUsageCell.vue
+web/src/components/alerts/TemplateList.vue
+web/src/composables/alerts/useDependencyGraph.spec.ts
+web/src/composables/alerts/useDependencyGraph.ts
+web/src/lib/core/Icon/OIcon.icons.ts
+web/src/locales/languages/en-US.json
+web/src/services/alerts.ts

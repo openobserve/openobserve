@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-dependency-graph.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-destinations-prebuilt.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-content-templates.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-ui-operations.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-e2e-flow.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_target": "tests/ui-testing/ci-matrix/ci_matrix.json -> shard \"Alerts\" -> run_files (add \"alerts-dependency-graph.spec.js\")",
+  "rationale": "The Alert Notification Dependency Graph is an entirely new client-side surface (DependencyUsageCell + DependencyImpactDialog + useDependencyGraph composable). No existing spec exercises the 'Used by' column, the impact dialog, or the graph wiring — a repo-wide grep for dependency/used-by in the Alerts area returned zero matches. Existing specs (destinations-prebuilt, content-templates) cover CRUD/navigation for the same host pages but never the graph column. The feature doc specifies a dedicated spec file and this is its own feature area within Alerts, so a new spec (action:new) is correct rather than appending to a CRUD spec. CI runs only the files listed in ci_matrix.json's Alerts shard run_files, so the new file must be registered there (the playwright config itself uses testDir, but the CI matrix is the effective gate)."
+}

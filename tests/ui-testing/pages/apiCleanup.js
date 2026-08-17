@@ -2303,7 +2303,8 @@ class APICleanup {
             'viewer_delete_test_',    // RBAC viewer delete test alerts (orphaned)
             'viewer_update_test_',    // RBAC viewer update test alerts (orphaned)
             'editor_create_test_',    // RBAC editor create test alerts (orphaned)
-            'editor_delete_test_'     // RBAC editor delete test alerts (orphaned)
+            'editor_delete_test_',    // RBAC editor delete test alerts (orphaned)
+            'depgraph_'               // alerts-dependency-graph.spec.js (dependency graph alerts)
         ];
 
         try {

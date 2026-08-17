@@ -1,0 +1,2227 @@
+===== COMPLETE LIST OF CHANGED FILES (16 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+src/api/management/src/models/alerts/requests.rs
+src/api/management/src/models/alerts/responses.rs
+src/api/management/src/request/alerts/mod.rs
+web/src/components/alerts/AlertList.vue
+web/src/components/alerts/AlertsDestinationList.vue
+web/src/components/alerts/DependencyEntityRow.vue
+web/src/components/alerts/DependencyImpactDialog.spec.ts
+web/src/components/alerts/DependencyImpactDialog.vue
+web/src/components/alerts/DependencyUsageCell.spec.ts
+web/src/components/alerts/DependencyUsageCell.vue
+web/src/components/alerts/TemplateList.vue
+web/src/composables/alerts/useDependencyGraph.spec.ts
+web/src/composables/alerts/useDependencyGraph.ts
+web/src/lib/core/Icon/OIcon.icons.ts
+web/src/locales/languages/en-US.json
+web/src/services/alerts.ts
+===== END CHANGED FILES =====
+
+diff --git a/src/api/management/src/models/alerts/requests.rs b/src/api/management/src/models/alerts/requests.rs
+index 3e1deebb565..5270dead798 100644
+--- a/src/api/management/src/models/alerts/requests.rs
++++ b/src/api/management/src/models/alerts/requests.rs
+@@ -431,6 +431,13 @@ pub struct ListAlertsQuery {
+ 
+     /// Sort direction: `desc` for descending, anything else ascending.
+     pub sort_order: Option<String>,
++
++    /// When `true`, each list item also carries its notification `destinations`
++    /// and any alert-level `template` override — the fields the notification
++    /// dependency view cross-references. Only that view opts in; the default
++    /// (absent / false) keeps them off the hot list path so ordinary consumers
++    /// neither pay the extra bytes nor receive destination/template names.
++    pub include_dependencies: Option<bool>,
+ }
+ 
+ /// HTTP URL query component that contains parameters for enabling alerts.
+@@ -804,6 +811,7 @@ mod tests {
+             tags: None,
+             sort_by: None,
+             sort_order: None,
++            include_dependencies: None,
+         };
+         let params = q.into("my_org");
+         assert_eq!(params.org_id, "my_org");
+@@ -830,6 +838,7 @@ mod tests {
+             tags: None,
+             sort_by: None,
+             sort_order: None,
++            include_dependencies: None,
+         };
+         let params = q.into("org2");
+         assert_eq!(params.org_id, "org2");
+@@ -854,6 +863,7 @@ mod tests {
+             tags: None,
+             sort_by: None,
+             sort_order: None,
++            include_dependencies: None,
+         };
+         let params = q.into("org3");
+         assert_eq!(params.page_size_and_idx, Some((5, 0)));
+@@ -905,6 +915,7 @@ mod priority_tag_query_tests {
+             tags: tags.map(|s| s.to_string()),
+             sort_by: sort_by.map(|s| s.to_string()),
+             sort_order: order.map(|s| s.to_string()),
++            include_dependencies: None,
+         }
+     }
+ 
+diff --git a/src/api/management/src/models/alerts/responses.rs b/src/api/management/src/models/alerts/responses.rs
+index d5d643f487f..42eacb71dc0 100644
+--- a/src/api/management/src/models/alerts/responses.rs
++++ b/src/api/management/src/models/alerts/responses.rs
+@@ -105,6 +105,16 @@ pub struct ListAlertsResponseBodyItem {
+     /// Normalized selection tags (PT-6). Omitted when empty.
+     #[serde(skip_serializing_if = "Vec::is_empty")]
+     pub tags: Vec<String>,
++    /// Names of the notification destinations this alert delivers to
++    /// (`Alert.destinations`). Lets the destination↔alert dependency view build
++    /// the linkage from the list alone; omitted when empty.
++    #[serde(skip_serializing_if = "Vec::is_empty")]
++    pub destinations: Vec<String>,
++    /// Alert-level template override (`Alert.template`): when set it replaces the
++    /// destination-level template for every destination above. Absent when the
++    /// alert defers to each destination's own template.
++    #[serde(skip_serializing_if = "Option::is_none")]
++    pub template: Option<String>,
+     /// Multi-alerts only (§5.4): how many groups the last evaluation observed,
+     /// counted **before** the M-6 cap truncated them. Absent for every alert
+     /// that has not opted in.
+@@ -457,6 +467,8 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
+             level_since: None,
+             priority: alert.priority.map(|p| p.to_i32() as u8),
+             tags: alert.tags,
++            destinations: alert.destinations,
++            template: alert.template,
+             // Filled from the rollup state row by `enrich_with_run_state`,
+             // alongside the other run-state fields above.
+             groups_observed: None,
+@@ -558,6 +570,9 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
+             .get("tags")
+             .and_then(|t| serde_json::from_value::<Vec<String>>(t.clone()).ok())
+             .unwrap_or_default(),
++        // Anomaly configs deliver through their own path, not alert destinations.
++        destinations: Vec::new(),
++        template: None,
+         // Anomaly configs have no grouping, so there is nothing to count.
+         groups_observed: None,
+         groups_firing: None,
+@@ -645,6 +660,8 @@ mod tests {
+             level_since: None,
+             priority: None,
+             tags: vec![],
++            destinations: vec![],
++            template: None,
+             groups_observed: None,
+             groups_firing: None,
+             groups_observed_is_lower_bound: None,
+@@ -659,6 +676,9 @@ mod tests {
+         assert!(!obj.contains_key("last_trained_at"));
+         assert!(!obj.contains_key("status"));
+         assert!(!obj.contains_key("last_error"));
++        // Empty destinations / no override template are omitted from the wire.
++        assert!(!obj.contains_key("destinations"));
++        assert!(!obj.contains_key("template"));
+         // §5.4: a non-multi alert must not advertise a group summary at all —
+         // an absent field reads as "not a multi-alert", a zero would read as
+         // "observed no groups".
+diff --git a/src/api/management/src/request/alerts/mod.rs b/src/api/management/src/request/alerts/mod.rs
+index 3e957861e28..68ccdf1db2d 100644
+--- a/src/api/management/src/request/alerts/mod.rs
++++ b/src/api/management/src/request/alerts/mod.rs
+@@ -508,6 +508,8 @@ fn composite_list_item(
+         level_since: None,
+         priority: definition.priority.map(|value| value as u8),
+         tags,
++        destinations: Vec::new(),
++        template: None,
+         groups_observed: None,
+         groups_firing: None,
+         groups_observed_is_lower_bound: None,
+@@ -2353,6 +2355,13 @@ pub async fn list_alerts(
+     // post-filtering an already-fetched page.
+     let requested_tags = query.requested_tags();
+ 
++    // Opt-in (dependency view only): destinations/template ride the response only
++    // when asked for. Captured before `query` is moved into `params` below.
++    let include_dependencies = query.include_dependencies.unwrap_or(false);
++
++    #[cfg(not(feature = "enterprise"))]
++    let mut params = query.into(&org_id);
++    #[cfg(feature = "enterprise")]
+     let mut params = query.into(&org_id);
+ 
+     if !requested_tags.is_empty() {
+@@ -2595,6 +2604,15 @@ pub async fn list_alerts(
+     enrich_with_run_state(&mut list).await;
+     enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
+ 
++    // Feature-scoped fields: keep destinations/template off the default list path
++    // (bytes + module-scoped names) unless the dependency view explicitly opted in.
++    if !include_dependencies {
++        for item in &mut list {
++            item.destinations = Vec::new();
++            item.template = None;
++        }
++    }
++
+     MetaHttpResponse::json(ListAlertsResponseBody { list })
+ }
+ 
+diff --git a/web/src/components/alerts/AlertList.vue b/web/src/components/alerts/AlertList.vue
+index cc1a3ad9b13..393bcaf7be1 100644
+--- a/web/src/components/alerts/AlertList.vue
++++ b/web/src/components/alerts/AlertList.vue
+@@ -855,6 +855,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import FolderList from "../common/sidebar/FolderList.vue";
+ 
+ import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
++import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
+ import { nextTick } from "vue";
+ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
+ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+@@ -1512,7 +1513,7 @@ export default defineComponent({
+           header: t("alerts.actions"),
+           isAction: true,
+           sortable: false,
+-          size: 150,
++          size: 160,
+           meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
+         },
+       ];
+@@ -1668,6 +1669,10 @@ export default defineComponent({
+       //for a moment also so we are not filtering the alerts by the activeTab
+       selectedAlerts.value = [];
+       allSelectedAlerts.value = false;
++      // The alerts list is refreshed after every alert mutation — drop the shared
++      // dependency-graph cache so the destination/template impact dialogs reflect
++      // the change on next open.
++      invalidateDependencyGraphCache();
+       if (query) {
+         //here we reset the filteredResults before fetching the filtered alerts
+         filteredResults.value = [];
+@@ -2755,6 +2760,10 @@ export default defineComponent({
+       activeFolderToMove.value = activeFolderId.value;
+     };
+ 
++    // A delete inside the dependency popover — reload the current folder's alerts
++    // so the table drops the removed row.
++    const onDependencyDeleted = () => getAlertsFn(store, activeFolderId.value);
++
+     const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
+       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
+       if (selectedFolderId === activeFolderId) {
+@@ -3221,6 +3230,7 @@ export default defineComponent({
+       t,
+       store,
+       router,
++      onDependencyDeleted,
+       columns,
+       recencyLevel,
+       alertRowClass,
+diff --git a/web/src/components/alerts/AlertsDestinationList.vue b/web/src/components/alerts/AlertsDestinationList.vue
+index bb5542a4d1a..3548906b1a3 100644
+--- a/web/src/components/alerts/AlertsDestinationList.vue
++++ b/web/src/components/alerts/AlertsDestinationList.vue
+@@ -238,6 +238,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               </OButton>
+             </div>
+           </template>
++
++          <template #cell-used_by="{ row }">
++            <DependencyUsageCell
++              :graph="depGraph"
++              :focus="{ kind: 'destination', name: row.name }"
++              @deleted="getDestinations"
++            />
++          </template>
+         </OTable>
+       </div>
+     </OPageLayout>
+@@ -292,6 +300,10 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
+ import type { Template } from "@/ts/interfaces/index";
+ 
+ import ImportDestination from "./ImportDestination.vue";
++import DependencyUsageCell from "./DependencyUsageCell.vue";
++import useDependencyGraph, {
++  invalidateDependencyGraphCache,
++} from "@/composables/alerts/useDependencyGraph";
+ import useActions from "@/composables/useActions";
+ import { useReo } from "@/services/reodotdev_analytics";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+@@ -329,11 +341,13 @@ export default defineComponent({
+     OToggleGroup,
+     OToggleGroupItem,
+     OPageLayout,
++    DependencyUsageCell,
+   },
+   setup() {
+     const store = useStore();
+     const editingDestination: Ref<DestinationPayload | null> = ref(null);
+     const { t } = useI18nTyped();
++    const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
+     const { getAllActions } = useActions();
+     const { track } = useReo();
+ 
+@@ -390,12 +404,22 @@ export default defineComponent({
+         size: COL.method,
+         meta: { align: "left" },
+       },
++      {
++        id: "used_by",
++        header: t("alert_dependencies.usedByColumn"),
++        cell: " ",
++        sortable: false,
++        resizable: true,
++        hideable: true,
++        size: 200,
++        meta: { align: "left" },
++      },
+       {
+         id: "actions",
+         header: t("alert_destinations.actions"),
+         isAction: true,
+         pinned: "right",
+-        size: 120,
++        size: 130,
+         meta: { align: "center", actionCount: 3 },
+       },
+     ];
+@@ -491,6 +515,11 @@ export default defineComponent({
+           );
+           resultTotal.value = res.data.length;
+           destinations.value = res.data;
++          // Any destination add/edit/delete lands here on refresh — drop the
++          // shared dependency-graph cache and rebuild it so the "Used by" counts
++          // (and the impact dialog) are current.
++          invalidateDependencyGraphCache();
++          loadDepGraph(store.state.selectedOrganization.identifier);
+           updateRoute();
+         })
+         .catch((err) => {
+@@ -815,6 +844,7 @@ export default defineComponent({
+     ]);
+     return {
+       t,
++      depGraph,
+       showDestinationEditor,
+       destinations,
+       columns,
+diff --git a/web/src/components/alerts/DependencyEntityRow.vue b/web/src/components/alerts/DependencyEntityRow.vue
+new file mode 100644
+index 00000000000..4ab0c0af5f2
+--- /dev/null
++++ b/web/src/components/alerts/DependencyEntityRow.vue
+@@ -0,0 +1,102 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  One entity row inside the impact dialog: an alert shows an enabled/paused status
++  dot, everything else its kind icon. Presentational — emits open/delete; the
++  dialog opens (new tab) or confirms.
++-->
++<template>
++  <div
++    class="group rounded-default flex items-center gap-2 px-2 py-1.5"
++    :class="{ 'hover:bg-interactive-hover-bg': !noHover }"
++    :data-test="`dependency-impact-row-${node.name}`"
++  >
++    <span
++      v-if="node.kind === 'alert'"
++      class="size-2 shrink-0 rounded-full"
++      :class="node.enabled ? 'bg-status-positive' : 'bg-text-muted'"
++    >
++      <OTooltip
++        side="top"
++        :content="node.enabled ? t('alert_dependencies.enabled') : t('alert_dependencies.paused')"
++      />
++    </span>
++    <OIcon
++      v-else
++      :name="depKindIcon(node.kind)"
++      size="sm"
++      class="shrink-0"
++      :class="depKindColor(node)"
++    />
++
++    <span class="text-compact min-w-0 flex-1 truncate">
++      {{ node.name }}
++      <OTooltip side="top" :content="raw(node.name)" />
++    </span>
++
++    <OTag v-if="node.missing" type="countChip" value="error" class="shrink-0">
++      {{ t("alert_dependencies.missingTag") }}
++    </OTag>
++    <OTag v-else-if="count" type="countChip" value="neutral" class="shrink-0">
++      {{ t("alert_dependencies.usedBy", { count }, count) }}
++    </OTag>
++
++    <div class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
++      <OButton
++        v-if="!node.missing"
++        variant="ghost"
++        size="icon-xs"
++        :data-test="`dependency-impact-open-${node.name}`"
++        @click.stop="emit('open', node)"
++      >
++        <OIcon name="open-in-new" size="sm" />
++        <OTooltip side="top" :content="t('alert_dependencies.actionOpen')" />
++      </OButton>
++      <OButton
++        v-if="!node.missing"
++        variant="ghost"
++        size="icon-xs"
++        :data-test="`dependency-impact-delete-${node.name}`"
++        @click.stop="emit('delete', node)"
++      >
++        <OIcon name="delete" size="sm" class="text-status-negative" />
++        <OTooltip side="top" :content="t('alert_dependencies.actionDelete')" />
++      </OButton>
++    </div>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { useI18nTyped, raw } from "@/types/i18n";
++import OButton from "@/lib/core/Button/OButton.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OTag from "@/lib/core/Badge/OTag.vue";
++import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
++import { depKindIcon, depKindColor } from "@/composables/alerts/useDependencyGraph";
++import type { DepNode } from "@/composables/alerts/useDependencyGraph";
++
++// noHover: suppress the row's own hover background where a wrapper already
++// provides the highlight (the destination cards), so hover and selected read the
++// same shade instead of stacking two tints.
++defineProps<{ node: DepNode; count?: number; noHover?: boolean }>();
++const emit = defineEmits<{
++  (e: "open", node: DepNode): void;
++  (e: "delete", node: DepNode): void;
++}>();
++
++const { t } = useI18nTyped();
++</script>
+diff --git a/web/src/components/alerts/DependencyImpactDialog.spec.ts b/web/src/components/alerts/DependencyImpactDialog.spec.ts
+new file mode 100644
+index 00000000000..c4c91c1b0ff
+--- /dev/null
++++ b/web/src/components/alerts/DependencyImpactDialog.spec.ts
+@@ -0,0 +1,218 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
++import { ref } from "vue";
++import { mount, flushPromises } from "@vue/test-utils";
++import router from "@/test/unit/helpers/router";
++import store from "@/test/unit/helpers/store";
++import i18n from "@/locales";
++import {
++  useDependencyGraph as realUseDependencyGraph,
++  type DepGraph,
++} from "@/composables/alerts/useDependencyGraph";
++
++const { buildGraph } = realUseDependencyGraph();
++
++// slack: used by 3 alerts (one paused), uses tpl-http.
++const graph: DepGraph = buildGraph(
++  [
++    { alert_id: "a1", name: "cpu", destinations: ["slack"], enabled: true },
++    { alert_id: "a2", name: "mem", destinations: ["slack"], enabled: false },
++    { alert_id: "a3", name: "disk", destinations: ["slack"], enabled: true },
++  ],
++  [{ name: "slack", type: "http", template: "tpl-http" }],
++  [{ name: "tpl-http", type: "http" }],
++);
++
++const loadGraph = vi.fn();
++// Replace only the composable's fetch; keep the real graph-building helpers
++// (buildFocusChain / focusSummary / kind helpers) so behaviour stays honest.
++vi.mock("@/composables/alerts/useDependencyGraph", async (importOriginal) => {
++  const actual = await importOriginal<typeof import("@/composables/alerts/useDependencyGraph")>();
++  return {
++    ...actual,
++    default: () => ({
++      graph: ref(graph),
++      loading: ref(false),
++      error: ref<string | null>(null),
++      loadGraph,
++      buildGraph: actual.useDependencyGraph().buildGraph,
++    }),
++  };
++});
++
++import DependencyImpactDialog from "./DependencyImpactDialog.vue";
++
++const rowNames = () =>
++  [...document.querySelectorAll('[data-test^="dependency-impact-row-"]')].map((el) =>
++    el.getAttribute("data-test"),
++  );
++
++let wrapper: ReturnType<typeof mount> | null = null;
++const mountDialog = (focus: any) => {
++  wrapper = mount(DependencyImpactDialog, {
++    props: { open: true, focus },
++    attachTo: document.body,
++    global: { provide: { store }, plugins: [i18n, router] },
++  });
++  return wrapper;
++};
++
++describe("DependencyImpactDialog", () => {
++  beforeEach(() => loadGraph.mockClear());
++  afterEach(() => {
++    wrapper?.unmount();
++    wrapper = null;
++    document.body.innerHTML = "";
++  });
++
++  it("loads the graph when opened", async () => {
++    mountDialog({ kind: "destination", name: "slack" });
++    await flushPromises();
++    expect(loadGraph).toHaveBeenCalled();
++  });
++
++  it("destination focus: only the alerts lane (no self or destination lane)", async () => {
++    mountDialog({ kind: "destination", name: "slack" });
++    await flushPromises();
++    expect(document.querySelector('[data-test="dependency-impact-lane-alert"]')).toBeTruthy();
++    // Neither the removed self/focus lane nor a destinations lane is shown.
++    expect(document.querySelector('[data-test="dependency-impact-lane-destination"]')).toBeFalsy();
++    expect(document.querySelector('[data-test="dependency-impact-lane-template"]')).toBeFalsy();
++    expect(rowNames()).toEqual(
++      expect.arrayContaining([
++        "dependency-impact-row-cpu",
++        "dependency-impact-row-mem",
++        "dependency-impact-row-disk",
++      ]),
++    );
++  });
++
++  it("template focus: destinations → alerts grouped by destination (no template lane)", async () => {
++    mountDialog({ kind: "template", name: "tpl-http" });
++    await flushPromises();
++    // The self/template lane is gone; the flow starts at Destinations.
++    expect(document.querySelector('[data-test="dependency-impact-lane-template"]')).toBeFalsy();
++    expect(document.querySelector('[data-test="dependency-impact-lane-destination"]')).toBeTruthy();
++    // The alerts lane carries a box grouped by the destination.
++    expect(document.querySelector('[data-test="dependency-impact-group-slack"]')).toBeTruthy();
++  });
++
++  it("hovering a destination highlights its alert group; leaving clears it", async () => {
++    mountDialog({ kind: "template", name: "tpl-http" });
++    await flushPromises();
++    const group = document.querySelector(
++      '[data-test="dependency-impact-group-slack"]',
++    ) as HTMLElement;
++    const card = document.querySelector(
++      '[data-test="dependency-impact-lane-destination"] [data-test="dependency-impact-card-slack"]',
++    ) as HTMLElement;
++    expect(group.className).not.toContain("bg-surface-accent");
++    card.dispatchEvent(new MouseEvent("mouseenter"));
++    await flushPromises();
++    expect(group.className).toContain("bg-surface-accent");
++    // Nothing stays highlighted once the cursor leaves.
++    card.dispatchEvent(new MouseEvent("mouseleave"));
++    await flushPromises();
++    expect(group.className).not.toContain("bg-surface-accent");
++  });
++
++  it("hovering an alert highlights its destination card, not the box", async () => {
++    mountDialog({ kind: "template", name: "tpl-http" });
++    await flushPromises();
++    const card = document.querySelector(
++      '[data-test="dependency-impact-lane-destination"] [data-test="dependency-impact-card-slack"]',
++    ) as HTMLElement;
++    const group = document.querySelector(
++      '[data-test="dependency-impact-group-slack"]',
++    ) as HTMLElement;
++    const alertRow = document.querySelector(
++      '[data-test="dependency-impact-group-slack"] [data-test="dependency-impact-row-cpu"]',
++    ) as HTMLElement;
++    alertRow.dispatchEvent(new MouseEvent("mouseenter"));
++    await flushPromises();
++    // The alert's destination card lights up…
++    expect(card.className).toContain("bg-surface-accent");
++    // …but the box it sits in is NOT filled (that's reserved for hovering the dest).
++    expect(group.className).not.toContain("bg-surface-accent");
++  });
++
++  it("clicking a destination scrolls its alert group into view", async () => {
++    mountDialog({ kind: "template", name: "tpl-http" });
++    await flushPromises();
++    const group = document.querySelector(
++      '[data-test="dependency-impact-group-slack"]',
++    ) as HTMLElement;
++    // jsdom doesn't implement scrollIntoView, so provide it as a mock.
++    const scrollSpy = vi.fn();
++    group.scrollIntoView = scrollSpy;
++    (
++      document.querySelector(
++        '[data-test="dependency-impact-lane-destination"] [data-test="dependency-impact-card-slack"]',
++      ) as HTMLElement
++    ).click();
++    await flushPromises();
++    expect(scrollSpy).toHaveBeenCalled();
++  });
++
++  it("search keeps the Destinations and Alerts lanes in sync", async () => {
++    // slack has alert 'cpu'; a search matching that alert must keep slack visible
++    // in BOTH the destinations lane and as an alerts box.
++    mountDialog({ kind: "template", name: "tpl-http" });
++    await flushPromises();
++    const input = document.querySelector(
++      '[data-test="dependency-impact-search"] input',
++    ) as HTMLInputElement;
++    input.value = "cpu";
++    input.dispatchEvent(new Event("input"));
++    await flushPromises();
++    expect(
++      document.querySelector(
++        '[data-test="dependency-impact-lane-destination"] [data-test="dependency-impact-card-slack"]',
++      ),
++    ).toBeTruthy();
++    expect(document.querySelector('[data-test="dependency-impact-group-slack"]')).toBeTruthy();
++  });
++
++  it("filters rows by the search box", async () => {
++    mountDialog({ kind: "destination", name: "slack" });
++    await flushPromises();
++    const input = document.querySelector(
++      '[data-test="dependency-impact-search"] input',
++    ) as HTMLInputElement;
++    input.value = "cpu";
++    input.dispatchEvent(new Event("input"));
++    await flushPromises();
++    expect(rowNames()).toContain("dependency-impact-row-cpu");
++    expect(rowNames()).not.toContain("dependency-impact-row-mem");
++  });
++
++  it("opens a redirect in a new browser tab", async () => {
++    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
++    mountDialog({ kind: "destination", name: "slack" });
++    await flushPromises();
++    (document.querySelector('[data-test="dependency-impact-open-cpu"]') as HTMLElement).click();
++    expect(openSpy).toHaveBeenCalledWith(expect.any(String), "_blank", "noopener,noreferrer");
++    openSpy.mockRestore();
++  });
++
++  it("emits update:open=false when Close is clicked", async () => {
++    const w = mountDialog({ kind: "destination", name: "slack" });
++    await flushPromises();
++    (document.querySelector('[data-test="dependency-impact-close"]') as HTMLElement).click();
++    expect(w.emitted("update:open")?.at(-1)).toEqual([false]);
++  });
++});
+diff --git a/web/src/components/alerts/DependencyImpactDialog.vue b/web/src/components/alerts/DependencyImpactDialog.vue
+new file mode 100644
+index 00000000000..be6866276f7
+--- /dev/null
++++ b/web/src/components/alerts/DependencyImpactDialog.vue
+@@ -0,0 +1,463 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  "Impact" dialog — everything downstream of one entity as a left→right flow of
++  card lanes (delivery direction Template → Destination → Alert):
++    • a destination shows: this destination → the alerts that use it;
++    • a template shows: this template → its destinations → their alerts, with the
++      alerts grouped into a box per destination. Clicking or hovering a destination
++      highlights its alert box (and vice-versa), so the destination↔alert link is
++      visible even though both sides can be many.
++  Open jumps to the entity's editor in a NEW TAB; delete is confirmed here.
++-->
++<template>
++  <ODialog
++    :open="open"
++    :size="isTemplateFocus ? 'lg' : 'sm'"
++    :max-height="86"
++    @update:open="(v) => emit('update:open', v)"
++  >
++    <template #header>
++      <div class="flex min-w-0 items-center gap-2.5">
++        <OIcon
++          :name="depKindIcon(focus.kind)"
++          size="md"
++          :class="depKindColor(focusNode ?? { kind: focus.kind, orphan: false, missing: false })"
++        />
++        <div class="min-w-0">
++          <div class="text-text-heading truncate text-base font-semibold" :title="entityName">
++            {{ entityName }}
++          </div>
++          <div class="text-text-secondary truncate text-xs" :title="impactLabel">
++            {{ impactLabel }}
++          </div>
++        </div>
++      </div>
++    </template>
++
++    <div class="flex flex-col" data-test="dependency-impact-body">
++      <div
++        v-if="loading"
++        class="text-text-secondary flex h-72 items-center justify-center gap-2 text-sm"
++        data-test="dependency-impact-loading"
++      >
++        <OSpinner size="sm" />
++        {{ t("alert_dependencies.loading") }}
++      </div>
++
++      <OBanner
++        v-else-if="error"
++        variant="error"
++        icon="error"
++        :content="t('alert_dependencies.failedToLoad', { error })"
++        data-test="dependency-impact-error"
++      />
++
++      <template v-else>
++        <OSearchInput
++          v-model="search"
++          class="mb-3 shrink-0"
++          data-test="dependency-impact-search"
++          :placeholder="t('alert_dependencies.searchPlaceholder')"
++        />
++
++        <div class="flex items-stretch justify-center gap-1" data-test="dependency-impact-flow">
++          <!-- Destinations lane (template focus only). -->
++          <template v-if="isTemplateFocus">
++            <section
++              class="flex max-w-96 min-w-0 flex-1 flex-col"
++              data-test="dependency-impact-lane-destination"
++            >
++              <div class="mb-1.5 flex items-center gap-1.5 px-1">
++                <OIcon name="location-on" size="sm" class="text-info" />
++                <span class="text-text-secondary text-2xs font-semibold tracking-wide uppercase">
++                  {{ t("alert_dependencies.sectionDestinations") }}
++                </span>
++                <OTag type="countChip" value="neutral">{{ chain.destinations.length }}</OTag>
++              </div>
++              <div
++                class="border-border-default bg-surface-panel rounded-surface h-72 space-y-1 overflow-y-auto border p-1.5"
++              >
++                <div
++                  v-if="!filteredDestinations.length"
++                  class="text-text-muted flex h-full items-center justify-center px-2 text-center text-xs"
++                >
++                  {{
++                    search ? t("alert_dependencies.noMatches") : t("alert_dependencies.laneEmpty")
++                  }}
++                </div>
++                <div
++                  v-for="d in filteredDestinations"
++                  :key="d.id"
++                  class="rounded-default cursor-pointer transition-colors"
++                  :class="isDestHighlighted(d.id) ? 'bg-surface-accent' : ''"
++                  :data-test="`dependency-impact-card-${d.name}`"
++                  @mouseenter="hoveredDest = d.id"
++                  @mouseleave="hoveredDest = null"
++                  @click="scrollToGroup(d)"
++                >
++                  <DependencyEntityRow
++                    :node="d"
++                    :count="d.usageCount || undefined"
++                    no-hover
++                    @open="openInNewTab"
++                    @delete="requestDelete"
++                  />
++                </div>
++              </div>
++            </section>
++            <OIcon
++              name="chevron-right"
++              size="md"
++              class="text-text-muted mt-8 shrink-0"
++              aria-hidden="true"
++            />
++          </template>
++
++          <!-- Alerts lane: a box per destination (the group). Capped only in the
++               template (multi-lane) layout; on a destination it fills the width so
++               it lines up with the full-width search bar above. -->
++          <section
++            class="flex min-w-0 flex-1 flex-col"
++            :class="isTemplateFocus ? 'max-w-96' : ''"
++            data-test="dependency-impact-lane-alert"
++          >
++            <div class="mb-1.5 flex items-center gap-1.5 px-1">
++              <OIcon name="shield-alert-outline" size="sm" class="text-status-positive" />
++              <span class="text-text-secondary text-2xs font-semibold tracking-wide uppercase">
++                {{ t("alert_dependencies.sectionAlerts") }}
++              </span>
++              <OTag type="countChip" value="neutral">{{ chain.alerts.length }}</OTag>
++            </div>
++            <div
++              class="border-border-default bg-surface-panel rounded-surface h-72 overflow-y-auto border p-1.5"
++            >
++              <div
++                v-if="alertsEmpty"
++                class="text-text-muted flex h-full items-center justify-center px-2 text-center text-xs"
++              >
++                {{ search ? t("alert_dependencies.noMatches") : t("alert_dependencies.laneEmpty") }}
++              </div>
++
++              <!-- Destination focus: one destination, so a flat list — no boxes,
++                   no highlighting (every alert obviously belongs to it). -->
++              <template v-if="!isTemplateFocus">
++                <DependencyEntityRow
++                  v-for="a in flatAlerts"
++                  :key="a.id"
++                  :node="a"
++                  @open="openInNewTab"
++                  @delete="requestDelete"
++                />
++              </template>
++
++              <!-- Template focus: one box per destination, click/hover to link.
++                   The gap lives here (between boxes) so the destination-focus flat
++                   list above stays as tight as the rows inside a box. -->
++              <div v-else class="space-y-2">
++                <div
++                  v-for="g in alertGroups"
++                  :key="g.dest.id"
++                  :ref="(el) => setGroupEl(g.dest.id, el)"
++                  class="rounded-default p-1 transition-colors"
++                  :class="isBoxFilled(g.dest.id) ? 'bg-surface-accent' : ''"
++                  :data-test="`dependency-impact-group-${g.dest.name}`"
++                >
++                  <!-- Only the destination header drives the box highlight, so
++                       hovering a single alert never lights up the whole box. -->
++                  <div
++                    class="text-text-secondary text-2xs mb-0.5 flex cursor-pointer items-center gap-1 px-1 font-medium"
++                    @mouseenter="hoveredDest = g.dest.id"
++                    @mouseleave="hoveredDest = null"
++                    @click="scrollToGroup(g.dest)"
++                  >
++                    <OIcon name="location-on" size="xs" class="text-info shrink-0" />
++                    <span class="truncate" :title="g.dest.name">{{ g.dest.name }}</span>
++                  </div>
++                  <!-- Hovering an alert highlights its destination card(s). -->
++                  <DependencyEntityRow
++                    v-for="a in g.alerts"
++                    :key="a.id"
++                    :node="a"
++                    @mouseenter="hoveredAlert = a.id"
++                    @mouseleave="hoveredAlert = null"
++                    @open="openInNewTab"
++                    @delete="requestDelete"
++                  />
++                  <div v-if="!g.alerts.length" class="text-text-muted px-2 py-1 text-xs">
++                    {{ t("alert_dependencies.laneEmpty") }}
++                  </div>
++                </div>
++
++                <!-- Alerts that reference the template directly (overrides). -->
++                <div v-if="directAlerts.length" data-test="dependency-impact-direct">
++                  <div
++                    class="text-text-secondary text-2xs flex items-center gap-1 px-1.5 pt-1 font-medium"
++                  >
++                    <OIcon name="bolt" size="xs" class="text-text-muted shrink-0" />
++                    {{ t("alert_dependencies.directOverrides") }}
++                  </div>
++                  <DependencyEntityRow
++                    v-for="a in directAlerts"
++                    :key="a.id"
++                    :node="a"
++                    @open="openInNewTab"
++                    @delete="requestDelete"
++                  />
++                </div>
++              </div>
++            </div>
++          </section>
++        </div>
++      </template>
++    </div>
++
++    <template #footer>
++      <div class="flex w-full items-center">
++        <OButton
++          variant="outline"
++          size="sm"
++          class="ms-auto"
++          data-test="dependency-impact-close"
++          @click="emit('update:open', false)"
++        >
++          {{ t("common.close") }}
++        </OButton>
++      </div>
++    </template>
++  </ODialog>
++
++  <ConfirmDialog
++    v-model="confirm.visible"
++    :title="t('alert_dependencies.deleteTitle', { name: confirm.node?.name || '' })"
++    :message="t('alert_dependencies.deleteMessage')"
++    @update:ok="performDelete"
++    @update:cancel="cancelDelete"
++  />
++</template>
++
++<script setup lang="ts">
++import { computed, nextTick, ref, watch } from "vue";
++import { useStore } from "vuex";
++import { useRouter } from "vue-router";
++import { useI18nTyped, raw } from "@/types/i18n";
++import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
++import OButton from "@/lib/core/Button/OButton.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OTag from "@/lib/core/Badge/OTag.vue";
++import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
++import OBanner from "@/lib/feedback/Banner/OBanner.vue";
++import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
++import ConfirmDialog from "../ConfirmDialog.vue";
++import DependencyEntityRow from "./DependencyEntityRow.vue";
++import { toast } from "@/lib/feedback/Toast/useToast";
++import destinationService from "@/services/alert_destination";
++import templateService from "@/services/alert_templates";
++import alertsService from "@/services/alerts";
++import useDependencyGraph, {
++  buildFocusChain,
++  invalidateDependencyGraphCache,
++  depKindIcon,
++  depKindColor,
++} from "@/composables/alerts/useDependencyGraph";
++import type { DepFocus, DepNode } from "@/composables/alerts/useDependencyGraph";
++
++const props = defineProps<{ open: boolean; focus: DepFocus }>();
++const emit = defineEmits<{
++  (e: "update:open", value: boolean): void;
++  (e: "deleted"): void;
++}>();
++
++const { t } = useI18nTyped();
++const store = useStore();
++const router = useRouter();
++const { graph, loading, error, loadGraph } = useDependencyGraph();
++
++const search = ref("");
++const hoveredDest = ref<string | null>(null);
++const hoveredAlert = ref<string | null>(null);
++const confirm = ref<{ visible: boolean; node: DepNode | null }>({ visible: false, node: null });
++
++const org = () => store.state.selectedOrganization.identifier;
++
++watch(
++  () => props.open,
++  (isOpen) => {
++    if (!isOpen) return;
++    search.value = "";
++    hoveredDest.value = null;
++    hoveredAlert.value = null;
++    loadGraph(org());
++  },
++  { immediate: true },
++);
++
++const isTemplateFocus = computed(() => props.focus.kind === "template");
++const chain = computed(() => buildFocusChain(graph.value, props.focus));
++const focusNode = computed(() => chain.value.focusNode);
++const entityName = computed(() => focusNode.value?.name ?? props.focus.name ?? "");
++
++// Header subtitle: what this entity is used by, downstream. A template names its
++// destinations + alerts; a destination names its alerts.
++const impactLabel = computed(() => {
++  const alerts = t(
++    "alert_dependencies.usedBy",
++    { count: chain.value.alerts.length },
++    chain.value.alerts.length,
++  );
++  if (!isTemplateFocus.value) return t("alert_dependencies.impactDestination", { alerts });
++  const destinations = t(
++    "alert_dependencies.countDestinations",
++    { count: chain.value.destinations.length },
++    chain.value.destinations.length,
++  );
++  return t("alert_dependencies.impactTemplate", { destinations, alerts });
++});
++
++const nameMatches = (name: string) => {
++  const term = search.value.trim().toLowerCase();
++  return !term || name.toLowerCase().includes(term);
++};
++
++// Destination focus: the alerts using it, as a flat list.
++const flatAlerts = computed(() => chain.value.alerts.filter((a) => nameMatches(a.name)));
++
++// The ONE filtered set both the Destinations lane and the Alerts lane render, so
++// they never disagree: a destination is visible when its own name matches (then
++// all its alerts show) OR when any of its alerts match (then only those show).
++const alertGroups = computed(() => {
++  const hasTerm = !!search.value.trim();
++  return chain.value.destinations
++    .map((d) => {
++      const destHit = nameMatches(d.name);
++      const alerts = destHit ? d.alerts : d.alerts.filter((a) => nameMatches(a.name));
++      return { dest: d, alerts, show: !hasTerm || destHit || alerts.length > 0 };
++    })
++    .filter((g) => g.show);
++});
++const filteredDestinations = computed(() => alertGroups.value.map((g) => g.dest));
++
++// Alerts referencing the template directly (an override), not via any destination.
++const directAlerts = computed(() => {
++  const viaDest = new Set(chain.value.destinations.flatMap((d) => d.alerts.map((a) => a.id)));
++  return chain.value.alerts.filter((a) => !viaDest.has(a.id) && nameMatches(a.name));
++});
++
++const alertsEmpty = computed(() =>
++  isTemplateFocus.value
++    ? alertGroups.value.length === 0 && directAlerts.value.length === 0
++    : flatAlerts.value.length === 0,
++);
++
++// alert id → the destinations that deliver it (an alert can use several), for the
++// reverse highlight: hovering an alert lights up its destination card(s).
++const destsOfAlert = computed(() => {
++  const m = new Map<string, Set<string>>();
++  for (const d of chain.value.destinations)
++    for (const a of d.alerts) (m.get(a.id) ?? m.set(a.id, new Set()).get(a.id)!).add(d.id);
++  return m;
++});
++const hoveredAlertDests = computed(() =>
++  hoveredAlert.value
++    ? (destsOfAlert.value.get(hoveredAlert.value) ?? new Set<string>())
++    : new Set<string>(),
++);
++
++// Highlight is hover-driven, nothing sticks. A destination CARD lights up when
++// hovered directly or when one of its alerts is hovered; the alert BOX fills only
++// when the destination itself is hovered (so hovering a single alert never fills
++// the whole box).
++const isDestHighlighted = (id: string) =>
++  hoveredDest.value === id || hoveredAlertDests.value.has(id);
++const isBoxFilled = (id: string) => hoveredDest.value === id;
++
++// Group-box elements, keyed by destination id, so a click can scroll the alerts
++// lane to the matching box (the highlight is useless if it's below the fold).
++const groupEls = new Map<string, HTMLElement>();
++const setGroupEl = (id: string, el: unknown) => {
++  if (el instanceof HTMLElement) groupEls.set(id, el);
++  else groupEls.delete(id);
++};
++const scrollToGroup = async (dest: DepNode) => {
++  await nextTick();
++  groupEls.get(dest.id)?.scrollIntoView({ block: "start", behavior: "smooth" });
++};
++
++// Every redirection opens the target's editor in a NEW browser tab, so the user
++// keeps the impact view (and it sidesteps same-route remount issues entirely).
++const openInNewTab = (n: DepNode) => {
++  if (n.missing) return;
++  const org_identifier = org();
++  let route;
++  if (n.kind === "destination") {
++    route = {
++      name: "alertDestinations",
++      query: { action: "update", name: n.name, org_identifier },
++    };
++  } else if (n.kind === "template") {
++    route = { name: "alertTemplates", query: { action: "update", name: n.name, org_identifier } };
++  } else if (n.kind === "alert" && n.alertId) {
++    route = {
++      name: "alertDetail",
++      params: { alert_id: n.alertId },
++      query: { org_identifier, ...(n.folderId ? { folder: n.folderId } : {}) },
++    };
++  } else {
++    return;
++  }
++  const href = router.resolve(route).href;
++  window.open(href, "_blank", "noopener,noreferrer");
++};
++
++const requestDelete = (node: DepNode) => {
++  confirm.value = { visible: true, node };
++};
++const cancelDelete = () => {
++  confirm.value = { visible: false, node: null };
++};
++const performDelete = async () => {
++  const n = confirm.value.node;
++  confirm.value = { visible: false, node: null };
++  if (!n) return;
++  const org_identifier = org();
++  try {
++    if (n.kind === "destination") {
++      await destinationService.delete({ org_identifier, destination_name: n.name });
++    } else if (n.kind === "template") {
++      await templateService.delete({ org_identifier, template_name: n.name });
++    } else if (n.kind === "alert" && n.alertId) {
++      await alertsService.delete_by_alert_id(org_identifier, n.alertId, n.folderId);
++    } else {
++      return;
++    }
++    invalidateDependencyGraphCache();
++    toast({ variant: "success", message: t("alert_dependencies.deletedToast", { name: n.name }) });
++    emit("deleted");
++    // Deleting the focused entity leaves nothing to show; close. Otherwise the
++    // reference just left the chain — refetch so the list is current.
++    if (n.id === focusNode.value?.id) emit("update:open", false);
++    else await loadGraph(org_identifier);
++  } catch (err: any) {
++    toast({
++      variant: "error",
++      message:
++        raw(err?.response?.data?.message) ||
++        t("alert_dependencies.deleteFailedToast", { name: n.name }),
++    });
++  }
++};
++</script>
+diff --git a/web/src/components/alerts/DependencyUsageCell.spec.ts b/web/src/components/alerts/DependencyUsageCell.spec.ts
+new file mode 100644
+index 00000000000..4dda705ba77
+--- /dev/null
++++ b/web/src/components/alerts/DependencyUsageCell.spec.ts
+@@ -0,0 +1,92 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it } from "vitest";
++import { mount, flushPromises } from "@vue/test-utils";
++import DependencyUsageCell from "./DependencyUsageCell.vue";
++import DependencyImpactDialog from "./DependencyImpactDialog.vue";
++import { useDependencyGraph } from "@/composables/alerts/useDependencyGraph";
++import type { DepFocus, DepGraph } from "@/composables/alerts/useDependencyGraph";
++import router from "@/test/unit/helpers/router";
++import store from "@/test/unit/helpers/store";
++import i18n from "@/locales";
++
++const { buildGraph } = useDependencyGraph();
++
++// slack: used by cpu + mem, uses tpl-http. lonely: no alerts (orphan).
++const graph: DepGraph = buildGraph(
++  [
++    { alert_id: "a1", name: "cpu", destinations: ["slack"], enabled: true },
++    { alert_id: "a2", name: "mem", destinations: ["slack"], enabled: false },
++  ],
++  [
++    { name: "slack", type: "http", template: "tpl-http" },
++    { name: "lonely", type: "email" },
++  ],
++  [{ name: "tpl-http", type: "http" }],
++);
++
++const emptyGraph: DepGraph = buildGraph([], [], []);
++
++const mountCell = (g: DepGraph, focus: DepFocus) =>
++  mount(DependencyUsageCell, {
++    props: { graph: g, focus },
++    global: { provide: { store }, plugins: [i18n, router] },
++  });
++
++describe("DependencyUsageCell", () => {
++  it("a destination shows only its alert count (downstream), not its template", async () => {
++    const wrapper = mountCell(graph, { kind: "destination", name: "slack" });
++    await flushPromises();
++    expect(wrapper.find('[data-test="used-by-slack-alert"]').text()).toContain("2");
++    // Upstream template is not what the destination is "used by".
++    expect(wrapper.find('[data-test="used-by-slack-template"]').exists()).toBe(false);
++    expect(wrapper.find('[data-test="used-by-slack-destination"]').exists()).toBe(false);
++    wrapper.unmount();
++  });
++
++  it("a template shows its destinations and alerts (downstream)", async () => {
++    const wrapper = mountCell(graph, { kind: "template", name: "tpl-http" });
++    await flushPromises();
++    expect(wrapper.find('[data-test="used-by-tpl-http-destination"]').text()).toContain("1");
++    expect(wrapper.find('[data-test="used-by-tpl-http-alert"]').text()).toContain("2");
++    wrapper.unmount();
++  });
++
++  it("shows the Unused chip for an orphan entity", async () => {
++    const wrapper = mountCell(graph, { kind: "destination", name: "lonely" });
++    await flushPromises();
++    expect(wrapper.find('[data-test="used-by-lonely-unused"]').exists()).toBe(true);
++    expect(wrapper.find('[data-test="used-by-lonely-alert"]').exists()).toBe(false);
++    wrapper.unmount();
++  });
++
++  it("shows a neutral placeholder before the graph has loaded", async () => {
++    const wrapper = mountCell(emptyGraph, { kind: "destination", name: "slack" });
++    await flushPromises();
++    expect(wrapper.find('[data-test="used-by-slack-unused"]').exists()).toBe(false);
++    expect(wrapper.find('[data-test="used-by-slack-alert"]').exists()).toBe(false);
++    wrapper.unmount();
++  });
++
++  it("opens the impact dialog on click", async () => {
++    const wrapper = mountCell(graph, { kind: "destination", name: "slack" });
++    await flushPromises();
++    expect(wrapper.findComponent(DependencyImpactDialog).props("open")).toBe(false);
++    await wrapper.find('[data-test="used-by-slack"]').trigger("click");
++    expect(wrapper.findComponent(DependencyImpactDialog).props("open")).toBe(true);
++    wrapper.unmount();
++  });
++});
+diff --git a/web/src/components/alerts/DependencyUsageCell.vue b/web/src/components/alerts/DependencyUsageCell.vue
+new file mode 100644
+index 00000000000..6e20401de13
+--- /dev/null
++++ b/web/src/components/alerts/DependencyUsageCell.vue
+@@ -0,0 +1,121 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  The list "Used by" cell: per-kind count badges for one row, sourced from the
++  shared dependency graph (so it can't disagree with the impact dialog it opens).
++  An orphan/missing entity collapses to a single Unused/Missing chip; clicking the
++  cell opens the impact dialog.
++-->
++<template>
++  <OButton
++    variant="ghost"
++    size="sm"
++    class="h-auto! gap-1! px-1.5! py-1! font-normal!"
++    :data-test="`used-by-${key}`"
++    @click.stop="open = true"
++  >
++    <OIcon v-if="!loaded" name="graph-1" size="sm" class="text-text-muted" />
++
++    <OTag v-else-if="isMissing" type="countChip" value="error">
++      {{ t("alert_dependencies.missingTag") }}
++    </OTag>
++
++    <OTag
++      v-else-if="isUnused"
++      type="countChip"
++      value="neutral"
++      :data-test="`used-by-${key}-unused`"
++    >
++      {{ t("alert_dependencies.orphanTag") }}
++    </OTag>
++
++    <template v-else>
++      <OTag
++        v-for="b in badges"
++        :key="b.kind"
++        type="countChip"
++        value="neutral"
++        :data-test="`used-by-${key}-${b.kind}`"
++      >
++        <OIcon :name="depKindIcon(b.kind)" size="xs" class="mr-0.5" :class="kindColor(b.kind)" />
++        {{ b.count }}
++        <OTooltip side="top" :content="b.label" />
++      </OTag>
++    </template>
++  </OButton>
++
++  <DependencyImpactDialog v-model:open="open" :focus="focus" @deleted="emit('deleted')" />
++</template>
++
++<script setup lang="ts">
++import { computed, ref } from "vue";
++import { useI18nTyped } from "@/types/i18n";
++import type { I18nText } from "@/types/i18n";
++import OButton from "@/lib/core/Button/OButton.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OTag from "@/lib/core/Badge/OTag.vue";
++import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
++import DependencyImpactDialog from "./DependencyImpactDialog.vue";
++import { focusSummary, depKindIcon, depKindColor } from "@/composables/alerts/useDependencyGraph";
++import type { DepGraph, DepFocus, DepNodeKind } from "@/composables/alerts/useDependencyGraph";
++
++const props = defineProps<{ graph: DepGraph; focus: DepFocus }>();
++const emit = defineEmits<{ (e: "deleted"): void }>();
++
++const { t } = useI18nTyped();
++
++const open = ref(false);
++
++// The graph is fetched by the host page; until it lands, show the neutral graph
++// icon (the dialog loads its own copy on open) instead of flashing a false "Unused".
++const loaded = computed(() => props.graph.nodes.length > 0);
++const summary = computed(() => focusSummary(props.graph, props.focus));
++const key = computed(() => props.focus.name ?? props.focus.alertId ?? "");
++
++const isMissing = computed(() => !!summary.value.node?.missing);
++
++// Downstream only, in delivery order: a template shows its destinations then
++// alerts; a destination shows just its alerts. Nothing "upstream" (a template a
++// destination uses) — that isn't what this entity is used by.
++const badges = computed(() => {
++  const c = summary.value.counts;
++  const out: { kind: DepNodeKind; count: number; label: I18nText }[] = [];
++  if (props.focus.kind === "template" && c.destinations)
++    out.push({
++      kind: "destination",
++      count: c.destinations,
++      label: t("alert_dependencies.countDestinations", { count: c.destinations }, c.destinations),
++    });
++  if (c.alerts)
++    out.push({
++      kind: "alert",
++      count: c.alerts,
++      label: t("alert_dependencies.usedBy", { count: c.alerts }, c.alerts),
++    });
++  return out;
++});
++
++// Orphan (nothing uses it) wins over any downstream badge — a destination with a
++// template but zero alerts still reads "Unused". An entity with no neighbours at
++// all falls here too.
++const isUnused = computed(
++  () =>
++    loaded.value && !isMissing.value && (!!summary.value.node?.orphan || badges.value.length === 0),
++);
++
++const kindColor = (kind: DepNodeKind) => depKindColor({ kind, orphan: false, missing: false });
++</script>
+diff --git a/web/src/components/alerts/TemplateList.vue b/web/src/components/alerts/TemplateList.vue
+index db40def4394..3c721738503 100644
+--- a/web/src/components/alerts/TemplateList.vue
++++ b/web/src/components/alerts/TemplateList.vue
+@@ -209,6 +209,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               <OIcon name="delete" size="sm" />
+             </OButton>
+           </template>
++          <template #cell-used_by="{ row }">
++            <DependencyUsageCell
++              :graph="depGraph"
++              :focus="{ kind: 'template', name: row.name }"
++              @deleted="getTemplates"
++            />
++          </template>
+           <template v-if="selectedTemplates.length > 0" #bottom>
+             <span class="text-text-secondary text-xs">
+               {{ selectedTemplates.length }} {{ t("alert_templates.selected") }}
+@@ -277,6 +284,10 @@ import OTag from "@/lib/core/Badge/OTag.vue";
+ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+ import ImportTemplate from "./ImportTemplate.vue";
++import DependencyUsageCell from "./DependencyUsageCell.vue";
++import useDependencyGraph, {
++  invalidateDependencyGraphCache,
++} from "@/composables/alerts/useDependencyGraph";
+ import { useReo } from "@/services/reodotdev_analytics";
+ import { toast } from "@/lib/feedback/Toast/useToast";
+ import { useShortcuts } from "@/lib/vue-shortcut-manager";
+@@ -288,6 +299,7 @@ const store = useStore();
+ const { t } = useI18nTyped();
+ const router = useRouter();
+ const { track } = useReo();
++const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
+ const templates: Ref<Template[]> = ref([]);
+ const columns: OTableColumnDef[] = [
+   {
+@@ -297,12 +309,22 @@ const columns: OTableColumnDef[] = [
+     sortable: true,
+     meta: { align: "left", autoWidth: true },
+   },
++  {
++    id: "used_by",
++    header: t("alert_dependencies.usedByColumn"),
++    cell: " ",
++    sortable: false,
++    resizable: true,
++    hideable: true,
++    size: 200,
++    meta: { align: "left" },
++  },
+   {
+     id: "actions",
+     header: t("alert_templates.actions"),
+     isAction: true,
+     pinned: "right",
+-    size: 150,
++    size: 160,
+     meta: { align: "center", actionCount: 4 },
+   },
+ ];
+@@ -375,6 +397,11 @@ const getTemplates = () => {
+     .then((res) => {
+       resultTotal.value = res.data.length;
+       templates.value = res.data;
++      // Any template add/edit/delete lands here on refresh — drop the shared
++      // dependency-graph cache and rebuild it so the "Used by" counts (and the
++      // impact dialog) reflect the change.
++      invalidateDependencyGraphCache();
++      loadDepGraph(store.state.selectedOrganization.identifier);
+       updateRoute();
+     })
+     .catch((err) => {
+diff --git a/web/src/composables/alerts/useDependencyGraph.spec.ts b/web/src/composables/alerts/useDependencyGraph.spec.ts
+new file mode 100644
+index 00000000000..064a2db0a73
+--- /dev/null
++++ b/web/src/composables/alerts/useDependencyGraph.spec.ts
+@@ -0,0 +1,242 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, it, expect } from "vitest";
++import {
++  useDependencyGraph,
++  buildFocusChain,
++  focusSummary,
++  depKindIcon,
++  depKindColor,
++} from "@/composables/alerts/useDependencyGraph";
++import type { DepNode } from "@/composables/alerts/useDependencyGraph";
++
++const { buildGraph } = useDependencyGraph();
++
++const byName = (nodes: DepNode[], name: string, kind: DepNode["kind"]) =>
++  nodes.find((n) => n.name === name && n.kind === kind)!;
++
++describe("useDependencyGraph.buildGraph", () => {
++  it("links Template → Destination → Alert by name", () => {
++    const { nodes, edges, stats } = buildGraph(
++      [
++        {
++          alert_id: "a1",
++          name: "cpu",
++          destinations: ["slack"],
++          enabled: true,
++          folder_id: "default",
++        },
++      ],
++      [{ name: "slack", type: "http", template: "tpl" }],
++      [{ name: "tpl", type: "http" }],
++    );
++
++    expect(stats).toMatchObject({ templates: 1, destinations: 1, alerts: 1 });
++    // Destination shows its alert usage; template feeds the destination.
++    expect(byName(nodes, "slack", "destination").usageCount).toBe(1);
++    expect(edges).toEqual(
++      expect.arrayContaining([
++        expect.objectContaining({
++          relation: "template",
++          source: "template:tpl",
++          target: "destination:slack",
++        }),
++        expect.objectContaining({
++          relation: "usage",
++          source: "destination:slack",
++          target: "alert:a1",
++        }),
++      ]),
++    );
++  });
++
++  it("flags an unused destination and an orphan template", () => {
++    const { nodes, stats } = buildGraph(
++      [],
++      [{ name: "pager", type: "http", template: undefined }],
++      [{ name: "lonely", type: "email" }],
++    );
++
++    expect(byName(nodes, "pager", "destination").orphan).toBe(true);
++    expect(byName(nodes, "lonely", "template").orphan).toBe(true);
++    expect(stats.orphanDestinations).toBe(1);
++    expect(stats.orphanTemplates).toBe(1);
++  });
++
++  it("flags a dangling destination reference (alert points at a missing destination)", () => {
++    const { nodes, stats } = buildGraph(
++      [{ alert_id: "a1", name: "disk", destinations: ["ghost"], enabled: true }],
++      [],
++      [],
++    );
++
++    const ghost = byName(nodes, "ghost", "destination");
++    expect(ghost.missing).toBe(true);
++    expect(ghost.orphan).toBe(false);
++    expect(stats.danglingReferences).toBe(1);
++  });
++
++  it("draws a dashed override edge when the alert sets its own template", () => {
++    const { edges } = buildGraph(
++      [
++        {
++          alert_id: "a1",
++          name: "mem",
++          destinations: ["slack"],
++          template: "override-tpl",
++          enabled: true,
++        },
++      ],
++      [{ name: "slack", type: "http", template: "dest-tpl" }],
++      [
++        { name: "override-tpl", type: "http" },
++        { name: "dest-tpl", type: "http" },
++      ],
++    );
++
++    expect(edges).toEqual(
++      expect.arrayContaining([
++        expect.objectContaining({
++          relation: "override",
++          source: "template:override-tpl",
++          target: "alert:a1",
++        }),
++      ]),
++    );
++  });
++
++  it("counts one destination shared by two alerts", () => {
++    const { nodes } = buildGraph(
++      [
++        { alert_id: "a1", name: "cpu", destinations: ["slack"], enabled: true },
++        { alert_id: "a2", name: "mem", destinations: ["slack"], enabled: true },
++      ],
++      [{ name: "slack", type: "http" }],
++      [],
++    );
++
++    expect(byName(nodes, "slack", "destination").usageCount).toBe(2);
++  });
++});
++
++describe("buildFocusChain", () => {
++  // slack ← tpl-http, used by cpu + mem; pager ← tpl-http too (sibling branch).
++  const graph = buildGraph(
++    [
++      { alert_id: "a1", name: "cpu", destinations: ["slack"], enabled: true },
++      { alert_id: "a2", name: "mem", destinations: ["slack"], enabled: true },
++      { alert_id: "a3", name: "disk", destinations: ["pager"], enabled: true },
++    ],
++    [
++      { name: "slack", type: "http", template: "tpl-http" },
++      { name: "pager", type: "http", template: "tpl-http" },
++    ],
++    [{ name: "tpl-http", type: "http" }],
++  );
++
++  it("destination focus = its template + its alerts, NOT sibling destinations", () => {
++    const chain = buildFocusChain(graph, { kind: "destination", name: "slack" });
++    expect(chain.focusNode?.name).toBe("slack");
++    expect(chain.templates.map((n) => n.name)).toEqual(["tpl-http"]);
++    expect(chain.alerts.map((n) => n.name).sort()).toEqual(["cpu", "mem"]);
++    // The shared template must NOT drag in 'pager' or its alert 'disk'.
++    expect(chain.destinations.map((n) => n.name)).toEqual(["slack"]);
++    expect(chain.alerts.map((n) => n.name)).not.toContain("disk");
++  });
++
++  it("template focus = destinations using it + their alerts", () => {
++    const chain = buildFocusChain(graph, { kind: "template", name: "tpl-http" });
++    expect(chain.destinations.map((n) => n.name).sort()).toEqual(["pager", "slack"]);
++    expect(chain.alerts.map((n) => n.name).sort()).toEqual(["cpu", "disk", "mem"]);
++    // The destination carries its own alert count.
++    expect(chain.destinations.find((d) => d.name === "slack")?.alerts.length).toBe(2);
++  });
++
++  it("alert focus = its destination + that destination's template", () => {
++    const chain = buildFocusChain(graph, { kind: "alert", alertId: "a1", name: "cpu" });
++    expect(chain.focusNode?.name).toBe("cpu");
++    expect(chain.destinations.map((n) => n.name)).toEqual(["slack"]);
++    expect(chain.templates.map((n) => n.name)).toEqual(["tpl-http"]);
++    const slack = chain.destinations.find((d) => d.name === "slack")!;
++    // The destination's badge shows its TOTAL usage (cpu + mem), not just the
++    // focused alert — so it never renders a misleading "0 alerts" on alert focus.
++    expect(slack.usageCount).toBe(2);
++    // …and its chain entry now records the focused alert rather than being empty.
++    expect(slack.alerts.map((n) => n.name)).toEqual(["cpu"]);
++  });
++});
++
++describe("focusSummary", () => {
++  const graph = buildGraph(
++    [
++      { alert_id: "a1", name: "cpu", destinations: ["slack"], enabled: true },
++      { alert_id: "a2", name: "mem", destinations: ["slack"], enabled: false },
++      { alert_id: "a3", name: "disk", destinations: ["pager"], enabled: true },
++    ],
++    [
++      { name: "slack", type: "http", template: "tpl-http" },
++      { name: "pager", type: "http", template: "tpl-http" },
++      { name: "lonely", type: "email" },
++    ],
++    [{ name: "tpl-http", type: "http" }],
++  );
++
++  it("counts a destination's neighbours (alerts + template), excluding itself", () => {
++    const { node, counts } = focusSummary(graph, { kind: "destination", name: "slack" });
++    expect(node?.name).toBe("slack");
++    expect(counts).toEqual({ templates: 1, destinations: 0, alerts: 2 });
++  });
++
++  it("counts a template's neighbours (destinations + alerts), excluding itself", () => {
++    const { counts } = focusSummary(graph, { kind: "template", name: "tpl-http" });
++    expect(counts).toEqual({ templates: 0, destinations: 2, alerts: 3 });
++  });
++
++  it("counts an alert's neighbours (destination + template), excluding itself", () => {
++    const { counts } = focusSummary(graph, { kind: "alert", alertId: "a1", name: "cpu" });
++    expect(counts).toEqual({ templates: 1, destinations: 1, alerts: 0 });
++  });
++
++  it("marks an orphan destination (no alerts) and keeps zero counts", () => {
++    const { node, counts } = focusSummary(graph, { kind: "destination", name: "lonely" });
++    expect(node?.orphan).toBe(true);
++    expect(counts.alerts).toBe(0);
++  });
++});
++
++describe("dependency kind helpers", () => {
++  it("maps each kind to its icon", () => {
++    expect(depKindIcon("template")).toBe("description");
++    expect(depKindIcon("destination")).toBe("location-on");
++    expect(depKindIcon("alert")).toBe("shield-alert-outline");
++  });
++
++  it("colours by state first, then kind", () => {
++    expect(depKindColor({ kind: "destination", orphan: false, missing: true })).toBe(
++      "text-status-negative",
++    );
++    expect(depKindColor({ kind: "destination", orphan: true, missing: false })).toBe(
++      "text-status-warning",
++    );
++    expect(depKindColor({ kind: "destination", orphan: false, missing: false })).toBe("text-info");
++    expect(depKindColor({ kind: "alert", orphan: false, missing: false })).toBe(
++      "text-status-positive",
++    );
++    expect(depKindColor({ kind: "template", orphan: false, missing: false })).toBe(
++      "text-text-secondary",
++    );
++  });
++});
+diff --git a/web/src/composables/alerts/useDependencyGraph.ts b/web/src/composables/alerts/useDependencyGraph.ts
+new file mode 100644
+index 00000000000..19e63933df0
+--- /dev/null
++++ b/web/src/composables/alerts/useDependencyGraph.ts
+@@ -0,0 +1,481 @@
++/* Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++// Builds the notification dependency graph (Template → Destination → Alert) by
++// cross-referencing the three existing list APIs client-side. There is no
++// reverse-lookup endpoint: the linkage lives only in `alert.destinations`
++// (destination NAMES), `alert.template` (an alert-level template override) and a
++// destination's own `template`. We fetch all three lists and match by name.
++//
++// The alert list DTO now carries `destinations` + `template` (an additive field
++// on ListAlertsResponseBodyItem), so the whole graph is three list calls with no
++// per-alert detail fetch.
++//
++// Output is an abstract, layout-free model (nodes carry kind + flags, edges carry
++// the relation) so it stays unit-testable; the view owns positioning + rendering.
++
++import { ref } from "vue";
++import alertsService from "@/services/alerts";
++import destinationService from "@/services/alert_destination";
++import templateService from "@/services/alert_templates";
++
++export type DepNodeKind = "template" | "destination" | "alert";
++
++/** One entity to focus the graph on (its dependency chain), used by the popup. */
++export type DepFocus = { kind: DepNodeKind; name?: string; alertId?: string };
++
++export type DepRelation = "usage" | "template" | "override";
++
++export interface DepNode {
++  /** `${kind}:${name}` — stable across rebuilds; alerts key on their id. */
++  id: string;
++  kind: DepNodeKind;
++  /** Display name; also the join key for destinations/templates. */
++  name: string;
++  /** Destination/template transport kind (http | email | sns | action). */
++  transport?: string;
++  /** Destinations: how many alerts deliver to it. Templates: dest + override refs. */
++  usageCount: number;
++  /** A destination with no alerts, or a template referenced by nothing. */
++  orphan: boolean;
++  /**
++   * A destination NAME referenced by an alert but absent from the destination
++   * list (broken alert), or a template referenced but not defined. This state is
++   * otherwise invisible today — it only surfaces as a runtime notification miss.
++   */
++  missing: boolean;
++  /** Alert-only: enabled flag, for a muted look on disabled alerts. */
++  enabled?: boolean;
++  /** Alert-only: id + folder, so the view can deep-link to the alert. */
++  alertId?: string;
++  folderId?: string;
++}
++
++export interface DepEdge {
++  id: string;
++  source: string;
++  target: string;
++  relation: DepRelation;
++}
++
++export interface DepGraph {
++  nodes: DepNode[];
++  edges: DepEdge[];
++  stats: {
++    templates: number;
++    destinations: number;
++    alerts: number;
++    orphanDestinations: number;
++    danglingReferences: number;
++    orphanTemplates: number;
++  };
++}
++
++/** A destination in a focus chain, with the alerts it feeds. */
++export type ChainDestination = DepNode & { alerts: DepNode[] };
++
++/** One entity's dependency chain, grouped for the compact panel. */
++export interface FocusChain {
++  focusNode: DepNode | null;
++  templates: DepNode[];
++  destinations: ChainDestination[];
++  /** Flat list of every alert in the chain (paginated by the panel). */
++  alerts: DepNode[];
++}
++
++/** The subset of each list-API row that the graph reads (rows carry more). */
++export interface AlertRow {
++  alert_id?: string;
++  id?: string;
++  name: string;
++  destinations?: string[];
++  template?: string | null;
++  enabled?: boolean;
++  folder_id?: string;
++}
++export interface DestinationRow {
++  name: string;
++  type?: string;
++  template?: string | null;
++}
++export interface TemplateRow {
++  name: string;
++  type?: string;
++}
++
++// Resolve one entity's dependency chain from the full graph, traversed
++// DIRECTIONALLY so a shared template pulls in only the focused branch (never
++// sibling destinations). Pure + exported so the panel stays thin and testable.
++export function buildFocusChain(graph: DepGraph, focus: DepFocus): FocusChain {
++  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
++
++  let start: string | null = null;
++  if (focus.kind === "alert") {
++    const n = graph.nodes.find(
++      (x) => x.kind === "alert" && (x.alertId === focus.alertId || x.name === focus.name),
++    );
++    start = n?.id ?? null;
++  } else {
++    const id = `${focus.kind}:${focus.name}`;
++    start = graph.nodes.some((x) => x.id === id) ? id : null;
++  }
++
++  // Build per-relation adjacency maps once (O(edges)) so each traversal below is a
++  // handful of O(1) lookups instead of rescanning every edge per node — the earlier
++  // nested scans were O(dests × edges) and grew badly on large orgs.
++  const push = (m: Map<string, string[]>, k: string, v: string) => {
++    const arr = m.get(k);
++    if (arr) arr.push(v);
++    else m.set(k, [v]);
++  };
++  const usageBySource = new Map<string, string[]>(); // destination → its alerts
++  const usageByTarget = new Map<string, string[]>(); // alert → its destinations
++  const templateBySource = new Map<string, string[]>(); // template → destinations
++  const templateByTarget = new Map<string, string[]>(); // destination → templates
++  const overrideBySource = new Map<string, string[]>(); // template → override alerts
++  const overrideByTarget = new Map<string, string[]>(); // alert → override templates
++  for (const e of graph.edges) {
++    if (e.relation === "usage") {
++      push(usageBySource, e.source, e.target);
++      push(usageByTarget, e.target, e.source);
++    } else if (e.relation === "template") {
++      push(templateBySource, e.source, e.target);
++      push(templateByTarget, e.target, e.source);
++    } else if (e.relation === "override") {
++      push(overrideBySource, e.source, e.target);
++      push(overrideByTarget, e.target, e.source);
++    }
++  }
++
++  const ids = new Set<string>();
++  const destAlerts = new Map<string, string[]>();
++  const addAlertToDest = (destId: string, alertId: string) => push(destAlerts, destId, alertId);
++
++  if (start) {
++    ids.add(start);
++    if (focus.kind === "destination") {
++      for (const tpl of templateByTarget.get(start) ?? []) ids.add(tpl);
++      for (const alert of usageBySource.get(start) ?? []) {
++        ids.add(alert);
++        addAlertToDest(start, alert);
++        for (const tpl of overrideByTarget.get(alert) ?? []) ids.add(tpl);
++      }
++    } else if (focus.kind === "template") {
++      for (const dest of templateBySource.get(start) ?? []) {
++        ids.add(dest);
++        for (const alert of usageBySource.get(dest) ?? []) {
++          ids.add(alert);
++          addAlertToDest(dest, alert);
++        }
++      }
++      for (const alert of overrideBySource.get(start) ?? []) ids.add(alert);
++    } else {
++      for (const dest of usageByTarget.get(start) ?? []) {
++        ids.add(dest);
++        // Record the focused alert against the destination so its chain entry is
++        // truthful (not empty); the row badge shows the destination's TOTAL usage.
++        addAlertToDest(dest, start);
++        for (const tpl of templateByTarget.get(dest) ?? []) ids.add(tpl);
++      }
++      for (const tpl of overrideByTarget.get(start) ?? []) ids.add(tpl);
++    }
++  }
++
++  const chain = graph.nodes.filter((n) => ids.has(n.id));
++  return {
++    focusNode: start ? (byId.get(start) ?? null) : null,
++    templates: chain.filter((n) => n.kind === "template"),
++    destinations: chain
++      .filter((n) => n.kind === "destination")
++      .map((d) => ({
++        ...d,
++        alerts: (destAlerts.get(d.id) ?? []).map((id) => byId.get(id)!).filter(Boolean),
++      })),
++    alerts: chain.filter((n) => n.kind === "alert"),
++  };
++}
++
++/** Counts of an entity's chain neighbours, by kind, EXCLUDING the entity itself. */
++export interface DepCounts {
++  templates: number;
++  destinations: number;
++  alerts: number;
++}
++
++// Per-kind icon + colour for a dependency node — the single source shared by the
++// "where used" rows and the list "Used by" column so a kind reads the same in both.
++export const depKindIcon = (kind: DepNodeKind): string =>
++  kind === "template"
++    ? "description"
++    : kind === "destination"
++      ? "location-on"
++      : "shield-alert-outline";
++
++export const depKindColor = (node: Pick<DepNode, "kind" | "orphan" | "missing">): string => {
++  if (node.missing) return "text-status-negative";
++  if (node.orphan) return "text-status-warning";
++  return node.kind === "destination"
++    ? "text-info"
++    : node.kind === "alert"
++      ? "text-status-positive"
++      : "text-text-secondary";
++};
++
++/** The focus entity's node plus its chain-neighbour counts, in one pass. */
++export interface FocusSummary {
++  node: DepNode | null;
++  counts: DepCounts;
++}
++
++// Everything the "Used by" cell needs: the entity's own node (for its
++// orphan/missing state) and its chain-neighbour counts (what the popover shows),
++// minus the entity itself. Reuses buildFocusChain so the column and the popover
++// can never disagree.
++export function focusSummary(graph: DepGraph, focus: DepFocus): FocusSummary {
++  const chain = buildFocusChain(graph, focus);
++  const selfId = chain.focusNode?.id ?? null;
++  const notSelf = (n: DepNode) => n.id !== selfId;
++  return {
++    node: chain.focusNode,
++    counts: {
++      templates: chain.templates.filter(notSelf).length,
++      destinations: chain.destinations.filter(notSelf).length,
++      alerts: chain.alerts.filter(notSelf).length,
++    },
++  };
++}
++
++const tplId = (name: string) => `template:${name}`;
++const dstId = (name: string) => `destination:${name}`;
++const alrId = (id: string) => `alert:${id}`;
++
++const emptyGraph = (): DepGraph => ({
++  nodes: [],
++  edges: [],
++  stats: {
++    templates: 0,
++    destinations: 0,
++    alerts: 0,
++    orphanDestinations: 0,
++    danglingReferences: 0,
++    orphanTemplates: 0,
++  },
++});
++
++// The graph is identical for every popover in an org and costs three list calls
++// (up to the org's full alert list), so build it once and reuse it across opens,
++// rows and list pages instead of re-downloading it on every popover open.
++// Correctness comes from explicit invalidation — the popover's delete AND every
++// list page's refresh (post add/edit/delete) call invalidateDependencyGraphCache()
++// — so this TTL only backstops changes made in another tab/session; kept long
++// because same-session mutations already drop the cache immediately.
++const GRAPH_TTL_MS = 300_000;
++let graphCache: { org: string; graph: DepGraph; at: number } | null = null;
++
++/** Drop the cached graph so the next open refetches (call after a mutation). */
++export function invalidateDependencyGraphCache() {
++  graphCache = null;
++}
++
++export function useDependencyGraph() {
++  const graph = ref<DepGraph>(emptyGraph());
++  const loading = ref(false);
++  const error = ref<string | null>(null);
++
++  // Pure builder — separated from the fetch so it can be unit-tested with fixtures.
++  const buildGraph = (
++    alerts: AlertRow[],
++    destinations: DestinationRow[],
++    templates: TemplateRow[],
++  ): DepGraph => {
++    const nodes = new Map<string, DepNode>();
++    const edges: DepEdge[] = [];
++
++    const templateNode = (name: string): DepNode => {
++      const id = tplId(name);
++      let node = nodes.get(id);
++      if (!node) {
++        node = { id, kind: "template", name, usageCount: 0, orphan: false, missing: true };
++        nodes.set(id, node);
++      }
++      return node;
++    };
++    const destinationNode = (name: string): DepNode => {
++      const id = dstId(name);
++      let node = nodes.get(id);
++      if (!node) {
++        node = { id, kind: "destination", name, usageCount: 0, orphan: false, missing: true };
++        nodes.set(id, node);
++      }
++      return node;
++    };
++
++    // Seed the DEFINED templates + destinations first, so `missing` starts false
++    // for anything that actually exists; still-missing nodes below are dangling
++    // references discovered only through an alert/destination pointing at them.
++    for (const tpl of templates) {
++      const node = templateNode(tpl.name);
++      node.missing = false;
++      node.transport = tpl.type;
++    }
++    for (const dst of destinations) {
++      const node = destinationNode(dst.name);
++      node.missing = false;
++      node.transport = dst.type;
++      // Destination's default template (used unless an alert overrides it).
++      if (dst.template) {
++        const tpl = templateNode(dst.template);
++        tpl.usageCount += 1;
++        edges.push({
++          id: `e:tpl:${dst.template}->dst:${dst.name}`,
++          source: tpl.id,
++          target: node.id,
++          relation: "template",
++        });
++      }
++    }
++
++    // Alerts are the demand side: each `destinations` name is a usage edge, and an
++    // `alert.template` is a dashed override edge straight to the template.
++    for (const alert of alerts) {
++      const id = alrId(alert.alert_id ?? alert.id ?? alert.name);
++      const alertNode: DepNode = {
++        id,
++        kind: "alert",
++        name: alert.name,
++        usageCount: 0,
++        orphan: false,
++        missing: false,
++        enabled: alert.enabled !== false,
++        alertId: alert.alert_id ?? alert.id,
++        folderId: alert.folder_id,
++      };
++      nodes.set(id, alertNode);
++
++      for (const destName of alert.destinations ?? []) {
++        const dst = destinationNode(destName);
++        dst.usageCount += 1;
++        edges.push({
++          id: `e:dst:${destName}->alr:${id}`,
++          source: dst.id,
++          target: id,
++          relation: "usage",
++        });
++      }
++
++      if (alert.template) {
++        const tpl = templateNode(alert.template);
++        tpl.usageCount += 1;
++        edges.push({
++          id: `e:tpl:${alert.template}->alr:${id}`,
++          source: tpl.id,
++          target: id,
++          relation: "override",
++        });
++      }
++    }
++
++    // Derive the flag states now that every reference has been counted.
++    let orphanDestinations = 0;
++    let danglingReferences = 0;
++    let orphanTemplates = 0;
++    for (const node of nodes.values()) {
++      if (node.kind === "destination") {
++        node.orphan = !node.missing && node.usageCount === 0;
++        if (node.orphan) orphanDestinations += 1;
++        if (node.missing) danglingReferences += 1;
++      } else if (node.kind === "template") {
++        node.orphan = !node.missing && node.usageCount === 0;
++        if (node.orphan) orphanTemplates += 1;
++        if (node.missing) danglingReferences += 1;
++      }
++    }
++
++    return {
++      nodes: [...nodes.values()],
++      edges,
++      stats: {
++        templates: templates.length,
++        destinations: destinations.length,
++        alerts: alerts.length,
++        orphanDestinations,
++        danglingReferences,
++        orphanTemplates,
++      },
++    };
++  };
++
++  const loadGraph = async (org: string) => {
++    if (graphCache && graphCache.org === org && Date.now() - graphCache.at < GRAPH_TTL_MS) {
++      graph.value = graphCache.graph;
++      loading.value = false;
++      error.value = null;
++      return;
++    }
++    loading.value = true;
++    error.value = null;
++    try {
++      const [alertsRes, destinationsRes, templatesRes] = await Promise.all([
++        // v2 list (no folder = every folder). The v1 GET /api/{org}/alerts is not
++        // registered in all builds (404), and only v2's item DTO carries the
++        // destinations/template fields we cross-reference.
++        // NB: this route does NOT paginate — the service never forwards page_num/
++        // page_size, so it returns the org's full alert list. That's intentional: a
++        // complete graph needs every alert. The leading 1/0 are placeholder args for
++        // the shared signature, not a real bound; the per-org cache above keeps this
++        // full fetch from repeating on every popover open. The trailing `true` opts
++        // in to destinations/template, which the backend omits from the default path.
++        alertsService.listByFolderId(
++          1,
++          0,
++          "name",
++          false,
++          "",
++          org,
++          undefined,
++          undefined,
++          undefined,
++          true,
++        ),
++        destinationService.list({
++          page_num: 1,
++          page_size: 100000,
++          sort_by: "name",
++          desc: false,
++          org_identifier: org,
++          module: "alert",
++        }),
++        templateService.list({ org_identifier: org }),
++      ]);
++
++      const alerts = alertsRes.data?.list ?? alertsRes.data ?? [];
++      const destinations = destinationsRes.data ?? [];
++      const templates = templatesRes.data ?? [];
++
++      graph.value = buildGraph(alerts, destinations, templates);
++      graphCache = { org, graph: graph.value, at: Date.now() };
++    } catch (err: any) {
++      error.value = err?.response?.data?.message || err?.message || "unknown";
++      graph.value = emptyGraph();
++    } finally {
++      loading.value = false;
++    }
++  };
++
++  return { graph, loading, error, loadGraph, buildGraph };
++}
++
++export default useDependencyGraph;
+diff --git a/web/src/lib/core/Icon/OIcon.icons.ts b/web/src/lib/core/Icon/OIcon.icons.ts
+index 2d8831eb82e..a1d3410a18a 100644
+--- a/web/src/lib/core/Icon/OIcon.icons.ts
++++ b/web/src/lib/core/Icon/OIcon.icons.ts
+@@ -237,6 +237,7 @@ import HelpIcon from "~icons/material-symbols/help-outline";
+ import HistoryToggleOffIcon from "~icons/material-symbols/history-toggle-off";
+ import HomeIcon from "~icons/mdi/home-outline";
+ import OrganizationIcon from "~icons/octicon/organization-16";
++import Graph1Icon from "~icons/material-symbols/graph-1";
+ import Graph2Icon from "~icons/material-symbols/graph-2";
+ import HubIcon from "~icons/material-symbols/hub-outline";
+ import ImageIcon from "~icons/material-symbols/image-outline";
+@@ -487,6 +488,7 @@ export const iconRegistry = {
+   dns: Dns,
+   "fork-right": ForkRight,
+   "git-branch": ForkRight,
++  "graph-1": Graph1Icon,
+   "graph-2": Graph2Icon,
+   flame: Whatshot,
+   whatshot: Whatshot,
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 5f28a64f00d..0473b7eed2c 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -6483,6 +6483,32 @@
+     "sloShortWindow": "Short window",
+     "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
+   },
++  "alert_dependencies": {
++    "actionOpen": "Open",
++    "actionDelete": "Delete",
++    "deleteTitle": "Delete {name}?",
++    "deleteMessage": "This permanently removes it. Deletion is blocked if an alert or destination still uses it.",
++    "deletedToast": "{name} deleted",
++    "deleteFailedToast": "Couldn't delete {name}",
++    "loading": "Building dependency graph…",
++    "failedToLoad": "Failed to load dependencies: {error}",
++    "usedBy": "{count} alert | {count} alerts",
++    "countDestinations": "{count} destination | {count} destinations",
++    "usedByColumn": "Used by",
++    "searchPlaceholder": "Search",
++    "noDependencies": "No dependencies.",
++    "noMatches": "No matches.",
++    "laneEmpty": "No alerts",
++    "directOverrides": "Uses this template directly",
++    "sectionDestinations": "Destinations",
++    "sectionAlerts": "Alerts",
++    "orphanTag": "Unused",
++    "missingTag": "Missing",
++    "enabled": "Enabled",
++    "paused": "Paused",
++    "impactTemplate": "Used by {destinations} · {alerts}",
++    "impactDestination": "Used by {alerts}"
++  },
+   "alert_templates": {
+     "exportTemplate": "Export Template",
+     "selected": "selected",
+diff --git a/web/src/services/alerts.ts b/web/src/services/alerts.ts
+index 32ac050e912..218523014e2 100644
+--- a/web/src/services/alerts.ts
++++ b/web/src/services/alerts.ts
+@@ -44,6 +44,7 @@ const alerts = {
+     folder_id?: string,
+     query?: string,
+     alert_type?: string,
++    include_dependencies?: boolean,
+   ) => {
+     let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
+     if (folder_id) {
+@@ -55,6 +56,11 @@ const alerts = {
+     if (alert_type) {
+       url += `&alert_type=${alert_type}`;
+     }
++    // Opt in to the destinations/template fields (dependency view only) — the
++    // backend keeps them off the default list response otherwise.
++    if (include_dependencies) {
++      url += `&include_dependencies=true`;
++    }
+     return http().get(url);
+   },
+   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {

@@ -1,0 +1,24 @@
+{
+  "feature_slug": "alert-dependency-graph",
+  "feature_title": "Alert Notification Dependency Graph",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-dependency-graph.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-dependency-graph.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/components/alerts/AlertsDestinationList.vue",
+    "web/src/components/alerts/TemplateList.vue",
+    "web/src/components/alerts/DependencyUsageCell.vue",
+    "web/src/components/alerts/DependencyImpactDialog.vue",
+    "web/src/components/alerts/DependencyEntityRow.vue",
+    "web/src/composables/alerts/useDependencyGraph.ts",
+    "web/src/services/alerts.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

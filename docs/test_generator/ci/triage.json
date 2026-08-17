@@ -1,0 +1,32 @@
+{
+  "feature_slug": "alert-dependency-graph",
+  "feature_title": "Alert Notification Dependency Graph",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-dependency-graph.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-dependency-graph.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/components/alerts/AlertsDestinationList.vue",
+    "web/src/components/alerts/TemplateList.vue",
+    "web/src/components/alerts/DependencyUsageCell.vue",
+    "web/src/components/alerts/DependencyImpactDialog.vue",
+    "web/src/components/alerts/DependencyEntityRow.vue",
+    "web/src/composables/alerts/useDependencyGraph.ts",
+    "web/src/services/alerts.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 16 changed files live in OSS-owned paths: web/src/** (Vue components, composable, service, i18n, icon registry) and src/api/management/src/** (alert request/response models and the list handler). No enterprise-owned directory appears in changed_files.txt, and the #[cfg(feature = \"enterprise\")] annotation in request/alerts/mod.rs is a compile-time feature gate, not enterprise code ownership. No enterprise keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management) are present, so edition is oss.",
+    "skip": "Not skipped. trigger_comment.txt is empty (no skip request or tests-added marker) and feature_hint.txt is empty. The change is user-facing: it adds a 'Used by' column and an impact dialog to the alerts UI, so the no-user-facing-change skip does not apply.",
+    "e2e": "E2E is warranted. The diff introduces new user-exercisable UI flows: a 'Used by' column on the alert destination and template lists, a click-to-open DependencyImpactDialog (with search, lane highlights, open-in-new-tab, and confirmed delete), and cache invalidation that refreshes those columns after mutations. These are brand-new interactive flows in web/src that a browser test should exercise.",
+    "area": "Alerts. The bulk of the changes live under web/src/components/alerts/ and web/src/composables/alerts/, backed by the alert list API under src/api/management/src. Sibling Playwright specs already exist under tests/ui-testing/playwright-tests/Alerts/, so this area is the natural home.",
+    "group": "Alerts. The OSS ci-matrix base manifest defines an 'Alerts' testfolder shard (actual_folder 'Alerts') that runs alerts-*.spec.js files such as alerts-ui-operations.spec.js and alerts-destinations-prebuilt.spec.js, which is the closest existing matrix group for this feature.",
+    "existing_tests": "No E2E specs in the diff. The only changed test files are Vitest unit specs (DependencyImpactDialog.spec.ts, DependencyUsageCell.spec.ts, useDependencyGraph.spec.ts) under web/src/** — these are unit tests, not Playwright E2E coverage, and do not cover the new feature at the browser level."
+  }
+}

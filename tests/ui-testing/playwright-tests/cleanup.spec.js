@@ -41,7 +41,8 @@ test.describe("Pre-Test Cleanup", () => {
         'test_fv_alerts_slack_',   // alerts-form-validation.spec.js (slack destination created by the test cases)
         /^destination\d{1,3}$/,    // destination4, destination44, destination444, etc.
         'wf_auto_dest_',           // Workflows v1 test destinations
-        'wf_auto_'                 // Workflows v1 generic test destinations
+        'wf_auto_',                // Workflows v1 generic test destinations
+        'depgraph_'                // alerts-dependency-graph.spec.js (dependency graph destinations)
       ],
       // Template prefixes to clean up
       [
@@ -65,7 +66,8 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
         'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
         'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite templates)
-        'test_fv_alerts_tmpl_'     // alerts-form-validation.spec.js (templates created by the test cases)
+        'test_fv_alerts_tmpl_',    // alerts-form-validation.spec.js (templates created by the test cases)
+        'depgraph_'                // alerts-dependency-graph.spec.js (dependency graph templates)
       ],
       // Folder prefixes to clean up
       ['auto_', 'incident_e2e_folder_', 'E2E Incidents ', 'E2E Scheduled ', 'wf_auto_']

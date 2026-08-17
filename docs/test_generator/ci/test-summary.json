@@ -1,0 +1,47 @@
+[
+  {
+    "title": "P0: Destination list shows an alert-count badge and opens a flat destination-focus impact dialog",
+    "action": "new",
+    "verifies": "a consumed destination renders a '1 alert' badge and clicking it opens a flat destination-focus impact dialog with the consuming alert and no destinations lane"
+  },
+  {
+    "title": "P0: Template list shows destination/alert badges and opens the multi-lane template-focus dialog with direct overrides",
+    "action": "new",
+    "verifies": "a template renders '1 destination' and '2 alerts' badges and its dialog shows a destinations lane, a per-destination alert group, and the direct-overrides section"
+  },
+  {
+    "title": "P1: Orphan destination and orphan template collapse to the Unused chip",
+    "action": "new",
+    "verifies": "an entity with zero downstream consumers shows the 'Unused' chip on both the destinations and templates lists"
+  },
+  {
+    "title": "P1: Impact dialog search filters downstream entities and shows the no-matches state",
+    "action": "new",
+    "verifies": "the dialog search input case-insensitively filters downstream entities by name and shows 'No matches.' when nothing matches"
+  },
+  {
+    "title": "P1: Deleting a non-focus neighbour from the dialog refetches the graph and removes the row",
+    "action": "new",
+    "verifies": "deleting a downstream alert (not the focus) from the dialog refetches the graph so the deleted row disappears while the focus row and dialog remain"
+  },
+  {
+    "title": "P1: Deleting an in-use entity from the dialog is blocked with an error toast",
+    "action": "new",
+    "verifies": "deleting an entity still referenced by an alert surfaces an error toast and leaves the entity and dialog intact"
+  },
+  {
+    "title": "P2: Open entity action navigates to the editor in a new tab",
+    "action": "new",
+    "verifies": "the hover-revealed open icon opens the entity's editor route in a new browser tab"
+  },
+  {
+    "title": "P1: Deleting the focus entity closes the dialog — not wired: focus is never rendered as a deletable row",
+    "action": "new",
+    "verifies": "deleting the focused entity closes the impact dialog (parked as fixme — the focus node is only rendered as the dialog header, never a deletable row)"
+  },
+  {
+    "title": "P2: Missing chip for a dangling reference — not wired to a deterministic setup",
+    "action": "new",
+    "verifies": "a dangling (missing) reference surfaces the 'Missing' chip (parked as fixme — no deterministic API setup and the chip lacks a data-test)"
+  }
+]
