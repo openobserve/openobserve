@@ -301,8 +301,37 @@ async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) ->
     if let Err(e) = synthetics_runs::increment_jobs_done(db, &row.run_id, 4, now_us).await {
         tracing::error!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] increment_jobs_done: {e}");
     }
-    if let Err(e) = synthetics_checks::update_last_check_status(db, &row.synthetics_id, 4).await {
-        tracing::error!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] update_last_check_status: {e}");
+    // The bool is whether the status actually changed. Publishing on that — not
+    // on the write — is what keeps this off the per-run traffic budget: a check
+    // that is already failing re-reports 4 on every dispatch failure and sends
+    // nothing, while the first failure after a pass sends one message. Without
+    // it the other regions' LIST would keep showing the last status they
+    // themselves ran, or "Unknown".
+    match synthetics_checks::update_last_check_status(db, &row.synthetics_id, 4).await {
+        Ok(true) => {
+            #[cfg(feature = "enterprise")]
+            if o2_enterprise::enterprise::common::config::get_config()
+                .super_cluster
+                .enabled
+                && let Err(e) =
+                    o2_enterprise::enterprise::super_cluster::queue::synthetics_check_last_status(
+                        &row.org_id,
+                        &row.synthetics_id,
+                        4,
+                    )
+                    .await
+            {
+                // Logged, not returned: this function's caller reads the bool as
+                // "the failure was recorded", and it was. A replication hiccup
+                // must not make it look otherwise.
+                tracing::warn!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] super-cluster last_check_status publish: {e}");
+            }
+        }
+        // Unchanged — the steady state, and deliberately silent.
+        Ok(false) => {}
+        Err(e) => {
+            tracing::error!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] update_last_check_status: {e}");
+        }
     }
     true
 }

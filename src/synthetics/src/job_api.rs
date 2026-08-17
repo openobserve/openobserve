@@ -930,13 +930,48 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
     };
 
     // Denormalize last check status onto the synthetic row.
-    if let Err(e) =
-        synthetics_checks::update_last_check_status(conn, &check.synthetics_id, status_db).await
-    {
-        tracing::warn!(
-            synthetics_id = %check.synthetics_id,
-            "[synthetics] update_last_check_status: {e}"
-        );
+    //
+    // The write returns whether it CHANGED the stored value, and that bool is
+    // the whole reason the publish below is affordable: this runs on every ack,
+    // so publishing unconditionally would put a super-cluster message on the
+    // queue for every run of every check. Publishing on the transition instead
+    // means a check that keeps passing sends nothing at all.
+    match synthetics_checks::update_last_check_status(conn, &check.synthetics_id, status_db).await {
+        // Only the region that ran the check writes this column, so without the
+        // broadcast every other region's LIST shows "Unknown" for a check its
+        // own detail page — federated search over the results stream — reports
+        // as passing.
+        Ok(true) => {
+            #[cfg(feature = "enterprise")]
+            if o2_enterprise::enterprise::common::config::get_config()
+                .super_cluster
+                .enabled
+                && let Err(e) =
+                    o2_enterprise::enterprise::super_cluster::queue::synthetics_check_last_status(
+                        &check.org_id,
+                        &check.synthetics_id,
+                        status_db,
+                    )
+                    .await
+            {
+                // Logged, never propagated. The probe has done its work and is
+                // owed its 200; failing the ack here would lose the run, and a
+                // status badge that is stale in another region until the next
+                // flip is cosmetic by comparison.
+                tracing::warn!(
+                    synthetics_id = %check.synthetics_id,
+                    "[synthetics] super-cluster last_check_status publish: {e}"
+                );
+            }
+        }
+        // Unchanged — the steady state, and deliberately silent.
+        Ok(false) => {}
+        Err(e) => {
+            tracing::warn!(
+                synthetics_id = %check.synthetics_id,
+                "[synthetics] update_last_check_status: {e}"
+            );
+        }
     }
 
     // Fetch synthetic for type, target, and destinations — all definition

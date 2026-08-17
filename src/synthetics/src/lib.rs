@@ -332,14 +332,19 @@ mod tests {
     }
 
     /// The OSS half of the enterprise `nothing_on_the_run_path_publishes`
-    /// guarantee, and the reason replication traffic scales with edits rather
-    /// than with runs.
+    /// guarantee, and the reason replication traffic scales with *changes*
+    /// rather than with runs.
     ///
     /// `claim_due` and `advance_schedule` live in `infra::table`, which cannot
     /// reach the enterprise crate at all, so the only place a per-run publish
     /// could be introduced is one of these callers. If one ever grows one,
     /// 1,000 checks on a 1-minute schedule become 1,000 messages a minute
     /// forever — and nothing else in the system would notice.
+    ///
+    /// The list is not "zero publishes" but a counted allowance per file,
+    /// because the property being protected is the rate, not the location. The
+    /// three run-path publishes below each sit behind a transition check and so
+    /// cost nothing in the steady state; see the comment on the allowance table.
     ///
     /// The enterprise copy walks the files still in `o2_enterprise`; this walks
     /// the ones that have moved here, with the same allowance table. A file
@@ -362,19 +367,37 @@ mod tests {
         ];
         for (name, source) in files {
             let source = squeezed(source);
-            assert!(
-                !source.contains(&prefix),
-                "{name} is off the user-CRUD path; only the check service may publish a check"
-            );
             // Exceptions are named, counted and guarded, never waved through by
-            // raising the ceiling for the whole list. `dispatcher` mints an
-            // org's default probe token when it has none — a once-per-org
-            // backfill for orgs older than the probe-token table, not a per-run
-            // event.
-            let allowed = match *name {
-                "dispatcher" => 1,
-                _ => 0,
+            // raising the ceiling for the whole list.
+            //
+            // `checks` is the count of check publishes; `any` additionally
+            // covers the locations and probe-token queues.
+            //
+            //  - `dispatcher` mints an org's default probe token when it has none — a once-per-org
+            //    backfill for orgs older than the probe-token table, not a per-run event. That one
+            //    is a probe-token publish, hence 0 checks but 1 of `any`.
+            //  - `dispatcher`, `job_api` and `reaper` each replicate `last_check_status`, the badge
+            //    the LIST renders. That column is written only where the check ran, so before this
+            //    the other regions showed "Unknown" for a check their own detail page — federated
+            //    search over the results stream — reported as passing.
+            //
+            //    This is the one publish on the run path, and it is safe for the
+            //    reason this test exists to protect: it sits behind the bool from
+            //    `update_last_check_status`, which is true only when the stored
+            //    value CHANGED. So the rate is status flips, not runs — a check
+            //    that passes 1,440 times a day publishes nothing. Anything that
+            //    would fire once per run still belongs at 0 here, and the guard
+            //    to add for it is a transition check, not another entry.
+            let (checks, allowed) = match *name {
+                "dispatcher" => (1, 2),
+                "job_api" | "reaper" => (1, 1),
+                _ => (0, 0),
             };
+            assert_eq!(
+                source.matches(&prefix).count(),
+                checks,
+                "{name} is off the user-CRUD path; it may publish a check exactly {checks} time(s)"
+            );
             assert_eq!(
                 source.matches(&any).count(),
                 allowed,

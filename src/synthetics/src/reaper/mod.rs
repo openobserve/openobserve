@@ -175,11 +175,45 @@ async fn handle_dead_letter(
     }
 
     // Mark synthetic as Failed so the UI reflects the infra problem.
-    if let Err(e) = synthetics_checks::update_last_check_status(db, &row.synthetics_id, 4).await {
-        tracing::error!(
-            synthetics_id = %row.synthetics_id,
-            "[synthetics reaper] update_last_check_status: {e}"
-        );
+    //
+    // "The UI" is every region's, not just this one's: the column is written
+    // only where the check ran, so a dead-letter here left the other regions'
+    // LIST showing the check as whatever they last saw, or "Unknown". The write
+    // reports whether it changed anything, and only a change is published — a
+    // check that is already in Error dead-letters silently, which is the common
+    // case when a private agent has gone away and every run of every check it
+    // served is expiring.
+    match synthetics_checks::update_last_check_status(db, &row.synthetics_id, 4).await {
+        Ok(true) => {
+            #[cfg(feature = "enterprise")]
+            if o2_enterprise::enterprise::common::config::get_config()
+                .super_cluster
+                .enabled
+                && let Err(e) =
+                    o2_enterprise::enterprise::super_cluster::queue::synthetics_check_last_status(
+                        &row.org_id,
+                        &row.synthetics_id,
+                        4,
+                    )
+                    .await
+            {
+                // This function returns nothing and its remaining work — the
+                // results and triggers stream writes — is what actually reports
+                // the dead letter. A failed publish must not stop it.
+                tracing::warn!(
+                    synthetics_id = %row.synthetics_id,
+                    "[synthetics reaper] super-cluster last_check_status publish: {e}"
+                );
+            }
+        }
+        // Unchanged — the steady state, and deliberately silent.
+        Ok(false) => {}
+        Err(e) => {
+            tracing::error!(
+                synthetics_id = %row.synthetics_id,
+                "[synthetics reaper] update_last_check_status: {e}"
+            );
+        }
     }
 
     // Fetch ingest token — needed for both stream writes.

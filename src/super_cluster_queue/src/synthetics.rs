@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Applies synthetic check *config* replicated from the region a user edited in.
+//! Applies synthetic check *config* replicated from the region a user edited
+//! in, plus the one runtime column that travels — the status badge, replicated
+//! from the region that ran the check, and only when it flips.
 //!
 //! Everything here goes through `infra::table::synthetics_checks` on purpose.
 //! The publishing wrapper is one layer up, in the enterprise synthetics
@@ -30,7 +32,8 @@
 //!
 //! Applies are idempotent because the queue redelivers: `Create` is a no-op
 //! when the row is already here, `Update` and `SetEnabled` are last-write-wins,
-//! and `Delete` is a delete.
+//! `Delete` is a delete, and `SetLastCheckStatus` writes only when the value
+//! differs, so a repeat touches nothing.
 //!
 //! The one field that is NOT applied as it arrives is `folder_id`. It is a
 //! `folders` KSUID, and the default synthetics folder is minted lazily by
@@ -170,6 +173,41 @@ async fn resolve_move_destination(org_id: &str, dst: &str) -> Result<String> {
     }
 }
 
+/// Applies the replicated status badge.
+///
+/// A missing row is **not** an error, deliberately unlike `SetEnabled` below.
+/// `enabled` decides whether the check runs at all, so losing it changes
+/// behaviour and is worth making the message redeliver; `last_check_status` is
+/// the badge the LIST renders, so a status that outran its create — or arrived
+/// after a delete — is cosmetic, and the check's next flip republishes it
+/// anyway. Erroring would retry a message about a check that does not exist
+/// here until it dead-lettered.
+///
+/// Redelivery is safe for the same reason the producer is quiet:
+/// `update_last_check_status` writes only when the value differs, so applying
+/// the same message twice is a no-op the second time.
+///
+/// `org_id` is carried for the log line and for parity with the other variants.
+/// The write keys on the check id, which is a KSUID and already unique across
+/// orgs.
+///
+/// Split out of [`process_msg`] so it can be exercised against a real database
+/// without going through the process-wide ORM handle.
+async fn apply_last_check_status<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    status: i32,
+) -> Result<()> {
+    if !table::synthetics_checks::update_last_check_status(conn, id, status).await? {
+        log::debug!(
+            "[SUPER_CLUSTER:DB] synthetics check {org_id}/{id} status {status} was already \
+             current, or the check is not in this region"
+        );
+    }
+    Ok(())
+}
+
 async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match msg {
@@ -231,6 +269,9 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
                     "synthetics check {org_id}/{id} not found for enable/pause"
                 )));
             }
+        }
+        SyntheticsMessage::SetLastCheckStatus { org_id, id, status } => {
+            apply_last_check_status(conn, &org_id, &id, status).await?;
         }
         SyntheticsMessage::MoveToFolder {
             org_id,
@@ -401,6 +442,143 @@ mod tests {
                 "{layer} publishes what it writes; applying through it loops"
             );
         }
+    }
+
+    /// A real sqlite holding just the checks table, so the apply below is
+    /// measured against what a database actually does rather than against a
+    /// queued `rows_affected`. One connection, because separate connections to
+    /// `sqlite::memory:` get separate databases.
+    async fn db_with_a_check(status: i32) -> sea_orm::DatabaseConnection {
+        use infra::table::entity::synthetics_checks::{ActiveModel, Entity, Model};
+        use sea_orm::{ActiveModelTrait, ConnectOptions, ConnectionTrait, Database, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(Entity)))
+            .await
+            .unwrap();
+
+        let model = Model {
+            id: "check-1".to_string(),
+            org_id: "org1".to_string(),
+            folder_id: "folder-1".to_string(),
+            tz_offset: 0,
+            name: "Login Flow".to_string(),
+            synthetics_type: "browser".to_string(),
+            target: "https://app.example.com".to_string(),
+            description: String::new(),
+            tags: serde_json::json!([]),
+            config: serde_json::json!({"browser_devices": [], "steps": []}),
+            frequency: serde_json::json!({"type": "minutes", "interval": 5, "cron": ""}),
+            locations: serde_json::json!(["aws-us-east-1"]),
+            enabled: true,
+            destinations: serde_json::json!([]),
+            settings: serde_json::json!({}),
+            secrets: "{}".to_string(),
+            next_run_at: 0,
+            last_triggered_at: 0,
+            last_check_status: status,
+            consecutive_failures: 0,
+            last_alert_at: 0,
+            alerting: false,
+            degraded_notified_at: 0,
+            owner: None,
+            created_at: 0,
+            updated_at: 0,
+        };
+        // `reset_all` because `From<Model>` marks every field `Unchanged`, which
+        // an INSERT would skip.
+        let am: ActiveModel = model.into();
+        am.reset_all().insert(&db).await.unwrap();
+        db
+    }
+
+    async fn stored_status(db: &sea_orm::DatabaseConnection, id: &str) -> i32 {
+        use sea_orm::EntityTrait;
+        infra::table::entity::synthetics_checks::Entity::find_by_id(id)
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap()
+            .last_check_status
+    }
+
+    /// The bug this variant exists for: only the region that ran the check
+    /// writes `last_check_status`, so before this the LIST in every other region
+    /// said "Unknown" for a check whose own detail page — federated search over
+    /// the results stream — reported it as passing.
+    #[tokio::test]
+    async fn a_status_message_lands_on_the_local_row() {
+        let db = db_with_a_check(0).await;
+
+        apply_last_check_status(&db, "org1", "check-1", 1)
+            .await
+            .unwrap();
+
+        assert_eq!(stored_status(&db, "check-1").await, 1);
+    }
+
+    /// The queue redelivers, so the same message arrives more than once. The
+    /// apply has to be a no-op the second time rather than something that has to
+    /// remember what it already did.
+    #[tokio::test]
+    async fn a_redelivered_status_message_changes_nothing() {
+        let db = db_with_a_check(0).await;
+
+        for _ in 0..3 {
+            apply_last_check_status(&db, "org1", "check-1", 3)
+                .await
+                .unwrap();
+        }
+
+        assert_eq!(stored_status(&db, "check-1").await, 3);
+    }
+
+    /// Deliberately unlike `SetEnabled`, which errors on a missing row. A status
+    /// that outran its create, or arrived after a delete, is cosmetic — erroring
+    /// would redeliver a message about a check that does not exist here until it
+    /// dead-lettered, and the check's next flip republishes it anyway.
+    #[tokio::test]
+    async fn a_status_for_a_check_that_is_not_here_is_not_an_error() {
+        let db = db_with_a_check(1).await;
+
+        apply_last_check_status(&db, "org1", "no-such-check", 3)
+            .await
+            .expect("a missing row must be acked, not redelivered forever");
+
+        assert_eq!(
+            stored_status(&db, "check-1").await,
+            1,
+            "and it must not have written some other row"
+        );
+    }
+
+    /// The type check has to reject a status message on the wrong `MessageType`
+    /// too. `SetLastCheckStatus` is the only variant a run can produce, so it is
+    /// also the one most likely to be published from somewhere new.
+    #[tokio::test]
+    async fn a_status_message_on_the_wrong_message_type_is_rejected() {
+        let payload = config::utils::json::to_vec(&SyntheticsMessage::SetLastCheckStatus {
+            org_id: "org1".to_string(),
+            id: "check-1".to_string(),
+            status: 1,
+        })
+        .unwrap();
+        let msg = Message::new(
+            "/synthetics/".to_string(),
+            Some(payload.into()),
+            None,
+            false,
+            MessageType::Put,
+        );
+        let err = process(msg).await.unwrap_err();
+        assert!(
+            err.to_string().contains("Invalid message type"),
+            "expected the type check to reject it, got: {err}"
+        );
     }
 
     /// The runtime tables are region-owned (`synthetics_jobs` is a lease queue,

@@ -810,17 +810,32 @@ pub async fn advance_schedule<C: ConnectionTrait>(
 }
 
 /// Updates `last_check_status` after a probe acks a job.
+///
+/// Returns `true` when the stored value actually CHANGED — `false` for a repeat
+/// of the same status, and for a check that is not in this region at all.
+///
+/// The `ne` filter is what makes transition-only replication possible. This is
+/// called on every ack, so a caller that published unconditionally would put a
+/// message on the super-cluster queue for every run of every check, forever;
+/// publishing on `true` instead makes the traffic scale with status *flips*, and
+/// a healthy check acking every minute sends nothing. It also makes the write
+/// idempotent, which is what lets the super-cluster consumer treat a redelivery
+/// as a no-op rather than having to remember what it already applied.
+///
+/// One statement, so there is no read-modify-write window for two acks of the
+/// same check to race through — the database decides who changed the value.
 pub async fn update_last_check_status<C: ConnectionTrait>(
     conn: &C,
     id: &str,
     status: i32,
-) -> Result<(), errors::Error> {
-    Entity::update_many()
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
         .col_expr(Column::LastCheckStatus, Expr::value(status))
         .filter(Column::Id.eq(id))
+        .filter(Column::LastCheckStatus.ne(status))
         .exec(conn)
         .await?;
-    Ok(())
+    Ok(res.rows_affected > 0)
 }
 
 /// The alert bookkeeping a completed run needs in order to decide whether to
@@ -1534,6 +1549,132 @@ mod tests {
         assert!(
             !new_check_id(&blank, true).is_empty(),
             "an empty id is not an id to honour"
+        );
+    }
+
+    /// A real sqlite with just this table, because the property under test is
+    /// the DATABASE's answer to "did that write change anything". A mock returns
+    /// whatever `rows_affected` the test queued, which would make the assertions
+    /// below about the mock rather than about the `ne` filter.
+    ///
+    /// One connection, not a pool: separate connections to `sqlite::memory:` get
+    /// separate databases, so a second checkout would see an empty table.
+    async fn db_with_one_check(status: i32) -> sea_orm::DatabaseConnection {
+        use sea_orm::{ActiveModelTrait, ConnectOptions, Database, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(Entity)))
+            .await
+            .unwrap();
+
+        let model = Model {
+            last_check_status: status,
+            ..make_model()
+        };
+        // `reset_all` because `From<Model>` marks every field `Unchanged`, which
+        // an INSERT would skip.
+        let am: ActiveModel = model.into();
+        am.reset_all().insert(&db).await.unwrap();
+        db
+    }
+
+    async fn stored_status(db: &sea_orm::DatabaseConnection, id: &str) -> i32 {
+        Entity::find_by_id(id)
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap()
+            .last_check_status
+    }
+
+    /// **The one that matters.** This is called on every ack, so the bool it
+    /// returns is the entire budget for super-cluster status replication: the
+    /// callers publish on `true`, so a check that keeps reporting the same
+    /// status publishes once and then never again, however often it runs.
+    ///
+    /// If this ever returns `true` twice for the same value, a thousand
+    /// 1-minute checks become a thousand messages a minute, forever.
+    #[tokio::test]
+    async fn acking_the_same_status_twice_reports_one_change() {
+        let db = db_with_one_check(0).await;
+
+        assert!(
+            update_last_check_status(&db, "mon-1", 1).await.unwrap(),
+            "0 -> 1 is a transition and must be published"
+        );
+        assert!(
+            !update_last_check_status(&db, "mon-1", 1).await.unwrap(),
+            "the second ack of the same status must be silent"
+        );
+        assert!(
+            !update_last_check_status(&db, "mon-1", 1).await.unwrap(),
+            "and stay silent"
+        );
+
+        assert_eq!(stored_status(&db, "mon-1").await, 1);
+    }
+
+    /// The flip side: a real transition must still be reported, or a check that
+    /// starts failing stays green in every other region until someone edits it.
+    #[tokio::test]
+    async fn a_changed_status_reports_a_change() {
+        let db = db_with_one_check(1).await;
+
+        assert!(update_last_check_status(&db, "mon-1", 3).await.unwrap());
+        assert_eq!(stored_status(&db, "mon-1").await, 3);
+        assert!(
+            update_last_check_status(&db, "mon-1", 1).await.unwrap(),
+            "recovery is a transition too"
+        );
+        assert_eq!(stored_status(&db, "mon-1").await, 1);
+    }
+
+    /// No row is `false`, not an error. It is what the super-cluster consumer
+    /// sees when a status message outran its create or arrived after a delete,
+    /// and erroring there would redeliver a message about a check that does not
+    /// exist until it dead-lettered.
+    #[tokio::test]
+    async fn a_missing_check_is_not_a_change_and_not_an_error() {
+        let db = db_with_one_check(1).await;
+
+        assert!(
+            !update_last_check_status(&db, "no-such-check", 3)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            stored_status(&db, "mon-1").await,
+            1,
+            "and it must not have written some other row"
+        );
+    }
+
+    /// The `ne` filter is the mechanism, so assert it reaches the SQL. The
+    /// behavioural tests above run on sqlite; this pins the emitted statement so
+    /// the filter cannot be dropped in favour of an application-side compare,
+    /// which would reintroduce the read-modify-write race between two acks of
+    /// the same check.
+    #[tokio::test]
+    async fn the_update_filters_on_the_status_being_different() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results(vec![MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        update_last_check_status(&db, "mon-1", 2).await.unwrap();
+
+        let sql = format!("{:?}", db.into_transaction_log());
+        assert!(
+            sql.contains(r#"\"last_check_status\" <> $"#),
+            "the transition test must be in the WHERE clause, not in Rust: {sql}"
         );
     }
 }
