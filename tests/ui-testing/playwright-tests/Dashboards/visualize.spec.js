@@ -11,13 +11,15 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
 import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
 
 import { deleteDashboard } from "./utils/dashCreation.js";
+const { isCloudEnvironment } = require("../../pages/cloudPages/cloud-env.js");
 
-//Dashboard name
-const randomDashboardName =
+// Tests run in parallel (mode: "parallel" below), so dashboard/panel names
+// must be generated fresh per test — a single shared name caused cross-test
+// races where one test's create/delete collided with another's mid-flight.
+const generateDashboardName = () =>
   "Dashboard_" + Math.random().toString(36).slice(2, 11);
-
-// Panel name
-const panelName = "Panel_" + Math.random().toString(36).slice(2, 11);
+const generatePanelName = () =>
+  "Panel_" + Math.random().toString(36).slice(2, 11);
 
 test.describe.configure({ mode: "parallel" });
 
@@ -83,6 +85,10 @@ test.describe("logs testcases", () => {
   test("should handle large datasets and complex SQL queries without showing an error on the chart", {
     tag: ["@logs", "@visualize", "@P1", "@all"],
   }, async ({ page }) => {
+    // The Visualize tab (logs-visualize-toggle) is gated behind
+    // store.state.zoConfig.timechart_enabled, which is disabled on alpha1
+    // (verified via /config) — no test code can enable a disabled backend flag.
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     const pm = new PageManager(page);
 
     await pm.logsVisualise.openLogs();
@@ -102,6 +108,7 @@ test.describe("logs testcases", () => {
   test("should redirect the correct chart type when added the aggregation query", {
     tag: ["@logs", "@visualize", "@P1", "@all"],
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     const pm = new PageManager(page);
 
     await pm.logsVisualise.openLogs();
@@ -127,6 +134,7 @@ test.describe("logs testcases", () => {
   test("should not show dashboard errors when changing chart types with aggregation query", {
     tag: ["@logs", "@visualize", "@P1", "@all"],
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     const pm = new PageManager(page);
 
     await pm.logsVisualise.openLogs();
@@ -173,6 +181,7 @@ test.describe("logs testcases", () => {
   test("should set line chart as default when using histogram query", {
     tag: ["@logs", "@visualize", "@P1", "@all"],
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     const pm = new PageManager(page);
 
     await pm.logsVisualise.openLogs();
@@ -205,7 +214,10 @@ test.describe("logs testcases", () => {
   test("Should display the correct query in the dashboard when saved from a Table chart.", {
     tag: ["@logs", "@visualize", "@dashboard", "@P1", "@all"],
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
+    const panelName = generatePanelName();
 
     await pm.logsVisualise.openLogs();
 
@@ -243,7 +255,10 @@ test.describe("logs testcases", () => {
   test("should display the correct query in the dashboard when saved from a Line chart.", {
     tag: ["@logs", "@visualize", "@dashboard", "@P1", "@all"],
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
+    const panelName = generatePanelName();
 
     await pm.logsVisualise.openLogs();
 
@@ -279,7 +294,10 @@ test.describe("logs testcases", () => {
   test("should save SELECT * query panel to dashboard successfully", {
     tag: ["@logs", "@visualize", "@dashboard", "@P1", "@all"],
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
+    const panelName = generatePanelName();
 
     await pm.logsVisualise.openLogs();
 
@@ -307,7 +325,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.verifyToastMessage("Panel added to dashboard");
 
     // Verify the panel is visible on the dashboard
-    const panelDropdown = page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+    const panelDropdown = pm.logsVisualise.getPanelDropdown(panelName);
     await expect(panelDropdown).toBeVisible({ timeout: 20000 });
     testLogger.info("SELECT * panel saved to dashboard successfully");
 
@@ -318,6 +336,7 @@ test.describe("logs testcases", () => {
   test("should show error message when using aggregation functions without aliases in SQL query", {
     tag: ["@logs", "@visualize", "@P2", "@all"],
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     const pm = new PageManager(page);
 
     await pm.logsVisualise.openLogs();
@@ -338,6 +357,7 @@ test.describe("logs testcases", () => {
   test("should show quick mode toggle accessible in visualize tab", {
     tag: ["@logs", "@visualize", "@P2", "@all"],
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     const pm = new PageManager(page);
 
     await pm.logsVisualise.openLogs();
@@ -364,6 +384,7 @@ test.describe("logs testcases", () => {
   test("should show connect null values toggle as true by default when visualizing histogram query with HAVING clause", {
     tag: ["@logs", "@visualize", "@P2", "@all"],
   }, async ({ page }) => {
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     const pm = new PageManager(page);
 
     await pm.logsVisualise.openLogs();

@@ -3,6 +3,78 @@ export default class DashboardFilter {
     this.page = page;
   }
 
+  // Click the "add condition" (+) button in the filter builder
+  async clickAddConditionBtn() {
+    await this.page.locator('[data-test="dashboard-add-condition-add"]').click();
+  }
+
+  // Click the "Add Group" menu option
+  async clickAddGroupOption() {
+    await this.page.getByText("Add Group").click();
+  }
+
+  // Click the last "Add Group" menu option (for nested groups)
+  async clickAddGroupOptionLast() {
+    await this.page.getByText("Add Group").last().click();
+  }
+
+  // Click the nth "Add Group" div (legacy nested-group flow)
+  async clickAddGroupDivByNth(n) {
+    await this.page.locator("div").filter({ hasText: "Add Group" }).nth(n).click();
+  }
+
+  // Click the "add condition" (+) button within a row matched by text/regex
+  async clickAddConditionWithinRowText(text) {
+    await this.page
+      .locator("div")
+      .filter({ hasText: text })
+      .locator('[data-test="dashboard-add-condition-add"]')
+      .click();
+  }
+
+  // Group container locator by group index
+  getGroup(groupIndex) {
+    return this.page.locator(
+      `[data-test="dashboard-group"][style*="--group-index: ${groupIndex}"]`
+    );
+  }
+
+  // Wait for a filter group (by index) to be visible
+  async waitForGroupVisible(groupIndex) {
+    await this.getGroup(groupIndex).waitFor({ state: "visible" });
+  }
+
+  // Click the "add condition" (+) button inside a specific group
+  async clickAddConditionInGroup(groupIndex) {
+    await this.getGroup(groupIndex)
+      .locator('[data-test="dashboard-add-condition-add"]')
+      .click();
+  }
+
+  // Click the remove-condition (trash) button
+  async clickRemoveCondition() {
+    await this.page.locator('[data-test="dashboard-add-condition-remove"]').click();
+  }
+
+  // Filter-condition label locator by index + field name
+  getAddConditionLabel(index, fieldName) {
+    return this.page.locator(
+      `[data-test="dashboard-add-condition-label-${index}-${fieldName}"]`
+    );
+  }
+
+  // Click the logical operator toggle (AND/OR) at a given condition index
+  async clickLogicalOperator(index) {
+    await this.page
+      .locator(`[data-test="dashboard-add-condition-logical-operator-${index}"]`)
+      .click();
+  }
+
+  // Select an operator option by its accessible name (e.g. "OR")
+  async selectOperatorOption(name) {
+    await this.page.getByRole("option", { name }).click();
+  }
+
   /**
    * Helper method to select a field from the StreamFieldSelect dropdown
    * @param {string} fieldName - The field name to select
@@ -130,7 +202,9 @@ export default class DashboardFilter {
 
       // OSelect in listbox mode: outer div gets data-test; PopoverTrigger is the inner button.
       // Use JS click to avoid viewport/portal click interception issues.
-      await operatorLocator.waitFor({ state: "visible", timeout: 10000 });
+      // 30s: the condition row renders after the field is added and its schema resolves,
+      // which under parallel CI load lands well past 10s.
+      await operatorLocator.waitFor({ state: "visible", timeout: 30000 });
       await operatorLocator.locator('button').first().evaluate((el) => el.click());
       // Options render in portal with data-test="${parent}-popover"
       const operatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
@@ -249,6 +323,37 @@ export default class DashboardFilter {
       await option.waitFor({ state: "visible" });
       await option.click();
     }
+  }
+
+  // Open a condition's list-tab OSelect, search for a value and pick the
+  // matching option (by data-test-value). Mirrors the maps filter flow:
+  // label -> list-tab OSelect -> search -> option.
+  async applyListConditionBySearch(index, fieldName, searchValue, optionValue) {
+    const idx = String(index);
+
+    const conditionLabel = this.page.locator(
+      `[data-test="dashboard-add-condition-label-${idx}-${fieldName}"]`
+    );
+    await conditionLabel.click();
+
+    const conditionList = this.page.locator(
+      '[data-test="dashboard-add-condition-list-tab"]'
+    );
+    await conditionList.click();
+
+    // Fill the search input inside the OSelect popover
+    const conditionSearch = this.page.locator(
+      '[data-test="dashboard-add-condition-list-tab-search"]'
+    );
+    await conditionSearch.waitFor({ state: "visible", timeout: 5000 });
+    await conditionSearch.fill(searchValue);
+
+    // Select the matching option via data-test-value
+    const optionLocator = this.page.locator(
+      `[data-test="dashboard-add-condition-list-tab-option"][data-test-value="${optionValue}"]`
+    );
+    await optionLocator.waitFor({ state: "visible", timeout: 5000 });
+    await optionLocator.click();
   }
 
   // Add filter condition with dynamic ,Group inside group filter

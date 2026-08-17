@@ -98,9 +98,9 @@ const BaseImportStub = {
   setup(_props: any, { expose }: any) {
     const jsonArrayOfObj = ref<any[]>([]);
     const jsonStr = ref("");
-    const isImporting = ref(false);
-    expose({ jsonArrayOfObj, jsonStr, isImporting });
-    return { jsonArrayOfObj, jsonStr, isImporting };
+    const isImportingLocal = ref(false);
+    expose({ jsonArrayOfObj, jsonStr, isImportingLocal });
+    return { jsonArrayOfObj, jsonStr, isImportingLocal };
   },
 };
 
@@ -467,9 +467,9 @@ describe("ImportDestination", () => {
     });
 
     it("does nothing and resets isImporting when jsonStr is empty", async () => {
-      wrapper.vm.$refs.baseImportRef.isImporting = true;
+      wrapper.vm.$refs.baseImportRef.isImportingLocal = true;
       await wrapper.vm.importJson({ jsonStr: "", jsonArray: [] });
-      expect(wrapper.vm.$refs.baseImportRef.isImporting).toBe(false);
+      expect(wrapper.vm.$refs.baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("calls toast with the parse error message for invalid JSON", async () => {
@@ -478,9 +478,9 @@ describe("ImportDestination", () => {
     });
 
     it("resets isImporting on parse error", async () => {
-      wrapper.vm.$refs.baseImportRef.isImporting = true;
+      wrapper.vm.$refs.baseImportRef.isImportingLocal = true;
       await wrapper.vm.importJson({ jsonStr: "{ bad json }", jsonArray: [] });
-      expect(wrapper.vm.$refs.baseImportRef.isImporting).toBe(false);
+      expect(wrapper.vm.$refs.baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("resets error arrays before processing", async () => {

@@ -988,16 +988,6 @@ const incidentIconClass = (severity: string) => {
   return "text-status-info-text";
 };
 
-const severityBadgeClass = (sev: string): string => {
-  const s = (sev || "p4").toLowerCase();
-  if (s === "p1") return "bg-error-50 text-error-600 border border-[0.0625em] border-error-600";
-  if (s === "p2")
-    return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
-  if (s === "p3")
-    return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
-  return "bg-status-info-bg text-status-info-text border border-[0.0625em] border-status-info-text";
-};
-
 const serviceCardClass = (svc: any) => {
   if (svc.errorFlag && svc.error_rate >= 5) return "border-l-[0.1875em] border-l-error-600";
   if (svc.errorFlag || svc.latencyFlag) return "border-l-[0.1875em] border-l-warning-600";

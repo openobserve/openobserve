@@ -311,14 +311,7 @@ export class StreamsPage {
         await schemaBtn.click();
     }
 
-    async searchForField(fieldName) {
-        // OInput exposes the fillable inner <input> via `${parent}-field`. The
-        // wrapper `data-test="schema-field-search-input"` resolves to a <div>
-        // which page.fill() rejects.
-        const field = this.page.locator('[data-test="schema-field-search-input-field"]');
-        await field.click();
-        await field.fill(fieldName);
-    }
+
 
     async selectFullTextSearch() {
         // Per-row OSelect on schema.vue uses data-test "schema-field-<row>-index-type-select".

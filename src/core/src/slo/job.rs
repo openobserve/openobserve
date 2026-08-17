@@ -31,7 +31,7 @@ use config::{
     meta::{
         search::{Query, Request, RequestEncoding},
         slo::{
-            SliConfig, Slo,
+            CountSource, QueryLanguage, SliConfig, Slo,
             alert_uptime::{EvalInterval, UptimeGrid, uptime_slices},
             slice::SliceRow,
             stream::{SLO_SLICES_STREAM, SloSliceRow},
@@ -44,7 +44,9 @@ use config::{
 use infra::table::{slo as slo_table, slos as slos_table};
 
 use super::{
-    ingest::{PassParams, PassResult, QueryRow, build_slices, exact_rollup, fill_missing},
+    ingest::{
+        PassParams, PassResult, QueryRow, RejectReason, build_slices, exact_rollup, fill_missing,
+    },
     query::{SLICE_ALIAS, SliQueryPlan, VALUE_ALIAS, group_key, plan},
 };
 
@@ -97,8 +99,31 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
         recompute_slices: cfg.slo.recompute_slices,
         generation_reset_time,
     }) else {
+        log::warn!("here, skipped the pass");
         return Ok(PassOutcome::NothingToDo);
     };
+
+    // for promql query, we add the slice interval sec to start to get the actual query start time
+    // see the prom_query fn for more details. But if after that calculation the start > = end
+    // we will get error in downstream processing and the slo will freeze. Thus instead we check
+    // here and skip early
+    match &slo.definition.sli_config {
+        SliConfig::TimeSlice { query_language, .. }
+            if matches!(query_language, QueryLanguage::PromQl)
+                && range.start + slo.definition.slice_interval_secs >= range.end =>
+        {
+            return Ok(PassOutcome::NothingToDo);
+        }
+
+        SliConfig::Count { source }
+            if matches!(source, CountSource::PromQl { .. })
+                && range.start + slo.definition.slice_interval_secs >= range.end =>
+        {
+            return Ok(PassOutcome::NothingToDo);
+        }
+
+        _ => {}
+    }
 
     let group_by = slo.definition.group_by.clone().unwrap_or_default();
     let params = PassParams {
@@ -115,8 +140,13 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
         max_groups: cfg.slo.max_groups,
     };
 
-    let rows = fetch_rows(slo, &group_by, &range, &params).await?;
+    let (rows, query_rejects) = fetch_rows(slo, &group_by, &range, &params).await?;
     let mut result = build_slices(&slo.definition.sli_config, rows, &params);
+    // Rows the query layer itself refused never reach `build_slices`, so their
+    // reasons are merged in here. Dropping them would report a window that is
+    // silently short of measurements as a clean pass, and the count is the only
+    // signal that an ambiguous PromQL aggregate is eating slices.
+    result.rejected.extend(query_rejects);
 
     // Gap fill BEFORE the rollup, or a grouped SLO's zero-traffic buckets
     // would be missing from the exact overall row.
@@ -156,12 +186,19 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
 }
 
 /// Run the pass's query and normalize its rows.
+///
+/// Returns the rows **and** the rows the normalization itself refused. Only the
+/// PromQL time-slice arm can produce the latter — an ambiguous aggregate is not
+/// a value that [`build_slices`] could reject downstream, it is the absence of
+/// one — and it is returned rather than logged here so the pass's single
+/// `rejected` count stays the one place that says how much of the window went
+/// unmeasured.
 async fn fetch_rows(
     slo: &Slo,
     group_by: &[String],
     range: &config::meta::slo::window::IngestRange,
     params: &PassParams,
-) -> Result<Vec<QueryRow>, anyhow::Error> {
+) -> Result<(Vec<QueryRow>, Vec<(String, RejectReason)>), anyhow::Error> {
     let plan = plan(
         &slo.definition.sli_config,
         group_by,
@@ -174,7 +211,7 @@ async fn fetch_rows(
     let stream_type = sli_stream_type(&slo.definition.sli_config);
 
     match plan {
-        SliQueryPlan::NoQuery => Ok(Vec::new()),
+        SliQueryPlan::NoQuery => Ok((Vec::new(), Vec::new())),
         SliQueryPlan::AlertLedger {
             alert_id,
             start_secs,
@@ -189,29 +226,43 @@ async fn fetch_rows(
                 end_secs * 1_000_000,
             )
             .await?;
-            Ok(ledger_query_rows(
-                &intervals,
-                UptimeGrid {
-                    range_start_secs: start_secs,
-                    range_end_secs: end_secs,
-                    slice_interval_secs: params.slice_interval_secs,
-                    min_coverage: get_config().slo.min_coverage,
-                },
+            Ok((
+                ledger_query_rows(
+                    &intervals,
+                    UptimeGrid {
+                        range_start_secs: start_secs,
+                        range_end_secs: end_secs,
+                        slice_interval_secs: params.slice_interval_secs,
+                        min_coverage: get_config().slo.min_coverage,
+                    },
+                ),
+                Vec::new(),
             ))
         }
         SliQueryPlan::Single(q) => {
             let hits = search(&slo.org, &q.sql, q.start_micros, q.end_micros, stream_type).await?;
-            Ok(hits
-                .iter()
-                .filter_map(|h| to_row(h, group_by, true))
-                .collect())
+            Ok((
+                single_query_rows(&hits, group_by, &slo.definition.sli_config),
+                Vec::new(),
+            ))
         }
         SliQueryPlan::PromQl { good, total } => {
             let good_series = prom_search(&slo.org, &good).await?;
             let total_series = prom_search(&slo.org, &total).await?;
-            Ok(promql_rows(
-                good_series,
-                total_series,
+            Ok((
+                promql_rows(
+                    good_series,
+                    total_series,
+                    group_by,
+                    params.slice_interval_secs,
+                ),
+                Vec::new(),
+            ))
+        }
+        SliQueryPlan::PromQlValue(q) => {
+            let series = prom_search(&slo.org, &q).await?;
+            Ok(promql_value_rows(
+                series,
                 group_by,
                 params.slice_interval_secs,
             ))
@@ -233,7 +284,7 @@ async fn fetch_rows(
                 stream_type,
             )
             .await?;
-            Ok(join_dual(&good_hits, &total_hits, group_by))
+            Ok((join_dual(&good_hits, &total_hits, group_by), Vec::new()))
         }
     }
 }
@@ -271,6 +322,28 @@ fn ledger_query_rows(
             good: s.good_secs,
             total: s.total_secs,
         })
+        .collect()
+}
+
+/// Normalize the hits of a [`SliQueryPlan::Single`] scan.
+///
+/// `plan` folds two SLI shapes onto that one variant and they do not project
+/// the same columns: a count single-query emits its conditional SUM under
+/// `zo_slo_good` beside the row count, while a time-slice query emits only its
+/// aggregate and leaves the good/bad decision to [`build_slices`]. Which
+/// column holds the numerator therefore comes from the SLI, never from
+/// whichever columns a hit happens to carry — an absent column is silent, so
+/// guessing would read a count bucket whose SUM came back NULL as fully good
+/// and invent uptime.
+fn single_query_rows(hits: &[json::Value], group_by: &[String], sli: &SliConfig) -> Vec<QueryRow> {
+    let with_good_column = matches!(
+        sli,
+        SliConfig::Count {
+            source: config::meta::slo::CountSource::SingleQuery { .. }
+        }
+    );
+    hits.iter()
+        .filter_map(|h| to_row(h, group_by, with_good_column))
         .collect()
 }
 
@@ -371,6 +444,83 @@ pub fn promql_rows(
         .collect()
 }
 
+/// Turn ONE PromQL range evaluation into time-slice [`QueryRow`]s, plus the
+/// `(slice_start, group)` pairs that were too ambiguous to answer.
+///
+/// The mapping is [`promql_rows`]': a sample at instant T measures the slice
+/// **ending** at T, so `slice_start = T - interval`, and the group key comes
+/// from the series' labels so it matches the SQL path byte-for-byte.
+///
+/// What differs is the collision rule, and it is the reason this is not
+/// [`promql_rows`]. When several series fold onto one `(slice_start, group)` —
+/// the routine result of a query whose grain is finer than the SLO's grouping,
+/// and the default for an ungrouped SLO over an unaggregated
+/// `histogram_quantile` — the count path SUMS them, which is right for
+/// counters: two pods' `increase()` genuinely add up. An aggregate has no such
+/// combining rule. Two p95s do not add to a p95, do not average to one, and
+/// taking whichever arrived last is arbitrary and unstable between passes.
+///
+/// Summing is the dangerous answer rather than the merely-imprecise one: two
+/// 250ms p95s would read as 500ms and fail a `p95 < 300ms` objective, inventing
+/// downtime out of a grouping mismatch. So the pair is refused — no row, and a
+/// [`RejectReason::AmbiguousSeries`] naming the group — which leaves a coverage
+/// hole with a reason attached instead of a confident wrong number. The refusal
+/// is scoped to the ambiguous slice, never to the group or the pass: one
+/// double-reporting instant must not black out a group's other instants.
+///
+/// Non-finite values are passed through untouched. `build_slices` rejects them;
+/// substituting anything here would hand the classifier a real-looking number
+/// (`0.0 < 300` reads as fully GOOD) and report an unmeasurable window as
+/// uptime.
+pub fn promql_value_rows(
+    series: Vec<PromSeries>,
+    group_by: &[String],
+    slice_interval_secs: i64,
+) -> (Vec<QueryRow>, Vec<(String, RejectReason)>) {
+    // `None` marks a pair that a second series has already contested. Ordered
+    // so both outputs are deterministic across passes: the same matrix must not
+    // produce differently-ordered rejects run to run.
+    type Seen = std::collections::BTreeMap<(i64, String), Option<(f64, String)>>;
+    let mut seen: Seen = Default::default();
+
+    for s in series {
+        let values: Vec<Option<String>> =
+            group_by.iter().map(|g| s.labels.get(g).cloned()).collect();
+        let key = group_key(group_by, &values);
+        let labels = group_by
+            .iter()
+            .zip(&values)
+            .map(|(k, v)| format!("{k}: {}", v.as_deref().unwrap_or("")))
+            .collect::<Vec<_>>()
+            .join(", ");
+        for (t_micros, value) in s.samples {
+            let slice_start = t_micros / 1_000_000 - slice_interval_secs;
+            seen.entry((slice_start, key.clone()))
+                .and_modify(|slot| *slot = None)
+                .or_insert_with(|| Some((value, labels.clone())));
+        }
+    }
+
+    let mut rows = Vec::new();
+    let mut rejected = Vec::new();
+    for ((slice_start, key), slot) in seen {
+        match slot {
+            // One value column, so it is both `good` and `total` — the same
+            // shape `to_row` gives a SQL time-slice hit, so nothing downstream
+            // has to know which source produced the row.
+            Some((value, labels)) => rows.push(QueryRow {
+                slice_start,
+                group_key: key,
+                group_labels: labels,
+                good: value,
+                total: value,
+            }),
+            None => rejected.push((key, RejectReason::AmbiguousSeries)),
+        }
+    }
+    (rows, rejected)
+}
+
 /// Run one PromQL range evaluation and normalize its matrix.
 async fn prom_search(
     org: &str,
@@ -401,7 +551,9 @@ async fn prom_search(
         // The same rule as a partial SQL response: an unusable result is an
         // ERROR that fails the pass, so coverage falls — never an empty
         // window that reads as data.
-        anyhow::bail!("SLO PromQL query returned a non-matrix response");
+        anyhow::bail!(
+            "SLO PromQL query returned a non-matrix response : {resp:?} trace : {trace_id}",
+        );
     };
     Ok(matrix
         .into_iter()
@@ -760,8 +912,9 @@ pub async fn run_range(
     };
     let range = config::meta::slo::window::IngestRange { start, end };
 
-    let rows = fetch_rows(slo, &group_by, &range, &params).await?;
+    let (rows, query_rejects) = fetch_rows(slo, &group_by, &range, &params).await?;
     let mut result = build_slices(&slo.definition.sli_config, rows, &params);
+    result.rejected.extend(query_rejects);
     let filled = fill_missing(&slo.definition.sli_config, &result.slices, &params);
     result.slices.extend(filled);
     if !group_by.is_empty() {
@@ -1229,5 +1382,605 @@ mod promql_rows_tests {
             },
         };
         assert_eq!(sli_stream_type(&sli), StreamType::Metrics);
+    }
+}
+
+/// Tests for normalizing a `SliQueryPlan::Single` hit.
+///
+/// `plan` returns `Single` for **two** different SLI shapes, and they project
+/// different columns: a count single-query projects `zo_slo_good` alongside
+/// `zo_slo_value`, a time-slice query projects `zo_slo_value` alone. One
+/// `Single` arm therefore has to normalize two shapes, and reading the
+/// numerator from a column that only one of them has is silent — the missing
+/// column defaults to `0.0` rather than failing.
+///
+/// These call [`single_query_rows`], the production normalizer, rather than
+/// re-implementing it: `fetch_rows` wraps it in a search RPC that a unit test
+/// cannot reach, so the extracted function is the seam and the arm's whole
+/// job is to call it.
+#[cfg(test)]
+mod single_query_row_tests {
+    use config::meta::{
+        alerts::Operator,
+        slo::{QueryLanguage, SliConfig},
+    };
+
+    use super::*;
+
+    /// Aligned to the 300s grid so `build_slices` accepts it, and written in
+    /// the datetime encoding the search layer actually returns.
+    const SLICE_START: i64 = 1_785_333_000;
+    const SLICE_START_TEXT: &str = "2026-07-29T13:50:00";
+    const SLICE_SECS: i64 = 300;
+
+    /// A hit shaped like `time_slice_sql`'s projection: the bucket and ONE
+    /// value column. There is deliberately no `zo_slo_good` — a time-slice
+    /// query aggregates and leaves the good/bad decision to Rust, so the
+    /// column does not exist to be read.
+    fn time_slice_hit(value: f64) -> json::Value {
+        json::json!({
+            "slice_start": SLICE_START_TEXT,
+            "zo_slo_value": value,
+        })
+    }
+
+    /// A hit shaped like `single_count_sql`'s projection: the conditional sum
+    /// under `zo_slo_good` and the row count under `zo_slo_value`. Integers,
+    /// as `SUM(CASE …)` and `COUNT(*)` actually come back.
+    fn count_hit(good: i64, total: i64) -> json::Value {
+        json::json!({
+            "slice_start": SLICE_START_TEXT,
+            "zo_slo_good": good,
+            "zo_slo_value": total,
+        })
+    }
+
+    fn time_slice_sli(comparator: Operator, threshold: f64) -> SliConfig {
+        SliConfig::TimeSlice {
+            stream: "requests".into(),
+            stream_type: "logs".into(),
+            query_language: QueryLanguage::Sql,
+            query: "approx_percentile_cont(duration_ms, 0.95)".into(),
+            scope: None,
+            comparator,
+            threshold,
+            absent_is_bad: false,
+        }
+    }
+
+    fn params() -> PassParams {
+        PassParams {
+            slo_id: "slo1".to_string(),
+            definition_generation: 1,
+            range_start: SLICE_START,
+            range_end: SLICE_START + SLICE_SECS,
+            slice_interval_secs: SLICE_SECS,
+            rev: 7,
+            max_groups: 500,
+        }
+    }
+
+    fn count_sli() -> SliConfig {
+        SliConfig::Count {
+            source: config::meta::slo::CountSource::SingleQuery {
+                stream: "requests".into(),
+                stream_type: "logs".into(),
+                scope: None,
+                good_expr: "status_code < 500".into(),
+            },
+        }
+    }
+
+    /// `QueryRow::good` is documented as "the aggregate value for a time-slice
+    /// one", and `build_slices` classifies `row.good` against the threshold.
+    /// A normalization that looks for `zo_slo_good` — a column
+    /// `time_slice_sql` never projects — and defaults it to `0.0` hands the
+    /// classifier a zero for every bucket in every pass.
+    #[test]
+    fn a_time_slice_hit_normalizes_its_aggregate_into_good() {
+        let rows = single_query_rows(
+            &[time_slice_hit(450.0)],
+            &[],
+            &time_slice_sli(Operator::LessThan, 300.0),
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].good, 450.0,
+            "the aggregate is what the classifier compares against"
+        );
+        assert_eq!(
+            rows[0].total, 450.0,
+            "a time-slice row has one value column, so good and total are it"
+        );
+    }
+
+    /// The count shape must keep reading its numerator from its own column:
+    /// the two shapes share the `Single` arm, so the fix for one must not
+    /// swap the columns of the other.
+    #[test]
+    fn a_count_hit_reads_its_numerator_from_zo_slo_good() {
+        let rows = single_query_rows(&[count_hit(97, 100)], &[], &count_sli());
+        assert_eq!(rows.len(), 1);
+        assert_eq!((rows[0].good, rows[0].total), (97.0, 100.0));
+    }
+
+    /// The mirror-image hazard, and the reason the flag must come from the
+    /// SLI rather than from which columns happen to be present. Guessing
+    /// ("no `zo_slo_good`? then the value column is the numerator") reads a
+    /// count bucket whose conditional SUM came back NULL as **fully good**
+    /// instead of fully bad — the same silent zero this module exists to
+    /// stop, pointing the other way and inventing uptime.
+    #[test]
+    fn a_count_hit_missing_its_good_column_is_fully_bad_not_fully_good() {
+        let no_good_column = json::json!({
+            "slice_start": SLICE_START_TEXT,
+            "zo_slo_value": 100,
+        });
+        let rows = single_query_rows(&[no_good_column], &[], &count_sli());
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            (rows[0].good, rows[0].total),
+            (0.0, 100.0),
+            "an absent numerator is zero good, never all good"
+        );
+    }
+
+    /// Every hit is normalized, and an unreadable one is DROPPED rather than
+    /// aborting the batch. The unreadable hit is deliberately first: a
+    /// normalizer that took only the head, or that unwrapped instead of
+    /// filtering, would return nothing here while still satisfying every
+    /// single-hit assertion above.
+    #[test]
+    fn a_batch_normalizes_every_readable_hit_and_drops_the_rest() {
+        let unreadable = json::json!({
+            "slice_start": "not-a-timestamp",
+            "zo_slo_value": 1.0,
+        });
+        let second_bucket = json::json!({
+            "slice_start": "2026-07-29T13:55:00",
+            "zo_slo_value": 275.0,
+        });
+        let rows = single_query_rows(
+            &[unreadable, time_slice_hit(450.0), second_bucket],
+            &[],
+            &time_slice_sli(Operator::LessThan, 300.0),
+        );
+        assert_eq!(
+            rows.len(),
+            2,
+            "one hit is unreadable, the other two are not"
+        );
+        assert_eq!(
+            (rows[0].slice_start, rows[0].good),
+            (SLICE_START, 450.0),
+            "hits keep their order"
+        );
+        assert_eq!(
+            (rows[1].slice_start, rows[1].good),
+            (SLICE_START + SLICE_SECS, 275.0)
+        );
+    }
+
+    /// The user-visible symptom, from search hit to stored slice: a 450ms p95
+    /// against a `p95 < 300ms` objective is a fully BAD slice. If the
+    /// aggregate never reaches `QueryRow::good` the classifier compares
+    /// `0.0 < 300` instead and stores a fully GOOD one — the SLO reads 100%
+    /// forever and its alerts can never fire.
+    #[test]
+    fn a_time_slice_aggregate_over_its_threshold_stores_a_fully_bad_slice() {
+        let sli = time_slice_sli(Operator::LessThan, 300.0);
+        let result = build_slices(
+            &sli,
+            single_query_rows(&[time_slice_hit(450.0)], &[], &sli),
+            &params(),
+        );
+        assert_eq!(result.slices.len(), 1);
+        assert_eq!(
+            (result.slices[0].good, result.slices[0].total),
+            (0.0, 300.0),
+            "seconds, not a ratio — and the slice still counts as measured"
+        );
+    }
+
+    /// A `>` objective is where the zero is unmistakable: an availability
+    /// aggregate of 99.9 against `> 99.0` is good, but a laundered `0.0`
+    /// compares false and reads as a fully bad slice — the same defect
+    /// pointing the other way, which pages continuously instead of never.
+    #[test]
+    fn a_greater_than_objective_is_not_inverted_by_a_lost_aggregate() {
+        let sli = time_slice_sli(Operator::GreaterThan, 99.0);
+        let result = build_slices(
+            &sli,
+            single_query_rows(&[time_slice_hit(99.9)], &[], &sli),
+            &params(),
+        );
+        assert_eq!(result.slices.len(), 1);
+        assert_eq!(
+            (result.slices[0].good, result.slices[0].total),
+            (300.0, 300.0)
+        );
+    }
+}
+
+/// Tests for turning a PromQL time-slice matrix into [`QueryRow`]s.
+///
+/// A time-slice SLI is **one number per slice**, not a good/total pair, so
+/// this normalizer is not [`promql_rows`] with an argument dropped — the two
+/// differ on the one thing that matters. `promql_rows` SUMS series that fold
+/// onto the same group, which is right for counters: two pods' `increase()`
+/// really do add up. Summing is *wrong* for an aggregate. Two series carrying
+/// a p95 for the same slice and group do not add to a p95, do not average to
+/// one, and picking either is arbitrary — so the pair is AMBIGUOUS and is
+/// rejected rather than answered wrongly (D2).
+///
+/// Written before `promql_value_rows` exists; the assertions below are its
+/// specification.
+#[cfg(test)]
+mod promql_value_rows_tests {
+    use config::meta::{alerts::Operator, slo::QueryLanguage};
+
+    use super::*;
+    use crate::slo::ingest::RejectReason;
+
+    const SLICE_SECS: i64 = 300;
+    /// Aligned to the 300s grid so `build_slices` accepts it, and chosen to
+    /// match the datetime the SQL path's fixture renders — the cross-source
+    /// comparison below depends on both sources landing on the same slice.
+    const SLICE_START: i64 = 1_785_333_000;
+    const SLICE_START_TEXT: &str = "2026-07-29T13:50:00";
+    /// The instant a sample for `SLICE_START` arrives at: PromQL is evaluated
+    /// at slice ENDS, so a sample at T covers the slice starting at
+    /// `T - interval`. Micros, matching promql sample timestamps.
+    const T_END: i64 = (SLICE_START + SLICE_SECS) * 1_000_000;
+    const T_END_NEXT: i64 = (SLICE_START + 2 * SLICE_SECS) * 1_000_000;
+
+    fn series(labels: &[(&str, &str)], samples: &[(i64, f64)]) -> PromSeries {
+        PromSeries {
+            labels: labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            samples: samples.to_vec(),
+        }
+    }
+
+    fn time_slice_sli(query_language: QueryLanguage, comparator: Operator) -> SliConfig {
+        SliConfig::TimeSlice {
+            stream: "http_request_duration_seconds".into(),
+            stream_type: "metrics".into(),
+            query_language,
+            query: "histogram_quantile(0.95, rate(latency_bucket[5m]))".into(),
+            scope: None,
+            comparator,
+            threshold: 300.0,
+            absent_is_bad: false,
+        }
+    }
+
+    fn params() -> PassParams {
+        PassParams {
+            slo_id: "slo1".to_string(),
+            definition_generation: 1,
+            range_start: SLICE_START,
+            range_end: SLICE_START + SLICE_SECS,
+            slice_interval_secs: SLICE_SECS,
+            rev: 7,
+            max_groups: 500,
+        }
+    }
+
+    // ===================== sample-to-slice mapping ========================
+
+    /// The plan evaluates at slice ends, so a sample at T is the measurement
+    /// of `(T - interval, T]`. Recording it at T instead would file every
+    /// value one slice late — invisible in the values and wrong in all of
+    /// them, and out of range at the pass boundary.
+    #[test]
+    fn a_sample_is_attributed_to_the_slice_it_closes() {
+        let (rows, rejected) =
+            promql_value_rows(vec![series(&[], &[(T_END, 450.0)])], &[], SLICE_SECS);
+        assert!(rejected.is_empty());
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].slice_start, SLICE_START);
+    }
+
+    /// A time-slice `QueryRow` has ONE value column, so it carries that value
+    /// in BOTH fields — exactly what the SQL path already does (`to_row`'s
+    /// `with_good_column: false` arm sets `good = total = value`, pinned by
+    /// `a_time_slice_hit_normalizes_its_aggregate_into_good`). `build_slices`
+    /// reads only `good`, so the two sources must not disagree about `total`:
+    /// one shape carrying the value and the other a zero for the same SLI type
+    /// is a landmine for anything that later reads a denominator.
+    #[test]
+    fn the_aggregate_lands_in_both_columns_as_the_sql_path_does() {
+        let (rows, _) = promql_value_rows(vec![series(&[], &[(T_END, 450.0)])], &[], SLICE_SECS);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            (rows[0].good, rows[0].total),
+            (450.0, 450.0),
+            "one value column, so good and total are it — one rule for both sources"
+        );
+    }
+
+    #[test]
+    fn each_sample_becomes_its_own_slice_in_time_order() {
+        let (rows, _) = promql_value_rows(
+            vec![series(&[], &[(T_END, 1.0), (T_END_NEXT, 2.0)])],
+            &[],
+            SLICE_SECS,
+        );
+        assert_eq!(rows.len(), 2);
+        let starts: Vec<i64> = rows.iter().map(|r| r.slice_start).collect();
+        assert_eq!(starts, vec![SLICE_START, SLICE_START + SLICE_SECS]);
+    }
+
+    // ===================== group identity =================================
+
+    /// The key must agree byte-for-byte with what the SQL path would produce,
+    /// because stored group keys survive a source change within a generation —
+    /// a differently-ordered key makes every group look new and restarts the
+    /// SLO.
+    #[test]
+    fn series_labels_become_the_group_key_in_definition_order() {
+        let gb = vec!["region".to_string(), "tier".to_string()];
+        let (rows, _) = promql_value_rows(
+            vec![series(
+                &[("tier", "gold"), ("region", "eu")],
+                &[(T_END, 12.5)],
+            )],
+            &gb,
+            SLICE_SECS,
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].group_key, "region=eu,tier=gold");
+        assert_eq!(rows[0].group_labels, "region: eu, tier: gold");
+    }
+
+    /// A series that simply lacks one of the SLO's group labels is still a
+    /// measurement. Dropping it would silently shrink the window; the empty
+    /// value keeps it, in the same shape the SQL path gives a NULL column.
+    #[test]
+    fn a_missing_group_label_reads_as_empty_not_dropped() {
+        let gb = vec!["region".to_string()];
+        let (rows, rejected) =
+            promql_value_rows(vec![series(&[], &[(T_END, 12.5)])], &gb, SLICE_SECS);
+        assert!(rejected.is_empty());
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].group_key, "region=");
+        assert_eq!(rows[0].group_labels, "region: ");
+    }
+
+    #[test]
+    fn an_ungrouped_slo_gets_the_empty_group_key() {
+        let (rows, _) = promql_value_rows(
+            vec![series(&[("pod", "a")], &[(T_END, 12.5)])],
+            &[],
+            SLICE_SECS,
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].group_key, "");
+        assert_eq!(rows[0].group_labels, "");
+    }
+
+    // ===================== ambiguity (D2) =================================
+
+    /// The whole reason this is not `promql_rows`. Two series folding onto one
+    /// `(slice_start, group_key)` is the routine result of a query returning a
+    /// finer grain than the SLO groups by — per-pod series under a per-region
+    /// SLO. For counters that SUMS correctly. For an aggregate there is no
+    /// correct answer: two p95s neither add nor average to a p95, and taking
+    /// whichever arrived last is arbitrary and unstable between passes.
+    ///
+    /// A summed answer here is the dangerous outcome, not a missing one: two
+    /// 250ms p95s would sum to 500ms and read as a fully BAD slice under
+    /// `< 300`, inventing downtime out of a grouping mismatch. The pair is
+    /// rejected instead: the slice is not written, so coverage falls with a
+    /// reason attached — unless the SLO opts into `absent_is_bad`, which
+    /// records the unwritten bucket as downtime rather than as a hole.
+    #[test]
+    fn two_series_colliding_on_one_slice_and_group_are_rejected_not_summed() {
+        let gb = vec!["region".to_string()];
+        let (rows, rejected) = promql_value_rows(
+            vec![
+                series(&[("region", "eu"), ("pod", "a")], &[(T_END, 250.0)]),
+                series(&[("region", "eu"), ("pod", "b")], &[(T_END, 250.0)]),
+            ],
+            &gb,
+            SLICE_SECS,
+        );
+        assert!(
+            rows.is_empty(),
+            "an ambiguous aggregate was answered anyway: {rows:?}"
+        );
+        assert_eq!(
+            rejected,
+            vec![("region=eu".to_string(), RejectReason::AmbiguousSeries)],
+            "the ambiguous pair must be surfaced with a reason, not dropped"
+        );
+    }
+
+    /// Ambiguity is not a property of grouping, and this is the likeliest way
+    /// it actually shows up: a `histogram_quantile` written without a
+    /// `sum by (…)` returns one series per instance, and an UNGROUPED SLO
+    /// folds every one of them onto the empty key. An implementation that
+    /// only looks for collisions when `!group_by.is_empty()` — and otherwise
+    /// sums into `""`, which is exactly what the count path is required to do
+    /// (`an_ungrouped_slo_sums_every_series_into_the_empty_key`) — passes
+    /// every other test in this section and still adds two p95s together.
+    #[test]
+    fn two_series_colliding_on_the_empty_group_are_rejected_too() {
+        let (rows, rejected) = promql_value_rows(
+            vec![
+                series(&[("pod", "a")], &[(T_END, 250.0)]),
+                series(&[("pod", "b")], &[(T_END, 250.0)]),
+            ],
+            &[],
+            SLICE_SECS,
+        );
+        assert!(
+            rows.is_empty(),
+            "an ungrouped collision was summed into the empty key: {rows:?}"
+        );
+        assert_eq!(
+            rejected,
+            vec![(String::new(), RejectReason::AmbiguousSeries)]
+        );
+    }
+
+    /// The rejection is scoped to the ambiguous SLICE, not to the pass and not
+    /// to the group. Refusing the whole pass — or blacklisting `region=eu` for
+    /// the pass because one of its instants collided — would turn one
+    /// mislabelled or briefly-double-reporting series into a blackout, which
+    /// is a far worse failure than the one being prevented.
+    ///
+    /// The colliding group therefore carries a SECOND, uncontested instant
+    /// that must survive. Without it a group-wide veto is indistinguishable
+    /// from a slice-scoped one, and this test would pass either way.
+    #[test]
+    fn an_ambiguous_slice_does_not_reject_its_unambiguous_neighbours() {
+        let gb = vec!["region".to_string()];
+        let (rows, rejected) = promql_value_rows(
+            vec![
+                // The two eu series collide at T_END only; pod=a alone reports
+                // at T_END_NEXT, so that slice of region=eu is unambiguous.
+                series(
+                    &[("region", "eu"), ("pod", "a")],
+                    &[(T_END, 250.0), (T_END_NEXT, 275.0)],
+                ),
+                series(&[("region", "eu"), ("pod", "b")], &[(T_END, 260.0)]),
+                series(&[("region", "us")], &[(T_END, 100.0)]),
+                // An untouched group, across both slices.
+                series(&[("region", "ap")], &[(T_END, 1.0), (T_END_NEXT, 2.0)]),
+            ],
+            &gb,
+            SLICE_SECS,
+        );
+        assert_eq!(rejected.len(), 1, "collateral rejections: {rejected:?}");
+        // Sorted rather than compared in emission order: what this test is
+        // about is which rows SURVIVED, not the order they came back in.
+        let mut kept: Vec<(i64, String, String)> = rows
+            .iter()
+            .map(|r| (r.slice_start, r.group_key.clone(), r.good.to_string()))
+            .collect();
+        kept.sort();
+        assert_eq!(
+            kept,
+            vec![
+                (SLICE_START, "region=ap".to_string(), "1".to_string()),
+                (SLICE_START, "region=us".to_string(), "100".to_string()),
+                (
+                    SLICE_START + SLICE_SECS,
+                    "region=ap".to_string(),
+                    "2".to_string()
+                ),
+                (
+                    SLICE_START + SLICE_SECS,
+                    "region=eu".to_string(),
+                    "275".to_string()
+                ),
+            ],
+            "the colliding group lost its uncontested slice too"
+        );
+    }
+
+    // ===================== non-finite values ==============================
+
+    /// NaN must reach the ingest boundary, which rejects it: the slice is not
+    /// written and coverage falls, unless the SLO opts into `absent_is_bad`
+    /// and the bucket is recorded as downtime instead. Laundering it here — to
+    /// `0.0`, or by skipping the sample — would hand `classify_time_slice` a
+    /// real-looking number: `0.0 < 300` reads as a fully GOOD slice, so an
+    /// unmeasurable window would report 100% uptime. This mirrors
+    /// `promql_rows`' refusal to clamp with `f64::min`.
+    #[test]
+    fn a_non_finite_value_survives_to_the_ingest_boundary() {
+        for bad in [f64::NAN, f64::INFINITY] {
+            let (rows, rejected) =
+                promql_value_rows(vec![series(&[], &[(T_END, bad)])], &[], SLICE_SECS);
+            assert!(rejected.is_empty(), "rejected here rather than at ingest");
+            assert_eq!(rows.len(), 1, "the sample was silently dropped");
+            assert!(
+                !rows[0].good.is_finite(),
+                "{bad} was laundered into {}",
+                rows[0].good
+            );
+
+            let result = build_slices(
+                &time_slice_sli(QueryLanguage::PromQl, Operator::LessThan),
+                rows,
+                &params(),
+            );
+            assert!(
+                result.slices.is_empty(),
+                "an unmeasurable slice was recorded as uptime"
+            );
+            assert_eq!(result.rejected.len(), 1);
+        }
+    }
+
+    // ===================== one classifier, two sources =====================
+
+    /// The core property of the feature: PromQL is a new *source*, not a new
+    /// *semantics*. Both paths hand `build_slices` the same aggregate under
+    /// `QueryRow::good`, so the identical definition must produce byte-equal
+    /// slices — same seconds, same coverage, same rev. Any divergence means
+    /// the language, not the objective, decides whether a slice is good.
+    #[test]
+    fn a_promql_row_classifies_exactly_as_a_sql_row_with_the_same_value() {
+        let sql_sli = time_slice_sli(QueryLanguage::Sql, Operator::LessThan);
+        let promql_sli = time_slice_sli(QueryLanguage::PromQl, Operator::LessThan);
+
+        let sql_hit = json::json!({
+            "slice_start": SLICE_START_TEXT,
+            "zo_slo_value": 450.0,
+        });
+        let from_sql = build_slices(
+            &sql_sli,
+            single_query_rows(&[sql_hit], &[], &sql_sli),
+            &params(),
+        );
+
+        let (prom_rows, rejected) =
+            promql_value_rows(vec![series(&[], &[(T_END, 450.0)])], &[], SLICE_SECS);
+        assert!(rejected.is_empty());
+        let from_promql = build_slices(&promql_sli, prom_rows, &params());
+
+        assert_eq!(from_sql.slices, from_promql.slices);
+        assert_eq!(from_sql.slices.len(), 1);
+        assert_eq!(
+            (from_sql.slices[0].good, from_sql.slices[0].total),
+            (0.0, 300.0),
+            "450ms against `p95 < 300ms` is a fully bad — but measured — slice"
+        );
+    }
+
+    /// The good branch of the same agreement. Both sources hand their value to
+    /// one `classify_time_slice`, so this cannot disagree with the case above
+    /// on the classification itself — what it pins is that the PromQL row
+    /// reaches the classifier carrying the same NUMBER when that number is on
+    /// the other side of the threshold.
+    #[test]
+    fn a_good_aggregate_also_agrees_across_the_two_sources() {
+        let sql_sli = time_slice_sli(QueryLanguage::Sql, Operator::LessThan);
+        let promql_sli = time_slice_sli(QueryLanguage::PromQl, Operator::LessThan);
+
+        let sql_hit = json::json!({
+            "slice_start": SLICE_START_TEXT,
+            "zo_slo_value": 120.0,
+        });
+        let from_sql = build_slices(
+            &sql_sli,
+            single_query_rows(&[sql_hit], &[], &sql_sli),
+            &params(),
+        );
+        let (prom_rows, _) =
+            promql_value_rows(vec![series(&[], &[(T_END, 120.0)])], &[], SLICE_SECS);
+        let from_promql = build_slices(&promql_sli, prom_rows, &params());
+
+        assert_eq!(from_sql.slices, from_promql.slices);
+        assert_eq!(
+            (from_sql.slices[0].good, from_sql.slices[0].total),
+            (300.0, 300.0)
+        );
     }
 }

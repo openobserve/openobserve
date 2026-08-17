@@ -3,7 +3,7 @@ const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const { getHeaders, getIngestionUrl, sendRequest } = require('../../utils/data-ingestion.js');
 const logData = require("../../../fixtures/log.json");
-const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
+const { getOrgIdentifier, getAuthHeaders, refreshCloudConfig } = require('../../utils/cloud-auth.js');
 
 /**
  * Alerts Regression Bugs Test Suite
@@ -19,8 +19,16 @@ test.describe("Alerts Regression Bugs", () => {
   let randomValue = `${Date.now()}`;
   const TEST_STREAM = 'e2e_automate';
   const METRICS_STREAM = 'e2e_test_cpu_usage';
-  const DESTINATION_NAME = 'e2e_promql_dest';
-  const TEMPLATE_NAME = 'e2e_promql_template';
+  // Unique per-run token for the template/destination. On the shared cloud org the fixed
+  // names left ghost records that a concurrent run's cleanup couldn't fully delete (delete
+  // stuck / destinations_templates_fk 500), so the beforeAll create returned 400
+  // "already exists" yet AlertList loaded ZERO destinations — and the revamped Add Alert
+  // button is disabled (`title="No destinations available"`) when destinations.length===0,
+  // failing every test at clickAddAlertButton. A fresh unique name always creates a real,
+  // loadable destination. Keeps the `e2e_promql_` prefix so cleanup.spec.js reclaims it.
+  const RUN_TOKEN = Date.now().toString(36);
+  const DESTINATION_NAME = `e2e_promql_dest_${RUN_TOKEN}`;
+  const TEMPLATE_NAME = `e2e_promql_template_${RUN_TOKEN}`;
 
   // ============================================================================
   // Setup hook: Create prerequisites (destination and template) ONCE before all tests
@@ -96,6 +104,31 @@ test.describe("Alerts Regression Bugs", () => {
         testLogger.info('Destination ready via API', { destinationName: DESTINATION_NAME, status: destResponse.status });
       } else {
         testLogger.warn('Destination creation response', { status: destResponse.status, data: destResponse.data });
+      }
+
+      // Gate on the destination actually appearing in the list API before tests run.
+      // AlertList disables the Add Alert button while destinations.length === 0, so the
+      // tests can't proceed until the just-created destination is loadable.
+      let destListed = false;
+      for (let attempt = 1; attempt <= 10; attempt++) {
+        destListed = await page.evaluate(async ({ baseUrl, org, authToken, name }) => {
+          try {
+            const r = await fetch(`${baseUrl}/api/${org}/alerts/destinations`, {
+              headers: { 'Authorization': `Basic ${authToken}` },
+            });
+            if (!r.ok) return false;
+            const d = await r.json();
+            const list = Array.isArray(d) ? d : (d.list || d.data || []);
+            return list.some(x => x && x.name === name);
+          } catch { return false; }
+        }, { baseUrl, org, authToken, name: DESTINATION_NAME });
+        if (destListed) break;
+        await page.waitForTimeout(2000);
+      }
+      if (destListed) {
+        testLogger.info('Destination confirmed in list API', { destinationName: DESTINATION_NAME });
+      } else {
+        testLogger.warn('Destination not visible in list API after retries — Add Alert button may stay disabled', { destinationName: DESTINATION_NAME });
       }
 
       testLogger.info('Prerequisites setup completed');
@@ -589,8 +622,8 @@ test.describe("Alerts Regression Bugs", () => {
       await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-      await cleanupAlertDestination(page, cleanupPm);
-      await cleanupAlertTemplate(page, cleanupPm);
+      await cleanupAlertDestination(page, cleanupPm, DESTINATION_NAME);
+      await cleanupAlertTemplate(page, cleanupPm, TEMPLATE_NAME);
       testLogger.info('Test suite cleanup completed');
     } catch (e) {
       testLogger.warn('Cleanup encountered issues', { error: e.message });
@@ -614,9 +647,14 @@ async function ingestMetricsData(page) {
   const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080';
   const ingestionUrl = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
 
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
+  // Cloud ingestion authenticates with the per-org passcode (email:passcode), NOT the
+  // Dex login password. getAuthHeaders() returns passcode Basic-auth on cloud and
+  // ZO_ROOT_USER creds on self-hosted. Refresh the passcode from the live browser
+  // session first so a stale cloud-config.json can't 401 the ingest — a silent 401 here
+  // left the metrics stream uncreated, so the PromQL flow later timed out trying to
+  // select 'e2e_test_cpu_usage'.
+  await refreshCloudConfig(page).catch(() => {});
+  const headers = getAuthHeaders();
 
   const timestamp = Math.floor(Date.now() / 1000);
 
@@ -635,28 +673,49 @@ async function ingestMetricsData(page) {
   }
 
   try {
-    const response = await page.evaluate(async ({ url, authToken, data }) => {
+    const response = await page.evaluate(async ({ url, headers, data }) => {
       const fetchResponse = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': `Basic ${authToken}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify(data)
       });
       return {
         status: fetchResponse.status,
         data: await fetchResponse.json().catch(() => ({}))
       };
-    }, { url: ingestionUrl, authToken: basicAuthCredentials, data: metricsData });
+    }, { url: ingestionUrl, headers, data: metricsData });
 
     testLogger.info('Metrics data ingested', { response, streamName });
   } catch (e) {
     testLogger.warn('Metrics ingestion may have failed', { error: e.message });
   }
 
-  // Allow time for indexing by waiting for network activity to settle
-  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  // Poll until the metrics stream is queryable so the later stream-select in the alert
+  // wizard doesn't race WAL indexing lag on cloud (a fixed networkidle wait was not
+  // enough — the stream showed up in the dropdown only seconds later).
+  const streamsUrl = `${baseUrl}/api/${orgId}/streams?type=metrics&page_num=0&page_size=1000`;
+  const deadline = Date.now() + 60000;
+  let streamFound = false;
+  while (Date.now() < deadline) {
+    streamFound = await page.evaluate(async ({ url, headers, streamName }) => {
+      try {
+        const r = await fetch(url, { headers });
+        if (!r.ok) return false;
+        const d = await r.json();
+        return (d.list || []).some(s => s.name === streamName);
+      } catch { return false; }
+    }, { url: streamsUrl, headers, streamName });
+    if (streamFound) {
+      testLogger.info('Metrics stream indexed and queryable', { streamName });
+      break;
+    }
+    await page.waitForTimeout(3000);
+  }
+  // Surface the real cause here rather than letting a later stream-select time out with
+  // a misleading error — if ingest 401'd or indexing never caught up, this is where it shows.
+  if (!streamFound) {
+    testLogger.warn('Metrics stream not indexed within 60s — downstream stream-select may fail', { streamName });
+  }
 }
 
 /**
@@ -694,9 +753,7 @@ async function createAlertTemplate(page, pm) {
 /**
  * Cleanup alert destination
  */
-async function cleanupAlertDestination(page, pm) {
-  const destinationName = 'e2e_promql_dest';
-
+async function cleanupAlertDestination(page, pm, destinationName = 'e2e_promql_dest') {
   try {
     // Use POM method to delete destination
     await pm.alertDestinationsPage.deleteDestinationByName(destinationName);
@@ -709,9 +766,7 @@ async function cleanupAlertDestination(page, pm) {
 /**
  * Cleanup alert template
  */
-async function cleanupAlertTemplate(page, pm) {
-  const templateName = 'e2e_promql_template';
-
+async function cleanupAlertTemplate(page, pm, templateName = 'e2e_promql_template') {
   try {
     // Use POM method to delete template
     await pm.alertTemplatesPage.deleteTemplateAndVerify(templateName);

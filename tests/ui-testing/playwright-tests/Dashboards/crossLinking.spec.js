@@ -84,7 +84,7 @@ test.describe("Cross-Linking testcases", () => {
         if (isVisible) {
             await pm.crossLinkPage.clickCrossLinkingTab();
             // Verify the Add Cross-Link button is visible (always present on stream-level manager)
-            await expect(page.locator('[data-test="add-cross-link-btn"]')).toBeVisible({ timeout: 5000 });
+            await expect(pm.crossLinkPage.getAddCrossLinkBtnLocator()).toBeVisible({ timeout: 5000 });
             testLogger.info('Cross-linking tab is visible and accessible');
         } else {
             testLogger.info('Cross-linking tab not visible - feature flag may be disabled, skipping gracefully');
@@ -110,11 +110,11 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickCrossLinkingTab();
 
         // Verify add button is present (confirms tab content loaded)
-        await expect(page.locator('[data-test="add-cross-link-btn"]')).toBeVisible({ timeout: 5000 });
+        await expect(pm.crossLinkPage.getAddCrossLinkBtnLocator()).toBeVisible({ timeout: 5000 });
 
         // Check if empty state or existing links are shown
-        const emptyState = page.locator('[data-test="cross-link-empty"]').first();
-        const linkList = page.locator('[data-test="cross-link-list"]').first();
+        const emptyState = pm.crossLinkPage.getCrossLinkEmptyLocator();
+        const linkList = pm.crossLinkPage.getCrossLinkListLocator();
         const hasEmpty = await emptyState.isVisible().catch(() => false);
         const hasList = await linkList.isVisible().catch(() => false);
 
@@ -147,11 +147,11 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.expectDialogVisible();
 
         // Verify all dialog fields are present
-        await expect(page.locator('[data-test="cross-link-name-input"]')).toBeVisible();
-        await expect(page.locator('[data-test="cross-link-url-input"]')).toBeVisible();
-        await expect(page.locator('[data-test="cross-link-field-input"]')).toBeVisible();
-        await expect(page.locator('[data-test="cross-link-dialog"] [data-test="o-dialog-primary-btn"]')).toBeVisible();
-        await expect(page.locator('[data-test="cross-link-dialog"] [data-test="o-dialog-secondary-btn"]')).toBeVisible();
+        await expect(pm.crossLinkPage.getCrossLinkNameInputLocator()).toBeVisible();
+        await expect(pm.crossLinkPage.getCrossLinkUrlInputLocator()).toBeVisible();
+        await expect(pm.crossLinkPage.getCrossLinkFieldInputLocator()).toBeVisible();
+        await expect(pm.crossLinkPage.getCrossLinkSaveBtnLocator()).toBeVisible();
+        await expect(pm.crossLinkPage.getCrossLinkCancelBtnLocator()).toBeVisible();
 
         testLogger.info('Test completed');
     });
@@ -308,7 +308,7 @@ test.describe("Cross-Linking testcases", () => {
 
         // Modify the URL
         await pm.crossLinkPage.fillCrossLinkUrl('https://updated.example.com/${field.__value}');
-        await pm.crossLinkPage.clickSave();
+        await pm.crossLinkPage.clickSaveAndWait();
 
         // Verify the update is reflected
         const itemText = await pm.crossLinkPage.getCrossLinkItemText(0);
@@ -334,7 +334,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickCrossLinkingTab();
 
         // Create a link to delete if none exist
-        const linkList = page.locator('[data-test="cross-link-list"]').first();
+        const linkList = pm.crossLinkPage.getCrossLinkListLocator();
         const hasList = await linkList.isVisible().catch(() => false);
 
         if (!hasList) {
@@ -348,14 +348,14 @@ test.describe("Cross-Linking testcases", () => {
         // Count links before delete. Use the per-item-name data-test so the
         // count includes only the top-level rows (each item exposes a single
         // `cross-link-item-name-<idx>` which is a 1:1 with the row).
-        const itemsBefore = await page.locator('[data-test^="cross-link-item-name-"]').count();
+        const itemsBefore = await pm.crossLinkPage.getCrossLinkItemNameCount();
         expect(itemsBefore).toBeGreaterThan(0);
 
         // Delete first link
         await pm.crossLinkPage.clickDeleteCrossLink(0);
 
         // Verify count decreased
-        const itemsAfter = await page.locator('[data-test^="cross-link-item-name-"]').count();
+        const itemsAfter = await pm.crossLinkPage.getCrossLinkItemNameCount();
         expect(itemsAfter).toBe(itemsBefore - 1);
 
         testLogger.info('Test completed');
@@ -382,7 +382,7 @@ test.describe("Cross-Linking testcases", () => {
         // per row, so it gives an accurate per-row count (unlike the broader
         // `cross-link-item-` prefix which also matches the per-cell url/name
         // attributes inside each row).
-        const itemsBefore = await page.locator('[data-test^="cross-link-item-name-"]').count();
+        const itemsBefore = await pm.crossLinkPage.getCrossLinkItemNameCount();
 
         // Open dialog, fill form, cancel
         await pm.crossLinkPage.clickAddCrossLink();
@@ -395,7 +395,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.expectDialogNotVisible();
 
         // Verify no new link was added
-        const itemsAfter = await page.locator('[data-test^="cross-link-item-name-"]').count();
+        const itemsAfter = await pm.crossLinkPage.getCrossLinkItemNameCount();
         expect(itemsAfter).toBe(itemsBefore);
 
         testLogger.info('Test completed');
@@ -449,7 +449,7 @@ test.describe("Cross-Linking testcases", () => {
         await page.waitForTimeout(2000);
 
         // Step 3: Expand a log row to reveal the inline JSON detail (JsonPreview)
-        const expandBtn = page.locator('[data-test^="o2-table-expand-"]').first();
+        const expandBtn = pm.crossLinkPage.firstLogRowExpand;
         await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
         await expandBtn.click();
         await page.waitForTimeout(2000);
@@ -790,8 +790,8 @@ test.describe("Cross-Linking testcases", () => {
         // Verify edit and delete action buttons exist on the stream-level
         // (editable) manager; the org-level read-only manager doesn't emit
         // these so we only need to assert presence at all.
-        await expect(page.locator('[data-test="cross-link-edit-0"]').first()).toBeVisible();
-        await expect(page.locator('[data-test="cross-link-delete-0"]').first()).toBeVisible();
+        await expect(pm.crossLinkPage.getCrossLinkEditBtnLocator(0).first()).toBeVisible();
+        await expect(pm.crossLinkPage.getCrossLinkDeleteBtnLocator(0).first()).toBeVisible();
 
         testLogger.info('List item display verified');
     });
@@ -817,11 +817,11 @@ test.describe("Cross-Linking testcases", () => {
         // (org-level read-only items render with `cross-link-item-name-<idx>`
         // but no matching `cross-link-delete-<idx>` — clicking idx=0 then
         // would time out).
-        let existingCount = await page.locator('[data-test^="cross-link-delete-"]').count();
+        let existingCount = await pm.crossLinkPage.getDeletableCrossLinkCount();
         while (existingCount > 0) {
             await pm.crossLinkPage.clickDeleteCrossLink(0);
             await page.waitForTimeout(500);
-            existingCount = await page.locator('[data-test^="cross-link-delete-"]').count();
+            existingCount = await pm.crossLinkPage.getDeletableCrossLinkCount();
         }
 
         const editLinkName = `Edit Prefill ${Date.now()}`;
@@ -906,7 +906,7 @@ test.describe("Cross-Linking testcases", () => {
 
         // Check the configured field — cross-link SHOULD appear
         // Resolve the configured field row via PO/data-test (no class/text selectors)
-        const configuredFieldRow = page.locator(pm.crossLinkPage.logDetailRow('kubernetes_container_name'));
+        const configuredFieldRow = pm.crossLinkPage.getLogDetailRowLocator('kubernetes_container_name');
         const configuredVisible = await configuredFieldRow.isVisible().catch(() => false);
 
         if (configuredVisible) {
@@ -925,7 +925,7 @@ test.describe("Cross-Linking testcases", () => {
         }
 
         // Check a different field — cross-link should NOT appear
-        const otherFieldRow = page.locator(pm.crossLinkPage.logDetailRow('_timestamp'));
+        const otherFieldRow = pm.crossLinkPage.getLogDetailRowLocator('_timestamp');
         const otherVisible = await otherFieldRow.isVisible().catch(() => false);
 
         if (otherVisible) {
@@ -955,7 +955,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.navigateToOrgSettings();
 
         // Verify the CrossLinkManager is present (feature flag must be enabled)
-        const addBtn = page.locator('[data-test="add-cross-link-btn"]');
+        const addBtn = pm.crossLinkPage.getAddCrossLinkBtnLocator();
         try {
             await addBtn.waitFor({ state: 'visible', timeout: 10000 });
         } catch {
@@ -992,7 +992,7 @@ test.describe("Cross-Linking testcases", () => {
 
         await pm.crossLinkPage.navigateToOrgSettings();
 
-        const addBtn = page.locator('[data-test="add-cross-link-btn"]');
+        const addBtn = pm.crossLinkPage.getAddCrossLinkBtnLocator();
         try {
             await addBtn.waitFor({ state: 'visible', timeout: 10000 });
         } catch {
@@ -1020,7 +1020,7 @@ test.describe("Cross-Linking testcases", () => {
 
         // Modify the URL
         await pm.crossLinkPage.fillCrossLinkUrl('https://org-updated.example.com/${field.__value}');
-        await pm.crossLinkPage.clickSave();
+        await pm.crossLinkPage.clickSaveAndWait();
 
         // Verify update is reflected
         const itemText = await pm.crossLinkPage.getCrossLinkItemText(0);
@@ -1039,7 +1039,7 @@ test.describe("Cross-Linking testcases", () => {
 
         await pm.crossLinkPage.navigateToOrgSettings();
 
-        const addBtn = page.locator('[data-test="add-cross-link-btn"]');
+        const addBtn = pm.crossLinkPage.getAddCrossLinkBtnLocator();
         try {
             await addBtn.waitFor({ state: 'visible', timeout: 10000 });
         } catch {
@@ -1065,7 +1065,7 @@ test.describe("Cross-Linking testcases", () => {
 
         // Verify it's gone (empty state or no items). Count via the per-row
         // name attribute so we don't double-count internal cells.
-        const remainingCount = await page.locator('[data-test^="cross-link-item-name-"]').count();
+        const remainingCount = await pm.crossLinkPage.getCrossLinkItemNameCount();
         expect(remainingCount).toBe(0);
 
         // Save org settings to persist deletion
@@ -1081,7 +1081,7 @@ test.describe("Cross-Linking testcases", () => {
 
         await pm.crossLinkPage.navigateToOrgSettings();
 
-        const addBtn = page.locator('[data-test="add-cross-link-btn"]');
+        const addBtn = pm.crossLinkPage.getAddCrossLinkBtnLocator();
         try {
             await addBtn.waitFor({ state: 'visible', timeout: 10000 });
         } catch {
@@ -1122,7 +1122,7 @@ test.describe("Cross-Linking testcases", () => {
         // Step 1: Create an org-level cross-link
         await pm.crossLinkPage.navigateToOrgSettings();
 
-        const addBtn = page.locator('[data-test="add-cross-link-btn"]');
+        const addBtn = pm.crossLinkPage.getAddCrossLinkBtnLocator();
         try {
             await addBtn.waitFor({ state: 'visible', timeout: 10000 });
         } catch {
@@ -1156,11 +1156,11 @@ test.describe("Cross-Linking testcases", () => {
 
         // Clean up only stream-level cross-links (those with visible delete buttons)
         // Org-level items are read-only and have no delete button
-        let deletableCount = await page.locator('[data-test^="cross-link-delete-"]').count();
+        let deletableCount = await pm.crossLinkPage.getDeletableCrossLinkCount();
         while (deletableCount > 0) {
             await pm.crossLinkPage.clickDeleteCrossLink(0);
             await page.waitForTimeout(500);
-            deletableCount = await page.locator('[data-test^="cross-link-delete-"]').count();
+            deletableCount = await pm.crossLinkPage.getDeletableCrossLinkCount();
         }
 
         // Verify the org cross-link item is visible (rendered by the readonly CrossLinkManager)
@@ -1168,18 +1168,18 @@ test.describe("Cross-Linking testcases", () => {
         const orgIdx = await pm.crossLinkPage.findCrossLinkItemIndexByName(orgLinkName);
         expect(orgIdx, `Org cross-link "${orgLinkName}" should be rendered`).toBeGreaterThanOrEqual(0);
 
-        const orgItem = page.locator(pm.crossLinkPage.crossLinkItem(orgIdx));
+        const orgItem = pm.crossLinkPage.getCrossLinkItemLocator(orgIdx);
         await expect(orgItem).toBeVisible({ timeout: 10000 });
         const itemText = await orgItem.textContent();
         expect(itemText).toContain(orgLinkName);
         expect(itemText).toContain('org-readonly.example.com');
 
         // Verify org-level items do NOT have edit/delete buttons (readonly prop hides them)
-        await expect(page.locator(pm.crossLinkPage.crossLinkEditBtn(orgIdx))).toHaveCount(0);
-        await expect(page.locator(pm.crossLinkPage.crossLinkDeleteBtn(orgIdx))).toHaveCount(0);
+        await expect(pm.crossLinkPage.getCrossLinkEditBtnLocator(orgIdx)).toHaveCount(0);
+        await expect(pm.crossLinkPage.getCrossLinkDeleteBtnLocator(orgIdx)).toHaveCount(0);
 
         // Verify the stream-level manager still has its add button (editable)
-        const streamAddBtn = page.locator('[data-test="add-cross-link-btn"]');
+        const streamAddBtn = pm.crossLinkPage.getAddCrossLinkBtnLocator();
         await expect(streamAddBtn).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Org-level cross-link visible in stream schema as read-only, no edit/delete buttons');
@@ -1205,12 +1205,12 @@ test.describe("Cross-Linking testcases", () => {
 
         // Only delete stream-level cross-links (those with visible delete buttons)
         // Org-level cross-links are read-only and don't have delete buttons
-        const initialDeletableCount = await page.locator('[data-test^="cross-link-delete-"]').count();
+        const initialDeletableCount = await pm.crossLinkPage.getDeletableCrossLinkCount();
         let deletableCount = initialDeletableCount;
         while (deletableCount > 0) {
             await pm.crossLinkPage.clickDeleteCrossLink(0);
             await page.waitForTimeout(500);
-            deletableCount = await page.locator('[data-test^="cross-link-delete-"]').count();
+            deletableCount = await pm.crossLinkPage.getDeletableCrossLinkCount();
         }
 
         // Only save if we actually deleted something (button is disabled if no changes)
@@ -1222,7 +1222,7 @@ test.describe("Cross-Linking testcases", () => {
         // Step 1: Create an org-level cross-link with start_time and end_time in URL template
         await pm.crossLinkPage.navigateToOrgSettings();
 
-        const addBtn = page.locator('[data-test="add-cross-link-btn"]');
+        const addBtn = pm.crossLinkPage.getAddCrossLinkBtnLocator();
         try {
             await addBtn.waitFor({ state: 'visible', timeout: 10000 });
         } catch {
@@ -1258,7 +1258,7 @@ test.describe("Cross-Linking testcases", () => {
         await page.waitForTimeout(2000);
 
         // Step 3: Expand a log row to reveal the inline JSON detail (JsonPreview)
-        const expandBtn = page.locator('[data-test^="o2-table-expand-"]').first();
+        const expandBtn = pm.crossLinkPage.firstLogRowExpand;
         await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
         await expandBtn.click();
         await page.waitForTimeout(2000);
@@ -1371,12 +1371,12 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.clickCrossLinkingTab();
 
         // Only delete stream-level cross-links (those with visible delete buttons)
-        const initialDeletableCount2 = await page.locator('[data-test^="cross-link-delete-"]').count();
+        const initialDeletableCount2 = await pm.crossLinkPage.getDeletableCrossLinkCount();
         let deletableCount2 = initialDeletableCount2;
         while (deletableCount2 > 0) {
             await pm.crossLinkPage.clickDeleteCrossLink(0);
             await page.waitForTimeout(500);
-            deletableCount2 = await page.locator('[data-test^="cross-link-delete-"]').count();
+            deletableCount2 = await pm.crossLinkPage.getDeletableCrossLinkCount();
         }
 
         // Only save if we actually deleted something (button is disabled if no changes)
@@ -1389,7 +1389,7 @@ test.describe("Cross-Linking testcases", () => {
         await pm.crossLinkPage.navigateToOrgSettings();
         testLogger.info('Navigated to org settings');
 
-        const addBtn = page.locator('[data-test="add-cross-link-btn"]');
+        const addBtn = pm.crossLinkPage.getAddCrossLinkBtnLocator();
         try {
             await addBtn.waitFor({ state: 'visible', timeout: 10000 });
             testLogger.info('Add cross-link button found in org settings');
@@ -1549,7 +1549,7 @@ test.describe("Cross-Linking testcases", () => {
 
         await pm.crossLinkPage.navigateToOrgSettings();
 
-        const addBtn = page.locator('[data-test="add-cross-link-btn"]');
+        const addBtn = pm.crossLinkPage.getAddCrossLinkBtnLocator();
         try {
             await addBtn.waitFor({ state: 'visible', timeout: 10000 });
         } catch {

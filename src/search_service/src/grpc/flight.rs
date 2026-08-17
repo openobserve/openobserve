@@ -19,7 +19,7 @@ use ::datafusion::{
     common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
-use arrow_schema::Schema;
+use arrow_schema::{DataType, Schema};
 use config::{
     cluster::LOCAL_NODE,
     datafusion::request::FlightSearchRequest,
@@ -155,7 +155,15 @@ pub async fn search(
     let stream_created_at = unwrap_stream_created_at(&db_schema);
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
         .into_iter()
-        .filter(|v| latest_schema_map.contains_key(v))
+        .filter(|v| {
+            latest_schema_map
+                .get(v)
+                .map(|f| {
+                    [DataType::Utf8, DataType::Utf8View, DataType::LargeUtf8]
+                        .contains(f.data_type())
+                })
+                .unwrap_or_default()
+        })
         .collect_vec();
     let index_fields = get_stream_setting_index_fields(&stream_settings)
         .into_iter()
@@ -207,10 +215,13 @@ pub async fn search(
             .as_ref()
             .map(|rule| rule.referenced_fields())
             .unwrap_or_default();
+        let distinct_fields_updated_at =
+            infra::db::tantivy_index::get_ttv_distinct_fields_updated_at().await;
         get_stream_setting_index_updated_at_for_fields(
             &stream_settings,
             stream_created_at,
             &index_used_fields,
+            distinct_fields_updated_at,
         )
     };
 

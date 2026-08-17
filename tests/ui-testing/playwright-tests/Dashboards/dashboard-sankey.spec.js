@@ -40,13 +40,13 @@ test.describe("Sankey chart testcases", () => {
 
       // Verify Sankey builder layout areas are visible
       await expect(
-        page.locator('[data-test="dashboard-source-layout"]')
+        pm.chartTypeSelector.getSankeySourceLayout()
       ).toBeVisible({ timeout: 10000 });
       await expect(
-        page.locator('[data-test="dashboard-target-layout"]')
+        pm.chartTypeSelector.getSankeyTargetLayout()
       ).toBeVisible();
       await expect(
-        page.locator('[data-test="dashboard-value-layout"]')
+        pm.chartTypeSelector.getSankeyValueLayout()
       ).toBeVisible();
 
       testLogger.info("Sankey chart builder layout verified");
@@ -172,9 +172,7 @@ test.describe("Sankey chart testcases", () => {
       await pm.chartTypeSelector.searchAndAddField("source", "source");
 
       // Verify source field is shown in the builder
-      const sourceLayout = page.locator(
-        '[data-test="dashboard-source-layout"]'
-      );
+      const sourceLayout = pm.chartTypeSelector.getSankeySourceLayout();
       await expect(
         sourceLayout.locator('[data-test^="dashboard-source-item-"]').first()
       ).toBeVisible({ timeout: 10000 });
@@ -222,11 +220,11 @@ test.describe("Sankey chart testcases", () => {
       await pm.chartTypeSelector.searchAndAddField("source", "source");
 
       // Search for another field and verify +S button is disabled
-      const searchInput = page.locator('[data-test="o-field-list-search-field"]');
+      const searchInput = pm.chartTypeSelector.getFieldSearchInput();
       await searchInput.click();
       await searchInput.fill("target");
 
-      const fieldItem = page.locator('[data-test="o-field-list-row-target"]').first();
+      const fieldItem = pm.chartTypeSelector.getFieldListRow("target").first();
       await fieldItem.waitFor({ state: "visible", timeout: 5000 });
       await fieldItem.hover();
       const sourceBtn = fieldItem.locator('[data-test="dashboard-add-source-data"]');
@@ -262,19 +260,47 @@ test.describe("Sankey chart testcases", () => {
       // Select Sankey chart type
       await pm.chartTypeSelector.selectChartType("sankey");
 
-      // Switch to custom query mode
-      await pm.chartTypeSelector.switchToCustomQueryMode();
+      // Select the stream explicitly before switching to custom SQL — without
+      // this, the panel's stream metadata never resolves to "sankey_data"
+      // (unlike e2e_automate, which is already the panel's auto-selected
+      // default stream), so the field list kept showing the unrelated
+      // default-stream fields (client_service, error_rate, etc.) no matter
+      // how many times the query was re-applied.
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("sankey_data");
 
-      // Enter custom SQL for Sankey
+      // Switch to SQL + custom query mode and enter the query. Using the
+      // combined setCustomSQL() helper (used by every other passing
+      // custom-SQL test) instead of switchToCustomQueryMode() +
+      // enterCustomSQL() separately — the latter skips the "SQL query type"
+      // click that setCustomSQL() does first, which left the field list
+      // never populating on alpha1.
       const customSQL = `SELECT source, target, sum(value) as flow FROM "sankey_data" GROUP BY source, target`;
-      await pm.chartTypeSelector.enterCustomSQL(customSQL);
+      await pm.chartTypeSelector.setCustomSQL(customSQL);
 
       // Apply first to populate field list from query result
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Wait for field list to populate from query result
-      await page.locator('[data-test="o-field-list-search-field"]').waitFor({ state: "visible", timeout: 10000 });
+      await pm.chartTypeSelector.getFieldSearchInput().waitFor({ state: "visible", timeout: 10000 });
+
+      // A freshly-added panel auto-runs a DEFAULT-stream query when it first
+      // opens, BEFORE the custom-SQL query fires on Apply. If that default
+      // query's response arrives AFTER the custom query's, it overwrites the
+      // field list with the default stream's fields (verified: client_service,
+      // error_rate, p50_latency_ns, etc.) instead of our query's actual
+      // columns (source/target/flow) — a last-writer race. Re-apply until the
+      // real field shows up (the default query only fires once on panel open,
+      // so re-Apply only fires the custom query).
+      const sourceFieldRow = page.locator('[data-test="o-field-list-row-source"]').first();
+      await expect(async () => {
+        if (!(await sourceFieldRow.isVisible().catch(() => false))) {
+          await pm.dashboardPanelActions.applyDashboardBtn();
+          await pm.dashboardPanelActions.waitForChartToRender();
+        }
+        await expect(sourceFieldRow).toBeVisible({ timeout: 8000 });
+      }).toPass({ timeout: 60000, intervals: [1000] });
 
       // Assign fields from custom query result to Sankey axes
       await pm.chartTypeSelector.searchAndAddField("source", "source");
@@ -313,14 +339,7 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardCreate.createDashboard(dashName);
 
       // Open dashboard settings and add a variable on `source` field (country names)
-      await page.waitForSelector('[data-test="dashboard-setting-btn"]', {
-        state: "visible",
-        timeout: 15000,
-      });
-      const settingsButton = page.locator(
-        '[data-test="dashboard-setting-btn"]'
-      );
-      await settingsButton.click();
+      await pm.dashboardSetting.openSetting();
 
       await pm.dashboardVariables.addDashboardVariable(
         "countryvar",
@@ -342,10 +361,10 @@ test.describe("Sankey chart testcases", () => {
       // Add source as a filter field
       // Sankey mode renders two button groups per field: standard (+X +Y +B +F) and sankey (+S +T +V +F).
       // Scope to the sankey group by finding +F that's a sibling of the +S button.
-      const searchInput = page.locator('[data-test="o-field-list-search-field"]');
+      const searchInput = pm.chartTypeSelector.getFieldSearchInput();
       await searchInput.click();
       await searchInput.fill("source");
-      const fieldItem = page.locator('[data-test="o-field-list-row-source"]').first();
+      const fieldItem = pm.chartTypeSelector.getFieldListRow("source").first();
       await fieldItem.waitFor({ state: "visible", timeout: 5000 });
       await fieldItem.hover();
       const filterBtn = fieldItem.locator('[data-test="dashboard-add-filter-data"]');

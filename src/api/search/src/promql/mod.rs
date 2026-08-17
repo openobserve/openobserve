@@ -182,7 +182,7 @@ async fn query(
         use crate::service::auth::AuthExtractor;
 
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
-        let mut visitor = promql::name_visitor::MetricNameVisitor::default();
+        let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         if !db::user::is_root_user(user_email) {
@@ -471,7 +471,7 @@ async fn query_range(
                     .into_response();
             }
         };
-        let mut visitor = promql::name_visitor::MetricNameVisitor::default();
+        let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         if !db::user::is_root_user(user_email) {

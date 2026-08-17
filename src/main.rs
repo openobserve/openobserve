@@ -35,7 +35,7 @@ use openobserve::{
     telemetry::{enable_tracing, setup_logs},
 };
 use openobserve_api_http::handler::http::router::*;
-use openobserve_core::{bootstrap, metadata};
+use openobserve_core::bootstrap;
 use openobserve_jobs::job;
 use tokio::sync::oneshot;
 #[cfg(feature = "enterprise")]
@@ -232,8 +232,6 @@ async fn main() -> Result<(), anyhow::Error> {
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
 
-            // flush distinct values
-            _ = metadata::close().await;
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
             // flush compact offset cache to disk disk
@@ -525,6 +523,13 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         log::info!("init super cluster");
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
         super_cluster_queue::init().await?;
+        // Composite alerts are unsupported in super-cluster mode (§18): fail
+        // closed at startup if any definitions or jobs remain, before serving.
+        if let Err(e) = openobserve_core::alerts::composite::startup_preflight().await {
+            return Err(anyhow::anyhow!(
+                "composite alerts super-cluster startup preflight failed: {e:#}"
+            ));
+        }
     }
 
     // Initialize enterprise AI components (agent and evaluation clients).

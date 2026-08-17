@@ -81,6 +81,12 @@ vi.mock("@/composables/useSyntheticsRecorder", () => ({
     stopReplayAndForget: vi.fn(),
     registerAutoDetect: vi.fn(),
     isReplaying: { value: false },
+    // The capability handshake. Defaulting to "not supported" keeps these tests on the
+    // pre-restore path, which is what they were written against — a mock that claimed
+    // recordFrom would route Record through a replay none of them stub.
+    hasCapability: () => false,
+    extVersion: { value: null },
+    capabilities: { value: null },
   }),
 }));
 
@@ -151,6 +157,8 @@ vi.mock("@/components/synthetics/CreateBrowserTest.schema", () => {
 });
 
 import CreateBrowserTest from "./CreateBrowserTest.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import { VARIABLES_SPLITTER_LIMITS } from "@/composables/synthetics/useCheckWizardUi";
 
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
@@ -225,6 +233,7 @@ const baseStubs = {
       "activeStepId",
       "blockedReason",
       "blockedDetail",
+      "variablesPanelOpen",
       "class",
     ],
   },
@@ -792,6 +801,72 @@ describe("CreateBrowserTest", () => {
       expect(mockRecorderStopReplay).toHaveBeenCalledTimes(1);
       // The view must not pre-empt the composable's stopping → stopped transition.
       expect(mockRecorderReplayPhase.value).toBe("running");
+    });
+  });
+
+  // The variables panel is journey-only and now starts COLLAPSED: the journey is
+  // the point of this step, and the labelled toolbar button brings the panel in
+  // when it is wanted. While collapsed the splitter must hand the whole width to
+  // the journey, so nothing is left behind an invisible drag handle.
+  describe("Journey step — variables panel", () => {
+    const journeyStub = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-browser-journey"]');
+    const panel = (w: VueWrapper) => w.find('[data-test="synthetics-check-variables-panel"]');
+    const splitter = (w: VueWrapper) => w.findComponent(OSplitter);
+
+    /** The journey toolbar's toggle button, as the view receives it. */
+    async function toggleFromToolbar(w: VueWrapper) {
+      journeyStub(w).vm.$emit("toggle-variables-panel");
+      await flushPromises();
+    }
+
+    it("should not render the variables panel on first mount", async () => {
+      wrapper = await mountValidEdit();
+
+      expect(wrapper.find('[data-test="synthetics-browser-journey"]').exists()).toBe(true);
+      expect(panel(wrapper).exists()).toBe(false);
+    });
+
+    it("should give the journey the full width while the panel is collapsed", async () => {
+      wrapper = await mountValidEdit();
+
+      expect(splitter(wrapper).props("modelValue")).toBe(100);
+      expect(splitter(wrapper).props("limits")).toEqual([100, 100]);
+      expect(splitter(wrapper).props("separator")).toBe(false);
+      expect(splitter(wrapper).props("disable")).toBe(true);
+    });
+
+    // BrowserJourney renders its toolbar toggle only when this prop is not
+    // `undefined`, so it must arrive as an explicit `false` — leaving it off
+    // would collapse the panel AND remove the only control that reopens it.
+    it("should tell BrowserJourney the panel is closed rather than omitting the prop", async () => {
+      wrapper = await mountValidEdit();
+
+      expect(journeyStub(wrapper).props("variablesPanelOpen")).toBe(false);
+    });
+
+    it("should reveal the panel when the journey toolbar toggles it", async () => {
+      wrapper = await mountValidEdit();
+
+      await toggleFromToolbar(wrapper);
+
+      expect(panel(wrapper).exists()).toBe(true);
+      expect(journeyStub(wrapper).props("variablesPanelOpen")).toBe(true);
+      // The split becomes draggable again, between the shared limits.
+      expect(splitter(wrapper).props("limits")).toEqual(VARIABLES_SPLITTER_LIMITS);
+      expect(splitter(wrapper).props("separator")).toBe(true);
+      expect(splitter(wrapper).props("disable")).toBe(false);
+    });
+
+    it("should hide the panel again on a second toggle", async () => {
+      wrapper = await mountValidEdit();
+
+      await toggleFromToolbar(wrapper);
+      await toggleFromToolbar(wrapper);
+
+      expect(panel(wrapper).exists()).toBe(false);
+      expect(journeyStub(wrapper).props("variablesPanelOpen")).toBe(false);
+      expect(splitter(wrapper).props("modelValue")).toBe(100);
     });
   });
 

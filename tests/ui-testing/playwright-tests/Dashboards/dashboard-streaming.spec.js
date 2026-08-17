@@ -57,11 +57,7 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardCreate.createDashboard(
       randomDashboardName + "_streaming"
     );
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
     await pm.dashboardVariables.addDashboardVariable(
       "variablename",
@@ -212,11 +208,7 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardCreate.createDashboard(
       randomDashboardName + "_filter"
     );
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
 
     // Add first variable without filter (existing behavior)

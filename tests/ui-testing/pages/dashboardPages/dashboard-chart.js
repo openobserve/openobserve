@@ -22,6 +22,7 @@ export default class ChartTypeSelector {
     this.sqlQueryTypeBtn = page.locator('[data-test="dashboard-sql-query-type"]');
     this.customQueryTypeBtn = page.locator('[data-test="dashboard-custom-query-type"]');
     this.builderQueryTypeBtn = page.locator('[data-test="dashboard-builder-query-type"]');
+    this.promqlQueryTypeBtn = page.locator('[data-test="dashboard-promql-query-type"]');
 
     // Custom query editor
     this.queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
@@ -30,6 +31,86 @@ export default class ChartTypeSelector {
     this.jsonFieldRenderer = page.locator('[data-test="json-field-renderer"]');
     this.jsonKey = page.locator('[data-test="json-key"]');
     this.jsonValue = page.locator('[data-test="json-value"]');
+
+    // VRL function editor (toggle + editor) shown in the panel query bar
+    this.vrlToggleBtn = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+    this.vrlFunctionEditor = page.locator('[data-test="dashboard-vrl-function-editor"]');
+
+    // Field layout containers (X / Y / Breakdown) and the +P (add-to-pivot) button
+    this.xLayout = page.locator('[data-test="dashboard-x-layout"]');
+    this.yLayout = page.locator('[data-test="dashboard-y-layout"]');
+    this.breakdownLayout = page.locator('[data-test="dashboard-b-layout"]');
+    this.pivotAddBtn = page.locator('[data-test="dashboard-add-p-data"]');
+
+    // Geomap chart canvas (rendered inside #chart-map)
+    this.mapCanvas = page.locator("#chart-map canvas");
+
+    // HTML chart editor + rendered output
+    this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
+    this.htmlRenderer = page.locator('[data-test="html-renderer"]');
+  }
+
+  // Click the geomap chart canvas at a given pixel position
+  async clickMapCanvas(position) {
+    await this.mapCanvas.click({ position });
+  }
+
+  // Enter HTML code into the HTML chart Monaco editor
+  async fillHtmlEditor(html) {
+    await this.htmlEditor.locator(".monaco-editor").click();
+    await this.htmlEditor.locator(".inputarea").fill(html);
+  }
+
+  // Rendered HTML output: heading by accessible name
+  getHtmlHeading(name) {
+    return this.page.getByRole("heading", { name });
+  }
+
+  // Rendered HTML output: element containing given text
+  getHtmlRendererText(text) {
+    return this.htmlRenderer.getByText(text);
+  }
+
+  // Rendered HTML output: any <script> tags (should be sanitized away)
+  getHtmlRendererScripts() {
+    return this.htmlRenderer.locator("script");
+  }
+
+  // Returns the field-list row for a given field name
+  getFieldListRow(fieldName) {
+    return this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
+  }
+
+  // Field-list search input (the OInput field itself)
+  getFieldSearchInput() {
+    return this.page.locator('[data-test="o-field-list-search-field"]');
+  }
+
+  // Returns the "selected chart type" indicator item (e.g. pie, donut)
+  getSelectedChartItem(chartType) {
+    return this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+  }
+
+  // Sankey builder layout areas
+  getSankeySourceLayout() {
+    return this.page.locator('[data-test="dashboard-source-layout"]');
+  }
+  getSankeyTargetLayout() {
+    return this.page.locator('[data-test="dashboard-target-layout"]');
+  }
+  getSankeyValueLayout() {
+    return this.page.locator('[data-test="dashboard-value-layout"]');
+  }
+
+  // Returns the nth breakdown (pivot) field chip (1-based index in the data-test)
+  getBreakdownItem(index) {
+    return this.page.locator(`[data-test="dashboard-b-item-breakdown_${index}"]`);
+  }
+
+  // Returns a field-section label by its visible text (e.g. "First Column",
+  // "Row Fields", "Add 0 or 1 field here"), used to assert layout-mode labels.
+  getFieldSectionLabel(text) {
+    return this.page.getByText(text);
   }
 
   // Chart Type select
@@ -156,31 +237,46 @@ export default class ChartTypeSelector {
     }
 
     // New data-test format: o-field-list-row-{fieldName}
+    // NOTE: no waitFor here — the retry loop below already waits for the row,
+    // and duplicating the wait outside the loop meant a slow schema/field-list
+    // load threw before the loop ever got its first attempt, collapsing the
+    // 3-attempt budget down to one.
     const fieldItem = this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
-    await fieldItem.first().waitFor({ state: "visible", timeout: 10000 });
 
-    // hover() auto-scrolls into view — scrollIntoViewIfNeeded() is not needed.
-    // Retry for DOM stability: Vue re-renders the field list multiple times after
-    // search input changes (debounce / virtual scroll), which detaches the element
-    // between waitFor and the action. Re-waiting after each detachment lets the
-    // list settle before the next attempt.
-    const maxAttempts = 3;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        await fieldItem.first().hover({ timeout: 5000 });
-        break;
-      } catch (e) {
-        if (attempt === maxAttempts) throw e;
-        await fieldItem.first().waitFor({ state: "visible", timeout: 5000 });
-      }
-    }
-
-    // Now locate and click the button within the field item.
     // Use .first() — in join panels the same field name can appear multiple times
     // (once per joined stream), which would cause a strict mode violation.
     const button = fieldItem.first().locator(`[data-test="${buttonTestId}"]`);
-    await button.waitFor({ state: "visible", timeout: 5000 });
-    await button.click();
+
+    // The add-to-axis buttons are CSS-hidden until the row is hovered
+    // (OFieldRow .__actions { display: none }), and hover() auto-scrolls into view
+    // so scrollIntoViewIfNeeded() is not needed.
+    //
+    // Hovering ONCE and then waiting for the button is not enough. Vue re-renders the
+    // field list after search input changes (debounce / virtual scroll); a re-render
+    // landing between the hover and the button check either detaches the row or
+    // shifts it out from under the cursor, dropping :hover. The button then stays
+    // hidden and the wait burns its full timeout on an element that can no longer
+    // become visible — the "15 x locator resolved to hidden" failure signature.
+    // Re-hover on every attempt so a re-render costs one retry, not the whole call.
+    // The click stays INSIDE the loop for the same reason: a re-render between the check
+    // and the click drops :hover again, so the click burns its full timeout. Keeping
+    // hover -> check -> click together costs one retry instead of the call; break on
+    // success means the field is never added twice.
+    const maxAttempts = 3;
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await fieldItem.first().waitFor({ state: "visible", timeout: 10000 });
+        await fieldItem.first().hover({ timeout: 5000 });
+        await button.waitFor({ state: "visible", timeout: 5000 });
+        await button.click({ timeout: 5000 });
+        break;
+      } catch (e) {
+        lastError = e;
+        if (attempt === maxAttempts) throw lastError;
+      }
+    }
+
     await searchInput.fill(""); // Clear the search input
   }
 
@@ -265,6 +361,42 @@ export default class ChartTypeSelector {
         );
       },
       { timeout: 15000 }
+    );
+
+    // The check above is satisfied by a STALE table. Re-applying a query leaves the
+    // previous result set on screen while the new one loads, so "some row has text"
+    // is instantly true and callers go on to measure the OLD data — a filter that
+    // narrows 77 rows to fewer still reads 77. The same gap in reverse lets a caller
+    // sample during a transient re-render and read zero rows.
+    //
+    // Wait for the row count to stop changing so the new result set has actually
+    // rendered. State is parked on window and reset first so repeated calls within a
+    // test do not inherit a previous call's sample.
+    await this.page.evaluate(() => {
+      delete window.__o2TableSettle;
+    });
+
+    await this.page.waitForFunction(
+      (settleMs) => {
+        const table = document.querySelector(
+          '[data-test="dashboard-panel-table"]'
+        );
+        const count = table ? table.querySelectorAll("tbody tr").length : 0;
+
+        if (!window.__o2TableSettle) {
+          window.__o2TableSettle = { count: -1, since: 0 };
+        }
+        const state = window.__o2TableSettle;
+
+        if (state.count !== count) {
+          state.count = count;
+          state.since = Date.now();
+          return false;
+        }
+        return count > 0 && Date.now() - state.since >= settleMs;
+      },
+      750,
+      { timeout: 20000 }
     );
   }
 
@@ -505,6 +637,35 @@ export default class ChartTypeSelector {
     await this.customQueryTypeBtn.waitFor({ state: "visible", timeout: 10000 });
     await this.customQueryTypeBtn.click();
     testLogger.debug('Switched to custom query mode');
+  }
+
+  /**
+   * Click the SQL query-type toggle button
+   */
+  async clickSqlQueryType() {
+    await this.sqlQueryTypeBtn.click();
+  }
+
+  /**
+   * Click the Custom query-type toggle button
+   */
+  async clickCustomQueryType() {
+    await this.customQueryTypeBtn.click();
+  }
+
+  /**
+   * Focus the panel query editor by clicking its Monaco code region
+   */
+  async clickQueryEditorCode() {
+    await this.queryEditor.getByRole('code').click();
+  }
+
+  /**
+   * Fill the panel query editor's hidden input area with a query string
+   * @param {string} query - The SQL query to fill
+   */
+  async fillQueryEditorInputArea(query) {
+    await this.queryEditor.locator(".inputarea").fill(query);
   }
 
   /**

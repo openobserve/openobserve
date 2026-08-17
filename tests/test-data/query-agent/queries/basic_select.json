@@ -647,13 +647,13 @@
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-A1"
+            "BS-2026-C3"
           ],
           [
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-C3"
+            "BS-2026-A1"
           ],
           [
             "SORT-Q5",
@@ -1581,11 +1581,7 @@
         ],
         "results": [
           [
-            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
-            "2"
-          ],
-          [
-            "[\"scraping_pattern\",\"high_freq\"]",
+            "[\"credential_stuffing\"]",
             "2"
           ],
           [
@@ -1593,7 +1589,11 @@
             "2"
           ],
           [
-            "[\"credential_stuffing\"]",
+            "[\"scraping_pattern\",\"high_freq\"]",
+            "2"
+          ],
+          [
+            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
             "2"
           ]
         ],
@@ -5944,31 +5944,31 @@
         ],
         "results": [
           [
-            "1780750500.0",
+            "1786709040.0",
             "0",
             "performanceMetric",
             "itemPage"
           ],
           [
-            "1780750536.0",
+            "1786709076.0",
             "36000000",
             "performanceMetric",
             "searchPage"
           ],
           [
-            "1780750554.0",
+            "1786709094.0",
             "54000000",
             "performanceMetric",
             "cartPage"
           ],
           [
-            "1780750560.0",
+            "1786709100.0",
             "0",
             "performanceMetric",
             "cartPage"
           ],
           [
-            "1780750572.0",
+            "1786709112.0",
             "12000000",
             "performanceMetric",
             "itemPage"
@@ -7435,13 +7435,13 @@
           [
             "ZONE-3",
             "CC-BETA",
-            "hybrid",
+            "manual",
             "SORT-X1"
           ],
           [
             "ZONE-3",
             "CC-BETA",
-            "manual",
+            "hybrid",
             "SORT-X1"
           ]
         ],

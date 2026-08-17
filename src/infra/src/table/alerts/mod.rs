@@ -306,7 +306,6 @@ pub async fn put<C: TransactionTrait>(
             let id = svix_ksuid::Ksuid::new(None, None).to_string();
             let stream_type = intermediate::StreamType::from(alert.stream_type).to_string();
             let stream_name = alert.stream_name.clone();
-            let alert_name = alert.name.clone();
             let mut alert_am = alerts::ActiveModel {
                 // The following fields can only be set on creation.
                 id: Set(id),
@@ -314,7 +313,6 @@ pub async fn put<C: TransactionTrait>(
                 folder_id: Set(folder_m.id),
                 stream_type: Set(stream_type),
                 stream_name: Set(stream_name),
-                name: Set(alert_name),
                 // All remaining fields can be set on creation or updated so
                 // they are set below.
                 ..Default::default()
@@ -368,7 +366,6 @@ pub async fn create<C: TransactionTrait>(
         folder_id: Set(folder_m.id),
         stream_type: Set(stream_type),
         stream_name: Set(alert.stream_name.clone()),
-        name: Set(alert.name.clone()),
         // All remaining fields can be set on creation or updated so
         // they are set below.
         ..Default::default()
@@ -743,14 +740,21 @@ async fn list_models<C: ConnectionTrait>(
         Some(slo_id) => query.filter(alerts::Column::SloId.eq(slo_id)),
     };
 
-    // Apply the alert-type filter, for the one variant that IS a column
-    // predicate (SA-16). `Scheduled` and `Realtime` read `is_real_time` and
-    // stay in-memory in the HTTP handler; `AnomalyDetection` short-circuits
-    // before this query runs. Only `Slo` maps to an indexed column, which is
-    // what the variant's own docs promise.
+    // Apply ordinary-alert type predicates before pagination. Composite rows
+    // live in their own table, while scheduled/realtime query alerts exclude
+    // SLO rows even if old data happens to carry an unexpected realtime bit.
     let query = match params.alert_type {
+        AlertTypeFilter::Scheduled => query
+            .filter(alerts::Column::IsRealTime.eq(false))
+            .filter(alerts::Column::SloId.is_null()),
+        AlertTypeFilter::Realtime => query
+            .filter(alerts::Column::IsRealTime.eq(true))
+            .filter(alerts::Column::SloId.is_null()),
         AlertTypeFilter::Slo => query.filter(alerts::Column::SloId.is_not_null()),
-        _ => query,
+        AlertTypeFilter::Composite => {
+            query.filter(alerts::Column::Id.eq(TAG_FILTER_NO_MATCH_SENTINEL))
+        }
+        AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection => query,
     };
 
     // Apply the optional priority filter (PT-3). Multiple values OR together;
@@ -876,6 +880,7 @@ fn update_mutable_fields(
 ) -> Result<(), errors::Error> {
     let last_triggered_at = alert.get_last_triggered_at_from_table();
     let last_satisfied_at = alert.get_last_satisfied_at_from_table();
+    let name = alert.name;
     let is_real_time = alert.is_real_time;
     let destinations = serde_json::to_value(alert.destinations)?;
     let template = alert.template.filter(|s| !s.is_empty());
@@ -992,6 +997,7 @@ fn update_mutable_fields(
             (false, None, None)
         };
 
+    alert_am.name = Set(name);
     alert_am.is_real_time = Set(is_real_time);
     alert_am.destinations = Set(destinations);
     alert_am.template = Set(template);
@@ -1067,13 +1073,13 @@ enum Alerts {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use svix_ksuid::KsuidLike as _;
 
     use super::*;
     use crate::table::entity::alerts::Model;
 
-    fn make_model(id: &str) -> Model {
+    pub(in crate::table) fn make_model(id: &str) -> Model {
         Model {
             id: id.to_string(),
             org: "myorg".to_string(),
@@ -1139,6 +1145,18 @@ mod tests {
     }
 
     // ── Feature 2: priority & tags storage mapping (PT-2, PT-6) ────────────
+
+    #[test]
+    fn test_update_mutable_fields_updates_alert_name() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut alert_am: alerts::ActiveModel = make_model(&id).into();
+        let mut alert = MetaAlert::default();
+        alert.name = "Renamed Alert".to_string();
+
+        update_mutable_fields(&mut alert_am, alert).unwrap();
+
+        assert_eq!(alert_am.name, Set("Renamed Alert".to_string()));
+    }
 
     #[test]
     fn test_priority_and_tags_unpack_from_model() {
@@ -1434,6 +1452,7 @@ mod tests {
             folder_pk: &'a str,
             slo: Option<SloShape<'a>>,
             enabled: bool,
+            is_real_time: bool,
             priority: Option<i32>,
         }
 
@@ -1454,6 +1473,7 @@ mod tests {
                     folder_pk: FOLDER_A_PK,
                     slo: None,
                     enabled: true,
+                    is_real_time: false,
                     priority: None,
                 }
             }
@@ -1493,6 +1513,11 @@ mod tests {
                 self
             }
 
+            fn realtime(mut self) -> Self {
+                self.is_real_time = true;
+                self
+            }
+
             fn in_folder(mut self, org: &'a str, folder_pk: &'a str) -> Self {
                 self.org = org;
                 self.folder_pk = folder_pk;
@@ -1511,6 +1536,7 @@ mod tests {
             model.folder_id = spec.folder_pk.to_string();
             model.name = format!("alert-{}", spec.label);
             model.enabled = spec.enabled;
+            model.is_real_time = spec.is_real_time;
             model.priority = spec.priority;
             if let Some(SloShape {
                 slo_id,
@@ -1971,6 +1997,75 @@ mod tests {
             );
         }
 
+        #[tokio::test]
+        async fn scheduled_and_realtime_predicates_are_mutually_exclusive_with_slo() {
+            let db = db_with_folder().await;
+            let scheduled = alert_id();
+            let realtime = alert_id();
+            let slo_scheduled = alert_id();
+            let slo_realtime = alert_id();
+            insert_alert(&db, AlertSpec::plain(&scheduled, "scheduled")).await;
+            insert_alert(&db, AlertSpec::plain(&realtime, "realtime").realtime()).await;
+            insert_alert(
+                &db,
+                AlertSpec::burn(&slo_scheduled, "slo-scheduled", SLO_A, 3600, 300),
+            )
+            .await;
+            insert_alert(
+                &db,
+                AlertSpec::burn(&slo_realtime, "slo-realtime", SLO_A, 7200, 600).realtime(),
+            )
+            .await;
+
+            let mut scheduled_params = ListAlertsParams::new(ORG);
+            scheduled_params.alert_type = AlertTypeFilter::Scheduled;
+            assert_eq!(ids_of(&db, scheduled_params).await, vec![scheduled.clone()]);
+
+            let mut realtime_params = ListAlertsParams::new(ORG);
+            realtime_params.alert_type = AlertTypeFilter::Realtime;
+            assert_eq!(ids_of(&db, realtime_params).await, vec![realtime.clone()]);
+
+            let mut slo_params = ListAlertsParams::new(ORG);
+            slo_params.alert_type = AlertTypeFilter::Slo;
+            assert_eq!(
+                sorted_ids(ids_of(&db, slo_params).await),
+                sorted_ids(vec![slo_scheduled, slo_realtime])
+            );
+
+            let mut all_params = ListAlertsParams::new(ORG);
+            all_params.alert_type = AlertTypeFilter::All;
+            assert_eq!(ids_of(&db, all_params).await.len(), 4);
+
+            let mut composite_params = ListAlertsParams::new(ORG);
+            composite_params.alert_type = AlertTypeFilter::Composite;
+            assert!(ids_of(&db, composite_params).await.is_empty());
+        }
+
+        #[tokio::test]
+        async fn scheduled_filter_is_applied_before_database_pagination() {
+            let db = db_with_folder().await;
+            let first = alert_id();
+            let second = alert_id();
+            let third = alert_id();
+
+            // SLO rows sort between the scheduled rows. A post-fetch filter
+            // would produce short pages and lose `third` from page 1.
+            insert_alert(&db, AlertSpec::burn(&alert_id(), "a-slo", SLO_A, 3600, 300)).await;
+            insert_alert(&db, AlertSpec::plain(&first, "b-first")).await;
+            insert_alert(&db, AlertSpec::burn(&alert_id(), "c-slo", SLO_A, 7200, 600)).await;
+            insert_alert(&db, AlertSpec::plain(&second, "d-second")).await;
+            insert_alert(&db, AlertSpec::plain(&third, "e-third")).await;
+
+            let page = |idx| {
+                let mut params = ListAlertsParams::new(ORG);
+                params.alert_type = AlertTypeFilter::Scheduled;
+                params.page_size_and_idx = Some((2, idx));
+                params
+            };
+            assert_eq!(ids_of(&db, page(0)).await, vec![first, second]);
+            assert_eq!(ids_of(&db, page(1)).await, vec![third]);
+        }
+
         /// Both new filters must read the indexed `slo_id` COLUMN, not the
         /// JSON condition and not `query_type`.
         ///
@@ -2030,12 +2125,7 @@ mod tests {
             insert_alert(&db, AlertSpec::burn(&a1, "a1", SLO_A, 3600, 300)).await;
             insert_alert(&db, AlertSpec::plain(&p1, "p1")).await;
 
-            for filter in [
-                AlertTypeFilter::All,
-                AlertTypeFilter::Scheduled,
-                AlertTypeFilter::Realtime,
-                AlertTypeFilter::AnomalyDetection,
-            ] {
+            for filter in [AlertTypeFilter::All, AlertTypeFilter::AnomalyDetection] {
                 let mut params = ListAlertsParams::new(ORG);
                 params.alert_type = filter;
                 assert_eq!(

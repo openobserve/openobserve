@@ -148,7 +148,7 @@ export const applyMeasuredYAxisLeftInset = (options: any): void => {
   }
 
   if (widest > 0) {
-    options.grid.left = widest;
+    options.grid.left = widest + 12;
     if (grid.containLabel === true && typeof grid.bottom === "number") {
       grid.bottom += X_AXIS_TICK_LABEL_BAND;
     }

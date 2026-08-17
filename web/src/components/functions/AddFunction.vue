@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @back="closeAddFunction"
         @cancel="cancelAddFunction"
         @open:chat="openChat"
-        :is-add-function-component="isAddFunctionComponent"
       />
     </OForm>
 
@@ -264,7 +263,6 @@ export default defineComponent({
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
-    const addJSTransformForm: any = ref(null);
     const disableColor: any = ref("");
     const formData: any = ref({
       name: "",
@@ -279,7 +277,6 @@ export default defineComponent({
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
     const { placeholder: jsPlaceholder } = useJsPlaceholder();
     let editorobj: any = null;
-    const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const testFunctionRef = ref<typeof TestFunction>();
     const splitterModel = ref(50);
@@ -585,19 +582,8 @@ export default defineComponent({
     /**
      * Handle successful generation from UnifiedQueryEditor
      */
-    const handleGenerationSuccess = (payload: { type: string; message: string }) => {
+    const handleGenerationSuccess = (_payload: { type: string; message: string }) => {
       // Function code is already updated via @update:query handler
-    };
-
-    // Unified Query Editor: Handle Ask AI
-    const handleAskAI = async (naturalLanguage: string, language: "vrl" | "javascript") => {
-      // Enable AI chat if not already enabled
-      if (!store.state.isAiChatEnabled) {
-        openChat(true);
-      }
-
-      // The unified component handles AI generation internally
-      // This event is just for parent components that may need to react
     };
 
     return {

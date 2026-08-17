@@ -44,7 +44,6 @@ Usage Examples:
 <script setup lang="ts">
 // withDefaults is a compiler macro; importing it conflicts with the macro declaration
 import { computed } from "vue";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
@@ -66,7 +65,6 @@ const props = withDefaults(defineProps<Props>(), {
   simpleMode: false,
 });
 
-const store = useStore();
 const { isDark } = useTheme();
 const { colorizeJson } = useLogsHighlighter();
 

@@ -508,6 +508,7 @@
 
   /* ProgressBar */
   --color-progress-bar-default: var(--color-primary-600);
+  --color-progress-bar-success: var(--color-success-600);
   --color-progress-bar-warning: var(--color-warning-500);
   --color-progress-bar-danger: var(--color-error-600);
   --color-progress-bar-track: var(--color-grey-200);
@@ -1481,6 +1482,7 @@
 
   /* ProgressBar */
   --color-progress-bar-default: var(--color-progress-bar-default);
+  --color-progress-bar-success: var(--color-progress-bar-success);
   --color-progress-bar-warning: var(--color-progress-bar-warning);
   --color-progress-bar-danger: var(--color-progress-bar-danger);
   --color-progress-bar-track: var(--color-progress-bar-track);

@@ -138,6 +138,34 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-queues": {
+    illustration: "data-scene",
+    variant: "create",
+    titleKey: "emptyState.noQueues.title",
+    descriptionKey: "emptyState.noQueues.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noQueues.action",
+        descriptionKey: "emptyState.noQueues.actionDesc",
+      },
+    ],
+  },
+  "no-datasets": {
+    illustration: "data-scene",
+    variant: "create",
+    titleKey: "emptyState.noDatasets.title",
+    descriptionKey: "emptyState.noDatasets.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noDatasets.action",
+        descriptionKey: "emptyState.noDatasets.actionDesc",
+      },
+    ],
+  },
   "no-pipelines": {
     illustration: "pipeline",
     variant: "create",
@@ -289,6 +317,27 @@ export const emptyStatePresets = {
     variant: "no-results",
     titleKey: "emptyState.noTraces.title",
     descriptionKey: "emptyState.noTraces.description",
+  },
+  "no-dataset-items": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noDatasetItems.title",
+    descriptionKey: "emptyState.noDatasetItems.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noDatasetItems.action",
+        descriptionKey: "emptyState.noDatasetItems.actionDesc",
+      },
+    ],
+  },
+  // Discovery lists only unhealthy targets, so "empty" is good news, not a gap.
+  "no-discovery-items": {
+    illustration: "check",
+    variant: "no-results",
+    titleKey: "emptyState.noDiscoveryItems.title",
+    descriptionKey: "emptyState.noDiscoveryItems.description",
   },
   "no-service-graph": {
     illustration: "service-graph",
@@ -787,6 +836,8 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-alerts": "emptyState.nouns.alerts",
   "no-incidents": "emptyState.nouns.incidents",
   "no-traces": "emptyState.nouns.traces",
+  "no-discovery-items": "emptyState.nouns.discoveryItems",
+  "no-dataset-items": "emptyState.nouns.datasetItems",
   "no-search-history": "emptyState.nouns.searches",
   "no-search-jobs": "emptyState.nouns.searchJobs",
   "no-users": "emptyState.nouns.users",

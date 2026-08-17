@@ -142,6 +142,10 @@ describe("TraceDetails", () => {
     } as any);
 
     globalThis.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+        () => HttpResponse.json(tracesMockData.tracesDetails.traceSpans),
+      ),
       http.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
         async ({ request }) => {
@@ -2322,6 +2326,10 @@ describe("TraceDetails", () => {
 
       // Register the search API handler that returns real trace spans
       globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          () => HttpResponse.json(tracesMockData.tracesDetails.traceSpans),
+        ),
         http.post(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
           async ({ request }) => {
@@ -2390,6 +2398,10 @@ describe("TraceDetails", () => {
       const spanId = response.hits[0].span_id;
 
       globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          () => HttpResponse.json(response),
+        ),
         http.post(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
           async ({ request }) => {
@@ -2415,6 +2427,10 @@ describe("TraceDetails", () => {
       const spanId = response.hits[0].span_id;
 
       globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          () => HttpResponse.json(response),
+        ),
         http.post(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
           async ({ request }) => {

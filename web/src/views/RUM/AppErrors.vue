@@ -697,13 +697,6 @@ const handleRowClick = (row: any) => {
   handleErrorTypeClick({ row });
 };
 
-// Severity spine flush against the row's left edge — same mechanism and
-// colors as the sessions table, for cross-page consistency.
-const getIssueStatusColor = (row: any) => {
-  if (row.error_handling === "handled") return "var(--color-severity-warning-color)";
-  return "var(--color-severity-error-color)";
-};
-
 function restoreUrlQueryParams() {
   const queryParams = router.currentRoute.value.query;
 

@@ -15,7 +15,6 @@
 
 import { computed, ref } from "vue";
 import type { TranslateFn } from "@/types/i18n";
-import { useStore } from "vuex";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
   aggregateStepStats,
@@ -82,7 +81,6 @@ const EMPTY_KPI: SyntheticKpi = {
  * Runs data is fetched separately via the REST /runs endpoint.
  */
 export function useSyntheticResults(t: TranslateFn) {
-  const store = useStore();
   const { getStream } = useStreams(t);
   const { executeQuery, cancelAll } = useLLMStreamQuery();
 

@@ -28,6 +28,7 @@ pub mod nats;
 pub mod postgres;
 pub mod sqlite;
 pub mod tantivy_index;
+pub mod trace_time_index;
 
 pub static NEED_WATCH: bool = true;
 pub static NO_NEED_WATCH: bool = false;
@@ -180,6 +181,18 @@ pub trait Db: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
+
+    /// Like `get`, but returns `None` when `key` is missing. Prefer it for
+    /// exact-key lookups expected to miss: `get` falls back to a prefix scan,
+    /// which on NATS costs a full bucket listing per miss.
+    async fn get_if_exists(&self, key: &str) -> Result<Option<Bytes>> {
+        match self.get(key).await {
+            Ok(v) => Ok(Some(v)),
+            Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     async fn put(
         &self,
         key: &str,

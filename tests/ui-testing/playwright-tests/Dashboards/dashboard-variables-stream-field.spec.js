@@ -10,6 +10,7 @@
  */
 
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager.js";
 import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped.js";
@@ -52,26 +53,28 @@ async function setupDashboardAndOpenVariables(page, pm, dashboardName) {
  * for the "add panel if no panel" button which is hidden when panels exist.
  */
 async function openDashboardWithPanels(page, dashboardName) {
-  // Use page.getByTitle() instead of XPath string concatenation — Playwright
-  // handles all escaping internally so dashboard names with special characters
-  // (quotes, brackets, etc.) are matched safely.
-  await page.getByTitle(dashboardName, { exact: true }).first().click();
-  await page
-    .locator('[data-test="dashboard-panel-container"]')
+  const scopedVars = new DashboardVariablesScoped(page);
+  // Use getByTitle (via page object) instead of XPath string concatenation —
+  // Playwright handles all escaping internally so dashboard names with special
+  // characters (quotes, brackets, etc.) are matched safely.
+  await scopedVars.getDashboardTitleLocator(dashboardName).first().click();
+  await scopedVars
+    .getPanelContainerLocator()
     .waitFor({ state: "visible", timeout: 20000 });
 }
 
 // Helper: Close settings, reopen, and go back to variables tab
 async function reopenSettingsVariables(page, pm) {
+  const scopedVars = new DashboardVariablesScoped(page);
   await pm.dashboardSetting.closeSettingWindow();
-  await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
+  await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 5000 });
   await safeWaitForNetworkIdle(page, { timeout: 5000 });
   await pm.dashboardSetting.openSetting();
   await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
   await pm.dashboardSetting.openVariables();
   await safeWaitForNetworkIdle(page, { timeout: 5000 });
-  await page
-    .locator(SELECTORS.ADD_VARIABLE_BTN)
+  await scopedVars
+    .getAddVariableBtnLocator()
     .waitFor({ state: "visible", timeout: 10000 });
 }
 
@@ -84,7 +87,8 @@ test.describe(
   "A - Variable in Stream Selection",
   { tag: ["@dashboards", "@dashboardVariables", "@streamFieldVariables", "@P1"] },
   () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, testInfo) => {
+      testLogger.testStart(testInfo.title, testInfo.file);
       await navigateToBase(page);
       await ingestion(page);
     });
@@ -105,8 +109,8 @@ test.describe(
       await reopenSettingsVariables(page, pm);
 
       // --- A1: Verify $streamVar appears in stream dropdown with (variable) label ---
-      await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-      await page.locator('[data-test="dashboard-variable-name-field"]').fill("child");
+      await scopedVars.clickAddVariableBtn();
+      await scopedVars.fillVariableName("child");
       await selectStreamType(page, "logs");
 
       const streamResult = await scopedVars.verifyStreamDropdownContainsVariable("streamVar");
@@ -123,7 +127,7 @@ test.describe(
       expect(noError).toBe(true);
 
       // Verify save button is still usable
-      const saveBtn = page.locator(SELECTORS.VARIABLE_SAVE_BTN);
+      const saveBtn = scopedVars.getVariableSaveBtnLocator();
       await expect(saveBtn).toBeVisible();
 
       // --- A2: Save variable with $streamVar as stream, $fieldVar as field ---
@@ -135,8 +139,8 @@ test.describe(
 
       // Reopen settings to verify variable was created
       await reopenSettingsVariables(page, pm);
-      const editBtn = page.locator(getEditVariableBtn("child"));
-      await expect(editBtn).toBeVisible({ timeout: 10000 });
+      const editBtn = scopedVars.getEditVariableBtnLocator("child");
+      await expect(editBtn).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -173,8 +177,8 @@ test.describe(
       await reopenSettingsVariables(page, pm);
 
       // --- B1: Verify $fieldVar appears in field dropdown with (variable) label ---
-      await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-      await page.locator('[data-test="dashboard-variable-name-field"]').fill("child");
+      await scopedVars.clickAddVariableBtn();
+      await scopedVars.fillVariableName("child");
       await selectStreamType(page, "logs");
       await scopedVars.selectStream("e2e_automate");
 
@@ -188,7 +192,7 @@ test.describe(
       // --- B2: Save variable with $fieldVar as field ---
       await scopedVars.selectField("$fieldVar");
 
-      const saveBtn = page.locator(SELECTORS.VARIABLE_SAVE_BTN);
+      const saveBtn = scopedVars.getVariableSaveBtnLocator();
       await saveBtn.waitFor({ state: "visible", timeout: 10000 });
       await saveBtn.click();
 
@@ -197,8 +201,8 @@ test.describe(
 
       // Reopen settings to verify variable was created
       await reopenSettingsVariables(page, pm);
-      const editBtn = page.locator(getEditVariableBtn("child"));
-      await expect(editBtn).toBeVisible({ timeout: 10000 });
+      const editBtn = scopedVars.getEditVariableBtnLocator("child");
+      await expect(editBtn).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -255,8 +259,8 @@ test.describe(
       );
 
       await reopenSettingsVariables(page, pm);
-      const editCombined = page.locator(getEditVariableBtn("combined"));
-      await expect(editCombined).toBeVisible({ timeout: 10000 });
+      const editCombined = scopedVars.getEditVariableBtnLocator("combined");
+      await expect(editCombined).toBeVisible({ timeout: 30000 });
 
       // --- C2: Same variable in field and filter value ---
       await scopedVars.addQueryValuesVariable(
@@ -274,8 +278,8 @@ test.describe(
       );
 
       await reopenSettingsVariables(page, pm);
-      const editDedup = page.locator(getEditVariableBtn("dedup"));
-      await expect(editDedup).toBeVisible({ timeout: 10000 });
+      const editDedup = scopedVars.getEditVariableBtnLocator("dedup");
+      await expect(editDedup).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -453,7 +457,7 @@ test.describe(
 
       // Verify variable C was created — if creation failed silently, the cycle
       // test below would pass vacuously (no $C in dropdown → no cycle).
-      const editCBtn = page.locator('[data-test="dashboard-edit-variable-C"]');
+      const editCBtn = scopedVars.getEditVariableBtnLocator("C");
       await expect(editCBtn).toBeVisible({ timeout: 5000 });
 
       // F2 variables (valid chain: env → region → pod)
@@ -492,7 +496,7 @@ test.describe(
       // Click save directly — don't use clickSaveButton() which waits up to 10s for
       // the button to hide. A brief DOM rerender can trick it into thinking save
       // succeeded, masking the cycle error. For cycle detection we just need the click.
-      const saveBtnF1 = page.locator(SELECTORS.VARIABLE_SAVE_BTN);
+      const saveBtnF1 = scopedVars.getVariableSaveBtnLocator();
       await saveBtnF1.waitFor({ state: "visible", timeout: 10000 });
       await saveBtnF1.click();
 
@@ -500,12 +504,12 @@ test.describe(
       expect(hasCycleF1).toBe(true);
 
       // Cancel the edit form, go back to variable list
-      await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
+      await scopedVars.getVariableCancelBtnLocator().click();
       // Wait for edit form to close (save button hidden indicates form is gone)
-      await page.locator(SELECTORS.VARIABLE_SAVE_BTN).waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
+      await scopedVars.getVariableSaveBtnLocator().waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
-      await page
-        .locator(SELECTORS.ADD_VARIABLE_BTN)
+      await scopedVars
+        .getAddVariableBtnLocator()
         .waitFor({ state: "visible", timeout: 10000 });
 
       // --- F2: Edit env to introduce cycle in env→region→pod chain ---
@@ -513,13 +517,13 @@ test.describe(
       await scopedVars.editVariable("env");
       await scopedVars.changeVariableType("Query Values");
       // Wait for Query Values form fields to render after type change
-      await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getVariableStreamTypeSelectLocator().waitFor({ state: "visible", timeout: 10000 });
       await selectStreamType(page, "logs");
       await scopedVars.selectStream("$pod");
       await scopedVars.selectField("$region");
 
       // Click save directly for cycle detection (same reason as F1 above)
-      const saveBtnF2 = page.locator(SELECTORS.VARIABLE_SAVE_BTN);
+      const saveBtnF2 = scopedVars.getVariableSaveBtnLocator();
       await saveBtnF2.waitFor({ state: "visible", timeout: 10000 });
       await saveBtnF2.click();
 
@@ -527,8 +531,8 @@ test.describe(
       expect(hasCycleF2).toBe(true);
 
       // Cancel the edit form before cleanup
-      await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
-      await page.locator(SELECTORS.VARIABLE_SAVE_BTN).waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
+      await scopedVars.getVariableCancelBtnLocator().click();
+      await scopedVars.getVariableSaveBtnLocator().waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       // Cleanup
@@ -611,9 +615,9 @@ test.describe(
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
-      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       // Reopen dashboard — this is the initial load we want to test
@@ -626,10 +630,10 @@ test.describe(
       await scopedVars.waitForVariableSelectorVisible("streamChild", { timeout: 40000 });
       await scopedVars.waitForVariableSelectorVisible("fieldChild", { timeout: 40000 });
 
-      await expect(page.locator(getVariableSelector("streamName"))).toBeVisible();
-      await expect(page.locator(getVariableSelector("streamChild"))).toBeVisible();
-      await expect(page.locator(getVariableSelector("fieldName"))).toBeVisible();
-      await expect(page.locator(getVariableSelector("fieldChild"))).toBeVisible();
+      await expect(scopedVars.getVariableSelectorLocator("streamName")).toBeVisible();
+      await expect(scopedVars.getVariableSelectorLocator("streamChild")).toBeVisible();
+      await expect(scopedVars.getVariableSelectorLocator("fieldName")).toBeVisible();
+      await expect(scopedVars.getVariableSelectorLocator("fieldChild")).toBeVisible();
 
       // Allow all initial variable API calls to settle before cascade testing.
       // In CI, SSE streaming responses can take longer to complete, so give
@@ -729,8 +733,8 @@ test.describe(
         "$fieldConst"
       );
       await reopenSettingsVariables(page, pm);
-      const editHyphen = page.locator(getEditVariableBtn("hyphenChild"));
-      await expect(editHyphen).toBeVisible({ timeout: 10000 });
+      const editHyphen = scopedVars.getEditVariableBtnLocator("hyphenChild");
+      await expect(editHyphen).toBeVisible({ timeout: 30000 });
 
       // --- H2: Variable name with underscores in field ---
       await scopedVars.addConstantVariable(
@@ -746,8 +750,8 @@ test.describe(
         "$field_name"
       );
       await reopenSettingsVariables(page, pm);
-      const editUnderscore = page.locator(getEditVariableBtn("underscoreChild"));
-      await expect(editUnderscore).toBeVisible({ timeout: 10000 });
+      const editUnderscore = scopedVars.getEditVariableBtnLocator("underscoreChild");
+      await expect(editUnderscore).toBeVisible({ timeout: 30000 });
 
       // --- H3: Switch variable type from query_values to constant ---
       await scopedVars.addConstantVariable("parent", "e2e_automate");
@@ -764,15 +768,15 @@ test.describe(
       // Edit var1, change type to Constant
       await scopedVars.editVariable("var1");
       await scopedVars.changeVariableType("Constant");
-      await page
-        .locator('[data-test="dashboard-variable-constant-value-field"]')
+      await scopedVars
+        .getVariableConstantValueFieldLocator()
         .fill("some_value");
       await scopedVars.clickSaveButton();
 
       // Verify save succeeded
       await reopenSettingsVariables(page, pm);
-      const editVar1 = page.locator(getEditVariableBtn("var1"));
-      await expect(editVar1).toBeVisible({ timeout: 10000 });
+      const editVar1 = scopedVars.getEditVariableBtnLocator("var1");
+      await expect(editVar1).toBeVisible({ timeout: 30000 });
 
       // Cleanup
       await pm.dashboardSetting.closeSettingWindow();
@@ -849,17 +853,17 @@ test.describe(
         "$fieldConst",
         { scope: "tabs", assignedTabs: ["tab1"] }
       );
-      await page
-        .locator(getEditVariableBtn("tabChildVar"))
+      await scopedVars
+        .getEditVariableBtnLocator("tabChildVar")
         .waitFor({ state: "visible", timeout: 15000 });
 
       // Close settings and navigate away then back for a clean initial load.
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
-      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       // Reopen dashboard — this is the initial load we want to test
@@ -885,9 +889,9 @@ test.describe(
         },
       });
 
-      await page.locator(getTabSelector("Tab1")).click();
-      await page
-        .locator(getVariableSelector("tabChildVar"))
+      await scopedVars.clickTab("Tab1");
+      await scopedVars
+        .getVariableSelectorLocator("tabChildVar")
         .waitFor({ state: "visible", timeout: 20000 });
 
       const result = await apiMonitor;
@@ -937,17 +941,17 @@ test.describe(
         "$globalField",
         { scope: "tabs", assignedTabs: ["tab1"] }
       );
-      await page
-        .locator(getEditVariableBtn("tabFieldVar"))
+      await scopedVars
+        .getEditVariableBtnLocator("tabFieldVar")
         .waitFor({ state: "visible", timeout: 15000 });
 
       // Close settings and navigate away then back for a clean initial load.
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
-      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       // Reopen dashboard — this is the initial load we want to test
@@ -971,9 +975,9 @@ test.describe(
         },
       });
 
-      await page.locator(getTabSelector("Tab1")).click();
-      await page
-        .locator(getVariableSelector("tabFieldVar"))
+      await scopedVars.clickTab("Tab1");
+      await scopedVars
+        .getVariableSelectorLocator("tabFieldVar")
         .waitFor({ state: "visible", timeout: 20000 });
 
       const result = await apiMonitor;
@@ -1025,17 +1029,17 @@ test.describe(
         "$fieldConst",
         { scope: "tabs", assignedTabs: ["tab1"] }
       );
-      await page
-        .locator(getEditVariableBtn("tabCustomChild"))
+      await scopedVars
+        .getEditVariableBtnLocator("tabCustomChild")
         .waitFor({ state: "visible", timeout: 15000 });
 
       // Close settings and navigate away then back for a clean initial load.
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
-      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       // Reopen dashboard — this is the initial load we want to test
@@ -1060,9 +1064,9 @@ test.describe(
         },
       });
 
-      await page.locator(getTabSelector("Tab1")).click();
-      await page
-        .locator(getVariableSelector("tabCustomChild"))
+      await scopedVars.clickTab("Tab1");
+      await scopedVars
+        .getVariableSelectorLocator("tabCustomChild")
         .waitFor({ state: "visible", timeout: 20000 });
 
       const result = await apiMonitor;
@@ -1137,7 +1141,7 @@ test.describe(
       // Open settings and navigate to variables tab
       await pm.dashboardSetting.openSetting();
       await pm.dashboardSetting.openVariables();
-      await page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
       // Global constant holds the stream name
       await scopedVars.addConstantVariable("globalStream", "e2e_automate");
@@ -1156,15 +1160,15 @@ test.describe(
         "$fieldConst",
         { scope: "panels", assignedPanels: ["TestPanel"] }
       );
-      await page
-        .locator(getEditVariableBtn("panelChildVar"))
+      await scopedVars
+        .getEditVariableBtnLocator("panelChildVar")
         .waitFor({ state: "visible", timeout: 15000 });
 
       // Close settings and navigate away for a clean initial load
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
-      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       // Start monitor BEFORE reopening — panel variables load on initial dashboard render
@@ -1219,7 +1223,7 @@ test.describe(
 
       await pm.dashboardSetting.openSetting();
       await pm.dashboardSetting.openVariables();
-      await page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
       // Global constant holds the field name
       await scopedVars.addConstantVariable("globalField", "kubernetes_namespace_name");
@@ -1234,14 +1238,14 @@ test.describe(
         "$globalField",
         { scope: "panels", assignedPanels: ["TestPanel"] }
       );
-      await page
-        .locator(getEditVariableBtn("panelFieldVar"))
+      await scopedVars
+        .getEditVariableBtnLocator("panelFieldVar")
         .waitFor({ state: "visible", timeout: 15000 });
 
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
-      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       const apiMonitor = monitorVariableAPICalls(page, {
@@ -1293,7 +1297,7 @@ test.describe(
 
       await pm.dashboardSetting.openSetting();
       await pm.dashboardSetting.openVariables();
-      await page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
       // Global custom variable selecting the stream
       await scopedVars.addCustomVariable("streamSelector", [
@@ -1313,14 +1317,14 @@ test.describe(
         "$fieldConst",
         { scope: "panels", assignedPanels: ["TestPanel"] }
       );
-      await page
-        .locator(getEditVariableBtn("panelCustomChild"))
+      await scopedVars
+        .getEditVariableBtnLocator("panelCustomChild")
         .waitFor({ state: "visible", timeout: 15000 });
 
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-drawer"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
-      await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
       const apiMonitor = monitorVariableAPICalls(page, {

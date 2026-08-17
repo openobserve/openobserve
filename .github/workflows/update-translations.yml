@@ -1,59 +1,175 @@
 # Copyright 2026 OpenObserve Inc.
 name: Update Translations
 
+# Translations are produced *inside the PR that changes en-US.json*, and pushed
+# back onto that PR's own branch. The previous design ran on `push: main` and
+# opened a separate `chore/update-translations` PR; that PR had no owner, was
+# never assigned or reviewed by a human, and piled up behind the merge queue.
+# Keeping the work in the originating PR means the author who added the English
+# strings also owns (and reviews) their translations, and main is never missing
+# translations for a string that has already landed.
 on:
-  push:
-    branches:
-      - main
-    # Only run when the English source actually changes. Gating to `main` (instead
-    # of every branch) avoids re-translating the same strings on each feature
-    # branch — the single largest cost driver of this job.
+  pull_request:
+    # Deliberately NOT the default opened/synchronize/reopened. Generating on
+    # every push meant every edit to en-US.json produced its own translation
+    # commit, and each of those commits re-ran the PR's entire check suite
+    # (playwright, unit-tests, api-testing, …) — on top of the merge queue
+    # running them all again at merge time. These two types fire once, at the
+    # point the author signals the PR is finished, so the translation commit
+    # costs one extra CI cycle per PR instead of one per edit.
+    #
+    # `merge_group` cannot be used for this, which is the obvious thing to reach
+    # for: merge-queue branches (gh-readonly-queue/*) are read-only and their
+    # commits are frozen — the whole point of a queue is that what is tested is
+    # what merges — so a merge_group run has nowhere to put the commit. The
+    # queue is gated by verify-translations.yml instead, which only *checks*.
+    #
+    # `paths` still applies: a PR that never touches en-US.json creates no run.
+    types: [auto_merge_enabled, ready_for_review]
     paths:
       - 'web/src/locales/languages/en-US.json'
   workflow_dispatch:
     inputs:
       languages:
-        description: 'Languages to translate (space-separated, e.g., "fr es de"). Leave empty for all.'
+        description: 'Languages to translate (space-separated, e.g., "fr-FR es-ES de-DE"). Leave empty for all.'
         required: false
         default: ''
 
-# Serialise runs on the same ref, but never cancel one that is already working.
-# `cancel-in-progress: true` was actively harmful here: en-US.json lands on main
-# more often than a backlog run takes, so every run was killed by the next merge
-# and its API spend thrown away (20 of the last 40 runs ended `cancelled`, none on
-# main ever succeeded). GitHub keeps at most one running + one pending run per
-# group, so queueing cannot pile up, and the work is incremental — a queued run
-# picks up exactly what its predecessor did not finish.
+# One run per PR. Unlike the old main-branch job, cancelling here is the right
+# call: a PR branch gets bursts of pushes, a cancelled run commits nothing (the
+# commit steps are gated on `!cancelled()`, not `always()`), and the surviving
+# run re-derives the full pending set from .translation_state.json — so a
+# cancelled run loses no progress, only spend. Two runs must never both reach
+# the push, or the older one replays less-complete locale files over the newer.
 concurrency:
-  group: update-translations-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  group: update-translations-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   update-translations:
     name: Update translation files
     runs-on: ubuntu-latest
 
-    # Only run on the main repo, not forks.
-    if: github.repository == 'openobserve/openobserve'
+    # Only the main repo, and only same-repo PRs: a fork PR's branch lives in the
+    # contributor's repo, which no token here can push to. Fork PRs that touch
+    # en-US.json are handled by a maintainer running this workflow manually
+    # (workflow_dispatch) from the fork branch, or by the next same-repo PR that
+    # touches en-US.json — the state file makes it pick up every pending key.
+    if: >-
+      github.repository == 'openobserve/openobserve' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
 
-    # Required for opening the translations PR.
     permissions:
       contents: write
-      pull-requests: write
+
+    env:
+      # Deliberately no token here: a job-level `env:` is injected into *every*
+      # step, including the ones that install and run PR-authored Python. The
+      # push credential is scoped to the single step that pushes.
+      HEAD_REF: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      COMMIT_SUBJECT: 'chore(i18n): update translations from en-US.json'
+      # Appended to the commit body when the run did not finish every string, so
+      # the skip-guard below knows this branch still has pending work.
+      PARTIAL_TRAILER: 'Translation-Run: partial'
 
     steps:
-      - name: Checkout repository
+      - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # Check out the branch TIP, not the triggering commit. The job is a
-          # reconciliation against .translation_state.json rather than a diff of
-          # one commit, so a run that waited in the concurrency queue must start
-          # from the newest main — which already contains the translations its
-          # predecessor merged. Pinning to github.sha would make it redo that work.
-          ref: ${{ github.ref_name }}
+          token: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN || secrets.GITHUB_TOKEN }}
+          # This job runs PR-authored code (requirements.txt, main.py,
+          # translator.py all come from the PR head). Without this, checkout
+          # would leave the push token in .git/config for that code to read.
+          # The push step re-attaches the credential after the Python is done.
+          persist-credentials: false
+          # Check out the PR's head branch by name (not the merge commit that
+          # `pull_request` checks out by default) so the generated files can be
+          # committed straight back onto it.
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          # Enough history for `git log -1` and for the common ancestor of a
+          # normal concurrent push. The retry path unshallows only if it has to,
+          # so the ordinary run doesn't full-clone a large repo.
+          fetch-depth: 50
+
+      - name: Skip if there is nothing to do, or nowhere to push
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        # Two independent reasons to stop before spending anything.
+        #
+        # 1. The head commit is already a complete translation commit. Our push no
+        #    longer re-triggers this workflow (it fires on auto_merge_enabled /
+        #    ready_for_review, not synchronize), so this is not the ping-pong guard
+        #    it used to be. It still matters for the paths that DO re-enter: a
+        #    workflow_dispatch re-run, or the author toggling auto-merge off and
+        #    back on. Except when the previous run left strings pending — main.py
+        #    exits 3 if any string failed validation, and the run marks its commit
+        #    with the partial trailer. Skipping that on subject alone would strand
+        #    those keys, so a re-run is allowed to pick them up.
+        #
+        # 2. The PR is already in the merge queue. `auto_merge_enabled` — one of
+        #    the two events that start this workflow — fires on the SAME click that
+        #    enqueues the PR, and GitHub freezes a queued PR's branch: every push
+        #    is rejected with GH006 no matter how often it is rebased. Translating
+        #    anyway would spend the DeepSeek budget building a commit with nowhere
+        #    to go. Stop instead, and let the queue's own gate
+        #    (verify-translations.yml) hard-fail if strings really are missing —
+        #    its error already tells the author to dequeue, re-run this workflow,
+        #    and re-queue.
+        run: |
+          SUBJECT="$(git log -1 --pretty=%s)"
+          BODY="$(git log -1 --pretty=%b)"
+          if [ "$SUBJECT" = "$COMMIT_SUBJECT" ] && ! printf '%s' "$BODY" | grep -qF "$PARTIAL_TRAILER"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=done" >> "$GITHUB_OUTPUT"
+            echo "ℹ️  Head commit is a complete translation commit — nothing to do."
+            exit 0
+          fi
+
+          # A failed or unrecognised lookup deliberately falls through to "not
+          # queued": a transient API blip must never silently stop translations
+          # from being generated. The push step classifies the same rejection, so
+          # a false negative here costs one wasted run, not a wrong result.
+          QUEUE_STATE=NONE
+          if [ -n "$PR_NUMBER" ]; then
+            QUEUE_STATE="$(gh api graphql \
+              -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){mergeQueueEntry{state}}}}' \
+              -F owner="${GITHUB_REPOSITORY%/*}" \
+              -F repo="${GITHUB_REPOSITORY#*/}" \
+              -F number="$PR_NUMBER" \
+              --jq '.data.repository.pullRequest.mergeQueueEntry.state // "NONE"' 2>/dev/null || echo NONE)"
+          fi
+
+          if [ "$QUEUE_STATE" != "NONE" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=queued" >> "$GITHUB_OUTPUT"
+            echo "::warning::PR #${PR_NUMBER} is in the merge queue (state: ${QUEUE_STATE}), so its branch is frozen and no translation commit can be pushed. Dequeue the PR, re-run this workflow, then re-queue."
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "reason=run" >> "$GITHUB_OUTPUT"
+          if [ "$SUBJECT" = "$COMMIT_SUBJECT" ]; then
+            echo "ℹ️  Head commit is a *partial* translation commit — retrying the strings it could not finish."
+          fi
+
+      - name: Refuse to run against a protected branch
+        if: steps.guard.outputs.skip == 'false'
+        # Only reachable via workflow_dispatch selecting a long-lived branch. The
+        # push at the end would be rejected by branch protection anyway; fail
+        # early with a comprehensible message instead of after a full run.
+        run: |
+          case "$HEAD_REF" in
+            main|master|release/*|v[0-9]*|[0-9]*.[0-9]*)
+              echo "::error::This workflow commits to the branch it runs on and cannot target the protected branch '$HEAD_REF'. Re-run it from the feature branch whose PR changes en-US.json."
+              exit 1
+              ;;
+          esac
 
       - name: Verify DeepSeek API key secret is configured
+        if: steps.guard.outputs.skip == 'false'
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
@@ -63,6 +179,7 @@ jobs:
           fi
 
       - name: Set up Python
+        if: steps.guard.outputs.skip == 'false'
         uses: actions/setup-python@v7
         with:
           python-version: '3.11'
@@ -70,16 +187,26 @@ jobs:
           cache-dependency-path: scripts/translations/requirements.txt
 
       - name: Install Python dependencies
+        if: steps.guard.outputs.skip == 'false'
         run: pip install -r scripts/translations/requirements.txt
 
       - name: Run translation script
         id: run_translation
+        if: steps.guard.outputs.skip == 'false'
         # Inputs are passed as environment variables (not interpolated into the
         # script body) so user-controlled text can never be injected into the
         # shell. The script itself validates language codes against the supported
-        # list before any API call (see main.py).
+        # list before any API call (see main.py). Only keys whose English text
+        # differs from the hash recorded in .translation_state.json are sent, so a
+        # PR pays only for the strings it actually added or changed.
+        #
+        # Failed strings are retried in-process rather than on a later push,
+        # because there is no later push: this workflow no longer fires on
+        # synchronize, so our own commit does not bring us back here. Each retry
+        # re-derives what is pending from state, so it only re-sends the strings
+        # that actually failed — a retry after a near-complete run is nearly free.
         env:
-          INPUT_LANGUAGES: ${{ github.event.inputs.languages }}
+          INPUT_LANGUAGES: ${{ inputs.languages }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
           cd scripts/translations
@@ -89,108 +216,184 @@ jobs:
             ARGS+=("${REQUESTED[@]}")
           fi
           echo "Running translation with args: ${ARGS[*]}"
-          python3 main.py "${ARGS[@]}"
+
+          for attempt in 1 2 3; do
+            set +e
+            python3 main.py "${ARGS[@]}"
+            STATUS=$?
+            set -e
+
+            if [ "$STATUS" -eq 0 ]; then
+              echo "run=complete" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            # Exit 3 means "some strings failed validation, the rest are written".
+            # Anything else (bad usage, missing source, unreachable API) is not
+            # worth retrying — fail the step and let the run surface it.
+            if [ "$STATUS" -ne 3 ]; then
+              echo "::error::Translation script failed with exit $STATUS."
+              exit "$STATUS"
+            fi
+            echo "::warning::Attempt $attempt left some strings unfinished — retrying just those."
+          done
+
+          # Still incomplete. Ship what we have; the merge-queue gate
+          # (verify-translations.yml) is what stops it reaching main.
+          echo "run=partial" >> "$GITHUB_OUTPUT"
+          echo "::warning::Some strings are still untranslated after 3 attempts. The completed locales are committed; the merge-queue check will block this PR until the rest land."
 
       - name: Check for translation changes
         id: check_changes
-        # `always()` because partial progress is still worth shipping. The script
-        # exits non-zero when ANY string failed validation (main.py), and it is
-        # cancellable mid-run — under the default `success()` this step and the PR
-        # steps were skipped, so multi-hour runs that had already written most
-        # locale files produced nothing and the next run repeated the work.
-        # Locale files are written atomically per locale, so whatever is on disk
-        # here is complete, valid JSON.
-        if: always()
+        # `!cancelled()` rather than `success()` because partial progress from a
+        # *failed* run is still worth shipping: main.py exits 3 when any string
+        # failed validation, and locale files are written atomically per locale,
+        # so whatever is on disk is complete, valid JSON for the locales it got
+        # through. `!cancelled()` rather than `always()` because a cancelled run
+        # has been superseded — letting it commit would race the newer run to the
+        # same branch and replay less-complete files over more-complete ones.
+        if: '!cancelled() && steps.guard.outputs.skip == ''false'''
         # Use `git status --porcelain` (not `git diff`) so brand-new untracked
         # files — e.g. a freshly created .translation_state.json or a new locale
         # file — are detected, not just modifications to already-tracked files.
         run: |
           PATHS="web/src/locales/languages/ scripts/translations/.translation_state.json"
           if [ -n "$(git status --porcelain -- $PATHS)" ]; then
-            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "changes=true" >> "$GITHUB_OUTPUT"
             echo "Translation changes detected:"
             git status --porcelain -- $PATHS
           else
-            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "changes=false" >> "$GITHUB_OUTPUT"
             echo "No translation changes detected"
           fi
 
-      # `main` is a protected branch, so a direct `git push` from GITHUB_TOKEN is
-      # rejected (this is why earlier runs failed on the push step). Open a PR
-      # with the generated translations instead. Requires the repo setting
-      # "Allow GitHub Actions to create and approve pull requests" to be enabled
-      # (Settings → Actions → General → Workflow permissions).
-      - name: Create pull request with translation updates
-        id: cpr
-        if: always() && steps.check_changes.outputs.changes == 'true'
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: chore/update-translations
-          delete-branch: true
-          add-paths: |
-            web/src/locales/languages/*.json
-            scripts/translations/.translation_state.json
-          commit-message: |
-            chore: update translations from en-US.json
-
-            Auto-generated translation updates from English source file.
-
-            🤖 Generated with automated translation workflow
-          title: "chore: update translations from en-US.json"
-          body: |
-            Auto-generated translation updates from the English source file
-            (`web/src/locales/languages/en-US.json`).
-
-            🤖 Generated with automated translation workflow
-          labels: |
-            translations
-            e2e
-
-      # Approve the PR so it satisfies the required-review rule. GITHUB_TOKEN
-      # cannot approve a PR it authored (the PR above is authored by
-      # github-actions[bot]), so this uses a personal access token that belongs
-      # to the reviewer account `nikhilsaikethe` — the approval is attributed to
-      # that user. Store that account's PAT in the TRANSLATIONS_APPROVE_TOKEN
-      # secret. PR number is passed via env (never interpolated into the shell body).
-      - name: Approve the translation PR
-        if: always() && steps.cpr.outputs.pull-request-number
+      - name: Commit translations onto the PR branch
+        id: commit
+        if: '!cancelled() && steps.check_changes.outputs.changes == ''true'''
         env:
-          GH_TOKEN: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN }}
-          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
-          REPO: ${{ github.repository }}
+          # Scoped to this step, not the job: every step above this one runs
+          # PR-authored code, and none of them need a push credential.
+          #
+          # Pushing with GITHUB_TOKEN would leave the PR wedged: GitHub
+          # deliberately does not re-trigger workflows for commits made with that
+          # token, so the new head SHA would have no status checks and required
+          # checks could never go green. TRANSLATIONS_APPROVE_TOKEN is a real
+          # user token, so its push re-runs CI on the translation commit. The
+          # fallback keeps the workflow functional if the secret is missing, at
+          # the cost of that re-trigger.
+          PUSH_TOKEN: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN || secrets.GITHUB_TOKEN }}
+          RUN_RESULT: ${{ steps.run_translation.outputs.run }}
         run: |
-          gh pr review "$PR_NUMBER" --repo "$REPO" --approve \
-            --body "Auto-approved: automated translation update."
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Checkout ran with persist-credentials: false, so re-attach the
+          # credential now that no more PR-authored code will run. Actions masks
+          # the secret in logs.
+          git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-      # Enable auto-merge so the PR enters the merge queue automatically once the
-      # required review (above) and status checks pass. Uses the same PAT so the
-      # enqueue is attributed to a real user and downstream workflows (e.g. the
-      # merge_group checks) trigger correctly. Merge method must match the repo's
-      # merge-queue configuration — change --squash if the queue uses merge/rebase.
-      - name: Enable auto-merge (merge queue)
-        if: always() && steps.cpr.outputs.pull-request-number
-        env:
-          GH_TOKEN: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN }}
-          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
-          REPO: ${{ github.repository }}
-        run: |
-          gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --squash
+          git add -- 'web/src/locales/languages/*.json' \
+                     'scripts/translations/.translation_state.json'
+          if git diff --cached --quiet; then
+            echo "Nothing staged after filtering to translation paths."
+            echo "pushed=noop" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Record whether strings are still pending, so a later re-run (manual
+          # dispatch, or auto-merge toggled off and on) picks them up instead of
+          # being short-circuited by the skip-guard.
+          if [ "$RUN_RESULT" = "partial" ]; then
+            git commit -m "$COMMIT_SUBJECT" -m "$PARTIAL_TRAILER"
+          else
+            git commit -m "$COMMIT_SUBJECT"
+          fi
+
+          # If the PR merged (or the branch was deleted) while this ran, pushing
+          # would silently *recreate* the head branch as a stray. Bail instead —
+          # the strings stay pending and the next PR touching en-US.json picks
+          # them up from the state file.
+          if ! git ls-remote --exit-code --heads origin "$HEAD_REF" >/dev/null 2>&1; then
+            echo "::warning::Branch '$HEAD_REF' no longer exists on origin (PR merged or branch deleted). Not recreating it; these strings stay pending."
+            echo "pushed=gone" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # The author may push while this job runs. Rebase onto the branch tip
+          # and retry rather than failing the PR; our commit only touches
+          # generated files, so a rebase conflict is not expected, and if one
+          # does occur the loop exits non-zero and the PR author re-runs the job.
+          #
+          # That retry is for ONE failure mode — losing a race to a concurrent
+          # push. Retrying is only ever right when the rejection is about our
+          # commit being out of date; see the GH006 branch below for the case
+          # where it is about the branch being closed to writes entirely.
+          for attempt in 1 2 3; do
+            set +e
+            PUSH_OUT="$(git push origin "HEAD:refs/heads/$HEAD_REF" 2>&1)"
+            PUSH_STATUS=$?
+            set -e
+            printf '%s\n' "$PUSH_OUT"
+
+            if [ "$PUSH_STATUS" -eq 0 ]; then
+              echo "pushed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            # The PR entered the merge queue after the guard above checked (the
+            # queue accepts it at "Merge when ready", while this job is still
+            # translating). A queued branch is frozen, so this is a policy
+            # rejection, not a lost race: rebasing changes nothing and the next
+            # two attempts fail identically, burying the real reason under a
+            # log that looks like a flaky race. Stop at the first one.
+            if printf '%s' "$PUSH_OUT" | grep -qEi 'GH006|merge queue|protected branch hook declined'; then
+              echo "pushed=queued" >> "$GITHUB_OUTPUT"
+              echo "::error::Cannot push translations: '$HEAD_REF' is frozen because its PR is in the merge queue. Dequeue the PR, re-run this workflow (Actions → Update Translations), then re-queue. Nothing is lost — the untranslated keys stay pending in .translation_state.json."
+              exit 1
+            fi
+
+            echo "Push rejected (attempt $attempt) — rebasing onto $HEAD_REF and retrying."
+            # The shallow clone may not reach the common ancestor of a branch
+            # that was rebased or force-pushed under us; deepen only here, on the
+            # path that actually needs full history.
+            git fetch --unshallow origin "$HEAD_REF" 2>/dev/null || git fetch origin "$HEAD_REF"
+            git rebase "origin/$HEAD_REF" || {
+              git rebase --abort || true
+              echo "::error::Could not rebase the translation commit onto $HEAD_REF. Rebase your branch and re-run this workflow."
+              exit 1
+            }
+          done
+          echo "::error::Failed to push translation commit to $HEAD_REF after 3 attempts."
+          exit 1
 
       - name: Summary
         if: always()
         env:
+          SKIPPED: ${{ steps.guard.outputs.skip }}
+          SKIP_REASON: ${{ steps.guard.outputs.reason }}
           SCRIPT_OUTCOME: ${{ steps.run_translation.outcome }}
+          RUN_RESULT: ${{ steps.run_translation.outputs.run }}
           HAS_CHANGES: ${{ steps.check_changes.outputs.changes }}
-          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
+          PUSHED: ${{ steps.commit.outputs.pushed }}
         run: |
-          if [ "$HAS_CHANGES" == "true" ] && [ -n "$PR_NUMBER" ]; then
-            echo "✅ PR #$PR_NUMBER created/updated (branch: chore/update-translations), labeled 'translations,e2e', approved, and set to auto-merge into the merge queue."
+          if [ "$SKIPPED" == "true" ] && [ "$SKIP_REASON" == "queued" ]; then
+            echo "⚠️  Skipped — this PR is in the merge queue, which freezes its branch, so a translation commit cannot be pushed."
+            echo "Dequeue the PR, re-run **Update Translations**, then re-queue. Pending keys are tracked in \`.translation_state.json\`, so nothing is lost."
+          elif [ "$SKIPPED" == "true" ]; then
+            echo "ℹ️  Skipped — head commit is already a complete translation commit."
+          elif [ "$PUSHED" == "queued" ]; then
+            echo "❌ \`$HEAD_REF\` entered the merge queue while this run was translating, so the commit could not be pushed. Dequeue the PR, re-run **Update Translations**, then re-queue."
+          elif [ "$PUSHED" == "true" ]; then
+            echo "✅ Translations committed to \`$HEAD_REF\` — they ship with this PR."
+          elif [ "$PUSHED" == "noop" ]; then
+            echo "ℹ️  Changes were outside the translation paths — nothing to commit."
+          elif [ "$PUSHED" == "gone" ]; then
+            echo "⚠️  \`$HEAD_REF\` no longer exists on origin — the PR merged or the branch was deleted mid-run. The branch was NOT recreated; these strings stay pending and the next PR touching \`en-US.json\` will pick them up."
           elif [ "$HAS_CHANGES" == "true" ]; then
-            echo "⚠️  Translation changes exist on disk but no PR was opened — see the 'Create pull request' step."
+            echo "⚠️  Translation changes exist on disk but were not pushed — see the 'Commit translations' step."
           else
             echo "ℹ️  No new or modified keys — translations already up to date."
           fi
-          if [ "$SCRIPT_OUTCOME" != "success" ]; then
-            echo "❌ Translation script outcome: $SCRIPT_OUTCOME — some strings failed or the run was interrupted. Any completed locales are included in the PR above; the rest retry on the next run. See the 'Run translation script' logs."
+          if [ "$RUN_RESULT" == "partial" ]; then
+            echo "❌ Some strings are still untranslated after 3 attempts. The completed locales are in the commit above, marked \`$PARTIAL_TRAILER\`. **Verify translations** will block this PR in the merge queue until they land — re-run this workflow, or check the logs for what is failing validation."
+          elif [ -n "$SCRIPT_OUTCOME" ] && [ "$SCRIPT_OUTCOME" != "success" ] && [ "$SCRIPT_OUTCOME" != "skipped" ]; then
+            echo "❌ Translation script outcome: $SCRIPT_OUTCOME — see the 'Run translation script' step."
           fi

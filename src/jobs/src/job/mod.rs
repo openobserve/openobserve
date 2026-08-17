@@ -40,6 +40,8 @@ pub(crate) mod files;
 mod flatten_compactor;
 #[cfg(feature = "enterprise")]
 mod incidents;
+#[cfg(feature = "enterprise")]
+mod llm_review_reconciliation;
 pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]
@@ -399,6 +401,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     _ = infra::db::tantivy_index::get_ttv_timestamp_updated_at().await;
     // check tantivy secondary index update time
     _ = infra::db::tantivy_index::get_ttv_secondary_index_updated_at().await;
+    if let Err(e) = infra::db::trace_time_index::initialize(
+        config::get_config().common.trace_time_index_enabled,
+    )
+    .await
+    {
+        log::warn!("failed to initialize trace time index coverage marker: {e}");
+    }
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
@@ -1091,6 +1100,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // climbs past what its window can hold. Also releases expired budget
     // residuals (S-14c).
     slo_maintenance::run();
+    // `_llm_scores` is authoritative for Workbench reviews. Repair the narrow
+    // failure window where ingestion succeeded but QueueItem status did not.
+    #[cfg(feature = "enterprise")]
+    llm_review_reconciliation::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

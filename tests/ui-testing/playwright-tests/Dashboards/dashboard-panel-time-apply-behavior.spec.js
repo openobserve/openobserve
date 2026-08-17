@@ -1,4 +1,5 @@
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager.js";
 import {
@@ -23,7 +24,8 @@ import {
 test.describe.configure({ mode: "parallel" });
 
 test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
   });

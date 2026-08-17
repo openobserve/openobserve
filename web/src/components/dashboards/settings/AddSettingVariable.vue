@@ -526,8 +526,6 @@ import {
   onActivated,
   watch,
   toRef,
-  toRaw,
-  type Ref,
   computed,
   nextTick,
 } from "vue";
@@ -970,7 +968,7 @@ export default defineComponent({
     // Add a watch for selectedTabs
     watch(
       selectedTabs,
-      (newTabs) => {
+      (_newTabs) => {
         if (variableData.scope === "panels") {
           nextTick(() => {
             updatePanels();
