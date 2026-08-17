@@ -42,10 +42,14 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const WEB_SRC = resolve(process.cwd(), "src");
+// Resolved from this file rather than from `process.cwd()`: a suite run from
+// the repo root instead of `web/` would otherwise find no specs at all and
+// "pass" by checking nothing.
+const WEB_SRC = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 /// The specs this guards. On-call is where the four instances were found and
 /// where the component surface is widest; the machinery is not on-call
