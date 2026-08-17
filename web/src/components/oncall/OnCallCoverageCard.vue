@@ -55,11 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col-span-3 grid grid-cols-subgrid items-center"
         :data-test="`oncall-coverage-row-${team.id}`"
       >
+        <!-- A truncated name with nothing behind it is a name nobody can read:
+             the rail is narrow and team names are as long as somebody typed. -->
         <span
           class="text-text-body min-w-0 truncate text-sm font-medium"
           :data-test="`oncall-coverage-team-${team.id}`"
         >
           {{ raw(team.name) }}
+          <OTooltip side="top" :content="raw(team.name)" />
         </span>
 
         <!-- A gap is the exception, so it is the only row that gets colour. -->
@@ -78,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`oncall-coverage-holder-${team.id}`"
           >
             {{ holderLabel(team.id) }}
+            <OTooltip side="top" :content="holderLabel(team.id)" />
           </span>
           <span
             v-if="handoverLabel(team.id)"
@@ -98,6 +102,7 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OnCallSlot, OnCallTeam } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";

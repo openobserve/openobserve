@@ -24,6 +24,7 @@ import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 const stubs = {
   OIcon: { name: "OIcon", template: "<span />" },
   OText: { name: "OText", template: "<span><slot /></span>" },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
 };
 
 const TO = 1_700_000_000_000_000;
@@ -96,5 +97,28 @@ describe("OnCallCausesCard", () => {
   it("labels itself with the server's window, not a local constant", () => {
     const wrapper = render(analytics({ from: TO - 7 * MICROS_PER_DAY, to: TO }));
     expect(wrapper.text()).toContain("last 7 days");
+  });
+
+  /// I8: the detail line carries a real alert title, so it is exactly as long
+  /// as whatever somebody named their alert — and this card is one column of a
+  /// side rail.
+  it("keeps the clipped detail line readable in full", () => {
+    const wrapper = render(
+      analytics({
+        causes: [
+          {
+            cause: "noisy_threshold",
+            count: 6,
+            last_title: "checkout_latency_p99_above_threshold_for_five_minutes",
+          },
+          { cause: "genuine_defect", count: 4 },
+        ],
+      }),
+    );
+
+    const tip = wrapper.findComponent({ name: "OTooltip" });
+    expect(String(tip.props("content"))).toContain(
+      "checkout_latency_p99_above_threshold_for_five_minutes",
+    );
   });
 });

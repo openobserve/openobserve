@@ -178,8 +178,12 @@
                   <OTimeCell :value="row.opened_at" unit="us" />
                 </template>
                 <template #cell-title="{ row }">
+                  <!-- Alert titles are long by nature and this column is one of
+                       five: the row tells you a page happened, the tooltip
+                       tells you which. -->
                   <span class="text-text-heading truncate text-sm">
                     {{ raw(row.title || row.subject.source_id) }}
+                    <OTooltip side="bottom" :content="raw(row.title || row.subject.source_id)" />
                   </span>
                 </template>
                 <template #cell-acked_by="{ row }">
@@ -401,6 +405,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";

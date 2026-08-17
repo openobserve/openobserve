@@ -57,7 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`oncall-reach-${name}`"
       >
         <span class="flex min-w-0 flex-col">
-          <span class="text-text-heading truncate text-sm font-medium">{{ raw(name) }}</span>
+          <!-- Destination names are as long as whoever created the alert
+               destination made them, and this card sits in a narrow rail. -->
+          <span class="text-text-heading truncate text-sm font-medium">
+            {{ raw(name) }}
+            <OTooltip side="left" :content="raw(name)" />
+          </span>
           <span class="text-text-secondary truncate text-xs">
             {{ t("oncall.reachDestinationHint") }}
           </span>
@@ -70,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 withDefaults(

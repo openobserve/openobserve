@@ -57,6 +57,9 @@
         :data-test="`oncall-rail-fairness-${entry.rotation.name}`"
       >
         {{ raw(entry.fairness) }}
+        <!-- The server writes a whole sentence and a chip is a chip: this one
+             was reading "mei.tanaka@openobserve.ai 1.8× loa". -->
+        <OTooltip side="bottom" :content="raw(entry.fairness)" />
       </OTag>
 
       <span v-if="entry.onNow" class="mt-2 flex flex-wrap items-center gap-2">
@@ -130,6 +133,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { SCHEDULE_BAND_TONE_COUNT } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { ResolvedSegment, Rotation, TeamLoad } from "@/ts/interfaces/oncall";

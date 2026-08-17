@@ -62,8 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </span>
 
+      <!-- The runner-up plus a real alert title, so this line is as long as
+           whatever somebody named their alert. -->
       <p class="text-text-secondary truncate text-xs" data-test="oncall-causes-detail">
         {{ detail }}
+        <OTooltip side="bottom" :content="detail" />
       </p>
     </template>
   </div>
@@ -74,6 +77,7 @@ import { computed } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { CauseAnalytics, CauseCount } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";

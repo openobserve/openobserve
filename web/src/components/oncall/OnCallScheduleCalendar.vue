@@ -123,8 +123,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-stretch gap-3"
             :data-test="`oncall-calendar-track-${track.name}`"
           >
+            <!-- A fixed-width gutter and a rotation name of any length: the
+                 bands already carry their full text, and the row label was the
+                 one string on this chart with nothing behind it. -->
             <span class="text-text-secondary flex w-28 shrink-0 items-center truncate text-xs">
               {{ raw(track.name) }}
+              <OTooltip side="right" :content="raw(track.name)" />
             </span>
             <div class="border-border-subtle relative h-12 flex-1 border-b">
               <!-- Weekends shaded and day boundaries ruled, so a band spanning
@@ -179,6 +183,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_MINUTE } from "@/ts/interfaces/oncall";
 import type { I18nKey } from "@/types/i18n";

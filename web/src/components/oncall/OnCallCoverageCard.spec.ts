@@ -24,6 +24,10 @@ const stubs = {
   OIcon: { name: "OIcon", template: "<span />" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
+  // Renders nothing, but keeps `content` inspectable — the tooltip IS the
+  // escape hatch for truncated text, so a stub that dropped it would let the
+  // truncation regress silently.
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
 };
 
 function team(id: string, name: string): OnCallTeam {
@@ -146,5 +150,21 @@ describe("OnCallCoverageCard truncation", () => {
   it("counts nothing hidden when every team fits", () => {
     const wrapper = render(many.slice(0, 2), { t1: [slot("a@o2.ai")], t2: [slot("b@o2.ai")] });
     expect(wrapper.find('[data-test="oncall-coverage-more"]').exists()).toBe(false);
+  });
+
+  /// I8: this rail is narrow and both strings are as long as somebody made
+  /// them — a name clipped to "Payments platfo…" with nothing behind it is a
+  /// name nobody can read.
+  it("keeps the full team name and holder reachable when they are clipped", () => {
+    const wrapper = render([team("t1", "Payments platform and settlement")], {
+      t1: [slot("aarav.kumar@openobserve.ai")],
+    });
+
+    const contents = wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .map((tip) => String(tip.props("content")));
+
+    expect(contents).toContain("Payments platform and settlement");
+    expect(contents.some((text) => text.includes("aarav.kumar@openobserve.ai"))).toBe(true);
   });
 });

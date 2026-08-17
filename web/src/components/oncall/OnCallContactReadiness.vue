@@ -85,7 +85,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span class="flex min-w-0 flex-col">
           <OUserCell :value="member.user_email" />
-          <span class="text-text-secondary truncate text-xs">{{ channelSummary(member) }}</span>
+          <span class="text-text-secondary truncate text-xs">
+            {{ channelSummary(member) }}
+            <OTooltip side="bottom" :content="channelSummary(member)" />
+          </span>
         </span>
 
         <!-- Only the failure is coloured: a rail of green ticks trains people
