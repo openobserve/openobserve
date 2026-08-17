@@ -42,9 +42,10 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
-import { ACTION_LABEL_KEYS, ACTION_ICONS } from "@/constants/synthetics";
+import { ACTION_ICONS, stepActionLabelKey } from "@/constants/synthetics";
 
 const { t } = useI18nTyped();
 
@@ -67,6 +68,20 @@ const props = withDefaults(
     dotStateFn?: (row: TData) => StepDotState | undefined;
     /** When true, hides row action buttons (during replay). */
     locked?: boolean;
+    /**
+     * Step id the recording marker sits above, or null when unanchored.
+     *
+     * The marker answers "where will my steps go" for the whole session, which the
+     * button label alone cannot: the label is gone the moment recording starts.
+     */
+    anchorId?: string | null;
+    /**
+     * Whether the installed extension can restore the journey before recording.
+     *
+     * The row action promises a restore, so without it the button is offered and cannot
+     * be honoured. Defaults true, leaving the results-mode caller unaffected.
+     */
+    canRecordFrom?: boolean;
     /** When true, the step list is read-only (no drag, no selection). */
     readonly?: boolean;
     /** Whether drag reorder is enabled (editor mode, disabled during record/replay/filter). */
@@ -99,6 +114,7 @@ const props = withDefaults(
     nameKey: "name",
     detailKey: "detail",
     iconKey: "icon",
+    canRecordFrom: true,
     enableReorder: false,
     filterActive: false,
     locked: false,
@@ -117,6 +133,14 @@ const emit = defineEmits<{
   expand: [row: TData];
   delete: [row: TData];
   duplicate: [row: TData];
+  /**
+   * Restore the journey up to this row, then record new steps BEFORE it.
+   *
+   * Named for the direction it inserts, not for "here": the two neighbouring row
+   * actions (insert-below, duplicate) both act downward, so an ambiguous name would
+   * be read the wrong way. See design §7.1.
+   */
+  "record-before": [row: TData];
   "insert-below": [row: TData];
   "retry-replay": [];
 }>();
@@ -137,10 +161,13 @@ function actionIcon(row: TData): string {
   return isStepAction(action) ? ACTION_ICONS[action] : "ads-click";
 }
 
+// A right or double click is a `click` carrying `button`/`clickCount`, so the
+// action alone labelled all three "Click". Results rows carry neither field and
+// fall back to exactly that.
 function actionLabel(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
   return isStepAction(action)
-    ? t(ACTION_LABEL_KEYS[action])
+    ? t(stepActionLabelKey(action, row.button, row.clickCount))
     : action.charAt(0).toUpperCase() + action.slice(1);
 }
 
@@ -210,7 +237,12 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
         size: 200,
         meta: { autoWidth: true },
       },
-      { id: "actions", header: raw(""), size: 128, isAction: true },
+      // Sized to the buttons it holds, which is now four: record-before, insert,
+      // duplicate, delete. An `xs` button is h-7 with ps-2.5/pe-2.5 around a 1rem
+      // icon — 36px — and they sit in a gap-0.5 row, so four need 150px against the
+      // three that needed 112px. Left at 128 the last button (delete) was clipped
+      // out of the column entirely.
+      { id: "actions", header: raw(""), size: 168, isAction: true },
     ];
   }
   // Results mode. Headers are named here because results mode renders them —
@@ -234,6 +266,34 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
 const reorderEnabled = computed(() => props.enableReorder && !props.filterActive);
 
 const isLocked = computed(() => props.locked);
+
+/** Whether the recording marker belongs above `row`. */
+function isAnchor(row: TData): boolean {
+  return !!props.anchorId && (row as { id?: string }).id === props.anchorId;
+}
+
+/**
+ * Whether `row` is the journey's first step.
+ *
+ * The first step must be the navigation that starts the journey, so there is no
+ * "before" it to record into — `validateJourneySteps` rejects a journey whose first
+ * step is anything else.
+ */
+function isFirstRow(row: TData): boolean {
+  return props.data[0] === row;
+}
+
+/**
+ * What the record-before action does, or why it cannot.
+ *
+ * Only the capability is spelled out: a first-row disable is legible from where the row
+ * sits, but an extension too old to restore looks identical to one that works.
+ */
+const recordBeforeTooltip = computed(() =>
+  props.canRecordFrom
+    ? t("synthetics.journey.recordBeforeStepHint")
+    : t("synthetics.journey.recordBeforeNeedsNewerExtension"),
+);
 
 function handleRowReorder(data: TData[]) {
   emit("update:data", data);
@@ -329,6 +389,15 @@ function handleUpdateExpanded(ids: string[]) {
           />
         </span>
 
+        <!-- Recording marker: new steps land here, above this row. -->
+        <span
+          v-if="isAnchor(row)"
+          class="bg-accent text-accent-foreground rounded-default mr-1 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase"
+          data-test="synthetics-journey-recording-marker"
+        >
+          {{ t("synthetics.journey.recordingHere") }}
+        </span>
+
         <!-- Action label badge -->
         <div class="w-24!">
           <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
@@ -373,8 +442,37 @@ function handleUpdateExpanded(ids: string[]) {
 
     <!-- ── cell-actions: Row action buttons (editor mode) ──────── -->
     <template v-if="mode === 'editor'" #cell-actions="{ row }">
-      <div class="flex shrink-0 items-center gap-0.5" :class="{ invisible: isLocked }">
+      <!-- Locked leaves these on screen and unavailable, rather than hiding them.
+           Hidden, a running replay or restore looked like the row had lost actions it
+           still has, and the author had nothing to point at to explain why. Each
+           button carries its own `isLocked` disable, so unavailability is stated per
+           control rather than by making the whole cluster vanish. -->
+      <div class="flex shrink-0 items-center gap-0.5">
         <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
+
+        <!-- Disabled on the first row: inserting before it would leave the journey
+             starting with something other than a navigate, which validation rejects.
+             Disabled without `canRecordFrom` because the action promises a restore the
+             installed extension cannot perform. -->
+        <OTooltip v-if="!readonly" :content="recordBeforeTooltip">
+          <!-- The span is the hover target, not the button: a disabled control
+               dispatches no pointer events, so a tooltip bound straight to it would
+               stay shut in the one state that has something to explain. -->
+          <span class="inline-flex">
+            <OButton
+              variant="ghost"
+              size="xs"
+              :aria-label="t('synthetics.journey.recordBeforeStep')"
+              data-test="synthetics-journey-step-record-before-btn"
+              :disabled="isLocked || isFirstRow(row) || !canRecordFrom"
+              @click="emit('record-before', row)"
+            >
+              <!-- The same icon as the toolbar's Record button: this row action starts a
+                   recording too, just anchored, so the two must read as one action. -->
+              <OIcon name="smart-display" size="sm" aria-hidden="true" />
+            </OButton>
+          </span>
+        </OTooltip>
 
         <OButton
           v-if="!readonly"

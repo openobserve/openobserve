@@ -30,7 +30,7 @@ use config::{
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use hashbrown::HashSet;
 use infra::errors::Result;
-use promql::{DEFAULT_LOOKBACK, TableProvider, exec::PromqlContext, name_visitor};
+use promql::{DEFAULT_LOOKBACK, TableProvider, exec::PromqlContext, promql::name_visitor};
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;

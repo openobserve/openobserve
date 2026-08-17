@@ -15,6 +15,12 @@
 
 import http from "./http";
 import { defineQuery, stableFilters } from "@/composables/query/queryClient";
+import type {
+  CompositeAlertValidationRequest,
+  CompositeAlertValidationResponse,
+  CompositeAlertReferenceResponse,
+  CompositeTimelineResponse,
+} from "@/ts/interfaces/alert";
 
 const alerts = {
   list: (
@@ -111,6 +117,10 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
+    if (data.alert_type === "composite") {
+      const { id: _id, ...body } = data;
+      return http().put(url, body);
+    }
     return http().put(url, data);
   },
   delete_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
@@ -170,6 +180,34 @@ const alerts = {
       url += `?folder=${folder_id}`;
     }
     return http().get(url);
+  },
+  validateComposite: (
+    org_identifier: string,
+    data: CompositeAlertValidationRequest,
+  ): Promise<{ data: CompositeAlertValidationResponse }> => {
+    return http().post<CompositeAlertValidationResponse>(
+      `/api/v2/${org_identifier}/alerts/composites/validate`,
+      data,
+    );
+  },
+  getCompositeReferences: (
+    org_identifier: string,
+    alert_id: string,
+  ): Promise<{ data: CompositeAlertReferenceResponse }> => {
+    return http().get<CompositeAlertReferenceResponse>(
+      `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}/composite-references`,
+    );
+  },
+  getCompositeTimeline: (
+    org_identifier: string,
+    alert_id: string,
+    from: number,
+    to: number,
+  ): Promise<{ data: CompositeTimelineResponse }> => {
+    return http().get<CompositeTimelineResponse>(
+      `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}/composite-timeline`,
+      { params: { from, to } },
+    );
   },
   //this endpoint is not used as we are using the common service to move the alerts across folders
   move_to_another_folder: (org_identifier: string, data: any, folder_id?: any) => {
@@ -274,18 +312,36 @@ const alerts = {
 export default alerts;
 
 /**
- * Alerts for one folder, or a name search across all of them. The folder and the
- * search term are both applied by the server, so both are in the key — searches
- * used to bypass the cache entirely. The tab filter is client-side and absent.
+ * Alerts for one folder, or a name search across all of them. The folder, the
+ * search term and the tab's `alert_type` are all applied by the server, so all
+ * three are in the key — searches used to bypass the cache entirely.
+ *
+ * An absent type normalises to "all", which is what the server falls back to
+ * when `alert_type` is omitted — so the mount read and the "all" tab share one
+ * entry instead of issuing the same request twice.
  */
-export const alertsListQuery = defineQuery<[folderId: string, query?: string], any[]>({
-  key: (folderId, query) =>
+export const alertsListQuery = defineQuery<
+  [folderId: string, query?: string, alertType?: string],
+  any[]
+>({
+  key: (folderId, query, alertType) =>
     query
-      ? ["alerts", "search", folderId || "__all__", { q: query }]
-      : ["alerts", "list", folderId],
-  fetch: async (org, folderId, query) =>
-    (await alerts.listByFolderId(1, 1000, "name", false, "", org, folderId, query ?? "")).data
-      ?.list ?? [],
+      ? ["alerts", "search", folderId || "__all__", { q: query, type: alertType || "all" }]
+      : ["alerts", "list", folderId, alertType || "all"],
+  fetch: async (org, folderId, query, alertType) =>
+    (
+      await alerts.listByFolderId(
+        1,
+        1000,
+        "name",
+        false,
+        "",
+        org,
+        folderId,
+        query ?? "",
+        alertType ?? "",
+      )
+    ).data?.list ?? [],
   refetchOnWindowFocus: true,
   scope: ["alerts"],
 });

@@ -1782,12 +1782,12 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(callsWithNonEmpty.length).toBe(0);
     });
 
-    it("should pass only the WHERE-clause portion to parseDurationWhereClause when editorValue contains a pipe prefix", async () => {
+    it("should pass a match_all term containing a pipe to parseDurationWhereClause in full", async () => {
       const parseSpy = vi.mocked(useDurationPercentilesModule.parseDurationWhereClause);
       parseSpy.mockReturnValue("duration >= 1500");
 
-      // editorValue with a query-functions prefix before the pipe
-      mockSearchObj.data.editorValue = "someFunc | duration >= '1.50ms'";
+      // A pipe inside a quoted search term is part of the term, not a separator.
+      mockSearchObj.data.editorValue = "match_all('text | error') and duration >= '1.50ms'";
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -1810,15 +1810,14 @@ describe("Index.vue (Main Traces Page)", () => {
       await wrapper.vm.searchData();
       await flushPromises();
 
-      // parseDurationWhereClause must be called with only the part after the pipe,
-      // NOT with the full "someFunc | duration >= '1.50ms'" string.
+      // The whole editor value is the where clause — the match_all term must reach
+      // parseDurationWhereClause intact rather than truncated at the pipe.
       const calls = parseSpy.mock.calls.filter(
         ([clause]) => typeof clause === "string" && clause.trim() !== "",
       );
       expect(calls.length).toBeGreaterThan(0);
       for (const [clause] of calls) {
-        expect(clause).not.toContain("|");
-        expect(clause).not.toContain("someFunc");
+        expect(clause).toContain("match_all('text | error')");
       }
     });
 
@@ -1985,8 +1984,8 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(callsWithNonEmpty.length).toBe(0);
     });
 
-    it("should pass only the WHERE-clause portion to parseSpanKindWhereClause when editorValue contains a pipe prefix", async () => {
-      mockSearchObj.data.editorValue = "someFunc | span_kind='Consumer'";
+    it("should pass a match_all term containing a pipe to parseSpanKindWhereClause in full", async () => {
+      mockSearchObj.data.editorValue = "match_all('text | error') and span_kind='Consumer'";
 
       wrapper = mountIndexStubbed();
       await flushPromises();
@@ -1999,9 +1998,8 @@ describe("Index.vue (Main Traces Page)", () => {
       );
       expect(nonEmptyCalls.length).toBeGreaterThan(0);
       for (const [clause] of nonEmptyCalls) {
-        // The pipe-prefix (function expression) must not be forwarded.
-        expect(clause).not.toContain("|");
-        expect(clause).not.toContain("someFunc");
+        // The quoted term is forwarded intact rather than truncated at the pipe.
+        expect(clause).toContain("match_all('text | error')");
       }
     });
   });

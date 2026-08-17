@@ -26,6 +26,7 @@
     "build-only-cloud-prod": "vite build --mode=production",
     "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
     "type-check:app": "vue-tsc --noEmit -p tsconfig.app.json --composite false",
+    "type-check:composite-alerts": "vue-tsc --noEmit -p tsconfig.composite-alerts-tests.json --composite false",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
     "lint:ci": "eslint \"src/**/*.{vue,ts,js,css}\" --no-fix",
     "lint:styles": "stylelint \"src/**/*.{css,vue}\"",

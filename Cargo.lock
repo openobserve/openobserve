@@ -7903,6 +7903,7 @@ dependencies = [
  "url",
  "usage_reporting",
  "utoipa",
+ "uuid",
  "zip 8.6.0",
 ]
 
@@ -9061,10 +9062,12 @@ dependencies = [
  "expect-test",
  "futures",
  "hashbrown 0.16.1",
+ "hashlink 0.11.1",
  "infra",
  "itertools 0.14.0",
  "log",
  "o2_enterprise",
+ "parking_lot 0.12.5",
  "promql-parser",
  "rayon",
  "regex",

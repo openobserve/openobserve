@@ -23,6 +23,7 @@ pub mod alerts;
 pub mod annotation_queues;
 #[cfg(feature = "enterprise")]
 pub mod annotations;
+pub mod announcements;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
 pub mod authz;

@@ -9,6 +9,14 @@ interface Props {
   icon?: string;
   dense?: boolean;
   inlineActions?: boolean;
+  /**
+   * Full-bleed strip instead of an inset block — square corners, no border, the
+   * message on the left and its actions pinned right. For an app-wide bar spanning
+   * the whole viewport, where an inset card with soft corners would read as
+   * floating debris, and where centering each row independently leaves a stack of
+   * banners visibly ragged.
+   */
+  bar?: boolean;
   dataTest?: string;
 }
 
@@ -16,6 +24,7 @@ const props = withDefaults(defineProps<Props>(), {
   variant: "default",
   dense: false,
   inlineActions: false,
+  bar: false,
 });
 
 const slots = useSlots();
@@ -47,6 +56,30 @@ const variantClass = computed(() => {
       return "bg-banner-default-bg text-banner-default-text";
   }
 });
+
+/**
+ * Bar mode carries the fill and the text colour but none of the borders.
+ * An inset card's 1px box and 4px left accent become a hairline down the
+ * viewport edge and a stub in the corner once the banner spans the screen —
+ * and, because only some variants carry them, a stack of bars ends up with
+ * rows of different heights.
+ */
+const barVariantClass = computed(() => {
+  switch (props.variant) {
+    case "info":
+      return "bg-banner-info-bg text-banner-info-text";
+    case "success":
+      return "bg-banner-success-bg text-banner-success-text";
+    case "warning":
+      return "bg-banner-warning-bg text-banner-warning-text";
+    case "error":
+      return "bg-banner-error-bg text-banner-error-text";
+    case "error-soft":
+      return "bg-banner-error-soft-bg text-banner-error-soft-text";
+    default:
+      return "bg-banner-default-bg text-banner-default-text";
+  }
+});
 </script>
 
 <template>
@@ -54,26 +87,34 @@ const variantClass = computed(() => {
     :role="ariaRole"
     :data-test="dataTest"
     :class="[
-      'rounded-default flex',
-      inlineActions ? 'flex-row items-center gap-3' : 'flex-col gap-2',
-      dense ? 'p-2' : 'p-4',
-      variantClass,
+      'flex',
+      bar ? 'w-full flex-row flex-wrap items-center justify-between gap-3 px-4 py-2' : '',
+      bar ? '' : 'rounded-default',
+      bar ? '' : inlineActions ? 'flex-row items-center gap-3' : 'flex-col gap-2',
+      bar ? '' : dense ? 'p-2' : 'p-4',
+      bar ? barVariantClass : variantClass,
     ]"
   >
-    <div :class="['flex flex-row items-start gap-3', inlineActions ? 'flex-1' : '']">
-      <div v-if="showIconArea" class="flex shrink-0 items-start">
+    <div
+      :class="[
+        'flex flex-row gap-3',
+        bar ? 'min-w-0 flex-1 items-center' : 'items-start',
+        inlineActions && !bar ? 'flex-1' : '',
+      ]"
+    >
+      <div v-if="showIconArea" :class="['flex shrink-0', bar ? 'items-center' : 'items-start']">
         <slot name="icon">
           <OIcon :name="icon" size="sm" />
         </slot>
       </div>
 
-      <div class="flex-1 text-sm">
+      <div :class="bar ? 'text-compact' : 'flex-1 text-sm'">
         <slot />
         <template v-if="showContentProp">{{ content }}</template>
       </div>
     </div>
 
-    <div v-if="hasActionsSlot">
+    <div v-if="hasActionsSlot" :class="bar ? 'shrink-0' : ''">
       <slot name="actions" />
     </div>
   </div>

@@ -1,13 +1,15 @@
-import { test, expect } from "../baseFixtures.js";
+const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import PageManager from "../../pages/page-manager";
 const testLogger = require('../utils/test-logger.js');
 
-const randomDashboardName =
+// Each test runs in parallel (mode: "parallel" below), so the name must be
+// generated fresh per test — a single shared name causes cross-test races
+// where one test's create/delete collides with another's mid-flight.
+const generateDashboardName = () =>
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
@@ -15,7 +17,7 @@ test.describe.configure({ mode: "parallel" });
 test.describe("dashboard multi y axis testcases", () => {
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing");
-    await login(page);
+    await navigateToBase(page);
     await page.waitForTimeout(1000);
     await ingestion(page);
     await page.waitForTimeout(2000);
@@ -32,6 +34,7 @@ test.describe("dashboard multi y axis testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -93,6 +96,7 @@ test.describe("dashboard multi y axis testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("Test_Panel");

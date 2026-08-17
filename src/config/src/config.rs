@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 67;
+pub const DB_SCHEMA_VERSION: u64 = 69;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -217,18 +217,18 @@ pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
-pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 2] = ["trace_id", "session_id"];
+pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let cfg = get_config();
     let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
-        &_DEFAULT_DISTINCT_FIELDS
+        &_DEFAULT_BLOOM_FILTER_FIELDS
     } else {
         &[]
     };
     let mut fields = chain(
         default_fields.iter().map(|s| s.to_string()),
         cfg.common
-            .feature_distinct_extra_fields
+            .feature_bloom_filter_extra_fields
             .split(',')
             .filter_map(|s| {
                 let s = s.trim();
@@ -240,25 +240,6 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
             }),
     )
     .collect::<Vec<_>>();
-    fields.sort();
-    fields.dedup();
-    fields
-});
-
-pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_bloom_filter_extra_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -751,6 +732,7 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub enrichment_table: EnrichmentTable,
     pub slo: Slo,
+    pub alert_composite: AlertComposite,
 }
 
 /// Feature 5 — SLO measurement (`alerts_2.md` §6b).
@@ -810,6 +792,38 @@ pub struct Slo {
         help = "Max distinct (long, short) burn-rate window pairs precomputed per SLO per pass. Alerts share these, so the cost is per SLO, not per alert."
     )]
     pub max_burn_window_pairs: i64,
+}
+
+/// Composite alerts tunables (§19.2).
+///
+/// Writes are on by default; `ZO_ALERT_COMPOSITE_WRITES_ENABLED` is an opt-out
+/// kill-switch for operators who want to disable composite mutation.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct AlertComposite {
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_WRITES_ENABLED",
+        default = true,
+        help = "Enable composite-alert mutation (create/update/move/trigger). Opt-out kill-switch: set to \"false\" to disable."
+    )]
+    pub writes_enabled: bool,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_STALE_K",
+        default = 3,
+        help = "Multiplier on a child's evaluation cadence that marks it stale."
+    )]
+    pub stale_k: i64,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_SWEEP_SECS",
+        default = 300,
+        help = "Composite scheduler sweep interval in seconds."
+    )]
+    pub sweep_secs: i64,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_DEBOUNCE_SECS",
+        default = 15,
+        help = "Minimum seconds between composite evaluations (coalescing debounce)."
+    )]
+    pub debounce_secs: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1364,7 +1378,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_FEATURE_DEFAULT_INDEX_FIELDS_ENABLED",
         default = true,
-        help = "When false, the built-in default fields for full text search, secondary index and distinct values are disabled; only the fields from the *_EXTRA_FIELDS ENVs and per-stream settings are used"
+        help = "When false, the built-in default fields for full text search and secondary index are disabled; only the fields from the *_EXTRA_FIELDS ENVs and per-stream settings are used"
     )]
     pub feature_default_index_fields_enabled: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -1377,8 +1391,6 @@ pub struct Common {
         help = "Comma-separated fields to build bloom filter on for all streams, replaces the deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS"
     )]
     pub feature_bloom_filter_extra_fields: String,
-    #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
-    pub feature_distinct_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
     pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
@@ -1481,6 +1493,12 @@ pub struct Common {
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
     pub tracing_search_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACE_TIME_INDEX_ENABLED",
+        default = true,
+        help = "Enable per-stream trace time indexes and trace time-range lookup"
+    )]
+    pub trace_time_index_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]
@@ -1778,12 +1796,6 @@ pub struct Common {
     )]
     pub log_page_default_field_list: String,
     #[env_config(
-        name = "ZO_TRACES_LIST_INDEX_ENABLED",
-        default = true,
-        help = "enable trace list index for traces"
-    )]
-    pub traces_list_index_enabled: bool,
-    #[env_config(
         name = "ZO_INGESTION_LOG_ENABLED",
         default = true,
         help = "enable ingestion error logs reporting"
@@ -1961,10 +1973,18 @@ pub struct Limit {
     pub metrics_max_series_response: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
     pub metrics_cache_max_entries: usize,
+    // Memory budget in MB for the PromQL series label cache. 0 (default)
+    // means auto: 5% of total memory, clamped to [100, 1024] MB.
+    #[env_config(name = "ZO_METRICS_LABEL_CACHE_MAX_SIZE", default = 0)]
+    pub metrics_label_cache_max_size: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
     pub node_heartbeat_ttl: i64,
+    // How long an o2-ai session->owner claim survives. Must exceed the longest
+    // expected conversation; mirrors o2-ai's O2_AI_SESSION_OWNER_TTL default.
+    #[env_config(name = "ZO_AI_SESSION_OWNER_TTL", default = 86400)] // seconds
+    pub ai_session_owner_ttl: i64,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)]
     pub http_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)]
@@ -2230,10 +2250,6 @@ pub struct Limit {
         help = "max time of transaction will retry"
     )]
     pub meta_transaction_retries: usize,
-    #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
-    pub distinct_values_interval: u64,
-    #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
-    pub distinct_values_hourly: bool,
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
     #[env_config(
@@ -2375,7 +2391,13 @@ pub struct Compact {
     pub old_data_min_hours: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
     pub old_data_min_files: i64,
-    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
+    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_MINUTES", default = 120)] // minutes
+    pub delete_files_delay_minutes: i64,
+    #[deprecated(
+        since = "0.92.2",
+        note = "Please use `ZO_COMPACT_DELETE_FILES_DELAY_MINUTES` instead. This ENV will be removed in a future release"
+    )]
+    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 0)] // hours
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
@@ -3833,8 +3855,14 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.max_file_size = 512;
     }
     cfg.compact.max_file_size *= 1024 * 1024;
-    if cfg.compact.delete_files_delay_hours < 1 {
-        cfg.compact.delete_files_delay_hours = 2;
+    if cfg.compact.delete_files_delay_minutes < 1 {
+        cfg.compact.delete_files_delay_minutes = 120;
+    }
+    // Backward compatibility: if the deprecated ZO_COMPACT_DELETE_FILES_DELAY_HOURS is
+    // explicitly set (default is 0, so > 0 means user provided a value), convert to minutes.
+    #[allow(deprecated)]
+    if cfg.compact.delete_files_delay_hours > 0 {
+        cfg.compact.delete_files_delay_minutes = cfg.compact.delete_files_delay_hours * 60;
     }
 
     if cfg.compact.data_retention_interval < 1 {
@@ -4673,12 +4701,14 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
         let mut cfg = Config::default();
         cfg.compact.data_retention_days = 0;
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
+        cfg.compact.delete_files_delay_minutes = 0;
         cfg.compact.data_retention_interval = 0;
         cfg.compact.old_data_interval = 0;
         cfg.compact.old_data_max_days = 0;
@@ -4690,7 +4720,8 @@ mod tests {
         check_compact_config(&mut cfg).unwrap();
         assert_eq!(cfg.compact.interval, 10);
         assert_eq!(cfg.compact.max_file_size, 512 * 1024 * 1024);
-        assert_eq!(cfg.compact.delete_files_delay_hours, 2);
+        assert_eq!(cfg.compact.delete_files_delay_hours, 0);
+        assert_eq!(cfg.compact.delete_files_delay_minutes, 120);
         assert_eq!(cfg.compact.data_retention_interval, 3600);
         assert_eq!(cfg.compact.old_data_interval, 3600);
         assert_eq!(cfg.compact.old_data_max_days, 7);

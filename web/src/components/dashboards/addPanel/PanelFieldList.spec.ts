@@ -878,6 +878,21 @@ describe("FieldList", () => {
       expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
     });
 
+    // Logs → Visualize with no stream picked on the logs page: the select is the
+    // user's own here, so deferring left it on "No options found" with no way out.
+    it("fetches in build edit mode even when stream is blank", async () => {
+      currentQuery().fields.stream = "";
+      currentQuery().fields.stream_type = "logs";
+
+      wrapper = mountComponent({
+        pageKey: "build",
+        props: { editMode: true },
+      });
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledWith("logs", false);
+    });
+
     it("fetches when the stream is set before mount (the seeded-parent case)", async () => {
       // The parent seeded this before the field list ever mounted.
       currentQuery().fields.stream = "envoy_cluster_assignment_stale";

@@ -624,7 +624,7 @@ const stats = computed<StatItem[]>(() => {
       tone: "neutral",
       max: total,
     },
-    { key: "total", label: t("slos.totalSlos"), value: total, tone: "primary", selectable: false },
+    { key: "total", label: t("slos.totalSlos"), value: total, tone: "primary", selectable: true },
   ];
 });
 
@@ -647,16 +647,23 @@ function onStatSelect(key: string | null) {
 }
 
 // Bound to the refresh button: always hits the server.
-const refresh = () => load(true);
+const refresh = () => load(null, undefined, true);
 
-async function load(force = false) {
+// org and folder are both optional: mount and refresh call `load()` bare and
+// fall back to the current org and active folder — the folder-change path is the
+// only caller that passes a folder the refs have not caught up with yet.
+async function load(orgId?: string | null, folderId?: string, force = false) {
   if (!org.value) return;
   error.value = null;
+  // sometimes the folder id might not be updated so passed via
+  // query params.
+  const currentOrg = orgId ?? org.value;
+  const folder = folderId ?? activeFolderId.value;
   try {
     // `force` only bypasses staleTime — the rows on screen stay either way.
     await slosQuery.load({
-      org: org.value,
-      args: [activeFolderId.value],
+      org: currentOrg,
+      args: [folder],
       apply: (data) => (rows.value = data),
       loading,
       fetching,
@@ -678,7 +685,7 @@ function onFolderChange(folderId: string) {
     name: "sloList",
     query: { ...route.query, org_identifier: org.value, folder: folderId },
   });
-  load();
+  load(org.value, folderId);
 }
 
 function openMove(targets: SloListItem[]) {
