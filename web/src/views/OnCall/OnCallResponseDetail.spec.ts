@@ -32,6 +32,7 @@ vi.mock("@/services/oncall", () => ({
     priorCauses: vi.fn(),
     responseHistory: vi.fn(),
     acknowledgeResponse: vi.fn(),
+    confirmRecovery: vi.fn(),
     snoozeResponse: vi.fn(),
     addNote: vi.fn(),
     handoffResponse: vi.fn(),
@@ -97,6 +98,12 @@ const stubs = {
     props: ["value"],
     emits: ["click"],
     template: `<button @click="$emit('click')"><slot /></button>`,
+  },
+  OInput: {
+    name: "OInput",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
   },
   OTextarea: {
     name: "OTextarea",
@@ -546,4 +553,45 @@ describe("OnCallResponseDetail", () => {
       expect(wrapper.findComponent({ name: "OnCallPriorCauses" }).props("groups")).toEqual([]);
     });
   });
+  /// B11. An impacted record closes through ITS verb: a plain resolve would
+  /// skip the sibling check that closes the owner, so the owner waits forever
+  /// on a confirmation that can no longer arrive — and every future firing of
+  /// that alert is then refused as a duplicate.
+  describe("confirm recovery", () => {
+    it("offers confirm-recovery instead of resolve on an impacted record", async () => {
+      const wrapper = await renderWith({ origin_response_id: "resp_owner" });
+      expect(wrapper.find('[data-test="oncall-response-confirm-recovery-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-resolve-btn"]').exists()).toBe(false);
+    });
+
+    it("offers resolve, not confirm-recovery, on an owner record", async () => {
+      const wrapper = await renderWith({ origin_response_id: null });
+      expect(wrapper.find('[data-test="oncall-response-resolve-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-confirm-recovery-btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("posts the confirmation with its note and refetches", async () => {
+      service.confirmRecovery.mockResolvedValue({ data: record() } as any);
+      const wrapper = await renderWith({ origin_response_id: "resp_owner" });
+
+      await wrapper.find('[data-test="oncall-response-confirm-recovery-btn"]').trigger("click");
+      await wrapper
+        .find('[data-test="oncall-confirm-recovery-note"]')
+        .setValue("replayed the buffered writes");
+      const before = service.getResponse.mock.calls.length;
+      await wrapper.find('[data-test="oncall-confirm-recovery-confirm"]').trigger("click");
+      await flushPromises();
+
+      expect(service.confirmRecovery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          response_id: "resp_1",
+          data: { note: "replayed the buffered writes" },
+        }),
+      );
+      expect(service.getResponse.mock.calls.length).toBeGreaterThan(before);
+    });
+  });
+
 });

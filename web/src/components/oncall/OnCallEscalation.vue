@@ -74,11 +74,13 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { EscalationProgress } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { useOnCallClock } from "@/composables/useOnCallClock";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = defineProps<{ progress: EscalationProgress }>();
 
 const { t } = useI18nTyped();
+const nowMicros = useOnCallClock();
 
 function offset(micros: number): string {
   return `+${formatMicrosDuration(micros)}`;
@@ -91,7 +93,7 @@ const nextWho = computed(() => props.progress.next_targets.join(", "));
 const nextWhen = computed(() => {
   const at = props.progress.next_at;
   if (!at) return "";
-  const remaining = at - Date.now() * 1000;
+  const remaining = at - nowMicros.value;
   return remaining <= 0
     ? t("oncall.ladderImminent")
     : t("oncall.ladderIn", { duration: formatMicrosDuration(remaining) });

@@ -138,7 +138,14 @@
                       {{ t("oncall.target_whole_team") }}
                     </span>
                     <span
-                      v-if="line && !line.people.length && !line.wholeTeam"
+                      v-for="pool in line?.pools ?? []"
+                      :key="pool"
+                      class="text-text-body text-sm"
+                    >
+                      {{ t("oncall.ladderPoolEveryone", { slot: raw(pool) }) }}
+                    </span>
+                    <span
+                      v-if="line && !line.people.length && !line.wholeTeam && !line.pools.length"
                       class="text-status-warning-text text-sm"
                       :data-test="`oncall-policy-preview-nobody-${current.priority}-${stepIndex}`"
                     >

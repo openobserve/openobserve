@@ -934,6 +934,41 @@ describe("resolveLadder", () => {
     expect(resolveLadder(rung([{ kind: "next_on_call" }]), solo)[0].people).toEqual([]);
   });
 
+  /// B12: a rung naming a slot rendered as "reaches nobody" because the
+  /// switch had no arm for it — a correct ladder reading as a broken one.
+  it("resolves a slot-naming rung against that slot", () => {
+    const two = [
+      { slot: "primary", rotation: "P", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" },
+      { slot: "secondary", rotation: "S", user_email: "cy@o2.ai", next_user_email: "dee@o2.ai" },
+    ] as any[];
+    expect(
+      resolveLadder(rung([{ kind: "on_call_in_slot", slot: "secondary" }]), two)[0].people,
+    ).toEqual(["cy@o2.ai"]);
+    expect(
+      resolveLadder(rung([{ kind: "next_on_call_in_slot", slot: "secondary" }]), two)[0].people,
+    ).toEqual(["dee@o2.ai"]);
+    const everyone = resolveLadder(rung([{ kind: "everyone_in_slot", slot: "secondary" }]), two)[0];
+    expect(everyone.pools).toEqual(["secondary"]);
+    expect(everyone.people).toEqual([]);
+  });
+
+  /// The unsuffixed targets mean the DEFAULT slot. Reading them as "every
+  /// slot" listed the secondary under a rung that pages the primary.
+  it("keeps on_call_now meaning the default slot when a secondary is staffed", () => {
+    const two = [
+      { slot: "primary", rotation: "P", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" },
+      { slot: "secondary", rotation: "S", user_email: "cy@o2.ai", next_user_email: "dee@o2.ai" },
+    ] as any[];
+    expect(resolveLadder(rung([{ kind: "on_call_now" }]), two)[0].people).toEqual(["ana@o2.ai"]);
+    // everyone_on_schedule stays the union — the last resort is the whole room.
+    expect(resolveLadder(rung([{ kind: "everyone_on_schedule" }]), two)[0].people).toEqual([
+      "ana@o2.ai",
+      "cy@o2.ai",
+      "bob@o2.ai",
+      "dee@o2.ai",
+    ]);
+  });
+
   it("keeps the whole team as a group rather than a list", () => {
     const step = resolveLadder(rung([{ kind: "whole_team" }]), slots)[0];
     expect(step.wholeTeam).toBe(true);

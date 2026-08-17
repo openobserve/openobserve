@@ -64,7 +64,22 @@
         >
           {{ t("oncall.handoff") }}
         </OButton>
+        <!-- An impacted record closes through ITS verb. A plain resolve would
+             close this record but skip the sibling check that closes the
+             owner's — the owner would wait forever on a confirmation that can
+             no longer arrive. -->
         <OButton
+          v-if="isImpacted"
+          :variant="canAcknowledge ? 'outline' : 'primary'"
+          size="sm-action"
+          :loading="confirmingRecovery"
+          data-test="oncall-response-confirm-recovery-btn"
+          @click="confirmRecoveryOpen = true"
+        >
+          {{ t("oncall.confirmRecovery") }}
+        </OButton>
+        <OButton
+          v-else
           :variant="canAcknowledge ? 'outline' : 'primary'"
           size="sm-action"
           :loading="resolving"
@@ -302,6 +317,38 @@
     </ODrawer>
 
     <ODialog
+      v-model="confirmRecoveryOpen"
+      :title="t('oncall.confirmRecoveryTitle')"
+      data-test="oncall-confirm-recovery-dialog"
+    >
+      <div class="flex flex-col gap-3">
+        <p class="text-text-muted text-sm">{{ t("oncall.confirmRecoveryMessage") }}</p>
+        <OInput
+          v-model="recoveryNote"
+          :label="t('oncall.confirmRecoveryNote')"
+          :placeholder="t('oncall.confirmRecoveryNotePlaceholder')"
+          data-test="oncall-confirm-recovery-note"
+        />
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <OButton variant="outline" size="sm-action" @click="confirmRecoveryOpen = false">
+            {{ t("oncall.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="confirmingRecovery"
+            data-test="oncall-confirm-recovery-confirm"
+            @click="confirmRecovery"
+          >
+            {{ t("oncall.confirmRecovery") }}
+          </OButton>
+        </div>
+      </template>
+    </ODialog>
+
+    <ODialog
       v-model="confirmResolve"
       :title="t('oncall.resolveTitle')"
       data-test="oncall-resolve-dialog"
@@ -397,10 +444,12 @@ import type {
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { useOnCallClock } from "@/composables/useOnCallClock";
 import { isEscalating, isSnoozed, isUnresolved, routingReasonOf } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const { t } = useI18nTyped();
+const nowMicros = useOnCallClock();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -410,6 +459,37 @@ const events = ref<OnCallResponseEvent[]>([]);
 const teamName = ref("");
 const loading = ref(false);
 const resolving = ref(false);
+const confirmRecoveryOpen = ref(false);
+const confirmingRecovery = ref(false);
+const recoveryNote = ref("");
+
+/// An impacted record was opened alongside another team's page to contain the
+/// blast radius on THIS team's service. Its origin id is the owner's record.
+const isImpacted = computed(() => !!response.value?.origin_response_id);
+
+/// The dependent's close. The owner's record closes on its own once the last
+/// dependent has confirmed — which may be this call.
+async function confirmRecovery() {
+  confirmingRecovery.value = true;
+  try {
+    await oncallService.confirmRecovery({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+      data: recoveryNote.value.trim() ? { note: recoveryNote.value.trim() } : undefined,
+    });
+    confirmRecoveryOpen.value = false;
+    recoveryNote.value = "";
+    toast({ variant: "success", message: t("oncall.recoveryConfirmed") });
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.confirmRecoveryFailed"),
+    });
+  } finally {
+    confirmingRecovery.value = false;
+  }
+}
 const acking = ref(false);
 const snoozing = ref(false);
 const addingNote = ref(false);
@@ -479,7 +559,7 @@ const subtitle = computed(() =>
 const summaryStats = computed<StatItem[]>(() => {
   const r = response.value;
   const next = escalation.value?.next_at;
-  const remaining = next ? next - Date.now() * 1000 : null;
+  const remaining = next ? next - nowMicros.value : null;
   return [
     {
       key: "escalatesIn",

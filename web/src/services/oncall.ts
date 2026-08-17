@@ -39,11 +39,8 @@ import type {
   CoverageGaps,
   DeliveryLedger,
   EscalationProgress,
-  HandoffSuggestion,
-  InventoryNode,
   MyOnCall,
   Override,
-  RelatedResponses,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 
@@ -460,17 +457,23 @@ const oncall = {
     );
   },
 
-  /// Records matched on facts already held — the rule, the ownership path, the
-  /// dependency edges, the cause a human wrote. Nothing here is inferred.
-  relatedResponses: ({
+  /// An impacted team says its own service is clear. The dependent's verb:
+  /// closes this record, and closes the OWNER's when it was the last one the
+  /// owner was waiting on. A plain resolve would close this record and skip
+  /// that check, leaving the owner open forever — which is why the UI offers
+  /// this instead of resolve on an impacted record.
+  confirmRecovery: ({
     org_identifier,
     response_id,
+    data,
   }: {
     org_identifier: string;
     response_id: string;
+    data?: { note?: string };
   }) =>
-    http().get<RelatedResponses>(
-      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/related`,
+    http().post<OnCallResponse>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/confirm-recovery`,
+      data ?? {},
     ),
 
   /// Advances THIS team's ladder by one rung. Ownership does not move — the
@@ -484,27 +487,6 @@ const oncall = {
   }) =>
     http().post<OnCallResponse>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/escalate`,
-    ),
-
-  /// Who the server would hand this to, and why. Advisory — the drawer still
-  /// lets a human pick anybody.
-  suggestHandoff: ({
-    org_identifier,
-    response_id,
-  }: {
-    org_identifier: string;
-    response_id: string;
-  }) =>
-    http().get<HandoffSuggestion>(
-      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/handoff-suggestion`,
-    ),
-
-  /// Who is on call across EVERY team in one request. Replaces a per-team
-  /// fan-out that made the teams list issue one call per row.
-  whoIsOnCallBulk: ({ org_identifier, at }: { org_identifier: string; at?: number }) =>
-    http().get<Record<string, OnCallSlot[]>>(
-      `/api/${org_identifier}/oncall/on-call`,
-      at === undefined ? undefined : { params: { at } },
     ),
 
   /// The teams whose schedule would page nobody at `at`. The standing banner
@@ -562,19 +544,11 @@ const oncall = {
       `/api/${org_identifier}/oncall/unrouted/${encodeURIComponent(signal_id)}`,
     ),
 
-  /// Open records with no team. Distinct from `unroutedSignals`: those never
-  /// became a record at all, these are records the UI can still assign.
-  unroutedResponses: ({ org_identifier }: { org_identifier: string }) =>
-    http().get<OnCallResponse[]>(`/api/${org_identifier}/oncall/responses/unrouted`),
-
-  /// The identity space as discovered, with the owner each path resolves to.
-  /// Additive — the ownership screen degrades to a flat rule table without it.
-  identityInventory: ({ org_identifier }: { org_identifier: string }) =>
-    http().get<InventoryNode[]>(`/api/${org_identifier}/oncall/routing/inventory`),
-
   /// Everything the signed-in person's on-call screen needs, in one call.
+  /// The route is `/my/teams` — `/oncall/me` never existed on the server and
+  /// 404ed for exactly as long as this function pointed at it.
   myOnCall: ({ org_identifier }: { org_identifier: string }) =>
-    http().get<MyOnCall>(`/api/${org_identifier}/oncall/me`),
+    http().get<MyOnCall>(`/api/${org_identifier}/oncall/my/teams`),
 
   /// Somebody stands in for the rotation over a window. Outside it the
   /// rotation resolves as normal, which is what makes an override safe.

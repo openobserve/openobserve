@@ -32,6 +32,7 @@ import type {
   OnCallSlot,
   PriorityRung,
 } from "@/ts/interfaces/oncall";
+import { DEFAULT_SLOT, sameSlot } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
@@ -318,8 +319,13 @@ export function isSnoozed(
  * Mirrors `EscalationTarget::describe` so the same rung says the same thing
  * on screen and in the email.
  */
-export function describeTarget(target: EscalationTarget, t: (k: I18nKey) => string): string {
-  return target.kind === "user" ? target.email : t(`oncall.target_${target.kind}`);
+export function describeTarget(
+  target: EscalationTarget,
+  t: (k: I18nKey, params?: Record<string, unknown>) => string,
+): string {
+  if (target.kind === "user") return target.email;
+  if ("slot" in target) return t(`oncall.target_${target.kind}`, { slot: target.slot });
+  return t(`oncall.target_${target.kind}`);
 }
 
 /**
@@ -788,6 +794,9 @@ export interface ResolvedRung {
   people: string[];
   /** The rung names the whole team, which is a group rather than a list. */
   wholeTeam: boolean;
+  /** Slots the rung pages EVERYONE in — groups, like wholeTeam, not lists.
+   *  The client only knows who is on shift, not a pool's full roster. */
+  pools: string[];
 }
 
 /**
@@ -800,13 +809,20 @@ export interface ResolvedRung {
  * saved, so it resolves to an empty `people` rather than being dropped.
  */
 export function resolveLadder(rung: PriorityRung, slots: OnCallSlot[]): ResolvedRung[] {
-  const onCall = slots.map((s) => s.user_email).filter(Boolean);
-  const next = slots.map((s) => s.next_user_email).filter((e): e is string => !!e);
+  /// The unsuffixed targets mean the DEFAULT slot. Reading them as "every
+  /// slot" listed two people for a rung that pages one, the day a team
+  /// staffed a secondary.
+  const inSlot = (name: string) => slots.filter((s) => sameSlot(s.slot, name));
+  const holders = (entries: OnCallSlot[]) => entries.map((s) => s.user_email).filter(Boolean);
+  const nexts = (entries: OnCallSlot[]) =>
+    entries.map((s) => s.next_user_email).filter((e): e is string => !!e);
+  const defaults = inSlot(DEFAULT_SLOT);
 
   return [...rung.steps]
     .sort((a, b) => a.after_micros - b.after_micros)
     .map((step) => {
       const people: string[] = [];
+      const pools: string[] = [];
       let wholeTeam = false;
       // Tolerates a step with no targets: this runs during render, so a
       // malformed rung must read as "reaches nobody" rather than take the
@@ -814,13 +830,27 @@ export function resolveLadder(rung: PriorityRung, slots: OnCallSlot[]): Resolved
       for (const target of step.targets ?? []) {
         switch (target.kind) {
           case "on_call_now":
-            people.push(...onCall);
+            people.push(...holders(defaults));
             break;
           case "next_on_call":
-            people.push(...next);
+            people.push(...nexts(defaults));
             break;
+          // The union across slots, per the spec: it is the last resort, and
+          // one that leaves out the senior pool is half a room.
           case "everyone_on_schedule":
-            people.push(...onCall, ...next);
+            people.push(...holders(slots), ...nexts(slots));
+            break;
+          case "on_call_in_slot":
+            people.push(...holders(inSlot(target.slot)));
+            break;
+          case "next_on_call_in_slot":
+            people.push(...nexts(inSlot(target.slot)));
+            break;
+          // A pool's full roster is not knowable from who is on shift, so it
+          // renders as a group — mislabelling it with one name would read as
+          // "pages one person".
+          case "everyone_in_slot":
+            pools.push(target.slot);
             break;
           case "user":
             people.push(target.email);
@@ -836,6 +866,7 @@ export function resolveLadder(rung: PriorityRung, slots: OnCallSlot[]): Resolved
         // engine deduplicates too.
         people: [...new Set(people)],
         wholeTeam,
+        pools: [...new Set(pools)],
       };
     });
 }

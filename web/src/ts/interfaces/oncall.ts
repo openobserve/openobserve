@@ -28,11 +28,21 @@ export type EscalationTargetKind =
   | "next_on_call"
   | "everyone_on_schedule"
   | "user"
-  | "whole_team";
+  | "whole_team"
+  /** The three slot-naming targets. The unsuffixed three keep meaning the
+   *  DEFAULT slot — every stored policy row holds `{"kind":"on_call_now"}`
+   *  and it has to keep meaning the primary. */
+  | "on_call_in_slot"
+  | "next_on_call_in_slot"
+  | "everyone_in_slot";
+
+/** The kinds that carry a slot name. */
+export type SlotTargetKind = "on_call_in_slot" | "next_on_call_in_slot" | "everyone_in_slot";
 
 export type EscalationTarget =
-  | { kind: Exclude<EscalationTargetKind, "user"> }
-  | { kind: "user"; email: string };
+  | { kind: Exclude<EscalationTargetKind, "user" | SlotTargetKind> }
+  | { kind: "user"; email: string }
+  | { kind: SlotTargetKind; slot: string };
 
 /** Offered in the target picker, in the order they are listed. */
 export const TARGET_KINDS: EscalationTargetKind[] = [
