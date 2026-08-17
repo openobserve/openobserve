@@ -108,7 +108,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
+      <!-- Delete was the only control here, so the most destructive act was
+           the most discoverable one and editing was a whole-row click nothing
+           announced. Safe actions first, destructive last. -->
       <template #cell-actions="{ row }">
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="edit"
+          :aria-label="t('oncall.editTeam')"
+          :data-test="`oncall-team-edit-${row.id}`"
+          @click.stop="openEdit(row)"
+        >
+          <OTooltip side="bottom" :content="t('oncall.editTeam')" />
+        </OButton>
+        <!-- G6: "would a page actually land" is the question a new team has,
+             and it cost a drill-in to ask. `test-page` runs the real path and
+             the real transports and writes no record, so a list can offer it. -->
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="campaign"
+          :loading="testingTeamId === row.id"
+          :aria-label="t('oncall.contactSendTest')"
+          :data-test="`oncall-team-test-page-${row.id}`"
+          @click.stop="sendTestPage(row)"
+        >
+          <OTooltip side="bottom" :content="t('oncall.contactSendTest')" />
+        </OButton>
         <OButton
           variant="ghost"
           size="icon-sm"
@@ -116,17 +143,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('oncall.deleteTeam')"
           :data-test="`oncall-team-delete-${row.id}`"
           @click.stop="teamToDelete = row"
-        />
-      </template>
-
-      <template v-if="notAvailable" #empty>
-        <OEmptyState
-          size="hero"
-          icon="cloud-off"
-          :title="t('oncall.notAvailableTitle')"
-          :description="t('oncall.notAvailableDescription')"
-          data-test="oncall-teams-not-available"
-        />
+        >
+          <OTooltip side="bottom" :content="t('oncall.deleteTeam')" />
+        </OButton>
       </template>
 
       <template #error>
@@ -142,9 +161,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
+      <!-- One `#empty` template, branching inside it: two templates bound to
+           the same slot is a lint error and only one of them was ever
+           rendered. The capability answer wins — a deployment without on-call
+           has no empty org to describe. -->
       <template #empty>
         <OEmptyState
-          v-if="!loading"
+          v-if="notAvailable"
+          size="hero"
+          icon="cloud-off"
+          :title="t('oncall.notAvailableTitle')"
+          :description="t('oncall.notAvailableDescription')"
+          data-test="oncall-teams-not-available"
+        />
+        <OEmptyState
+          v-else-if="!loading"
           size="hero"
           preset="no-oncall-teams"
           :filtered="!!search"
@@ -209,6 +240,8 @@ const search = ref("");
 const formOpen = ref(false);
 const editingTeam = ref<OnCallTeam | null>(null);
 const teamToDelete = ref<OnCallTeam | null>(null);
+// Which row's test page is in flight — a page-wide flag would spin every row.
+const testingTeamId = ref<string | null>(null);
 // Undefined = not fetched yet, so a team in flight reads as loading rather
 // than as an empty rotation.
 const onCallByTeam = ref<Record<string, OnCallSlot[]>>({});
@@ -237,8 +270,8 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => [
     header: t("oncall.actions"),
     isAction: true,
     sortable: false,
-    size: 110,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+    size: 160,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
   {
     id: "timezone",
@@ -328,6 +361,47 @@ async function deleteTeam() {
 function openCreate() {
   editingTeam.value = null;
   formOpen.value = true;
+}
+
+function openEdit(team: OnCallTeam) {
+  editingTeam.value = team;
+  formOpen.value = true;
+}
+
+/// The one honest answer to "would a page land": send a real one and report who
+/// it reached. `reached_anyone: false` carries the server's own reason, which is
+/// rendered verbatim rather than re-worded — the same contract the team screen
+/// keeps, so the two answers cannot drift into disagreeing.
+async function sendTestPage(team: OnCallTeam) {
+  testingTeamId.value = team.id;
+  try {
+    const res = await oncallService.testPage({
+      org_identifier: orgId.value,
+      team_id: team.id,
+    });
+    const data = res.data;
+    const reached = data?.recipients?.length ?? 0;
+    if (data?.reached_anyone && reached) {
+      toast({
+        variant: "success",
+        message: t("oncall.testPageSent", { count: reached }, reached),
+      });
+    } else {
+      toast({
+        variant: "warning",
+        message: t("oncall.testPageNobody", {
+          reason: raw(data?.not_sent_because) || t("oncall.wouldPageNobody"),
+        }),
+      });
+    }
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.testPageFailed"),
+    });
+  } finally {
+    testingTeamId.value = null;
+  }
 }
 
 function openTeam(team: OnCallTeam) {

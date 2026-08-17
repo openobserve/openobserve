@@ -22,11 +22,19 @@ import store from "@/test/unit/helpers/store";
 import OnCallTeams from "@/views/OnCall/OnCallTeams.vue";
 
 vi.mock("@/services/oncall", () => ({
-  default: { listTeams: vi.fn(), whoIsOnCall: vi.fn(), deleteTeam: vi.fn() },
+  default: {
+    listTeams: vi.fn(),
+    whoIsOnCall: vi.fn(),
+    deleteTeam: vi.fn(),
+    testPage: vi.fn(),
+  },
 }));
 
 const push = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 
 const service = vi.mocked(oncallService);
 
@@ -56,10 +64,13 @@ const stubs = {
     template: `<div>{{ description }}<button @click="$emit('action')">{{ actionLabel }}</button></div>`,
   },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
-  OTooltip: { name: "OTooltip", template: "<span />" },
+  // `props` declared deliberately: a stub that does not declare what it is
+  // passed drops it silently, and an assertion about a tooltip then passes
+  // with no tooltip mounted.
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span>{{ content }}</span>" },
   OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
-  OnCallTeamForm: { name: "OnCallTeamForm", template: "<div />" },
+  OnCallTeamForm: { name: "OnCallTeamForm", props: ["open", "team"], template: "<div />" },
   ConfirmDialog: {
     name: "ConfirmDialog",
     props: ["modelValue", "message"],
@@ -70,8 +81,9 @@ const stubs = {
   // falls through and handlers run twice) and the event passed on.
   OButton: {
     name: "OButton",
+    props: ["ariaLabel"],
     emits: ["click"],
-    template: `<button @click="(e) => $emit('click', e)"><slot /></button>`,
+    template: `<button :aria-label="ariaLabel" @click="(e) => $emit('click', e)"><slot /></button>`,
   },
 };
 
@@ -203,6 +215,122 @@ describe("OnCallTeams", () => {
       expect(wrapper.find('[data-test="confirm"]').exists()).toBe(false);
     });
   });
+  /// I6. Delete was the only per-row control, so the one irreversible act was
+  /// the one discoverable act, and editing was a whole-row click nothing on the
+  /// screen announced.
+  describe("row actions", () => {
+    async function rendered() {
+      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      const wrapper = render();
+      await flushPromises();
+      return wrapper;
+    }
+
+    it("offers edit and a test page beside delete", async () => {
+      const wrapper = await rendered();
+      expect(wrapper.find('[data-test="oncall-team-edit-team_1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-team-test-page-team_1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').exists()).toBe(true);
+    });
+
+    /// Three icons and no words: without a name each, the row offers a
+    /// destructive action and two glyphs the reader has to guess at. The
+    /// tooltip is the sighted reader's name and `aria-label` the other's, so
+    /// both are asserted — and both must SAY something, not merely exist.
+    it("names every icon-only action, on hover and to a screen reader", async () => {
+      const wrapper = await rendered();
+      for (const [id, name] of [
+        ["edit", "Edit team"],
+        ["test-page", "Send test page"],
+        ["delete", "Delete team"],
+      ] as const) {
+        const button = wrapper.find(`[data-test="oncall-team-${id}-team_1"]`);
+        expect(button.attributes("aria-label")).toBe(name);
+        expect(button.text()).toContain(name);
+      }
+    });
+
+    /// The destructive one last, so the mouse does not pass over it on the way
+    /// to either safe action.
+    it("puts the irreversible action last", async () => {
+      const html = (await rendered()).html();
+      expect(html.indexOf("oncall-team-edit-team_1")).toBeLessThan(
+        html.indexOf("oncall-team-test-page-team_1"),
+      );
+      expect(html.indexOf("oncall-team-test-page-team_1")).toBeLessThan(
+        html.indexOf("oncall-team-delete-team_1"),
+      );
+    });
+
+    it("opens the form on that team rather than an empty one", async () => {
+      const wrapper = await rendered();
+      await wrapper.find('[data-test="oncall-team-edit-team_1"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("team")).toEqual(
+        expect.objectContaining({ id: "team_1" }),
+      );
+      // The row click navigates; the edit button must not do both.
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    /// G6: "would a page actually land" cost a drill-in to ask. `test-page`
+    /// runs the real transports and writes no record, so a list may offer it.
+    it("sends a real test page from the row and says who it reached", async () => {
+      service.testPage.mockResolvedValue({
+        data: { reached_anyone: true, recipients: ["engineer@example.com"] },
+      } as any);
+      const wrapper = await rendered();
+
+      await wrapper.find('[data-test="oncall-team-test-page-team_1"]').trigger("click");
+      await flushPromises();
+
+      expect(service.testPage).toHaveBeenCalledWith(
+        expect.objectContaining({ team_id: "team_1" }),
+      );
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: expect.stringContaining("1") }),
+      );
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    /// The server's own reason for reaching nobody is the answer; re-wording it
+    /// in the UI is how the two screens start disagreeing about the same team.
+    it("reports reaching nobody without calling it a failure", async () => {
+      service.testPage.mockResolvedValue({
+        data: { reached_anyone: false, recipients: [], not_sent_because: "no transport configured" },
+      } as any);
+      const wrapper = await rendered();
+
+      await wrapper.find('[data-test="oncall-team-test-page-team_1"]').trigger("click");
+      await flushPromises();
+
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "warning",
+          message: expect.stringContaining("no transport configured"),
+        }),
+      );
+    });
+  });
+
+  /// E9/§G.8.1: the teams list IS the capability probe. This state had no test
+  /// and never rendered — it was a second `<template #empty>` on the same slot,
+  /// which is a lint error and, at runtime, a branch Vue never reached. A
+  /// deployment without on-call was told its org had no teams yet.
+  it.each([
+    { response: { status: 404 } },
+    { response: { status: 403, data: { message: "Not Supported" } } },
+  ])("says on-call is not available here rather than showing an empty org (%#)", async (err) => {
+    service.listTeams.mockRejectedValueOnce(err);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-teams-not-available"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-teams-empty"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(false);
+  });
+
   /// B8. A toast evaporates; what stayed on screen was "no teams" — the exact
   /// look of an unconfigured org, on a failed read.
   it("renders a failed load as an error with retry, never as an empty org", async () => {
