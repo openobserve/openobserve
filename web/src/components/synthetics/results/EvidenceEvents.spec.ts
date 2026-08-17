@@ -241,4 +241,12 @@ describe("EvidenceEvents", () => {
     expect(off.find(sel).classes()).toContain("truncate");
     expect(on.find(sel).classes()).not.toContain("truncate");
   });
+
+  it("drops the step cell's truncate when wrapping, same as the message cell", () => {
+    const off = mountEvents({ wrap: false });
+    const on = mountEvents({ wrap: true });
+    const sel = '[data-test="synthetics-evidence-events-step"]';
+    expect(off.find(sel).classes()).toContain("truncate");
+    expect(on.find(sel).classes()).not.toContain("truncate");
+  });
 });
