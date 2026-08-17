@@ -778,16 +778,32 @@ describe("SpanBlock", () => {
       expect(markers()[0].classes()).toContain("before:w-2.5");
     });
 
-    // The span bar is filled with an arbitrary per-service colour, so a 2px
-    // tick with no outline can land invisibly on a same-coloured bar. A ring
-    // holds contrast without consuming the tick's 2px width the way a border
-    // would.
-    it("outlines the tick so it stays visible on any service colour", async () => {
-      await setEvents([{ name: "a", _timestamp: eventNsAt(0.4) }]);
+    // The span bar is filled with an arbitrary per-service colour, so a
+    // saturated 2px tick can land invisibly on a same-hue bar. Error and
+    // warning get a ring to separate them from it.
+    it("outlines a saturated tick so it stays visible on any service colour", async () => {
+      await setEvents([
+        { name: "boom", level: "ERROR", _timestamp: eventNsAt(0.2) },
+        { name: "hmm", level: "WARN", _timestamp: eventNsAt(0.8) },
+      ]);
 
-      expect(markers()[0].classes()).toEqual(
-        expect.arrayContaining(["ring-1", "ring-surface-base"]),
-      );
+      expect(markers()).toHaveLength(2);
+      for (const marker of markers()) {
+        expect(marker.classes()).toEqual(expect.arrayContaining(["ring-1", "ring-surface-base"]));
+      }
+    });
+
+    // A ring is 1px on all four sides of a 2px tick — half its width, ~62% of
+    // its area — and `ring-surface-base` is opaque while the achromatic info
+    // fill is not. On an info tick the ring out-contrasts the mark it outlines,
+    // and it reads as a bordered box rather than a tick. Luminance already
+    // separates info from any fill, so it carries no ring.
+    it("gives the achromatic info tick no ring", async () => {
+      await setEvents([{ name: "fyi", level: "INFO", _timestamp: eventNsAt(0.4) }]);
+
+      expect(markers()[0].attributes("data-event-severity")).toBe("info");
+      expect(markers()[0].classes()).not.toContain("ring-1");
+      expect(markers()[0].classes()).not.toContain("ring-surface-base");
     });
 
     // Regression: 55.1% of default-stream events were hidden behind a neighbour.

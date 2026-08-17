@@ -1456,17 +1456,46 @@ describe("FlameGraphView span event markers", () => {
   // went dark. A canvas shape cannot take a utility class, so it resolves the
   // same token instead. jsdom returns "" for custom properties, so this asserts
   // the lookup rather than the resolved colour.
-  it("strokes the marker halo with the surface token, not a hex literal", () => {
+  // The fixture's events are both info, which carries no halo, so this mounts a
+  // span with an ERROR event — the tier that does.
+  const mountWithErrorEvent = () =>
+    mount(FlameGraphView, {
+      props: {
+        spans: [
+          {
+            ...spanWithEvents,
+            events: [{ name: "boom", level: "ERROR", _timestamp: spanStartNs + 40_000_000 }],
+          },
+        ],
+        traceDuration: 100,
+        selectedSpanId: null,
+      },
+    });
+
+  it("strokes a saturated marker's halo with the surface token, not a hex literal", () => {
     const spy = vi.spyOn(CSSStyleDeclaration.prototype, "getPropertyValue");
 
     try {
-      const marker = renderBlock(mountView(), 100).children[1];
+      const marker = renderBlock(mountWithErrorEvent(), 100).children[1];
 
       expect(spy).toHaveBeenCalledWith("--color-surface-base");
       expect(marker.style.stroke).not.toMatch(/^#/);
+      expect(marker.style.lineWidth).toBe(1);
     } finally {
       spy.mockRestore();
     }
+  });
+
+  // Mirrors SEVERITY_MARKER_CLASS, which rings only the saturated tiers: the
+  // halo is opaque while the achromatic info fill is not, so on an info marker
+  // it out-contrasts the mark it outlines. Canvas and DOM must agree, or the
+  // two surfaces drift the way the hardcoded #ffffff once made them drift.
+  it("leaves the achromatic info marker unstroked", () => {
+    const marker = renderBlock(mountView(), 100).children[1];
+
+    expect(marker.style.fill).toBeDefined();
+    expect(marker.style.stroke).toBeUndefined();
+    expect(marker.style.lineWidth).toBeUndefined();
   });
 });
 

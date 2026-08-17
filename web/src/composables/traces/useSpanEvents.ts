@@ -74,12 +74,19 @@ export type SpanEventSeverity = "error" | "warning" | "info";
  * Info is achromatic on purpose. The waterfall bar is filled with an arbitrary
  * per-service colour, so a hue-based info tick can land invisibly on a same-hue
  * bar; a 50%-alpha modifier holds contrast against any fill. Error and warning
- * keep their hues, where the colour is semantic and the marker's ring carries
- * it against a same-hue bar.
+ * keep their hues, where the colour is semantic.
+ *
+ * The halo (`ring-1 ring-surface-base`) is therefore carried per tier, not by
+ * every marker. A ring is 1px on all four sides of a 2px-wide tick, so it is
+ * half the mark's width and ~62% of its area — and `ring-surface-base` is
+ * opaque while the achromatic info fill is not. On an info tick the ring would
+ * out-contrast the mark it is supposed to outline. Error and warning need it
+ * because a saturated fill can land on a same-hue bar with nothing separating
+ * them; info does not, because luminance already does that job.
  */
 export const SEVERITY_MARKER_CLASS: Record<SpanEventSeverity, string> = {
-  error: "bg-badge-error-solid-bg",
-  warning: "bg-badge-warning-solid-bg",
+  error: "bg-badge-error-solid-bg ring-1 ring-surface-base",
+  warning: "bg-badge-warning-solid-bg ring-1 ring-surface-base",
   info: "bg-trace-event-info",
 };
 

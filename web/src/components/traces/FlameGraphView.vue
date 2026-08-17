@@ -325,8 +325,22 @@ const severityColor = (severity: SpanEventSeverity): string =>
  */
 const MARKER_HALO_TOKEN = "--color-surface-base";
 
-// Exposed for tests only — neither is part of this component's public surface.
-defineExpose({ buildSpanEventMarkers, severityColor });
+/**
+ * ECharts style fragment for a marker's halo, or nothing for the info tier.
+ *
+ * Mirrors `SEVERITY_MARKER_CLASS`, which carries `ring-1 ring-surface-base` on
+ * error and warning only: the halo is opaque while the achromatic info fill is
+ * not, so on an info marker it out-contrasts the mark it outlines. Error and
+ * warning keep it because a saturated fill can land on a same-hue block.
+ */
+const markerHaloStyle = (
+  severity: SpanEventSeverity,
+  haloColor: string,
+): { stroke: string; lineWidth: number } | Record<string, never> =>
+  severity === "info" ? {} : { stroke: haloColor, lineWidth: 1 };
+
+// Exposed for tests only — none is part of this component's public surface.
+defineExpose({ buildSpanEventMarkers, severityColor, markerHaloStyle });
 
 const GRID_LEFT = 10;
 const GRID_RIGHT = 10;
@@ -561,6 +575,11 @@ const chartOptions = computed(() => {
           // coordinate system and cannot drift from it. They are `silent` —
           // hover and click stay on the block, and per-event precision lives in
           // the sidebar mini-timeline.
+          // Resolved once per block rather than per marker: the token is
+          // constant across the render, so resolving it inside the map would
+          // repeat getComputedStyle for every event on the flame graph.
+          const haloColor = tokenColor(MARKER_HALO_TOKEN);
+
           const markerShapes = buildSpanEventMarkers(span, blockWidth).map((marker) => ({
             type: "rect",
             shape: {
@@ -572,8 +591,7 @@ const chartOptions = computed(() => {
             },
             style: {
               fill: severityColor(marker.severity),
-              stroke: tokenColor(MARKER_HALO_TOKEN),
-              lineWidth: 1,
+              ...markerHaloStyle(marker.severity, haloColor),
             },
             silent: true,
           }));

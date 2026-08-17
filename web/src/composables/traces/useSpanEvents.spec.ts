@@ -523,9 +523,21 @@ describe("marker vocabulary", () => {
   // construction. Error and warning keep their hues — there the colour is
   // semantic, and the ring carries them.
   it("gives the info tier an achromatic token and keeps hue for error and warning", () => {
-    expect(SEVERITY_MARKER_CLASS.info).toBe("bg-trace-event-info");
-    expect(SEVERITY_MARKER_CLASS.error).toBe("bg-badge-error-solid-bg");
-    expect(SEVERITY_MARKER_CLASS.warning).toBe("bg-badge-warning-solid-bg");
+    expect(SEVERITY_MARKER_CLASS.info).toContain("bg-trace-event-info");
+    expect(SEVERITY_MARKER_CLASS.error).toContain("bg-badge-error-solid-bg");
+    expect(SEVERITY_MARKER_CLASS.warning).toContain("bg-badge-warning-solid-bg");
+  });
+
+  // The halo is per tier, not per marker. A ring is 1px on all four sides of a
+  // 2px tick — half its width and ~62% of its area — and `ring-surface-base` is
+  // opaque while the achromatic info fill is not, so on an info tick the ring
+  // out-contrasts the mark it outlines and reads as a bordered box. Error and
+  // warning need it: a saturated fill can land on a same-hue bar with nothing
+  // separating them.
+  it("rings only the saturated tiers, leaving the achromatic one bare", () => {
+    expect(SEVERITY_MARKER_CLASS.error).toContain("ring-1 ring-surface-base");
+    expect(SEVERITY_MARKER_CLASS.warning).toContain("ring-1 ring-surface-base");
+    expect(SEVERITY_MARKER_CLASS.info).not.toContain("ring");
   });
 
   // The flame graph draws into a canvas and cannot take utility classes, so it
