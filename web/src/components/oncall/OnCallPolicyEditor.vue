@@ -157,8 +157,22 @@
             </template>
 
             <!-- What the ladder does when it runs out is part of its shape. -->
-            <div class="border-border-strong ms-3 border-s py-2 ps-4">
-              <span class="text-text-secondary text-xs">{{ t("oncall.policyLadderEnds") }}</span>
+            <div class="border-border-strong ms-3 flex flex-col gap-0.5 border-s py-2 ps-4">
+              <span class="text-text-secondary text-xs" data-test="oncall-policy-ladder-end">
+                {{ ladderEndLine }}
+              </span>
+              <!-- §G.9 #9: notify_default_team with nobody nominated is
+                   indistinguishable from stop — the ladder ends silently while
+                   the policy reads as having a safety net. Said HERE, where the
+                   policy is being written, not on a routing screen the author
+                   may never open. -->
+              <span
+                v-if="defaultTeamMissing"
+                class="text-status-warning-text text-xs"
+                data-test="oncall-policy-no-default-warning"
+              >
+                {{ t("oncall.policyNoDefaultTeam") }}
+              </span>
             </div>
           </div>
 
@@ -253,6 +267,7 @@ import destinationService from "@/services/alert_destination";
 import oncallService from "@/services/oncall";
 import type {
   Channel,
+  RoutingConfig,
   EscalationTarget,
   LadderStep,
   OnCallPolicy,
@@ -308,6 +323,41 @@ const destinationOptions = computed(() =>
 );
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+
+/// Only read to answer one question: does the final action's safety net
+/// exist. A failure leaves the warning off — a false "no default team" on a
+/// transient error would send somebody to fix a setting that is fine.
+const routingConfig = ref<RoutingConfig | null>(null);
+async function fetchRoutingConfig() {
+  try {
+    const res = await oncallService.getRoutingConfig({ org_identifier: orgId.value });
+    routingConfig.value = res.data ?? null;
+  } catch {
+    routingConfig.value = null;
+  }
+}
+
+const defaultTeamMissing = computed(
+  () =>
+    props.policy?.final_action === "notify_default_team" &&
+    routingConfig.value !== null &&
+    !routingConfig.value.default_team_id,
+);
+
+/// What actually happens when the rungs run out, from the policy itself —
+/// the static "decided by the repeat and final action" told the author to go
+/// find out. `repeat_count` 1 means the ladder runs once; there is no zero.
+const ladderEndLine = computed(() => {
+  const repeats = props.policy?.repeat_count ?? 1;
+  const hands = props.policy?.final_action === "notify_default_team";
+  if (hands) {
+    const team = routingConfig.value?.default_team_name;
+    return team
+      ? t("oncall.policyEndsHandsTo", { count: repeats, team: raw(team) }, repeats)
+      : t("oncall.policyEndsHandsToUnset", { count: repeats }, repeats);
+  }
+  return t("oncall.policyEndsStops", { count: repeats }, repeats);
+});
 
 const targetOptions = computed(() =>
   TARGET_KINDS.map((kind) => ({ label: t(`oncall.target_${kind}`), value: kind })),
@@ -449,6 +499,7 @@ async function fetchOnCallNow() {
 
 onMounted(() => {
   fetchDestinations();
+  fetchRoutingConfig();
   fetchMembers();
   fetchOnCallNow();
 });

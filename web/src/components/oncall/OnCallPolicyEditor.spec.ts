@@ -24,7 +24,12 @@ import store from "@/test/unit/helpers/store";
 import type { OnCallPolicy } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({
-  default: { setPolicy: vi.fn(), listMembers: vi.fn(), whoIsOnCall: vi.fn() },
+  default: {
+    setPolicy: vi.fn(),
+    listMembers: vi.fn(),
+    whoIsOnCall: vi.fn(),
+    getRoutingConfig: vi.fn(),
+  },
 }));
 vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
 
@@ -72,6 +77,9 @@ function render() {
 
 describe("OnCallPolicyEditor", () => {
   beforeEach(() => {
+    service.getRoutingConfig.mockResolvedValue({
+      data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
+    } as any);
     vi.clearAllMocks();
     service.setPolicy.mockResolvedValue({ data: {} } as any);
   });
@@ -308,4 +316,58 @@ describe("OnCallPolicyEditor", () => {
     expect(text).toContain("+10m");
     expect(text).not.toContain("+15m");
   });
+  /// §G.9 #9: notify_default_team with no team nominated is indistinguishable
+  /// from stop. The warning belongs where the policy is WRITTEN — a routing
+  /// screen the author may never open cannot warn them.
+  describe("the ladder's end", () => {
+    function policyEnding(final_action: string) {
+      return {
+        ...policy,
+        repeat_count: 2,
+        final_action,
+        rungs: [
+          {
+            priority: 1,
+            steps: [{ after_micros: 0, targets: [{ kind: "on_call_now" }] }],
+            channels: ["email"],
+          },
+        ],
+      } as any;
+    }
+
+    it("warns when the final action hands to a default team nobody nominated", async () => {
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: policyEnding("notify_default_team") },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-policy-no-default-warning"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-policy-ladder-end"]').text()).toContain("2 times");
+    });
+
+    it("names the default team once one exists, and does not warn", async () => {
+      service.getRoutingConfig.mockResolvedValue({
+        data: { org_id: "default", default_team_id: "t9", default_team_name: "Platform", updated_at: 1 },
+      } as any);
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: policyEnding("notify_default_team") },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-policy-no-default-warning"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-policy-ladder-end"]').text()).toContain("Platform");
+    });
+
+    it("says a stopping ladder marks the record never answered", async () => {
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: policyEnding("stop") },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+      const line = wrapper.find('[data-test="oncall-policy-ladder-end"]').text();
+      expect(line).toContain("never answered");
+      expect(wrapper.find('[data-test="oncall-policy-no-default-warning"]').exists()).toBe(false);
+    });
+  });
+
 });
