@@ -57,7 +57,13 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // `init_db` returns early when the stored version already matches, *before* it
 // reaches the SeaORM migrator, so an unbumped version means new migrations run
 // on fresh installs only.
-pub const DB_SCHEMA_VERSION: u64 = 70;
+//
+// One bump per released change, not per migration written. On-call arrived as
+// several migrations that were revised in place before the feature shipped
+// anywhere, so they collapse into this single step from 65 — nothing has ever
+// run with an intermediate value. `init_db` compares for equality and never
+// orders these, so no path can tell the difference.
+pub const DB_SCHEMA_VERSION: u64 = 66;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
