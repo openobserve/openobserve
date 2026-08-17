@@ -27,7 +27,7 @@ const stubs = {
   OTimeCell: { name: "OTimeCell", template: "<span />" },
 };
 
-function render(progress: Partial<EscalationProgress>) {
+function render(progress: Partial<EscalationProgress>, events: unknown[] = []) {
   return mount(OnCallEscalation, {
     props: {
       progress: {
@@ -38,6 +38,7 @@ function render(progress: Partial<EscalationProgress>) {
         stopped_because: null,
         ...progress,
       },
+      events: events as never,
     },
     global: { plugins: [i18n], stubs },
   });
@@ -119,4 +120,28 @@ describe("OnCallEscalation", () => {
     const wrapper = render({});
     expect(wrapper.find('[data-test="oncall-escalation-none"]').exists()).toBe(true);
   });
+  /// §G.9 #6: /escalation cannot say a fired rung reached nobody — it looks
+  /// exactly like one that landed. The rail cross-references the timeline's
+  /// whole-rung-lost marker, scoped to the CURRENT run: an earlier run's lost
+  /// rung is history, not a retry in flight.
+  it("marks a fired rung the transport lost, from the timeline", () => {
+    const wrapper = render(
+      { fired: [{ after_micros: 0, at: 1, targets: ["ana@o2.ai"] }] },
+      [{ kind: "page", at: 1, actor: "o2-engine", body: "paged ana", rung_micros: 0, delivered: false }],
+    );
+    expect(wrapper.find('[data-test="oncall-escalation-rung-lost-0"]').exists()).toBe(true);
+  });
+
+  it("does not carry an old run's lost rung into the current one", () => {
+    const wrapper = render(
+      { fired: [{ after_micros: 0, at: 9, targets: ["bo@o2.ai"] }] },
+      [
+        // run 1 lost its first rung; the handoff started run 2, which landed.
+        { kind: "page", at: 1, actor: "o2-engine", body: "paged ana", rung_micros: 0, delivered: false },
+        { kind: "page", at: 9, actor: "o2-engine", body: "paged bo", rung_micros: 0, ladder_run: 2 },
+      ],
+    );
+    expect(wrapper.find('[data-test="oncall-escalation-rung-lost-0"]').exists()).toBe(false);
+  });
+
 });

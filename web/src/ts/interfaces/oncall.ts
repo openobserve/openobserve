@@ -632,6 +632,19 @@ export interface OnCallResponseEvent {
   body: string;
   /** The rung this page belongs to, as its delay from the record opening. */
   rung_micros?: number | null;
+  /** Which climb of the ladder. Absent means the first run. */
+  ladder_run?: number | null;
+  /** `delivery` rows: who one page was addressed to. */
+  recipient?: string | null;
+  channel?: Channel | null;
+  /**
+   * On a `delivery` row: whether the transport took that one send. On a
+   * `page` row: `false` marks a rung with real recipients that reached NONE
+   * of them — the transport lost the whole rung, the ladder keeps its place
+   * and retries. A rung that resolved to nobody gets no marker: that rung is
+   * spent, this one is not. Absent means the rung reached somebody.
+   */
+  delivered?: boolean | null;
 }
 
 /** A team's claim over part of the identity space. */

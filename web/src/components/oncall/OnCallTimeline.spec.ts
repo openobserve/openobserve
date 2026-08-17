@@ -180,4 +180,19 @@ describe("OnCallTimeline", () => {
     const wrapper = render([event("note", 0, "restarted the pool")]);
     expect(wrapper.text()).not.toContain("rung at");
   });
+  /// B9: three states a fired rung can be in, and the timeline is the only
+  /// place they are distinguishable. delivered:false on a PAGE row means the
+  /// transport lost the whole rung — real people, zero landed — and the
+  /// ladder keeps its place and retries. Absent means it reached somebody; a
+  /// rung that resolved to nobody writes no page row at all.
+  it("marks a page whose whole rung the transport lost", () => {
+    const wrapper = render([
+      { ...event("page", 0, "paged ana (FAILED: email)"), delivered: false },
+      event("page", 5_000_000, "paged bo"),
+    ]);
+    const lost = wrapper.findAll('[data-test="oncall-timeline-rung-lost"]');
+    expect(lost).toHaveLength(1);
+    expect(wrapper.text()).toContain("Reached nobody — will retry");
+  });
+
 });

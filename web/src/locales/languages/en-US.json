@@ -12542,6 +12542,7 @@
     "addRung": "Add escalation step",
     "rungPages": "Page",
     "rungAfter": "after",
+    "rungReachedNobodyRetrying": "Reached nobody — will retry",
     "rungImmediately": "immediately",
     "removeRung": "Remove step",
     "addTarget": "Add",

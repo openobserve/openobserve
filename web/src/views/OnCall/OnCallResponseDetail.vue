@@ -118,7 +118,7 @@
           <OContent y>
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div class="lg:col-span-2">
-                <OnCallEscalation v-if="escalation" :progress="escalation" />
+                <OnCallEscalation v-if="escalation" :progress="escalation" :events="events" />
               </div>
 
               <!-- Same key/value grid the rest of the app uses for a details

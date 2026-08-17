@@ -56,6 +56,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTag>
           <span class="text-text-body text-sm">{{ raw(rung.targets.join(", ")) }}</span>
           <OTimeCell :value="rung.at" unit="us" />
+          <!-- `/escalation` cannot say this (§G.9 #6): a fired rung that
+               reached nobody looks exactly like one that landed. The timeline
+               can — its page entry carries the whole-rung-lost marker — so the
+               rail cross-references it rather than vouching for every rung. -->
+          <OTag
+            v-if="unreachedRungs.has(rung.after_micros)"
+            variant="error-soft"
+            size="sm"
+            :data-test="`oncall-escalation-rung-lost-${rung.after_micros}`"
+          >
+            {{ t("oncall.rungReachedNobodyRetrying") }}
+          </OTag>
         </li>
       </ol>
       <p v-else class="text-text-muted text-sm" data-test="oncall-escalation-none">
@@ -72,14 +84,35 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import type { EscalationProgress } from "@/ts/interfaces/oncall";
+import type { EscalationProgress, OnCallResponseEvent } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { formatMicrosDuration } from "@/utils/formatters";
 
-const props = defineProps<{ progress: EscalationProgress }>();
+const props = withDefaults(
+  defineProps<{
+    progress: EscalationProgress;
+    /** The record's timeline, for the whole-rung-lost cross-reference. */
+    events?: OnCallResponseEvent[];
+  }>(),
+  { events: () => [] },
+);
 
 const { t } = useI18nTyped();
+
+/// Rungs of the CURRENT run whose page entry says the transport lost them.
+/// `/escalation` is scoped to the current run, so the events are too: an
+/// earlier run's lost rung is history, not a retry in flight. Absent
+/// `ladder_run` means the first run.
+const unreachedRungs = computed(() => {
+  const pages = props.events.filter((e) => e.kind === "page");
+  const run = Math.max(1, ...pages.map((e) => e.ladder_run ?? 1));
+  return new Set(
+    pages
+      .filter((e) => (e.ladder_run ?? 1) === run && e.delivered === false)
+      .map((e) => e.rung_micros ?? 0),
+  );
+});
 const nowMicros = useOnCallClock();
 
 function offset(micros: number): string {

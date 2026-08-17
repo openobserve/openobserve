@@ -64,6 +64,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("oncall.atRung", { delay: formatMicrosDuration(event.rung_micros) }) }}
             </span>
+            <!-- The one fact the ladder cannot reconstruct from the delivery
+                 rows beside it: this rung had real recipients and reached NONE
+                 of them, so it has not really been sent and will be retried. -->
+            <OTag
+              v-if="event.kind === 'page' && event.delivered === false"
+              variant="error-soft"
+              size="sm"
+              data-test="oncall-timeline-rung-lost"
+            >
+              {{ t("oncall.rungReachedNobodyRetrying") }}
+            </OTag>
             <span class="text-text-muted text-xs">{{ formatAt(event.at) }}</span>
             <span class="text-text-muted text-xs">{{ relativeTo(event.at) }}</span>
           </div>
