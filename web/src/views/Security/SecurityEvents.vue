@@ -1,23 +1,159 @@
 <!-- Copyright 2026 OpenObserve Inc.
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import DateTime from "@/components/DateTime.vue";
 import SecurityEventDrawer from "./SecurityEventDrawer.vue";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
+import { b64EncodeUnicode, b64DecodeUnicodeSafe } from "@/utils/formatters";
 
 // ── Store / route ─────────────────────────────────────────────────────────────
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+
+// ── View state persistence ────────────────────────────────────────────────────
+// The URL is the source of truth, exactly like the logs explorer: every knob the
+// user turns is written back with router.replace, so a refresh or a shared link
+// rebuilds the same view. A copy is mirrored into localStorage so landing on the
+// page with a bare URL (nav click, new tab) still restores the last selection.
+//
+//   stream    selected stream name
+//   period    relative range, e.g. "15m" (mutually exclusive with from/to)
+//   from,to   absolute range in microseconds
+//   sql_mode  "true" when the raw-SQL editor is active
+//   query     base64 SQL (sql mode only)
+//   severity  comma-separated severity/level selection
+//   filters   base64 JSON array of { field, op, value }
+//   event_ts  _timestamp of the event whose detail drawer is open
+interface FieldFilter { field: string; op: string; value: string }
+interface DateState {
+  type: "relative" | "absolute";
+  period: string;
+  absolute: { startTime: number; endTime: number } | null;
+}
+interface ViewState {
+  stream: string | null;
+  sqlMode: boolean;
+  query: string;
+  severity: SeverityValue[];
+  filters: FieldFilter[];
+  date: DateState;
+  eventTs: string | null;
+}
+
+type SeverityValue = number | string;
+
+const URL_KEYS = ["stream", "period", "from", "to", "sql_mode", "query", "severity", "filters", "event_ts"] as const;
+
+function stateKey() { return `oo_sec_events_state_${orgId.value}`; }
+function colsKey() { return `oo_sec_events_cols_${orgId.value}`; }
+
+function parseFilters(raw: string): FieldFilter[] {
+  try {
+    const json = raw.trim().startsWith("[") ? raw : b64DecodeUnicodeSafe(raw, "[]");
+    const parsed = JSON.parse(json);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((f: any) => f?.field && f?.value != null)
+      .map((f: any) => ({ field: String(f.field), op: String(f.op ?? "="), value: String(f.value) }));
+  } catch { return []; }
+}
+
+const EMPTY_DATE: DateState = { type: "relative", period: "15m", absolute: null };
+
+function stateFromUrl(): ViewState | null {
+  const q = route.query as Record<string, any>;
+  if (!URL_KEYS.some((k) => q[k] != null && q[k] !== "")) return null;
+  const date: DateState = q.from && q.to
+    ? { type: "absolute", period: "", absolute: { startTime: Number(q.from), endTime: Number(q.to) } }
+    : { type: "relative", period: String(q.period ?? "15m"), absolute: null };
+  return {
+    stream: q.stream ? String(q.stream) : null,
+    sqlMode: String(q.sql_mode) === "true",
+    query: q.query ? b64DecodeUnicodeSafe(String(q.query), "") : "",
+    // Severity values stay strings here; they are coerced to numbers once the
+    // stream schema tells us whether the field is the numeric OCSF scale.
+    severity: q.severity ? String(q.severity).split(",").map((s) => s.trim()).filter(Boolean) : [],
+    filters: q.filters ? parseFilters(String(q.filters)) : [],
+    date,
+    eventTs: q.event_ts ? String(q.event_ts) : null,
+  };
+}
+
+function stateFromStorage(): ViewState | null {
+  try {
+    const raw = localStorage.getItem(stateKey());
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return {
+      stream: s.stream ?? null,
+      sqlMode: !!s.sqlMode,
+      query: s.query ?? "",
+      severity: Array.isArray(s.severity) ? s.severity.map(String) : [],
+      filters: Array.isArray(s.filters) ? s.filters : [],
+      date: s.date?.type ? s.date : { ...EMPTY_DATE },
+      // A stale drawer target shouldn't reopen on a fresh visit — only a URL does that.
+      eventTs: null,
+    };
+  } catch { return null; }
+}
+
+// URL wins; a bare URL falls back to the last session; otherwise defaults.
+const initialState: ViewState = stateFromUrl()
+  ?? stateFromStorage()
+  ?? { stream: null, sqlMode: false, query: "", severity: [], filters: [], date: { ...EMPTY_DATE }, eventTs: null };
+
+// Mirrors what the DateTime picker last reported, so the URL can carry a relative
+// period (which survives a refresh as "last 15m") rather than pinned timestamps.
+const dateState = ref<DateState>({ ...initialState.date });
+
+// "15m" / "2h" / "7d" → microseconds, matching the DateTime picker's period format.
+const PERIOD_MICROS: Record<string, number> = {
+  s: 1_000_000, m: 60_000_000, h: 3_600_000_000, d: 86_400_000_000,
+  w: 604_800_000_000, M: 2_592_000_000_000,
+};
+function relativeToMicros(period: string): number {
+  const m = period?.match(/^(\d+)\s*([smhdwM])$/);
+  if (!m) return 15 * 60 * 1_000_000;
+  return Number(m[1]) * (PERIOD_MICROS[m[2]] ?? PERIOD_MICROS.m);
+}
+// Seeds the first search with the restored range so results are correct even
+// before the DateTime picker has mounted and reported back.
+function initialTimeRange() {
+  const d = initialState.date;
+  if (d.type === "absolute" && d.absolute?.startTime && d.absolute?.endTime) {
+    return { start: Number(d.absolute.startTime), end: Number(d.absolute.endTime) };
+  }
+  const end = Date.now() * 1000;
+  return { start: end - relativeToMicros(d.period), end };
+}
+
+// Per-stream column choices — not in the URL (it would get unwieldy); localStorage
+// only, mirroring how the logs explorer remembers selected fields.
+function loadSavedCols(stream: string): string[] | null {
+  try {
+    const all = JSON.parse(localStorage.getItem(colsKey()) ?? "{}");
+    const cols = all?.[stream];
+    return Array.isArray(cols) && cols.length ? cols : null;
+  } catch { return null; }
+}
+function saveCols(stream: string, cols: string[]) {
+  try {
+    const all = JSON.parse(localStorage.getItem(colsKey()) ?? "{}");
+    all[stream] = cols;
+    localStorage.setItem(colsKey(), JSON.stringify(all));
+  } catch { /* quota / private mode — column memory is best-effort */ }
+}
 
 // ── Splitter sizes ────────────────────────────────────────────────────────────
 const topSplitter = ref(120);
@@ -136,6 +272,11 @@ const sourcesExpanded = ref(true);
 
 function initColumns(fields: StreamField[]) {
   const names = new Set(fields.map((f) => f.name));
+  // A previous session's column choice for this stream wins over the defaults,
+  // minus any field that has since left the schema.
+  const saved = selectedStream.value ? loadSavedCols(selectedStream.value) : null;
+  const restored = saved?.filter((c) => names.has(c)) ?? [];
+  if (restored.length) { visibleCols.value = restored; return; }
   const p = PREFERRED.filter((c) => names.has(c));
   visibleCols.value = p.length >= 2
     ? p
@@ -145,15 +286,34 @@ function toggleCol(name: string) {
   const i = visibleCols.value.indexOf(name);
   if (i === -1) visibleCols.value.push(name);
   else if (visibleCols.value.length > 1) visibleCols.value.splice(i, 1);
+  if (selectedStream.value) saveCols(selectedStream.value, visibleCols.value);
 }
 
 // ── Time / filters ────────────────────────────────────────────────────────────
-const timeRange = ref({ start: 0, end: 0 });
-const sqlQuery = ref("");
-const sqlMode = ref(false); // true = raw SQL, false = query builder (filter chips)
-const severityFilter = ref<number | null>(null);
+const timeRange = ref(initialTimeRange());
+const sqlQuery = ref(initialState.query);
+const sqlMode = ref(initialState.sqlMode); // true = raw SQL, false = query builder (filter chips)
+const severityFilter = ref<SeverityValue[]>([]);
+const fieldFilters = ref<FieldFilter[]>([...initialState.filters]);
+
+// ── Severity / level filter ───────────────────────────────────────────────────
+// Only OCSF streams carry `severity_id`; plain streams (cdc_events, nginx) carry a
+// textual level instead, so the filter binds to whichever the schema actually has
+// rather than disappearing on non-OCSF streams. First match wins.
+const SEVERITY_FIELDS = ["severity_id", "severity", "level", "log_level", "loglevel", "severity_text", "syslog_severity"];
+const severityField = computed(
+  () => SEVERITY_FIELDS.find((c) => schemaFields.value.some((f) => f.name === c)) ?? null,
+);
+// severity_id is the numeric OCSF scale; everything else is free text from the data.
+const severityIsNumeric = computed(() => severityField.value === "severity_id");
+// Row tinting reads the OCSF scale specifically.
 const hasSeverity = computed(() => schemaFields.value.some((f) => f.name === "severity_id"));
-const fieldFilters = ref<{ field: string; op: string; value: string }[]>([]);
+
+const severityTextOptions = ref<{ label: string; value: string }[]>([]);
+const severityOptionsLoading = ref(false);
+const severityOptions = computed(() =>
+  severityIsNumeric.value ? SEVERITY_SEL_OPTS : severityTextOptions.value,
+);
 
 // ── Filter builder (inline add row) ──────────────────────────────────────────
 const filterBuilderField = ref("");
@@ -170,18 +330,67 @@ const FILTER_OPS = [
 ];
 
 const SEVERITY_SEL_OPTS = [
-  { label: "All Severities", value: "" },
-  { label: "Critical (5)",   value: "5" },
-  { label: "High (4)",       value: "4" },
-  { label: "Medium (3)",     value: "3" },
-  { label: "Low (2)",        value: "2" },
-  { label: "Info (1)",       value: "1" },
+  { label: "Critical", value: 5 },
+  { label: "High",     value: 4 },
+  { label: "Medium",   value: 3 },
+  { label: "Low",      value: 2 },
+  { label: "Info",     value: 1 },
 ];
 
-const severitySelectVal = computed({
-  get: () => severityFilter.value === null ? "" : String(severityFilter.value),
-  set: (v: string) => { severityFilter.value = v === "" ? null : Number(v); },
-});
+// Ranked so the dropdown reads worst-first regardless of what order the data
+// hands back; anything unrecognised falls through to alphabetical.
+const LEVEL_ORDER = ["fatal","critical","crit","severe","error","err","warning","warn","notice","info","informational","debug","trace"];
+
+async function loadSeverityValues() {
+  severityTextOptions.value = [];
+  const field = severityField.value;
+  if (!field || severityIsNumeric.value || !selectedStream.value) return;
+  severityOptionsLoading.value = true;
+  try {
+    const { start, end } = timeRange.value.end ? timeRange.value : defaultTimeRange();
+    const res = await streamService.fieldValues({
+      org_identifier: orgId.value,
+      stream_name: selectedStream.value,
+      fields: [field],
+      size: 50,
+      start_time: start,
+      end_time: end,
+      type: "logs",
+    });
+    const hits: any[] = res.data?.hits ?? [];
+    const vals: string[] = hits.flatMap((h: any) => (h.values ?? []).map((v: any) => String(v.zo_sql_key ?? v.key ?? v)));
+    const uniq = [...new Set(vals)].filter((v) => v !== "" && v !== "null");
+    uniq.sort((a, b) => {
+      const ia = LEVEL_ORDER.indexOf(a.toLowerCase());
+      const ib = LEVEL_ORDER.indexOf(b.toLowerCase());
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.localeCompare(b);
+    });
+    severityTextOptions.value = uniq.map((v) => ({ label: v, value: v }));
+  } catch { severityTextOptions.value = []; }
+  finally { severityOptionsLoading.value = false; }
+}
+
+// Info by default: severity_id 1 on OCSF streams, the info-ish level elsewhere.
+function defaultSeveritySelection(): SeverityValue[] {
+  if (!severityField.value) return [];
+  if (severityIsNumeric.value) return [1];
+  const info = severityTextOptions.value.find((o) => /^inf(o|ormational)?$/i.test(o.label));
+  return info ? [info.value] : [];
+}
+
+function onSeverityChange(v: unknown) {
+  const next = (Array.isArray(v) ? v : v == null ? [] : [v]).filter(
+    (x) => x !== null && x !== undefined && x !== "",
+  ) as SeverityValue[];
+  // Bail when the contents match — re-assigning a fresh array on every emit
+  // hands OSelect a new modelValue identity and it re-emits in a loop.
+  const cur = severityFilter.value;
+  if (next.length === cur.length && next.every((n, i) => n === cur[i])) return;
+  severityFilter.value = next;
+}
 
 const fieldNameOptions = computed(() =>
   schemaFields.value.map((f) => ({ label: f.name, value: f.name }))
@@ -219,26 +428,15 @@ function commitFilter() {
   filterBuilderValue.value = "";
 }
 
-const SEVERITY_OPTS = [
-  { id: null, label: "All",      cls: "" },
-  { id: 5,    label: "Critical", cls: "sev-critical" },
-  { id: 4,    label: "High",     cls: "sev-high" },
-  { id: 3,    label: "Medium",   cls: "sev-medium" },
-  { id: 2,    label: "Low",      cls: "sev-low" },
-  { id: 1,    label: "Info",     cls: "sev-info" },
-] as const;
-
 function addFilter(field: string, value: string, op = "=") {
   if (!value) return;
   if (!fieldFilters.value.some((f) => f.field === field && f.value === value && f.op === op)) {
     fieldFilters.value.push({ field, op, value });
-    syncUrl();
     runSearch();
   }
 }
 function removeFilter(idx: number) {
   fieldFilters.value.splice(idx, 1);
-  syncUrl();
   runSearch();
 }
 
@@ -265,22 +463,33 @@ const errorMsg = ref("");
 
 // ── Drawer ────────────────────────────────────────────────────────────────────
 const drawerEvent = ref<any | null>(null);
+// Holds `event_ts` from the URL until the matching event has been located, so a
+// URL rewrite in between doesn't drop the deep link before it can be honoured.
+const pendingEventTs = ref<string | null>(initialState.eventTs);
 
 function openDrawer(ev: any) {
   drawerEvent.value = ev;
-  router.replace({ query: { ...route.query, event_ts: String(ev._timestamp) } });
+  syncUrl();
 }
 function closeDrawer() {
+  if (!drawerEvent.value && !pendingEventTs.value) return;
   drawerEvent.value = null;
-  const q = { ...route.query };
-  delete q.event_ts;
-  router.replace({ query: q });
+  pendingEventTs.value = null;
+  syncUrl();
 }
+function isActiveRow(ev: any) {
+  // Compared by timestamp, not identity: a drawer restored from the URL is a
+  // separately fetched object even when the same event is in the result list.
+  return !!drawerEvent.value && String(drawerEvent.value._timestamp) === String(ev._timestamp);
+}
+// A shared link pins the absolute window the viewer should see — a relative
+// period would resolve against *their* clock and show different events.
 const shareUrl = computed(() => {
   if (!drawerEvent.value || typeof window === "undefined") return "";
   const url = new URL(window.location.href);
-  if (selectedStream.value) url.searchParams.set("stream", selectedStream.value);
-  url.searchParams.set("event_ts", String(drawerEvent.value._timestamp));
+  url.search = "";
+  const q = buildQuery(true);
+  Object.entries(q).forEach(([k, v]) => url.searchParams.set(k, String(v)));
   return url.toString();
 });
 
@@ -310,7 +519,17 @@ function buildSQL(): string {
   if (sqlMode.value && sqlQuery.value.trim()) return sqlQuery.value.trim();
   if (!sqlMode.value) {
     const parts: string[] = [];
-    if (severityFilter.value !== null && hasSeverity.value) parts.push(`severity_id = ${severityFilter.value}`);
+    const sevField = severityField.value;
+    if (sevField && severityFilter.value.length) {
+      const list = severityIsNumeric.value
+        ? severityFilter.value.map((v) => Number(v)).join(", ")
+        : severityFilter.value.map((v) => `'${String(v).replace(/'/g, "''")}'`).join(", ");
+      parts.push(
+        severityFilter.value.length === 1
+          ? `"${sevField}" = ${list}`
+          : `"${sevField}" IN (${list})`,
+      );
+    }
     for (const f of fieldFilters.value) {
       const v = f.value.replace(/'/g, "''");
       if (f.op === "!=")             parts.push(`"${f.field}" != '${v}'`);
@@ -325,14 +544,51 @@ function buildSQL(): string {
 }
 
 // ── URL sync ──────────────────────────────────────────────────────────────────
+// `pinTime` forces the absolute window into the link instead of the relative
+// period — used for share links, never for the address bar.
+function buildQuery(pinTime = false): Record<string, string> {
+  const q: Record<string, string> = { org_identifier: orgId.value };
+  if (selectedStream.value) q.stream = selectedStream.value;
+
+  if (dateState.value.type === "relative" && !pinTime) {
+    q.period = dateState.value.period || "15m";
+  } else {
+    const { start, end } = timeRange.value.end ? timeRange.value : defaultTimeRange();
+    q.from = String(start);
+    q.to = String(end);
+  }
+
+  q.sql_mode = String(sqlMode.value);
+  if (sqlMode.value && sqlQuery.value.trim()) {
+    q.query = b64EncodeUnicode(sqlQuery.value.trim()) ?? "";
+  }
+  if (severityFilter.value.length) q.severity = severityFilter.value.join(",");
+  if (fieldFilters.value.length) {
+    q.filters = b64EncodeUnicode(JSON.stringify(fieldFilters.value)) ?? "";
+  }
+  const eventTs = drawerEvent.value?._timestamp ?? pendingEventTs.value;
+  if (eventTs != null) q.event_ts = String(eventTs);
+  return q;
+}
+
+function persistState() {
+  try {
+    localStorage.setItem(stateKey(), JSON.stringify({
+      stream: selectedStream.value,
+      sqlMode: sqlMode.value,
+      query: sqlQuery.value,
+      severity: severityFilter.value,
+      filters: fieldFilters.value,
+      date: dateState.value,
+    }));
+  } catch { /* quota / private mode — the URL still carries the full state */ }
+}
+
 function syncUrl() {
-  const q: Record<string, string> = { ...(route.query as any), org_identifier: orgId.value };
-  if (selectedStream.value) q.stream = selectedStream.value; else delete q.stream;
-  if (sqlMode.value && sqlQuery.value.trim()) q.query = sqlQuery.value.trim(); else delete q.query;
-  if (severityFilter.value !== null) q.severity = String(severityFilter.value); else delete q.severity;
-  if (fieldFilters.value.length) q.filters = JSON.stringify(fieldFilters.value); else delete q.filters;
-  if (drawerEvent.value) q.event_ts = String(drawerEvent.value._timestamp); else delete q.event_ts;
-  router.replace({ query: q });
+  // replace, not push: filter tweaks shouldn't stack history entries the way a
+  // navigation would, but the address bar always reflects the current view.
+  router.replace({ query: buildQuery() });
+  persistState();
 }
 
 // ── Load streams ──────────────────────────────────────────────────────────────
@@ -342,8 +598,10 @@ async function loadStreams() {
     const res = await streamService.nameList(orgId.value, "logs", false);
     allStreams.value = (res.data?.list ?? []).map((s: any) => s.name);
     buildStreamOptions();
-    const urlStream = route.query.stream as string;
-    if (urlStream && allStreams.value.includes(urlStream)) selectedStream.value = urlStream;
+    // Restored stream (URL or last session) wins, then auto-detected security
+    // streams, then whatever exists.
+    const wanted = initialState.stream;
+    if (wanted && allStreams.value.includes(wanted)) selectedStream.value = wanted;
     else if (secStreamNames.value.length) selectedStream.value = secStreamNames.value[0];
     else if (allStreams.value.length) selectedStream.value = allStreams.value[0];
   } finally { streamsLoading.value = false; }
@@ -362,6 +620,9 @@ async function loadSchema(streamName: string) {
 
 // ── Run search ────────────────────────────────────────────────────────────────
 async function runSearch() {
+  // Every search re-publishes the view to the URL, so whatever produced it —
+  // filter chip, severity pick, SQL edit, time range — is reproducible on reload.
+  if (mountComplete) syncUrl();
   if (!selectedStream.value || !orgId.value) return;
   loading.value = true;
   errorMsg.value = "";
@@ -377,11 +638,8 @@ async function runSearch() {
       schemaFields.value = Object.keys(events.value[0]).map((k) => ({ name: k, ftype: "Utf8" }));
       initColumns(schemaFields.value);
     }
-    const urlTs = route.query.event_ts as string;
-    if (urlTs && !drawerEvent.value) {
-      const found = events.value.find((e) => String(e._timestamp) === urlTs);
-      if (found) drawerEvent.value = found;
-    } else if (drawerEvent.value) {
+    if (drawerEvent.value) {
+      // Keep the open drawer pointed at the freshly fetched copy of its event.
       const refreshed = events.value.find((e) => String(e._timestamp) === String(drawerEvent.value._timestamp));
       if (refreshed) drawerEvent.value = refreshed;
     }
@@ -392,23 +650,98 @@ async function runSearch() {
   } finally { loading.value = false; }
 }
 
+// ── Deep-linked event ─────────────────────────────────────────────────────────
+// Reopens the drawer for `event_ts` after a reload. The event is usually in the
+// result page already; when it isn't (different sort position, page size, a
+// link shared with a wider range) it is fetched on its own so the deep link
+// still resolves.
+async function restoreDrawerFromUrl() {
+  const ts = pendingEventTs.value;
+  if (!ts || drawerEvent.value) return;
+  const inPage = events.value.find((e) => String(e._timestamp) === ts);
+  if (inPage) {
+    drawerEvent.value = inPage;
+    pendingEventTs.value = null;
+    return;
+  }
+  const tsNum = Number(ts);
+  if (Number.isFinite(tsNum) && selectedStream.value) {
+    try {
+      const res = await searchService.search(
+        {
+          org_identifier: orgId.value,
+          query: {
+            query: {
+              sql: `SELECT * FROM "${selectedStream.value}" WHERE _timestamp = ${tsNum}`,
+              start_time: tsNum - 1_000_000,
+              end_time: tsNum + 1_000_000,
+              from: 0,
+              size: 1,
+            },
+          },
+          page_type: "logs",
+        },
+        "ui",
+      );
+      const hit = res.data?.hits?.[0];
+      if (hit) drawerEvent.value = hit;
+    } catch { /* aged out or no longer queryable — leave the drawer closed */ }
+  }
+  pendingEventTs.value = null;
+  if (!drawerEvent.value) syncUrl(); // drop the dangling event_ts
+}
+
 // ── Watchers ──────────────────────────────────────────────────────────────────
 let mountComplete = false;
+let suppressSeverityWatch = false;
+
+// Seeds the severity selection for the current stream without kicking off a
+// search — the caller owns the single search that follows.
+function applySeverityDefault() {
+  suppressSeverityWatch = true;
+  severityFilter.value = defaultSeveritySelection();
+  nextTick(() => { suppressSeverityWatch = false; });
+}
+// Applies a restored severity selection, coercing to the scale the stream's
+// severity field actually uses (numeric OCSF vs. free-text level).
+function applySeveritySelection(values: SeverityValue[]) {
+  suppressSeverityWatch = true;
+  severityFilter.value = severityIsNumeric.value
+    ? values.map(Number).filter((n) => !Number.isNaN(n))
+    : values.map(String);
+  nextTick(() => { suppressSeverityWatch = false; });
+}
 watch(selectedStream, async (v) => {
   if (!mountComplete) return;
   if (!v) return;
   fieldFilters.value = [];
-  severityFilter.value = null;
   sqlQuery.value = "";
-  syncUrl();
+  drawerEvent.value = null;
+  pendingEventTs.value = null;
   await loadSchema(v);
+  // Both run after the schema resolves, so `severityField` reflects the new stream
+  // and the text options exist before a default can be picked from them.
+  await loadSeverityValues();
+  applySeverityDefault();
   runSearch();
 });
-watch(severityFilter, () => { if (!mountComplete) return; syncUrl(); runSearch(); });
+watch(severityFilter, () => {
+  if (!mountComplete || suppressSeverityWatch) return;
+  runSearch();
+}, { deep: true });
+// Switching between the filter builder and the SQL editor changes what the URL
+// has to carry, so republish even though the results haven't been re-fetched yet.
+watch(sqlMode, () => { if (mountComplete) syncUrl(); });
 
 // ── DateTime ──────────────────────────────────────────────────────────────────
 function onDateChange(dt: any) {
   timeRange.value = { start: Number(dt.startTime), end: Number(dt.endTime) };
+  // A relative range is stored as its period ("15m") so a reload keeps meaning
+  // "the last 15 minutes" instead of freezing the window at load time.
+  dateState.value = String(dt.valueType ?? "relative").startsWith("relative")
+    ? { type: "relative", period: dt.relativeTimePeriod || dateState.value.period || "15m", absolute: null }
+    : { type: "absolute", period: "", absolute: { startTime: Number(dt.startTime), endTime: Number(dt.endTime) } };
+  if (!mountComplete) return; // the mount flow owns the first search
   runSearch();
 }
 
@@ -416,13 +749,25 @@ function onDateChange(dt: any) {
 onMounted(async () => {
   taggedStreams.value = loadTaggedStreams();
   ocsfFlags.value = loadOcsfFlags();
-  timeRange.value = defaultTimeRange();
-  if (route.query.query) { sqlQuery.value = route.query.query as string; sqlMode.value = true; }
-  if (route.query.severity) severityFilter.value = Number(route.query.severity);
-  if (route.query.filters) { try { const parsed = JSON.parse(route.query.filters as string); fieldFilters.value = parsed.map((f: any) => ({ field: f.field, op: f.op ?? "=", value: f.value })); } catch { /**/ } }
+  if (!timeRange.value.end) timeRange.value = defaultTimeRange();
   await loadStreams();
+  if (selectedStream.value) {
+    await loadSchema(selectedStream.value);
+    await loadSeverityValues();
+    // A restored severity wins; otherwise seed the default for this stream.
+    // Applied here because only now do we know whether the field is numeric.
+    if (initialState.severity.length) applySeveritySelection(initialState.severity);
+    else applySeverityDefault();
+  }
   mountComplete = true;
-  if (selectedStream.value) { await loadSchema(selectedStream.value); runSearch(); }
+  // runSearch republishes the URL itself, so it is always a complete description
+  // of the view from the first paint on; syncUrl covers the no-stream case.
+  if (selectedStream.value) {
+    await runSearch();
+    await restoreDrawerFromUrl();
+  } else {
+    syncUrl();
+  }
 });
 </script>
 
@@ -430,7 +775,7 @@ onMounted(async () => {
   <div class="rounded-default h-full max-h-full! min-h-full! overflow-hidden flex flex-row" id="secEventsPage">
 
     <!-- ── LEFT: search bar + field panel + results ──────────────────────────── -->
-    <div class="sec-main-pane" :class="{ 'sec-main-pane--split': drawerEvent }">
+    <div class="sec-main-pane">
       <div class="h-full max-h-full overflow-hidden">
         <OSplitter
           class="h-full max-h-full overflow-hidden"
@@ -463,27 +808,39 @@ onMounted(async () => {
                   <button :class="['sec-mode-btn', { 'sec-mode-btn--active': sqlMode }]" @click="sqlMode = true">SQL</button>
                 </div>
 
-                <!-- Severity dropdown (same toolbar level as Filters/SQL) -->
+                <!-- Severity / level multi-select (same toolbar level as Filters/SQL).
+                     Always rendered so it doesn't vanish on streams without the field. -->
                 <OSelect
-                  v-if="!sqlMode && hasSeverity"
-                  v-model="severitySelectVal"
-                  :options="SEVERITY_SEL_OPTS"
+                  v-if="!sqlMode"
+                  :model-value="severityFilter"
+                  :options="severityOptions"
+                  :disabled="!severityField"
+                  :loading="severityOptionsLoading"
+                  multiple
+                  select-all
+                  clearable
+                  :placeholder="severityField ? `All ${severityField}` : 'No severity field'"
+                  :title="severityField ? `Filtering on ${severityField}` : 'This stream has no severity or level field'"
+                  data-test="security-events-severity-filter"
                   class="sec-severity-sel shrink-0"
+                  @update:model-value="onSeverityChange"
                 />
 
                 <div class="flex-1 min-w-2" />
 
-                <!-- DateTime picker -->
+                <!-- DateTime picker — seeded from the restored range so a reload
+                     reopens on the same window rather than snapping back to 15m -->
                 <DateTime
-                  defaultRelativeTime="15m"
-                  defaultType="relative"
-                  :autoApply="true"
+                  :default-type="dateState.type"
+                  :default-relative-time="dateState.period || '15m'"
+                  :default-absolute-time="dateState.absolute ?? undefined"
+                  :auto-apply="true"
                   class="shrink-0"
                   @on:date-change="onDateChange"
                 />
 
                 <!-- Run button -->
-                <OButton size="sm" variant="solid" :loading="loading" class="shrink-0" @click="runSearch">
+                <OButton size="sm" variant="primary" :loading="loading" class="shrink-0" @click="runSearch">
                   <OIcon name="play-arrow" size="sm" />
                   Run
                 </OButton>
@@ -708,10 +1065,10 @@ onMounted(async () => {
 
                       <!-- Event rows -->
                       <div v-for="(ev, idx) in events" :key="idx"
-                        :class="['sec-event-row', rowSevClass(ev), { 'sec-event-row--active': drawerEvent === ev }]"
+                        :class="['sec-event-row', rowSevClass(ev), { 'sec-event-row--active': isActiveRow(ev) }]"
                         @click="openDrawer(ev)">
                         <div class="sec-expand-cell">
-                          <OIcon :name="drawerEvent === ev ? 'expand-more' : 'arrow-forward'" size="xs" class="text-text-tertiary" />
+                          <OIcon :name="isActiveRow(ev) ? 'expand-more' : 'arrow-forward'" size="xs" class="text-text-tertiary" />
                         </div>
                         <div v-for="col in visibleCols" :key="col"
                           class="sec-data-cell-val"
@@ -738,35 +1095,34 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- ── RIGHT: drawer (full height, half page) ──────────────────────────── -->
-    <Transition name="sec-drawer-slide">
+    <!-- ── Event detail — overlay drawer, slides over the results instead of
+         squeezing them; open state lives in the URL (event_ts) ───────────── -->
+    <ODrawer
+      :open="!!drawerEvent"
+      side="right"
+      size="xl"
+      bleed
+      :show-close="false"
+      data-test="security-event-drawer"
+      @update:open="(v: boolean) => { if (!v) closeDrawer(); }"
+    >
       <SecurityEventDrawer
         v-if="drawerEvent"
-        class="sec-drawer-pane"
         :event="drawerEvent"
         :stream="selectedStream ?? ''"
         :share-url="shareUrl"
         @close="closeDrawer"
         @add-filter="addFilter"
       />
-    </Transition>
+    </ODrawer>
   </div>
 </template>
 
 <style>
 /* ── Root layout ─────────────────────────────────────────────────────────── */
-.sec-main-pane {
-  flex: 1 1 100%; min-width: 0; overflow: hidden;
-  transition: flex-basis 0.26s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.26s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.sec-main-pane--split { flex: 0 0 50%; max-width: 50%; }
-
-.sec-drawer-pane {
-  flex: 0 0 50%; width: 50%; min-width: 380px; height: 100%; overflow: hidden;
-}
-.sec-drawer-slide-enter-active { transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; }
-.sec-drawer-slide-leave-active { transition: transform 0.2s cubic-bezier(0.4, 0, 1, 1), opacity 0.15s ease; }
-.sec-drawer-slide-enter-from, .sec-drawer-slide-leave-to { transform: translateX(32px); opacity: 0; }
+/* The event detail is an ODrawer overlay, so the results pane keeps the full
+   width whether or not an event is open — no reflow on select. */
+.sec-main-pane { flex: 1 1 100%; min-width: 0; overflow: hidden; }
 
 /* ── Mode toggle (Filters / SQL) ─────────────────────────────────────────── */
 .sec-mode-toggle {
@@ -796,7 +1152,7 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.sec-severity-sel     { width: 150px; flex-shrink: 0; }
+.sec-severity-sel     { width: 13rem; flex-shrink: 0; }
 .sec-filter-field-sel { width: 160px; flex-shrink: 0; }
 .sec-filter-op-sel    { width: 110px; flex-shrink: 0; }
 .sec-filter-value-sel { width: 200px; flex-shrink: 0; }

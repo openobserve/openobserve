@@ -182,7 +182,8 @@ function sigClass(level: string) {
 </script>
 
 <template>
-  <div class="sdr-root bg-surface-panel border-border-default border-l flex flex-col h-full overflow-hidden">
+  <!-- Hosted inside an ODrawer overlay, which owns the panel's edge border. -->
+  <div class="sdr-root bg-surface-panel flex flex-col h-full overflow-hidden">
 
     <!-- ── HEADER ──────────────────────────────────────────────────────────── -->
     <div class="sdr-header border-border-default border-b shrink-0">
