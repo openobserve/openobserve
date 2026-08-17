@@ -259,14 +259,26 @@ const mutations: Mutation[] = [
   },
 ];
 
-function generateBrokenQueries() {
-  const result: { mutation: string; broken: string; expectedFragment: string }[] = [];
+type BrokenQuery = { mutation: string; broken: string; expectedFragment: string };
+
+let brokenQueryCache: BrokenQuery[] | null = null;
+
+/**
+ * Mutate every valid query with every mutation. Deterministic and expensive
+ * (~1,000 queries × 16 mutations, each re-parsed), so the result is computed
+ * once and shared — every caller treats it as read-only.
+ */
+function generateBrokenQueries(): BrokenQuery[] {
+  if (brokenQueryCache) return brokenQueryCache;
+
+  const result: BrokenQuery[] = [];
   for (const sql of allValidSqls()) {
     for (const mut of mutations) {
       const res = mut.apply(sql);
       if (res) result.push({ mutation: mut.name, ...res });
     }
   }
+  brokenQueryCache = result;
   return result;
 }
 
@@ -278,6 +290,14 @@ describe("buildContextualSqlMessage", () => {
     ["AND incomplete", "SELECT * FROM t WHERE x = 1 AND", "AND"],
     ["OR incomplete", "SELECT * FROM t WHERE x = 1 OR", "OR"],
     ["LIKE incomplete", "SELECT * FROM t WHERE x LIKE", "LIKE"],
+    // Unquoted LIKE patterns — the parser stops on the '%' only when the first
+    // pattern character cannot continue an identifier; otherwise it stops later.
+    ["LIKE unquoted, stops on %", "SELECT * FROM t WHERE x LIKE BIN-% AND y = 1", "single quotes"],
+    ["LIKE unquoted, stops later", "SELECT * FROM t WHERE x LIKE E00% ORDER BY y", "single quotes"],
+    ["LIKE unquoted path", "SELECT * FROM t WHERE x LIKE /api/% ORDER BY y", "single quotes"],
+    ["NOT LIKE unquoted", "SELECT * FROM t WHERE x NOT LIKE Malicious% AND y = 1", "single quotes"],
+    // A quoted pattern is valid — a later error must keep its own message
+    ["AND incomplete after valid LIKE", "SELECT * FROM t WHERE x LIKE '%a%' AND", "AND"],
     ["IN incomplete", "SELECT * FROM t WHERE x IN", "IN"],
     ["BETWEEN incomplete", "SELECT * FROM t WHERE x BETWEEN", "BETWEEN"],
     ["IS incomplete", "SELECT * FROM t WHERE x IS", "IS"],
@@ -335,7 +355,7 @@ describe("buildContextualSqlMessage", () => {
 // ─── Suite 2: no false positives on valid queries ─────────────────────────────
 
 describe("validateSql — no false positives on valid queries", () => {
-  it("returns null for all 400 query-agent test queries", async () => {
+  it("returns null for all 400 query-agent test queries", { timeout: 30000 }, async () => {
     const sqls = allValidSqls();
     const results = await Promise.all(sqls.map((sql) => validateSql(sql)));
     const falsePositives = sqls.filter((_, i) => results[i] !== null);
@@ -428,7 +448,7 @@ describe("validateSql — mutation detection on broken queries", () => {
   // Per-mutation expectations. A `rate` is the share of that mutation's queries
   // that must get a specific message; a `minSpecific` is an absolute floor, for
   // mutations whose detectable share is a property of the corpus rather than of
-  // the diagnostics (see unquote_like_pattern).
+  // the diagnostics.
   type Expectation = { rate: number } | { minSpecific: number };
 
   const perMutationExpectations: Record<string, Expectation> = {
@@ -441,15 +461,14 @@ describe("validateSql — mutation detection on broken queries", () => {
     truncate_after_LIMIT: { rate: 0.97 },
     // tightened missingWhere guard: ambiguous patterns suppressed; expanded query set lowers rate
     remove_WHERE_keyword: { rate: 0.8 },
-    // Counted, not rated. Only one shape is localizable: the parser must report
-    // `found === "%"`. An unquoted pattern that lexes as valid SQL — LIKE E00%,
-    // LIKE /api/%, LIKE Android% — puts the error somewhere unrelated, and
-    // `col LIKE other_col` is itself valid SQL, so these cannot be flagged from
-    // the source text without squiggling correct queries. The corpus lives in
-    // tests/test-data/query-agent/ and grows with backend PRs, so every added
-    // LIKE query dilutes a ratio without the diagnostics changing at all: this
-    // was 6/12 = 0.50, then 6/13 after #13808, then 6/14 after #13810.
-    unquote_like_pattern: { minSpecific: 6 },
+    // Rated again: hasUnquotedLikePattern reads the operand out of the source
+    // text, so the shapes that lex as valid SQL — LIKE E00%, LIKE /api/%,
+    // LIKE Android% — are classified even though the parser stops somewhere
+    // unrelated. `col LIKE other_col` stays untouched: the operand must carry a
+    // % wildcard. This was a count (minSpecific: 6) while only `found === "%"`
+    // was localizable, which is why every LIKE query a backend PR added diluted
+    // the ratio — 6/12, then 6/13 after #13808, then 6/14 after #13810.
+    unquote_like_pattern: { rate: 0.9 },
     drop_AND_between_conditions: { rate: 0.9 },
     // Complex-construct mutations
     truncate_inside_case_when: { rate: 0.9 },
@@ -465,7 +484,7 @@ describe("validateSql — mutation detection on broken queries", () => {
         ? `≥ ${Math.round(expectation.rate * 100)}% specific messages`
         : `≥ ${expectation.minSpecific} specific messages`;
 
-    it(`${mutName}: ${label}`, async () => {
+    it(`${mutName}: ${label}`, { timeout: 30000 }, async () => {
       const broken = generateBrokenQueries().filter((b) => b.mutation === mutName);
       if (broken.length === 0) return; // mutation didn't apply to any query
 
