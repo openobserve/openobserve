@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 32] = [
+const QUERIER_ROUTES: [(&str, usize); 34] = [
     ("config", 0),               // /config
     ("summary", 2),              // /api/{org_id}/summary
     ("organizations", 1),        // /api/organizations
