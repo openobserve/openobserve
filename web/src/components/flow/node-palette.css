@@ -124,7 +124,7 @@
   color: var(--color-text-body);
   border-radius: var(--radius-surface);
   background: var(--color-status-info-bg);
-  box-shadow: var(--shadow-glow-sm-geom)
+  box-shadow: var(--shadow-glow-md-geom)
     color-mix(in srgb, var(--color-status-info-text) 10%, transparent);
   transition:
     background 0.3s ease,
@@ -149,7 +149,7 @@
   color: var(--color-text-body);
   border-radius: var(--radius-surface);
   background: var(--color-status-warning-bg);
-  box-shadow: var(--shadow-glow-sm-geom)
+  box-shadow: var(--shadow-glow-md-geom)
     color-mix(in srgb, var(--color-status-warning-text) 10%, transparent);
   transition:
     background 0.3s ease,

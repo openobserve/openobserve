@@ -259,7 +259,12 @@
   --shadow-sticky-right-geom: -2px 0 4px -2px;
   --shadow-sticky-footer-geom: 0 -0.25rem 0.4375rem 0;
   --shadow-rail-geom: inset 0.25rem 0 0 0;
+  --shadow-rail-thin-geom: inset 0.125rem 0 0 0;
   --shadow-ring-hairline-geom: 0 0 0 0.0625rem;
+  --shadow-ring-hairline-inset-geom: inset 0 0 0 0.0625rem;
+  /* Pivot total column: an inner edge, plus an outer cast when it is also sticky. */
+  --shadow-pivot-edge-geom: inset 0.25rem 0 0.375rem -0.125rem;
+  --shadow-pivot-cast-geom: 0.25rem 0 0.5rem;
   --shadow-sticky-left: var(--shadow-sticky-left-geom) var(--color-border-default);
   --shadow-sticky-right: var(--shadow-sticky-right-geom) var(--color-border-default);
   --shadow-sticky-footer: var(--shadow-sticky-footer-geom) var(--color-border-subtle);
@@ -273,6 +278,9 @@
   /* AI send button only — under-lit at the lg/sm steps. */
   --shadow-glow-xl-geom: 0 6px 20px;
   --shadow-glow-press-geom: 0 2px 10px;
+  /* Flattest step (trace pills) and the drag step (dashboard panels). */
+  --shadow-glow-2xs-geom: 0 1px 2px;
+  --shadow-glow-drag-geom: 0 8px 24px;
   --shadow-glow-sm: var(--shadow-glow-sm-geom) color-mix(in srgb, rgb(0 0 0) 10%, transparent);
   --shadow-glow-md: var(--shadow-glow-md-geom) color-mix(in srgb, rgb(0 0 0) 20%, transparent);
   --shadow-glow-lg: var(--shadow-glow-lg-geom) color-mix(in srgb, rgb(0 0 0) 20%, transparent);
@@ -283,6 +291,11 @@
     0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent),
     0 0.375rem 1rem -0.125rem color-mix(in srgb, var(--color-black) 10%, transparent),
     0 1rem 2.5rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 32%, transparent);
+  /* Same composer at rest — dimmer bloom, same three layers, same dark rule. */
+  --shadow-ai-composer:
+    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 6%, transparent),
+    0 0.5rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 12%, transparent),
+    0 1.125rem 2.75rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 30%, transparent);
   /* eslint-enable local/no-hardcoded-px */
 
   /* Code-syntax family. Registered so bg-syntax-bg / text-syntax-keyword etc.

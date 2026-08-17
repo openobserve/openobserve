@@ -40,7 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
           · {{ formatDuration(totalToolDuration(toolCalls)) }}
         </span>
-        <span class="tt-link text-accent">{{ t("traces.threadToolCalls.showCalls") }}</span>
+        <span class="tt-link text-thread-tool-link">{{
+          t("traces.threadToolCalls.showCalls")
+        }}</span>
       </span>
       <span class="tt-zz bg-border-strong"></span>
     </button>
@@ -219,14 +221,14 @@ function formatDuration(ns: number): string {
     gap: 0.125rem;
     padding: 0.5rem 1.125rem;
     border-radius: 0.625rem;
-    box-shadow: var(--shadow-xs);
+    box-shadow: var(--shadow-glow-2xs-geom) color-mix(in srgb, var(--color-black) 4%, transparent);
     transition:
       box-shadow 0.15s ease,
       border-color 0.15s ease;
   }
 
   .tt-toggle:hover .tt-pill {
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-black) 10%, transparent);
   }
 
   .tt-count {

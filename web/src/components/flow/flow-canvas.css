@@ -40,7 +40,7 @@
   width: auto;
   min-height: 2.75rem;
   border-radius: 0.75rem;
-  box-shadow: var(--shadow-glow-md);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-black) 8%, transparent);
   cursor: grab;
   display: flex;
   align-items: center;
@@ -77,7 +77,7 @@
   color: var(--color-grey-800);
   border-radius: 0.75rem;
   background: color-mix(in srgb, var(--color-blue-50) 80%, transparent);
-  box-shadow: var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-blue-500) 10%, transparent);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-blue-500) 10%, transparent);
 }
 
 .o2vf_node .vue-flow__node-default {
@@ -86,7 +86,7 @@
   color: var(--color-grey-800);
   border-radius: 0.75rem;
   background: color-mix(in srgb, var(--color-amber-50) 80%, transparent);
-  box-shadow: var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-amber-500) 10%, transparent);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-amber-500) 10%, transparent);
 }
 
 .o2vf_node .vue-flow__node-output {
@@ -126,7 +126,7 @@
   border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);
   border-radius: 50% !important;
   background: var(--color-grey-500);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-black) 15%, transparent);
   transition: all 0.3s ease;
 }
 
@@ -175,7 +175,7 @@
 /* ── Dark mode ───────────────────────────────────────────────────────────── */
 .dark .o2vf_node .vue-flow__node {
   background: color-mix(in srgb, var(--color-surface-base) 90%, transparent) !important;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-black) 35%, transparent);
 }
 
 .dark .o2vf_node .vue-flow__node-input {

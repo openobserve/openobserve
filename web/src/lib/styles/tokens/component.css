@@ -523,6 +523,10 @@
   --color-timeline-dot-muted: var(--color-grey-400);
   --color-timeline-dot-fg: var(--color-white);
 
+  /* Trace tool-call "show calls" link. Its own step, not --color-text-link:
+     that one is 600/400 per theme, this one is 500 in both. */
+  --color-thread-tool-link: var(--color-primary-500);
+
   /* Pagination (OPagination) */
   --color-pagination-item-text: var(--color-text-secondary);
   --color-pagination-item-hover-bg: var(--color-surface-subtle-hover);
@@ -1891,6 +1895,7 @@
   --color-timeline-dot-info: var(--color-timeline-dot-info);
   --color-timeline-dot-muted: var(--color-timeline-dot-muted);
   --color-timeline-dot-fg: var(--color-timeline-dot-fg);
+  --color-thread-tool-link: var(--color-thread-tool-link);
 
   /* Pagination (OPagination) */
   --color-pagination-item-text: var(--color-pagination-item-text);

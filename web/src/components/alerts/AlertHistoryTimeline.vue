@@ -481,7 +481,7 @@ function formatDuration(ms: number): string {
     transparent 0.125rem,
     transparent 0.375rem
   );
-  box-shadow: var(--shadow-ring-hairline-geom)
+  box-shadow: var(--shadow-ring-hairline-inset-geom)
     color-mix(in srgb, var(--color-badge-purple-solid-bg) 55%, transparent);
 }
 

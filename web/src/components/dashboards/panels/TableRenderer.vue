@@ -630,13 +630,13 @@ export default defineComponent({
 
 /* Sticky total column visual separator */
 .table-wrapper :deep(.pivot-total-col) {
-  box-shadow: var(--shadow-sticky-right-geom) var(--color-actions-column-shadow) !important;
+  box-shadow: var(--shadow-pivot-edge-geom) var(--color-actions-column-shadow) !important;
 }
 
 .table-wrapper :deep(.sticky-column.pivot-total-col) {
   box-shadow:
-    var(--shadow-sticky-left-geom) var(--color-actions-column-shadow),
-    var(--shadow-sticky-right-geom) var(--color-actions-column-shadow) !important;
+    var(--shadow-pivot-cast-geom) var(--color-actions-column-shadow),
+    var(--shadow-pivot-edge-geom) var(--color-actions-column-shadow) !important;
 }
 
 @media print {
