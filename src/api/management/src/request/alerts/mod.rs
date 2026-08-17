@@ -508,6 +508,8 @@ fn composite_list_item(
         level_since: None,
         priority: definition.priority.map(|value| value as u8),
         tags,
+        destinations: Vec::new(),
+        template: None,
         groups_observed: None,
         groups_firing: None,
         groups_observed_is_lower_bound: None,
