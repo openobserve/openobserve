@@ -12672,7 +12672,17 @@
       "unattributedCount": "{count} events were not attributed to any step",
       "stepFilterBanner": "Showing events for step {step}",
       "clearStepFilter": "Clear",
-      "rowTitleWithTimestamps": "{label}\ninitiated {initiated} · observed {observed}"
+      "rowTitleWithTimestamps": "{label}\ninitiated {initiated} · observed {observed}",
+      "detailEvent": "Event",
+      "detailOccurred": "Occurred",
+      "detailInitiated": "Initiated",
+      "detailResourceType": "Resource type",
+      "detailLevel": "Level",
+      "detailOrigin": "Origin",
+      "detailFirstParty": "First-party",
+      "detailThirdParty": "Third-party",
+      "detailStackTrace": "Stack trace",
+      "footerEvents": "Events"
     },
     "runDetail": {
       "evidenceSection": "Evidence",
