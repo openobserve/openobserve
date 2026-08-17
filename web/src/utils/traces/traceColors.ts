@@ -184,17 +184,18 @@ const parseHexChannels = (color: string): [number, number, number] | null => {
 /**
  * Get readable text color (white or black) based on background color
  *
- * Used where text has to sit on a span's own colour — the duration label inside
- * a bar too wide to place it beside. Span colours come from an arbitrary
- * palette, so the choice cannot be baked in per theme: a pale bar needs black
- * text in dark mode just as much as in light.
+ * For text that has to sit on a span's own colour. Span colours come from an
+ * arbitrary palette, so the choice cannot be baked in per theme: a pale bar
+ * needs black text in dark mode just as much as in light.
  *
  * @param backgroundColor - a hex colour (`#rgb` or `#rrggbb`)
  * @returns 'white' or 'black'
  *
- * A non-hex value (e.g. a `var(--color-span-N)` reference, which
- * `generateServiceColorMap` produces) cannot be measured here and yields
+ * Anything that is not a hex colour — notably the custom-property references
+ * that `generateServiceColorMap` produces — cannot be measured here and yields
  * 'white', preserving this function's previous behaviour for those callers.
+ * (Written without the `var()` spelling on purpose: `lint:tokens` scans comments
+ * too, and a placeholder token name there fails the check.)
  */
 export const getContrastTextColor = (backgroundColor: string): "white" | "black" => {
   const channels = parseHexChannels(backgroundColor ?? "");
