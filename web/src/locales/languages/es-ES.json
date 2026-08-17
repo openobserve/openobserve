@@ -13992,7 +13992,6 @@
     "rolling": "móvil",
     "totalSlos": "Total de SLOs",
     "noGrouping": "Ninguna (una sola serie general)",
-    "generation": "generación {n}",
     "newAlert": "Nueva alerta",
     "overRolling": "sobre ventana móvil de {window}",
     "searchPlaceholder": "Buscar SLO o etiqueta, p. ej. team:payments",

@@ -13987,7 +13987,6 @@
     "rolling": "滾動",
     "totalSlos": "SLO 總數",
     "noGrouping": "無（單一整體系列）",
-    "generation": "第 {n} 代",
     "newAlert": "新增警示",
     "overRolling": "在滾動 {window} 內",
     "searchPlaceholder": "搜尋 SLO 或標籤，例如 team:payments",

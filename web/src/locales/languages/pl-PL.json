@@ -13992,7 +13992,6 @@
     "rolling": "przesuwne",
     "totalSlos": "Łączna liczba SLO",
     "noGrouping": "Brak (pojedyncza seria ogólna)",
-    "generation": "generacja {n}",
     "newAlert": "Nowy alert",
     "overRolling": "w przesuwnym oknie {window}",
     "searchPlaceholder": "Szukaj SLO lub tagu, np. team:payments",

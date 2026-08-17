@@ -13992,7 +13992,6 @@
     "rolling": "롤링",
     "totalSlos": "총 SLO",
     "noGrouping": "없음 (단일 전체 시리즈)",
-    "generation": "세대 {n}",
     "newAlert": "새 알림",
     "overRolling": "롤링 {window} 동안",
     "searchPlaceholder": "SLO 또는 태그 검색, 예: team:payments",

@@ -13992,7 +13992,6 @@
     "rolling": "滚动",
     "totalSlos": "SLO 总数",
     "noGrouping": "无（单一整体序列）",
-    "generation": "第 {n} 代",
     "newAlert": "新建告警",
     "overRolling": "在滚动 {window} 内",
     "searchPlaceholder": "搜索 SLO 或标签，例如 team:payments",

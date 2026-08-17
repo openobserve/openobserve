@@ -13992,7 +13992,6 @@
     "rolling": "gleitend",
     "totalSlos": "SLOs gesamt",
     "noGrouping": "Keine (eine einzelne Gesamtserie)",
-    "generation": "Generation {n}",
     "newAlert": "Neuer Alarm",
     "overRolling": "über gleitende {window}",
     "searchPlaceholder": "SLO oder Tag suchen, z. B. team:payments",

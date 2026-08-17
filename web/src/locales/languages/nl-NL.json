@@ -13992,7 +13992,6 @@
     "rolling": "rollend",
     "totalSlos": "Totaal SLO's",
     "noGrouping": "Geen (een enkele overkoepelende reeks)",
-    "generation": "generatie {n}",
     "newAlert": "Nieuw alarm",
     "overRolling": "over rollend {window}",
     "searchPlaceholder": "Zoek SLO of tag, bijv. team:payments",

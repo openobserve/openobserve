@@ -13992,7 +13992,6 @@
     "rolling": "glissant",
     "totalSlos": "Total des SLOs",
     "noGrouping": "Aucun (une seule série globale)",
-    "generation": "génération {n}",
     "newAlert": "Nouvelle alerte",
     "overRolling": "sur la période glissante {window}",
     "searchPlaceholder": "Rechercher un SLO ou une étiquette, p. ex. team:payments",

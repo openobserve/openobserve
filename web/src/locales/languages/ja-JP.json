@@ -13992,7 +13992,6 @@
     "rolling": "ローリング",
     "totalSlos": "SLO総数",
     "noGrouping": "なし (単一の全体シリーズ)",
-    "generation": "世代 {n}",
     "newAlert": "新しいアラート",
     "overRolling": "ローリング {window} にわたる",
     "searchPlaceholder": "SLOまたはタグを検索、例: team:payments",

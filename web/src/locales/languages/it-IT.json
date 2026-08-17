@@ -13992,7 +13992,6 @@
     "rolling": "scorrevole",
     "totalSlos": "Totale SLO",
     "noGrouping": "Nessuna (una singola serie complessiva)",
-    "generation": "generazione {n}",
     "newAlert": "Nuovo avviso",
     "overRolling": "su finestra scorrevole {window}",
     "searchPlaceholder": "Cerca SLO o tag, ad es. team:payments",

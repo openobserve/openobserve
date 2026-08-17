@@ -13992,7 +13992,6 @@
     "rolling": "kayan",
     "totalSlos": "Toplam SLO",
     "noGrouping": "Yok (tek bir genel seri)",
-    "generation": "nesil {n}",
     "newAlert": "Yeni uyarı",
     "overRolling": "kayan {window} üzerinde",
     "searchPlaceholder": "SLO veya etiket ara, örn. takım:ödemeler",

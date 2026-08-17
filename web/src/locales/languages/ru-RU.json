@@ -13992,7 +13992,6 @@
     "rolling": "скользящий",
     "totalSlos": "Всего SLO",
     "noGrouping": "Нет (один общий ряд)",
-    "generation": "поколение {n}",
     "newAlert": "Новое оповещение",
     "overRolling": "за скользящее окно {window}",
     "searchPlaceholder": "Поиск SLO или тега, напр. team:payments",
