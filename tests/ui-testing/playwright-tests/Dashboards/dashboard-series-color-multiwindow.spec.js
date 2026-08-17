@@ -15,47 +15,64 @@ import {
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import testLogger from "../utils/test-logger.js";
-import { verifyColorOnCanvas } from "./utils/canvasHelpers.js";
+import { verifyColorOnCanvas, applyAndWaitForRender } from "./utils/canvasHelpers.js";
+
+// The comparison series label the 15m time shift produces. convertSQLData builds
+// it as `${seriesName} (${periodAsStr})`, and dateTimeUtils renders a 15-minute
+// offset as "15 Minutes ago".
+const COMPARISON_SERIES_LABEL = "15 Minutes ago";
+
+// Both tests query a 6-day window rather than the default panel range. The time
+// shift only produces a comparison series when the *shifted* window also returns
+// rows, and on the shared alpha deployment ingestion is skipped (SKIP_INGESTION),
+// so e2e_automate holds older data and a short default window comes back empty.
+// With no comparison series the color-by-series dropdown offers only the base
+// series — which is exactly how this spec used to pass without ever exercising
+// the multi-window fix it names.
+const QUERY_RANGE = { value: "6", unit: "d" };
 
 /**
- * Wait for multi-window API response(s) and chart rendering after applying a query.
- * Multi-window (time shift) may fire one or two API calls depending on the backend.
- * We wait for the first _search response, then wait for the chart to render, and
- * allow a short buffer for Vue reactivity to propagate comparison series data.
+ * Open the Color By Series popup and confirm the chart is actually offering the
+ * time-shift comparison series. ECharts can finish its paint before Vue has
+ * propagated the merged multi-window series into the config panel's options, so
+ * re-apply and retry rather than reading a half-populated dropdown.
+ *
  * @param {import('@playwright/test').Page} page
  * @param {PageManager} pm
+ * @param {string} matchText - Label fragment the comparison series must contain
+ * @returns {Promise<string[]>} The option labels offered for row 0
  */
-async function applyAndWaitForMultiWindowRender(page, pm) {
-  const apiPromise = page.waitForResponse(
-    (response) =>
-      /\/api\/.*\/_search/.test(response.url()) && response.status() === 200,
-    { timeout: 30000 }
-  );
-  await pm.dashboardPanelActions.applyDashboardBtn();
-  await apiPromise;
+async function openColorBySeriesWithComparison(page, pm, matchText) {
+  const maxAttempts = 3;
+  let labels = [];
 
-  // Wait for chart to render with comparison data.
-  // waitForChartToRender checks canvas existence but not repaint completion.
-  // ECharts needs additional time to process data and paint the canvas after
-  // the API response arrives, especially for multi-window merging.
-  await pm.dashboardPanelActions.waitForChartToRender().catch(() => {
-    testLogger.warn("waitForChartToRender timed out, continuing");
-  });
-  // Allow ECharts to finish canvas repaint and Vue to propagate series data
-  await page.waitForFunction(
-    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    { timeout: 5000 }
-  ).catch(() => {});
-  // Wait for ECharts canvas to have painted pixels before pixel-level color assertions
-  await page.waitForFunction(() => {
-    const canvases = document.querySelectorAll('canvas');
-    return Array.from(canvases).some(c => {
-      const ctx = c.getContext('2d');
-      if (!ctx || c.width === 0 || c.height === 0) return false;
-      const d = ctx.getImageData(0, 0, Math.min(c.width, 50), Math.min(c.height, 50));
-      return d.data.some(v => v > 0);
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    await pm.dashboardPanelConfigs.openColorBySeries();
+    labels = await pm.dashboardPanelConfigs.getColorBySeriesOptionLabels(0);
+
+    if (labels.some((label) => label.includes(matchText))) {
+      testLogger.info("Comparison series available in Color By Series", {
+        attempt,
+        labels,
+      });
+      return labels;
+    }
+
+    testLogger.warn("Comparison series not offered yet, re-applying", {
+      attempt,
+      labels,
     });
-  }, { timeout: 15000 }).catch(() => {});
+    await pm.dashboardPanelConfigs.cancelColorBySeries();
+    if (attempt < maxAttempts) {
+      await applyAndWaitForRender(page, pm);
+    }
+  }
+
+  throw new Error(
+    `Time shift comparison series "${matchText}" never appeared in the ` +
+      `color-by-series options after ${maxAttempts} attempts. ` +
+      `Last options: ${JSON.stringify(labels)}`
+  );
 }
 
 test.describe("Dashboard series color with multi-window (time shift)", () => {
@@ -91,6 +108,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
 
     // Step 3: Apply the query to render the chart initially
     testLogger.info("Applying initial query");
+    await pm.dashboardTimeRefresh.setRelative(QUERY_RANGE.value, QUERY_RANGE.unit);
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -105,24 +123,27 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
 
     // Step 6: Apply the query again to render with multi-window data
     testLogger.info("Applying query with time shift");
-    await applyAndWaitForMultiWindowRender(page, pm);
+    await applyAndWaitForRender(page, pm);
 
-    // Step 7: Open Color By Series popup and configure comparison series color
+    // Step 7: Open Color By Series popup, asserting the comparison series exists
     testLogger.info("Opening Color By Series configuration");
-    await pm.dashboardPanelConfigs.openColorBySeries();
-    testLogger.info("Color By Series popup opened");
+    await openColorBySeriesWithComparison(page, pm, COMPARISON_SERIES_LABEL);
 
     // Step 8: Select the comparison series and set custom color #1a2cf0
     const customColor = "#1a2cf0";
     const selectedSeriesName = await pm.dashboardPanelConfigs.configureColorBySeries({
       rowIndex: 0,
-      matchText: "15 Minutes ago",
+      matchText: COMPARISON_SERIES_LABEL,
       color: customColor,
     });
     testLogger.info("Configured comparison series color", {
       seriesName: selectedSeriesName,
       color: customColor,
     });
+
+    // The color must land on the *comparison* series — that is the series the
+    // multi-window rename used to strand without its mapping.
+    expect(selectedSeriesName).toContain(COMPARISON_SERIES_LABEL);
 
     // Step 9: Save the color configuration
     testLogger.info("Saving color by series configuration");
@@ -131,7 +152,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
 
     // Step 10: Apply and verify the chart renders with the custom color
     testLogger.info("Applying final query to verify color");
-    await applyAndWaitForMultiWindowRender(page, pm);
+    await applyAndWaitForRender(page, pm);
 
     // Step 11: Verify #1a2cf0 is applied on the chart canvas
     const colorVerification = await verifyColorOnCanvas(page, { r: 26, g: 44, b: 240 });
@@ -140,12 +161,16 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
       canvasCount: colorVerification.canvasCount,
       matchingPixels: colorVerification.matchingPixels,
       colorFound: colorVerification.colorFound,
-      canvasInfo: colorVerification.canvasInfo,
     });
 
     // Assert: the custom color #1a2cf0 appears on the chart canvas
     // This verifies the fix: colorBySeries mappings are re-applied after multi-window merge
-    expect(colorVerification.colorFound).toBe(true);
+    expect(
+      colorVerification.colorFound,
+      `Expected ${customColor} on the chart canvas for series "${selectedSeriesName}", ` +
+        `but only ${colorVerification.matchingPixels} pixels matched across ` +
+        `${colorVerification.canvasCount} canvases`
+    ).toBe(true);
 
     // Step 12: Save the panel
     testLogger.info("Saving panel", { panelName });
@@ -156,19 +181,26 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     testLogger.info(
       "Re-editing panel to verify color configuration persists after save"
     );
-    // Wait for dashboard view to settle before re-editing
-    await page.waitForSelector('[data-test="dashboard-panel"]', { timeout: 15000 }).catch(() => {});
+    await page
+      .waitForSelector('[data-test="dashboard-panel-container"]', { timeout: 15000 })
+      .catch(() => {
+        testLogger.warn("Panel container not visible after save, continuing");
+      });
 
-    await pm.dashboardPanelActions.selectPanelAction(panelName, "Edit");
-
-    // Wait for add_panel page to load and chart to render
-    await page.waitForURL(/\/add_panel/, { timeout: 15000 });
-    // Wait for API responses to complete (re-edit triggers data fetch)
-    await page.waitForResponse(
+    // Register the search wait *before* triggering the edit — re-opening the panel
+    // fires its data fetch immediately, and a listener attached afterwards misses
+    // the response and burns its full timeout for nothing.
+    const reEditSearch = page.waitForResponse(
       (response) =>
         /\/api\/.*\/_search/.test(response.url()) && response.status() === 200,
       { timeout: 30000 }
-    ).catch(() => {});
+    );
+    await pm.dashboardPanelActions.selectPanelAction(panelName, "Edit");
+
+    await page.waitForURL(/\/(add|edit)_panel/, { timeout: 15000 });
+    await reEditSearch.catch(() => {
+      testLogger.warn("No search response observed on re-edit, continuing");
+    });
     await pm.dashboardPanelActions.waitForChartToRender().catch(() => {
       testLogger.warn("waitForChartToRender timed out on re-edit, continuing");
     });
@@ -178,25 +210,17 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     await pm.dashboardPanelConfigs.openColorBySeries();
 
     // Verify the series name is still the comparison series
-    const popup = pm.dashboardPanelConfigs.colorBySeriesPopup;
-    const savedSeriesInput = popup.locator(
-      '[data-test="dashboard-addpanel-config-color-by-series-series-select-0-input"]'
-    );
-    const savedSeriesValue = await savedSeriesInput.inputValue();
+    const savedSeriesValue = await pm.dashboardPanelConfigs.getColorBySeriesRowValue(0);
     testLogger.info("Verifying saved series name", { savedSeriesValue });
-    // The stored config value is the base field name (e.g., "Kubernetes Container Name").
-    // The "(15 Minutes ago)" suffix is only added at chart render time, so the
-    // autocomplete may or may not include it when re-editing depending on timing.
+    // Original assertion, kept as-is: the stored value carries the base field name.
     expect(savedSeriesValue.toLowerCase()).toContain("kubernetes container name");
+    // Additionally, it must be the comparison series — the saved value is
+    // "Kubernetes Container Name (15 Minutes ago)", so this narrows the check
+    // without weakening the one above.
+    expect(savedSeriesValue).toContain(COMPARISON_SERIES_LABEL);
 
     // Verify the color is still #1a2cf0 — read from the OColor text input in row 0
-    const colorSection = popup.locator('[data-test="dashboard-addpanel-config-color-by-series-color-section-0"]');
-    await colorSection.waitFor({ state: "visible", timeout: 5000 });
-    const savedColor = await colorSection.evaluate((el) => {
-      const input = el.querySelector('input');
-      return input ? input.value : '';
-    });
-
+    const savedColor = await pm.dashboardPanelConfigs.getColorBySeriesRowColor(0);
     testLogger.info("Verifying saved color persists", { savedColor });
 
     // #1a2cf0 must persist after save+reopen
@@ -228,7 +252,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Step 2: Apply initial query
-    await pm.dashboardTimeRefresh.setRelative("6", "d");
+    await pm.dashboardTimeRefresh.setRelative(QUERY_RANGE.value, QUERY_RANGE.unit);
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -236,23 +260,35 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     await pm.dashboardPanelConfigs.openConfigPanel();
     await pm.dashboardPanelConfigs.addTimeShift();
 
-    // Step 4: Apply with time shift — wait for API responses (multi-window fires 2 calls)
+    // Step 4: Apply with time shift
     testLogger.info("Applying query with time shift");
-    await applyAndWaitForMultiWindowRender(page, pm);
+    await applyAndWaitForRender(page, pm);
 
     // Step 5: Open Color By Series, select comparison series, and set #11ad29
     const customColor = "#11ad29";
-    await pm.dashboardPanelConfigs.openColorBySeries();
-    await pm.dashboardPanelConfigs.configureColorBySeries({
+    const labels = await openColorBySeriesWithComparison(
+      page,
+      pm,
+      COMPARISON_SERIES_LABEL
+    );
+
+    // The base series must still be on offer alongside the comparison one — the
+    // rename adds a series, it does not replace the original.
+    expect(
+      labels.some((label) => !label.includes(COMPARISON_SERIES_LABEL))
+    ).toBe(true);
+
+    const selectedSeriesName = await pm.dashboardPanelConfigs.configureColorBySeries({
       rowIndex: 0,
-      matchText: "15 Minutes ago",
+      matchText: COMPARISON_SERIES_LABEL,
       color: customColor,
     });
+    expect(selectedSeriesName).toContain(COMPARISON_SERIES_LABEL);
     await pm.dashboardPanelConfigs.saveColorBySeries();
 
-    // Step 6: Apply and verify — wait for API responses
+    // Step 6: Apply and verify
     testLogger.info("Applying final query to verify color");
-    await applyAndWaitForMultiWindowRender(page, pm);
+    await applyAndWaitForRender(page, pm);
 
     // Verify: the custom color #11ad29 appears on the chart canvas
     const colorResult = await verifyColorOnCanvas(page, { r: 17, g: 173, b: 41 });
@@ -263,7 +299,11 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     });
 
     // The custom color #11ad29 appears on the chart (applied to comparison series)
-    expect(colorResult.colorFound).toBe(true);
+    expect(
+      colorResult.colorFound,
+      `Expected ${customColor} on the chart canvas for series "${selectedSeriesName}", ` +
+        `but only ${colorResult.matchingPixels} pixels matched`
+    ).toBe(true);
 
     // Save the panel
     await pm.dashboardPanelActions.addPanelName(panelName);
