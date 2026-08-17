@@ -116,7 +116,7 @@ const onCopy = () => {
 
 <template>
   <div
-    class="o2-code-block rounded-default border-border-default my-3 overflow-hidden border"
+    class="o2-code-block rounded-default border-border-default bg-syntax-bg my-3 overflow-hidden border"
     :class="chrome ? `o2-chrome-${chrome}` : ''"
     :data-test="dataTest"
   >
@@ -138,7 +138,7 @@ const onCopy = () => {
       </span>
       <span
         v-else-if="chrome === 'editor'"
-        class="o2-code-head inline-flex min-w-0 items-center gap-2"
+        class="o2-code-head bg-theme-tab-bg inline-flex min-w-0 items-center gap-2"
       >
         <OIcon name="code" size="xs" class="opacity-60" />
         <span class="font-mono text-xs font-semibold tracking-[0.01em] opacity-75">{{
@@ -177,7 +177,7 @@ const onCopy = () => {
       class="o2-code-pre"
       :class="wrap ? 'o2-code-pre--wrap' : ''"
       :style="preStyle"
-    ><code class="hljs" v-html="highlighted"></code></pre>
+    ><code class="hljs text-syntax-text" v-html="highlighted"></code></pre>
   </div>
 </template>
 
@@ -188,12 +188,6 @@ const onCopy = () => {
    rules here are the ones whose values are unregistered tokens
    (--color-syntax-bg / --color-syntax-text have no @theme entry, so `bg-syntax-bg`
    would compile to nothing) or need color-mix over one. */
-.o2-code-block {
-  /* --color-syntax-* are :root-only (no @theme registration) → no utility exists.
-     They flip light→dark in dark.css, so one rule set covers both themes. */
-  background: var(--color-syntax-bg);
-}
-
 .o2-code-toolbar {
   background: color-mix(in srgb, var(--color-syntax-text) 4%, transparent);
 }
@@ -203,7 +197,6 @@ const onCopy = () => {
   padding: 0.18rem 0.6rem;
   margin: -0.05rem 0;
   border-radius: 0.375rem;
-  background: var(--color-theme-tab-bg);
 }
 /* Dark keeps a neutral white wash rather than the accent-tinted token, so the
    tab reads as a highlight on the near-black syntax surface. `.dark` is set on
@@ -228,7 +221,6 @@ const onCopy = () => {
   font-size: inherit;
   line-height: inherit;
   padding: 0;
-  color: var(--color-syntax-text);
 }
 
 /* Wrapped mode: break anywhere, because a long SQL string can be one

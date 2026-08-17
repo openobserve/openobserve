@@ -14,7 +14,7 @@
         <div class="flex items-center gap-3">
           <div class="flex shrink-0 items-center gap-2.5">
             <div
-              class="rounded-default flex h-8 w-8 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)]"
+              class="rounded-default bg-accent/12 flex h-8 w-8 shrink-0 items-center justify-center"
             >
               <OIcon name="key" class="text-accent h-4 w-4" />
             </div>

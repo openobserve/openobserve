@@ -58,7 +58,7 @@ const logoSrc = computed(() =>
     >
       {{ t("aiAssistant.welcome.taglineLead") }}
       <span
-        class="welcome-hero__highlight bg-[image:var(--color-gradient-brand-ribbon)] [background-clip:text] font-semibold text-transparent [-webkit-background-clip:text]"
+        class="welcome-hero__highlight bg-gradient-brand-ribbon [background-clip:text] font-semibold text-transparent [-webkit-background-clip:text]"
         >{{ t("aiAssistant.welcome.taglineHighlight") }}</span
       >{{ t("aiAssistant.welcome.taglineTail") }}
       <span
@@ -79,7 +79,7 @@ const logoSrc = computed(() =>
 
     <div
       v-if="email"
-      class="welcome-hero__meta text-2xs mt-1.5 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 rounded-full bg-[color-mix(in_srgb,var(--color-border-default)_30%,transparent)] px-3 py-1.5"
+      class="welcome-hero__meta text-2xs bg-border-default/30 mt-1.5 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 rounded-full px-3 py-1.5"
     >
       <span class="welcome-hero__meta-item inline-flex items-center gap-1">
         <span class="welcome-hero__meta-label text-typography-meta">{{

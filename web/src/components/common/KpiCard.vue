@@ -79,8 +79,9 @@ withDefaults(
     icon?: IconName;
     /**
      * Override the icon badge's color classes (bg + text). Omit for the default
-     * monochrome subtle badge. Use token-backed utilities, e.g.
-     * `bg-(--color-indigo-50) text-(--color-indigo-600) dark:…`.
+     * monochrome subtle badge. Use registered token utilities, e.g.
+     * `bg-icon-chip-info-bg text-icon-chip-info-text` — not a raw
+     * `bg-(--color-*)`, which bypasses the design-token guard.
      */
     iconClass?: string;
     /** Icon badge size. `md` renders the larger, more prominent colored tile. */

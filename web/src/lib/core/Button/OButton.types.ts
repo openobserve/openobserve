@@ -39,6 +39,7 @@ export type ButtonVariant =
   | "preview-slack"
   | "preview-teams"
   | "preview-email"
+  | "preview-opsgenie"
   // Generic preview action button — for destination previews with no specific brand color
   | "preview-action"
   // Webinar banner dismiss — inline text-link style button for the top bar banner

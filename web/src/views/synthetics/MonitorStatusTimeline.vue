@@ -31,21 +31,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <span class="flex-1" />
       <span class="text-text-secondary inline-flex items-center gap-1.5 text-xs">
-        <span
-          class="h-[0.4375rem] w-[0.4375rem] rounded-full bg-[var(--color-badge-error-solid-bg)]"
-        />
+        <span class="bg-badge-error-solid-bg h-[0.4375rem] w-[0.4375rem] rounded-full" />
         {{ failCount }} {{ t("synthetics.timeline.failed") }}
       </span>
       <span class="text-text-secondary inline-flex items-center gap-1.5 text-xs">
-        <span
-          class="h-[0.4375rem] w-[0.4375rem] rounded-full bg-[var(--color-badge-orange-solid-bg)]"
-        />
+        <span class="bg-badge-orange-solid-bg h-[0.4375rem] w-[0.4375rem] rounded-full" />
         {{ mixedCount }} {{ t("synthetics.timeline.warning") }}
       </span>
       <span class="text-text-secondary inline-flex items-center gap-1.5 text-xs">
-        <span
-          class="h-[0.4375rem] w-[0.4375rem] rounded-full bg-[var(--color-badge-success-solid-bg)]"
-        />
+        <span class="bg-badge-success-solid-bg h-[0.4375rem] w-[0.4375rem] rounded-full" />
         {{ passCount }} {{ t("synthetics.timeline.passed") }}
       </span>
     </div>
@@ -84,23 +78,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="text-text-secondary mb-1.5 flex flex-wrap items-center gap-1.5 border-b px-1 pb-1 text-xs font-semibold"
                   >
-                    <span
-                      class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-success-solid-bg)]"
-                    />
+                    <span class="bg-badge-success-solid-bg h-2 w-2 shrink-0 rounded-full" />
                     <span class="text-text-secondary">{{
                       t("synthetics.timeline.tooltipPassed", { count: seg.tally.passed })
                     }}</span>
                     <template v-if="seg.tally.warning > 0">
-                      <span
-                        class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-warning-solid-bg)]"
-                      />
+                      <span class="bg-badge-warning-solid-bg h-2 w-2 shrink-0 rounded-full" />
                       <span class="text-text-secondary">{{
                         t("synthetics.timeline.tooltipWarning", { count: seg.tally.warning })
                       }}</span>
                     </template>
-                    <span
-                      class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-error-solid-bg)]"
-                    />
+                    <span class="bg-badge-error-solid-bg h-2 w-2 shrink-0 rounded-full" />
                     <span class="text-text-secondary">{{
                       t("synthetics.timeline.tooltipFailed", { count: seg.tally.failed })
                     }}</span>
@@ -110,10 +98,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         class="h-2 w-2 shrink-0 rounded-full"
                         :class="{
-                          'bg-[var(--color-badge-success-solid-bg)]': group.status === 'all-pass',
-                          'bg-[var(--color-badge-warning-solid-bg)]':
+                          'bg-badge-success-solid-bg': group.status === 'all-pass',
+                          'bg-badge-warning-solid-bg':
                             group.status === 'mixed' || group.status === 'all-warning',
-                          'bg-[var(--color-badge-error-solid-bg)]': group.status === 'all-fail',
+                          'bg-badge-error-solid-bg': group.status === 'all-fail',
                         }"
                       />
                       <span class="text-text-secondary text-xs font-semibold">
@@ -135,9 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span
                           class="h-2 w-2 shrink-0 rounded-full"
                           :class="{
-                            'bg-[var(--color-badge-success-solid-bg)]': exec.status === 'pass',
-                            'bg-[var(--color-badge-warning-solid-bg)]': exec.status === 'warning',
-                            'bg-[var(--color-badge-error-solid-bg)]':
+                            'bg-badge-success-solid-bg': exec.status === 'pass',
+                            'bg-badge-warning-solid-bg': exec.status === 'warning',
+                            'bg-badge-error-solid-bg':
                               exec.status === 'fail' || exec.status === 'error',
                           }"
                         />
