@@ -1,0 +1,35 @@
+{
+  "feature_slug": "design-token-migration",
+  "feature_title": "Design Token Migration & Design System Consistency",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "designTokenConsistency.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/designTokenConsistency.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/lib/styles/tokens/semantic.css",
+    "web/src/lib/styles/tokens/component.css",
+    "web/src/lib/styles/tokens/dark.css",
+    "web/src/lib/styles/tokens/base.css",
+    "web/src/lib/core/Button/OButton.vue",
+    "web/src/lib/core/Table/OTable.vue",
+    "web/src/lib/core/Table/sub-components/OTableBodyCell.vue",
+    "web/src/lib/forms/Select/OSelect.vue",
+    "web/src/composables/useStickyColumns.ts",
+    "web/src/utils/query/sqlDiagnostics.ts",
+    "web/scripts/check-design-consistency.mjs"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The changed file paths are almost entirely frontend. The bulk lives in OSS `web/src/**` (components, plugins, views, lib/core, lib/styles/tokens), but a subset lives under the enterprise web layer `web/src/enterprise/components/**` (billings + onlineEvals). Because it spans both OSS and enterprise-owned UI paths, edition is 'both'. No backend Rust paths are touched.",
+    "skip": "Not skipped. There is no explicit opt-out (feature_hint.txt and trigger_comment.txt are both empty, and no tests-added/skip label was supplied). The diff is not docs/CI-only: it alters ~140 user-facing `web/src/**` Vue components plus the design-token CSS they consume, which is a real, user-exercisable UI change.",
+    "e2e": "E2E is warranted. This is a zero-tolerance design-token migration (check-design-consistency.mjs drops the debt baseline and enforces zero raw-token bypasses; hardcoded hex/shadows are replaced with token utilities across buttons, tables, sticky columns, dark mode, and the SQL diagnostics editor). It re-colors and re-shadows nearly every surface, so a smoke pass is needed to catch invisible-text, broken-dark-mode, or malformed-shadow regressions. A small behavioral change (new `missingWhereBefore` SQL diagnostic) rides along but is secondary.",
+    "area": "No single product area owns this change — it touches Logs, Traces, Dashboards, Alerts, Pipelines, Synthetics, RUM, Settings, and the core O* component library. The cross-cutting catch-all `GeneralTests` area is the right home rather than any one plugin folder.",
+    "group": "GeneralTests is the existing matrix shard for cross-area/enterprise-wide specs (ci_matrix.ent.json appends cipherKeys/logoManagement/model-pricing there), so the new smoke spec joins that group.",
+    "existing_tests": "No E2E specs in the diff — there are no changes under `tests/ui-testing/playwright-tests/`. The `.spec.ts` files touched (AlertSettingsHelpDrawer, ErrorStackTrace, FlameGraphView, useStickyColumns, SessionDetails, TraceDAG, sqlDiagnostics) are Vitest unit tests, which are not E2E coverage."
+  }
+}

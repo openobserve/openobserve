@@ -345,4 +345,31 @@ export class ThemePage {
             return getComputedStyle(document.body).backgroundColor;
         });
     }
+
+    /**
+     * Reads a single CSS custom property off <html> (document.documentElement) —
+     * the layer the token migration wires semantic/component tokens to.
+     */
+    async getCssVariable(name) {
+        return await this.page.evaluate((varName) => {
+            return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+        }, name);
+    }
+
+    /**
+     * One evaluate() snapshot of the semantic tokens that are guaranteed to resolve
+     * and flip between light/dark: --color-accent, --color-surface-base,
+     * --color-text-heading. Used by the dark-flip assertion (non-empty + light ≠ dark).
+     */
+    async getTokenSnapshot() {
+        return await this.page.evaluate(() => {
+            const styles = getComputedStyle(document.documentElement);
+            const read = (name) => styles.getPropertyValue(name).trim();
+            return {
+                accent: read('--color-accent'),
+                surfaceBase: read('--color-surface-base'),
+                textHeading: read('--color-text-heading'),
+            };
+        });
+    }
 }

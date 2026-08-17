@@ -1,0 +1,9 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/designTokenConsistency.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/theme-management.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "theme-management.spec.js covers theme toggle/persistence and predefined themes but never asserts the token layer itself: token resolution, light->dark value flip, OButton token-class + data-o2-variant hooks, or OTable/OSelect token chrome + slug matrix. This cross-cutting design-system migration (area GeneralTests) needs its own dedicated spec. No existing spec touches these runtime facts, so action is 'new' (not extend/append). Register the new file in ci_matrix.json GeneralTests run_files (the single source of truth for the playwright matrix)."
+}

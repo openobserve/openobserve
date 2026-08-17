@@ -1,0 +1,32 @@
+[
+  {
+    "title": "should resolve semantic tokens non-empty and flip values in dark mode",
+    "action": "new",
+    "verifies": "semantic tokens (--color-accent, --color-surface-base, --color-text-heading) resolve non-empty on <html> and accent + surface-base flip under dark mode"
+  },
+  {
+    "title": "should emit token-based variant classes and stable hooks on OButton without raw palette classes",
+    "action": "new",
+    "verifies": "primary OButton carries bg-button-primary/text-button-primary-foreground + data-o2-btn/data-o2-variant hooks and no raw bg-primary-*/bg-gray-* ramp classes"
+  },
+  {
+    "title": "should render token chrome and slug matrix on the Streams list OTable",
+    "action": "new",
+    "verifies": "the Streams list OTable mounts (o2-table) with bg-table-header-bg on the thead and text-table-header-text on header cells"
+  },
+  {
+    "title": "should resolve primary OButton background from --color-button-primary without a phantom dark flip",
+    "action": "new",
+    "verifies": "the primary OButton computed background equals the resolved --color-button-primary token value (probe-element linkage, no hardcoded hex) and does not flip under dark mode"
+  },
+  {
+    "title": "should derive child slugs and token chrome on a schema index-type OSelect — data-gated: requires a stream with ≥1 field (schema.vue:409)",
+    "action": "new",
+    "verifies": "OSelect forwards its parent data-test into -trigger/-popover derived slugs and renders bg-select-content-bg (fixme: data-gated)"
+  },
+  {
+    "title": "sticky-column shadow tokens — data-gated: needs pivot table with sticky columns (useStickyColumns.ts:59-64)",
+    "action": "new",
+    "verifies": "--shadow-sticky-left/right/footer semantic tokens resolve non-empty (fixme: data-gated for pivot consumption)"
+  }
+]
