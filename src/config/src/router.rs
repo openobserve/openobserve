@@ -171,6 +171,7 @@ mod tests {
         ));
         assert!(is_querier_route(
             "/api/org1/annotation_queues/queue-1/items/item-1/reviews"
+        ));
         // Test trace detail routes
         assert!(is_querier_route(
             "/api/org1/default/traces/trace-id/details"
