@@ -326,6 +326,8 @@ impl SchedulerJobPuller {
             for trigger in triggers {
                 let job_id = trigger.id;
                 let job_key = trigger.module_key.clone();
+                let claim =
+                    (trigger.module == TriggerModule::CompositeAlert).then(|| trigger.clone());
                 let (tx, mut rx) = mpsc::channel::<()>(1);
                 let scheduled_job = ScheduledJob {
                     trace_id: trace_id.clone(),
@@ -363,7 +365,26 @@ impl SchedulerJobPuller {
                             return;
                         }
 
-                        if let Err(e) =
+                        if let Some(claim) = claim.as_ref() {
+                            match infra::scheduler::keep_alive_claim(
+                                claim,
+                                alert_timeout,
+                                report_timeout,
+                            )
+                            .await
+                            {
+                                Ok(true) => {}
+                                Ok(false) => {
+                                    log::warn!(
+                                        "[SCHEDULER][JobPuller-{trace_id_keep_alive}] composite claim for job[{job_id}] trigger[{job_key}] is stale; stopping keep_alive"
+                                    );
+                                    return;
+                                }
+                                Err(e) => log::error!(
+                                    "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for composite job[{job_id}] trigger[{job_key}] failed: {e}"
+                                ),
+                            }
+                        } else if let Err(e) =
                             infra::scheduler::keep_alive(&[job_id], alert_timeout, report_timeout)
                                 .await
                         {
@@ -588,6 +609,13 @@ fn resolve_module_configs(
             poll_interval_secs: default_interval,
         },
         ModuleSchedulerConfig {
+            module: TriggerModule::CompositeAlert,
+            // Composite evaluation reuses the ordinary alert scheduler budget and
+            // cadence (§9.4); it has no dedicated concurrency/interval vars.
+            concurrency: default_concurrency,
+            poll_interval_secs: default_interval,
+        },
+        ModuleSchedulerConfig {
             module: TriggerModule::Report,
             concurrency: pick_concurrency(cfg.limit.scheduler_report_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_report_interval),
@@ -761,12 +789,13 @@ mod tests {
         // never be pulled once per-module pullers are enabled.
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &make_config());
-        assert_eq!(configs.len(), 8);
+        assert_eq!(configs.len(), 9);
         let modules: std::collections::HashSet<_> =
             configs.iter().map(|c| c.module.clone()).collect();
-        assert_eq!(modules.len(), 8, "duplicate module in resolved configs");
+        assert_eq!(modules.len(), 9, "duplicate module in resolved configs");
         for m in [
             TriggerModule::Alert,
+            TriggerModule::CompositeAlert,
             TriggerModule::Report,
             TriggerModule::DerivedStream,
             TriggerModule::Backfill,
@@ -789,6 +818,7 @@ mod tests {
 
         for m in [
             TriggerModule::Alert,
+            TriggerModule::CompositeAlert,
             TriggerModule::Report,
             TriggerModule::DerivedStream,
             TriggerModule::AnomalyDetection,

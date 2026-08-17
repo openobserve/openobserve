@@ -202,7 +202,9 @@ export default class DashboardFilter {
 
       // OSelect in listbox mode: outer div gets data-test; PopoverTrigger is the inner button.
       // Use JS click to avoid viewport/portal click interception issues.
-      await operatorLocator.waitFor({ state: "visible", timeout: 10000 });
+      // 30s: the condition row renders after the field is added and its schema resolves,
+      // which under parallel CI load lands well past 10s.
+      await operatorLocator.waitFor({ state: "visible", timeout: 30000 });
       await operatorLocator.locator('button').first().evaluate((el) => el.click());
       // Options render in portal with data-test="${parent}-popover"
       const operatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');

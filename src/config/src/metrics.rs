@@ -1216,6 +1216,46 @@ pub static QUERY_CANCELED_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static TRACE_TIME_INDEX_OPERATIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "trace_time_index_operations_total",
+            "Trace time index operations by outcome",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "operation", "status"],
+    )
+    .expect("Metric created")
+});
+
+pub static TRACE_TIME_INDEX_QUERY_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "trace_time_index_query_duration_seconds",
+            "Trace time index query duration in seconds",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status"],
+    )
+    .expect("Metric created")
+});
+
+pub static TRACE_TIME_INDEX_QUERY_ROUNDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "trace_time_index_query_rounds",
+            "Trace time index query rounds by phase",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0, 34.0]),
+        &["organization", "phase"],
+    )
+    .expect("Metric created")
+});
+
 // This corresponds to pgsql queries, not sqlite as that is local and can be ignored
 pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -2332,7 +2372,15 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(QUERY_CANCELED_NUMS.clone()))
         .expect("Metric registered");
-
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_OPERATIONS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_QUERY_DURATION.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_QUERY_ROUNDS.clone()))
+        .expect("Metric registered");
     // compactor stats
     registry
         .register(Box::new(COMPACT_USED_TIME.clone()))

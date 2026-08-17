@@ -43,6 +43,8 @@ export type ButtonVariant =
   | "preview-action"
   // Webinar banner dismiss — inline text-link style button for the top bar banner
   | "webinar-dismiss"
+  // Banner action — inline text-link style button for actions inside an OBanner bar
+  | "banner-dismiss"
   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
   | "pricing-chip"
   // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)

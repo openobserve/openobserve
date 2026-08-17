@@ -36,9 +36,9 @@ to be overwritten. Start your output directly with the `## AI Code Review` headi
 Output the review and nothing else — no preamble such as "Now I have all the context" and
 no trailing commentary. The first character of your output must be `#`.
 
-**Keep the top-level comment compact.** Only the decision line, a 1-2 sentence explanation, and a one-line count summary are visible by default. All findings go inside a single collapsed `<details>` block — nothing else.
+**Keep the top-level comment compact.** Only the decision line, a 1-2 sentence explanation, and a one-line count summary are visible by default. All findings go inside a single `<details open>` block (expanded by default) — nothing else.
 
-**Inside the collapsed block, group by severity, not by category.** A reviewer skims top-to-bottom by "what must I act on", so the order is always: Blockers (critical) → Warnings → Suggestions. Never render a `### Security` / `### Code Quality` / etc. category section — category is a tag on the line, not a heading. Each finding is exactly **one line**: no separate description paragraph. Put the concrete fix inline in parentheses, terse — not a "Fix:" sub-bullet.
+**Inside the open block, group by severity, not by category.** A reviewer skims top-to-bottom by "what must I act on", so the order is always: Blockers (critical) → Warnings → Suggestions. Never render a `### Security` / `### Code Quality` / etc. category section — category is a tag on the line, not a heading. Each finding is exactly **one line**: no separate description paragraph. Put the concrete fix inline in parentheses, terse — not a "Fix:" sub-bullet.
 
 Line format: `- \`file:line\` **[Category]** One-sentence summary of the bug/risk (→ concrete fix).`
 
@@ -54,7 +54,7 @@ If findings exist:
 
 **Findings:** 🔴 <critical count> blocker · 🟡 <warning count> warning · 🔵 <suggestion count> suggestion
 
-<details>
+<details open>
 <summary>Show findings (<total count>)</summary>
 
 #### 🔴 Blockers
@@ -104,7 +104,7 @@ If previous review findings are provided, you must:
 - If a developer replied **"won't fix"** or **"acknowledged"** → treat as resolved
 - If a developer replied **"I disagree"** → read their justification and either resolve or argue back
 
-Add a `#### ✅ Previously Flagged (resolved)` section (inside the same collapsed `<details>` block, after Blockers/Warnings/Suggestions) listing resolved items as one-line entries with ~~strikethrough~~, same `file:line **[Category]** summary` format.
+Add a `#### ✅ Previously Flagged (resolved)` section (inside the same `<details open>` block, after Blockers/Warnings/Suggestions) listing resolved items as one-line entries with ~~strikethrough~~, same `file:line **[Category]** summary` format.
 
 ## Rules
 

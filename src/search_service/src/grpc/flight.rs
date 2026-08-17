@@ -215,10 +215,13 @@ pub async fn search(
             .as_ref()
             .map(|rule| rule.referenced_fields())
             .unwrap_or_default();
+        let distinct_fields_updated_at =
+            infra::db::tantivy_index::get_ttv_distinct_fields_updated_at().await;
         get_stream_setting_index_updated_at_for_fields(
             &stream_settings,
             stream_created_at,
             &index_used_fields,
+            distinct_fields_updated_at,
         )
     };
 
