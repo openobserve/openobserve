@@ -788,7 +788,13 @@ export interface OwnershipRule {
   updated_at: number;
 }
 
-export type RoutingDecisionKind = "explicit" | "ownership" | "unrouted";
+/**
+ * Why a subject routed the way it did. Five kinds, not three — `context` is
+ * an alert's `context_attributes.team` naming a team, and `default` is the
+ * org's nominated catch-all absorbing a signal nothing matched (drift caught
+ * by the H5 contract spec on its first run).
+ */
+export type RoutingDecisionKind = "explicit" | "context" | "ownership" | "default" | "unrouted";
 
 /** A rule that also matched but did not win, and the server's reason it lost. */
 export interface AlsoMatchedRule {
