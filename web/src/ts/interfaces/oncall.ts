@@ -282,6 +282,8 @@ export interface OnCallPolicy {
   p1_parallel?: boolean;
   /** Off by default — a P4 that wakes somebody is a severity bug. */
   p4_pages?: boolean;
+  /** How many full passes the ladder runs before `final_action`. 1 = once; there is no zero. */
+  repeat_count?: number;
   final_action?: PolicyFinalAction;
 }
 

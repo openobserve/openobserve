@@ -336,6 +336,9 @@ const teamLabel = computed<I18nText>(() => {
 const teamNote = computed<I18nText>(() => {
   const id = props.preview?.team_id;
   if (!id) return t("oncall.simulatorNoOwner");
+  // Org-level host: there is no "this team" to compare against, and the team
+  // name above the note already answers the question.
+  if (!props.teamId) return raw("");
   if (id === props.teamId) return t("oncall.thisTeam");
   return t("oncall.simulatorOtherTeam");
 });

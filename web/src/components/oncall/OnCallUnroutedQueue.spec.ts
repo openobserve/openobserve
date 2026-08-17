@@ -89,4 +89,20 @@ describe("OnCallUnroutedQueue", () => {
     await wrapper.find('[data-test="oncall-unrouted-dismiss-s1"]').trigger("click");
     expect(wrapper.emitted("dismiss")?.[0][0]).toMatchObject({ id: "s1" });
   });
+
+  /// The org screen hosts the queue with no team of its own: a claim starts by
+  /// choosing one, so the button says what happens instead of naming a team it
+  /// does not have, and the one-team bulk action is not offered at all.
+  it("offers to write a rule, not claim for a team, when hosted without one", async () => {
+    const wrapper = mount(OnCallUnroutedQueue, {
+      props: { signals: [signal()] },
+      global: { plugins: [i18n, store], stubs },
+    });
+    expect(wrapper.text()).toContain("Write the rule");
+    expect(wrapper.text()).not.toContain("Claim for");
+    expect(wrapper.find('[data-test="oncall-unrouted-claim-all"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test="oncall-unrouted-claim-s1"]').trigger("click");
+    expect(wrapper.emitted("claim")?.[0][0]).toMatchObject({ id: "s1" });
+  });
 });

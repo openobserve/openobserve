@@ -31,8 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
       <OText variant="panel-title">{{ t("oncall.unroutedTitle") }}</OText>
       <OText variant="meta">{{ t("oncall.unroutedHint") }}</OText>
+      <!-- Bulk claim needs a team to claim FOR, so it only renders where the
+           host screen supplies one. The org queue claims row by row, because
+           "assign everything unowned to one team" is rarely the true intent. -->
       <OButton
-        v-if="signals.length"
+        v-if="signals.length && teamName"
         variant="outline"
         size="xs"
         class="ms-auto"
@@ -82,7 +85,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`oncall-unrouted-claim-${signal.id}`"
           @click="emit('claim', signal)"
         >
-          {{ t("oncall.unroutedClaimFor", { team: raw(teamName) }) }}
+          {{
+            teamName
+              ? t("oncall.unroutedClaimFor", { team: raw(teamName) })
+              : t("oncall.unroutedWriteRule")
+          }}
         </OButton>
 
         <OButton

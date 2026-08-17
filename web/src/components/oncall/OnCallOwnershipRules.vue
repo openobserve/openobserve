@@ -55,6 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <code class="text-text-body text-compact">{{ raw(sentenceOf(row)) }}</code>
       </template>
 
+      <!-- Org view only: on a team's own tab every row routes to that team,
+           and a column repeating it would be noise. -->
+      <template #cell-team="{ row }">
+        <span class="text-text-body" :data-test="`oncall-rule-team-${row.rule_id}`">
+          {{ raw(row.team_name || row.team_id) }}
+        </span>
+      </template>
+
       <template #cell-specificity="{ row }">
         <span class="flex flex-wrap gap-1">
           <OTag v-for="name in dimensionNames(row)" :key="name" variant="purple-outline" size="sm">
@@ -137,8 +145,10 @@ const props = withDefaults(
     /** The org's field vocabulary, so a dimension reads as it does elsewhere. */
     aliases?: { id: string; display?: string }[];
     loading?: boolean;
+    /** Org-level view: rules span teams, so each row names where it routes. */
+    showTeam?: boolean;
   }>(),
-  { rules: () => [], aliases: () => [], loading: false },
+  { rules: () => [], aliases: () => [], loading: false, showTeam: false },
 );
 
 const emit = defineEmits<{
@@ -169,6 +179,17 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     accessorFn: (row: OwnershipRuleStats) => sentenceOf(row),
     meta: { isName: true },
   },
+  ...(props.showTeam
+    ? [
+        {
+          id: "team",
+          header: t("oncall.ruleRoutesTo"),
+          size: 150,
+          sortable: true,
+          accessorFn: (row: OwnershipRuleStats) => row.team_name || row.team_id,
+        } as OTableColumnDef<OwnershipRuleStats>,
+      ]
+    : []),
   {
     id: "specificity",
     header: t("oncall.ruleSpecificity"),

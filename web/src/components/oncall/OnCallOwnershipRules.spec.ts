@@ -140,4 +140,27 @@ describe("OnCallOwnershipRules", () => {
     await wrapper.find('[data-test="oncall-ownership-add-rule"]').trigger("click");
     expect(wrapper.emitted("add")).toHaveLength(1);
   });
+
+  /// The org screen hosts every team's rules on one table, so a row has to say
+  /// where it routes. On a team's own tab the same column would repeat the
+  /// page title on every row.
+  it("adds a team column only when asked to", () => {
+    const org = mount(OnCallOwnershipRules, {
+      props: { rules: [rule({ team_name: "Payments" })], showTeam: true },
+      global: { plugins: [i18n, store], stubs },
+    });
+    expect(column(org, "team")).toBeTruthy();
+    expect(column(org, "team").accessorFn(rows(org)[0])).toBe("Payments");
+    expect(column(render(), "team")).toBeUndefined();
+  });
+
+  /// The id is what the rule is actually written against — the honest
+  /// fallback when the server sent no display name.
+  it("falls back to the team id when the server sent no name", () => {
+    const wrapper = mount(OnCallOwnershipRules, {
+      props: { rules: [rule({ team_name: null })], showTeam: true },
+      global: { plugins: [i18n, store], stubs },
+    });
+    expect(column(wrapper, "team").accessorFn(rows(wrapper)[0])).toBe("team_1");
+  });
 });
