@@ -23,6 +23,7 @@ import type {
   RoutingPreview,
   RoutingConfig,
   Unavailability,
+  TeamChannel,
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
@@ -321,6 +322,30 @@ const oncall = {
     ),
 
   /// Answers "where would this route?" without waiting for an alert to fire.
+  /// Where the team is talked to, and WHERE THE ANSWER CAME FROM — read
+  /// whole rather than "unset", because answering with an empty list while
+  /// pages go to the policy's room would be a lie of omission.
+  getTeamChannel: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
+    http().get<TeamChannel>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/channel`,
+    ),
+
+  /// `destinations: null` clears the override (the policy's list applies
+  /// again); `[]` silences the team's room on purpose. Distinct facts.
+  setTeamChannel: ({
+    org_identifier,
+    team_id,
+    data,
+  }: {
+    org_identifier: string;
+    team_id: string;
+    data: { destinations: string[] | null };
+  }) =>
+    http().put<TeamChannel>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/channel`,
+      data,
+    ),
+
   /// Org-scoped, deliberately not per team. All three params optional; both
   /// bounds filter to absences overlapping [from, to).
   listUnavailability: ({

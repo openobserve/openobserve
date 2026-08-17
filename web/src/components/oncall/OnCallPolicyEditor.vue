@@ -235,6 +235,70 @@
         <!-- C11: the l0_json block. Wire rule: `l0` absent on the PUT means
              unchanged, so it is only included once the panel is touched —
              editing rungs must never silently rewrite the gate. -->
+        <!-- WHERE the team is talked to, beside the policy list it can
+             override. `source` makes precedence visible: "I set the team
+             channel and pages still go to the old room" has to be answerable
+             here, not by paging somebody to find out. -->
+        <div class="flex flex-col gap-1" data-test="oncall-team-channel">
+          <span class="flex items-center gap-2">
+            <span class="text-text-label text-xs">{{ t("oncall.teamChannelTitle") }}</span>
+            <OTag
+              v-if="teamChannel"
+              :variant="teamChannel.source === 'team' ? 'primary-soft' : 'default-soft'"
+              size="sm"
+              data-test="oncall-team-channel-source"
+            >
+              {{
+                teamChannel.source === "team"
+                  ? t("oncall.teamChannelFromTeam")
+                  : t("oncall.teamChannelFromPolicy")
+              }}
+            </OTag>
+          </span>
+          <!-- One post per firing, not a live room: the only transport is an
+               HTTP destination, which cannot edit what it already sent. Said
+               here so nobody designs an expectation the engine cannot meet. -->
+          <span class="text-text-muted text-xs">{{ t("oncall.teamChannelHint") }}</span>
+          <OSelect
+            v-model="teamChannelDraft"
+            :options="destinationOptions"
+            multiple
+            :placeholder="t('oncall.teamChannelPlaceholder')"
+            data-test="oncall-team-channel-select"
+          />
+          <span class="flex flex-wrap items-center gap-2">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              :loading="savingChannel"
+              :disabled="!teamChannelDirty"
+              data-test="oncall-team-channel-save"
+              @click="saveTeamChannel(teamChannelDraft)"
+            >
+              {{ t("oncall.teamChannelSave") }}
+            </OButton>
+            <!-- Clearing is its own verb because null and [] are different
+                 facts on the wire: back-to-policy versus silence-on-purpose. -->
+            <OButton
+              v-if="teamChannel?.source === 'team'"
+              variant="ghost"
+              size="sm-action"
+              :loading="savingChannel"
+              data-test="oncall-team-channel-clear"
+              @click="saveTeamChannel(null)"
+            >
+              {{ t("oncall.teamChannelUsePolicy") }}
+            </OButton>
+          </span>
+          <span
+            v-if="teamChannel && !teamChannel.destinations.length"
+            class="text-status-warning-text text-xs"
+            data-test="oncall-team-channel-silent"
+          >
+            {{ t("oncall.teamChannelSilent") }}
+          </span>
+        </div>
+
         <OnCallL0Editor
           :l0="props.policy?.l0 ?? null"
           @update:l0="onL0Update"
@@ -279,6 +343,7 @@ import oncallService from "@/services/oncall";
 import type {
   Channel,
   RoutingConfig,
+  TeamChannel,
   EscalationTarget,
   L0Policy,
   LadderStep,
@@ -334,6 +399,52 @@ const destinationOptions = computed(() =>
 );
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+
+/// The team's room, read whole with its provenance.
+const teamChannel = ref<TeamChannel | null>(null);
+const teamChannelDraft = ref<string[]>([]);
+const savingChannel = ref(false);
+
+const teamChannelDirty = computed(
+  () =>
+    JSON.stringify([...teamChannelDraft.value].sort()) !==
+    JSON.stringify([...(teamChannel.value?.destinations ?? [])].sort()),
+);
+
+async function fetchTeamChannel() {
+  try {
+    const res = await oncallService.getTeamChannel({
+      org_identifier: orgId.value,
+      team_id: props.teamId,
+    });
+    teamChannel.value = res.data ?? null;
+    teamChannelDraft.value = [...(res.data?.destinations ?? [])];
+  } catch {
+    teamChannel.value = null;
+  }
+}
+
+/// `null` clears the override; an array (even empty) is the team's own list.
+async function saveTeamChannel(destinations: string[] | null) {
+  savingChannel.value = true;
+  try {
+    const res = await oncallService.setTeamChannel({
+      org_identifier: orgId.value,
+      team_id: props.teamId,
+      data: { destinations },
+    });
+    teamChannel.value = res.data ?? null;
+    teamChannelDraft.value = [...(res.data?.destinations ?? [])];
+    toast({ variant: "success", message: t("oncall.teamChannelSaved") });
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.teamChannelSaveFailed"),
+    });
+  } finally {
+    savingChannel.value = false;
+  }
+}
 
 /// Only read to answer one question: does the final action's safety net
 /// exist. A failure leaves the warning off — a false "no default team" on a
@@ -511,6 +622,7 @@ async function fetchOnCallNow() {
 onMounted(() => {
   fetchDestinations();
   fetchRoutingConfig();
+  fetchTeamChannel();
   fetchMembers();
   fetchOnCallNow();
 });

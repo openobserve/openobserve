@@ -29,6 +29,8 @@ vi.mock("@/services/oncall", () => ({
     listMembers: vi.fn(),
     whoIsOnCall: vi.fn(),
     getRoutingConfig: vi.fn(),
+    getTeamChannel: vi.fn(),
+    setTeamChannel: vi.fn(),
   },
 }));
 vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
@@ -77,6 +79,9 @@ function render() {
 
 describe("OnCallPolicyEditor", () => {
   beforeEach(() => {
+    service.getTeamChannel.mockResolvedValue({
+      data: { team_id: "team_1", destinations: ["slack-eng"], source: "policy" },
+    } as any);
     service.getRoutingConfig.mockResolvedValue({
       data: { org_id: "default", default_team_id: null, default_team_name: null, updated_at: 0 },
     } as any);
@@ -367,6 +372,47 @@ describe("OnCallPolicyEditor", () => {
       const line = wrapper.find('[data-test="oncall-policy-ladder-end"]').text();
       expect(line).toContain("never answered");
       expect(wrapper.find('[data-test="oncall-policy-no-default-warning"]').exists()).toBe(false);
+    });
+  });
+
+  /// C15/C16. `source` is the point: precedence must be visible, or "I set
+  /// the team channel and pages still go to the old room" is unanswerable.
+  describe("the team channel", () => {
+    it("names where the current answer came from", async () => {
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-team-channel-source"]').text()).toContain(
+        "from the policy",
+      );
+    });
+
+    /// null and [] are different facts on the wire: back-to-policy versus
+    /// silence-on-purpose. Two controls, two payloads.
+    it("clears back to the policy with null, never an empty array", async () => {
+      service.getTeamChannel.mockResolvedValue({
+        data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+      } as any);
+      service.setTeamChannel.mockResolvedValue({
+        data: { team_id: "team_1", destinations: [], source: "policy" },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-team-channel-clear"]').trigger("click");
+      await flushPromises();
+
+      expect(service.setTeamChannel).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { destinations: null } }),
+      );
+    });
+
+    it("says so when the team's channel is empty on purpose", async () => {
+      service.getTeamChannel.mockResolvedValue({
+        data: { team_id: "team_1", destinations: [], source: "team" },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-team-channel-silent"]').exists()).toBe(true);
     });
   });
 

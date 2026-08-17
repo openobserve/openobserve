@@ -268,6 +268,21 @@ export interface OnCallSchedule {
  * about a person, and a per-team row is the one somebody forgets to write
  * twice. The resolver skips an away member and moves ONLY their turn.
  */
+/**
+ * `GET/PUT /oncall/teams/{id}/channel` — where the team is talked to.
+ *
+ * `source` is the point: precedence has to be visible, or "I set the team
+ * channel and pages still go to the old room" is unanswerable from the API.
+ * On the PUT, `null` clears the override (back to the policy's list) while
+ * `[]` says "this team has no channel" — silence, on purpose. Two different
+ * facts; never collapse them into one control.
+ */
+export interface TeamChannel {
+  team_id: string;
+  destinations: string[];
+  source: "team" | "policy";
+}
+
 export interface Unavailability {
   id: string;
   org_id: string;
