@@ -319,28 +319,24 @@ const tokenColor = (token: string): string =>
 const severityColor = (severity: SpanEventSeverity): string =>
   tokenColor(SEVERITY_MARKER_TOKEN[severity]);
 
-/**
- * Halo separating a marker from the block colour behind it. The DOM surfaces
- * use `ring-surface-base` for the same job, so this reads the same token.
- */
-const MARKER_HALO_TOKEN = "--color-surface-base";
+// Markers carry no halo on any surface — see SEVERITY_MARKER_CLASS for why the
+// outline was removed. This surface therefore strokes nothing either, so the
+// canvas and the DOM keep one vocabulary.
 
 /**
- * ECharts style fragment for a marker's halo, or nothing for the info tier.
+ * Marker width in canvas pixels, matching the DOM surfaces' `w-0.75` (3px).
  *
- * Mirrors `SEVERITY_MARKER_CLASS`, which carries `ring-1 ring-surface-base` on
- * error and warning only: the halo is opaque while the achromatic info fill is
- * not, so on an info marker it out-contrasts the mark it outlines. Error and
- * warning keep it because a saturated fill can land on a same-hue block.
+ * A canvas cannot take a utility class, so this is the one place the shared 3px
+ * tick width is restated. `MARKER_MIN_SPACING_PX` in useSpanEvents is derived
+ * from the same number.
  */
-const markerHaloStyle = (
-  severity: SpanEventSeverity,
-  haloColor: string,
-): { stroke: string; lineWidth: number } | Record<string, never> =>
-  severity === "info" ? {} : { stroke: haloColor, lineWidth: 1 };
+const MARKER_WIDTH_PX = 3;
 
-// Exposed for tests only — none is part of this component's public surface.
-defineExpose({ buildSpanEventMarkers, severityColor, markerHaloStyle });
+/** Leading-edge flag for a block too narrow to position markers inside. */
+const MARKER_FLAG_WIDTH_PX = 4;
+
+// Exposed for tests only — neither is part of this component's public surface.
+defineExpose({ buildSpanEventMarkers, severityColor });
 
 const GRID_LEFT = 10;
 const GRID_RIGHT = 10;
@@ -575,23 +571,19 @@ const chartOptions = computed(() => {
           // coordinate system and cannot drift from it. They are `silent` —
           // hover and click stay on the block, and per-event precision lives in
           // the sidebar mini-timeline.
-          // Resolved once per block rather than per marker: the token is
-          // constant across the render, so resolving it inside the map would
-          // repeat getComputedStyle for every event on the flame graph.
-          const haloColor = tokenColor(MARKER_HALO_TOKEN);
-
           const markerShapes = buildSpanEventMarkers(span, blockWidth).map((marker) => ({
             type: "rect",
             shape: {
               x: x + (marker.isFlag ? 0 : (blockWidth * marker.left) / 100),
               y: y + BLOCK_HEIGHT * 0.2,
-              width: marker.isFlag ? 3 : 2,
+              // 3px matches the DOM surfaces' `w-0.75` tick. The flag is wider
+              // so it stays distinguishable from a positioned marker.
+              width: marker.isFlag ? MARKER_FLAG_WIDTH_PX : MARKER_WIDTH_PX,
               height: BLOCK_HEIGHT * 0.6,
               r: 1,
             },
             style: {
               fill: severityColor(marker.severity),
-              ...markerHaloStyle(marker.severity, haloColor),
             },
             silent: true,
           }));

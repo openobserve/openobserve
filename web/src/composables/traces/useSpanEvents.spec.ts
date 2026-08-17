@@ -528,16 +528,15 @@ describe("marker vocabulary", () => {
     expect(SEVERITY_MARKER_CLASS.warning).toContain("bg-badge-warning-solid-bg");
   });
 
-  // The halo is per tier, not per marker. A ring is 1px on all four sides of a
-  // 2px tick — half its width and ~62% of its area — and `ring-surface-base` is
-  // opaque while the achromatic info fill is not, so on an info tick the ring
-  // out-contrasts the mark it outlines and reads as a bordered box. Error and
-  // warning need it: a saturated fill can land on a same-hue bar with nothing
-  // separating them.
-  it("rings only the saturated tiers, leaving the achromatic one bare", () => {
-    expect(SEVERITY_MARKER_CLASS.error).toContain("ring-1 ring-surface-base");
-    expect(SEVERITY_MARKER_CLASS.warning).toContain("ring-1 ring-surface-base");
-    expect(SEVERITY_MARKER_CLASS.info).not.toContain("ring");
+  // No tier carries a halo. A ring is 1px on all four sides, so on a 3px tick it
+  // is 40% of the width and most of the area, and it is opaque where the
+  // achromatic info fill is not — the outline out-shouted the mark it outlined
+  // and the marker read as a bordered box. Separation now comes from the
+  // marker's own form: luminance for info, overhang for error, hue for warning.
+  it("carries no halo on any tier, so the fill is the whole mark", () => {
+    for (const className of Object.values(SEVERITY_MARKER_CLASS)) {
+      expect(className).not.toContain("ring");
+    }
   });
 
   // The flame graph draws into a canvas and cannot take utility classes, so it

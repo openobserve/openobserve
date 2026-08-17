@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="cluster in eventClusters"
           :key="cluster.key"
           type="button"
-          class="absolute top-1/2 w-0.5 -translate-x-1/2 -translate-y-1/2 p-0 before:absolute before:top-1/2 before:left-1/2 before:h-4 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+          class="absolute top-1/2 w-0.75 -translate-x-1/2 -translate-y-1/2 p-0 before:absolute before:top-1/2 before:left-1/2 before:h-4 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
           :class="[SEVERITY_MARKER_CLASS[cluster.severity], MARKER_HEIGHT_CLASS[cluster.severity]]"
           :style="{
             left: cluster.left + '%',

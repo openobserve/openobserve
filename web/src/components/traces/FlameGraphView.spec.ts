@@ -1451,13 +1451,6 @@ describe("FlameGraphView span event markers", () => {
     expect(mountView().vm.buildSpanEventMarkers(configuredColumnOnly, 400)).toHaveLength(1);
   });
 
-  // Regression: the halo was a hardcoded #ffffff, so on the dark theme every
-  // marker kept a white outline while the DOM surfaces' `ring-surface-base`
-  // went dark. A canvas shape cannot take a utility class, so it resolves the
-  // same token instead. jsdom returns "" for custom properties, so this asserts
-  // the lookup rather than the resolved colour.
-  // The fixture's events are both info, which carries no halo, so this mounts a
-  // span with an ERROR event — the tier that does.
   const mountWithErrorEvent = () =>
     mount(FlameGraphView, {
       props: {
@@ -1472,30 +1465,33 @@ describe("FlameGraphView span event markers", () => {
       },
     });
 
-  it("strokes a saturated marker's halo with the surface token, not a hex literal", () => {
-    const spy = vi.spyOn(CSSStyleDeclaration.prototype, "getPropertyValue");
+  // No tier carries a halo on any surface — a ring was 40% of a 3px tick's width
+  // and out-shouted the fill. This surface must agree, or the canvas and the DOM
+  // drift the way a hardcoded #ffffff once made them drift. Both tiers are
+  // checked because the halo previously applied to error but not info.
+  it("strokes no marker on any tier", () => {
+    for (const wrapper of [mountView(), mountWithErrorEvent()]) {
+      const marker = renderBlock(wrapper, 100).children[1];
 
-    try {
-      const marker = renderBlock(mountWithErrorEvent(), 100).children[1];
-
-      expect(spy).toHaveBeenCalledWith("--color-surface-base");
-      expect(marker.style.stroke).not.toMatch(/^#/);
-      expect(marker.style.lineWidth).toBe(1);
-    } finally {
-      spy.mockRestore();
+      expect(marker.style.fill).toBeDefined();
+      expect(marker.style.stroke).toBeUndefined();
+      expect(marker.style.lineWidth).toBeUndefined();
     }
   });
 
-  // Mirrors SEVERITY_MARKER_CLASS, which rings only the saturated tiers: the
-  // halo is opaque while the achromatic info fill is not, so on an info marker
-  // it out-contrasts the mark it outlines. Canvas and DOM must agree, or the
-  // two surfaces drift the way the hardcoded #ffffff once made them drift.
-  it("leaves the achromatic info marker unstroked", () => {
-    const marker = renderBlock(mountView(), 100).children[1];
+  // 3px matches the DOM surfaces' `w-0.75`; a canvas cannot take the class, so
+  // the number is restated there and must not drift from it.
+  //
+  // NOTE on the argument: renderBlock's second parameter is the series' width
+  // *percentage*, which the api stub's `coord` scales by 10 to reach pixels. So
+  // `2` is a 20px block — under MARKER_LEGIBILITY_FLOOR_PX (24), which is what
+  // collapses the markers to a single leading-edge flag — while `100` is 1000px.
+  it("draws positioned markers at the shared 3px width and the flag wider", () => {
+    const positioned = renderBlock(mountView(), 100).children[1];
+    expect(positioned.shape.width).toBe(3);
 
-    expect(marker.style.fill).toBeDefined();
-    expect(marker.style.stroke).toBeUndefined();
-    expect(marker.style.lineWidth).toBeUndefined();
+    const flag = renderBlock(mountView(), 2).children[1];
+    expect(flag.shape.width).toBe(4);
   });
 });
 
