@@ -118,6 +118,10 @@
           <OContent y>
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div class="flex flex-col gap-6 lg:col-span-2">
+                <!-- Renders nothing until a verdict event exists (§G.7) — the
+                     default deployment has no agent and must not show an
+                     analysis panel that sits empty forever. -->
+                <OnCallVerdictCard :events="events" />
                 <OnCallEscalation v-if="escalation" :progress="escalation" :events="events" />
                 <OnCallDeliveryLedger
                   :records="deliveries"
@@ -431,6 +435,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
+import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

@@ -232,6 +232,15 @@
           </span>
         </div>
 
+        <!-- C11: the l0_json block. Wire rule: `l0` absent on the PUT means
+             unchanged, so it is only included once the panel is touched —
+             editing rungs must never silently rewrite the gate. -->
+        <OnCallL0Editor
+          :l0="props.policy?.l0 ?? null"
+          @update:l0="onL0Update"
+          @update:valid="(v: boolean) => (l0Valid = v)"
+        />
+
         <div class="flex justify-end gap-2">
           <OButton variant="outline" size="sm-action" @click="reset">
             {{ t("oncall.cancel") }}
@@ -240,6 +249,7 @@
             variant="primary"
             size="sm-action"
             :loading="saving"
+            :disabled="!l0Valid"
             data-test="oncall-policy-save"
             @click="save"
           >
@@ -255,6 +265,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -269,6 +280,7 @@ import type {
   Channel,
   RoutingConfig,
   EscalationTarget,
+  L0Policy,
   LadderStep,
   OnCallPolicy,
   OnCallSlot,
@@ -283,7 +295,6 @@ import {
   DELIVERABLE_CHANNELS,
   describeTarget,
   priorityLabel,
-  priorityTagVariant,
   resolveLadder,
 } from "@/utils/oncall";
 
@@ -524,13 +535,28 @@ function toggleChannel(rung: PriorityRung, channel: Channel, on: boolean) {
   }
 }
 
+/// Held OUTSIDE the PUT body until touched: the server reads an absent `l0`
+/// as "unchanged", which is the only reason a rung edit cannot wipe the gate.
+const l0Draft = ref<L0Policy | null>(null);
+const l0Touched = ref(false);
+const l0Valid = ref(true);
+
+function onL0Update(value: L0Policy) {
+  l0Draft.value = value;
+  l0Touched.value = true;
+}
+
 async function save() {
   saving.value = true;
   try {
     await oncallService.setPolicy({
       org_identifier: orgId.value,
       team_id: props.teamId,
-      data: { rungs: draft.value, destinations: destinations.value },
+      data: {
+        rungs: draft.value,
+        destinations: destinations.value,
+        ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
+      },
     });
     toast({ variant: "success", message: t("oncall.policySaved") });
     emit("saved");
