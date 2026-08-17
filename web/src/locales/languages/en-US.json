@@ -372,6 +372,12 @@
       "action": "New report",
       "actionDesc": "Schedule a dashboard delivery"
     },
+    "noVariables": {
+      "title": "No variables yet",
+      "description": "Add a variable to make this dashboard interactive — filter panels by namespace, pod, and more.",
+      "action": "Add variable",
+      "actionDesc": "Create a dashboard variable"
+    },
     "noQueries": {
       "title": "No running queries",
       "description": "There are no active queries right now. Long-running queries will appear here while they run."
@@ -437,7 +443,8 @@
       "pipelineHistory": "pipeline history",
       "regexPatterns": "regex patterns",
       "monitors": "monitors",
-      "modelPricing": "model pricing definitions"
+      "modelPricing": "model pricing definitions",
+      "variables": "variables"
     },
     "demo": {
       "pageTitle": "Empty states — full set for review",
@@ -3718,6 +3725,7 @@
     "variableScopeHelp": "Variables will be applied to all tabs and panels if global is selected.",
     "newTab": "Add Tab",
     "editTab": "Edit Tab",
+    "tabPanelCount": "{count} panel | {count} panels",
     "generalSettingsTitle": "General Settings",
     "tabSettingsTitle": "Tabs Settings",
     "addGeneralSettings": "General",
@@ -4741,6 +4749,7 @@
       "variables": "Variables",
       "tabsCount": "{n} Tabs",
       "panelsCount": "{n} Panels",
+      "dependsOn": "Depends on: {names}",
       "variablesDependencyGraph": "Variables Dependency Graph",
       "scope": "Scope",
       "deletedTab": "Deleted Tab",
@@ -4752,7 +4761,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "Dashboard updated successfully.",
-      "updationFailed": "Dashboard updation failed"
+      "updationFailed": "Dashboard updation failed",
+      "dynamicFiltersHelp": "Adds an ad-hoc filter row above the panels.",
+      "appliesToEveryone": "These settings are shared with everyone who can access this dashboard.",
+      "saveChanges": "Save changes"
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard added successfully.",

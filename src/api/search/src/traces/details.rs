@@ -33,61 +33,11 @@ use openobserve_core::auth::UserEmail;
 use search_service as SearchService;
 use tracing::{Instrument, Span};
 
-use super::time_index::{TraceTimeRange, check_stream_permission};
+use super::time_index::{check_stream_permission, parse_optional_time_range, union_ranges};
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
     search::error_utils::map_error_to_http_response,
 };
-
-fn parse_optional_time_range(
-    params: &HashMap<String, String>,
-) -> std::result::Result<Option<TraceTimeRange>, Response> {
-    match (params.get("start_time"), params.get("end_time")) {
-        (None, None) => Ok(None),
-        (Some(start), Some(end)) => {
-            let start_time = start
-                .parse::<i64>()
-                .map_err(|_| MetaHttpResponse::bad_request("Invalid start_time parameter"))?;
-            let end_time = end
-                .parse::<i64>()
-                .map_err(|_| MetaHttpResponse::bad_request("Invalid end_time parameter"))?;
-            if start_time == 0 && end_time == 0 {
-                return Ok(None);
-            }
-            if start_time == 0 || end_time == 0 {
-                return Err(MetaHttpResponse::bad_request(
-                    "start_time and end_time must both be zero or non-zero",
-                ));
-            }
-            if start_time > end_time {
-                return Err(MetaHttpResponse::bad_request(
-                    "start_time must not be greater than end_time",
-                ));
-            }
-            Ok(Some(TraceTimeRange {
-                start_time,
-                end_time,
-            }))
-        }
-        _ => Err(MetaHttpResponse::bad_request(
-            "start_time and end_time must be provided together",
-        )),
-    }
-}
-
-fn union_ranges(
-    caller_range: Option<TraceTimeRange>,
-    index_range: Option<TraceTimeRange>,
-) -> Option<TraceTimeRange> {
-    match (caller_range, index_range) {
-        (Some(caller), Some(index)) => Some(TraceTimeRange {
-            start_time: caller.start_time.min(index.start_time),
-            end_time: caller.end_time.max(index.end_time),
-        }),
-        (Some(range), None) | (None, Some(range)) => Some(range),
-        (None, None) => None,
-    }
-}
 
 /// GetTraceDetails
 ///
@@ -231,50 +181,4 @@ pub async fn get_trace_details(
         .new_end_time
         .get_or_insert(effective_range.end_time);
     Json(response).into_response()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_complete_optional_range() {
-        let params = HashMap::from([
-            ("start_time".to_string(), "10".to_string()),
-            ("end_time".to_string(), "20".to_string()),
-        ]);
-        assert_eq!(
-            parse_optional_time_range(&params).unwrap(),
-            Some(TraceTimeRange {
-                start_time: 10,
-                end_time: 20,
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_half_of_a_range() {
-        let params = HashMap::from([("start_time".to_string(), "10".to_string())]);
-        assert!(parse_optional_time_range(&params).is_err());
-    }
-
-    #[test]
-    fn union_never_narrows_the_caller_range() {
-        let caller = TraceTimeRange {
-            start_time: 10,
-            end_time: 20,
-        };
-        assert_eq!(
-            union_ranges(
-                Some(caller),
-                Some(TraceTimeRange {
-                    start_time: 12,
-                    end_time: 18,
-                })
-            ),
-            Some(caller)
-        );
-        assert_eq!(union_ranges(Some(caller), None), Some(caller));
-        assert_eq!(union_ranges(None, None), None);
-    }
 }

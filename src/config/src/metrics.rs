@@ -1160,11 +1160,11 @@ pub static TRACE_TIME_INDEX_QUERY_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
             "trace_time_index_query_duration_seconds",
-            "Trace time index query duration in seconds",
+            "Trace time index query duration in seconds by lookup-key kind",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "status"],
+        &["organization", "kind", "status"],
     )
     .expect("Metric created")
 });
@@ -1173,12 +1173,12 @@ pub static TRACE_TIME_INDEX_QUERY_ROUNDS: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
             "trace_time_index_query_rounds",
-            "Trace time index query rounds by phase",
+            "Trace time index query rounds by lookup-key kind and phase",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels())
         .buckets(vec![1.0, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0, 34.0]),
-        &["organization", "phase"],
+        &["organization", "kind", "phase"],
     )
     .expect("Metric created")
 });
