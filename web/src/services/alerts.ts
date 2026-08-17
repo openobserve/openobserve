@@ -14,6 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import type {
+  CompositeAlertValidationRequest,
+  CompositeAlertValidationResponse,
+  CompositeAlertReferenceResponse,
+  CompositeTimelineResponse,
+} from "@/ts/interfaces/alert";
 
 const alerts = {
   list: (
@@ -116,6 +122,10 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
+    if (data.alert_type === "composite") {
+      const { id: _id, ...body } = data;
+      return http().put(url, body);
+    }
     return http().put(url, data);
   },
   delete_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
@@ -175,6 +185,34 @@ const alerts = {
       url += `?folder=${folder_id}`;
     }
     return http().get(url);
+  },
+  validateComposite: (
+    org_identifier: string,
+    data: CompositeAlertValidationRequest,
+  ): Promise<{ data: CompositeAlertValidationResponse }> => {
+    return http().post<CompositeAlertValidationResponse>(
+      `/api/v2/${org_identifier}/alerts/composites/validate`,
+      data,
+    );
+  },
+  getCompositeReferences: (
+    org_identifier: string,
+    alert_id: string,
+  ): Promise<{ data: CompositeAlertReferenceResponse }> => {
+    return http().get<CompositeAlertReferenceResponse>(
+      `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}/composite-references`,
+    );
+  },
+  getCompositeTimeline: (
+    org_identifier: string,
+    alert_id: string,
+    from: number,
+    to: number,
+  ): Promise<{ data: CompositeTimelineResponse }> => {
+    return http().get<CompositeTimelineResponse>(
+      `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}/composite-timeline`,
+      { params: { from, to } },
+    );
   },
   //this endpoint is not used as we are using the common service to move the alerts across folders
   move_to_another_folder: (org_identifier: string, data: any, folder_id?: any) => {

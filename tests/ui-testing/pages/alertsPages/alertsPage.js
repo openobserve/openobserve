@@ -80,7 +80,7 @@ export class AlertsPage {
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
             streamNamePopover: '[data-test="add-alert-stream-name-select-dropdown-popover"]',
             streamNameOption: '[data-test="add-alert-stream-name-select-dropdown-option"]',
-            alertTypeSelect: '[data-test="add-alert-type-select-dropdown"]',
+            alertTypeSelect: '[data-test="add-alert-type-tabs"]',
 
             // Step 2: Query/Conditions selectors
             queryTabsContainer: '[data-test="step2-query-tabs"]',
@@ -1290,6 +1290,25 @@ export class AlertsPage {
         await options.first().click();
         await this.page.keyboard.press('Escape');
         testLogger.info('Selected first available destination');
+    }
+
+    /**
+     * Select a destination by exact name. Prefer this over selectFirstDestination:
+     * the "first" option can be a stale destination created by a parallel spec
+     * and deleted before save, which surfaces as a 404 "destination not found".
+     */
+    async selectDestinationByName(name) {
+        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
+        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
+        await openOSelectDropdown(this.page, dropdown);
+        const option = this.page
+            .locator('[data-test$="-popover"] [data-test$="-option"]')
+            .filter({ hasText: name })
+            .first();
+        await expect(option).toBeVisible({ timeout: 5000 });
+        await option.click();
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected destination by name', { name });
     }
 
     /** Assert the list row for `name` renders the given priority (string or RegExp). */
@@ -2707,8 +2726,14 @@ export class AlertsPage {
         // folder the OTable can still be loading; clicking select-all over a not-yet-populated
         // table selects nothing, so the selection-gated Export button never appears (the 30s
         // toPass timeout in CI). OTable renders rows as [data-test^="o2-table-row-"].
-        await this.page.locator('[data-test^="o2-table-row-"]').first()
-            .waitFor({ state: 'visible', timeout: 15000 });
+        // The folder-list refetch after navigation lags under CI load, so reload + retry once
+        // (mirrors verifyAlertCreated) rather than failing on a single slow fetch.
+        const firstRow = this.page.locator('[data-test^="o2-table-row-"]').first();
+        if (!(await firstRow.isVisible({ timeout: 15000 }).catch(() => false))) {
+            await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+            await firstRow.waitFor({ state: 'visible', timeout: 15000 });
+        }
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox for export');
 

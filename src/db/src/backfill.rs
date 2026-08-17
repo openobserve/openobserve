@@ -211,6 +211,7 @@ pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<()
                             start_time: None,
                             end_time: None,
                             retries: 0,
+                            claim_epoch: 0,
                             data,
                         };
 

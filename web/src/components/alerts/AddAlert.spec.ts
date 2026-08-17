@@ -84,6 +84,20 @@ vi.mock("@/services/alerts", () => ({
     ),
     update_by_alert_id: vi.fn(() => Promise.resolve({ data: { success: true } })),
     generate_sql: vi.fn(() => Promise.resolve({ data: { sql: "SELECT * FROM test" } })),
+    validateComposite: vi.fn(() =>
+      Promise.resolve({
+        data: {
+          valid: true,
+          canonical_expression: "({id-a} && {id-b})",
+          children: [],
+          warnings: [],
+          errors: [],
+          result: true,
+          result_level: "critical",
+        },
+      }),
+    ),
+    listByFolderId: vi.fn(() => Promise.resolve({ data: { list: [] } })),
   },
 }));
 
@@ -938,6 +952,106 @@ describe("AddAlert (OForm owner)", () => {
 
     it("returns empty string for an invalid group", () => {
       expect(generateWhereClause(null as any, streamFieldsMap)).toBe("");
+    });
+  });
+
+  describe("composite alert integration", () => {
+    const compositeCondition = {
+      expression: "{id-a} && {id-b}",
+      warning_counts_as_firing: true,
+      stale_child_policy: "use_last_state",
+    };
+
+    it("offers Composite and replaces query controls when the capability is available", async () => {
+      const previous = store.state.zoConfig.composite_alerts_available;
+      try {
+        store.state.zoConfig.composite_alerts_available = true;
+        wrapper = mountAlert();
+        await flushPromises();
+
+        expect(wrapper.vm.alertTypeOptions).toEqual(
+          expect.arrayContaining([expect.objectContaining({ value: "composite" })]),
+        );
+        wrapper.vm.form.setFieldValue("is_real_time", "composite");
+        await flushPromises();
+
+        expect(wrapper.findComponent({ name: "CompositeAlertForm" }).exists()).toBe(true);
+        expect(wrapper.findComponent({ name: "QueryConfig" }).exists()).toBe(false);
+      } finally {
+        store.state.zoConfig.composite_alerts_available = previous;
+      }
+    });
+
+    it("saves an ID-only composite payload without stream, query, threshold, or cadence fields", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      form.setFieldValue("is_real_time", "composite");
+      form.setFieldValue("name", "checkout_degraded");
+      form.setFieldValue("stream_type", "");
+      form.setFieldValue("stream_name", "");
+      form.setFieldValue("destinations", ["pager"]);
+      form.setFieldValue("trigger_condition", { silence: 15 });
+      form.setFieldValue("composite_condition", compositeCondition);
+      form.setFieldValue("children", [
+        { alert_id: "id-a", name: "Renamed error alert", accessible: true },
+        { alert_id: "id-b", name: "Moved latency alert", accessible: true },
+      ]);
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      const payload = vi.mocked(alertsService.create_by_alert_id).mock.calls.at(-1)?.[1];
+      expect(payload).toEqual(
+        expect.objectContaining({
+          alert_type: "composite",
+          name: "checkout_degraded",
+          trigger_condition: { silence: 15 },
+          composite_condition: compositeCondition,
+        }),
+      );
+      expect(payload).not.toHaveProperty("stream_name");
+      expect(payload).not.toHaveProperty("query_condition");
+      expect(payload).not.toHaveProperty("period");
+      expect(JSON.stringify(payload)).not.toContain("Renamed error alert");
+      expect(JSON.stringify(payload)).not.toContain("Moved latency alert");
+    });
+
+    it("edit round-trip keeps expression IDs when child names and folders have changed", async () => {
+      const modelValue = {
+        id: "composite-1",
+        alert_type: "composite",
+        is_real_time: "composite",
+        name: "checkout_degraded",
+        enabled: true,
+        destinations: ["pager"],
+        trigger_condition: { silence: 15 },
+        composite_condition: compositeCondition,
+        children: [
+          {
+            alert_id: "id-a",
+            name: "New child name",
+            folder_id: "moved-folder",
+            accessible: true,
+          },
+          { alert_id: "id-b", name: "High latency", folder_id: "default", accessible: true },
+        ],
+      };
+      wrapper = mountAlert({ modelValue, isUpdated: true });
+      await flushPromises();
+
+      expect(wrapper.vm.form.state.values.composite_condition.expression).toBe("{id-a} && {id-b}");
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(alertsService.update_by_alert_id).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          id: "composite-1",
+          composite_condition: compositeCondition,
+        }),
+        expect.anything(),
+      );
     });
   });
 });

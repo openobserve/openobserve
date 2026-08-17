@@ -76,18 +76,18 @@
             "2"
           ],
           [
-            "SORT-Q5",
+            "SORT-Z9",
+            "manual",
+            "2"
+          ],
+          [
+            "SORT-A7",
             "auto",
             "2"
           ],
           [
             "SORT-X1",
             "hybrid",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "auto",
             "2"
           ],
           [
@@ -2043,13 +2043,13 @@
             "290.0"
           ],
           [
-            "ZONE-4",
-            "auto",
+            "ZONE-2",
+            "manual",
             "190.0"
           ],
           [
-            "ZONE-2",
-            "manual",
+            "ZONE-4",
+            "auto",
             "190.0"
           ]
         ],
@@ -2762,15 +2762,15 @@
         ],
         "results": [
           [
-            "sorter-engine",
+            "temp-regulator",
             "1"
           ],
           [
-            "lane-monitor",
+            "charge-checker",
             "2"
           ],
           [
-            "charge-checker",
+            "lane-monitor",
             "2"
           ]
         ],
@@ -2944,13 +2944,13 @@
             "1"
           ],
           [
-            "warehouse-east",
-            "inbound",
+            "warehouse-south",
+            "outbound",
             "1"
           ],
           [
-            "warehouse-south",
-            "outbound",
+            "warehouse-east",
+            "inbound",
             "1"
           ]
         ],

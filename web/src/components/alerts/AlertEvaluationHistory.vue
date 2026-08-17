@@ -99,7 +99,7 @@
     <template #cell-condition="{ row }">
       <div class="flex min-w-0 items-center gap-1.5">
         <span class="text-compact font-mono whitespace-nowrap tabular-nums">
-          {{ conditionSummary(row) }}
+          {{ conditionText(row) }}
         </span>
         <template v-if="row.level">
           <span class="text-2xs text-text-secondary shrink-0">→</span>
@@ -158,7 +158,9 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
 
-const props = defineProps<{ alertId: string }>();
+const props = withDefaults(defineProps<{ alertId: string; isComposite?: boolean }>(), {
+  isComposite: false,
+});
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -190,6 +192,17 @@ const rows = computed(() =>
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
     .map((row, index) => ({ ...row, rowKey: `${row.timestamp}-${index}` })),
 );
+
+// A composite's `actual_value` is the boolean expression result (1/0) with no
+// threshold; render it as true/false rather than a bare 1/0.
+const conditionText = (row: Record<string, unknown>): string => {
+  if (props.isComposite) {
+    if (row.actual_value === 1) return "true";
+    if (row.actual_value === 0) return "false";
+    return "—";
+  }
+  return conditionSummary(row);
+};
 
 const fetchHistory = async () => {
   const orgId = store.state.selectedOrganization?.identifier;
