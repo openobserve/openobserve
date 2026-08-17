@@ -1040,7 +1040,7 @@ describe("FlameGraphView", () => {
       });
 
       expect(result).toContain("⚠ Has errors");
-      expect(result).toContain("var(--color-flame-tooltip-error)");
+      expect(result).toContain('class="text-flame-tooltip-error mt-1"');
     });
 
     it("should not show error indicator for normal spans", async () => {
@@ -1147,7 +1147,7 @@ describe("FlameGraphView", () => {
       expect(result).toContain("font-size: var(--text-2xs)");
       expect(result).toContain("display: flex");
       expect(result).toContain("justify-content: space-between");
-      expect(result).toContain("color: var(--color-flame-tooltip-label)");
+      expect(result).toContain('class="text-flame-tooltip-label"');
     });
 
     it("should handle very small percentages correctly", async () => {

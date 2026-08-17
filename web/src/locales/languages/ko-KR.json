@@ -372,6 +372,12 @@
       "action": "새 보고서",
       "actionDesc": "대시보드 전송 예약"
     },
+    "noVariables": {
+      "title": "아직 변수가 없습니다",
+      "description": "변수를 추가하여 이 대시보드를 대화형으로 만드세요 — 네임스페이스, 파드 등으로 패널을 필터링할 수 있습니다.",
+      "action": "변수 추가",
+      "actionDesc": "대시보드 변수 만들기"
+    },
     "noQueries": {
       "title": "실행 중인 쿼리 없음",
       "description": "현재 활성 쿼리가 없습니다.장기 실행 쿼리는 실행 중에 여기에 표시됩니다."
@@ -437,7 +443,8 @@
       "pipelineHistory": "파이프라인 기록",
       "regexPatterns": "정규식 패턴",
       "monitors": "모니터",
-      "modelPricing": "모델 가격 정의"
+      "modelPricing": "모델 가격 정의",
+      "variables": "변수"
     },
     "demo": {
       "pageTitle": "빈 상태 — 검토용 전체 세트",
@@ -3642,6 +3649,7 @@
     "variableScopeHelp": "글로벌을 선택하면 변수가 모든 탭과 패널에 적용됩니다.",
     "newTab": "탭 추가",
     "editTab": "탭 편집",
+    "tabPanelCount": "{count} 패널 | {count} 패널",
     "generalSettingsTitle": "일반 설정",
     "tabSettingsTitle": "탭 설정",
     "addGeneralSettings": "일반",
@@ -4665,6 +4673,7 @@
       "variables": "변수",
       "tabsCount": "{n}개 탭",
       "panelsCount": "{n}개 패널",
+      "dependsOn": "다음에 따라 달라짐: {names}",
       "variablesDependencyGraph": "변수 종속성 그래프",
       "scope": "범위",
       "deletedTab": "삭제된 탭",
@@ -4676,7 +4685,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "대시보드가 성공적으로 업데이트되었습니다.",
-      "updationFailed": "대시보드 업데이트 실패"
+      "updationFailed": "대시보드 업데이트 실패",
+      "dynamicFiltersHelp": "패널 위에 임시 필터 행을 추가합니다.",
+      "appliesToEveryone": "이 설정은 이 대시보드에 액세스할 수 있는 모든 사용자와 공유됩니다.",
+      "saveChanges": "변경 사항 저장"
     },
     "addDashboardPage": {
       "addedSuccessfully": "대시보드가 성공적으로 추가되었습니다.",

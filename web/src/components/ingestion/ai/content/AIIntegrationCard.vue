@@ -98,7 +98,11 @@ const renderedSections = computed(() =>
       />
 
       <!-- Sections (all open — install guides read top to bottom) -->
-      <section v-for="section in renderedSections" :key="section.title" class="o2-section min-w-0">
+      <section
+        v-for="section in renderedSections"
+        :key="section.title"
+        class="o2-section border-border-default min-w-0 border-t"
+      >
         <h3 class="o2-section-title">{{ section.title }}</h3>
         <template v-for="(seg, j) in section.segments" :key="j">
           <div
@@ -142,8 +146,6 @@ const renderedSections = computed(() =>
 
 .o2-section {
   padding: 1.25rem 0;
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border-top must not scale with text or it smears at fractional zoom */
-  border-top: 1px solid var(--color-border-default);
 
   &:first-of-type {
     border-top: none;
