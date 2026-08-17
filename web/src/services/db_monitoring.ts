@@ -1019,10 +1019,17 @@ export interface BlockingParams {
 export interface BadgesParams {
   startTime?: number;
   endTime?: number;
-  /** Applied to the databases/queries slices and the server fallbacks only —
-   *  the event slices take the bare window, exactly as the strip's own
-   *  six-read fan-out sent them. */
+  /**
+   * The reader's scope. The server forwards each dimension to exactly the
+   * slices whose endpoint accepts it, so a badge counts what its tab would
+   * show — see the `/badges` handler.
+   */
   system?: string;
+  instance?: string;
+  namespace?: string;
+  /** Trace-vantage only: the queries and samples slices. */
+  env?: string;
+  service?: string;
 }
 
 /**
@@ -1373,6 +1380,10 @@ const dbMonitoringService = {
     put(params, "start_time", options.startTime);
     put(params, "end_time", options.endTime);
     put(params, "system", options.system);
+    put(params, "instance", options.instance);
+    put(params, "namespace", options.namespace);
+    put(params, "env", options.env);
+    put(params, "service", options.service);
     return http().get<BadgesResponse>(`/api/${orgId}/traces/db_monitoring/badges`, { params });
   },
 };

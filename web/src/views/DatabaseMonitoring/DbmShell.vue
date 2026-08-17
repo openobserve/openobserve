@@ -61,7 +61,12 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
 import { provideDbmTabCounts } from "@/composables/dbm/dbmTabCounts";
-import { useDbmTabCounts, type DbmTabCountsLoadOptions } from "@/composables/dbm/useDbmTabCounts";
+import {
+  DBM_COUNT_FILTER_KEYS,
+  useDbmTabCounts,
+  type DbmCountFilters,
+  type DbmTabCountsLoadOptions,
+} from "@/composables/dbm/useDbmTabCounts";
 import { rangeFromQuery, periodToMinutes } from "@/composables/dbm/useDbmScope";
 
 /**
@@ -110,7 +115,7 @@ const store = useStore();
 
 const rendersTabStrip = computed(() => DBM_TAB_STRIP_ROUTES.has(String(route.name ?? "")));
 
-const { counts, load } = useDbmTabCounts();
+const { counts, load, publishOwnCount } = useDbmTabCounts();
 
 const org = computed(() => (store.state.selectedOrganization?.identifier as string) ?? "");
 
@@ -127,11 +132,22 @@ const org = computed(() => (store.state.selectedOrganization?.identifier as stri
 const range = computed(() => rangeFromQuery(route.query));
 
 /**
- * The only page-level filter that narrows the badge counts: DatabasesPage's
- * `system`, which it also writes to the URL. Read from the route for the same
- * reason the window is.
+ * The reader's SCOPE, read from the route for the same reason the window is.
+ *
+ * All five dimensions, not `system` alone. The badges endpoint forwards each
+ * to exactly the slices whose endpoint accepts it, so a badge counts what its
+ * tab would show — and a dimension the shell never reads could never get
+ * there. That was the bug: a URL carrying `instance=postgres` produced the
+ * same badges as one without it, while the Slowest-calls TAB it labelled had
+ * already narrowed from 73 rows to 0.
  */
-const systemFilter = computed(() => (route.query.system as string) ?? null);
+const scopeFilters = computed<DbmCountFilters>(() => ({
+  system: (route.query.system as string) ?? null,
+  instance: (route.query.instance as string) ?? null,
+  namespace: (route.query.namespace as string) ?? null,
+  env: (route.query.env as string) ?? null,
+  service: (route.query.service as string) ?? null,
+}));
 
 const MINUTE_US = 60_000_000;
 
@@ -167,7 +183,7 @@ const refresh = (options: DbmTabCountsLoadOptions = {}) => {
   // Guarded HERE rather than only in the watcher so no caller — present or
   // future — can spend the fan-out's reads on a route with no badges to fill.
   if (!rendersTabStrip.value) return;
-  void load(org.value, range.value, window.value, { system: systemFilter.value }, options);
+  void load(org.value, range.value, window.value, scopeFilters.value, options);
 };
 
 /**
@@ -188,12 +204,18 @@ watch(
     range.value.relativeTimePeriod,
     range.value.startTime,
     range.value.endTime,
-    systemFilter.value,
+    // Every dimension, or a cache keyed on less than it sends would serve the
+    // first scope's answer to every later one.
+    ...DBM_COUNT_FILTER_KEYS.map((key) => scopeFilters.value[key]),
     rendersTabStrip.value,
   ],
   () => refresh(),
   { immediate: true },
 );
 
-provideDbmTabCounts({ counts, refresh });
+// `publishOwnCount` rides along so a page can write the badge IT measured
+// better than the fan-out can into the shared snapshot — the thing that makes
+// a refined count visible from every tab and not only from the page that
+// produced it. See useDbmListPage's `ownCounts`.
+provideDbmTabCounts({ counts, refresh, publishOwnCount });
 </script>

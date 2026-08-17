@@ -51,6 +51,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @date-change="onDateChange"
   >
     <div class="flex min-h-0 flex-1 flex-col">
+      <!-- Scope lives ABOVE both tables, not inside either one's toolbar. It
+           used to sit in the client table's `#toolbar`, so it unmounted with
+           that table in fallback mode while the load kept sending all five
+           dimensions — leaving the database-reported list silently narrowed,
+           with no chip saying so and no control to clear it. A filter that is
+           APPLIED must be VISIBLE, in every state that applies it, so there is
+           exactly one instance of this control, outside both tables. -->
+      <!-- Search rides UP here rather than the filter riding DOWN into a
+           toolbar: both tables below own a toolbar and only one of them is
+           mounted at a time, so a control in either would vanish with it.
+           One row, above both, serving whichever table is showing. -->
+      <div class="px-page-edge flex shrink-0 items-center gap-2 pb-1.5">
+        <div class="w-64 shrink-0">
+          <OSearchInput
+            :model-value="search"
+            :placeholder="t('dbm.samples.searchPlaceholder')"
+            clearable
+            :debounce="400"
+            data-test="dbm-samples-search"
+            @update:model-value="(v: unknown) => (search = typeof v === 'string' ? v : '')"
+          />
+        </div>
+        <DbmScopeFilters class="min-w-0 flex-1" :filters="dimensionFilters" @clear="clearScope" />
+        <DbmRefreshButton
+          :loading="loading"
+          :last-run-at="lastRunAt"
+          data-test="dbm-samples-refresh"
+          @refresh="onRefresh"
+        />
+      </div>
+
       <!-- In fallback mode the client table UNMOUNTS: its tall empty-state
            checklist would otherwise consume the viewport and squeeze the
            database-reported list to nothing. The section below carries its
@@ -71,29 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-samples-table"
         @row-click="onRowClick"
       >
-        <template #toolbar>
-          <DbmTableToolbar
-            v-model:search="search"
-            :placeholder="t('dbm.samples.searchPlaceholder')"
-            :debounce="400"
-            search-data-test="dbm-samples-search"
-          >
-            <DbmScopeFilters
-              class="min-w-0 flex-1"
-              :filters="dimensionFilters"
-              @clear="clearScope"
-            />
-          </DbmTableToolbar>
-        </template>
-
-        <template #toolbar-trailing>
-          <DbmRefreshButton
-            :loading="loading"
-            data-test="dbm-samples-refresh"
-            @refresh="onRefresh"
-          />
-        </template>
-
         <template #subheader>
           <!-- The scatter — inside the table frame because it draws exactly
                the rows below it. Hidden while empty: an axis with no points
@@ -199,6 +207,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dbm-samples-no-matches"
             @action="search = ''"
           />
+          <!-- The databases answered, and answered that they log nothing.
+               Without this the page is a bare empty state sitting beside a Top
+               queries tab listing 50 statements — the two feeds have different
+               prerequisites (cumulative counters vs the slow-query log, which
+               ships off), so the honest reading is "not switched on", not "no
+               slow calls". The generic empty state below cannot say this: it
+               reasons about traces, and this is a database setting. -->
+          <DbmStateNote
+            v-else-if="serverLogOff"
+            :title="t('dbm.samples.logOffTitle')"
+            :hint="t('dbm.samples.logOffDescription')"
+            placement="centered"
+            data-test="dbm-samples-log-off"
+          />
           <DbmEmptyState
             v-else-if="!loading"
             :permission-ok="permissionOk"
@@ -246,21 +268,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The section owns the page in fallback mode (the client table is
                unmounted), so it carries the toolbar — same search and refresh
                bindings. -->
-          <template #toolbar>
-            <DbmTableToolbar
-              v-model:search="search"
-              :placeholder="t('dbm.samples.searchPlaceholder')"
-              :debounce="400"
-              search-data-test="dbm-server-samples-search"
-            />
-          </template>
-          <template #toolbar-trailing>
-            <DbmRefreshButton
-              :loading="loading"
-              data-test="dbm-server-samples-refresh"
-              @refresh="onRefresh"
-            />
-          </template>
           <template #cell-query="{ row }">
             <DbmQueryCell
               :text="raw(row.query ?? '')"
@@ -312,8 +319,9 @@ import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptySt
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
-import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
+import DbmStateNote from "@/components/dbm/DbmStateNote.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -326,8 +334,9 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
 import useStreams from "@/composables/useStreams";
 import { useDbmQueryDetailHop } from "@/composables/dbm/useDbmQueryDetailHop";
-import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
+import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { useDbmOwnFilterSync } from "@/composables/dbm/useDbmScopeFilters";
 import { useDbmChartTheme } from "@/composables/dbm/useDbmChartTheme";
 import { useDbmSearchEmpty } from "@/composables/dbm/useDbmSearchEmpty";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
@@ -365,34 +374,38 @@ const {
   loading,
   error,
   search,
+  lastRunAt,
   org,
   dbmEnabled,
   run,
   onRefresh,
   onDateChange,
-} = useDbmListPage({ load: () => load(), syncUrl: () => syncUrl() });
+} = useDbmListPage({
+  load: () => load(),
+  syncUrl: () => syncUrl(),
+  // The page's own client rows never override the badge — they are a capped
+  // top-list, not the population (see `sampleCallsCount` in useDbmTabCounts.ts).
+  // The ONE override is fallback mode: with zero client rows and a
+  // database-reported list rendered beneath the badge, the shared `0` would
+  // deny working data — so the badge counts the reported list as a capped claim
+  // (`100+`), the same false-zero rule the fleet badge follows.
+  //
+  // The override counts the DATABASE-REPORTED list, so it carries the `server`
+  // vantage — the third of the three reads that can feed this one badge, and the
+  // reason the qualifier is resolved from the count rather than fixed per page.
+  ownCounts: [
+    {
+      key: "sampleCallsCount",
+      value: () =>
+        allRows.value.length || !serverRows.value.length
+          ? undefined
+          : countClaim(serverRows.value.length, serverTruncated.value, "server"),
+    },
+  ],
+});
 
-// The page's own client rows never override the badge — they are a capped
-// top-list, not the population (see `sampleCallsCount` in useDbmTabCounts.ts).
-// The ONE override is fallback mode: with zero client rows and a
-// database-reported list rendered beneath the badge, the shared `0` would
-// deny working data — so the badge counts the reported list as a capped claim
-// (`100+`), the same false-zero rule the fleet badge follows.
-//
-// The override counts the DATABASE-REPORTED list, so it carries the `server`
-// vantage — the third of the three reads that can feed this one badge, and the
-// reason the qualifier is resolved from the count rather than fixed per page.
-const tabCounts = computed(() =>
-  tabCountProps(
-    withOwnCount(
-      tabCountsContext.counts.value,
-      "sampleCallsCount",
-      allRows.value.length || !serverRows.value.length
-        ? undefined
-        : countClaim(serverRows.value.length, serverTruncated.value, "server"),
-    ),
-  ),
-);
+/** Every badge, from the shell's shared snapshot — this page's own included. */
+const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 const allRows = shallowRef<DbmSampleRow[]>([]);
 const truncated = ref(false);
@@ -411,6 +424,37 @@ const permissionOk = ref(true);
  * says so.
  */
 const serverRows = shallowRef<ServerSampleRow[]>([]);
+
+/**
+ * Whether the databases EVER reported a per-execution duration — the API's own
+ * `server_samples_capture` ("on"/"off"), verbatim.
+ *
+ * This is what tells the two zero-trace empty states apart, and until now
+ * nothing in the UI read it. Top queries falls back to `pg_stat_statements`,
+ * a cumulative counter table that is populated on any instance with the
+ * extension loaded; THIS page falls back to the slow-query log, which is off by
+ * default (`log_min_duration_statement = -1`, MySQL `long_query_time = 10`).
+ * So on a stock install the two feeds legitimately disagree — Top queries lists
+ * 50 statements and Slowest calls has nothing — and with no disclosure the page
+ * reads as broken beside its sibling rather than as un-configured.
+ *
+ * `null` when the response made no claim: a build whose envelope omits the flag
+ * has not said the log is off, and asserting it would invent a diagnosis.
+ */
+const serverSamplesCapture = ref<string | null>(null);
+
+/**
+ * The databases answered, and answered that they log nothing. Distinct from
+ * "no fallback ran" (a traced org) and from "the fallback failed" — only this
+ * one has an action attached, and only this one may claim the log is off.
+ */
+const serverLogOff = computed(
+  () =>
+    !loading.value &&
+    !allRows.value.length &&
+    !serverRows.value.length &&
+    serverSamplesCapture.value === "off",
+);
 
 /**
  * Fallback mode: the database-reported list is what the reader sees, so the
@@ -432,6 +476,22 @@ const instanceFilter = ref<string | null>((route.query.instance as string) ?? nu
 const namespaceFilter = ref<string | null>((route.query.namespace as string) ?? null);
 const envFilter = ref<string | null>((route.query.env as string) ?? null);
 const serviceFilter = ref<string | null>((route.query.service as string) ?? null);
+
+// This page is kept alive, so the seeds above run ONCE per session — a filter
+// set (or cleared) on a sibling tab would otherwise never reach these refs,
+// leaving the chips and the next read disagreeing with the URL. Re-read on
+// activation, the same moment the range sync uses.
+useDbmOwnFilterSync(
+  () => route.query,
+  {
+    system: systemFilter,
+    instance: instanceFilter,
+    namespace: namespaceFilter,
+    env: envFilter,
+    service: serviceFilter,
+  },
+  () => void load(),
+);
 
 /**
  * Filtering is client-side over what was loaded: the endpoint takes no
@@ -660,43 +720,72 @@ const filterEntry = createDbmFilterEntry(() => {
   load();
 });
 
-const dimensionFilters = computed<DbmScopeFilter[]>(() => [
-  filterEntry({
+const dimensionFilters = computed<DbmScopeFilter[]>(() => {
+  // In fallback mode the options must describe the list ON SCREEN. Every
+  // `options:` below used to derive from `allRows` alone — which is empty
+  // exactly when the fallback fires — so the hoisted control would otherwise
+  // offer five empty selects. The server rows are unioned in.
+  const serverList = serverListShown.value ? filteredServerRows.value : [];
+
+  const instance = filterEntry({
     key: "instance",
     dimension: t("dbm.filters.dimension.instance"),
     placeholder: t("dbm.filters.allInstances"),
-    options: optionsFrom(allRows.value.map((r) => r.dbInstance)),
+    options: optionsFrom([
+      ...allRows.value.map((r) => r.dbInstance),
+      ...serverList.map((r) => r.db_instance),
+    ]),
     model: instanceFilter,
-  }),
-  filterEntry({
+  });
+  const system = filterEntry({
+    key: "system",
+    dimension: t("dbm.filters.dimension.system"),
+    placeholder: t("dbm.filters.allEngines"),
+    options: optionsFrom([
+      ...allRows.value.map((r) => r.dbSystem),
+      ...serverList.map((r) => r.db_system),
+    ]),
+    model: systemFilter,
+  });
+  const namespace = filterEntry({
+    key: "namespace",
+    dimension: t("dbm.filters.dimension.namespace"),
+    placeholder: t("dbm.filters.allNamespaces"),
+    options: optionsFrom([
+      ...allRows.value.map((r) => r.dbNamespace),
+      ...serverList.map((r) => r.db_namespace),
+    ]),
+    model: namespaceFilter,
+  });
+  const env = filterEntry({
     key: "env",
     dimension: t("dbm.filters.dimension.env"),
     placeholder: t("dbm.filters.allEnvs"),
     options: optionsFrom(allRows.value.map((r) => r.env)),
     model: envFilter,
-  }),
-  filterEntry({
-    key: "system",
-    dimension: t("dbm.filters.dimension.system"),
-    placeholder: t("dbm.filters.allEngines"),
-    options: optionsFrom(allRows.value.map((r) => r.dbSystem)),
-    model: systemFilter,
-  }),
-  filterEntry({
+  });
+  const service = filterEntry({
     key: "service",
     dimension: t("dbm.filters.dimension.service"),
     placeholder: t("dbm.filters.allServices"),
     options: optionsFrom(allRows.value.map((r) => r.serviceName)),
     model: serviceFilter,
-  }),
-  filterEntry({
-    key: "namespace",
-    dimension: t("dbm.filters.dimension.namespace"),
-    placeholder: t("dbm.filters.allNamespaces"),
-    options: optionsFrom(allRows.value.map((r) => r.dbNamespace)),
-    model: namespaceFilter,
-  }),
-]);
+  });
+
+  // Only the dimensions `/server_samples` accepts are offered — system,
+  // instance and namespace. A set `env`/`service` stays as a removable chip
+  // rather than being cleared: it still narrows the CLIENT read whose
+  // emptiness put the page in fallback, so dropping it silently would change
+  // which list is shown. See the matching note on QueriesPage.
+  if (!serverListShown.value) return [instance, env, system, service, namespace];
+  return [
+    instance,
+    system,
+    namespace,
+    ...(envFilter.value ? [{ ...env, options: [] }] : []),
+    ...(serviceFilter.value ? [{ ...service, options: [] }] : []),
+  ];
+});
 
 const clearScope = () => {
   systemFilter.value = null;
@@ -852,10 +941,18 @@ const load = () =>
       if (hits.length) {
         serverRows.value = [];
         serverTruncated.value = false;
+        // A traced answer means the fallback never ran, so nothing was learned
+        // about the engine's logging — withdraw any claim from a previous
+        // window rather than carrying it over a list it does not describe.
+        serverSamplesCapture.value = null;
       } else {
         const fallback = data.server_fallback;
         serverRows.value = (fallback?.hits ?? []) as ServerSampleRow[];
         serverTruncated.value = Boolean(fallback?.truncated);
+        // The engine's own answer about whether it logs per-execution
+        // durations at all. Only meaningful when the fallback actually ran —
+        // a null member is a failed read and claims nothing.
+        serverSamplesCapture.value = fallback?.server_samples_capture ?? null;
       }
       // Only probed when there is an empty state about to explain itself.
       if (!allRows.value.length) void probeTracePresence();
@@ -872,6 +969,8 @@ const load = () =>
         streamsFailed.value = 0;
         serverRows.value = [];
         serverTruncated.value = false;
+        // A failed request made no claim about the engine's logging either.
+        serverSamplesCapture.value = null;
       },
       // 403 is a diagnosis the empty state names, not an error banner.
       onForbidden: () => {

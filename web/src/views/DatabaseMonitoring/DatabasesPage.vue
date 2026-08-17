@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar-trailing>
           <DbmRefreshButton
             :loading="loading"
+            :last-run-at="lastRunAt"
             data-test="dbm-databases-refresh"
             @refresh="onRefresh"
           />
@@ -436,8 +437,9 @@ import dbMonitoringService, {
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
-import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
+import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { useDbmOwnFilterSync } from "@/composables/dbm/useDbmScopeFilters";
 import { createDbmContextProvider } from "@/composables/contextProviders";
 import { buildDatabaseBreakdown, type DbmBreakdown } from "@/utils/dbm/breakdown";
 import {
@@ -487,6 +489,7 @@ const {
   loading,
   error,
   search,
+  lastRunAt,
   org,
   dbmEnabled,
   run,
@@ -496,6 +499,13 @@ const {
   load: () => load(),
   syncUrl: () => syncUrl(),
   context: () => dbmContext,
+  // `undefined` while loading: the page has no better number YET, and stamping
+  // a transient 0 over the shared snapshot's zero-trace fallback would flash
+  // the badge wrong on every first paint. The exact fleet count takes over the
+  // moment the union settles, on THIS tab and on every sibling.
+  ownCounts: [
+    { key: "databaseCount", value: () => (loading.value ? undefined : fleetRowCount.value) },
+  ],
 });
 
 const rows = shallowRef<DatabaseRow[]>([]);
@@ -507,30 +517,29 @@ const permissionOk = ref(true);
 // still return staging merged with prod — a filter that lies is worse than no
 // filter. Top queries is the grain that genuinely accepts `env`.
 const systemFilter = ref<string | null>((route.query.system as string) ?? null);
+
+// This page is kept alive, so the seeds above run ONCE per session — a filter
+// set (or cleared) on a sibling tab would otherwise never reach these refs,
+// leaving the chips and the next read disagreeing with the URL. Re-read on
+// activation, the same moment the range sync uses.
+useDbmOwnFilterSync(
+  () => route.query,
+  { system: systemFilter },
+  () => void load(),
+);
 /** Kept so the empty state can say "we haven't finished counting" rather than "no data". */
 const neverAggregated = ref(false);
 /**
- * The sibling badges, from the shell's shared fan-out, plus THIS tab's own
- * count in place of the shared one.
+ * Every badge, from the shell's shared snapshot.
  *
- * `fleetRowCount` is not the same number the shared fan-out produces, and the
- * difference is the point: it counts the rows this page is SHOWING — the
- * fleet union, trafficless instances included — never the raw `hits.length`,
- * which cannot see the instances the metrics join discovered.
+ * This page's own `databaseCount` is in there too — `ownCount` above publishes
+ * it — which is the point: `fleetRowCount` is not the number the shared
+ * fan-out produces (it counts the rows this page is SHOWING, the fleet union
+ * with trafficless instances included, where the fan-out sees only raw
+ * `hits.length`), and it must read the same from every tab, not only from this
+ * one.
  */
-const tabCounts = computed(() =>
-  // `undefined` while loading: the page has no better number YET, and stamping
-  // a transient 0 over the shared snapshot's zero-trace fallback would flash
-  // the badge wrong on every first paint. The exact fleet count takes over the
-  // moment the union settles.
-  tabCountProps(
-    withOwnCount(
-      tabCountsContext.counts.value,
-      "databaseCount",
-      loading.value ? undefined : fleetRowCount.value,
-    ),
-  ),
-);
+const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 /**
  * W4/W4b. Off by default: the join costs a second read across up to eight

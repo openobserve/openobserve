@@ -74,6 +74,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dbm.queries.completionBias.body") }}
       </OBanner>
 
+      <!-- Scope lives ABOVE both tables, not inside either one's toolbar.
+           It used to sit in the client table's `#toolbar`, so it unmounted
+           with that table in fallback mode — while `requestParams()` kept
+           spreading all five dimensions into the fallback fetch. A reader who
+           had set `instance=prod-2` and then hit a traceless window got a
+           database-reported list silently narrowed to prod-2, with no chip
+           saying so and no control to clear it, under a subtitle claiming the
+           list spanned every client. A filter that is APPLIED must be VISIBLE,
+           in every state that applies it — so there is exactly one instance of
+           this control, bound to one set of models, outside both tables. -->
+      <!-- Search rides UP here rather than the filter riding DOWN into a
+           toolbar: both tables below own a toolbar and only one of them is
+           mounted at a time, so a control in either would vanish with it.
+           One row, above both, serving whichever table is showing. -->
+      <div class="px-page-edge flex shrink-0 items-center gap-2 pb-1.5">
+        <div class="w-64 shrink-0">
+          <OSearchInput
+            :model-value="search"
+            :placeholder="t('dbm.queries.searchPlaceholder')"
+            clearable
+            :debounce="400"
+            data-test="dbm-queries-search"
+            @update:model-value="onSearchInput"
+          />
+        </div>
+        <DbmScopeFilters
+          class="min-w-0 flex-1"
+          :filters="dimensionFilters"
+          :insight-chip="activeInsightChip"
+          @clear="clearScope"
+          @clear-insight="activeInsightId = null"
+        />
+        <OToggleGroup
+          :model-value="stmtClass"
+          class="shrink-0"
+          data-test="dbm-queries-stmt-class"
+          @update:model-value="onStmtClassChange"
+        >
+          <!-- The second option names what it ADDS rather than restating the
+               whole: two halves that both read as "everything" ("Queries" /
+               "All statements") make the distinction invisible. -->
+          <OToggleGroupItem value="query" size="sm">
+            {{ t("dbm.queries.stmtClass.query") }}
+            <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.queryHint')" />
+          </OToggleGroupItem>
+          <OToggleGroupItem value="all" size="sm">
+            {{ t("dbm.queries.stmtClass.all") }}
+            <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
+          </OToggleGroupItem>
+        </OToggleGroup>
+
+        <!-- What every Δ and every insight is measured AGAINST (W5). Each rule
+             line names the choice, so a number can always be traced to the
+             comparison that produced it. -->
+        <OToggleGroup
+          :model-value="baseline"
+          class="shrink-0"
+          data-test="dbm-queries-baseline"
+          @update:model-value="onBaselineChange"
+        >
+          <OToggleGroupItem value="previous" size="sm">
+            {{ t("dbm.insights.baseline.previousShort") }}
+            <OTooltip side="bottom" :content="t('dbm.insights.baseline.previousHint')" />
+          </OToggleGroupItem>
+          <OToggleGroupItem value="yesterday" size="sm">
+            {{ t("dbm.insights.baseline.yesterdayShort") }}
+            <OTooltip side="bottom" :content="t('dbm.insights.baseline.yesterdayHint')" />
+          </OToggleGroupItem>
+        </OToggleGroup>
+
+        <DbmRefreshButton
+          :loading="loading"
+          :last-run-at="lastRunAt"
+          data-test="dbm-queries-refresh"
+          @refresh="onRefresh"
+        />
+      </div>
+
       <!-- In fallback mode the client table UNMOUNTS: its tall empty-state
            checklist would otherwise consume the viewport and squeeze the
            database-reported list to nothing. The section below carries its
@@ -103,77 +181,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- ONE toolbar row: search, the filter popover, its chips, the
              statement toggle, then the time range pinned right. -->
-        <template #toolbar>
-          <!-- `min-w-0` + `flex-1` so the chip run absorbs the slack and the
-               trailing controls keep their intrinsic width; without it the
-               chips push the time range off the row. -->
-          <DbmTableToolbar
-            v-model:search="search"
-            :placeholder="t('dbm.queries.searchPlaceholder')"
-            :debounce="400"
-            search-data-test="dbm-queries-search"
-            @search="load"
-          >
-            <OToggleGroup
-              :model-value="stmtClass"
-              class="shrink-0"
-              data-test="dbm-queries-stmt-class"
-              @update:model-value="onStmtClassChange"
-            >
-              <!-- The second option names what it ADDS rather than restating
-                   the whole: two halves that both read as "everything"
-                   ("Queries" / "All statements") make the distinction
-                   invisible. The tooltips list the actual statements. -->
-              <OToggleGroupItem value="query" size="sm">
-                {{ t("dbm.queries.stmtClass.query") }}
-                <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.queryHint')" />
-              </OToggleGroupItem>
-              <OToggleGroupItem value="all" size="sm">
-                {{ t("dbm.queries.stmtClass.all") }}
-                <OTooltip side="bottom" :content="t('dbm.queries.stmtClass.allHint')" />
-              </OToggleGroupItem>
-            </OToggleGroup>
-
-            <!-- What every Δ and every insight is measured AGAINST (W5). The
-                 comparison used to be welded to the preceding window, which
-                 made "did this get slower since the deploy?" unanswerable:
-                 widening the picker moved the baseline along with it. Each
-                 rule line names the choice, so a number can always be traced
-                 to the comparison that produced it. -->
-            <OToggleGroup
-              :model-value="baseline"
-              class="shrink-0"
-              data-test="dbm-queries-baseline"
-              @update:model-value="onBaselineChange"
-            >
-              <OToggleGroupItem value="previous" size="sm">
-                {{ t("dbm.insights.baseline.previousShort") }}
-                <OTooltip side="bottom" :content="t('dbm.insights.baseline.previousHint')" />
-              </OToggleGroupItem>
-              <OToggleGroupItem value="yesterday" size="sm">
-                {{ t("dbm.insights.baseline.yesterdayShort") }}
-                <OTooltip side="bottom" :content="t('dbm.insights.baseline.yesterdayHint')" />
-              </OToggleGroupItem>
-            </OToggleGroup>
-
-            <DbmScopeFilters
-              class="min-w-0 flex-1"
-              :filters="dimensionFilters"
-              :insight-chip="activeInsightChip"
-              @clear="clearScope"
-              @clear-insight="activeInsightId = null"
-            />
-          </DbmTableToolbar>
-        </template>
-
-        <template #toolbar-trailing>
-          <DbmRefreshButton
-            :loading="loading"
-            data-test="dbm-queries-refresh"
-            @refresh="onRefresh"
-          />
-        </template>
-
         <!-- Coverage, then the cross-row framing. Both inside the table frame
              because both are claims about exactly these rows. -->
         <template #subheader>
@@ -456,25 +463,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dbm-server-queries-table"
           @row-click="openServerQueryDetail"
         >
-          <!-- The section owns the page in fallback mode (the client table is
-               unmounted), so it carries the toolbar — same search and refresh
-               bindings, minus the client-only controls (statement-class and
-               baseline toggles describe data this list does not have). -->
-          <template #toolbar>
-            <DbmTableToolbar
-              v-model:search="search"
-              :placeholder="t('dbm.queries.searchPlaceholder')"
-              :debounce="400"
-              search-data-test="dbm-server-queries-search"
-            />
-          </template>
-          <template #toolbar-trailing>
-            <DbmRefreshButton
-              :loading="loading"
-              data-test="dbm-server-queries-refresh"
-              @refresh="onRefresh"
-            />
-          </template>
           <!-- The totals follow the TABLE. When the client vantage is empty
                this band used to unmount with the client table, taking the
                window's totals with it; before that it summed a trace vantage
@@ -486,6 +474,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <DbmSubheaderBand data-test="dbm-server-queries-summary">
               <OStatStrip :items="visibleSummaryStats" :loading="loading" />
             </DbmSubheaderBand>
+            <!-- Coverage follows the TABLE too, for the same reason the stat
+                 band above does. It used to live only in the client table's
+                 subheader, so freshness, the top-N truncation disclosure and
+                 the "counted to" timestamp all vanished at exactly the moment
+                 the numbers changed vantage — the one moment a reader most
+                 needs to be told what they are looking at. `hits` is the
+                 fallback list, so the line counts the rows actually on screen;
+                 the error count is withheld because the server feed carries
+                 none, and a `0` there would read as an all-clear nobody
+                 measured. -->
+            <DbmCoverageLine
+              :freshness="freshness"
+              :hits="serverCoverageHits"
+              :top-n-subset="serverTruncated"
+              :filter-label="narrowingFilterLabel"
+              data-test="dbm-server-queries-coverage"
+            />
           </template>
           <template #cell-query="{ row }">
             <DbmQueryCell
@@ -561,10 +566,10 @@ import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
-import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { copyToClipboard } from "@/utils/clipboard";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -589,8 +594,9 @@ import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
 import { useDbmQueryDetailHop } from "@/composables/dbm/useDbmQueryDetailHop";
 import { useDbmTracePresence } from "@/composables/dbm/useDbmTracePresence";
 import useStreams from "@/composables/useStreams";
-import { tabCountProps, withOwnCount } from "@/composables/dbm/useDbmTabCounts";
+import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
+import { useDbmOwnFilterSync } from "@/composables/dbm/useDbmScopeFilters";
 import { createDbmContextProvider } from "@/composables/contextProviders";
 import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
@@ -663,6 +669,7 @@ const {
   loading,
   error,
   search,
+  lastRunAt,
   org,
   dbmEnabled,
   run,
@@ -673,6 +680,30 @@ const {
   syncUrl: () => syncUrl(),
   context: () => dbmContext,
   beforeMount: () => restoreFromUrl(),
+  // In fallback mode the table beneath the badge is the database-reported
+  // list, so the badge counts THAT — a `0` from the empty client read directly
+  // above rendered rows would deny working data (the same false-zero the fleet
+  // badge fix removed). The claim carries the cap, so a full page renders
+  // `50+`, never the cap as a total. While loading — and while the fallback
+  // read is still out — `undefined` lets the shared snapshot's own zero-trace
+  // fallback stand instead of stamping a transient 0 over it.
+  //
+  // Each branch carries the vantage of the list it counted, so the tab strip's
+  // qualifier follows the number instead of being fixed per page.
+  ownCounts: [
+    {
+      key: "queryCount",
+      value: () =>
+        loading.value || (!rows.value.length && !serverRows.value.length)
+          ? undefined
+          : rows.value.length
+            ? countClaim(rows.value.length, false, "client")
+            : countClaim(serverRows.value.length, serverTruncated.value, "server"),
+    },
+    // 0 here means "no client traffic", not "no databases" — the shared
+    // snapshot's fleet fallback is the better number then.
+    { key: "databaseCount", value: () => databaseCount.value || undefined },
+  ],
 });
 // The list→detail hop: the seed hand-off plus the push, in one place. See
 // useDbmQueryDetailHop.
@@ -778,6 +809,22 @@ const filteredServerRows = computed(() => {
   );
 });
 
+/**
+ * The fallback rows in the shape the coverage line measures time in.
+ *
+ * `DbmCoverageLine` sums `total_time_ns`; a server row carries `exec_time_s`.
+ * Handing it the raw rows would make every row contribute 0, so the line would
+ * report "we cannot tell" over a list whose time it can in fact add up. The
+ * conversion is the same one the fallback stat tile does (`exec_time_s * 1e9`),
+ * so the two cannot disagree.
+ *
+ * No `other` bucket: the server feed has no remainder, so coverage is the whole
+ * of what it reported and the share sentence is not offered.
+ */
+const serverCoverageHits = computed(() =>
+  filteredServerRows.value.map((row) => ({ total_time_ns: (row.exec_time_s ?? 0) * 1e9 })),
+);
+
 const serverColumns = computed<OTableColumnDef<ServerQueryRow>[]>(() => [
   {
     id: "query",
@@ -869,43 +916,15 @@ const completionBias = ref<{ dropPercent: number } | null>(null);
 const databaseCount = ref<number | null>(null);
 
 /**
- * The sibling badges from the shell's shared fan-out, with the TWO this page
- * counts better than the fan-out can substituted in.
+ * Every badge, from the shell's shared snapshot.
  *
- * `queryCount` is `rows.length` — what the table is showing after this page's
- * filters — and `databaseCount` the distinct instances within it. Both differ
- * from the unfiltered shared read by design.
+ * The TWO this page counts better than the fan-out can are in there too —
+ * `ownCounts` above publishes them. `queryCount` is `rows.length` (what the
+ * table is showing after this page's filters) and `databaseCount` the distinct
+ * instances within it; both differ from the unfiltered shared read by design,
+ * and both must read the same from every tab rather than only from this one.
  */
-const tabCounts = computed(() =>
-  tabCountProps(
-    withOwnCount(
-      withOwnCount(
-        tabCountsContext.counts.value,
-        "queryCount",
-        // In fallback mode the table beneath the badge is the
-        // database-reported list, so the badge counts THAT — a `0` from the
-        // empty client read directly above rendered rows would deny working
-        // data (the same false-zero the fleet badge fix removed). The claim
-        // carries the cap, so a full page renders `50+`, never the cap as a
-        // total. While loading — and while the fallback read is still out —
-        // `undefined` lets the shared snapshot's own zero-trace fallback
-        // stand instead of stamping a transient 0 over it.
-        //
-        // Each branch carries the vantage of the list it counted, so the tab
-        // strip's qualifier follows the number instead of being fixed per page.
-        loading.value || (!rows.value.length && !serverRows.value.length)
-          ? undefined
-          : rows.value.length
-            ? countClaim(rows.value.length, false, "client")
-            : countClaim(serverRows.value.length, serverTruncated.value, "server"),
-      ),
-      "databaseCount",
-      // 0 here means "no client traffic", not "no databases" — the shared
-      // snapshot's fleet fallback is the better number then.
-      databaseCount.value || undefined,
-    ),
-  ),
-);
+const tabCounts = computed(() => tabCountProps(tabCountsContext.counts.value));
 
 /**
  * Only the two things this page asks of the table. `InstanceType<typeof OTable>`
@@ -922,6 +941,22 @@ const instanceFilter = ref<string | null>((route.query.instance as string) ?? nu
 const namespaceFilter = ref<string | null>((route.query.namespace as string) ?? null);
 const envFilter = ref<string | null>((route.query.env as string) ?? null);
 const serviceFilter = ref<string | null>((route.query.service as string) ?? null);
+
+// This page is kept alive, so the seeds above run ONCE per session — a filter
+// set (or cleared) on a sibling tab would otherwise never reach these refs,
+// leaving the chips and the next read disagreeing with the URL. Re-read on
+// activation, the same moment the range sync uses.
+useDbmOwnFilterSync(
+  () => route.query,
+  {
+    system: systemFilter,
+    instance: instanceFilter,
+    namespace: namespaceFilter,
+    env: envFilter,
+    service: serviceFilter,
+  },
+  () => void load(),
+);
 
 const insights = ref<DbmInsight[]>([]);
 const insightsHidden = ref(false);
@@ -1174,43 +1209,84 @@ const filterEntry = createDbmFilterEntry(() => {
  * each carrying the plain-language name of its dimension so a set filter reads
  * as `database: orders-db` rather than a bare value with no subject.
  */
-const dimensionFilters = computed<DbmScopeFilter[]>(() => [
-  filterEntry({
+const dimensionFilters = computed<DbmScopeFilter[]>(() => {
+  // In fallback mode the options must describe the list ON SCREEN. Every
+  // `options:` below used to derive from `rows` alone — which is empty exactly
+  // when the fallback fires — so hoisting the control out of the client
+  // table's toolbar (see the template) would otherwise have produced five
+  // empty selects. The server rows are unioned in, so the values offered are
+  // the values the visible table actually contains.
+  const serverList = serverListShown.value ? filteredServerRows.value : [];
+
+  const instance = filterEntry({
     key: "instance",
     dimension: t("dbm.filters.dimension.instance"),
     placeholder: t("dbm.filters.allInstances"),
-    options: optionsFrom(rows.value.map((r) => r.db_instance)),
+    options: optionsFrom([
+      ...rows.value.map((r) => r.db_instance),
+      ...serverList.map((r) => r.db_instance),
+    ]),
     model: instanceFilter,
-  }),
-  filterEntry({
+  });
+  const system = filterEntry({
+    key: "system",
+    dimension: t("dbm.filters.dimension.system"),
+    placeholder: t("dbm.filters.allEngines"),
+    options: optionsFrom([
+      ...rows.value.map((r) => r.db_system),
+      ...serverList.map((r) => r.db_system),
+    ]),
+    model: systemFilter,
+  });
+  const namespace = filterEntry({
+    key: "namespace",
+    dimension: t("dbm.filters.dimension.namespace"),
+    placeholder: t("dbm.filters.allNamespaces"),
+    options: optionsFrom([
+      ...rows.value.flatMap((r) => r.namespaces ?? [r.db_namespace]),
+      ...serverList.map((r) => r.db_namespace),
+    ]),
+    model: namespaceFilter,
+  });
+  const env = filterEntry({
     key: "env",
     dimension: t("dbm.filters.dimension.env"),
     placeholder: t("dbm.filters.allEnvs"),
     options: optionsFrom(rows.value.flatMap((r) => r.envs ?? [r.env])),
     model: envFilter,
-  }),
-  filterEntry({
-    key: "system",
-    dimension: t("dbm.filters.dimension.system"),
-    placeholder: t("dbm.filters.allEngines"),
-    options: optionsFrom(rows.value.map((r) => r.db_system)),
-    model: systemFilter,
-  }),
-  filterEntry({
+  });
+  const service = filterEntry({
     key: "service",
     dimension: t("dbm.filters.dimension.service"),
     placeholder: t("dbm.filters.allServices"),
     options: optionsFrom(rows.value.flatMap((r) => r.services ?? [r.service_name])),
     model: serviceFilter,
-  }),
-  filterEntry({
-    key: "namespace",
-    dimension: t("dbm.filters.dimension.namespace"),
-    placeholder: t("dbm.filters.allNamespaces"),
-    options: optionsFrom(rows.value.flatMap((r) => r.namespaces ?? [r.db_namespace])),
-    model: namespaceFilter,
-  }),
-]);
+  });
+
+  // DatabasesPage's rule, applied here: only the dimensions THIS list's
+  // endpoint accepts are offered, because a select that silently did nothing
+  // would be worse than its absence. `/server_queries` takes system, instance
+  // and namespace only — verified against the live fleet, where a fallback
+  // fetched under `service=<nonexistent>` still returned 50 rows (the server
+  // never applied it) while `instance=<nonexistent>` correctly returned none.
+  //
+  // A value already SET on an unsupported dimension is kept as a chip rather
+  // than dropped. It is not inert: `env`/`service` still narrow the CLIENT
+  // read whose emptiness is what put the page in fallback in the first place,
+  // so silently clearing them would change which list is shown and re-run the
+  // page under a scope the reader never asked to leave. Shown-and-removable
+  // states the truth ("this is set") and hands the reader the control; the
+  // select is withheld because offering NEW values for it would promise
+  // narrowing of the list below that the endpoint cannot perform.
+  if (!serverListShown.value) return [instance, env, system, service, namespace];
+  return [
+    instance,
+    system,
+    namespace,
+    ...(envFilter.value ? [{ ...env, options: [] }] : []),
+    ...(serviceFilter.value ? [{ ...service, options: [] }] : []),
+  ];
+});
 
 /**
  * The active insight, as a toolbar chip. Clicking an insight filters the table

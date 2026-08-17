@@ -8287,11 +8287,30 @@ async fn server_prologue(org_id: &str, user_id: &str) -> Option<DbmServerPrologu
 pub struct BadgesQuery {
     pub start_time: Option<i64>,
     pub end_time: Option<i64>,
-    /// Database system filter. Applied only to the slices whose browser
-    /// fan-out applied it (databases, queries and the two server fallbacks) —
-    /// the event slices took the bare window there, and this endpoint must
-    /// answer the same questions the six reads answered.
+    /// The reader's scope, forwarded to exactly the slices whose endpoint
+    /// ACCEPTS each dimension — the same matrix the pages apply to their own
+    /// reads, because a badge must count what its tab would show.
+    ///
+    /// This used to be `system` alone, forwarded to only three of the seven
+    /// slices, which was inherited from the browser fan-out this replaced
+    /// rather than chosen. It made the strip answer a different question than
+    /// the tabs it labels: measured live, `/deadlocks` returns 91 unfiltered
+    /// and 7 under `system=postgresql`, while the badge said 91 either way,
+    /// and `/server_samples` narrows from 73 rows to 0 under
+    /// `instance=postgres` while the Slowest-calls badge could not narrow at
+    /// all — there was no field here to carry it.
+    ///
+    /// A dimension a slice does not accept is simply not sent to it. That is
+    /// honest rather than lossy: the databases endpoint has no namespace
+    /// concept, so neither the Overview badge nor the Overview TAB can narrow
+    /// by one.
     pub system: Option<String>,
+    pub instance: Option<String>,
+    pub namespace: Option<String>,
+    /// Trace-vantage only — the queries and samples slices are the only ones
+    /// whose feed carries the calling application.
+    pub env: Option<String>,
+    pub service: Option<String>,
 }
 
 /// The six slice outcomes plus the two conditionally-run fallbacks, ready to
@@ -8433,7 +8452,11 @@ pub(crate) fn databases_slice_reports_zero_calls(databases: &Result<Value, HttpR
         ("org_id" = String, Path, description = "Organization name"),
         ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
-        ("system" = Option<String>, Query, description = "Database system filter (applied to the databases/queries slices and the server fallbacks)"),
+        ("system" = Option<String>, Query, description = "Database system filter"),
+        ("instance" = Option<String>, Query, description = "Database instance filter"),
+        ("namespace" = Option<String>, Query, description = "Database/schema filter"),
+        ("env" = Option<String>, Query, description = "Environment filter (trace-vantage slices only)"),
+        ("service" = Option<String>, Query, description = "Calling service filter (trace-vantage slices only)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -8460,7 +8483,10 @@ pub async fn get_dbm_badges(
         end_time: q.end_time,
         stream: None,
         system: q.system.clone(),
-        service: None,
+        // The databases endpoint deserializes only system/service/stream, so
+        // instance and namespace are not sent — the Overview tab cannot narrow
+        // by them either, and a badge must count what its tab would show.
+        service: q.service.clone(),
         baseline_start_time: None,
         baseline_end_time: None,
         // A badge is a COUNT of rows; the per-instance split is a drill-down
@@ -8472,10 +8498,10 @@ pub async fn get_dbm_badges(
         end_time: q.end_time,
         stream: None,
         system: q.system.clone(),
-        instance: None,
-        namespace: None,
-        env: None,
-        service: None,
+        instance: q.instance.clone(),
+        namespace: q.namespace.clone(),
+        env: q.env.clone(),
+        service: q.service.clone(),
         stmt_class: None,
         sort: None,
         limit: Some(1),
@@ -8493,10 +8519,12 @@ pub async fn get_dbm_badges(
         start_time: q.start_time,
         end_time: q.end_time,
         stream: None,
-        system: None,
-        instance: None,
+        system: q.system.clone(),
+        instance: q.instance.clone(),
+        // `database` is not a dimension the strip offers; `namespace` is the
+        // one the pages actually filter on.
         database: None,
-        namespace: None,
+        namespace: q.namespace.clone(),
         limit: None,
     };
     // `DeadlocksQuery` / `BlockingQuery` / `TableHealthQuery` only exist on an
@@ -8509,10 +8537,12 @@ pub async fn get_dbm_badges(
         start_time: q.start_time,
         end_time: q.end_time,
         stream: None,
-        system: None,
-        instance: None,
+        system: q.system.clone(),
+        instance: q.instance.clone(),
+        // `database` is not a dimension the strip offers; `namespace` is the
+        // one the pages actually filter on.
         database: None,
-        namespace: None,
+        namespace: q.namespace.clone(),
         search: None,
         limit: None,
     };
@@ -8521,10 +8551,12 @@ pub async fn get_dbm_badges(
         start_time: q.start_time,
         end_time: q.end_time,
         stream: None,
-        system: None,
-        instance: None,
+        system: q.system.clone(),
+        instance: q.instance.clone(),
+        // `database` is not a dimension the strip offers; `namespace` is the
+        // one the pages actually filter on.
         database: None,
-        namespace: None,
+        namespace: q.namespace.clone(),
         search: None,
         min_wait_seconds: None,
         limit: None,
@@ -8534,8 +8566,10 @@ pub async fn get_dbm_badges(
         stream: None,
         start_time: q.start_time,
         end_time: q.end_time,
-        system: None,
-        instance: None,
+        // Its feed carries no database at all, so namespace is withheld — the
+        // Table health tab withholds that select for the same reason.
+        system: q.system.clone(),
+        instance: q.instance.clone(),
         limit: None,
         include_indexes: None,
     };
@@ -8595,9 +8629,9 @@ pub async fn get_dbm_badges(
                 end_time: q.end_time,
                 stream: None,
                 system: q.system.clone(),
-                instance: None,
+                instance: q.instance.clone(),
                 database: None,
-                namespace: None,
+                namespace: q.namespace.clone(),
                 // The badges slice counts the window's statements — narrowing
                 // it to one would make the badge report 1.
                 fingerprint: None,
@@ -8614,9 +8648,9 @@ pub async fn get_dbm_badges(
                 end_time: q.end_time,
                 stream: None,
                 system: q.system.clone(),
-                instance: None,
+                instance: q.instance.clone(),
                 database: None,
-                namespace: None,
+                namespace: q.namespace.clone(),
                 limit: None,
             };
             Some(read_server_samples_body(org, user, &ss).await)
@@ -15996,6 +16030,71 @@ mod tests {
             reexport.contains("get_dbm_badges"),
             "the handler must be re-exported, or the router cannot name it"
         );
+    }
+
+    /// A BADGE COUNTS WHAT ITS TAB WOULD SHOW.
+    ///
+    /// `/badges` used to forward only `system`, and only to the databases,
+    /// queries and server-fallback slices — the four event slices were
+    /// constructed with every dimension hardcoded `None`. That was inherited
+    /// from the browser fan-out it replaced rather than chosen, and it made the
+    /// strip answer a different question than the tabs it labels: measured
+    /// live, `/deadlocks` returns 91 unfiltered and 7 under
+    /// `system=postgresql`, while the Deadlocks BADGE said 91 either way.
+    /// Slowest calls was worse — `/server_samples` honours `instance` (73 rows
+    /// to 0), but the badge could not narrow at all, because `BadgesQuery` had
+    /// no field to carry it.
+    ///
+    /// Each dimension goes to exactly the slices whose endpoint ACCEPTS it —
+    /// the same matrix the pages already use, so a badge and its tab are
+    /// answering one question. A dimension a slice does not accept is simply
+    /// not sent to it, which is honest rather than lossy: the Overview tab
+    /// cannot narrow by namespace either.
+    #[test]
+    fn test_badges_forwards_each_dimension_to_the_slices_that_accept_it() {
+        let src = include_str!("api.rs");
+        let start = src
+            .find("pub async fn get_dbm_badges")
+            .expect("badges handler must exist");
+        let end = src[start..]
+            .find("\n/// Attach the database-reported fallback")
+            .map(|i| start + i)
+            .unwrap_or(src.len());
+        let body = &src[start..end];
+
+        // The query struct must be able to CARRY the scope in the first place.
+        let bq_start = src
+            .find("pub struct BadgesQuery")
+            .expect("BadgesQuery must exist");
+        let bq_end = bq_start
+            + src[bq_start..]
+                .find("\n}")
+                .expect("BadgesQuery must be a closed struct");
+        let bq = &src[bq_start..bq_end];
+        for dim in ["system", "instance", "namespace", "env", "service"] {
+            assert!(
+                bq.contains(&format!("pub {dim}:")),
+                "BadgesQuery must carry `{dim}` — a badge that cannot receive a \
+                 dimension can never respond to it"
+            );
+        }
+
+        // No slice may hardcode a dimension its endpoint accepts. The four
+        // event slices are the ones that regressed, so they are named.
+        for slice in ["activity_q", "deadlocks_q", "blocking_q", "table_health_q"] {
+            let at = body
+                .find(&format!("let {slice} = "))
+                .unwrap_or_else(|| panic!("{slice} must be constructed in the handler"));
+            let decl = &body[at..at + body[at..].find("};").unwrap_or(600)];
+            assert!(
+                decl.contains("q.system.clone()"),
+                "{slice} must receive the caller's `system`, not a hardcoded None"
+            );
+            assert!(
+                decl.contains("q.instance.clone()"),
+                "{slice} must receive the caller's `instance`, not a hardcoded None"
+            );
+        }
     }
 
     // ── A partial search result is an ERROR, never an empty page ────────────

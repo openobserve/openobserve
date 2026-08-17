@@ -78,11 +78,14 @@ describe("the overview badge counts the fleet it shows", () => {
    * not quietly return.
    */
   it("overrides the tab badge with the rendered row count, not a traffic-only count", () => {
-    // While loading the page yields (`undefined`) to the shared snapshot's
-    // zero-trace fallback instead of stamping a transient 0 over it; the
-    // exact fleet count takes over when the union settles.
+    // PUBLISHED to the shared snapshot rather than substituted into this
+    // page's own copy, so the number reads the same from every tab and not
+    // only while standing here. While loading the page yields (`undefined`)
+    // to the shared snapshot's zero-trace fallback instead of stamping a
+    // transient 0 over it; the exact fleet count takes over when the union
+    // settles. See dbmTabCountsResilience.spec.ts.
     expect(source).toMatch(
-      /"databaseCount",\s*\n\s*loading\.value \? undefined : fleetRowCount\.value/,
+      /key: "databaseCount", value: \(\) => \(loading\.value \? undefined : fleetRowCount\.value\)/,
     );
     expect(source).toMatch(/const fleetRowCount = computed\(\(\) => rows\.value\.length\)/);
     expect(
