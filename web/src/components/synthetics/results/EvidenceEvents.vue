@@ -135,13 +135,25 @@ const columns = computed<OTableColumnDef<EvidenceRow>[]>(() => [
     size: 200,
     meta: { autoWidth: true },
   },
-  ...(isPanel.value ? [{ id: "step", header: t("synthetics.evidence.colStep"), size: 240 }] : []),
+  ...(isPanel.value
+    ? [
+        {
+          id: "step",
+          header: t("synthetics.evidence.colStep"),
+          size: 240,
+          sortable: true,
+        },
+      ]
+    : []),
   {
     id: "duration",
     header: t("synthetics.evidence.colDuration"),
     size: 80,
     sortable: isPanel.value,
     accessorKey: "durationMs",
+    // Right-aligned on the COLUMN: a `text-right` class on the cell's inline
+    // span does nothing, which is why these read ragged.
+    meta: { align: "right" },
   },
 ]);
 
@@ -263,6 +275,7 @@ function rowTitle(e: EvidenceEvent): string {
     :expansion="isPanel ? 'multiple' : 'none'"
     :expanded-ids="expandedIds"
     @update:expandedIds="(ids: string[]) => (expandedIds = ids)"
+    :footer-title="t('synthetics.evidence.footerEvents')"
     data-test="synthetics-evidence-events"
   >
     <!-- First column, because it is the axis every other cell is read against:
@@ -338,7 +351,7 @@ function rowTitle(e: EvidenceEvent): string {
     </template>
 
     <template #cell-duration="{ row }">
-      <span class="text-text-secondary text-right font-mono text-xs">
+      <span class="text-text-secondary font-mono text-xs">
         {{ row.durationMs != null ? `${row.durationMs}ms` : "" }}
       </span>
     </template>

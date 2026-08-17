@@ -154,7 +154,7 @@ describe("EvidenceEvents", () => {
     const sortable = (table.props("columns") as { id: string; sortable?: boolean }[])
       .filter((c) => c.sortable)
       .map((c) => c.id);
-    expect(sortable).toEqual(["elapsed", "type", "status", "duration"]);
+    expect(sortable).toEqual(["elapsed", "type", "status", "step", "duration"]);
     expect(mountEvents({ mode: "inline" }).findComponent(OTable).props("sorting")).toBe("none");
   });
 
@@ -248,5 +248,21 @@ describe("EvidenceEvents", () => {
     const sel = '[data-test="synthetics-evidence-events-step"]';
     expect(off.find(sel).classes()).toContain("truncate");
     expect(on.find(sel).classes()).not.toContain("truncate");
+  });
+
+  it("right-aligns Took, so durations line up on their digits", () => {
+    const cols = mountEvents().findComponent(OTable).props("columns") as Array<Record<string, any>>;
+    expect(cols.find((c) => c.id === "duration")?.meta?.align).toBe("right");
+  });
+
+  it("lets the panel sort by step, the other axis of the run", () => {
+    const cols = mountEvents({ mode: "panel" }).findComponent(OTable).props("columns") as Array<
+      Record<string, any>
+    >;
+    expect(cols.find((c) => c.id === "step")?.sortable).toBe(true);
+  });
+
+  it("labels the footer count instead of leaving a bare number", () => {
+    expect(mountEvents({ mode: "panel" }).findComponent(OTable).props("footerTitle")).toBeTruthy();
   });
 });
