@@ -1,0 +1,413 @@
+===== COMPLETE LIST OF CHANGED FILES (4 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+src/core/src/providers.rs
+web/src/enterprise/components/onlineEvals/forms/ProviderFormPage.vue
+o2_enterprise/src/enterprise/llm_evaluations/provider.rs
+tests/api-testing/tests/online_eval/test_online_eval.py
+===== END CHANGED FILES =====
+
+diff --git a/src/core/src/providers.rs b/src/core/src/providers.rs
+index b82f75ba831..88f8b855296 100644
+--- a/src/core/src/providers.rs
++++ b/src/core/src/providers.rs
+@@ -46,6 +46,23 @@ fn scorer_uses_provider(scorer: &table::scorers::Scorer, provider_id: &str) -> b
+     scorer.params.get("provider_id").and_then(|v| v.as_str()) == Some(provider_id)
+ }
+ 
++fn resolve_updated_auth_config(
++    requested: &serde_json::Value,
++    existing: &serde_json::Value,
++) -> serde_json::Value {
++    let has_new_api_key = requested
++        .get("api_key")
++        .and_then(|value| value.as_str())
++        .map(str::trim)
++        .is_some_and(|value| !value.is_empty());
++
++    if has_new_api_key {
++        requested.clone()
++    } else {
++        existing.clone()
++    }
++}
++
+ #[cfg(feature = "enterprise")]
+ fn validate_provider_config(provider: &table::providers::Provider) -> Result<(), ProviderError> {
+     o2_enterprise::enterprise::llm_evaluations::provider::PreparedProvider::parse(provider.into())
+@@ -99,6 +116,8 @@ pub async fn update_provider(
+     if existing.org_id != org_id {
+         return Err(ProviderError::NotFound);
+     }
++    provider.auth_config =
++        resolve_updated_auth_config(&provider.auth_config, &existing.auth_config);
+ 
+     // Check name uniqueness excluding self
+     let all = table::providers::get_all_by_org(org_id).await?;
+@@ -296,4 +315,23 @@ mod tests {
+         assert!(scorer_uses_provider(&scorer, "provider-1"));
+         assert!(!scorer_uses_provider(&scorer, "provider-2"));
+     }
++
++    #[test]
++    fn test_blank_updated_api_key_preserves_existing_auth_config() {
++        let existing = serde_json::json!({"api_key": "sk-existing"});
++        let requested = serde_json::json!({"api_key": "  "});
++
++        assert_eq!(resolve_updated_auth_config(&requested, &existing), existing);
++    }
++
++    #[test]
++    fn test_non_empty_updated_api_key_replaces_existing_auth_config() {
++        let existing = serde_json::json!({"api_key": "sk-existing"});
++        let requested = serde_json::json!({"api_key": "sk-new"});
++
++        assert_eq!(
++            resolve_updated_auth_config(&requested, &existing),
++            requested
++        );
++    }
+ }
+diff --git a/web/src/enterprise/components/onlineEvals/forms/ProviderFormPage.vue b/web/src/enterprise/components/onlineEvals/forms/ProviderFormPage.vue
+index 2859a83adc8..e95cf835223 100644
+--- a/web/src/enterprise/components/onlineEvals/forms/ProviderFormPage.vue
++++ b/web/src/enterprise/components/onlineEvals/forms/ProviderFormPage.vue
+@@ -140,7 +140,9 @@
+           <div class="mb-3">
+             <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
+               {{ t("onlineEvals.provider.apiKeyLabel") }}
+-              <span v-if="mode === 'create'" class="text-status-error-text ml-0.5">*</span>
++              <span v-if="mode === 'create' && apiKeyRequired" class="text-status-error-text ml-0.5"
++                >*</span
++              >
+             </div>
+             <OFormInput
+               name="apiKey"
+@@ -226,6 +228,9 @@ const form = useOForm<ProviderForm>({
+   onSubmit: save,
+ });
+ const formValues = form.useStore((s: any) => s.values as ProviderForm);
++const apiKeyRequired = computed(() =>
++  ["openai", "deepseek", "anthropic"].includes(formValues.value.providerType),
++);
+ 
+ const providerTypeOptions = computed(() => [
+   { label: raw("OpenAI"), value: "openai" },
+
+
+===== LINKED / SISTER PR: openobserve/o2-enterprise #2390 (combined for full feature context) =====
+
+diff --git a/o2_enterprise/src/enterprise/llm_evaluations/provider.rs b/o2_enterprise/src/enterprise/llm_evaluations/provider.rs
+index 6aaf946f4..f4289c31b 100644
+--- a/o2_enterprise/src/enterprise/llm_evaluations/provider.rs
++++ b/o2_enterprise/src/enterprise/llm_evaluations/provider.rs
+@@ -75,6 +75,10 @@ impl std::error::Error for ProviderStructuredOutputError {}
+ pub enum ProviderKind {
+     /// OpenAI chat completions compatible provider.
+     OpenAi,
++    /// Generic OpenAI-compatible chat completions provider.
++    OpenAiCompatible,
++    /// Self-hosted vLLM OpenAI-compatible provider.
++    Vllm,
+     /// DeepSeek chat completions compatible provider.
+     DeepSeek,
+     /// Anthropic messages API provider.
+@@ -88,6 +92,8 @@ impl ProviderKind {
+     pub fn parse(raw: &str) -> Result<Self> {
+         match raw.trim().to_lowercase().as_str() {
+             "openai" => Ok(Self::OpenAi),
++            "openai_compatible" => Ok(Self::OpenAiCompatible),
++            "vllm" => Ok(Self::Vllm),
+             "deepseek" => Ok(Self::DeepSeek),
+             "anthropic" => Ok(Self::Anthropic),
+             "ollama" => Ok(Self::Ollama),
+@@ -99,36 +105,42 @@ impl ProviderKind {
+     pub fn as_str(&self) -> &'static str {
+         match self {
+             Self::OpenAi => "openai",
++            Self::OpenAiCompatible => "openai_compatible",
++            Self::Vllm => "vllm",
+             Self::DeepSeek => "deepseek",
+             Self::Anthropic => "anthropic",
+             Self::Ollama => "ollama",
+         }
+     }
+ 
+-    fn default_run_endpoint(&self) -> &'static str {
++    fn default_run_endpoint(&self) -> Option<&'static str> {
+         match self {
+-            Self::OpenAi => "https://api.openai.com/v1/chat/completions",
+-            Self::DeepSeek => "https://api.deepseek.com/chat/completions",
+-            Self::Anthropic => "https://api.anthropic.com/v1/messages",
+-            Self::Ollama => "http://localhost:11434/api/generate",
++            Self::OpenAi => Some("https://api.openai.com/v1/chat/completions"),
++            Self::OpenAiCompatible => None,
++            Self::Vllm => Some("http://localhost:8000/v1/chat/completions"),
++            Self::DeepSeek => Some("https://api.deepseek.com/chat/completions"),
++            Self::Anthropic => Some("https://api.anthropic.com/v1/messages"),
++            Self::Ollama => Some("http://localhost:11434/api/generate"),
+         }
+     }
+ 
+-    fn default_test_endpoint(&self) -> &'static str {
++    fn default_test_endpoint(&self) -> Option<&'static str> {
+         match self {
+-            Self::OpenAi => "https://api.openai.com/v1/models",
+-            Self::DeepSeek => "https://api.deepseek.com/models",
+-            Self::Anthropic => "https://api.anthropic.com/v1/messages",
+-            Self::Ollama => "http://localhost:11434/api/tags",
++            Self::OpenAi => Some("https://api.openai.com/v1/models"),
++            Self::OpenAiCompatible | Self::Vllm => None,
++            Self::DeepSeek => Some("https://api.deepseek.com/models"),
++            Self::Anthropic => Some("https://api.anthropic.com/v1/messages"),
++            Self::Ollama => Some("http://localhost:11434/api/tags"),
+         }
+     }
+ 
+-    fn default_model(&self) -> &'static str {
++    fn default_model(&self) -> Option<&'static str> {
+         match self {
+-            Self::OpenAi => "gpt-4o",
+-            Self::DeepSeek => "deepseek-v4-pro",
+-            Self::Anthropic => "claude-3-5-sonnet-20241022",
+-            Self::Ollama => "llama3.2",
++            Self::OpenAi => Some("gpt-4o"),
++            Self::OpenAiCompatible | Self::Vllm => None,
++            Self::DeepSeek => Some("deepseek-v4-pro"),
++            Self::Anthropic => Some("claude-3-5-sonnet-20241022"),
++            Self::Ollama => Some("llama3.2"),
+         }
+     }
+ }
+@@ -159,6 +171,17 @@ impl ProviderAuth {
+                     })?;
+                 Ok(Self::ApiKey(api_key.to_string()))
+             }
++            ProviderKind::OpenAiCompatible | ProviderKind::Vllm => {
++                let api_key = auth_config
++                    .get("api_key")
++                    .and_then(|v| v.as_str())
++                    .map(str::trim)
++                    .filter(|v| !v.is_empty());
++                Ok(match api_key {
++                    Some(api_key) => Self::ApiKey(api_key.to_string()),
++                    None => Self::None,
++                })
++            }
+             ProviderKind::Ollama => Ok(Self::None),
+         }
+     }
+@@ -228,7 +251,12 @@ impl PreparedProvider {
+     pub fn parse(raw: RawProviderConfig) -> Result<Self> {
+         let kind = ProviderKind::parse(&raw.provider_type)?;
+         let default_model = match raw.default_model.trim() {
+-            "" => kind.default_model().to_string(),
++            "" => kind.default_model().map(str::to_string).ok_or_else(|| {
++                anyhow::anyhow!(
++                    "default_model is required for provider type {}",
++                    kind.as_str()
++                )
++            })?,
+             model => model.to_string(),
+         };
+         let mut available_models: Vec<String> = raw
+@@ -251,8 +279,11 @@ impl PreparedProvider {
+             .as_deref()
+             .map(str::trim)
+             .filter(|v| !v.is_empty())
+-            .unwrap_or_else(|| kind.default_run_endpoint())
+-            .to_string();
++            .map(str::to_string)
++            .or_else(|| kind.default_run_endpoint().map(str::to_string))
++            .ok_or_else(|| {
++                anyhow::anyhow!("endpoint is required for provider type {}", kind.as_str())
++            })?;
+         reqwest::Url::parse(&endpoint)
+             .map_err(|e| anyhow::anyhow!("Invalid provider endpoint '{endpoint}': {e}"))?;
+ 
+@@ -316,27 +347,40 @@ impl PreparedProvider {
+     /// Performs a lightweight connectivity check for this provider.
+     pub async fn test_connection(&self) -> Result<String> {
+         let client = http_client();
++        let test_endpoint = self
++            .kind
++            .default_test_endpoint()
++            .unwrap_or(self.endpoint.as_str());
+ 
+         let response = match self.kind {
+-            ProviderKind::OpenAi => {
++            ProviderKind::OpenAi | ProviderKind::DeepSeek => {
+                 client
+-                    .get(self.kind.default_test_endpoint())
++                    .get(test_endpoint)
+                     .timeout(Duration::from_secs(10))
+                     .header("Authorization", format!("Bearer {}", self.auth.api_key()))
+                     .send()
+                     .await
+             }
+-            ProviderKind::DeepSeek => {
+-                client
+-                    .get(self.kind.default_test_endpoint())
++            ProviderKind::OpenAiCompatible | ProviderKind::Vllm => {
++                let request = client
++                    .post(&self.endpoint)
+                     .timeout(Duration::from_secs(10))
+-                    .header("Authorization", format!("Bearer {}", self.auth.api_key()))
+-                    .send()
+-                    .await
++                    .header("Content-Type", "application/json")
++                    .json(&serde_json::json!({
++                        "model": self.default_model,
++                        "max_tokens": 1,
++                        "messages": [{"role": "user", "content": "hi"}]
++                    }));
++                let request = if self.auth.api_key().is_empty() {
++                    request
++                } else {
++                    request.header("Authorization", format!("Bearer {}", self.auth.api_key()))
++                };
++                request.send().await
+             }
+             ProviderKind::Anthropic => {
+                 client
+-                    .post(self.kind.default_test_endpoint())
++                    .post(test_endpoint)
+                     .timeout(Duration::from_secs(10))
+                     .header("x-api-key", self.auth.api_key())
+                     .header("anthropic-version", "2023-06-01")
+@@ -351,7 +395,7 @@ impl PreparedProvider {
+             }
+             ProviderKind::Ollama => {
+                 client
+-                    .get(self.kind.default_test_endpoint())
++                    .get(test_endpoint)
+                     .timeout(Duration::from_secs(10))
+                     .send()
+                     .await
+@@ -460,12 +504,16 @@ async fn call_chat_completions(
+     let start = std::time::Instant::now();
+ 
+     let resp = send_with_retries(provider_label, || {
+-        http_client()
++        let request = http_client()
+             .post(&params.endpoint)
+             .timeout(Duration::from_millis(params.timeout_ms))
+-            .header("Authorization", format!("Bearer {}", params.api_key))
+             .header("Content-Type", "application/json")
+-            .json(&body)
++            .json(&body);
++        if params.api_key.is_empty() {
++            request
++        } else {
++            request.header("Authorization", format!("Bearer {}", params.api_key))
++        }
+     })
+     .await?;
+ 
+@@ -761,7 +809,9 @@ async fn call_provider(
+         .map_err(|e| anyhow::anyhow!("LLM provider concurrency limiter closed: {e}"))?;
+ 
+     match provider_kind {
+-        ProviderKind::OpenAi => call_openai(params).await,
++        ProviderKind::OpenAi | ProviderKind::OpenAiCompatible | ProviderKind::Vllm => {
++            call_openai(params).await
++        }
+         ProviderKind::DeepSeek => call_deepseek(params).await,
+         ProviderKind::Anthropic => call_anthropic(params).await,
+         ProviderKind::Ollama => call_ollama(params).await,
+@@ -900,6 +950,49 @@ mod tests {
+         assert_eq!(provider.auth, ProviderAuth::ApiKey("sk-test".to_string()));
+     }
+ 
++    #[test]
++    fn preserves_openai_compatible_endpoint() {
++        let mut raw = raw_provider(
++            "openai_compatible",
++            serde_json::json!({"api_key": "sk-test"}),
++        );
++        raw.endpoint = Some("https://api.minimax.io/v1/chat/completions".to_string());
++
++        let provider = PreparedProvider::parse(raw).unwrap();
++
++        assert_eq!(provider.kind, ProviderKind::OpenAiCompatible);
++        assert_eq!(
++            provider.endpoint,
++            "https://api.minimax.io/v1/chat/completions"
++        );
++        assert_eq!(provider.auth, ProviderAuth::ApiKey("sk-test".to_string()));
++    }
++
++    #[test]
++    fn parses_keyless_vllm_provider() {
++        let provider =
++            PreparedProvider::parse(raw_provider("vllm", serde_json::json!({}))).unwrap();
++
++        assert_eq!(provider.kind, ProviderKind::Vllm);
++        assert_eq!(
++            provider.endpoint,
++            "http://localhost:8000/v1/chat/completions"
++        );
++        assert_eq!(provider.auth, ProviderAuth::None);
++    }
++
++    #[test]
++    fn requires_openai_compatible_endpoint() {
++        let err = PreparedProvider::parse(raw_provider(
++            "openai_compatible",
++            serde_json::json!({"api_key": "sk-test"}),
++        ))
++        .unwrap_err()
++        .to_string();
++
++        assert!(err.contains("endpoint is required"));
++    }
++
+     #[test]
+     fn parses_deepseek_provider_with_api_key() {
+         let provider = PreparedProvider::parse(raw_provider(
+diff --git a/tests/api-testing/tests/online_eval/test_online_eval.py b/tests/api-testing/tests/online_eval/test_online_eval.py
+index c72278c2b..2a16fca40 100644
+--- a/tests/api-testing/tests/online_eval/test_online_eval.py
++++ b/tests/api-testing/tests/online_eval/test_online_eval.py
+@@ -182,6 +182,22 @@ def test_05_update(self):
+                      json_data=payload, label="update")
+         assert resp.json()["defaultModel"] == "gpt-4-turbo"
+ 
++    def test_05b_update_preserves_existing_api_key(self):
++        created = self._create(name=f"upd-secret-{self.rnd()}")
++        payload = {
++            "name": created["name"],
++            "providerType": "openai",
++            "endpoint": "https://api.openai.com/v1/chat/completions",
++            "defaultModel": "gpt-4o",
++            "availableModels": ["gpt-4o"],
++            "authConfig": {"api_key": ""},
++            "isDefault": False,
++        }
++        resp = _api(self.s, self.base, self.org,
++                    f"providers/{created['id']}", method="PUT",
++                    json_data=payload, label="update without rotating key")
++        assert resp.json()["defaultModel"] == "gpt-4o"
++
+     def test_06_delete(self):
+         created = self._create(name=f"del-{self.rnd()}")
+         _api(self.s, self.base, self.org, f"providers/{created['id']}",
+@@ -211,6 +227,18 @@ def test_09_duplicate_name(self):
+                         "defaultModel": "claude-3", "authConfig": {"api_key": "k"}},
+              expected_status=400, label="create duplicate")
+ 
++    def test_09b_create_openai_compatible(self):
++        created = self._create(
++            name=f"compatible-{self.rnd()}",
++            providerType="openai_compatible",
++            endpoint="https://api.minimax.io/v1/chat/completions",
++            default_model="MiniMax-M3",
++            available_models=["MiniMax-M3"],
++            api_key="sk-minimax",
++        )
++        assert created["providerType"] == "openai_compatible"
++        assert created["endpoint"] == "https://api.minimax.io/v1/chat/completions"
++
+     def test_10_test_endpoint(self):
+         created = self._create(name=f"tst-{self.rnd()}")
+         resp = _api(self.s, self.base, self.org,

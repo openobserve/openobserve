@@ -1,0 +1,6 @@
+{
+  "group": "OnlineEvals",
+  "spec_filename": "llmProviderTypes.spec.js",
+  "create_group": true,
+  "browser": "chrome"
+}

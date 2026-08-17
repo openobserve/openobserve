@@ -1,0 +1,17 @@
+{
+  "feature_slug": "llm-provider-types",
+  "feature_title": "Online Evals LLM Provider Types & API Key Handling",
+  "area": "OnlineEvals",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "llmProviderTypes.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/OnlineEvals/llmProviderTypes.spec.js",
+  "playwright_group": "OnlineEvals",
+  "source_files": [
+    "web/src/enterprise/components/onlineEvals/forms/ProviderFormPage.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

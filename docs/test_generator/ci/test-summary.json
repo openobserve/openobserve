@@ -1,0 +1,10 @@
+[
+  { "title": "should expose vLLM and OpenAI-compatible in the provider type dropdown", "action": "new", "verifies": "the provider type dropdown renders the new vLLM and OpenAI-compatible options" },
+  { "title": "should toggle the API key required marker with the provider type", "action": "new", "verifies": "the API-key required marker shows for openai/deepseek and hides for vLLM/openai_compatible in create mode" },
+  { "title": "should create a keyless vLLM provider", "action": "new", "verifies": "a vLLM provider saves without an API key and appears in the provider list" },
+  { "title": "should create an OpenAI-compatible provider with a custom endpoint and API key", "action": "new", "verifies": "an openai_compatible provider persists with a user-supplied endpoint and key" },
+  { "title": "should show an endpoint required error for OpenAI-compatible without an endpoint", "action": "new", "verifies": "saving openai_compatible without an endpoint surfaces the backend endpoint-required error" },
+  { "title": "should preserve the stored API key when editing with a blank key", "action": "new", "verifies": "editing a provider with a blank key succeeds without clearing the stored secret" },
+  { "title": "should not show the API key required marker in edit mode", "action": "new", "verifies": "the API-key required marker is hidden in edit mode even for openai providers" },
+  { "title": "should close the form without persisting when cancel is clicked", "action": "new", "verifies": "cancelling the create form returns to the provider list without creating a provider" }
+]
