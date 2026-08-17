@@ -633,7 +633,7 @@ export const convertServiceGraphToTree = (
 /**
  * Fruchterman-Reingold force-directed layout.
  *
- * Produces the organic, well-spread graph layout used by tools like DataDog.
+ * Produces the organic, well-spread graph layout used by service-graph views.
  * No external dependencies — runs as a pure-JS physics simulation.
  *
  * Algorithm:
@@ -1407,7 +1407,7 @@ export const convertServiceGraphToNetwork = (
       else if (errorRate > 1) borderColor = "#faad14"; // Yellow (degraded)
     }
 
-    // Node size: scales with request volume like DataDog (70–110 px range)
+    // Node size: scales with request volume (70–110 px range)
     const baseSymbolSize = Math.max(70, Math.min(110, Math.log10(metrics.requests + 1) * 28));
     // Agent accent treatment (tint/size/ping) applies only when the Agent
     // Graph page asks for it; elsewhere an un-highlighted agent renders like any

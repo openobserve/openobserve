@@ -125,28 +125,73 @@ describe("FunctionsToolbar", () => {
     expect(wrapper.find('[data-test="add-function-name-input-value"]').exists()).toBe(true);
   });
 
-  it("should render VRL radio button", () => {
+  it("should render the VRL language option", () => {
     const wrapper = mountToolbar({
       transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-    expect(wrapper.find('[data-test="function-transform-type-vrl-radio"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="function-transform-type-vrl-option"]').exists()).toBe(true);
   });
 
-  it("should render JavaScript radio button when option is provided", () => {
+  it("should render the JavaScript language option when it is provided", () => {
     const wrapper = mountToolbar({
       transformTypeOptions: [
         { label: "VRL", value: "0" },
         { label: "JavaScript", value: "1" },
       ],
     });
-    expect(wrapper.find('[data-test="function-transform-type-js-radio"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="function-transform-type-js-option"]').exists()).toBe(true);
   });
 
-  it("should NOT render the JavaScript radio when only one option is provided", () => {
+  it("should NOT render the JavaScript option when only one option is provided", () => {
     const wrapper = mountToolbar({
       transformTypeOptions: [{ label: "VRL", value: "0" }],
     });
-    expect(wrapper.find('[data-test="function-transform-type-js-radio"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="function-transform-type-js-option"]').exists()).toBe(false);
+  });
+
+  it("marks the option matching the form's transType as selected", () => {
+    const wrapper = mountToolbar(
+      {
+        transformTypeOptions: [
+          { label: "VRL", value: "0" },
+          { label: "JavaScript", value: "1" },
+        ],
+      },
+      { name: "fn", transType: "1" },
+    );
+
+    expect(
+      wrapper.find('[data-test="function-transform-type-js-option"]').attributes("data-state"),
+    ).toBe("on");
+    expect(
+      wrapper.find('[data-test="function-transform-type-vrl-option"]').attributes("data-state"),
+    ).toBe("off");
+  });
+
+  it("writes the picked language to the form when an option is clicked", async () => {
+    const wrapper = mountToolbar({
+      transformTypeOptions: [
+        { label: "VRL", value: "0" },
+        { label: "JavaScript", value: "1" },
+      ],
+    });
+
+    await wrapper.find('[data-test="function-transform-type-js-option"]').trigger("click");
+
+    expect(getForm(wrapper).state.values.transType).toBe("1");
+  });
+
+  it("offers an info tip for BOTH languages without selecting either", () => {
+    const wrapper = mountToolbar({
+      transformTypeOptions: [
+        { label: "VRL", value: "0" },
+        { label: "JavaScript", value: "1" },
+      ],
+    });
+
+    // transType defaults to "0" (VRL) — the JS tip must still be reachable.
+    expect(wrapper.find('[data-test="function-transform-type-vrl-info"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="function-transform-type-js-info"]').exists()).toBe(true);
   });
 
   it("hides the language toggle entirely when hideTransType is set", () => {
@@ -164,8 +209,10 @@ describe("FunctionsToolbar", () => {
       },
     });
 
-    expect(wrapper.find('[data-test="function-transform-type-vrl-radio"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="function-transform-type-js-radio"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="function-transform-type-vrl-option"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="function-transform-type-js-option"]').exists()).toBe(false);
+    // The locked language's tip stays reachable.
+    expect(wrapper.find('[data-test="function-transform-type-info"]').exists()).toBe(true);
   });
 
   it("should emit test event when test button is clicked", async () => {

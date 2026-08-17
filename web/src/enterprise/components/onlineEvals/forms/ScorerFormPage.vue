@@ -639,8 +639,7 @@
         <pre
           class="rounded-default bg-card-bg border-border-default text-text-body m-0 max-h-[60vh] overflow-auto border p-3 font-mono text-xs font-normal whitespace-pre [tab-size:2]"
           v-else
-          >{{ schemaPreview }}</pre
-        >
+          >{{ schemaPreview }}</pre>
 
         <template #footer>
           <div class="flex w-full items-center justify-between gap-2">
@@ -884,7 +883,6 @@ function cleanExtraFields(fields: ExtraMetadataFieldRow[]): ExtraMetadataField[]
     }));
 }
 
-const cleanedCustomHeaders = computed(() => cleanHeaders(formValues.value.customHeaders));
 const cleanedExtraFields = computed<ExtraMetadataField[]>(() =>
   cleanExtraFields(formValues.value.extraMetadataFields),
 );
@@ -1211,9 +1209,7 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
           .map((f) => ({
             name: String(f.name || ""),
             type: (f.type === "number" || f.type === "boolean" ? f.type : "string") as
-              | "string"
-              | "number"
-              | "boolean",
+              "string" | "number" | "boolean",
             description: String(f.description || ""),
           }))
       : [],

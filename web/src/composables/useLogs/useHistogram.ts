@@ -169,7 +169,6 @@ export const useHistogram = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
-      let hasAggregationFlag = false;
       const parsedSQL: any = fnParsedSQL();
       if (searchObj.meta.sqlMode && Object.prototype.hasOwnProperty.call(parsedSQL, "columns")) {
         hasAggregation(parsedSQL.columns);

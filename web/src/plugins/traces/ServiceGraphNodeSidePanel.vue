@@ -423,7 +423,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="active"
                     variant="ghost"
                     size="icon"
-                    class="bg-table-row-hover-bg! rounded-default shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
                     :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                     @click.stop="
                       navigateToTraces({
@@ -2409,11 +2408,20 @@ export default defineComponent({
         sql_mode: "false",
         query: b64EncodeUnicode(filterQuery),
         org_identifier: org,
+        // The Logs route is keep-alive, so a repeat visit only runs onActivated —
+        // which restores the URL params solely on the trace-explorer branch.
+        type: "trace_explorer",
       };
 
       if (streamName) {
-        queryParams.stream_value = streamName;
+        queryParams.stream = streamName;
       }
+
+      // The Logs page keeps `isInitialized` in the store across unmounts, and while
+      // it is set it restores the previous session from the store instead of reading
+      // these params — dropping the stream, time range and filter. Clearing it makes
+      // the URL the source of truth, same as the trace-details "View Logs" button.
+      store.dispatch("logs/setIsInitialized", false);
 
       router.push({
         path: "/logs",

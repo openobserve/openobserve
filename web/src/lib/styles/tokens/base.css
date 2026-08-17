@@ -281,6 +281,8 @@
   --color-chart-series-11: #e879f9;
   --color-chart-series-12: #facc15;
 
+  --color-chart-markline-shadow: rgba(255, 255, 255, 0.7);
+
   /* --- Dashboard table row-highlight palette — light values (dark overrides in
      dark.css). Read by colorPalette.ts getColorForTable() via chartColor(). --- */
   --color-chart-table-1: #ffcdee;
@@ -369,6 +371,7 @@
   --color-black: #000000;
 
   /* --- Spacing scale --- */
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   --spacing-px: 1px;
   --spacing-3: 0.75rem; /* 12px */
   --spacing-4: 1rem; /* 16px */
@@ -389,6 +392,7 @@
      (small→default, large→surface). Do NOT reintroduce sm/md/lg/xl. */
   --radius-default: 0.375rem; /* 6px  — control tier */
   --radius-surface: 0.75rem; /* 12px — surface tier (matches the historical dialog curve) */
+  /* eslint-disable-next-line local/no-hardcoded-px -- fully-rounded pill sentinel */
   --radius-full: 9999px; /* pills / avatars / circles */
   /* Checkboxes stay at the original 4px: the tick box is tiny (12–16px), and the
      control tier's 6px reads as visibly round on a box that small. Pinned to its
@@ -396,10 +400,16 @@
   --radius-checkbox: 0.25rem; /* 4px  — checkbox tick box only */
 
   /* --- Shadow scale — hairline-border philosophy ---
-     Only md/lg render real elevation (overlays: dialogs, menus). Cards use a
+     Only sm/md/lg render real elevation (overlays: dialogs, menus). Cards use a
      1px border, not a drop shadow — a flat surface needs NO shadow class. */
-  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
-  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.1), 0 4px 8px -4px rgb(0 0 0 / 0.06);
+  --shadow-sm-c1: rgb(0 0 0 / 0.1);
+  --shadow-sm-c2: rgb(0 0 0 / 0.06);
+  --shadow-md-c1: rgb(0 0 0 / 0.08);
+  --shadow-md-c2: rgb(0 0 0 / 0.06);
+  --shadow-lg-c1: rgb(0 0 0 / 0.1);
+  --shadow-lg-c2: rgb(0 0 0 / 0.06);
+  --shadow-scroll-c: rgb(0 0 0 / 0.1);
+  --shadow-glow-c: rgb(0 0 0 / 0.6);
 }
 
 /* ============================================================

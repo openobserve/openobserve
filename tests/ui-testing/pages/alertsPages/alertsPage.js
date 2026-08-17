@@ -80,7 +80,7 @@ export class AlertsPage {
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
             streamNamePopover: '[data-test="add-alert-stream-name-select-dropdown-popover"]',
             streamNameOption: '[data-test="add-alert-stream-name-select-dropdown-option"]',
-            alertTypeSelect: '[data-test="add-alert-type-select-dropdown"]',
+            alertTypeSelect: '[data-test="add-alert-type-tabs"]',
 
             // Step 2: Query/Conditions selectors
             queryTabsContainer: '[data-test="step2-query-tabs"]',
@@ -327,7 +327,51 @@ export class AlertsPage {
 
             // OToast (alerts module - success / error variants)
             oToastSuccess: '[data-test-variant="success"]',
-            oToastError: '[data-test-variant="error"]'
+            oToastError: '[data-test-variant="error"]',
+
+            // --- Sentinel POM relocations (from regression specs) ---
+            oToastMessage: '[data-test="o-toast-message"]',
+            errorOrNegativeElements: '[class*="error"], [class*="negative"]',
+            errorToastOrAlert: '[data-test-variant="error"], [role="alert"]',
+            monacoEditor: '.monaco-editor',
+            alertDestinationsSelectPopover: '[data-test="alert-destinations-select-popover"]',
+            alertDestinationsSelectOption: '[data-test="alert-destinations-select-option"]',
+            groupBySelectFirstTrigger: '[data-test="alert-group-by-select-0-trigger"]',
+            groupBySelectOptions: '[data-test^="alert-group-by-select-"][data-test$="-option"]',
+
+            // --- Sentinel POM relocations: Additional Settings Help Drawer spec ---
+            helpDrawerTemplateInfoBtn: '[data-test="advanced-template-info-btn"]',
+            helpDrawerVariablesInfoBtn: '[data-test="advanced-variables-info-btn"]',
+            alertSettingsHelpDrawer: '[data-test="alert-settings-help-drawer"]',
+            helpCurrentSection: '[data-test="help-current-section"]',
+            helpPreviewTemplateSelect: '[data-test="help-preview-template-select"]',
+            helpPreviewTemplateSelectOption: '[data-test="help-preview-template-select-popover"] [data-test$="-option"]',
+            helpDrawerOverlay: '[data-test="o-drawer-overlay"]',
+            helpBuiltinVar: '[data-test="help-builtin-var"]',
+            helpBuiltinToggle: '[data-test="help-builtin-toggle"]',
+
+            // --- Sentinel POM relocations: Content Templates E2E spec ---
+            templateListAddBtn: '[data-test="template-list-add-btn"]',
+            addTemplateModeTabs: '[data-test="add-template-mode-tabs"]',
+            addTemplateNameInputField: '[data-test="add-template-name-input-field"]',
+            contentTemplateFormTitleInputField: '[data-test="content-template-form-title-input-field"]',
+            // Body editor lines: content-template body editor OR generic monaco view-lines.
+            contentTemplateFormBodyEditorLines: '[data-test="content-template-form-body-editor"] .view-lines, .monaco-editor .view-lines',
+            addTemplatePreviewPanel: '[data-test="add-template-preview-panel"]',
+            templatePreviewPanelVisualTab: '[data-test="template-preview-panel-visual-tab"]',
+            templatePreviewPanelRawTab: '[data-test="template-preview-panel-raw-tab"]',
+            templatePreviewPanelVisualCard: '[data-test="template-preview-panel-visual-card"]',
+            templatePreviewPanelRawJson: '[data-test="template-preview-panel-raw-json"]',
+            contentTemplateFormOptionalCollapsible: '[data-test="content-template-form-optional-collapsible"]',
+            contentTemplateFormFieldsAddBtn: '[data-test="content-template-form-fields-add-btn"]',
+            contentTemplateFormFieldRow0LabelInputField: '[data-test="content-template-form-fields-row-0-label-input-field"]',
+            contentTemplateFormFieldRow0ValueInputField: '[data-test="content-template-form-fields-row-0-value-input-field"]',
+            // Per-row severity/show-when trigger: severity-select OR show-when variant.
+            contentTemplateFormFieldRow0SeverityTrigger: '[data-test="content-template-form-fields-row-0-severity-select-trigger"], [data-test="content-template-form-fields-row-0-show-when-trigger"]',
+            templatePreviewPanelFields: '[data-test="template-preview-panel-fields"]',
+            templatePreviewPanelSeveritySelect: '[data-test="template-preview-panel-severity-select"]',
+            templatePreviewPanelSeverityCriticalValue: '[data-test-value="critical"]',
+            addTemplateSubmitBtn: '[data-test="add-template-submit-btn"]'
         };
     }
 
@@ -355,6 +399,289 @@ export class AlertsPage {
     /** Wait for the Add Alert button to render — the readiness gate before creating an alert. */
     async waitForAddAlertButton() {
         await this.page.locator(this.locators.addAlertButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    // --- Sentinel POM helpers (relocated from spec files) ---
+    // Row locator matched by visible text (list cells are unreliable with ARIA role matching).
+    getAlertRowByText(name) {
+        return this.page.getByText(name);
+    }
+
+    getTemplateRowByText(name) {
+        // Same locator as getAlertRowByText — kept as a semantic alias, single impl.
+        return this.getAlertRowByText(name);
+    }
+
+    getAlertHistoryRowsLocator() {
+        return this.page.locator(this.locators.alertDetailsHistoryTable + ' tbody tr');
+    }
+
+    // --- Sentinel POM getters (relocated from regression specs) ---
+    /** Add Alert button (bare locator, no .first()). */
+    getAddAlertButtonLocator() {
+        return this.page.locator(this.locators.addAlertButton);
+    }
+
+    /** Add Condition button (bare locator, no .first()). */
+    getAddConditionButtonLocator() {
+        return this.page.locator(this.locators.addConditionButton);
+    }
+
+    /** Advanced tab button (.first() — matches clickAdvancedTab). */
+    getAdvancedTabLocator() {
+        return this.page.locator(this.locators.advancedTabBtn).first();
+    }
+
+    /** Alert import button (bare locator). */
+    getAlertImportButtonLocator() {
+        return this.page.locator(this.locators.alertImportButton);
+    }
+
+    /** Alert import "Import JSON file" tab (bare locator). */
+    getAlertImportFileTabLocator() {
+        return this.page.locator(this.locators.alertImportFileTab);
+    }
+
+    /** Alert import JSON file input field (bare locator). */
+    getAlertImportJsonFileInputLocator() {
+        return this.page.locator(this.locators.alertImportJsonFileInputField);
+    }
+
+    /** Alert name inner input field (bare locator). */
+    getAlertNameInputFieldLocator() {
+        return this.page.locator(this.locators.alertNameInputField);
+    }
+
+    /** Alert submit button (bare locator). */
+    getAlertSubmitButtonLocator() {
+        return this.page.locator(this.locators.alertSubmitButton);
+    }
+
+    /** Alert destinations select (bare locator). */
+    getAlertDestinationsSelectLocator() {
+        return this.page.locator(this.locators.alertDestinationsSelect);
+    }
+
+    /** Alert destinations select popover. */
+    getAlertDestinationsSelectPopover() {
+        return this.page.locator(this.locators.alertDestinationsSelectPopover);
+    }
+
+    /** First alert destinations select option. */
+    getFirstAlertDestinationOption() {
+        return this.page.locator(this.locators.alertDestinationsSelectOption).first();
+    }
+
+    /** SQL tab scoped within the step2 query tabs container. */
+    getSqlTabInQueryTabs() {
+        return this.page.locator(this.locators.queryTabsContainer).locator(this.locators.tabSql);
+    }
+
+    /** Last Monaco editor on the page (alert creation wizard pattern). */
+    getMonacoEditorLast() {
+        return this.page.locator(this.locators.monacoEditor).last();
+    }
+
+    /** Elements matching error/negative CSS classes (bug pre-check). */
+    getErrorOrNegativeElements() {
+        return this.page.locator(this.locators.errorOrNegativeElements);
+    }
+
+    /** App-level error toast or ARIA alert. */
+    getErrorToastOrAlert() {
+        return this.page.locator(this.locators.errorToastOrAlert);
+    }
+
+
+
+    /** Page body (used for click-away to dismiss dropdowns). */
+    getBodyLocator() {
+        return this.page.locator('body');
+    }
+
+    /** "Group by" label row (parent element via ..). */
+    getGroupByRow() {
+        return this.page.locator('text=Group by').locator('..');
+    }
+
+    /** First group-by select trigger. */
+    getGroupBySelectTrigger() {
+        return this.page.locator(this.locators.groupBySelectFirstTrigger).first();
+    }
+
+    /** Group-by select suggestion options. */
+    getGroupBySuggestions() {
+        return this.page.locator(this.locators.groupBySelectOptions);
+    }
+
+    /** Generic text-content locator (getByText) — used for toast/option text matches. */
+    getElementByText(text) {
+        return this.page.getByText(text);
+    }
+
+    // --- Sentinel POM getters: scheduled-features spec ---
+    /** Alert details refresh button (bare locator). */
+    getAlertDetailsRefreshButtonLocator() {
+        return this.page.locator(this.locators.alertDetailsRefreshButton);
+    }
+
+    /** Alert details copy-conditions button (bare locator). */
+    getAlertDetailsCopyConditionsButtonLocator() {
+        return this.page.locator(this.locators.alertDetailsCopyConditionsButton);
+    }
+
+    /** Alert preview chart (bare locator). */
+    getAlertPreviewChartLocator() {
+        return this.page.locator(this.locators.alertPreviewChart);
+    }
+
+    /** "Alert if" row (logs) locator (bare locator). */
+    getAlertIfRowLogsLocator() {
+        return this.page.locator(this.locators.alertIfRowLogs);
+    }
+
+    // --- Sentinel POM getters: Additional Settings Help Drawer spec ---
+    /** "Learn more" help trigger next to the Template Override field. */
+    getHelpDrawerTemplateInfoBtn() {
+        return this.page.locator(this.locators.helpDrawerTemplateInfoBtn);
+    }
+
+    /** "Learn more" help trigger next to the Additional Variables field. */
+    getHelpDrawerVariablesInfoBtn() {
+        return this.page.locator(this.locators.helpDrawerVariablesInfoBtn);
+    }
+
+    /** Alert settings help drawer container. */
+    getAlertSettingsHelpDrawer() {
+        return this.page.locator(this.locators.alertSettingsHelpDrawer);
+    }
+
+    /** Help drawer "current section" content area. */
+    getHelpCurrentSection() {
+        return this.page.locator(this.locators.helpCurrentSection);
+    }
+
+
+
+    /** In-drawer preview template select (root — pass to openOSelectDropdown). */
+    getHelpPreviewTemplateSelect() {
+        return this.page.locator(this.locators.helpPreviewTemplateSelect);
+    }
+
+    /** First option in the in-drawer preview template select popover. */
+    getHelpPreviewTemplateFirstOption() {
+        return this.page.locator(this.locators.helpPreviewTemplateSelectOption).first();
+    }
+
+    /** Help drawer dismiss overlay. */
+    getHelpDrawerOverlay() {
+        return this.page.locator(this.locators.helpDrawerOverlay);
+    }
+
+    /** First built-in variable chip in the Additional Variables help panel. */
+    getFirstHelpBuiltinVar() {
+        return this.page.locator(this.locators.helpBuiltinVar).first();
+    }
+
+    /** Built-in variables disclosure toggle. */
+    getHelpBuiltinToggle() {
+        return this.page.locator(this.locators.helpBuiltinToggle);
+    }
+
+    // --- Sentinel POM getters: Content Templates E2E spec ---
+    /** Template list "Add" button. */
+    getTemplateListAddBtn() {
+        return this.page.locator(this.locators.templateListAddBtn);
+    }
+
+    /** Add-template mode/kind tabs. */
+    getAddTemplateModeTabs() {
+        return this.page.locator(this.locators.addTemplateModeTabs);
+    }
+
+    /** Add-template name inner input field. */
+    getAddTemplateNameInputField() {
+        return this.page.locator(this.locators.addTemplateNameInputField);
+    }
+
+    /** Content-template Title inner input field. */
+    getContentTemplateTitleInputField() {
+        return this.page.locator(this.locators.contentTemplateFormTitleInputField);
+    }
+
+    /** First body-editor view-lines block (content editor or monaco). */
+    getContentTemplateBodyEditorLines() {
+        return this.page.locator(this.locators.contentTemplateFormBodyEditorLines).first();
+    }
+
+    /** Add-template preview panel container. */
+    getAddTemplatePreviewPanel() {
+        return this.page.locator(this.locators.addTemplatePreviewPanel);
+    }
+
+    /** Preview panel visual ("approximate") tab. */
+    getTemplatePreviewVisualTab() {
+        return this.page.locator(this.locators.templatePreviewPanelVisualTab);
+    }
+
+    /** Preview panel raw-payload tab. */
+    getTemplatePreviewRawTab() {
+        return this.page.locator(this.locators.templatePreviewPanelRawTab);
+    }
+
+    /** Preview panel visual card. */
+    getTemplatePreviewVisualCard() {
+        return this.page.locator(this.locators.templatePreviewPanelVisualCard);
+    }
+
+    /** Preview panel raw JSON payload area. */
+    getTemplatePreviewRawJson() {
+        return this.page.locator(this.locators.templatePreviewPanelRawJson);
+    }
+
+    /** Content-template optional-fields disclosure ("Add to this template"). */
+    getContentTemplateOptionalCollapsible() {
+        return this.page.locator(this.locators.contentTemplateFormOptionalCollapsible);
+    }
+
+    /** Content-template fields "Add" button. */
+    getContentTemplateFieldsAddBtn() {
+        return this.page.locator(this.locators.contentTemplateFormFieldsAddBtn);
+    }
+
+    /** Content-template field row 0 label inner input. */
+    getContentTemplateFieldRow0LabelInput() {
+        return this.page.locator(this.locators.contentTemplateFormFieldRow0LabelInputField);
+    }
+
+    /** Content-template field row 0 value inner input. */
+    getContentTemplateFieldRow0ValueInput() {
+        return this.page.locator(this.locators.contentTemplateFormFieldRow0ValueInputField);
+    }
+
+    /** Content-template field row 0 severity/show-when trigger (.first()). */
+    getContentTemplateFieldRow0SeverityTrigger() {
+        return this.page.locator(this.locators.contentTemplateFormFieldRow0SeverityTrigger).first();
+    }
+
+    /** Preview panel fields block. */
+    getTemplatePreviewFields() {
+        return this.page.locator(this.locators.templatePreviewPanelFields);
+    }
+
+    /** Preview panel severity select. */
+    getTemplatePreviewSeveritySelect() {
+        return this.page.locator(this.locators.templatePreviewPanelSeveritySelect);
+    }
+
+    /** Preview panel severity "critical" value option. */
+    getTemplatePreviewSeverityCriticalValue() {
+        return this.page.locator(this.locators.templatePreviewPanelSeverityCriticalValue);
+    }
+
+    /** Add-template submit button. */
+    getAddTemplateSubmitBtn() {
+        return this.page.locator(this.locators.addTemplateSubmitBtn);
     }
 
     async createAlert(streamName, column, value, destinationName, randomValue) {
@@ -782,8 +1109,8 @@ export class AlertsPage {
         return this.bulkOperations.pauseAllSelectedAlerts();
     }
 
-    async moveAllAlertsToFolder(targetFolderName) {
-        return this.bulkOperations.moveAllAlertsToFolder(targetFolderName);
+    async moveAllAlertsToFolder(targetFolderName, options = {}) {
+        return this.bulkOperations.moveAllAlertsToFolder(targetFolderName, options);
     }
 
     async deleteAllAlertsInFolder() {
@@ -804,29 +1131,9 @@ export class AlertsPage {
 
     // ==================== REGRESSION TEST HELPER METHODS ====================
 
-    /**
-     * Click the "Add Alert" button on the alerts list page
-     */
-    async clickAddAlertButton() {
-        const btn = this.page.locator(this.locators.addAlertButton);
-        await btn.waitFor({ state: 'visible', timeout: 5000 });
-        await btn.click();
-        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
-        testLogger.info('Clicked Add Alert button');
-    }
 
-    /**
-     * Fill the alert name input in the add alert form
-     * @param {string} name - Alert name
-     */
-    async fillAlertName(name) {
-        // Inline-edit title: click the trigger to open the editor, then fill the input.
-        await this.page.locator(this.locators.alertNameTrigger).waitFor({ state: 'visible', timeout: 3000 });
-        await this.page.locator(this.locators.alertNameTrigger).click();
-        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
-        await this.page.locator(this.locators.alertNameInputField).fill(name);
-        testLogger.info(`Filled alert name: ${name}`);
-    }
+
+
 
     /**
      * Read the current alert name from the inline-edit title (OFormInlineEdit).
@@ -985,6 +1292,25 @@ export class AlertsPage {
         testLogger.info('Selected first available destination');
     }
 
+    /**
+     * Select a destination by exact name. Prefer this over selectFirstDestination:
+     * the "first" option can be a stale destination created by a parallel spec
+     * and deleted before save, which surfaces as a 404 "destination not found".
+     */
+    async selectDestinationByName(name) {
+        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
+        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
+        await openOSelectDropdown(this.page, dropdown);
+        const option = this.page
+            .locator('[data-test$="-popover"] [data-test$="-option"]')
+            .filter({ hasText: name })
+            .first();
+        await expect(option).toBeVisible({ timeout: 5000 });
+        await option.click();
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected destination by name', { name });
+    }
+
     /** Assert the list row for `name` renders the given priority (string or RegExp). */
     async expectAlertPriorityInList(name, matcher) {
         const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
@@ -1076,14 +1402,38 @@ export class AlertsPage {
             await this.navigateToAlertsPage();
         }
 
-        // Use specific folder-item selector to avoid matching unrelated text
-        const folderItem = this.page.locator(`div.folder-item:has-text("${folderName}")`).first();
-        const folderVisible = await folderItem.isVisible({ timeout: 5000 }).catch(() => false);
-        if (folderVisible) {
-            await folderItem.click();
+        // The folder list is reka OTabs. The clickable element is the [role="tab"] TabsTrigger
+        // that wraps the folder-name cell (data-test="dashboard-folder-tab-name-<name>"); it is
+        // the element that carries data-state="active" AND, via OTabs' v-model, drives
+        // activeFolderId — the folder the "New alert" wizard writes the alert into.
+        //
+        // Two bugs made the old approach silently switch to the wrong folder:
+        //   1. It clicked the inner .folder-item <div>, not the tab. The list is virtualized/
+        //      animated, so a force-click can land mid-reflow and never flip the reka tab.
+        //   2. It then gated only on the alert table OR empty-state being visible. The DEFAULT
+        //      folder's table is already on screen, so that gate is a FALSE success: the method
+        //      returned while still on "default", and any alert created next landed in "default"
+        //      instead of the intended folder (target folder then reads empty at export/move,
+        //      timing out the row wait). Trace confirmed POST /alerts?folder=default here.
+        // Fix: click the tab itself and gate on it actually becoming active before returning.
+        const folderTab = this.page.locator(
+            `[role="tab"]:has([data-test="dashboard-folder-tab-name-${folderName}"])`
+        ).first();
+        const tabVisible = await folderTab.isVisible({ timeout: 10000 }).catch(() => false);
+        if (tabVisible) {
+            // Force-click past the reflow, retrying, until the tab reports data-state="active".
+            // Re-clicking each iteration self-heals a click that landed mid-animation; the
+            // active-state assertion is the real completion signal (activeFolderId switched).
+            await expect(async () => {
+                if ((await folderTab.getAttribute('data-state')) !== 'active') {
+                    await folderTab.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+                    await folderTab.click({ force: true, timeout: 5000 });
+                }
+                await expect(folderTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
+            }).toPass({ timeout: 30000 });
         } else {
-            // Fallback to generic text selector
-            await this.page.getByText(folderName).first().click();
+            // Fallback to generic text selector for any legacy markup, then still verify below.
+            await this.page.getByText(folderName).first().click({ force: true });
         }
         try {
             await Promise.race([
@@ -2372,6 +2722,18 @@ export class AlertsPage {
     async exportAlerts() {
         const headerCheckbox = this.page.locator(this.locators.alertListHeaderCheckbox).first();
         await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for at least one alert ROW to render before select-all. After navigating to a
+        // folder the OTable can still be loading; clicking select-all over a not-yet-populated
+        // table selects nothing, so the selection-gated Export button never appears (the 30s
+        // toPass timeout in CI). OTable renders rows as [data-test^="o2-table-row-"].
+        // The folder-list refetch after navigation lags under CI load, so reload + retry once
+        // (mirrors verifyAlertCreated) rather than failing on a single slow fetch.
+        const firstRow = this.page.locator('[data-test^="o2-table-row-"]').first();
+        if (!(await firstRow.isVisible({ timeout: 15000 }).catch(() => false))) {
+            await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+            await firstRow.waitFor({ state: 'visible', timeout: 15000 });
+        }
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox for export');
 
@@ -2389,7 +2751,19 @@ export class AlertsPage {
             };
         });
 
-        await this.page.locator(this.locators.alertExportButton).click();
+        // The Export button is disabled until at least one alert is selected. The select-all
+        // click above can race the row render (nothing ends up selected), so the button never
+        // becomes actionable and a plain click 45s-timed-out. Ensure the selection took and the
+        // button is ready (re-selecting if needed) before clicking.
+        const exportBtn = this.page.locator(this.locators.alertExportButton);
+        await expect(async () => {
+            if (!(await exportBtn.isEnabled().catch(() => false))) {
+                await headerCheckbox.click().catch(() => {});
+            }
+            await expect(exportBtn).toBeVisible({ timeout: 3000 });
+            await expect(exportBtn).toBeEnabled({ timeout: 3000 });
+        }).toPass({ timeout: 30000 });
+        await exportBtn.click();
         await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' })).toBeVisible({ timeout: 60000 });
         testLogger.info('Export success notification visible');
 
@@ -2795,12 +3169,7 @@ export class AlertsPage {
         return this.page.locator(this.locators.conditionColumnSelect).first();
     }
 
-    /**
-     * Get the Step 2: Query Config section container
-     */
-    getStepQueryConfigSection() {
-        return this.page.locator(this.locators.stepQueryConfig);
-    }
+
 
     /**
      * Get the operator select dropdown
@@ -4030,5 +4399,86 @@ export class AlertsPage {
      */
     getErrorMessageBanner() {
         return this.page.locator('[class*="error"], [data-test*="error"]');
+    }
+
+    // ==================== ALERT FORM (from-dashboard-panel) LOCATORS ====================
+
+    /** Pre-filled alert name input on the add-alert form */
+    getAlertNameInput() {
+        return this.page.locator(this.locators.alertNameInput);
+    }
+
+    /** Wizard "Continue" button */
+    getContinueButton() {
+        return this.page.getByRole("button", { name: "Continue" });
+    }
+
+    /** Threshold operator select control (Step 4 settings) */
+    getThresholdOperatorSelect() {
+        return this.page.locator('[data-test="alert-threshold-operator-select"]');
+    }
+
+    /** Threshold operator option by exact text (e.g. ">=") */
+    getThresholdOperatorOption(text) {
+        return this.page.getByText(text, { exact: true });
+    }
+
+    /**
+     * Threshold value input. The data-test may sit on the native <input> or on
+     * its root div, so match both forms.
+     */
+    getThresholdValueInput() {
+        return this.page.locator(
+            'input[data-test="alert-threshold-value-input"], [data-test="alert-threshold-value-input"] input'
+        );
+    }
+
+    /** Destination select control */
+    getDestinationsSelect() {
+        return this.getAlertDestinationsSelectLocator();
+    }
+
+    /** Destination option by name */
+    getDestinationOption(destinationName) {
+        return this.page.locator(
+            `[data-test="alert-destination-option-${destinationName}"]`
+        );
+    }
+
+    /** Add-alert submit button */
+    getAddAlertSubmitButton() {
+        return this.getAlertSubmitButtonLocator();
+    }
+
+    /** Toast message filtered by text */
+    getToastMessageByText(text) {
+        return this.page
+            .locator(this.locators.oToastMessage)
+            .filter({ hasText: text });
+    }
+
+    /** Alert list search input */
+    getAlertListSearchInput() {
+        return this.page.locator(this.locators.alertSearchInput);
+    }
+
+    /** Alert list table rows */
+    getAlertTableRows() {
+        return this.page.locator("table tbody tr");
+    }
+
+    /** Context/kebab menu "Delete" option by exact text */
+    getDeleteMenuOption() {
+        return this.page.getByText("Delete", { exact: true });
+    }
+
+    /** Generic dialog primary (confirm) button */
+    getDialogPrimaryButton() {
+        return this.page.locator('[data-test="o-dialog-primary-btn"]');
+    }
+
+    /** "Alert deleted" toast text */
+    getAlertDeletedText() {
+        return this.page.getByText(this.locators.alertDeletedMessage);
     }
 }

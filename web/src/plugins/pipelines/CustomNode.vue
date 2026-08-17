@@ -448,7 +448,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           >
             {{ nodeErrorCount }}
           </span>
-          <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
+          <OTooltip side="top" align="center" :sideOffset="10" max-width="37.5rem">
             <template #content>
               <div class="max-h-75 overflow-y-auto">
                 {{ getNodeErrorInfo || t("common.errorOccurred") }}
@@ -570,6 +570,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   width: 9.375rem;
   font-size: var(--text-xs);
   text-align: center;
+  /* eslint-disable-next-line local/no-hardcoded-px -- 1px outline on the flow node: a border width — optical, not layout; it must not thicken with the node label */
   border-width: 1px;
   border-style: solid;
   color: var(--vf-node-text);

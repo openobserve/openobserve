@@ -34,12 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          text stays selectable. Still fully keyboard reachable: the action bar
          reveals on `focus-within`, so tabbing lands on Refresh / Configure /
          Pin / Open. -->
-    <!-- Matches the dashboard panel bar's box (PanelContainer's
-         dashboard-panel-bar): same min-height, padding and bottom border, no
-         tint. -->
-    <div
-      class="border-border-default relative flex min-h-7 min-w-0 items-center gap-2 border-b px-2 py-1"
-    >
+    <!-- The SAME bar the dashboard panels use — box, tint and title type all
+         come from PanelBar; only this card's layout is added on top. -->
+    <PanelBar class="relative min-w-0 gap-2">
       <!-- Name, then the type badge tight beside it. The name is the only
            flexible element in the row: it truncates whenever the right-hand
            cluster needs the room. -->
@@ -231,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </span>
       </div>
-    </div>
+    </PanelBar>
 
     <!-- Flush to the frame, like a panel body — the chart's own converter
          margins are the only inset, same as dashboards. -->
@@ -292,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip
             :content="raw(errorTooltip)"
             content-class="whitespace-pre-line"
-            max-width="360px"
+            max-width="22.5rem"
             :delay="200"
           />
           <OIcon name="error-outline" size="sm" class="text-error-600" />
@@ -322,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip
               :content="raw(errorReport)"
               content-class="whitespace-pre-line"
-              max-width="360px"
+              max-width="22.5rem"
               :delay="400"
             />
           </OButton>
@@ -358,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip
               :content="t('metrics.explorer.card.sparseHint')"
               content-class="whitespace-pre-line"
-              max-width="320px"
+              max-width="20rem"
               :delay="200"
             />
             {{ t("metrics.explorer.card.sparse") }}
@@ -387,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip
             :content="raw(renderError)"
             content-class="whitespace-pre-line"
-            max-width="360px"
+            max-width="22.5rem"
             :delay="200"
           />
           <OIcon name="error-outline" size="sm" class="text-error-600" />
@@ -431,7 +428,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-nan-guard-${card.name}`"
       >
         <span class="inline-flex cursor-help">
-          <OTooltip :content="t('metrics.explorer.card.nanGuard')" max-width="360px" :delay="200" />
+          <OTooltip
+            :content="t('metrics.explorer.card.nanGuard')"
+            max-width="22.5rem"
+            :delay="200"
+          />
           <OIcon name="info-outline" size="xs" />
         </span>
       </div>
@@ -455,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip
             :content="raw(staleTooltip)"
             content-class="whitespace-pre-line"
-            max-width="360px"
+            max-width="22.5rem"
             :delay="200"
           />
           <OIcon name="sync-problem" size="xs" />
@@ -484,6 +485,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import PanelBar from "@/components/common/PanelBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -527,6 +529,7 @@ export default defineComponent({
     OSkeleton,
     OEmptyState,
     LoadingProgress,
+    PanelBar,
     OTag,
     OTooltip,
   },
@@ -727,6 +730,7 @@ export default defineComponent({
             emit(entry.isIntersecting ? "visible" : "hidden", props.card);
           }
         },
+        // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
         { rootMargin: "100% 0px" },
       );
       observer.observe(root.value);

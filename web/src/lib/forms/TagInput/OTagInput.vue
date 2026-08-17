@@ -24,7 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="label"
         data-test="tag-input-label"
         class="group-focus-within:text-theme-accent pointer-events-none absolute top-4 left-3 -ml-1 origin-top-left bg-transparent px-1 text-base transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.5,1)]"
-        :class="hasContent ? 'text-theme-accent -translate-y-2 scale-75' : 'text-text-secondary'"
+        :class="
+          hasContent || isFocused
+            ? 'text-theme-accent -translate-y-2 scale-75'
+            : 'text-text-secondary'
+        "
         >{{ label }}</label
       >
       <div
@@ -37,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`tag-chip-${index}`"
           type="selectionChip"
           class="tag-chip m-0! shrink-0 grow-0 basis-auto bg-[color-mix(in_srgb,var(--color-button-primary)_20%,white_10%)]"
+          :class="isHighlighted(tag) ? 'ring-theme-accent ring-1' : ''"
         >
           {{ tag }}
           <template #trailing>
@@ -58,11 +63,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="
             modelValue.length > 0 ? '' : (placeholder ?? t('common.typeAndPressEnterOrComma'))
           "
-          class="text-text-body placeholder:text-text-secondary min-w-25 [flex:1_1_100px] border-0 bg-transparent p-1 text-sm outline-none"
+          class="text-text-body placeholder:text-text-secondary min-w-25 [flex:1_1_6.25rem] border-0 bg-transparent p-1 text-sm outline-none"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"
-          @blur="addTag"
+          @focus="isFocused = true"
+          @blur="
+            addTag();
+            isFocused = false;
+          "
         />
       </div>
     </div>
@@ -81,6 +90,8 @@ interface Props {
   modelValue: string[];
   placeholder?: I18nText;
   label?: I18nText;
+  /** Case-insensitive substring — tags containing it get a highlight ring (search-match affordance). */
+  highlightQuery?: string;
 }
 
 // No `placeholder` default: `t()` in `withDefaults` would freeze the locale at
@@ -90,6 +101,17 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const hasContent = computed(() => props.modelValue.length > 0 || inputValue.value.length > 0);
+
+const isHighlighted = (tag: string): boolean => {
+  const q = props.highlightQuery?.trim().toLowerCase();
+  return Boolean(q) && tag.toLowerCase().includes(q!);
+};
+// Live-reported bug: the label only floated when there was content, so an
+// empty, focused field showed the label sitting directly on top of the
+// placeholder ("Type and press Enter or comma") — indistinguishable from
+// garbled/overlapping text. Standard floating-label inputs also float on
+// focus, before any content exists; this input didn't.
+const isFocused = ref(false);
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string[]): void;

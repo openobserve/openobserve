@@ -759,8 +759,30 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       await wrapper.vm.fetchTracesByDimensions();
 
       const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
-      expect(callArg.queryReq.filter).toContain("service='api'");
-      expect(callArg.queryReq.filter).toContain("env='prod'");
+      // Identifiers and values are escaped via buildSqlCondition (F2/F38)
+      expect(callArg.queryReq.filter).toContain("\"service\" = 'api'");
+      expect(callArg.queryReq.filter).toContain("\"env\" = 'prod'");
+    });
+
+    it("should escape single quotes in trace filter values", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
+        handlers.complete();
+      });
+
+      wrapper = createWrapper({
+        traceStreams: [
+          {
+            stream_name: "traces",
+            stream_type: "traces",
+            filters: { service: "a' OR 1=1 --" },
+          },
+        ],
+      });
+
+      await wrapper.vm.fetchTracesByDimensions();
+
+      const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+      expect(callArg.queryReq.filter).toBe("\"service\" = 'a'' OR 1=1 --'");
     });
 
     it("should accumulate and return hits from streaming data callback", async () => {

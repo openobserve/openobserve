@@ -279,9 +279,12 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.unflattenedTab.click();
     await page.waitForTimeout(500);
 
+    // Switching to the unflattened tab re-renders the drawer, so the close
+    // button node detaches mid-click ("element was detached from the DOM") and
+    // a bare .click() times out unrecoverably on CI. Use the resilient helper
+    // (Escape fallback + wait-for-hidden) instead.
     testLogger.info('Closing log detail dialog');
-    await pageManager.unflattenedPage.closeDialog.waitFor();
-    await pageManager.unflattenedPage.closeDialog.click();
+    await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
 
     // Cleanup: Toggle Store Original Data back OFF
     testLogger.info('Cleanup: Toggling Store Original Data back OFF');
@@ -422,9 +425,12 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.unflattenedTab.click();
     await page.waitForTimeout(500);
 
+    // Switching to the unflattened tab re-renders the drawer, so the close
+    // button node detaches mid-click ("element was detached from the DOM") and
+    // a bare .click() times out unrecoverably on CI. Use the resilient helper
+    // (Escape fallback + wait-for-hidden) instead.
     testLogger.info('Closing log detail dialog');
-    await pageManager.unflattenedPage.closeDialog.waitFor();
-    await pageManager.unflattenedPage.closeDialog.click();
+    await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
 
     testLogger.info('Toggling Store Original Data back OFF to clean up');
     await page.goto(`${process.env.ZO_BASE_URL}/web/streams?org_identifier=${getOrgIdentifier()}`);

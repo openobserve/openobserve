@@ -75,8 +75,9 @@ const appTabsStub = {
   emits: ["update:activeTab"],
 };
 
-async function mountComp(props: Record<string, any> = {}) {
+async function mountComp(props: Record<string, any> = {}, opts: Record<string, any> = {}) {
   const wrapper = mount(AddTemplate, {
+    ...opts,
     props: {
       template: null,
       ...props,
@@ -86,11 +87,24 @@ async function mountComp(props: Record<string, any> = {}) {
       stubs: {
         QueryEditor: editorStub,
         AppTabs: appTabsStub,
+        ContentTemplateForm: true,
       },
     },
   });
   await flushPromises();
   return wrapper;
+}
+
+// Most of this file exercises the legacy raw-payload ("custom") editor, which
+// pre-migration was the only mode. New templates now default to CONTENT mode
+// (brief: "new templates default to content mode"), so these tests select
+// custom mode first via the mode AppTabs — the same bridge onModeChange uses.
+// There are TWO AppTabs stubs once in custom mode (mode switch + http/email
+// type switch); the mode switcher is always the first one rendered.
+async function selectCustomMode(wrapper: any) {
+  const modeTabs = wrapper.findAllComponents({ name: "AppTabs" });
+  await modeTabs[0].vm.$emit("update:activeTab", "custom");
+  await flushPromises();
 }
 
 // Grab the REAL <OForm>'s underlying TanStack form (the single source of truth).
@@ -116,10 +130,12 @@ describe("AddTemplate - body editor language", () => {
   // language sticks and a markdown body renders with JSON syntax errors.
   it("remounts the body editor when the type flips (http → email)", async () => {
     const w = await mountComp();
+    await selectCustomMode(w);
     const mountsAfterInitial = editorMounts;
     expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe("json");
 
-    await w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "email");
+    const typeTabs = w.findAllComponents({ name: "AppTabs" });
+    await typeTabs[1].vm.$emit("update:activeTab", "email");
     await flushPromises();
 
     expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe("markdown");
@@ -128,11 +144,14 @@ describe("AddTemplate - body editor language", () => {
 
   it("remounts the body editor when the type flips back (email → http)", async () => {
     const w = await mountComp();
-    await w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "email");
+    await selectCustomMode(w);
+    let typeTabs = w.findAllComponents({ name: "AppTabs" });
+    await typeTabs[1].vm.$emit("update:activeTab", "email");
     await flushPromises();
     const mountsAfterEmail = editorMounts;
 
-    await w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "http");
+    typeTabs = w.findAllComponents({ name: "AppTabs" });
+    await typeTabs[1].vm.$emit("update:activeTab", "http");
     await flushPromises();
 
     expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe("json");
@@ -143,10 +162,12 @@ describe("AddTemplate - body editor language", () => {
   // `value: props.query`, so the form-owned body has to survive the swap.
   it("preserves the typed body across the remount", async () => {
     const w = await mountComp();
+    await selectCustomMode(w);
     getForm(w).setFieldValue("body", "# hello");
     await flushPromises();
 
-    await w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "email");
+    const typeTabs = w.findAllComponents({ name: "AppTabs" });
+    await typeTabs[1].vm.$emit("update:activeTab", "email");
     await flushPromises();
 
     expect(w.findComponent({ name: "QueryEditor" }).props("query")).toBe("# hello");
@@ -170,6 +191,7 @@ describe("AddTemplate - rendering (create mode)", () => {
 
   it("preserves the core data-tests", async () => {
     const w = await mountComp();
+    await selectCustomMode(w);
     expect(w.find('[data-test="add-template-name-input"]').exists()).toBe(true);
     expect(w.find('[data-test="add-template-submit-btn"]').exists()).toBe(true);
     expect(w.find('[data-test="add-template-cancel-btn"]').exists()).toBe(true);
@@ -179,10 +201,12 @@ describe("AddTemplate - rendering (create mode)", () => {
 
   it("hides the email title input for http (default) and shows it for email", async () => {
     const w = await mountComp();
+    await selectCustomMode(w);
     expect(w.find('[data-test="add-template-email-title-input"]').exists()).toBe(false);
 
     // Bridge: driving the tabs toggle updates the form discriminator → v-if.
-    await w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "email");
+    const typeTabs = w.findAllComponents({ name: "AppTabs" });
+    await typeTabs[1].vm.$emit("update:activeTab", "email");
     await nextTick();
     expect(w.find('[data-test="add-template-email-title-input"]').exists()).toBe(true);
   });
@@ -275,6 +299,7 @@ describe("AddTemplate - validation (real OForm)", () => {
   // transform would mutate what pre-migration sent to the backend.
   it("saves the body RAW (surrounding whitespace preserved, not trimmed)", async () => {
     const w = await mountComp();
+    await selectCustomMode(w);
     const form = getForm(w);
     const rawBody = '  {"text":"x"}  ';
     form.setFieldValue("name", "valid-name");
@@ -320,6 +345,7 @@ describe("AddTemplate - save payload parity", () => {
 
   it("creates an http template with the EXACT payload", async () => {
     const w = await mountComp();
+    await selectCustomMode(w);
     const form = getForm(w);
     form.setFieldValue("name", "new-template");
     // Body is bridged from the Monaco editor's change handler.
@@ -336,6 +362,7 @@ describe("AddTemplate - save payload parity", () => {
         body: '{"text":"alert"}',
         type: "http",
         title: "",
+        kind: "custom",
       },
     });
     expect(templateService.update).not.toHaveBeenCalled();
@@ -343,6 +370,7 @@ describe("AddTemplate - save payload parity", () => {
 
   it("creates an email template carrying the title", async () => {
     const w = await mountComp();
+    await selectCustomMode(w);
     const form = getForm(w);
     form.setFieldValue("name", "email-template");
     form.setFieldValue("type", "email");
@@ -359,6 +387,7 @@ describe("AddTemplate - save payload parity", () => {
         body: "Body text",
         type: "email",
         title: "My subject",
+        kind: "custom",
       },
     });
   });
@@ -385,6 +414,7 @@ describe("AddTemplate - save payload parity", () => {
         body: '{"text":"updated"}',
         type: "http",
         title: "",
+        kind: "custom",
       },
     });
     expect(templateService.create).not.toHaveBeenCalled();
@@ -397,6 +427,7 @@ describe("AddTemplate - http JSON-validity toast (Rule ④ side-effect)", () => 
   it("fires the error toast and blocks save when http body is invalid JSON", async () => {
     vi.mocked(validateTemplateBody).mockReturnValueOnce({ valid: false });
     const w = await mountComp();
+    await selectCustomMode(w);
     const form = getForm(w);
     form.setFieldValue("name", "http-template");
     form.setFieldValue("body", "{ invalid json"); // non-empty → passes schema
@@ -412,6 +443,7 @@ describe("AddTemplate - http JSON-validity toast (Rule ④ side-effect)", () => 
 
   it("does NOT run the JSON check for email templates (non-JSON body allowed)", async () => {
     const w = await mountComp();
+    await selectCustomMode(w);
     const form = getForm(w);
     form.setFieldValue("name", "email-template");
     form.setFieldValue("type", "email");
@@ -432,5 +464,442 @@ describe("AddTemplate - cancel", () => {
     const w = await mountComp();
     await w.find('[data-test="add-template-cancel-btn"]').trigger("click");
     expect(w.emitted("cancel:hideform")).toBeTruthy();
+  });
+});
+
+describe("AddTemplate - mode switch picks kind from an existing template", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("defaults to content mode for a brand-new template", async () => {
+    const w = await mountComp();
+    expect(getForm(w).state.values.kind).toBe("content");
+    expect(w.find('[data-test="add-template-content-form"]').exists()).toBe(true);
+  });
+
+  it("seeds a brand-new template with the starter spec (Task 17 D2)", async () => {
+    const w = await mountComp();
+    const spec = (w.vm as any).contentSpec;
+    expect(spec.title).not.toBe("");
+    expect(spec.body).not.toBe("");
+    expect(spec.rows.enabled).toBe(true);
+  });
+
+  // Live-UX-audit fix: a PRISTINE new template switched to raw mode must seed
+  // an example webhook payload — not the serialized ContentSpec, which is an
+  // internal representation that would be sent verbatim.
+  it("seeds raw mode with an example payload when the spec is the untouched starter", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    const body = getForm(w).state.values.body as string;
+    expect(body).toContain('"text"');
+    expect(body).toContain("{alert_name}");
+    expect(body).not.toContain("title_overrides");
+  });
+
+  it("keeps the serialize round-trip in raw mode once the spec has been edited", async () => {
+    const w = await mountComp();
+    (w.vm as any).contentSpec = {
+      ...(w.vm as any).contentSpec,
+      title: "My authored title",
+    };
+    await flushPromises();
+    await selectCustomMode(w);
+    const body = getForm(w).state.values.body as string;
+    expect(body).toContain("title_overrides");
+    expect(body).toContain("My authored title");
+  });
+
+  it("does NOT overwrite an existing template's spec with the starter spec", async () => {
+    const spec = {
+      title: "My saved title",
+      title_overrides: {},
+      body: "My saved body",
+      fields: [],
+      rows: { enabled: false, max: 5, columns: null, format: null },
+      links: [],
+      chart: { enabled: false },
+    };
+    const existingTemplate = {
+      name: "content-template",
+      body: JSON.stringify(spec),
+      type: "http",
+      title: "",
+      kind: "content",
+    };
+    const w = await mountComp({ template: existingTemplate });
+    expect((w.vm as any).contentSpec).toEqual(spec);
+  });
+
+  it("clone mode carries the source's spec, not the starter spec", async () => {
+    const spec = {
+      title: "Cloned title",
+      title_overrides: {},
+      body: "Cloned body",
+      fields: [],
+      rows: { enabled: false, max: 5, columns: null, format: null },
+      links: [],
+      chart: { enabled: false },
+    };
+    const sourceTemplate = {
+      name: "source-template",
+      body: JSON.stringify(spec),
+      type: "http",
+      title: "",
+      kind: "content",
+    };
+    const w = await mountComp({ template: sourceTemplate, isClone: true });
+    expect((w.vm as any).contentSpec).toEqual(spec);
+  });
+
+  it("opens an existing kind:content template in content mode", async () => {
+    const spec = {
+      title: "Alert fired",
+      title_overrides: {},
+      body: "{alert_name}",
+      fields: [],
+      rows: { enabled: false, max: 5, columns: null, format: null },
+      links: [],
+      chart: { enabled: false },
+    };
+    const existingTemplate = {
+      name: "content-template",
+      body: JSON.stringify(spec),
+      type: "http",
+      title: "",
+      kind: "content",
+    };
+    const w = await mountComp({ template: existingTemplate });
+
+    expect(getForm(w).state.values.kind).toBe("content");
+    expect(w.find('[data-test="add-template-content-form"]').exists()).toBe(true);
+    expect(w.find('[data-test="template-body-editor"]').exists()).toBe(false);
+  });
+
+  it("opens an existing kind:custom template in custom mode", async () => {
+    const existingTemplate = {
+      name: "custom-template",
+      body: '{"text":"legacy"}',
+      type: "http",
+      title: "",
+      kind: "custom",
+    };
+    const w = await mountComp({ template: existingTemplate });
+
+    expect(getForm(w).state.values.kind).toBe("custom");
+    expect(w.find('[data-test="template-body-editor"]').exists()).toBe(true);
+    expect(w.find('[data-test="add-template-content-form"]').exists()).toBe(false);
+  });
+
+  it("opens a legacy template with no `kind` in custom mode (never guesses content)", async () => {
+    const existingTemplate = {
+      name: "legacy-template",
+      body: '{"text":"legacy, no kind field"}',
+      type: "http",
+      title: "",
+    };
+    const w = await mountComp({ template: existingTemplate });
+
+    expect(getForm(w).state.values.kind).toBe("custom");
+    expect(w.find('[data-test="template-body-editor"]').exists()).toBe(true);
+  });
+
+  it("shows the legacy banner only for an existing custom template, not for a new one", async () => {
+    const wNew = await mountComp();
+    expect(wNew.find('[data-test="add-template-legacy-banner"]').exists()).toBe(false);
+
+    const existingTemplate = {
+      name: "custom-template",
+      body: '{"text":"legacy"}',
+      type: "http",
+      title: "",
+      kind: "custom",
+    };
+    const wExisting = await mountComp({ template: existingTemplate });
+    expect(wExisting.find('[data-test="add-template-legacy-banner"]').exists()).toBe(true);
+  });
+
+  it("'start a content version' switches to content mode and seeds the body from detected {vars}", async () => {
+    const existingTemplate = {
+      name: "custom-template",
+      body: '{"text":"{alert_name} fired on {stream_name}"}',
+      type: "http",
+      title: "",
+      kind: "custom",
+    };
+    const w = await mountComp({ template: existingTemplate });
+
+    await w.find('[data-test="add-template-start-content-version-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(getForm(w).state.values.kind).toBe("content");
+    expect((w.vm as any).contentSpec.body).toContain("{alert_name}");
+    expect((w.vm as any).contentSpec.body).toContain("{stream_name}");
+  });
+
+  it("saves a content-mode template with kind explicitly set to content", async () => {
+    const w = await mountComp();
+    const form = getForm(w);
+    form.setFieldValue("name", "new-content-template");
+    (w.vm as any).contentSpec = {
+      ...(w.vm as any).contentSpec,
+      title: "My alert",
+    };
+    await flushPromises();
+
+    await submit(w);
+
+    expect(templateService.create).toHaveBeenCalledTimes(1);
+    const sent = (templateService.create as any).mock.calls[0][0];
+    expect(sent.data.kind).toBe("content");
+    expect(sent.data.type).toBe("http");
+    expect(sent.data.title).toBe("My alert");
+    expect(() => JSON.parse(sent.data.body)).not.toThrow();
+  });
+});
+
+// Live-reported bug: the Variable Guide collapsible starts OPEN in custom
+// mode (`default-open`) but never remounts across a mode switch — it lives
+// outside the `editorMode` v-if/v-else, in the OSplitter's `after` slot. It
+// used `:default-open` (a one-time seed, not reactive) instead of `v-model`,
+// so switching custom → content left it open, overlapping the now-visible
+// TemplatePreviewPanel in the same scrollable column.
+describe("AddTemplate - variable guide collapses when switching to content mode", () => {
+  it("is open by default in custom mode and closes when switching to content mode", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+
+    expect(w.html()).toContain('data-state="open"');
+
+    const modeTabs = w.findAllComponents({ name: "AppTabs" });
+    await modeTabs[0].vm.$emit("update:activeTab", "content");
+    await flushPromises();
+
+    expect(w.html()).toContain('data-state="closed"');
+    expect(w.html()).not.toContain('data-state="open"');
+  });
+
+  it("stays closed when a new template starts in content mode", async () => {
+    const w = await mountComp();
+
+    expect(w.html()).toContain('data-state="closed"');
+    expect(w.html()).not.toContain('data-state="open"');
+  });
+});
+
+// P0 regression (o2-enterprise#2364): on an EXISTING custom template, the two
+// mode tabs share the single form `body` field. Switching to the Template tab
+// overwrote it with the serialized EMPTY spec (Template tab blank), and
+// switching back left that empty-spec JSON in the editor (raw payload "reset")
+// — original payload destroyed, and Save would persist the empty spec.
+describe("AddTemplate - existing custom template survives a mode-tab round trip", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const LEGACY_BODY = '{"text":"{alert_name} fired on {stream_name}"}';
+
+  async function mountExistingCustom() {
+    return mountComp({
+      template: {
+        name: "custom-template",
+        body: LEGACY_BODY,
+        type: "http",
+        title: "",
+        kind: "custom",
+      },
+    });
+  }
+
+  async function selectMode(wrapper: any, mode: "content" | "custom") {
+    const modeTabs = wrapper.findAllComponents({ name: "AppTabs" });
+    await modeTabs[0].vm.$emit("update:activeTab", mode);
+    await flushPromises();
+  }
+
+  it("restores the original raw payload when switching Template → Raw payload", async () => {
+    const w = await mountExistingCustom();
+
+    await selectMode(w, "content");
+    await selectMode(w, "custom");
+
+    expect(getForm(w).state.values.body).toBe(LEGACY_BODY);
+  });
+
+  it("restores raw-mode EDITS (not just the saved body) across the round trip", async () => {
+    const w = await mountExistingCustom();
+    getForm(w).setFieldValue("body", '{"text":"edited draft"}');
+    await flushPromises();
+
+    await selectMode(w, "content");
+    await selectMode(w, "custom");
+
+    expect(getForm(w).state.values.body).toBe('{"text":"edited draft"}');
+  });
+
+  it("prefills the Template tab from detected {vars} instead of opening blank", async () => {
+    const w = await mountExistingCustom();
+
+    await selectMode(w, "content");
+
+    const spec = (w.vm as any).contentSpec;
+    expect(spec.body).toContain("{alert_name}");
+    expect(spec.body).toContain("{stream_name}");
+  });
+
+  it("'start a content version' then Raw payload restores the original body too", async () => {
+    const w = await mountExistingCustom();
+
+    await w.find('[data-test="add-template-start-content-version-btn"]').trigger("click");
+    await flushPromises();
+    await selectMode(w, "custom");
+
+    expect(getForm(w).state.values.body).toBe(LEGACY_BODY);
+  });
+});
+
+// o2-enterprise#2394: clearing the body and saving toasted "Please fill
+// required fields" but left the Monaco editor visually unchanged — the user
+// was told something was wrong with no indication of WHERE. The schema
+// already produces an error on the `body` path; it simply had nowhere to
+// render, because a bare Monaco is bridged in via setFieldValue and is not
+// an OFormInput with an error slot.
+describe("AddTemplate - required-field highlighting on failed save", () => {
+  it("marks the body editor invalid and shows its message when body is empty", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+
+    const form = getForm(w);
+    form.setFieldValue("name", "my-template");
+    form.setFieldValue("body", "");
+    await submit(w);
+
+    // The save must not have gone through.
+    expect(form.state.isValid).toBe(false);
+
+    // The editor must carry a visible error affordance...
+    const shell = w.find('[data-test="add-template-body-editor-shell"]');
+    expect(shell.exists()).toBe(true);
+    expect(shell.attributes("data-error")).toBe("true");
+
+    // ...and a message the user can actually read.
+    const err = w.find('[data-test="add-template-body-error"]');
+    expect(err.exists()).toBe(true);
+    expect(err.text().length).toBeGreaterThan(0);
+  });
+
+  it("clears the body error once a body is typed back in", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+
+    const form = getForm(w);
+    form.setFieldValue("name", "my-template");
+    form.setFieldValue("body", "");
+    await submit(w);
+    expect(w.find('[data-test="add-template-body-error"]').exists()).toBe(true);
+
+    form.setFieldValue("body", '{"text":"hi"}');
+    await flushPromises();
+
+    expect(w.find('[data-test="add-template-body-error"]').exists()).toBe(false);
+    expect(w.find('[data-test="add-template-body-editor-shell"]').attributes("data-error")).toBe(
+      "false",
+    );
+  });
+
+  it("shows no body error before the first save attempt", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    expect(w.find('[data-test="add-template-body-error"]').exists()).toBe(false);
+  });
+
+  // The aria wiring must live on the SHELL, not on <QueryEditor>:
+  // CodeQueryEditor has `inheritAttrs: false` and binds $attrs to a
+  // non-focusable wrapper, so attributes passed to the component are inert
+  // and would be false assurance for a screen-reader user.
+  it("exposes the error to assistive tech on the shell, not the inert editor", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+
+    const form = getForm(w);
+    form.setFieldValue("name", "my-template");
+    form.setFieldValue("body", "");
+    await submit(w);
+
+    const shell = w.find('[data-test="add-template-body-editor-shell"]');
+    expect(shell.attributes("aria-invalid")).toBe("true");
+    // ...and the described-by must resolve to a node that actually exists.
+    const describedBy = shell.attributes("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    const target = w.find(`#${describedBy}`);
+    expect(target.exists()).toBe(true);
+    expect(target.attributes("role")).toBe("alert");
+  });
+});
+
+// The issue also names the title field. Email templates require a subject;
+// unlike body it IS an OFormInput, so it should already highlight — pin that
+// so the two required fields behave consistently.
+describe("AddTemplate - email title highlighting", () => {
+  it("marks the email title input invalid when it is empty on save", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+
+    const form = getForm(w);
+    form.setFieldValue("type", "email");
+    form.setFieldValue("name", "my-template");
+    form.setFieldValue("body", "hello");
+    form.setFieldValue("title", "");
+    await submit(w);
+
+    expect(form.state.isValid).toBe(false);
+    const err = w.find('[data-test="add-template-email-title-input-error"]');
+    expect(err.exists()).toBe(true);
+    expect(err.text().length).toBeGreaterThan(0);
+  });
+});
+
+// A rejected save must SHOW the user what is wrong. On this form the offending
+// field is often scrolled out of view (the body editor is tall), so the toast
+// alone left them hunting. The first invalid field is scrolled into view.
+describe("AddTemplate - scrolls the first error into view on failed save", () => {
+  it("scrolls to an invalid field when save is rejected", async () => {
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+
+    // `attachTo: document.body` is REQUIRED: scrollToFirstError queries the
+    // real document, and a detached wrapper would make it find nothing —
+    // the test would fail while the app works.
+    const w = await mountComp({}, { attachTo: document.body });
+    await selectCustomMode(w);
+
+    // Leave `name` empty so the schema rejects the submit.
+    const form = getForm(w);
+    form.setFieldValue("name", "");
+    form.setFieldValue("body", "");
+    // Click the real Save button: the scroll lives in handleSave, so calling
+    // form.handleSubmit() directly would bypass exactly what we are testing.
+    // Invoke the button's own handler: `trigger("click")` on the OButton
+    // wrapper does not reliably reach the inner <button>, and the behaviour
+    // under test is handleSave's, not Vue's event plumbing.
+    await (w.vm as any).handleSave();
+    await flushPromises();
+    await nextTick();
+
+    expect(form.state.isValid).toBe(false);
+    expect(scrollSpy).toHaveBeenCalled();
+  });
+
+  it("does not scroll when the form is valid", async () => {
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+
+    const w = await mountComp({}, { attachTo: document.body });
+    await selectCustomMode(w);
+    const form = getForm(w);
+    form.setFieldValue("name", "valid-name");
+    form.setFieldValue("body", '{"text":"hi"}');
+    await (w.vm as any).handleSave();
+    await flushPromises();
+    await nextTick();
+
+    expect(scrollSpy).not.toHaveBeenCalled();
   });
 });

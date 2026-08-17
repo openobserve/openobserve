@@ -57,11 +57,7 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardCreate.createDashboard(
       randomDashboardName + "_streaming"
     );
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
     await pm.dashboardVariables.addDashboardVariable(
       "variablename",
@@ -110,7 +106,7 @@ test.describe("dashboard streaming testcases", () => {
     try {
       await valuesApiPromise;
     } catch (e) {
-      console.log("Warning: _values API response not detected, continuing...");
+      testLogger.warn("_values API response not detected, continuing", { error: e?.message });
     }
 
     // Type partial search terms to trigger multiple _values API calls with streaming enabled
@@ -128,7 +124,7 @@ test.describe("dashboard streaming testcases", () => {
       try {
         await valuesApiResponse;
       } catch (e) {
-        console.log(`Warning: _values API response not detected for term "${term}", continuing...`);
+        testLogger.warn("_values API response not detected for term, continuing", { term, error: e?.message });
       }
     }
     // Select the final value
@@ -212,11 +208,7 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardCreate.createDashboard(
       randomDashboardName + "_filter"
     );
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
 
     // Add first variable without filter (existing behavior)

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Stepper -->
     <div class="bg-card-glass-bg h-[calc(100vh-7rem)] overflow-auto px-3 py-2">
-      <div style="max-width: 720px">
+      <div style="max-width: 45rem">
         <OForm
           ref="storageForm"
           :schema="orgStorageEditorSchema"
@@ -434,8 +434,8 @@ function blankFormValues(provider: string): OrgStorageEditorForm {
 
 // Dynamic defaults (region from cloud/store, provider projected from the card
 // grid) → a typed computed.
-const orgStorageEditorDefaults = computed(
-  (): OrgStorageEditorForm => blankFormValues(selectedProvider.value),
+const orgStorageEditorDefaults = computed((): OrgStorageEditorForm =>
+  blankFormValues(selectedProvider.value),
 );
 
 const cloudProviders = computed(() => {

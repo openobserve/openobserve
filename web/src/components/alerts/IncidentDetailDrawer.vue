@@ -888,8 +888,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                           </div>
 
+                          <!-- Composite members have no stream/query — show the type. -->
+                          <div
+                            v-if="alerts[selectedAlertIndex]?.alert_type === 'composite'"
+                            class="flex flex-col gap-0.5"
+                          >
+                            <span
+                              :class="'text-text-secondary'"
+                              class="text-3xs tracking-wide uppercase"
+                            >
+                              {{ t("alerts.alertType") }}
+                            </span>
+                            <OTag type="alertType" :value="'composite'" class="w-fit" />
+                          </div>
+
                           <!-- Stream Type & Name -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
@@ -917,7 +931,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Threshold & Period -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
@@ -951,7 +965,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Frequency & Silence -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
@@ -990,6 +1004,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- Alert Conditions Section -->
                         <div
+                          v-if="!isSelectedComposite"
                           :class="[
                             'rounded-default border-card-glass-border rounded-default flex flex-col border',
                           ]"
@@ -1022,8 +1037,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
-                                >{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre
-                              >
+                                >{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
                             </div>
 
                             <!-- PromQL Query -->
@@ -1033,8 +1047,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
-                                >{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre
-                              >
+                                >{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
                             </div>
 
                             <!-- Custom Conditions -->
@@ -1050,8 +1063,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   formatCustomConditions(
                                     alerts[selectedAlertIndex]?.query_condition?.conditions,
                                   )
-                                }}</pre
-                              >
+                                }}</pre>
                             </div>
 
                             <!-- No conditions -->
@@ -1134,6 +1146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :source-stream="'incidents'"
                     :source-type="'incidents'"
                     :available-dimensions="availableDimensions"
+                    :semantic-groups="semanticGroups"
                     :fts-fields="ftsFields"
                     :time-range="telemetryTimeRange"
                     :hide-view-related-button="true"
@@ -1345,7 +1358,6 @@ import {
   ref,
   watch,
   computed,
-  nextTick,
   onMounted,
   onBeforeUnmount,
   onUnmounted,
@@ -1458,6 +1470,12 @@ export default defineComponent({
 
     // Alert Triggers tab - selected alert for detail view
     const selectedAlertIndex = ref(-1);
+
+    // A composite member has no stream/query/threshold/frequency, so those
+    // sections and the query panel are hidden for it (§9.6).
+    const isSelectedComposite = computed(
+      () => alerts.value[selectedAlertIndex.value]?.alert_type === "composite",
+    );
 
     // Computed property to process alerts with formatted conditions upfront
     // Editable status and severity for Overview tab
@@ -2336,7 +2354,10 @@ export default defineComponent({
 
         incidentDetails.value = response.data;
         triggers.value = response.data.triggers || [];
-        alerts.value = response.data.alerts || [];
+        // Composites have no `alerts` row, so the live-definition resolver
+        // returns them under `composite_alerts`; merge so the name-based
+        // trigger→details lookup finds them too (§9.6).
+        alerts.value = [...(response.data.alerts || []), ...(response.data.composite_alerts || [])];
 
         // Initialize editable status and severity from incident data
         editableStatus.value = response.data.status;
@@ -3357,6 +3378,7 @@ export default defineComponent({
       triggers,
       alerts,
       selectedAlertIndex,
+      isSelectedComposite,
       rcaLoading,
       rcaError,
       rcaCancelling,
@@ -3388,6 +3410,7 @@ export default defineComponent({
       telemetryTimeRange,
       actualMatchedDimensions,
       availableDimensions,
+      semanticGroups,
       ftsFields,
       incidentContextData,
       affectedServicesCount,

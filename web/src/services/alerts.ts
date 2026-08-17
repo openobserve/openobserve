@@ -14,6 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import type {
+  CompositeAlertValidationRequest,
+  CompositeAlertValidationResponse,
+  CompositeAlertReferenceResponse,
+  CompositeTimelineResponse,
+} from "@/ts/interfaces/alert";
 
 const alerts = {
   list: (
@@ -110,6 +116,10 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
+    if (data.alert_type === "composite") {
+      const { id: _id, ...body } = data;
+      return http().put(url, body);
+    }
     return http().put(url, data);
   },
   delete_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
@@ -145,12 +155,58 @@ const alerts = {
     }
     return http().delete(url, { data });
   },
+  /** Every alert attached to one SLO (Feature 5). Filters on the indexed
+   *  `slo_id` column server-side, and unlike the burn-pair lookup it includes
+   *  DISABLED alerts — the SLO page must show them so they can be re-enabled.
+   *
+   *  `alert_type=slo` is not redundant with `slo_id`. Omitted, the filter
+   *  defaults to `all`, and on enterprise builds `list_alerts` then APPENDS
+   *  every anomaly-detection config in the org to the response — those rows are
+   *  merged in after the SQL WHERE clause and so never saw the `slo_id`
+   *  predicate at all. Callers use this list to say how many alerts an SLO
+   *  delete destroys, and to show what is attached to an SLO; both would be
+   *  wrong. `AlertTypeFilter::Slo` is a real SQL predicate
+   *  (`SloId.is_not_null()`), and it also excludes the anomaly merge, which
+   *  only runs for `all` and `anomaly_detection`. */
+  list_by_slo: (org_identifier: string, slo_id: string) => {
+    return http().get(
+      `/api/v2/${org_identifier}/alerts?slo_id=${encodeURIComponent(slo_id)}&alert_type=slo`,
+    );
+  },
   get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
     return http().get(url);
+  },
+  validateComposite: (
+    org_identifier: string,
+    data: CompositeAlertValidationRequest,
+  ): Promise<{ data: CompositeAlertValidationResponse }> => {
+    return http().post<CompositeAlertValidationResponse>(
+      `/api/v2/${org_identifier}/alerts/composites/validate`,
+      data,
+    );
+  },
+  getCompositeReferences: (
+    org_identifier: string,
+    alert_id: string,
+  ): Promise<{ data: CompositeAlertReferenceResponse }> => {
+    return http().get<CompositeAlertReferenceResponse>(
+      `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}/composite-references`,
+    );
+  },
+  getCompositeTimeline: (
+    org_identifier: string,
+    alert_id: string,
+    from: number,
+    to: number,
+  ): Promise<{ data: CompositeTimelineResponse }> => {
+    return http().get<CompositeTimelineResponse>(
+      `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}/composite-timeline`,
+      { params: { from, to } },
+    );
   },
   //this endpoint is not used as we are using the common service to move the alerts across folders
   move_to_another_folder: (org_identifier: string, data: any, folder_id?: any) => {

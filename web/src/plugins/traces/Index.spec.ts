@@ -21,6 +21,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
+import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
 
 // Create DOM node for mounting
 const node = document.createElement("div");
@@ -152,7 +153,7 @@ const mockSearchObj = {
     showQuery: true,
     showHistogram: true,
     sqlMode: false,
-    searchMode: "traces" as "traces" | "spans" | "service-graph",
+    searchMode: "traces" as "traces" | "spans" | "service-graph" | "services-catalog",
     resultGrid: {
       rowsPerPage: 25,
       sortBy: "start_time" as string,
@@ -393,6 +394,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -402,27 +404,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find("#tracePage").exists()).toBe(true);
-    });
-
-    it("should initialize with search tab active by default", async () => {
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      expect(wrapper.vm.activeTab).toBe("search");
     });
 
     it("should load stream list on mount", async () => {
@@ -436,6 +417,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -454,37 +436,6 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Tab Navigation", () => {
-    it("should switch to service-graph tab on enterprise", async () => {
-      routerCurrentRouteSpy.mockReturnValue({
-        value: {
-          query: { tab: "service-graph" },
-          name: "traces",
-          path: "/traces",
-        },
-      } as any);
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      // onBeforeMount sets searchMode from URL; activeTab computed reflects it
-      expect(mockSearchObj.meta.searchMode).toBe("service-graph");
-      expect(wrapper.vm.activeTab).toBe("service-graph");
-    });
-
     it("should update URL with tab=service-graph when searchMode changes to service-graph", async () => {
       wrapper = mount(Index, {
         attachTo: node,
@@ -496,6 +447,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -531,6 +483,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -550,6 +503,119 @@ describe("Index.vue (Main Traces Page)", () => {
         }),
       );
     });
+
+    it("should switch to service-graph tab from ?tab= on enterprise", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { tab: "service-graph" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      // onBeforeMount sets searchMode from URL; activeTab computed reflects it
+      expect(mockSearchObj.meta.searchMode).toBe("service-graph");
+      expect(wrapper.vm.activeTab).toBe("service-graph");
+    });
+  });
+
+  describe("In-page tab rendering", () => {
+    const mountIndex = () =>
+      mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+    it("should render the ServiceGraph stub inline in service-graph mode (enterprise)", async () => {
+      mockSearchObj.meta.searchMode = "service-graph";
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "service-graph" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "services-catalog" }).exists()).toBe(false);
+    });
+
+    it("should render the ServicesCatalog stub inline in services-catalog mode", async () => {
+      mockSearchObj.meta.searchMode = "services-catalog";
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "services-catalog" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "service-graph" }).exists()).toBe(false);
+    });
+
+    it("should apply the built filter and switch mode on view-traces from the graph", async () => {
+      mockSearchObj.meta.searchMode = "service-graph";
+      wrapper = mountIndex();
+      await flushPromises();
+
+      const payload = {
+        serviceName: "cart-service",
+        operationName: "GET /cart",
+        mode: "traces",
+        stream: "default",
+      };
+      const graphEl = wrapper.findComponent({ name: "service-graph" });
+      expect(graphEl.exists()).toBe(true);
+      await graphEl.vm.$emit("view-traces", payload);
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe(buildViewTracesFilter(payload));
+      expect(mockSearchObj.data.editorValue).toBe(
+        "service_name = 'cart-service' AND operation_name = 'GET /cart'",
+      );
+      expect(mockSearchObj.meta.searchMode).toBe("traces");
+      expect(mockSearchObj.data.stream.selectedStream).toEqual({
+        label: "default",
+        value: "default",
+      });
+    });
+
+    it("should hydrate the handoff ?filter= into the editor on mount", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { filter: "service_name = 'checkout'" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+      mockSearchObj.meta.sqlMode = true;
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
+      expect(mockSearchObj.meta.sqlMode).toBe(false);
+    });
   });
 
   describe("Stream Selection", () => {
@@ -564,6 +630,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -599,6 +666,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -629,6 +697,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -663,6 +732,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -684,6 +754,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -715,6 +786,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -746,6 +818,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -772,6 +845,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -802,6 +876,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -810,66 +885,6 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="traces-search-error-20003"]').exists()).toBe(true);
-    });
-  });
-
-  describe("Field List Management", () => {
-    it("should toggle field list visibility", async () => {
-      mockSearchObj.meta.showFields = true;
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      // collapseFieldList is exposed directly; there is no collapse button in the
-      // current template, so we call the method rather than triggering a DOM click.
-      await wrapper.vm.collapseFieldList();
-      await flushPromises();
-
-      expect(mockSearchObj.meta.showFields).toBe(false);
-    });
-
-    it("should update splitter model when fields are collapsed", async () => {
-      mockSearchObj.meta.showFields = true;
-      mockSearchObj.config.splitterModel = 20;
-      mockSearchObj.config.lastSplitterPosition = 20;
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      // Call collapseFieldList and verify showFields changed
-      await wrapper.vm.collapseFieldList();
-      await flushPromises();
-
-      // The watcher will set splitterModel to 0 when showFields is false
-      expect(mockSearchObj.meta.showFields).toBe(false);
     });
   });
 
@@ -899,6 +914,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -932,6 +948,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -962,6 +979,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1001,6 +1019,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1122,6 +1141,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1135,376 +1155,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(consoleSpy).toHaveBeenCalledWith("SearchBar not ready for filter application");
       consoleSpy.mockRestore();
-    });
-  });
-
-  describe("Service Graph Integration", () => {
-    it("should set searchMode to traces when viewing traces from service graph", async () => {
-      // Start in service-graph mode
-      mockSearchObj.meta.searchMode = "service-graph";
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      const serviceGraphData = {
-        stream: "default",
-        serviceName: "test-service",
-        mode: "spans" as const,
-        timeRange: {
-          startTime: 1755853746625720,
-          endTime: 1755853746725720,
-        },
-      };
-
-      wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
-      await flushPromises();
-
-      // handleServiceGraphViewTraces sets searchMode from data.mode
-      expect(mockSearchObj.meta.searchMode).toBe("spans");
-      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
-      expect(mockSearchObj.data.editorValue).toContain("test-service");
-    });
-
-    it("should escape single quotes in service name filter", async () => {
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      const serviceGraphData = {
-        stream: "default",
-        serviceName: "test'service",
-        timeRange: {
-          startTime: 1755853746625720,
-          endTime: 1755853746725720,
-        },
-      };
-
-      wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
-      await flushPromises();
-
-      // SQL-style escaping uses double quotes: test'service becomes test''service
-      expect(mockSearchObj.data.editorValue).toContain("test''service");
-    });
-
-    it("should not write searchObj.data.query on view-traces (no duplicate trigger)", async () => {
-      // The redirect used to set searchObj.data.query, which tripped a query
-      // watcher in addition to its own runQueryFn() → duplicate search. The
-      // watcher and that write are removed; only editorValue is set now.
-      mockSearchObj.data.query = "";
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "checkout",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("checkout");
-      expect(mockSearchObj.data.query).toBe("");
-    });
-
-    function mountIndexComponent() {
-      return mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-    }
-
-    it("should include operationName in filter query when provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        operationName: "GET /api/health",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND operation_name = 'GET /api/health'");
-    });
-
-    it("should include nodeName in filter query when provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        nodeName: "node-1",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND service_k8s_node_name = 'node-1'");
-    });
-
-    it("should include podName in filter query when provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        podName: "pod-abc",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND service_k8s_pod_name = 'pod-abc'");
-    });
-
-    it("should append span_status = 'ERROR' when errorsOnly is true", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        errorsOnly: true,
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND span_status = 'ERROR'");
-    });
-
-    it("should include minDurationMicros in filter when greater than zero", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        minDurationMicros: 5000,
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND duration >= 5000");
-    });
-
-    it("should include maxDurationMicros in filter when greater than zero", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        maxDurationMicros: 20000,
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND duration <= 20000");
-    });
-
-    it("should combine all optional filter fields when all are provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        operationName: "POST /ingest",
-        nodeName: "node-2",
-        podName: "pod-xyz",
-        errorsOnly: true,
-        minDurationMicros: 1000,
-        maxDurationMicros: 9000,
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      const query = mockSearchObj.data.editorValue;
-      expect(query).toContain("service_name = 'svc'");
-      expect(query).toContain("AND operation_name = 'POST /ingest'");
-      expect(query).toContain("AND service_k8s_node_name = 'node-2'");
-      expect(query).toContain("AND service_k8s_pod_name = 'pod-xyz'");
-      expect(query).toContain("AND span_status = 'ERROR'");
-      expect(query).toContain("AND duration >= 1000");
-      expect(query).toContain("AND duration <= 9000");
-    });
-
-    it("should omit optional fields from filter when they are not provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      const query = mockSearchObj.data.editorValue;
-      expect(query).toBe("service_name = 'svc'");
-      expect(query).not.toContain("operation_name");
-      expect(query).not.toContain("service_k8s_node_name");
-      expect(query).not.toContain("service_k8s_pod_name");
-      expect(query).not.toContain("span_status");
-      expect(query).not.toContain("duration");
-    });
-
-    it("should not include duration filters when minDurationMicros and maxDurationMicros are zero", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        minDurationMicros: 0,
-        maxDurationMicros: 0,
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).not.toContain("duration");
-    });
-
-    it("should set searchMode from data.mode when navigating via handleServiceGraphViewTraces", async () => {
-      mockSearchObj.meta.searchMode = "service-graph";
-
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        mode: "traces",
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.meta.searchMode).toBe("traces");
-    });
-
-    it("should append resourceFilter to query when data.resourceFilter is provided", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        mode: "spans",
-        resourceFilter: { field: "service.name", value: "my-service" },
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND service.name = 'my-service'");
-    });
-
-    it("should escape single quotes in resourceFilter value", async () => {
-      wrapper = mountIndexComponent();
-      await flushPromises();
-
-      wrapper.vm.handleServiceGraphViewTraces({
-        stream: "default",
-        serviceName: "svc",
-        mode: "spans",
-        resourceFilter: { field: "service.name", value: "it's here" },
-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
-      });
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toContain("AND service.name = 'it''s here'");
-    });
-
-    it("should call loadServiceGraph on serviceGraphRef when service-graph-refresh event fires from SearchBar", async () => {
-      const mockLoadServiceGraph = vi.fn();
-
-      // Start in service-graph mode so the ServiceGraph stub is rendered
-      mockSearchObj.meta.searchMode = "service-graph";
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": {
-              name: "search-bar",
-              template: "<div />",
-              emits: ["service-graph-refresh"],
-            },
-            "index-list": true,
-            "search-result": true,
-            "service-graph": {
-              name: "service-graph",
-              template: "<div />",
-              setup() {
-                return { loadServiceGraph: mockLoadServiceGraph };
-              },
-            },
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
-      expect(searchBarEl.exists()).toBe(true);
-      await searchBarEl.vm.$emit("service-graph-refresh");
-      await flushPromises();
-
-      expect(mockLoadServiceGraph).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1522,6 +1172,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1548,6 +1199,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1569,6 +1221,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1591,6 +1244,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1612,6 +1266,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1651,6 +1306,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1677,6 +1333,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1702,6 +1359,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1727,6 +1385,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1754,6 +1413,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1847,6 +1507,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1891,6 +1552,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1929,6 +1591,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1972,6 +1635,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2028,6 +1692,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2058,6 +1723,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2091,6 +1757,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2109,12 +1776,12 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(callsWithNonEmpty.length).toBe(0);
     });
 
-    it("should pass only the WHERE-clause portion to parseDurationWhereClause when editorValue contains a pipe prefix", async () => {
+    it("should pass a match_all term containing a pipe to parseDurationWhereClause in full", async () => {
       const parseSpy = vi.mocked(useDurationPercentilesModule.parseDurationWhereClause);
       parseSpy.mockReturnValue("duration >= 1500");
 
-      // editorValue with a query-functions prefix before the pipe
-      mockSearchObj.data.editorValue = "someFunc | duration >= '1.50ms'";
+      // A pipe inside a quoted search term is part of the term, not a separator.
+      mockSearchObj.data.editorValue = "match_all('text | error') and duration >= '1.50ms'";
 
       wrapper = mount(Index, {
         attachTo: node,
@@ -2126,6 +1793,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2136,15 +1804,14 @@ describe("Index.vue (Main Traces Page)", () => {
       await wrapper.vm.searchData();
       await flushPromises();
 
-      // parseDurationWhereClause must be called with only the part after the pipe,
-      // NOT with the full "someFunc | duration >= '1.50ms'" string.
+      // The whole editor value is the where clause — the match_all term must reach
+      // parseDurationWhereClause intact rather than truncated at the pipe.
       const calls = parseSpy.mock.calls.filter(
         ([clause]) => typeof clause === "string" && clause.trim() !== "",
       );
       expect(calls.length).toBeGreaterThan(0);
       for (const [clause] of calls) {
-        expect(clause).not.toContain("|");
-        expect(clause).not.toContain("someFunc");
+        expect(clause).toContain("match_all('text | error')");
       }
     });
 
@@ -2167,6 +1834,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2207,14 +1875,6 @@ describe("Index.vue (Main Traces Page)", () => {
       });
     }
 
-    it("should restore tab=services-catalog from URL params", async () => {
-      mockSearchObj.meta.searchMode = "services-catalog";
-      wrapper = mountWithServicesCatalogStub();
-      await flushPromises();
-
-      expect(wrapper.vm.activeTab).toBe("services-catalog");
-    });
-
     it("should set searchMode and early-return without resetting sortBy when switching to services-catalog", async () => {
       // Set a non-default sortBy to prove it was not reset
       mockSearchObj.meta.resultGrid.sortBy = "operation_name";
@@ -2232,71 +1892,6 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
-  describe("Services Catalog — handleServicesCatalogViewTraces", () => {
-    function mountWithServicesCatalogStub() {
-      return mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-    }
-
-    it("should set editorValue with service_name filter when viewing traces from services catalog", async () => {
-      wrapper = mountWithServicesCatalogStub();
-      await flushPromises();
-
-      wrapper.vm.handleServicesCatalogViewTraces("my-service");
-      await flushPromises();
-
-      expect(mockSearchObj.data.editorValue).toBe("service_name = 'my-service'");
-    });
-
-    it("should set searchMode to 'traces' when handling services catalog view traces", async () => {
-      mockSearchObj.meta.searchMode = "services-catalog";
-
-      wrapper = mountWithServicesCatalogStub();
-      await flushPromises();
-
-      wrapper.vm.handleServicesCatalogViewTraces("test-svc");
-      await flushPromises();
-
-      expect(mockSearchObj.meta.searchMode).toBe("traces");
-    });
-
-    it("should escape single quotes in service name when building filter", async () => {
-      wrapper = mountWithServicesCatalogStub();
-      await flushPromises();
-
-      wrapper.vm.handleServicesCatalogViewTraces("test's-service");
-      await flushPromises();
-
-      // escapeSingleQuotes uses SQL-style escaping: ' → ''
-      expect(mockSearchObj.data.editorValue).toBe("service_name = 'test''s-service'");
-    });
-
-    it("should set sqlMode to false when handling services catalog view traces", async () => {
-      mockSearchObj.meta.sqlMode = true;
-
-      wrapper = mountWithServicesCatalogStub();
-      await flushPromises();
-
-      wrapper.vm.handleServicesCatalogViewTraces("test-svc");
-      await flushPromises();
-
-      expect(mockSearchObj.meta.sqlMode).toBe(false);
-    });
-  });
-
   describe("parseSpanKindWhereClause integration", () => {
     // Shared mount factory — keeps stub config in one place.
     function mountIndexStubbed() {
@@ -2310,6 +1905,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2382,8 +1978,8 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(callsWithNonEmpty.length).toBe(0);
     });
 
-    it("should pass only the WHERE-clause portion to parseSpanKindWhereClause when editorValue contains a pipe prefix", async () => {
-      mockSearchObj.data.editorValue = "someFunc | span_kind='Consumer'";
+    it("should pass a match_all term containing a pipe to parseSpanKindWhereClause in full", async () => {
+      mockSearchObj.data.editorValue = "match_all('text | error') and span_kind='Consumer'";
 
       wrapper = mountIndexStubbed();
       await flushPromises();
@@ -2396,9 +1992,8 @@ describe("Index.vue (Main Traces Page)", () => {
       );
       expect(nonEmptyCalls.length).toBeGreaterThan(0);
       for (const [clause] of nonEmptyCalls) {
-        // The pipe-prefix (function expression) must not be forwarded.
-        expect(clause).not.toContain("|");
-        expect(clause).not.toContain("someFunc");
+        // The quoted term is forwarded intact rather than truncated at the pipe.
+        expect(clause).toContain("match_all('text | error')");
       }
     });
   });
@@ -2418,6 +2013,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2472,6 +2068,7 @@ describe("Index.vue (Main Traces Page)", () => {
               "index-list": true,
               "search-result": true,
               "service-graph": true,
+              "services-catalog": true,
               SanitizedHtmlRenderer: true,
             },
           },
@@ -2662,6 +2259,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2695,6 +2293,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2732,6 +2331,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2774,6 +2374,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2805,6 +2406,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -3054,42 +2656,6 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.streamChangeDialog.show).toBe(false);
       // Stream must remain unchanged — the cancel did not apply the pending change
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
-    });
-
-    it("should trigger onChildStreamChangeRequest when service-graph emits request:stream-change", async () => {
-      mockSearchObj.data.editorValue = "duration >= 500";
-
-      wrapper = mountIndexStubbed();
-      await flushPromises();
-
-      const serviceGraphEl = wrapper.findComponent({ name: "service-graph" });
-      expect(serviceGraphEl.exists()).toBe(true);
-
-      await serviceGraphEl.vm.$emit("request:stream-change", "graph-stream");
-      await flushPromises();
-
-      // Non-empty editorValue → dialog must be shown
-      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
-      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("graph-stream");
-    });
-
-    it("should trigger onChildStreamChangeRequest when services-catalog emits request:stream-change", async () => {
-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
-      mockSearchObj.meta.searchMode = "services-catalog";
-
-      wrapper = mountIndexStubbed();
-      await flushPromises();
-
-      const servicesCatalogEl = wrapper.findComponent({
-        name: "services-catalog",
-      });
-      expect(servicesCatalogEl.exists()).toBe(true);
-
-      await servicesCatalogEl.vm.$emit("request:stream-change", "catalog-stream");
-      await flushPromises();
-
-      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
-      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("catalog-stream");
     });
   });
 });

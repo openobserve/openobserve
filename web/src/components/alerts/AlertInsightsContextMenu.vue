@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="context-menu bg-surface-overlay border-border-default rounded-default fixed z-9999 min-w-50 overflow-hidden border py-1 shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+    class="context-menu bg-surface-overlay border-border-default rounded-default fixed z-9999 min-w-50 overflow-hidden border py-1 shadow-md"
     :style="{ top: `${y}px`, left: `${x}px` }"
     @click.stop
     data-test="alert-insights-context-menu"

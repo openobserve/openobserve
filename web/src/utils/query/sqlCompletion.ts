@@ -41,14 +41,7 @@ import { gt, raw } from "@/types/i18n";
 
 /** Names of monaco's CompletionItemKind members that we actually use. */
 export type CompletionKindName =
-  | "Function"
-  | "Keyword"
-  | "Operator"
-  | "Field"
-  | "Value"
-  | "Variable"
-  | "Snippet"
-  | "Text";
+  "Function" | "Keyword" | "Operator" | "Field" | "Value" | "Variable" | "Snippet" | "Text";
 
 /** Names of monaco's CompletionItemInsertTextRule members. */
 export type InsertTextRuleName = "InsertAsSnippet" | "KeepWhitespace" | "None";

@@ -612,8 +612,15 @@ export default defineComponent({
         const value = model?.getValue();
         const trimmedValue = value?.trim();
 
-        // Only apply trim if there are actually tailing and leading spaces to trim
-        if (value !== trimmedValue) {
+        // Trimming on blur exists so a query committed for execution doesn't
+        // carry incidental leading/trailing whitespace — but for markdown
+        // (the content-template body editor) trailing blank lines ARE
+        // meaningful content, not incidental whitespace, so skip the trim
+        // there. Without this guard, clicking a toolbar button (which blurs
+        // the editor) silently deletes trailing blank lines out from under
+        // the click before its handler reads the selection — see the
+        // list/heading toolbar cursor-position bug report.
+        if (props.language !== "markdown" && value !== trimmedValue) {
           const lastLine = model.getLineCount();
           const lastLineLength = model.getLineLength(lastLine);
 
@@ -1135,7 +1142,14 @@ export default defineComponent({
 
     return {
       editorRef,
-      editorObj,
+      // `editorObj` is reassigned by a plain closure variable (monaco.editor.create
+      // runs after mount), so exposing it directly here would freeze callers to
+      // whatever it was at setup() return time (null, since the editor hasn't
+      // mounted yet). Expose a getter instead so external callers (see
+      // ContentTemplateForm.vue's toolbar actions) always read the live instance.
+      get editorObj() {
+        return editorObj;
+      },
       setValue,
       resetEditorLayout,
       disableSuggestionPopup,

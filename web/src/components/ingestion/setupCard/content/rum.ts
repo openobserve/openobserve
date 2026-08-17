@@ -137,7 +137,7 @@ openobserveRum.startSessionReplayRecording();`;
 
 // ── CDN variant ──────────────────────────────────────────────────────────────
 
-// Datadog-style async loader: creates an OO_RUM / OO_LOGS stub with an onReady
+// Standard RUM-agent async loader: creates an OO_RUM / OO_LOGS stub with an onReady
 // queue, then injects the bundle with `async` so it downloads in parallel and
 // never blocks parsing or first paint. Queued callbacks run when it lands.
 const cdnLoader = (globalName: string, src: string) => `  (function (h, o, u, n, d) {

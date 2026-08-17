@@ -75,7 +75,7 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(panel.queryType).toBe("sql");
       expect(panel.queries).toHaveLength(1);
       expect(panel.queries[0].query).toContain('FROM "cpu_usage"');
-      expect(panel.queries[0].query).toContain("service = 'api'");
+      expect(panel.queries[0].query).toContain("\"service\" = 'api'");
       expect(panel.queries[0].query).toContain("\"k8s-cluster\" = 'prod'");
     });
 
@@ -102,7 +102,7 @@ describe("useMetricsCorrelationDashboard", () => {
       const query = dashboard.tabs[0].panels[0].queries[0].query;
 
       // Single quotes should be escaped
-      expect(query).toContain("description = 'it''s a test'");
+      expect(query).toContain("\"description\" = 'it''s a test'");
     });
 
     it("should position panels in 3-column grid", () => {
@@ -275,8 +275,8 @@ describe("useMetricsCorrelationDashboard", () => {
       // Should only use matched dimension values from API filters
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       expect(query).toContain('FROM "default"');
-      expect(query).toContain("service_name = 'api'");
-      expect(query).toContain("env = 'prod'");
+      expect(query).toContain("\"service_name\" = 'api'");
+      expect(query).toContain("\"env\" = 'prod'");
       expect(query).not.toContain("host = 'server01'"); // Not in API filters
     });
 
@@ -354,7 +354,7 @@ describe("useMetricsCorrelationDashboard", () => {
 
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       // Should only include service_name (string, non-internal) in WHERE clause
-      expect(query).toContain("service_name = 'api'");
+      expect(query).toContain("\"service_name\" = 'api'");
       expect(query).not.toContain("port");
       expect(query).not.toContain("enabled");
       // _timestamp appears in ORDER BY, not in WHERE clause (which is correct)
@@ -390,8 +390,9 @@ describe("useMetricsCorrelationDashboard", () => {
       // Fields with hyphens should be quoted
       expect(query).toContain("\"k8s-cluster\" = 'prod'");
       expect(query).toContain("\"k8s-namespace\" = 'default'");
-      // Regular field names should not be quoted
-      expect(query).toContain("service = 'api'");
+      // Regular field names are quoted too — every identifier goes through
+      // quoteSqlIdentifier so escaping can never be forgotten (F2/F38)
+      expect(query).toContain("\"service\" = 'api'");
     });
 
     it("should set table_dynamic_columns for logs panel", () => {
@@ -528,6 +529,60 @@ describe("useMetricsCorrelationDashboard", () => {
 
       expect(dashboard.defaultDatetimeDuration.startTime).toBe(1234567890000000);
       expect(dashboard.defaultDatetimeDuration.endTime).toBe(1234567990000000);
+    });
+  });
+
+  describe("subject overrides (F31)", () => {
+    const semanticGroups = [
+      {
+        id: "k8s-namespace",
+        fields: ["k8s_namespace_name", "service_k8s_namespace_name"],
+      },
+    ] as MetricsCorrelationConfig["semanticGroups"];
+
+    const buildConfig = (
+      overrides: Partial<MetricsCorrelationConfig>,
+    ): MetricsCorrelationConfig => ({
+      serviceName: "api",
+      matchedDimensions: { "k8s-namespace": "staging" },
+      metricStreams: [],
+      orgIdentifier: "test-org",
+      timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      semanticGroups,
+      ...overrides,
+    });
+
+    it("replaces the stream's own alias rather than ANDing both aliases", () => {
+      const metricStreams: StreamInfo[] = [
+        { stream_name: "cpu", filters: { service_k8s_namespace_name: "prod" } },
+      ];
+
+      const dashboard = composable.generateDashboard(
+        metricStreams,
+        buildConfig({
+          metricSchemas: {
+            cpu: { schema: [{ name: "k8s_namespace_name" }, { name: "value" }] },
+          },
+        }),
+      );
+
+      const query = dashboard.tabs[0].panels[0].queries[0].query;
+      expect(query).toContain(`"k8s_namespace_name" = 'staging'`);
+      expect(query).not.toContain("service_k8s_namespace_name");
+    });
+
+    it("does not guess a field name when the stream schema is unavailable", () => {
+      const metricStreams: StreamInfo[] = [
+        { stream_name: "cpu", filters: { service_k8s_namespace_name: "prod" } },
+      ];
+
+      // No metricSchemas entry -> schema unknown. Guessing an alias here used to
+      // emit a WHERE on a nonexistent column and kill the panel.
+      const dashboard = composable.generateDashboard(metricStreams, buildConfig({}));
+
+      const query = dashboard.tabs[0].panels[0].queries[0].query;
+      expect(query).toContain(`"service_k8s_namespace_name" = 'prod'`);
+      expect(query).not.toContain("'staging'");
     });
   });
 });

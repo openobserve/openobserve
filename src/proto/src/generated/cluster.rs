@@ -3587,7 +3587,7 @@ pub enum Role {
     Querier = 2,
     Compactor = 3,
     Router = 4,
-    AlertManager = 5,
+    Scheduler = 5,
     FlattenCompactor = 6,
     ScriptServer = 7,
 }
@@ -3603,7 +3603,7 @@ impl Role {
             Self::Querier => "QUERIER",
             Self::Compactor => "COMPACTOR",
             Self::Router => "ROUTER",
-            Self::AlertManager => "ALERT_MANAGER",
+            Self::Scheduler => "SCHEDULER",
             Self::FlattenCompactor => "FLATTEN_COMPACTOR",
             Self::ScriptServer => "SCRIPT_SERVER",
         }
@@ -3616,7 +3616,7 @@ impl Role {
             "QUERIER" => Some(Self::Querier),
             "COMPACTOR" => Some(Self::Compactor),
             "ROUTER" => Some(Self::Router),
-            "ALERT_MANAGER" => Some(Self::AlertManager),
+            "SCHEDULER" => Some(Self::Scheduler),
             "FLATTEN_COMPACTOR" => Some(Self::FlattenCompactor),
             "SCRIPT_SERVER" => Some(Self::ScriptServer),
             _ => None,

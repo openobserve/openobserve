@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            whole form. Inline form → the footer Save is type="submit" (Enter
            works natively) and its spinner is form-driven via v-slot. -->
       <OForm :form="form" v-slot="{ isSubmitting }">
+        <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <div class="overflow-auto" style="height: calc(100vh - var(--navbar-height) - 155px)">
           <!-- Constrain the whole form to a sensible reading width on wide screens
                while staying fluid below the breakpoint. -->
@@ -52,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
+            <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
             <div style="height: calc(100vh - var(--navbar-height) - 300px)">
               <OStepper
                 v-model="step"

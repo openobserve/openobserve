@@ -16,6 +16,15 @@ import {
   skipTSAsExpression,
 } from "@intlify/eslint-plugin-vue-i18n/dist/utils/index.js";
 import fs from "fs";
+import css from "@eslint/css";
+// The parser behind @eslint/css. Used directly on .vue <style> blocks, which no ESLint
+// parser hands to a rule as an AST — `parse` takes an `offset`, so the positions it returns
+// are already absolute to the .vue file. Every style block in this repo is plain CSS (no
+// `lang="scss"`), so the .css branch and the <style> branch run the same parser.
+import { parse as parseCss, walk as walkCss } from "@eslint/css-tree";
+// `px(?![a-zA-Z0-9])`, not `px\b`: `_` is a word char and Tailwind uses `_` for the
+// space inside arbitrary values, so `\b` would skip the first value of `p-[8px_12px]`.
+const PX_LITERAL = /(?<![a-zA-Z0-9.])(\d+(?:\.\d+)?)px(?![a-zA-Z0-9])/g;
 
 // Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue/.ts
 // file's raw text — catches Tailwind arbitrary-value usages in templates
@@ -76,6 +85,182 @@ const noLegacyO2Tokens = {
             }
           },
         };
+      },
+    },
+  },
+};
+
+// ── no-hardcoded-px ────────────────────────────────────────────────────────
+// Sizing is authored in rem (WCAG 1.4.4); 1rem = 16px. No exemption list: a sanctioned px
+// carries `eslint-disable-next-line local/no-hardcoded-px -- <reason>` at the site (SKILL.md §3).
+// px is read from AST nodes, never raw text — so comments are excluded structurally, and a
+// string containing `/*` cannot blank out the code around it the way comment-masking did.
+const noHardcodedPx = {
+  rules: {
+    "no-hardcoded-px": {
+      meta: {
+        type: "problem",
+        docs: { description: "Size in rem, not px" },
+      },
+      create(context) {
+        const filename = (context.filename ?? context.getFilename() ?? "").replace(/\\/g, "/");
+        // Spec files legitimately assert on literal px strings.
+        if (/\.spec\.|\.test\.|\/tests?\//.test(filename)) return {};
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+
+        // Node ranges overlap (a TemplateElement sits inside its own literal), so dedupe.
+        const reported = new Set();
+        const reportAt = (start, raw) => {
+          if (reported.has(start)) return;
+          reported.add(start);
+          const px = parseFloat(raw);
+          const asRem = parseFloat((px / 16).toFixed(6));
+          const scale = px / 4;
+          const hint = Number.isInteger(scale * 2) ? ` (or the Tailwind scale step ${scale})` : "";
+          context.report({
+            loc: {
+              start: sourceCode.getLocFromIndex(start),
+              end: sourceCode.getLocFromIndex(start + raw.length),
+            },
+            message: `Hardcoded ${raw}. Size in rem: use ${asRem}rem${hint}. If px is genuinely required (hairline, shadow/ring width, query condition, IntersectionObserver rootMargin, user-facing copy, SVG dimension attribute, canvas/ECharts/email consumer), add \`// eslint-disable-next-line local/no-hardcoded-px -- <why px is correct here>\` at the site.`,
+          });
+        };
+
+        // @eslint/css nodes carry offsets on `loc`, ESLint/Vue nodes carry `range`.
+        const rangeOf = (node) => node.range ?? [node.loc.start.offset, node.loc.end.offset];
+        const scanRange = (start, end, { suppress } = {}) => {
+          const chunk = sourceCode.getText().slice(start, end);
+          let match;
+          PX_LITERAL.lastIndex = 0;
+          while ((match = PX_LITERAL.exec(chunk))) {
+            const at = start + match.index;
+            if (suppress?.(at)) continue;
+            reportAt(at, match[0]);
+          }
+        };
+        const scanNode = (node) => {
+          const [start, end] = rangeOf(node);
+          scanRange(start, end);
+        };
+
+        // ── .css ───────────────────────────────────────────────────────────
+        if (filename.endsWith(".css")) {
+          return {
+            Dimension(node) {
+              if (node.unit !== "px") return;
+              reportAt(rangeOf(node)[0], `${node.value}px`);
+            },
+            // css-tree leaves custom-property values unparsed (`--radius-full: 9999px`).
+            Raw: scanNode,
+            // px inside an escaped utility class: `.h-\[calc\(100vh-105px\)\]`.
+            Selector: scanNode,
+          };
+        }
+
+        // ── .vue <style> ───────────────────────────────────────────────────
+        // No ESLint parser hands a style block to a rule — parse it here, same node kinds as
+        // .css. Core cannot see its comments either, so it registers no disable directive;
+        // this rule honours `/* eslint-disable-next-line|line … -- <reason> */` itself and
+        // reports one that suppresses nothing or omits its reason.
+        const STYLE_DIRECTIVE =
+          /\/\*\s*eslint-disable-(next-line|line)\s+local\/no-hardcoded-px([\s\S]*?)\*\//g;
+        const styleDirectives = [];
+        const collectDirectives = (start, end) => {
+          const chunk = sourceCode.getText().slice(start, end);
+          let match;
+          STYLE_DIRECTIVE.lastIndex = 0;
+          while ((match = STYLE_DIRECTIVE.exec(chunk))) {
+            const at = start + match.index;
+            styleDirectives.push({
+              at,
+              end: at + match[0].length,
+              line: sourceCode.getLocFromIndex(at).line,
+              kind: match[1],
+              hasReason: /--\s*\S/.test(match[2]),
+              used: false,
+            });
+          }
+        };
+        const suppress = (at) => {
+          const line = sourceCode.getLocFromIndex(at).line;
+          const d = styleDirectives.find((x) =>
+            x.kind === "next-line" ? x.line + 1 === line : x.line === line,
+          );
+          if (!d) return false;
+          d.used = true;
+          return true;
+        };
+
+        const scanStyleBlocks = () => {
+          const text = sourceCode.getText();
+          const re = /<style\b([^>]*)>([\s\S]*?)<\/style>/gi;
+          let match;
+          while ((match = re.exec(text))) {
+            const start = match.index + match[0].indexOf(">") + 1;
+            const body = match[2];
+            collectDirectives(start, start + body.length);
+
+            let ast;
+            try {
+              ast = parseCss(body, {
+                positions: true,
+                offset: start, // makes every reported position absolute to the .vue file
+                parseCustomProperty: false, // keeps `--x: 4px` a Raw node, as the .css branch expects
+                onParseError: () => {}, // tolerate Tailwind v4 / unknown syntax, as @eslint/css does
+              });
+            } catch {
+              // Never skip silently — px must not pass because a parser gave up.
+              context.report({
+                loc: sourceCode.getLocFromIndex(start),
+                message: `This <style> block could not be parsed, so it is NOT checked for hardcoded px. Fix the CSS syntax.`,
+              });
+              continue;
+            }
+            walkCss(ast, (node) => {
+              if (node.type === "Dimension") {
+                if (node.unit !== "px") return;
+                const at = node.loc.start.offset;
+                if (suppress(at)) return;
+                reportAt(at, `${node.value}px`);
+              } else if (node.type === "Raw" || node.type === "Selector") {
+                scanRange(node.loc.start.offset, node.loc.end.offset, { suppress });
+              }
+            });
+          }
+
+          for (const d of styleDirectives) {
+            if (!d.used) {
+              context.report({
+                loc: {
+                  start: sourceCode.getLocFromIndex(d.at),
+                  end: sourceCode.getLocFromIndex(d.end),
+                },
+                message: `Unused eslint-disable directive (no px was reported on the ${
+                  d.kind === "next-line" ? "next line" : "line"
+                }).`,
+              });
+            } else if (!d.hasReason) {
+              context.report({
+                loc: {
+                  start: sourceCode.getLocFromIndex(d.at),
+                  end: sourceCode.getLocFromIndex(d.end),
+                },
+                message: `This disable must carry its justification: \`-- <why px is correct here>\`.`,
+              });
+            }
+          }
+        };
+
+        const scriptVisitor = { Literal: scanNode, TemplateElement: scanNode };
+        const services = sourceCode.parserServices ?? context.parserServices;
+
+        if (filename.endsWith(".vue") && services?.defineTemplateBodyVisitor) {
+          return services.defineTemplateBodyVisitor(
+            { VLiteral: scanNode, VText: scanNode, Literal: scanNode, TemplateElement: scanNode },
+            { ...scriptVisitor, Program: scanStyleBlocks },
+          );
+        }
+        return scriptVisitor;
       },
     },
   },
@@ -318,8 +503,10 @@ export default [
       ".vscode/**",
     ],
   },
-  js.configs.recommended,
-  ...vue.configs["flat/essential"],
+  // Scoped: without `files` these apply to .css too, where JS/Vue rules crash on a
+  // CSS SourceCode.
+  { ...js.configs.recommended, files: ["**/*.{js,mjs,cjs,ts,tsx,vue}"] },
+  ...vue.configs["flat/essential"].map((c) => ({ ...c, files: ["**/*.vue"] })),
   {
     files: ["**/*.{js,mjs,cjs,ts,tsx,vue}"],
     ignores: [
@@ -345,7 +532,7 @@ export default [
       vue,
       "@typescript-eslint": typescript,
       prettier,
-      local: noLegacyO2Tokens,
+      local: { rules: { ...noLegacyO2Tokens.rules, ...noHardcodedPx.rules } },
       "@intlify/vue-i18n": vueI18n,
     },
     // en-US only. The other locales are generated from it and lag behind, so
@@ -358,6 +545,7 @@ export default [
     },
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
+      "local/no-hardcoded-px": ["error"],
 
       // A missing key is invisible at build time — vue-i18n renders the raw key to
       // the user. Dynamic keys are skipped by the rule; specs are exempted below.
@@ -563,6 +751,18 @@ export default [
     rules: {
       ...cypress.configs.recommended.rules,
     },
+  },
+  // ── Stylesheets ──────────────────────────────────────────────────────────
+  // Only no-hardcoded-px runs here; colour/token rules for stylesheets stay with
+  // stylelint (lint:styles).
+  {
+    files: ["**/*.css"],
+    language: "css/css",
+    // Tailwind v4 syntax (`--color-*: initial`, @custom-variant, @plugin, @source)
+    // is not standard CSS; tolerant mode skips it instead of erroring.
+    languageOptions: { tolerant: true },
+    plugins: { css, local: { rules: { ...noHardcodedPx.rules } } },
+    rules: { "local/no-hardcoded-px": ["error"] },
   },
   // Must be last: disables core/TS/Vue stylistic rules that could conflict
   // with Prettier's formatting decisions. Formatting is owned by `format:check`,

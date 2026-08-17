@@ -16,24 +16,32 @@ Decision per key (per locale):
   * key removed from en-US.json               -> pruned from the target file
 
 Pending leaves are translated in batches (many strings per API call) to keep the
-request count and cost low. Each item is validated independently — a string whose
-translation drops/alters an interpolation placeholder (e.g. `{count}`) is rejected
-and left un-advanced so it retries on the next run, exactly like a hard API failure.
+request count and cost low, and several batches are in flight at once so a large
+backlog finishes in minutes rather than hours. Each item is validated
+independently — a string whose translation drops/alters an interpolation
+placeholder (e.g. `{count}`) is rejected and left un-advanced so it retries on the
+next run, exactly like a hard API failure.
 
 Environment:
     DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
     DEEPSEEK_MODEL     Model id (default "deepseek-v4-flash").
     DEEPSEEK_BASE_URL  API base URL (default "https://api.deepseek.com").
     TRANSLATION_BATCH_SIZE  Strings per API call (default 50).
+    TRANSLATION_CONCURRENCY Batches in flight per locale (default 4; 1 = serial).
 """
 
 import json
 import os
 import re
 import hashlib
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from openai import OpenAI
+# `openai` is imported inside _get_client(), not here: the change-detection half of
+# this module (collect_pending_leaves, load_state, …) is pure file comparison, and
+# `main.py --check` runs it with no dependencies installed and no API key — which is
+# what lets the merge-queue gate be free.
 
 STATE_FILENAME = ".translation_state.json"
 
@@ -64,11 +72,28 @@ LANGUAGE_NAMES = {
     # Add them here together with RTL layout support and their web wiring.
 }
 
-# vue-i18n / printf style interpolation tokens that MUST survive translation
-# unchanged: {count}, {name}, {0}, %s, %d, @:linked.key
-_PLACEHOLDER = re.compile(r"{[^{}]*}|%[sd]|@:[\w.]+")
+# printf / linked-message tokens that MUST survive translation unchanged.
+# Brace tokens are handled by _scan_tokens, which a regex cannot do: `{'}'}` is a
+# single literal-escape token whose body contains the very character a regex like
+# `{[^{}]*}` stops at.
+_PRINTF = re.compile(r"%[sd]")
+# `@` always starts a linked message in vue-i18n — `@:key` or `@.modifier:key`.
+# A bare `@` (even inside a word, e.g. an email address) is a compile error; the
+# locale files spell it `{'@'}` for that reason.
+_LINKED = re.compile(r"@(?:\.[A-Za-z_$][A-Za-z0-9_$]*)?:[\w.]+")
+
+# A vue-i18n named placeholder is a JS-style identifier; a list placeholder is an
+# index. Anything else — most importantly a name the model helpfully translated,
+# `{标识符}` for `{identifier}` — is INVALID_TOKEN_IN_PLACEHOLDER, and vue-i18n
+# compiles messages just-in-time, so it *throws* at render time and blanks the
+# page that used the string.
+_NAMED = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*\Z")
+_LIST = re.compile(r"\d+\Z")
 
 _client = None
+# Batches are translated concurrently (see translate_pending), so the lazy client
+# construction below must be race-free.
+_client_lock = threading.Lock()
 
 
 class TranslationError(Exception):
@@ -123,41 +148,136 @@ def load_state():
     return load_json(get_state_file_path(), {})
 
 
+def write_json(path, data, sort_keys=False):
+    """Write `data` as pretty JSON to `path` atomically.
+
+    Written to a sibling temp file and renamed, so an interrupted run (the job is
+    cancellable mid-write, and CI now commits whatever progress exists) can never
+    leave a truncated / half-written locale file behind to be committed.
+    """
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data, indent=2, ensure_ascii=False, sort_keys=sort_keys) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
 def save_state(state):
-    with open(get_state_file_path(), "w", encoding="utf-8") as f:
-        f.write(json.dumps(state, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
+    write_json(get_state_file_path(), state, sort_keys=True)
 
 
 def new_counters():
     return {"pending": 0, "kept": 0, "translated": 0, "failed": 0, "failed_paths": set()}
 
 
+def _scan_tokens(text):
+    """
+    Return (tokens, compilable) for one message.
+
+    `tokens` is the multiset of interpolation tokens vue-i18n would see —
+    placeholders (`{count}`, `{0}`), literal escapes (`{'{'}`, `{'@'}`), printf
+    tokens and linked-message references — normalised so that incidental
+    whitespace inside braces does not count as a difference.
+
+    `compilable` is False when the message is something vue-i18n's compiler would
+    reject outright: a placeholder whose name is not an identifier, an unclosed
+    or unbalanced brace, or an unterminated literal escape. Those are what turn a
+    translation into a thrown SyntaxError at render time instead of a wrong-looking
+    label, so they must never be written to a locale file.
+    """
+    tokens = []
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+
+        if ch == "%":
+            m = _PRINTF.match(text, i)
+            if m:
+                tokens.append(m.group(0))
+                i = m.end()
+                continue
+
+        if ch == "@":
+            m = _LINKED.match(text, i)
+            if not m:
+                return tokens, False  # bare @ — must be written {'@'}
+            tokens.append(m.group(0))
+            i = m.end()
+            continue
+
+        if ch == "}":
+            return tokens, False  # closing brace with nothing open
+
+        if ch != "{":
+            i += 1
+            continue
+
+        j = i + 1
+        while j < n and text[j].isspace():
+            j += 1
+
+        if j < n and text[j] == "'":
+            # Literal escape: {'{'}, {'}'}, {'@'}, {'|'}. The body is quoted, so
+            # scan to the closing quote rather than to the next brace.
+            end = text.find("'", j + 1)
+            if end == -1:
+                return tokens, False
+            k = end + 1
+            while k < n and text[k].isspace():
+                k += 1
+            if k >= n or text[k] != "}":
+                return tokens, False
+            tokens.append("{'" + text[j + 1 : end] + "'}")
+            i = k + 1
+            continue
+
+        end = text.find("}", j)
+        if end == -1:
+            return tokens, False
+        name = text[j:end].strip()
+        if not (_NAMED.match(name) or _LIST.match(name)):
+            return tokens, False
+        tokens.append("{" + name + "}")
+        i = end + 1
+
+    return tokens, True
+
+
 def _placeholders(text):
     """Multiset of interpolation tokens in a string (order-independent)."""
-    return sorted(_PLACEHOLDER.findall(text))
+    return sorted(_scan_tokens(text)[0])
 
 
 def _get_client():
     """Lazily construct the DeepSeek (OpenAI-compatible) client.
 
     Constructed on first use so that dry passes / imports don't require the API
-    key to be present (e.g. when only counting pending work).
+    key — or the `openai` package — to be present (e.g. when only counting pending
+    work). The client itself is thread-safe and shared by every worker; only its
+    construction is locked.
     """
     global _client
     if _client is None:
-        api_key = os.environ.get("DEEPSEEK_API_KEY")
-        if not api_key:
-            raise TranslationError(
-                "DEEPSEEK_API_KEY is not set — cannot reach the translation service."
-            )
-        _client = OpenAI(
-            api_key=api_key,
-            base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-            # Cap per-request time so a single hung/slow call can't stall the whole
-            # run for the SDK's 600s default. Our own retry/split loop then recovers.
-            timeout=float(os.environ.get("DEEPSEEK_TIMEOUT", "60")),
-            max_retries=2,
-        )
+        with _client_lock:
+            if _client is None:
+                from openai import OpenAI
+
+                api_key = os.environ.get("DEEPSEEK_API_KEY")
+                if not api_key:
+                    raise TranslationError(
+                        "DEEPSEEK_API_KEY is not set — cannot reach the translation service."
+                    )
+                _client = OpenAI(
+                    api_key=api_key,
+                    base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+                    # Cap per-request time so a single hung/slow call can't stall the
+                    # whole run for the SDK's 600s default. Our own retry/split loop
+                    # then recovers.
+                    timeout=float(os.environ.get("DEEPSEEK_TIMEOUT", "60")),
+                    max_retries=2,
+                )
     return _client
 
 
@@ -410,13 +530,20 @@ def _validate(src, out):
     Return `out` if it safely preserves `src`'s structure, else None.
 
     Rejects a translation that is empty/whitespace-only (which would blank the
-    label), changes the interpolation-placeholder multiset ({count}, %s, @:key),
-    or changes the vue-i18n pluralization pipe count (`|`) — each silently breaks
-    runtime rendering.
+    label), that vue-i18n could not compile at all, that changes the
+    interpolation-token multiset ({count}, {'{'}, %s, @:key), or that changes the
+    vue-i18n pluralization pipe count (`|`).
+
+    The compilability check is the one that matters most: a translated placeholder
+    name or a mangled literal escape makes vue-i18n throw while rendering, which
+    blanks every component on the page rather than just spoiling one label.
     """
     if not isinstance(out, str) or not out.strip():
         return None
-    if _placeholders(src) != _placeholders(out):
+    out_tokens, compilable = _scan_tokens(out)
+    if not compilable:
+        return None
+    if _placeholders(src) != sorted(out_tokens):
         return None
     if src.count("|") != out.count("|"):
         return None
@@ -456,14 +583,38 @@ def translate_pending(pending, locale):
             flat.append((uidx, 0, value))
 
     total = len(flat)
+    chunks = [flat[start : start + batch_size] for start in range(0, total, batch_size)]
+
+    # Batches are independent, so translate several concurrently. Sequentially a
+    # backlog run is ~880 API calls and takes hours — longer than the gap between
+    # two en-US.json merges to main, so the run was always superseded before it
+    # could open a PR. Concurrency is what lets a full run actually land.
+    workers = max(1, int(os.environ.get("TRANSLATION_CONCURRENCY", "4")))
+    batch_results = [None] * len(chunks)
     done = 0
-    for start in range(0, total, batch_size):
-        chunk = flat[start : start + batch_size]
-        results = translate_batch([s for _, _, s in chunk], locale)
+
+    if workers == 1 or len(chunks) <= 1:
+        for i, chunk in enumerate(chunks):
+            batch_results[i] = translate_batch([s for _, _, s in chunk], locale)
+            done += len(chunk)
+            print(f"    {locale}: {done}/{total} strings translated", flush=True)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(translate_batch, [s for _, _, s in chunk], locale): i
+                for i, chunk in enumerate(chunks)
+            }
+            # Results are stored by index, so out-of-order completion cannot
+            # misalign a translation with its source string.
+            for fut in as_completed(futures):
+                i = futures[fut]
+                batch_results[i] = fut.result()
+                done += len(chunks[i])
+                print(f"    {locale}: {done}/{total} strings translated", flush=True)
+
+    for chunk, results in zip(chunks, batch_results):
         for (uidx, eidx, src), out in zip(chunk, results):
             units[uidx][2][eidx] = _validate(src, out)  # None on failure/mismatch
-        done += len(chunk)
-        print(f"    {locale}: {done}/{total} strings translated")
 
     translated = {}
     for path, kind, slots in units:

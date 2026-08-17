@@ -35,11 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          is `type="submit"` and Enter submits natively — no `form-id` needed. -->
     <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 w-full flex-1 flex-col">
       <div class="min-h-0 w-full flex-1 px-2.5 pt-1 pb-2.5">
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <div
           class="bg-card-glass-bg overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
         >
-          <div ref="addAlertFormRef" class="px-4 pb-3" style="width: 1024px">
+          <!-- eslint-enable local/no-hardcoded-px -->
+          <div ref="addAlertFormRef" class="px-4 pb-3" style="width: 64rem">
             <div class="create-report-form">
               <div data-test="add-action-script-name-input-wrapper" class="report-name-input pt-3">
                 <OFormInput
@@ -49,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   required
                   class="showLabelOnTop"
                   tabindex="0"
-                  style="width: 400px"
+                  style="width: 25rem"
                   :help-text="t('actions.nameInvalidChars')"
                 />
               </div>
@@ -59,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('reports.description')"
                   class="showLabelOnTop"
                   tabindex="0"
-                  style="width: 800px"
+                  style="width: 50rem"
                 />
               </div>
 
@@ -180,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           data-test="add-action-script-cron-input"
                           class="mr-2 pt-2"
-                          style="width: 320px"
+                          style="width: 20rem"
                         >
                           <div
                             class="text-text-secondary mb-1 font-bold"
@@ -227,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :loading="isFetchingServiceAccounts"
                             class="showLabelOnTop no-case mb-[2.4rem]"
                             disabled
-                            style="min-width: 250px !important; width: 250px !important"
+                            style="min-width: 15.625rem !important; width: 15.625rem !important"
                           />
                         </div>
                       </div>
@@ -285,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="no-case py-2"
                         labelKey="label"
                         valueKey="value"
-                        style="min-width: 250px !important; width: 250px !important"
+                        style="min-width: 15.625rem !important; width: 15.625rem !important"
                       />
                     </div>
                   </div>
@@ -590,18 +592,16 @@ const editScriptSchema = makeEditScriptSchema({
 // Dynamic (edit-prefill) defaults: projects the form-owned fields out of the
 // component's `formData` / `frequency`. Seeds useOForm at create; re-applied
 // via form.reset() when an edited record arrives async (see below).
-const editScriptDefaults = computed(
-  (): EditScriptForm => ({
-    name: formData.value.name ?? "",
-    description: formData.value.description ?? "",
-    type: formData.value.type ?? "scheduled",
-    service_account: formData.value.service_account ?? "",
-    timezone: formData.value.timezone ?? "UTC",
-    codeZip: (formData.value.codeZip as File | null) ?? null,
-    cron: frequency.value.cron ?? "",
-    frequencyType: frequency.value.type ?? "once",
-  }),
-);
+const editScriptDefaults = computed((): EditScriptForm => ({
+  name: formData.value.name ?? "",
+  description: formData.value.description ?? "",
+  type: formData.value.type ?? "scheduled",
+  service_account: formData.value.service_account ?? "",
+  timezone: formData.value.timezone ?? "UTC",
+  codeZip: (formData.value.codeZip as File | null) ?? null,
+  cron: frequency.value.cron ?? "",
+  frequencyType: frequency.value.type ?? "once",
+}));
 
 // Headless form (Rule ③ owner). defaultValues seed the blank create form; the
 // async edit record re-seeds via form.reset() below. onSubmit is deferred to

@@ -14,14 +14,51 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import PerformanceSummary from "./PerformanceSummary.vue";
 import { createStore } from "vuex";
-import { nextTick } from "vue";
+import { nextTick, reactive, ref } from "vue";
 
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
+
+// Shared reactive `_rumdata` schema state, mirroring the module-level singleton the real
+// usePerformance() exposes. `mock` prefix so the vi.mock factories may reference it.
+const mockPerformanceState = reactive({
+  data: {
+    datetime: { startTime: 0, endTime: 0, relativeTimePeriod: "15m", valueType: "relative" },
+    streams: {} as Record<string, any>,
+  },
+});
+
+const mockGetStream = vi.fn();
+
+vi.mock("@/composables/rum/usePerformance", () => ({
+  default: () => ({ performanceState: mockPerformanceState }),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: mockGetStream }),
+}));
+
+// This tab passes its time range, so the real composable would fire a platform-detection
+// search on mount. Stub it out: platform resolution has its own spec
+// (useRumPerformanceTab.spec.ts) and an unstubbed probe times the suite out.
+const mockHasBrowser = ref(true);
+const mockHasMobile = ref(false);
+const mockResolvedKey = ref<string | null>("0-0");
+const mockDetectPlatforms = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@/composables/rum/useRumPlatforms", () => ({
+  default: () => ({
+    hasBrowser: mockHasBrowser,
+    hasMobile: mockHasMobile,
+    resolvedKey: mockResolvedKey,
+    detectPlatforms: mockDetectPlatforms,
+    resetRumPlatforms: vi.fn(),
+  }),
+}));
 
 vi.mock("@/utils/commons.ts", () => ({
   getDashboard: vi.fn(),
@@ -47,13 +84,16 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data),
 }));
 
+// Panels carry a layout because the capability filter reflows survivors when it drops
+// anything. They intentionally declare no gated columns and no platform tag, so they
+// survive every schema — this spec is about the tab, not the gate.
 vi.mock("@/utils/rum/overview.json", () => ({
   default: {
     version: 2,
     title: "RUM Overview",
     panels: [
-      { id: "panel1", title: "LCP" },
-      { id: "panel2", title: "FID" },
+      { id: "panel1", title: "LCP", layout: { x: 0, y: 0, w: 6, h: 4, i: 1 } },
+      { id: "panel2", title: "FID", layout: { x: 6, y: 0, w: 6, h: 4, i: 2 } },
     ],
   },
 }));
@@ -112,8 +152,40 @@ function mountComponent(routeQuery: Record<string, any> = {}, props: Record<stri
         $router: mockRouter,
         $route: { query: { dashboard: "test-dashboard", folder: "test-folder", ...routeQuery } },
       },
+      stubs: {
+        OSpinner: { template: '<div data-test="spinner" v-bind="$attrs" />', inheritAttrs: false },
+        OEmptyState: {
+          name: "OEmptyState",
+          template: '<div><slot name="title" /><slot name="description" /></div>',
+        },
+      },
     },
   });
+}
+
+// Seeds the shared performanceState so ensureRumSchema() short-circuits without calling
+// getStream — the dashboard branch then renders after a single flush.
+function seedRumSchema(schemaMap: Record<string, any> | null) {
+  if (schemaMap === null) {
+    delete mockPerformanceState.data.streams["_rumdata"];
+    return;
+  }
+  mockPerformanceState.data.streams["_rumdata"] = { schema: schemaMap, name: "_rumdata" };
+}
+
+/**
+ * Mounts with the schema gate already resolved, so the dashboard branch is rendered
+ * rather than the loading spinner. Most tests here are about the tab's own behaviour and
+ * need the dashboard on screen.
+ */
+async function mountResolved(
+  routeQuery: Record<string, any> = {},
+  props: Record<string, any> = {},
+) {
+  seedRumSchema({ view_name: { name: "view_name" } });
+  const mounted = mountComponent(routeQuery, props);
+  await flushPromises();
+  return mounted;
 }
 
 // ---------------------------------------------------------------------------
@@ -128,12 +200,26 @@ describe("PerformanceSummary", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
+    // Every test starts with no known `_rumdata` schema and a browser-resolved platform
+    // probe; tests opt into a seeded schema via mountResolved().
+    seedRumSchema(null);
+    mockGetStream.mockReset();
+    mockGetStream.mockResolvedValue({ schema: [{ name: "view_name" }] });
+    mockHasBrowser.value = true;
+    mockHasMobile.value = false;
+    mockResolvedKey.value = "0-0";
+
     const { deletePanel } = await import("@/utils/commons.ts");
     mockDeletePanel = vi.mocked(deletePanel);
 
     const { convertDashboardSchemaVersion } =
       await import("@/utils/dashboard/convertDashboardSchemaVersion");
     mockConvertDashboardSchemaVersion = vi.mocked(convertDashboardSchemaVersion);
+    // vi.clearAllMocks() clears call history but keeps queued return values, so restore
+    // the identity default explicitly — otherwise one test's stubbed dashboard leaks into
+    // every later mount and silently empties the capability filter.
+    mockConvertDashboardSchemaVersion.mockReset();
+    mockConvertDashboardSchemaVersion.mockImplementation((data: any) => data);
 
     mockRouterPush.mockClear();
     mockRouterReplace.mockClear();
@@ -196,35 +282,35 @@ describe("PerformanceSummary", () => {
   // RenderDashboardCharts integration
   // -------------------------------------------------------------------------
 
-  it("renders RenderDashboardCharts component", () => {
+  it("renders RenderDashboardCharts component", async () => {
     // Arrange
-    wrapper = mountComponent();
+    wrapper = await mountResolved();
 
     // Assert
     expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).exists()).toBe(true);
   });
 
-  it("passes viewOnly=true to RenderDashboardCharts", () => {
+  it("passes viewOnly=true to RenderDashboardCharts", async () => {
     // Arrange
-    wrapper = mountComponent();
+    wrapper = await mountResolved();
 
     // Assert
     const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
     expect(charts.props("viewOnly")).toBe(true);
   });
 
-  it("passes searchType=RUM to RenderDashboardCharts", () => {
+  it("passes searchType=RUM to RenderDashboardCharts", async () => {
     // Arrange
-    wrapper = mountComponent();
+    wrapper = await mountResolved();
 
     // Assert
     const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
     expect(charts.props("searchType")).toBe("RUM");
   });
 
-  it("integrates with RenderDashboardCharts with correct props", () => {
+  it("integrates with RenderDashboardCharts with correct props", async () => {
     // Arrange
-    wrapper = mountComponent();
+    wrapper = await mountResolved();
 
     // Assert
     const chartsComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
@@ -241,7 +327,7 @@ describe("PerformanceSummary", () => {
 
   it("shows loading indicator element when isLoading has items", async () => {
     // Arrange
-    wrapper = mountComponent();
+    wrapper = await mountResolved();
     wrapper.vm.isLoading.push("loading");
     await nextTick();
 
@@ -252,7 +338,7 @@ describe("PerformanceSummary", () => {
 
   it("hides loading indicator when isLoading is empty", async () => {
     // Arrange
-    wrapper = mountComponent();
+    wrapper = await mountResolved();
     wrapper.vm.isLoading.splice(0); // ensure empty
     await nextTick();
 
@@ -290,56 +376,55 @@ describe("PerformanceSummary", () => {
     expect(mockConvertDashboardSchemaVersion).toHaveBeenCalled();
   });
 
-  it("calls convertDashboardSchemaVersion when loadDashboard is invoked", async () => {
-    // Arrange
-    wrapper = mountComponent();
+  it("shows the schema-loading spinner and no dashboard until the gate resolves", async () => {
+    // Arrange — a getStream that never settles keeps the gate open.
+    let resolveStream!: (value: { schema: any[] }) => void;
+    mockGetStream.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStream = resolve;
+      }),
+    );
 
     // Act
-    await wrapper.vm.loadDashboard();
-
-    // Assert
-    expect(mockConvertDashboardSchemaVersion).toHaveBeenCalled();
-  });
-
-  it("sets variablesData.isVariablesLoading to false when dashboard has no variables", async () => {
-    // Arrange
     wrapper = mountComponent();
-    wrapper.vm.currentDashboardData.data = { panels: [] };
-
-    // Act
-    await wrapper.vm.loadDashboard();
 
     // Assert
-    expect(wrapper.vm.variablesData.isVariablesLoading).toBe(false);
-    expect(wrapper.vm.variablesData.values).toEqual([]);
+    expect(wrapper.find('[data-test="performance-summary-schema-loading"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).exists()).toBe(false);
+
+    // Cleanup — settle the pending promise so it can't leak into other tests.
+    resolveStream({ schema: [] });
+    await flushPromises();
   });
 
-  it("applies converted dashboard data when loadDashboard runs with variable data", async () => {
-    // Arrange
-    const mockDashboardWithVars = {
-      variables: { list: [{ name: "var1", value: "value1" }] },
+  it("hands the schema-migrated dashboard to RenderDashboardCharts", async () => {
+    // Arrange — the conversion runs once while the composable is created, so the return
+    // value has to be queued before mount.
+    const convertedDashboard = {
+      title: "Converted RUM Overview",
+      panels: [{ id: "panel1", title: "LCP", layout: { x: 0, y: 0, w: 6, h: 4, i: 1 } }],
     };
-    mockConvertDashboardSchemaVersion.mockReturnValue(mockDashboardWithVars);
-    wrapper = mountComponent();
+    mockConvertDashboardSchemaVersion.mockReturnValueOnce(convertedDashboard);
 
     // Act
-    await wrapper.vm.loadDashboard();
+    wrapper = await mountResolved();
 
     // Assert
-    expect(wrapper.vm.currentDashboardData.data).toEqual(mockDashboardWithVars);
+    const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+    expect(charts.props("dashboardData")).toEqual(convertedDashboard);
   });
 
-  it("persists dashboard data set directly on currentDashboardData.data", async () => {
+  it("renders the full dashboard when getStream rejects and the schema stays inconclusive", async () => {
     // Arrange
-    wrapper = mountComponent();
-    const testData = { title: "Test Dashboard", panels: [{ id: "panel1" }] };
+    mockGetStream.mockRejectedValueOnce(new Error("network error"));
 
     // Act
-    wrapper.vm.currentDashboardData.data = testData;
-    await nextTick();
+    wrapper = mountComponent();
+    await flushPromises();
 
-    // Assert
-    expect(wrapper.vm.currentDashboardData.data).toEqual(testData);
+    // Assert — a transient error must never degrade a working dashboard.
+    expect(wrapper.find('[data-test="performance-summary-empty"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).exists()).toBe(true);
   });
 
   // -------------------------------------------------------------------------
@@ -531,7 +616,7 @@ describe("PerformanceSummary", () => {
   it("calls deletePanel with correct args and reloads dashboard on onDeletePanel", async () => {
     // Arrange
     mockDeletePanel.mockResolvedValue(true);
-    mockConvertDashboardSchemaVersion.mockReturnValue({});
+    mockConvertDashboardSchemaVersion.mockReturnValueOnce({});
     wrapper = mountComponent({ dashboard: "test-dashboard", folder: "test-folder" });
 
     // Act
@@ -676,7 +761,9 @@ describe("PerformanceSummary", () => {
     wrapper = mountComponent();
 
     // Assert
-    expect(wrapper.vm.currentDashboardData).toBeDefined();
+    expect(wrapper.vm.dashboardData).toBeDefined();
+    expect(wrapper.vm.schemaResolved).toBe(false);
+    expect(wrapper.vm.showEmptyState).toBe(false);
     expect(wrapper.vm.showDashboardSettingsDialog).toBe(false);
     expect(wrapper.vm.variablesData).toBeDefined();
     expect(wrapper.vm.selectedDate).toBeDefined();
@@ -690,11 +777,11 @@ describe("PerformanceSummary", () => {
     wrapper = mountComponent();
 
     // Assert
-    expect(typeof wrapper.vm.loadDashboard).toBe("function");
     expect(typeof wrapper.vm.addPanelData).toBe("function");
     expect(typeof wrapper.vm.refreshData).toBe("function");
     expect(typeof wrapper.vm.onDeletePanel).toBe("function");
     expect(typeof wrapper.vm.openSettingsDialog).toBe("function");
+    expect(typeof wrapper.vm.updateLayout).toBe("function");
   });
 
   // -------------------------------------------------------------------------
@@ -787,28 +874,17 @@ describe("PerformanceSummary", () => {
   // Template rendering
   // -------------------------------------------------------------------------
 
-  it("renders Web Vitals label from i18n in the template", () => {
+  // Section headings used to be a fixed three-column label row rendered here, which only
+  // described the browser layout. They now come from the dashboard's own section panels
+  // (overview.json), so they are covered by the dashboardCapability specs instead.
+
+  it("no longer renders the fixed browser-shaped label row", () => {
     // Arrange + Act
     wrapper = mountComponent();
 
     // Assert
-    expect(wrapper.text()).toContain("Web Vitals");
-  });
-
-  it("renders Errors label from i18n in the template", () => {
-    // Arrange + Act
-    wrapper = mountComponent();
-
-    // Assert
-    expect(wrapper.text()).toContain("Errors");
-  });
-
-  it("renders Sessions label from i18n in the template", () => {
-    // Arrange + Act
-    wrapper = mountComponent();
-
-    // Assert
-    expect(wrapper.text()).toContain("Sessions");
+    expect(wrapper.text()).not.toContain("Web Vitals");
+    expect(wrapper.text()).not.toContain("Sessions");
   });
 
   // -------------------------------------------------------------------------
@@ -863,7 +939,7 @@ describe("PerformanceSummary", () => {
 
   it("accumulates multiple loading states in isLoading array", async () => {
     // Arrange
-    wrapper = mountComponent();
+    wrapper = await mountResolved();
 
     // Act
     wrapper.vm.isLoading.push("dashboard");

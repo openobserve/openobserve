@@ -207,6 +207,107 @@ export const usePanelSQLExecutor = (ctx: {
     }
   };
 
+  // Bumped by executeSQL on every run. A fire-and-forget sparkline stream captures
+  // the token at fire time and only writes if it still matches — so a slow stream
+  // from a previous range/variable can't overwrite the freshly-reset state.
+  let sparklineRunToken = 0;
+
+  // Isolated 2nd fetch: a UI histogram (is_ui_histogram=true) of the SAME query,
+  // used ONLY to draw the metric sparkline. Fully guarded and fire-and-forget —
+  // any failure leaves state.sparklineData empty and the metric shows value-only.
+  const fetchSparklineHistogram = (
+    query: string,
+    it: any,
+    startISOTimestamp: string,
+    endISOTimestamp: string,
+    pageType: string,
+    currentQueryIndex: number,
+    abortControllerRef: any,
+  ) => {
+    try {
+      if (abortControllerRef?.signal?.aborted) return;
+      // Snapshot the current run; a later run bumps this and invalidates our writes.
+      const runToken = sparklineRunToken;
+      const { traceId } = generateTraceContext();
+      const hits: any[] = [];
+      const payload: any = {
+        queryReq: {
+          query: {
+            sql: query,
+            query_fn: buildQueryFn(it),
+            start_time: startISOTimestamp,
+            end_time: endISOTimestamp,
+            size: -1,
+            histogram_interval: undefined,
+          },
+          ...getRegionClusterParams(),
+        },
+        type: "histogram",
+        isPagination: false,
+        traceId,
+        org_id: store?.state?.selectedOrganization?.identifier,
+        pageType,
+        searchType: searchType.value ?? "dashboards",
+        meta: {
+          currentQueryIndex,
+          panel_id: panelSchema.value.id,
+          panel_name: panelSchema.value.title,
+          is_ui_histogram: true,
+        },
+        clear_cache: false,
+      };
+      // Histogram is unavailable for CTE/DISTINCT/UNION/JOIN/LIMIT queries (API
+      // code 20013). Surface a non-blocking header warning; the metric value still
+      // renders. Other transient errors stay silent. The API delivers this either
+      // as a `data` event of type "error" or via the stream `error` callback.
+      const captureSparklineError = (content: any) => {
+        if (runToken !== sparklineRunToken) return;
+        if (content?.code === 20013) {
+          state.sparklineWarning = content?.error_detail || content?.message || "";
+        }
+      };
+      // Publish the hits accumulated so far. Called on every chunk so the trend
+      // streams in (the render watcher tracks sparklineData) instead of appearing
+      // once at the end. Dropped if a newer run already reset the state.
+      const commitHits = () => {
+        if (runToken !== sparklineRunToken) return;
+        // Reassign the whole array so the render watcher (shallow ref) fires.
+        const next = Array.isArray(state.sparklineData) ? state.sparklineData.slice() : [];
+        next[currentQueryIndex] = hits.slice();
+        state.sparklineData = next;
+      };
+      // Same contract as handleSearchResponse: (requestPayload, streamResponse).
+      // The response is the 2nd arg; the 1st is our own request (type "histogram").
+      fetchQueryDataWithHttpStream(payload, {
+        data: (_payload: any, response: any) => {
+          if (response?.type === "search_response_hits") {
+            const h = response?.content?.results?.hits;
+            if (Array.isArray(h)) {
+              hits.push(...h);
+              commitHits();
+            }
+          } else if (response?.type === "error") {
+            captureSparklineError(response?.content);
+          }
+        },
+        error: (_payload: any, wsError: any) => {
+          captureSparklineError(wsError?.content);
+          removeTraceId(traceId);
+        },
+        complete: () => {
+          commitHits();
+          removeTraceId(traceId);
+        },
+        reset: () => {
+          hits.length = 0;
+        },
+      });
+      addTraceId(traceId);
+    } catch {
+      // best-effort: never block the panel on the sparkline fetch
+    }
+  };
+
   const executeSQL = async (
     startISOTimestamp: any,
     endISOTimestamp: any,
@@ -219,6 +320,10 @@ export const usePanelSQLExecutor = (ctx: {
         queries: [],
       };
       state.resultMetaData = [];
+      // Invalidate any in-flight sparkline stream from a previous run before reset.
+      sparklineRunToken++;
+      state.sparklineData = [];
+      state.sparklineWarning = "";
       state.annotations = [];
       state.isOperationCancelled = false;
 
@@ -654,6 +759,19 @@ export const usePanelSQLExecutor = (ctx: {
             abortControllerRef,
           );
 
+          // Best-effort 2nd fetch for the metric sparkline trend (isolated).
+          if (panelSchema.value.type === "metric" && panelSchema.value.config?.sparkline?.enabled) {
+            fetchSparklineHistogram(
+              query,
+              it,
+              startISOTimestamp,
+              endISOTimestamp,
+              pageType,
+              panelQueryIndex,
+              abortControllerRef,
+            );
+          }
+
           // Wait for annotations to complete if they were started
           if (annotationsPromise) {
             state.annotations = await annotationsPromise;
@@ -736,6 +854,10 @@ export const usePanelSQLExecutor = (ctx: {
       queries: [],
     };
     state.resultMetaData = [];
+    // Invalidate any in-flight sparkline stream from a previous run before reset.
+    sparklineRunToken++;
+    state.sparklineData = [];
+    state.sparklineWarning = "";
     state.annotations = [];
     state.isOperationCancelled = false;
 
@@ -873,6 +995,22 @@ export const usePanelSQLExecutor = (ctx: {
       state.data.push([]);
       state.metadata.queries.push(allMetadata[i]);
       state.resultMetaData.push([]);
+    }
+
+    if (panelSchema.value.type === "metric" && panelSchema.value.config?.sparkline?.enabled) {
+      for (let i = 0; i < allSearchRequests.length; i++) {
+        const it = panelSchema.value.queries[allMetadata[i]?.panelQueryIndex];
+        if (!it) continue;
+        fetchSparklineHistogram(
+          allSearchRequests[i].sql,
+          it,
+          allSearchRequests[i].start_time,
+          allSearchRequests[i].end_time,
+          pageType,
+          i,
+          abortControllerRef,
+        );
+      }
     }
 
     // Phase 3: Send single multi-stream call

@@ -1063,7 +1063,7 @@ Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : 
 
 **Findings:** 🔴 ${bySeverity.critical.length} blocker · 🟡 ${bySeverity.warning.length} warning · 🔵 ${bySeverity.suggestion.length} suggestion
 
-<details>
+<details open>
 <summary>Show findings (${sorted.length})</summary>
 
 ${sections.join("\n")}

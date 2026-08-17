@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          button lives inside <OForm> as type="submit", so Enter + click both
          submit natively (no form-id). -->
     <OForm id="add-ai-toolset-form" :form="form" v-slot="{ isSubmitting }">
+      <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div style="height: calc(100vh - 120px)" class="overflow-auto">
         <div class="mx-4 mt-4 max-w-2xl">
           <!-- Name -->

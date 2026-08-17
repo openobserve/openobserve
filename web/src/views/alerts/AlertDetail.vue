@@ -59,6 +59,15 @@
         >
           {{ firingSummary }}
         </span>
+        <CompositeReferencesDrawer
+          v-if="(alert?.referenced_by_composite_count ?? 0) > 0"
+          :open="referenceDrawerOpen"
+          :reference-count="alert?.referenced_by_composite_count ?? 0"
+          :references="compositeReferences"
+          :hidden-reference-count="hiddenReferenceCount"
+          @update:open="handleReferenceOpen"
+          @navigate="navigateToReference"
+        />
       </div>
     </template>
 
@@ -85,106 +94,138 @@
     </OContent>
 
     <div v-else class="flex h-full min-h-0 flex-col">
-      <!-- M-6 forbids silent truncation: when the last evaluation observed more
+      <template v-if="isCompositeAlert">
+        <OContent class="min-h-0 flex-1 overflow-y-auto py-4">
+          <CompositeAlertDetail v-if="alert" :alert="alert" />
+        </OContent>
+
+        <OTabs
+          v-model="activeTab"
+          dense
+          bordered
+          class="shrink-0"
+          data-test="alerts-alertdetail-tabs"
+        >
+          <OTab name="history" :label="t('alerts.history')" icon="history" />
+          <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
+        </OTabs>
+        <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
+          <OTabPanel name="history" stretch>
+            <AlertEvaluationHistory :alert-id="alertId" :is-composite="isCompositeAlert" />
+          </OTabPanel>
+          <OTabPanel name="configuration" stretch>
+            <OContent class="h-full overflow-y-auto py-4">
+              <AlertConfigSummary v-if="alert" :alert="alert" />
+            </OContent>
+          </OTabPanel>
+        </OTabPanels>
+      </template>
+
+      <template v-else>
+        <!-- M-6 forbids silent truncation: when the last evaluation observed more
            groups than the cap tracks, say so rather than quietly showing a
            partial table. -->
-      <OBanner
-        v-if="groupData?.capped"
-        variant="warning"
-        class="shrink-0"
-        data-test="alerts-alertdetail-cap-banner"
-      >
-        {{
-          t("alerts.groups.capBanner", {
-            observed: groupData.groups_observed,
-            cap: groupData.group_cap,
-          })
-        }}
-      </OBanner>
+        <OBanner
+          v-if="groupData?.capped"
+          variant="warning"
+          class="shrink-0"
+          data-test="alerts-alertdetail-cap-banner"
+        >
+          {{
+            t("alerts.groups.capBanner", {
+              observed: groupData.groups_observed,
+              cap: groupData.group_cap,
+            })
+          }}
+        </OBanner>
 
-      <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
-        <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
-      </OContent>
+        <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
+          <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
+        </OContent>
 
-      <!-- A grouped alert that never opted in has no Groups tab, because it
+        <!-- A grouped alert that never opted in has no Groups tab, because it
            has no per-group state to show. Without saying so, the chart below
            showing one line per group makes that look like a bug rather than
            the deliberate opt-in it is (M-9). -->
-      <OBanner
-        v-if="isGroupedButSimple"
-        variant="info"
-        class="shrink-0"
-        data-test="alerts-alertdetail-simple-grouped-banner"
-      >
-        {{
-          t("alerts.multiAlert.groupedButSimple", {
-            columns: (aggregation?.group_by || []).join(", "),
-          })
-        }}
-        <template #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="alerts-alertdetail-enable-multi"
-            @click="editAlert"
-          >
-            {{ t("alerts.multiAlert.enableCta") }}
-          </OButton>
-        </template>
-      </OBanner>
+        <OBanner
+          v-if="isGroupedButSimple"
+          variant="info"
+          class="shrink-0"
+          data-test="alerts-alertdetail-simple-grouped-banner"
+        >
+          {{
+            t("alerts.multiAlert.groupedButSimple", {
+              columns: (aggregation?.group_by || []).join(", "),
+            })
+          }}
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="alerts-alertdetail-enable-multi"
+              @click="editAlert"
+            >
+              {{ t("alerts.multiAlert.enableCta") }}
+            </OButton>
+          </template>
+        </OBanner>
 
-      <!-- Above the tabs, not inside the Groups tab: the evaluation chart
+        <!-- Above the tabs, not inside the Groups tab: the evaluation chart
            answers "what is this alert watching, and how close is it to the
            thresholds" for EVERY scheduled alert. A grouped alert that never
            opted in to per-group evaluation has no Groups tab, and burying the
            chart there left it with no chart at all. -->
-      <OContent v-if="alert" class="shrink-0 py-3">
-        <AlertGroupChart :alert="alert" />
-      </OContent>
+        <!-- Hidden for SLO alerts: the chart plots a stream query, and this
+           family has neither. It bails safely without a stream, but what it
+           renders then is an empty frame that reads as "no data" — a lie about
+           an alert that is evaluating perfectly well. -->
+        <OContent v-if="alert && !isSloAlertView" class="shrink-0 py-3">
+          <AlertGroupChart :alert="alert" />
+        </OContent>
 
-      <!-- The tabs live HERE, below the stat strip and the chart, not in the
+        <!-- The tabs live HERE, below the stat strip and the chart, not in the
            page header: everything above is shared context visible on every
            tab — only the region below actually switches. A header tab strip
            would promise the whole page changes. Per the tab-strip house rule
            the strip takes no horizontal wrapper padding (the first label
            self-aligns to the px-page-edge grid) and carries its own bottom
            divider via `bordered`. -->
-      <OTabs
-        v-model="activeTab"
-        dense
-        bordered
-        class="shrink-0"
-        data-test="alerts-alertdetail-tabs"
-      >
-        <!-- Custom trigger content: OTab's default slot exists for exactly
+        <OTabs
+          v-model="activeTab"
+          dense
+          bordered
+          class="shrink-0"
+          data-test="alerts-alertdetail-tabs"
+        >
+          <!-- Custom trigger content: OTab's default slot exists for exactly
              this (badges) — prop-driven label/icon cannot carry the firing
              count the mock shows on the Groups tab. -->
-        <OTab v-if="isMultiAlert" name="groups" data-test="alerts-alertdetail-tab-groups">
-          <OIcon name="layers" size="sm" class="o-tab__icon shrink-0" />
-          <span class="o-tab__label truncate">{{ t("alerts.groups.tab") }}</span>
-          <OTag
-            v-if="firingBadge"
-            variant="error-soft"
-            size="sm"
-            :label="firingBadge"
-            data-test="alerts-alertdetail-tab-groups-count"
-          />
-        </OTab>
-        <OTab name="history" :label="t('alerts.history')" icon="history" />
-        <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
-      </OTabs>
+          <OTab v-if="isMultiAlert" name="groups" data-test="alerts-alertdetail-tab-groups">
+            <OIcon name="layers" size="sm" class="o-tab__icon shrink-0" />
+            <span class="o-tab__label truncate">{{ t("alerts.groups.tab") }}</span>
+            <OTag
+              v-if="firingBadge"
+              variant="error-soft"
+              size="sm"
+              :label="firingBadge"
+              data-test="alerts-alertdetail-tab-groups-count"
+            />
+          </OTab>
+          <OTab name="history" :label="t('alerts.history')" icon="history" />
+          <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
+        </OTabs>
 
-      <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
-        <OTabPanel v-if="isMultiAlert" name="groups" stretch>
-          <AlertGroupsTable
-            :groups="groupData?.list || []"
-            :loading="loadingGroups"
-            @refresh="fetchGroups"
-            @show-history="openGroupHistory"
-          />
-        </OTabPanel>
+        <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
+          <OTabPanel v-if="isMultiAlert" name="groups" stretch>
+            <AlertGroupsTable
+              :groups="groupData?.list || []"
+              :loading="loadingGroups"
+              @refresh="fetchGroups"
+              @show-history="openGroupHistory"
+            />
+          </OTabPanel>
 
-        <!-- Multi-alerts keep the per-group transitions view untouched.
+          <!-- Multi-alerts keep the per-group transitions view untouched.
 
              Simple alerts get TWO readings of "history", because the
              transitions table is write-on-change: an alert that has been
@@ -194,61 +235,62 @@
              "Level changes" reads the rollup row's transitions
              (group_key ""), without the Group column/filter that would
              repeat the same non-answer on every line. -->
-        <OTabPanel name="history" stretch>
-          <AlertGroupHistory
-            v-if="isMultiAlert"
-            :transitions="transitions"
-            :loading="loadingTransitions"
-            :group-filter="historyGroupFilter"
-            @clear-filter="clearGroupFilter"
-            @refresh="fetchTransitions"
-          />
-          <!-- `v-else-if="alert"`, not a bare else: until the GET resolves the
+          <OTabPanel name="history" stretch>
+            <AlertGroupHistory
+              v-if="isMultiAlert"
+              :transitions="transitions"
+              :loading="loadingTransitions"
+              :group-filter="historyGroupFilter"
+              @clear-filter="clearGroupFilter"
+              @refresh="fetchTransitions"
+            />
+            <!-- `v-else-if="alert"`, not a bare else: until the GET resolves the
                page cannot know which mode it is in, and mounting the
                evaluations view speculatively fires its fetch even for alerts
                that turn out to be multi. -->
-          <div v-else-if="alert" class="flex h-full min-h-0 flex-col">
-            <OContent class="shrink-0 py-2">
-              <OToggleGroup
-                :model-value="historyView"
-                data-test="alerts-alertdetail-history-view"
-                @update:model-value="onHistoryViewChange"
-              >
-                <OToggleGroupItem
-                  value="evaluations"
-                  size="sm"
-                  data-test="alerts-alertdetail-history-view-evaluations"
+            <div v-else-if="alert" class="flex h-full min-h-0 flex-col">
+              <OContent class="shrink-0 py-2">
+                <OToggleGroup
+                  :model-value="historyView"
+                  data-test="alerts-alertdetail-history-view"
+                  @update:model-value="onHistoryViewChange"
                 >
-                  {{ t("alerts.groups.evaluationsView") }}
-                </OToggleGroupItem>
-                <OToggleGroupItem
-                  value="transitions"
-                  size="sm"
-                  data-test="alerts-alertdetail-history-view-transitions"
-                >
-                  {{ t("alerts.groups.levelChangesView") }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-            </OContent>
-            <div class="min-h-0 flex-1">
-              <AlertEvaluationHistory v-if="historyView === 'evaluations'" :alert-id="alertId" />
-              <AlertGroupHistory
-                v-else
-                :transitions="transitions"
-                :loading="loadingTransitions"
-                :show-group-column="false"
-                @refresh="fetchTransitions"
-              />
+                  <OToggleGroupItem
+                    value="evaluations"
+                    size="sm"
+                    data-test="alerts-alertdetail-history-view-evaluations"
+                  >
+                    {{ t("alerts.groups.evaluationsView") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem
+                    value="transitions"
+                    size="sm"
+                    data-test="alerts-alertdetail-history-view-transitions"
+                  >
+                    {{ t("alerts.groups.levelChangesView") }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
+              </OContent>
+              <div class="min-h-0 flex-1">
+                <AlertEvaluationHistory v-if="historyView === 'evaluations'" :alert-id="alertId" />
+                <AlertGroupHistory
+                  v-else
+                  :transitions="transitions"
+                  :loading="loadingTransitions"
+                  :show-group-column="false"
+                  @refresh="fetchTransitions"
+                />
+              </div>
             </div>
-          </div>
-        </OTabPanel>
+          </OTabPanel>
 
-        <OTabPanel name="configuration" stretch>
-          <OContent class="h-full overflow-y-auto py-4">
-            <AlertConfigSummary v-if="alert" :alert="alert" />
-          </OContent>
-        </OTabPanel>
-      </OTabPanels>
+          <OTabPanel name="configuration" stretch>
+            <OContent class="h-full overflow-y-auto py-4">
+              <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
+            </OContent>
+          </OTabPanel>
+        </OTabPanels>
+      </template>
     </div>
   </OPageLayout>
 </template>
@@ -264,6 +306,8 @@ import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.v
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";
 import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
+import CompositeAlertDetail from "@/components/alerts/composite/CompositeAlertDetail.vue";
+import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -280,7 +324,20 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
-import type { AlertGroup, AlertGroupsResponse, AlertGroupTransition } from "@/ts/interfaces/alert";
+import sloService from "@/services/slos";
+import {
+  isSloAlert,
+  isUnplaceableSloAlert,
+  sloAlertEditRoute,
+  sloIdOf,
+} from "@/utils/alerts/sloAlertRouting";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import type {
+  AlertGroup,
+  AlertGroupsResponse,
+  AlertGroupTransition,
+  CompositeAlertReference,
+} from "@/ts/interfaces/alert";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -305,6 +362,9 @@ const activeTab = ref<string | number>("history");
 // is the default — the transitions log is write-on-change, so it answers
 // "when did it change?" but not "has it been running, and what did it see?".
 const historyView = ref<"evaluations" | "transitions">("evaluations");
+const referenceDrawerOpen = ref(false);
+const compositeReferences = ref<CompositeAlertReference[]>([]);
+const hiddenReferenceCount = ref(0);
 
 const onHistoryViewChange = (value: unknown) => {
   if (value !== "evaluations" && value !== "transitions") return;
@@ -326,6 +386,32 @@ const isMultiAlert = computed(() => {
   const qc = alert.value?.query_condition ?? alert.value?.condition;
   return qc?.type === "promql" ? !!qc?.promql_multi_alert : !!qc?.aggregation?.multi_alert;
 });
+const isCompositeAlert = computed(() => alert.value?.alert_type === "composite");
+
+const handleReferenceOpen = async (open: boolean) => {
+  referenceDrawerOpen.value = open;
+  if (!open || !orgId.value || !alertId.value) return;
+  try {
+    const response = await alertsService.getCompositeReferences(orgId.value, alertId.value);
+    compositeReferences.value = response.data.references ?? [];
+    hiddenReferenceCount.value = response.data.hidden_reference_count ?? 0;
+  } catch {
+    compositeReferences.value = [];
+    hiddenReferenceCount.value = 0;
+  }
+};
+
+const navigateToReference = (reference: CompositeAlertReference) => {
+  referenceDrawerOpen.value = false;
+  router.push({
+    name: "alertDetail",
+    params: { alert_id: reference.alert_id },
+    query: {
+      org_identifier: orgId.value,
+      folder: reference.folder_id || "default",
+    },
+  });
+};
 
 // Grouped, but still evaluating as one collapsed result. The distinction the
 // banner exists to explain: grouping produces the SERIES on the chart,
@@ -344,12 +430,46 @@ const backTarget = computed(() => ({
   label: t("alerts.header"),
   to: {
     name: "alertList",
-    query: { org_identifier: orgId.value },
+    query: {
+      org_identifier: orgId.value,
+      // Carry the folder the list navigated in with. Without it the list falls
+      // back to "default" and the user lands somewhere their alert isn't —
+      // going "back" has to mean back, not back-to-the-first-folder. Same
+      // reasoning (and the same fallback) as editAlert below.
+      folder: route.query.folder || "default",
+    },
   },
 }));
 
+// ── SLO alerts (Feature 5, Phase 3.3) ───────────────────────────────────────
+// Plain row-click still lands here — only the EDIT action diverts to the SLO
+// page — so this page has to describe an alert with no stream and no query.
+const isSloAlertView = computed(() => isSloAlert(alert.value));
+const sloId = computed(() => sloIdOf(alert.value));
+// The alert GET carries `slo_condition` but not the SLO's NAME, which is the
+// one thing a human recognises. One extra fetch; failure degrades to the id.
+const sloName = ref("");
+
+const fetchSloName = async () => {
+  if (!orgId.value || !sloId.value) return;
+  try {
+    const res = await sloService.get(orgId.value, sloId.value);
+    sloName.value = res.data?.name || "";
+  } catch {
+    // Contained deliberately: this runs inside the mount chain, and letting it
+    // reject would abandon everything sequenced after it — the history fetch
+    // included — leaving a page that looks empty rather than one missing a name.
+    sloName.value = "";
+  }
+};
+
 const subtitle = computed(() => {
   if (!alert.value) return raw("");
+  // An SLO alert's stream_name is empty and its group_by does not exist, so the
+  // generic subtitle renders as nothing at all. Say what it actually watches.
+  if (isSloAlertView.value) {
+    return raw(sloName.value || sloId.value || "");
+  }
   const groupBy = aggregation.value?.group_by || [];
   const parts = [alert.value.stream_name].filter(Boolean);
   if (groupBy.length) {
@@ -494,18 +614,38 @@ const clearGroupFilter = () => {
   fetchTransitions();
 };
 
-// The alert editor lives on the list route, opened by query params. The action
-// value is `update` — `edit` is silently ignored, which just lands you on the
-// list with nothing open.
+// Straight to the editor. This used to push the LIST route with
+// `action=update`, which mounted the list, fetched every alert, then fetched
+// this one — so pressing Edit visibly bounced through the list on the way to
+// the form.
 const editAlert = () => {
+  // Straight to the SLO page for an SLO alert. Routing through
+  // `alertList?action=update` would bounce off that page's own diversion,
+  // leaving the alerts-list URL in history so Back re-diverts — an
+  // inescapable loop.
+  const sloRoute = sloAlertEditRoute(alert.value, orgId.value);
+  if (sloRoute) {
+    router.push(sloRoute);
+    return;
+  }
+  // `sloAlertEditRoute` returns null for TWO unrelated things, and only one of
+  // them may fall through: "not an SLO alert" (carry on) and "an SLO alert
+  // whose SLO cannot be resolved". The generic editor cannot represent the
+  // second — saving from it fails forever or strips the SLO wiring — and the
+  // fallthrough would also leave this page's URL in history, so Back re-opens
+  // the loop the diversion above exists to avoid. Same guard `AlertList` uses.
+  if (isUnplaceableSloAlert(alert.value)) {
+    toast({ variant: "error", message: t("alerts.sloAlertUnplaceable") });
+    return;
+  }
   router.push({
-    name: "alertList",
+    name: "editAlert",
+    params: { alert_id: alertId.value },
     query: {
       org_identifier: orgId.value,
-      action: "update",
-      alert_id: alertId.value,
       // The GET response carries no folder, so carry through the one the list
-      // navigated with; "default" is the folder every org is created with.
+      // navigated with; "default" is the folder every org is created with. The
+      // editor needs it to send the user back to the right folder on save.
       folder: route.query.folder || "default",
     },
   });
@@ -513,6 +653,8 @@ const editAlert = () => {
 
 onMounted(async () => {
   await fetchAlert();
+  await fetchSloName();
+  if (isCompositeAlert.value) return;
   // Multi-alerts land on Groups (the reason the page exists for them); everything
   // else has no groups tab, so History is the only sensible default. The alert is
   // fetched exactly once and never re-fetched, so handling the initial load here

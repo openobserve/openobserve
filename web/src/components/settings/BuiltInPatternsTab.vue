@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="p-6 text-center">
-      <OIcon name="error" style="width: 50px; height: 50px" />
+      <OIcon name="error" style="width: 3.125rem; height: 3.125rem" />
       <div class="text-status-error-text mt-3">{{ error }}</div>
       <span class="mt-2">
         <OButton variant="ghost-primary" size="sm" @click="() => fetchPatterns()">
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li v-if="filteredPatterns.length === 0" class="flex items-center px-3 py-2">
             <div class="text-text-muted flex min-w-0 flex-1 flex-col text-center">
               <div class="p-6">
-                <OIcon name="search-off" style="width: 50px; height: 50px" />
+                <OIcon name="search-off" style="width: 3.125rem; height: 3.125rem" />
                 <div class="mt-3">
                   {{ t("regex_patterns.no_patterns_found") }}
                 </div>

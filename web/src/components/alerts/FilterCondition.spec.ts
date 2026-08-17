@@ -369,35 +369,6 @@ describe("FilterCondition.vue Branch Coverage", () => {
     });
   });
 
-  describe("Event Emission Branch Coverage", () => {
-    it("should call delete, add, and add-group functions", async () => {
-      const wrapper = mount(FilterCondition, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
-        },
-      });
-
-      // Test deleteApiHeader function
-      (wrapper.vm as any).deleteApiHeader("testField");
-      expect(wrapper.emitted("remove")).toBeTruthy();
-      expect(wrapper.emitted("input:update")).toBeTruthy();
-
-      // Test addApiHeader function
-      (wrapper.vm as any).addApiHeader("testGroup");
-      expect(wrapper.emitted("add")).toBeTruthy();
-      expect(wrapper.emitted("add")?.[0]).toEqual(["testGroup"]);
-
-      // Test addGroupApiHeader function
-      (wrapper.vm as any).addGroupApiHeader("testGroupId");
-      expect(wrapper.emitted("add-group")).toBeTruthy();
-      expect(wrapper.emitted("add-group")?.[0]).toEqual(["testGroupId"]);
-    });
-  });
-
   describe("Computed Label Branch Coverage", () => {
     it("should return the correct computed label when not first in group", async () => {
       const wrapper = mount(FilterCondition, {

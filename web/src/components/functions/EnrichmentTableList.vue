@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="check-circle" size="sm" class="text-status-positive">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
+                          <div style="max-width: 18.75rem">
                             <strong>{{ t("function.statusAllCompleted") }}</strong
                             ><br />
                             {{ t("function.urlJobsCompleted", { count: row.urlJobs.length })
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="sync" size="sm" class="animate-spin">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
+                          <div style="max-width: 18.75rem">
                             <strong>{{ t("function.statusProcessing") }}</strong
                             ><br />
                             {{ t("function.jobsCurrentlyProcessing") }}<br />
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 350px">
+                          <div style="max-width: 21.875rem">
                             <strong>{{ t("function.statusFailed") }}</strong
                             ><br />
                             {{ t("function.jobsFailedNote") }}<br />
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="schedule" size="sm">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
+                          <div style="max-width: 18.75rem">
                             <strong>{{ t("function.statusPending") }}</strong
                             ><br />
                             {{ t("function.jobsWaitingToBeProcessed") }}<br />

@@ -29,6 +29,14 @@ const AISessionsPage = () => import("@/enterprise/views/AIObservability/Sessions
 const AIAgentGraphPage = () => import("@/enterprise/views/AIObservability/AgentGraphPage.vue");
 const AIAgentBehaviorPage = () =>
   import("@/enterprise/views/AIObservability/AgentBehaviorPage.vue");
+const AIDatasetsPage = () => import("@/enterprise/views/AIObservability/DatasetsPage.vue");
+const AIDatasetDetailPage = () =>
+  import("@/enterprise/views/AIObservability/DatasetDetailPage.vue");
+const AIDiscoveryPage = () => import("@/enterprise/views/AIObservability/DiscoveryPage.vue");
+const AIQueuesPage = () => import("@/enterprise/views/AIObservability/QueuesPage.vue");
+const AIQueueDetailPage = () => import("@/enterprise/views/AIObservability/QueueDetailPage.vue");
+const AIQueueWorkbenchPage = () =>
+  import("@/enterprise/views/AIObservability/QueueWorkbenchPage.vue");
 // Reused for the AI/LLM session drill-down so it lives under /ai (keeps the
 // AI menu item active) instead of the Traces session-details route.
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
@@ -103,6 +111,44 @@ const useEnvRoutes = () => {
           name: "aiAgentBehavior",
           component: AIAgentBehaviorPage,
           meta: { titleKey: "aiObservability.nav.agentBehavior", keepAlive: false },
+        },
+        {
+          path: "discovery",
+          name: "aiDiscovery",
+          component: AIDiscoveryPage,
+          meta: { title: "Discovery", keepAlive: false },
+        },
+        {
+          path: "queues",
+          name: "aiQueues",
+          component: AIQueuesPage,
+          meta: { title: "Queues", keepAlive: false },
+        },
+        {
+          path: "queues/:id",
+          name: "aiQueueDetail",
+          component: AIQueueDetailPage,
+          meta: { title: "Queue", keepAlive: false },
+        },
+        // The Workbench is a MODE of a queue, not a sibling page — it sits under
+        // the queue it reviews so "back" lands on the queue, not the list.
+        {
+          path: "queues/:id/review",
+          name: "aiQueueWorkbench",
+          component: AIQueueWorkbenchPage,
+          meta: { title: "Queue Review", keepAlive: false },
+        },
+        {
+          path: "datasets",
+          name: "aiDatasets",
+          component: AIDatasetsPage,
+          meta: { title: "Datasets", keepAlive: false },
+        },
+        {
+          path: "datasets/:id",
+          name: "aiDatasetDetail",
+          component: AIDatasetDetailPage,
+          meta: { title: "Dataset", keepAlive: false },
         },
         {
           path: "evaluations",

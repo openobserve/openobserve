@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
         >
           <button
-            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-[0_2px_6px_rgba(0,0,0,0.12)] transition-all duration-150 hover:shadow-[0_3px_8px_rgba(0,0,0,0.16)] active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
             :tabindex="svcScrollCanLeft ? 0 : -1"
             :aria-hidden="!svcScrollCanLeft"
             :aria-label="t('overview.scrollLeft')"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           ref="svcGridRef"
-          class="flex flex-row gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          class="flex [scrollbar-width:none] flex-row gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden"
           @scroll="onSvcScroll"
         >
           <div
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
         >
           <button
-            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-[0_2px_6px_rgba(0,0,0,0.12)] transition-all duration-150 hover:shadow-[0_3px_8px_rgba(0,0,0,0.16)] active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
             :tabindex="svcScrollCanRight ? 0 : -1"
             :aria-hidden="!svcScrollCanRight"
             :aria-label="t('overview.scrollRight')"
@@ -997,16 +997,6 @@ const incidentIconClass = (severity: string) => {
   if (s === "p1") return "text-error-600";
   if (s === "p2") return "text-warning-600";
   return "text-status-info-text";
-};
-
-const severityBadgeClass = (sev: string): string => {
-  const s = (sev || "p4").toLowerCase();
-  if (s === "p1") return "bg-error-50 text-error-600 border border-[0.0625em] border-error-600";
-  if (s === "p2")
-    return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
-  if (s === "p3")
-    return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
-  return "bg-status-info-bg text-status-info-text border border-[0.0625em] border-status-info-text";
 };
 
 const serviceCardClass = (svc: any) => {

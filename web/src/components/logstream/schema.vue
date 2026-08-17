@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="text-3xs rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5 font-medium"
           >
-            {{ t("logStream.utc") }}
+            {{ displayTimezone }}
           </span>
           <div class="text-text-body text-xs font-semibold">
             {{ indexData.stats.doc_time_min }}
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mb-3" v-if="isDialogOpen">
                       <OCard class="flex w-screen max-w-full flex-col">
                         <!-- Header Section -->
-                        <OCardSection class="p-0" style="padding: 4px 16px 4px 16px">
+                        <OCardSection class="p-0" style="padding: 0.25rem 1rem 0.25rem 1rem">
                           <div class="flex items-center justify-between">
                             <div class="text-xl font-semibold">
                               {{ t("logStream.addFieldsTitle") }}
@@ -320,10 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </OCardSection>
                         <!-- Main Content (Scrollable if necessary) -->
-                        <OCardSection
-                          class="mb-0.5 flex-1 overflow-y-auto p-0"
-                          style="padding: 0px 16px 0px 16px"
-                        >
+                        <OCardSection class="mb-0.5 flex-1 overflow-y-auto px-4 py-0">
                           <OForm :form="newSchemaFieldsForm" @keyup="onAddFieldsKeyup">
                             <StreamFieldsInputs
                               form-field-name="newSchemaFields"
@@ -412,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               clearable
                               size="sm"
                               :data-test="`schema-field-${row.name}-index-type-select`"
-                              style="width: 190px"
+                              style="width: 11.875rem"
                               @update:model-value="
                                 (val) => updateIndexType({ row }, enforceMaxIndexTypes(val))
                               "
@@ -794,7 +791,10 @@ import { computed, defineComponent, onBeforeMount, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { convertUnixToDateFormat as convertUnixToFormat, formatTimestamp } from "@/utils/date";
+import {
+  convertUnixToDateFormat as convertUnixToFormat,
+  formatTimestampInTimezone,
+} from "@/utils/date";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import {
@@ -919,6 +919,11 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
+    // Timezone used for the stream-stats time range: the user's selected
+    // timezone, falling back to the browser's zone (never a hardcoded "UTC").
+    const displayTimezone = computed(
+      () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    );
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
@@ -1361,13 +1366,15 @@ export default defineComponent({
       indexData.value.stats.original_doc_time_max = streamResponse.stats.doc_time_max;
       indexData.value.stats.original_doc_time_min = streamResponse.stats.doc_time_min;
 
-      indexData.value.stats.doc_time_max = formatTimestamp(
+      indexData.value.stats.doc_time_max = formatTimestampInTimezone(
         parseInt(streamResponse.stats.doc_time_max),
         "YYYY-MM-DDTHH:mm:ss:SS",
+        displayTimezone.value,
       );
-      indexData.value.stats.doc_time_min = formatTimestamp(
+      indexData.value.stats.doc_time_min = formatTimestampInTimezone(
         parseInt(streamResponse.stats.doc_time_min),
         "YYYY-MM-DDTHH:mm:ss:SS",
+        displayTimezone.value,
       );
 
       indexData.value.defined_schema_fields = streamResponse.settings.defined_schema_fields || [];
@@ -2445,6 +2452,7 @@ export default defineComponent({
       t,
       raw,
       store,
+      displayTimezone,
       config,
       dateChangeValue,
       isCloud,

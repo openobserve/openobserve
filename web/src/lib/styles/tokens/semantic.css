@@ -222,8 +222,16 @@
   --radius-full: var(--radius-full);
   --radius-checkbox: var(--radius-checkbox);
 
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
+  /* eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom */
+  --shadow-sm: 0 2px 8px -2px var(--shadow-sm-c1), 0 1px 3px -1px var(--shadow-sm-c2);
+  --shadow-md: 0 4px 12px -2px var(--shadow-md-c1), 0 2px 6px -2px var(--shadow-md-c2);
+  --shadow-lg: 0 12px 24px -4px var(--shadow-lg-c1), 0 4px 8px -4px var(--shadow-lg-c2);
+  --shadow-scroll-top: inset 0 8px 6px -6px var(--shadow-scroll-c);
+  --shadow-scroll-bottom: inset 0 -8px 6px -6px var(--shadow-scroll-c);
+  --shadow-scroll-both:
+    inset 0 8px 6px -6px var(--shadow-scroll-c), inset 0 -8px 6px -6px var(--shadow-scroll-c);
+  --shadow-glow: 0 0 4px var(--shadow-glow-c);
+  /* eslint-enable local/no-hardcoded-px */
 
   /* Code-syntax family. Registered so bg-syntax-bg / text-syntax-keyword etc.
      compile as utilities. */
@@ -282,5 +290,6 @@
 
 /* ── Layout aliases ── */
 :root {
+  /* eslint-disable-next-line local/no-hardcoded-px -- subtracted inside calc(100vh - var(--navbar-height) - …) expressions: mixed with vh, which tracks the window while rem tracks font-size; keep those expressions unit-consistent */
   --navbar-height: 36px;
 }

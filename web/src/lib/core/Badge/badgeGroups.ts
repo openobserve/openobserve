@@ -131,6 +131,16 @@ export const BADGE_GROUPS = {
         icon: "query-stats",
         labelKey: "components.badge.alertType.anomalydetection",
       },
+      composite: {
+        variant: "purple-soft",
+        icon: "account-tree",
+        labelKey: "components.badge.alertType.composite",
+      },
+      slo: {
+        variant: "indigo-soft",
+        icon: "monitor-heart",
+        labelKey: "components.badge.alertType.slo",
+      },
     },
   },
 
@@ -413,7 +423,7 @@ export const BADGE_GROUPS = {
         labelKey: "components.badge.nodeRole.flattencompactor",
       },
       router: { variant: "orange-soft", labelKey: "components.badge.nodeRole.router" },
-      alertmanager: { variant: "amber-soft", labelKey: "components.badge.nodeRole.alertmanager" },
+      scheduler: { variant: "amber-soft", labelKey: "components.badge.nodeRole.scheduler" },
       actionserver: { variant: "lime-soft", labelKey: "components.badge.nodeRole.actionserver" },
       script: { variant: "default-soft", labelKey: "components.badge.nodeRole.script" },
     },

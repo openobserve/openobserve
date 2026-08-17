@@ -64,6 +64,9 @@ pub struct CreateAlertRequestBody {
     /// Anomaly-detection-specific fields (nested object).
     pub anomaly_config: Option<AnomalyAlertFields>,
 
+    /// Composite-only boolean condition over stable child alert IDs.
+    pub composite_condition: Option<CompositeCondition>,
+
     /// The alert configuration. All fields from Alert are flattened into this request body.
     #[serde(flatten)]
     #[schema(inline)]
@@ -71,6 +74,37 @@ pub struct CreateAlertRequestBody {
 }
 
 impl CreateAlertRequestBody {
+    /// Returns the name of the first field this payload carries that a
+    /// composite alert does not support (query conditions, realtime, etc.), or
+    /// `None` when it is a valid composite definition. Callers use the returned
+    /// name to emit a precise `composite_unsupported_field` error.
+    pub fn composite_unsupported_field(&self) -> Option<&'static str> {
+        if self.anomaly_config.is_some() {
+            return Some("anomaly_config");
+        }
+        if self.alert.id.is_some() {
+            return Some("id");
+        }
+        if !self.alert.stream_name.is_empty() {
+            return Some("stream_name");
+        }
+        if self.alert.query_condition != QueryCondition::default() {
+            return Some("query_condition");
+        }
+        if !self.alert.row_template.is_empty() {
+            return Some("row_template");
+        }
+        if self.alert.is_real_time {
+            return Some("is_real_time");
+        }
+        if self.alert.deduplication.is_some() {
+            return Some("deduplication");
+        }
+        if self.alert.tz_offset != 0 {
+            return Some("tz_offset");
+        }
+        composite_trigger_unsupported_field(&self.alert.trigger_condition)
+    }
     /// Return the anomaly config fields, combining `detection_function` +
     /// `detection_function_field` into the canonical "avg(field)" form.
     /// Returns `None` when no `anomaly_config` was supplied or when
@@ -140,13 +174,109 @@ pub struct UpdateAlertRequestBody {
     /// are changed).
     pub anomaly_config: Option<UpdateAnomalyAlertFields>,
 
+    /// Composite-only boolean condition over stable child alert IDs.
+    pub composite_condition: Option<CompositeCondition>,
+
     /// Alert configuration fields (used for scheduled/realtime alerts).
     #[serde(flatten)]
     #[schema(inline)]
     pub alert: Alert,
 }
 
+/// Composite expression and truth-policy configuration.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeCondition {
+    /// Boolean expression over child alert IDs, e.g. `{child_a} && ({child_b} || {child_c})`.
+    pub expression: String,
+    /// Whether a child at `warning` severity counts as firing (`true`) or only
+    /// `critical` does (`false`). Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub warning_counts_as_firing: bool,
+    /// How a child with a stale (out-of-freshness) state is treated.
+    #[serde(default)]
+    pub stale_child_policy: CompositeStaleChildPolicy,
+}
+
+/// How a composite treats a child whose latest state is stale (no recent
+/// evaluation within its freshness deadline).
+///
+/// The `storage_id` mapping below is persisted in the `stale_child_policy`
+/// column and is **append-only**: never renumber an existing variant, or rows
+/// already on disk will silently decode to the wrong policy.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CompositeStaleChildPolicy {
+    /// Use the child's last known truth value (the default).
+    #[default]
+    UseLastState,
+    /// Treat a stale child as evaluating `false`.
+    TreatAsFalse,
+    /// Treat a stale child as evaluating `true`.
+    TreatAsTrue,
+}
+
+impl CompositeStaleChildPolicy {
+    /// Persisted integer id (0/1/2). Append-only: the ids are part of the
+    /// on-disk contract and must not be reordered.
+    pub fn storage_id(self) -> i16 {
+        match self {
+            Self::UseLastState => 0,
+            Self::TreatAsFalse => 1,
+            Self::TreatAsTrue => 2,
+        }
+    }
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+/// Advisory validation/preview request. Persistence repeats all checks under
+/// the organization graph lock.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct ValidateCompositeRequestBody {
+    /// The composite expression and truth policy to validate.
+    pub composite_condition: CompositeCondition,
+    /// When editing an existing composite, its ID (so the graph check can exempt
+    /// the composite being updated); `None` when validating a new definition.
+    pub composite_id: Option<String>,
+    /// Reserved and currently unused: validation does not read this field, so
+    /// callers must not rely on it to scope or validate the composite.
+    pub folder_id: Option<String>,
+}
+
 impl UpdateAlertRequestBody {
+    /// Returns the name of the first field this payload carries that a
+    /// composite alert does not support (query conditions, realtime, etc.), or
+    /// `None` when it is a valid composite definition. Callers use the returned
+    /// name to emit a precise `composite_unsupported_field` error.
+    pub fn composite_unsupported_field(&self) -> Option<&'static str> {
+        if self.anomaly_config.is_some() {
+            return Some("anomaly_config");
+        }
+        if self.alert.id.is_some() {
+            return Some("id");
+        }
+        if !self.alert.stream_name.is_empty() {
+            return Some("stream_name");
+        }
+        if self.alert.query_condition != QueryCondition::default() {
+            return Some("query_condition");
+        }
+        if !self.alert.row_template.is_empty() {
+            return Some("row_template");
+        }
+        if self.alert.is_real_time {
+            return Some("is_real_time");
+        }
+        if self.alert.deduplication.is_some() {
+            return Some("deduplication");
+        }
+        if self.alert.tz_offset != 0 {
+            return Some("tz_offset");
+        }
+        composite_trigger_unsupported_field(&self.alert.trigger_condition)
+    }
     /// Return the anomaly config fields, combining `detection_function` +
     /// `detection_function_field` into the canonical "avg(field)" form when both are present.
     pub fn anomaly_fields(&self) -> UpdateAnomalyAlertFields {
@@ -159,6 +289,32 @@ impl UpdateAlertRequestBody {
             );
         }
         base
+    }
+}
+
+fn composite_trigger_unsupported_field(trigger: &super::TriggerCondition) -> Option<&'static str> {
+    if trigger.period_minutes != 0 {
+        Some("trigger_condition.period")
+    } else if trigger.operator != super::Operator::default() {
+        Some("trigger_condition.operator")
+    } else if trigger.threshold_count != 0 {
+        Some("trigger_condition.threshold")
+    } else if trigger.warning_threshold_count.is_some() {
+        Some("trigger_condition.warning_threshold")
+    } else if trigger.notify_on_warning.is_some() {
+        Some("trigger_condition.notify_on_warning")
+    } else if trigger.frequency_minutes != 0 {
+        Some("trigger_condition.frequency")
+    } else if trigger.frequency_type.is_some() {
+        Some("trigger_condition.frequency_type")
+    } else if !trigger.cron.is_empty() {
+        Some("trigger_condition.cron")
+    } else if trigger.timezone.is_some() {
+        Some("trigger_condition.timezone")
+    } else if trigger.tolerance_seconds.is_some() {
+        Some("trigger_condition.tolerance_in_secs")
+    } else {
+        None
     }
 }
 
@@ -217,6 +373,12 @@ pub struct MoveAlertsRequestBody {
 pub struct ListAlertsQuery {
     /// Optional folder ID filter parameter.
     pub folder: Option<String>,
+
+    /// Restrict the list to the alerts attached to one SLO (Feature 5, B1).
+    /// Reads the indexed `slo_id` column, so it is a SQL predicate rather than
+    /// an app-side scan. An EMPTY value matches nothing — see the field docs on
+    /// `ListAlertsParams::slo_id`.
+    pub slo_id: Option<String>,
 
     /// Optional stream type filter parameter.
     pub stream_type: Option<StreamType>,
@@ -319,6 +481,7 @@ impl ListAlertsQuery {
                 _ => None,
             },
             sort_desc: matches!(self.sort_order.as_deref(), Some("desc")),
+            slo_id: self.slo_id,
         }
     }
 
@@ -627,6 +790,7 @@ mod tests {
     #[test]
     fn test_list_alerts_query_into_all_fields() {
         let q = ListAlertsQuery {
+            slo_id: None,
             folder: Some("f1".to_string()),
             stream_type: None,
             stream_name: None,
@@ -652,6 +816,7 @@ mod tests {
     #[test]
     fn test_list_alerts_query_into_defaults() {
         let q = ListAlertsQuery {
+            slo_id: None,
             folder: None,
             stream_type: None,
             stream_name: None,
@@ -675,6 +840,7 @@ mod tests {
     #[test]
     fn test_list_alerts_query_page_idx_defaults_to_zero() {
         let q = ListAlertsQuery {
+            slo_id: None,
             folder: None,
             stream_type: None,
             stream_name: None,
@@ -725,6 +891,7 @@ mod priority_tag_query_tests {
         // comma-separated string is still one entry.
         let priority = priority.map(|p| vec![p.to_string()]).unwrap_or_default();
         ListAlertsQuery {
+            slo_id: None,
             folder: None,
             alert_name_substring: None,
             stream_type: None,

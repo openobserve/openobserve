@@ -82,9 +82,7 @@ export function useLatencyInsightsAnalysis(t: TranslateFn) {
     streamName: string,
     timeRange: { startTime: number; endTime: number },
     durationFilter:
-      | { start: number; end: number; timeStart?: number; timeEnd?: number }
-      | null
-      | undefined,
+      { start: number; end: number; timeStart?: number; timeEnd?: number } | null | undefined,
     baseFilter?: string,
     applyDurationFilter: boolean = true,
   ) => {
@@ -132,9 +130,7 @@ export function useLatencyInsightsAnalysis(t: TranslateFn) {
     streamName: string,
     timeRange: { startTime: number; endTime: number },
     durationFilter:
-      | { start: number; end: number; timeStart?: number; timeEnd?: number }
-      | null
-      | undefined,
+      { start: number; end: number; timeStart?: number; timeEnd?: number } | null | undefined,
     baseFilter?: string,
     applyDurationFilter: boolean = true,
   ) => {

@@ -229,7 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-hover-actions="{ row, column, active }">
               <O2AIContextAddBtn
                 v-if="active && column.id === correlatedTimestampCol"
-                class="ai-btn"
+                class="size-6!"
+                :imageHeight="'14'"
+                :imageWidth="'14'"
                 @send-to-ai-chat="handleSendToAiChat(JSON.stringify(row))"
               />
               <CellActions
@@ -255,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @copy="handleCopy"
                 @add-field-to-table="handleAddFieldToTable"
                 @add-search-term="handleAddSearchTerm"
-                @view-trace="handleViewTrace"
+                @view-trace="handleViewTrace(row)"
                 @show-correlation="handleNestedCorrelation"
                 @send-to-ai-chat="handleSendToAiChat"
               />
@@ -784,12 +786,16 @@ const getColumnWidth = (field: string, maxCap: number): { width: number; exceede
 
   try {
     // Font of table header — must match what actually renders, or the measured
-    // width is wrong and cells truncate/overflow.
-    canvasContext.font = canvasFont("14px", "sans", "bold");
+    // width is wrong and cells truncate/overflow. Rem, not px: this text is
+    // painted by the DOM, so it scales with the root font-size and the
+    // measurement has to scale with it. The px exemptions on the dashboard's
+    // canvas measurements are the opposite case — those measure text ECharts
+    // paints at a fixed numeric fontSize.
+    canvasContext.font = canvasFont("0.875rem", "sans", "bold");
     let max = canvasContext.measureText(field).width + 16;
 
     // Font of the table content
-    canvasContext.font = canvasFont("12px", "mono");
+    canvasContext.font = canvasFont("0.75rem", "mono");
 
     const hits = searchResults.value || [];
     for (let i = 0; i < Math.min(5, hits.length); i++) {
@@ -953,10 +959,6 @@ const tableColumns = computed<OTableColumnDef<any>[]>(() => {
 });
 
 // Determine if we're showing default columns (only timestamp + source)
-const showingDefaultColumns = computed(() => {
-  return visibleFields.value.length === 1 && visibleFields.value[0] === "_timestamp";
-});
-
 /**
  * Format timestamp (microsecond precision) to human-readable format
  */
@@ -1220,6 +1222,17 @@ const onCorrelatedExpandedIdsChange = (newIds: string[]) => {
 };
 
 const handleViewTrace = (log: any) => {
+  // Guard: a caller that loses the record used to crash here on
+  // `log[timestamp_column]` (issue #13708). Tell the user instead of leaving a
+  // button that silently does nothing.
+  if (!log) {
+    toast({
+      variant: "warning",
+      message: t("search.viewTraceUnavailable"),
+    });
+    return;
+  }
+
   // 15 mins +- from the log timestamp
   const from = log[store.state.zoConfig.timestamp_column] - 900000000;
   const to = log[store.state.zoConfig.timestamp_column] + 900000000;

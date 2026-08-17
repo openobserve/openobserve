@@ -21,7 +21,7 @@ const k8sMetadata = {
     podPrefix: ['ziox-querier', 'ziox-ingester', 'prometheus-k8s', 'nginx-ingress', 'coredns'],
     container: ['ziox', 'prometheus', 'nginx', 'coredns', 'sidecar'],
     host: ['ip-10-2-15-197.us-east-2.compute.internal', 'ip-10-2-50-35.us-east-2.compute.internal', 'ip-10-2-56-159.us-east-2.compute.internal'],
-    role: ['querier', 'ingester', 'router', 'compactor', 'alertmanager']
+    role: ['querier', 'ingester', 'router', 'compactor', 'scheduler']
 };
 
 // Log levels
@@ -100,7 +100,7 @@ for (let i = 0; i < 1500; i++) {
 }
 
 // Pattern 5: gRPC/connection events (1000 logs)
-const grpcServices = ['ingester', 'querier', 'router', 'compactor', 'alertmanager'];
+const grpcServices = ['ingester', 'querier', 'router', 'compactor', 'scheduler'];
 const grpcEvents = ['connected', 'disconnected', 'request_received', 'response_sent', 'stream_opened'];
 for (let i = 0; i < 1000; i++) {
     const service = grpcServices[i % grpcServices.length];

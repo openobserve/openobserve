@@ -17,6 +17,7 @@ use std::collections::HashSet;
 
 use config::{
     cluster::LOCAL_NODE,
+    get_config,
     meta::stream::StreamType,
     metrics,
     utils::time::{HourFormat, day_micros, get_ymdh_from_micros, now_micros},
@@ -167,14 +168,19 @@ pub async fn update_stats_from_file_list_for_stream(
     let mut stats =
         infra_file_list::stats_by_date_range(org_id, stream_type, stream_name, date_range.clone())
             .await?;
-    let dump_stats = infra_file_list::query_dump_stats_by_date_range(
-        org_id,
-        stream_type,
-        stream_name,
-        date_range.clone(),
-    )
-    .await?;
-    stats.merge(&dump_stats);
+    // Only read the dump stats when dumping is enabled. `file_list_dump_stats` is created
+    // conditionally on the same flag (see handle_partitioned_tables in the postgres backend), so
+    // reading it unconditionally fails on a metastore where it was never created.
+    if get_config().compact.file_list_dump_enabled {
+        let dump_stats = infra_file_list::query_dump_stats_by_date_range(
+            org_id,
+            stream_type,
+            stream_name,
+            date_range.clone(),
+        )
+        .await?;
+        stats.merge(&dump_stats);
+    }
     infra_file_list::set_stream_stats(org_id, stream_type, stream_name, &stats, is_recent).await?;
 
     Ok(())

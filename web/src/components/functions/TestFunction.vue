@@ -50,7 +50,7 @@
             labelKey="label"
             valueKey="value"
             @update:model-value="updateStreams()"
-            style="width: 100px"
+            style="width: 6.25rem"
           />
         </div>
         <div class="function-stream-select-input w-75">
@@ -63,7 +63,7 @@
             :loading="isFetchingStreams"
             :placeholder="t('pipeline.selectStream')"
             searchable
-            style="min-width: 120px"
+            style="min-width: 7.5rem"
             @search="filterStreams"
             @update:model-value="updateQuery"
           />
@@ -160,14 +160,14 @@
           <!-- o2 ai context add button in the test function -->
           <O2AIContextAddBtn
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
-            imageHeight="24px"
-            imageWidth="24px"
+            imageHeight="24"
+            imageWidth="24"
             :class="'mr-4 px-2'"
             style="
-              width: 32px !important;
-              height: 32px !important;
-              min-width: 32px !important;
-              min-height: 32px !important;
+              width: 2rem !important;
+              height: 2rem !important;
+              min-width: 2rem !important;
+              min-height: 2rem !important;
             "
           />
         </template>
@@ -177,6 +177,7 @@
         class="relative"
         data-test="test-function-input-editor-section"
       >
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <QueryEditor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
@@ -186,6 +187,7 @@
           v-model:query="inputEvents"
           language="json"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
     <div class="mt-2">
@@ -237,6 +239,7 @@
             {{ outputMessage }}
           </div>
         </div>
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <QueryEditor
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
@@ -247,6 +250,7 @@
           language="json"
           read-only
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </div>
@@ -810,7 +814,7 @@ defineExpose({
 .test-function-query-container :deep(.test-function-run-query-btn) {
   padding: 0.125rem 0.5rem !important;
   font-size: var(--text-2xs) !important;
-  margin: 1px 0.125rem !important;
+  margin: 0.0625rem 0.125rem !important;
 }
 
 .functions-duration-input :deep(.date-time-button) {

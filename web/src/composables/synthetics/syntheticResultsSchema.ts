@@ -406,13 +406,7 @@ export interface StepEvidence {
 // why the panel reads the bundle rather than the index.
 
 export type EvidenceKind =
-  | "console"
-  | "pageerror"
-  | "response"
-  | "requestfailed"
-  | "dialog"
-  | "crash"
-  | "truncation";
+  "console" | "pageerror" | "response" | "requestfailed" | "dialog" | "crash" | "truncation";
 
 export interface EvidenceEvent {
   /** When the event was OBSERVED. */

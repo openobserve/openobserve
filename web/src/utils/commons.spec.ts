@@ -936,6 +936,88 @@ describe("Commons Utility Functions", () => {
     });
   });
 
+  describe("getDashboard — duplicate layout ids", () => {
+    it("reassigns duplicate layout.i per tab, then saves and re-fetches", async () => {
+      const dashboardId = "dashboard-dup-layout";
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-1",
+            panels: [
+              { id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+              { id: "panel-2", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+              { id: "panel-3", layout: { x: 0, y: 0, w: 24, h: 9, i: 2 } },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      const ids = mockDashboard.tabs[0].panels.map((p: any) => p.layout.i);
+      // first occurrence kept, collisions reassigned from max i (2) upward
+      expect(ids[0]).toBe(1);
+      expect(ids[2]).toBe(2);
+      expect(new Set(ids).size).toBe(ids.length); // all unique
+      expect(dashboardService.save).toHaveBeenCalled();
+      expect(dashboardService.get_Dashboard).toHaveBeenCalled();
+    });
+
+    it("dedupes layout.i independently within each tab", async () => {
+      const dashboardId = "dashboard-dup-layout-tabs";
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-1",
+            panels: [{ id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }],
+          },
+          {
+            tabId: "tab-2",
+            panels: [{ id: "panel-2", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      // same i across different tabs is fine (grid is per-tab) → no save
+      expect(mockDashboard.tabs[0].panels[0].layout.i).toBe(1);
+      expect(mockDashboard.tabs[1].panels[0].layout.i).toBe(1);
+      expect(dashboardService.save).not.toHaveBeenCalled();
+    });
+
+    it("does not save when all layout ids are already unique", async () => {
+      const dashboardId = "dashboard-unique-layout";
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-1",
+            panels: [
+              { id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+              { id: "panel-2", layout: { x: 0, y: 0, w: 24, h: 9, i: 2 } },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      expect(dashboardService.save).not.toHaveBeenCalled();
+    });
+  });
+
   describe("addVariable", () => {
     it("should add variable to dashboard with empty variables", async () => {
       const dashboardId = "dashboard-1";

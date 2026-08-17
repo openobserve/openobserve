@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, defineAsyncComponent, onMounted } from "vue";
+import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -409,9 +409,9 @@ export default defineComponent({
     };
 
     const buildFieldValuesSql = (fieldName: string): string => {
-      const query = searchObj.data.editorValue;
-      const parts = query.split("|");
-      let whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+      // The whole editor value is the where clause — never split it on "|", the
+      // split is quote-unaware and would truncate match_all('text | error').
+      let whereClause = searchObj.data.editorValue.trim();
 
       const durationParseResult = parseDurationWhereClause(
         whereClause,
@@ -621,6 +621,7 @@ export default defineComponent({
 }
 
 .index-menu .index-table :deep(tr) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel row gap must not scale with text or it smears at fractional zoom */
   margin-bottom: 1px;
 }
 

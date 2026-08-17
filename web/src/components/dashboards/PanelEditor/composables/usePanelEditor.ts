@@ -123,6 +123,9 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
   /** Series limit warning message */
   const limitNumberOfSeriesWarningMessage: Ref<string> = ref("");
 
+  /** Sparkline-unavailable warning (e.g. JOIN queries — API code 20013) */
+  const sparklineWarning: Ref<string> = ref("");
+
   /** General error message */
   const errorMessage: Ref<string> = ref("");
 
@@ -222,6 +225,14 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     );
   };
 
+  const appliedSparklineEnabled = ref(false);
+  let sparklineBaselineCaptured = false;
+  const sparklinePendingApply = computed(
+    () =>
+      dashboardPanelData.data?.config?.sparkline?.enabled === true &&
+      !appliedSparklineEnabled.value,
+  );
+
   /**
    * Whether the chart is out of date (panel data differs from chart data)
    */
@@ -279,7 +290,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
       );
     }
 
-    return configNeedsApiCall || variablesChanged;
+    return configNeedsApiCall || variablesChanged || sparklinePendingApply.value;
   });
 
   /**
@@ -334,6 +345,8 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
       // Copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // Applied — capture the sparkline state so the "pending" banner clears.
+      appliedSparklineEnabled.value = dashboardPanelData.data?.config?.sparkline?.enabled === true;
 
       // Refresh the date time picker if available
       if (dateTimePickerRef?.value) {
@@ -384,6 +397,10 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    */
   const handleLimitNumberOfSeriesWarningMessage = (message: string): void => {
     limitNumberOfSeriesWarningMessage.value = message;
+  };
+
+  const handleSparklineWarningUpdate = (message: string): void => {
+    sparklineWarning.value = message;
   };
 
   /**
@@ -614,6 +631,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     errorMessage.value = "";
     maxQueryRangeWarning.value = "";
     limitNumberOfSeriesWarningMessage.value = "";
+    sparklineWarning.value = "";
   };
 
   /**
@@ -755,6 +773,13 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     // to date" on edit load.
     nextTick(() => {
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // Capture the sparkline baseline only on the first (load) init; later inits
+      // fire on every config edit and must NOT clear the pending banner.
+      if (!sparklineBaselineCaptured) {
+        appliedSparklineEnabled.value =
+          dashboardPanelData.data?.config?.sparkline?.enabled === true;
+        sparklineBaselineCaptured = true;
+      }
     });
   };
 
@@ -774,6 +799,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     shouldRefreshWithoutCache,
     maxQueryRangeWarning,
     limitNumberOfSeriesWarningMessage,
+    sparklineWarning,
     errorMessage,
     isPartialData,
     isPanelLoading,
@@ -798,6 +824,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     handleChartApiError,
     handleLastTriggeredAtUpdate,
     handleLimitNumberOfSeriesWarningMessage,
+    handleSparklineWarningUpdate,
     handleIsPartialDataUpdate,
     handleLoadingStateChange,
     handleIsCachedDataDifferWithCurrentTimeRangeUpdate,

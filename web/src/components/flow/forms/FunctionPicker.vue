@@ -145,8 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <pre
                   class="text-compact text-text-code m-0 cursor-default border-0 bg-transparent p-4 font-mono leading-normal font-normal break-words whitespace-pre-wrap select-text"
-                  >{{ selectedDefinition }}</pre
-                >
+                  >{{ selectedDefinition }}</pre>
               </div>
             </OCardSection>
           </OCard>

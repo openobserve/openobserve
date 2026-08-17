@@ -37,7 +37,7 @@ import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
 /** Published React Native SDK release these snippets are written against. */
-export const RUM_RN_SDK_VERSION = "0.1.0-alpha.4";
+export const RUM_RN_SDK_VERSION = "0.1.0";
 
 const PKG_CORE = "@openobserve/mobile-react-native";
 const PKG_REPLAY = "@openobserve/mobile-react-native-session-replay";
@@ -154,7 +154,7 @@ import {
 
 const navCode = `import { useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { OoRumReactNavigationTracking } from '${PKG_NAV}';
+import { O2RumReactNavigationTracking } from '${PKG_NAV}';
 
 const navigationRef = useRef(null);
 
@@ -162,7 +162,7 @@ const navigationRef = useRef(null);
   ref={navigationRef}
   onReady={() => {
     // Every route change becomes a RUM view.
-    OoRumReactNavigationTracking.startTrackingViews(navigationRef.current);
+    O2RumReactNavigationTracking.startTrackingViews(navigationRef.current);
   }}
 >
   {/* your screens */}

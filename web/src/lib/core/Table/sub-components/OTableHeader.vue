@@ -45,6 +45,8 @@ const props = defineProps<{
   dense?: boolean;
   /** Show the per-column value-filter dropdown on filterable columns. */
   enableColumnFilter?: boolean;
+  /** Show the per-column "format this column" icon on formattable columns. */
+  enableColumnFormat?: boolean;
 }>();
 
 // ── Per-column value filter ─────────────────────────────────────
@@ -113,6 +115,8 @@ const emit = defineEmits<{
   /** Per-column close ("x"). Emits the column definition so the consumer can
    *  drop the field - distinct from hiding it. */
   "close-column": [column: any];
+  /** Per-column format icon click. Emits the column id. */
+  "format-column": [columnId: string];
 }>();
 
 // Notify the parent BEFORE the resize begins so it can freeze any flex columns
@@ -243,6 +247,7 @@ function getPivotRowColStyle(colId: string): Record<string, any> {
     position: "sticky",
     left: `${leftOffset}px`,
     zIndex: 12,
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the pinned-column edge shadow would bloom if it scaled with text
     boxShadow: leftOffset > 0 ? "2px 0 4px -2px var(--color-border-default)" : "none",
     backgroundColor: "var(--color-table-header-bg)",
   };
@@ -265,6 +270,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     backgroundColor: "var(--color-table-header-bg)",
     // Same separator the pinned/actions columns use; the body and grand-total
     // cells carry it too, so the whole column reads as one shadowed column.
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the sticky total-column separator shadow would bloom if it scaled with text
     boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 }
@@ -284,6 +290,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     backgroundColor: "var(--color-table-header-bg)",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the sticky total-column separator shadow would bloom if it scaled with text
     boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 }
@@ -460,6 +467,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       />
 
       <!-- Column headers -->
+      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — the pinned-column edge shadow would bloom if it scaled with text -->
       <th
         v-for="header in headerGroup.headers"
         :key="header.id"
@@ -518,6 +526,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           ...getStandardStickyTotalStyle(header),
         }"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <div
           :class="[
             'flex h-full min-w-0 items-center gap-1 overflow-hidden',
@@ -678,6 +687,17 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </div>
             </div>
           </ODropdown>
+
+          <button
+            v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
+            type="button"
+            :data-test="`o2-table-column-format-btn-${header.column.id}`"
+            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            :aria-label="t('components.table.formatColumnAria')"
+            @click.stop="emit('format-column', header.column.id)"
+          >
+            <OIcon name="tune" size="xs" class="opacity-50" />
+          </button>
         </div>
 
         <!-- Column resize handle -->
@@ -745,6 +765,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         aria-hidden="true"
       />
 
+      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — the pinned-column edge shadow would bloom if it scaled with text -->
       <th
         v-for="header in headerGroup.headers"
         :key="header.id"
@@ -796,6 +817,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           ...getStandardStickyTotalStyle(header),
         }"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <div
           :class="[
             'flex h-full min-w-0 items-center gap-1 overflow-hidden',
@@ -948,6 +970,17 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </div>
             </div>
           </ODropdown>
+
+          <button
+            v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
+            type="button"
+            :data-test="`o2-table-column-format-btn-${header.column.id}`"
+            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            :aria-label="t('components.table.formatColumnAria')"
+            @click.stop="emit('format-column', header.column.id)"
+          >
+            <OIcon name="tune" size="xs" class="opacity-50" />
+          </button>
         </div>
         <div
           v-if="header.column.getCanResize()"

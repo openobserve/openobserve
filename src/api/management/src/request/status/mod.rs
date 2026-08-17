@@ -185,6 +185,10 @@ struct ConfigResponse<'a> {
     timechart_enabled: bool,
     max_query_range: i64,
     ai_enabled: bool,
+    /// Days a soft-deleted org stays recoverable before it is purged. `0` means no
+    /// recovery window at all — deletion is immediate and permanent, which is what
+    /// every OSS build reports.
+    org_deletion_grace_period_days: i64,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
     dashboard_show_field_as_json_enabled: bool,
@@ -205,11 +209,12 @@ struct ConfigResponse<'a> {
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
+    composite_alerts_available: bool,
     synthetics_enabled: bool,
-    /// SLO measurement (`ZO_SLO_ENABLED`). Not enterprise-gated — the SLO APIs
-    /// answer 501 while it is off, so the UI uses this to hide the menu entry
-    /// rather than offer a page that cannot work.
-    slo_enabled: bool,
+    /// Chrome Web Store URL of the OpenObserve Recorder extension
+    /// (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
+    /// links its install button here.
+    synthetics_recorder_extension_url: String,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -368,8 +373,15 @@ pub async fn zo_config() -> impl IntoResponse {
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
+    // Composite alerts are available for creation when writes are enabled
+    // (on by default; disabled by the opt-out kill-switch) and the deployment
+    // is not running super-cluster mode (§18, §19.2).
+    let composite_alerts_available =
+        config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
+    let synthetics_recorder_extension_url =
+        enterprise_value!("", &o2cfg.synthetics.recorder_extension_url);
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
@@ -452,7 +464,7 @@ pub async fn zo_config() -> impl IntoResponse {
         ingestion_url: cfg.common.ingestion_url.to_string(),
         web_url: cfg.common.web_url.to_string(),
         #[cfg(feature = "enterprise")]
-        streaming_aggregation_enabled: cfg.common.feature_query_streaming_aggs,
+        streaming_aggregation_enabled: cfg.search.feature_query_streaming_aggs,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
@@ -462,6 +474,7 @@ pub async fn zo_config() -> impl IntoResponse {
         timechart_enabled: cfg.limit.timechart_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
+        org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         dashboard_show_field_as_json_enabled: cfg.common.dashboard_show_field_as_json_enabled,
@@ -482,8 +495,9 @@ pub async fn zo_config() -> impl IntoResponse {
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
         anomaly_detection_enabled,
+        composite_alerts_available,
         synthetics_enabled,
-        slo_enabled: cfg.slo.enabled,
+        synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,

@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Lower: conversation (left) + rail (right) -->
-          <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] gap-2.5">
+          <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_21.25rem] gap-2.5">
             <!-- Conversation column: toolbar + panel -->
             <div class="flex min-h-0 min-w-0 flex-col">
               <div class="mb-2.5 flex flex-shrink-0 items-center gap-2">
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="xs"
                       class="text-text-muted ml-[0.15rem] cursor-default"
                     />
-                    <OTooltip max-width="280px">
+                    <OTooltip max-width="17.5rem">
                       <template #content>
                         <div class="flex min-w-57.5 flex-col gap-2">
                           <div class="text-text-heading text-xs font-semibold">
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Lower area: conversation column (left) + hotspot rail (right). Full-page
            scroll — the column grows with content; the rail sticks (items-start so
            it doesn't stretch to the tall conversation's height). -->
-          <div class="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-2.5">
+          <div class="grid grid-cols-[minmax(0,1fr)_21.25rem] items-start gap-2.5">
             <!-- Conversation column: toolbar + panel -->
             <div class="flex min-h-0 min-w-0 flex-col">
               <!-- Conversation toolbar: search (fills width) + status + model filters.
@@ -677,10 +677,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            internal scroll. Each card caps its list at a max-height and only
            scrolls internally when it genuinely overflows. The rail sticks to the
            top and never exceeds the viewport. -->
+            <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
             <aside
               class="sticky top-0 flex max-h-[calc(100vh-2.6rem-68px-1.25rem)] flex-col gap-2.5 self-start overflow-y-auto pb-2.5"
               data-test="session-rail"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
               <div
                 class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
@@ -738,7 +740,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Hover: which turns this (deduped) tool actually ran in. side="left"
                    (like the Cost/Slowest hovers) so it opens to the side instead of
                    covering the rows above it. -->
-                    <OTooltip side="left" :delay="120" max-width="220px" content-class="p-0!">
+                    <OTooltip side="left" :delay="120" max-width="13.75rem" content-class="p-0!">
                       <template #content>
                         <div class="text-text-body w-50 px-3 py-2.25 text-xs">
                           <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>
@@ -802,7 +804,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("traces.sessionDetail.turnLabel") }} {{ row.n }}
                       </span>
                       <span class="min-w-0 flex-1">
-                        <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="xs" />
+                        <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="sm" />
                       </span>
                       <span class="flex min-w-[3.25rem] flex-col items-end">
                         <span class="text-2xs text-text-secondary font-semibold tabular-nums">
@@ -858,7 +860,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OProgressBar
                           :value="ratio(row.lat, maxTurnLat)"
                           :variant="row.status === 'error' ? 'danger' : 'warning'"
-                          size="xs"
+                          size="sm"
                         />
                       </span>
                       <span
@@ -1063,7 +1065,7 @@ function cacheInputDenominator(d: SessionDetail): number {
 // Errors uses a variant (red when > 50% error rate); every other tile is neutral.
 function kpiCardClass(variant?: "danger"): string {
   const base =
-    "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
+    "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-sm";
   if (variant === "danger")
     return `${base} bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))] border-[color-mix(in_srgb,var(--color-error-500)_35%,var(--color-border-default))]`;
   return `${base} bg-surface-base border-border-default`;
@@ -1724,7 +1726,7 @@ function formatTokens(n: number): string {
 onMounted(load);
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): markdown styling for the assistant message injected
    with v-html. Those nodes carry no scope attribute and no classes of their own,
    so :deep() element selectors are the only expressible form — a Tailwind
@@ -1787,6 +1789,7 @@ onMounted(load);
   }
   :deep(pre) {
     background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel code block border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--color-border-default);
     padding: 0.5rem 0.625rem;
     border-radius: var(--radius-default);
@@ -1811,6 +1814,7 @@ onMounted(load);
   }
   :deep(th),
   :deep(td) {
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--color-border-default);
     padding: 0.3rem 0.5rem;
     text-align: left;
@@ -1821,6 +1825,7 @@ onMounted(load);
   }
   :deep(hr) {
     border: none;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
     border-top: 1px solid var(--color-border-default);
     margin: 0.625rem 0;
   }

@@ -221,34 +221,36 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
  */
 export const generateTracePatternTooltipContent = (metadata: any): string => {
   if (!metadata) {
+    /* eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
     return `
       <div style="
         font-family: var(--font-sans);
-        font-size: 12px;
+        font-size: 0.75rem;
         line-height: 1.4;
-        max-width: 280px;
+        max-width: 17.5rem;
         color: rgba(255, 255, 255, 0.88);
       ">
         <div style="
           font-weight: 600;
-          font-size: 13px;
-          margin-bottom: 8px;
+          font-size: 0.8125rem;
+          margin-bottom: 0.5rem;
           color: rgba(255, 255, 255, 0.95);
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          padding-bottom: 4px;
+          padding-bottom: 0.25rem;
         ">${gt("traces.unknownPattern")}</div>
         <div>
-          <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.callsLabel")} <span style="font-family: var(--font-mono);">1</span></div>
-          <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.averageLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.minimumLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.maximumLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.p75Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.p95Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.p99Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
-          <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.errorRateLabel")} <span style="font-family: var(--font-mono); color: #10b981;">0.0%</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.callsLabel")} <span style="font-family: var(--font-mono);">1</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.averageLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.minimumLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.maximumLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p75Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p95Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p99Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.errorRateLabel")} <span style="font-family: var(--font-mono); color: #10b981;">0.0%</span></div>
         </div>
       </div>
     `;
+    /* eslint-enable local/no-hardcoded-px */
   }
 
   const {
@@ -263,33 +265,35 @@ export const generateTracePatternTooltipContent = (metadata: any): string => {
     errorRate = 0,
   } = metadata;
 
+  /* eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   return `
     <div style="
       font-family: var(--font-sans);
-      font-size: 12px;
+      font-size: 0.75rem;
       line-height: 1.4;
-      max-width: 280px;
+      max-width: 17.5rem;
       color: rgba(255, 255, 255, 0.88);
     ">
       <div style="
         font-weight: 600;
-        font-size: 13px;
-        margin-bottom: 8px;
+        font-size: 0.8125rem;
+        margin-bottom: 0.5rem;
         color: rgba(255, 255, 255, 0.95);
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        padding-bottom: 4px;
+        padding-bottom: 0.25rem;
       ">${escapeHtml(pathSignature)}</div>
 
       <div>
-        <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.callsLabel")} <span style="font-family: var(--font-mono);">${count}</span></div>
-        <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.averageLabel")} <span style="font-family: var(--font-mono);">${avg.toFixed(1)}ms</span></div>
-        <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.minimumLabel")} <span style="font-family: var(--font-mono);">${min.toFixed(1)}ms</span></div>
-        <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.maximumLabel")} <span style="font-family: var(--font-mono);">${max.toFixed(1)}ms</span></div>
-        <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.p75Label")} <span style="font-family: var(--font-mono);">${p75.toFixed(1)}ms</span></div>
-        <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.p95Label")} <span style="font-family: var(--font-mono);">${p95.toFixed(1)}ms</span></div>
-        <div style="margin-bottom: 2px;">${gt("traces.graphTooltip.p99Label")} <span style="font-family: var(--font-mono);">${p99.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.callsLabel")} <span style="font-family: var(--font-mono);">${count}</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.averageLabel")} <span style="font-family: var(--font-mono);">${avg.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.minimumLabel")} <span style="font-family: var(--font-mono);">${min.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.maximumLabel")} <span style="font-family: var(--font-mono);">${max.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p75Label")} <span style="font-family: var(--font-mono);">${p75.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p95Label")} <span style="font-family: var(--font-mono);">${p95.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p99Label")} <span style="font-family: var(--font-mono);">${p99.toFixed(1)}ms</span></div>
         <div>${gt("traces.graphTooltip.errorRateLabel")} <span style="font-family: var(--font-mono); color: ${errorRate > 0 ? "#ef4444" : "#10b981"};">${errorRate.toFixed(1)}%</span></div>
       </div>
     </div>
   `;
+  /* eslint-enable local/no-hardcoded-px */
 };

@@ -479,7 +479,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     let includeMenuItem = null;
 
     for (const menuText of possibleMenuTexts) {
-      const menuItem = page.getByText(menuText, { exact: false }).first();
+      const menuItem = pm.logsPage.getMenuItemByText(menuText);
       if (await menuItem.isVisible({ timeout: 1000 }).catch(() => false)) {
         includeMenuItem = menuItem;
         testLogger.info(`✓ Found include menu item with text: ${menuText}`);
@@ -490,7 +490,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     if (!includeMenuItem) {
       // Post-migration the action is on an ODropdown rendered via JsonPreview;
       // its include item carries data-test="log-details-include-field-btn".
-      const anyMenuItem = page.locator('[data-test="log-details-include-field-btn"]').first();
+      const anyMenuItem = pm.logsPage.getIncludeSearchTermMenuItem();
       if (await anyMenuItem.isVisible({ timeout: 1000 }).catch(() => false)) {
         includeMenuItem = anyMenuItem;
         testLogger.info('✓ Using first visible menu item');
@@ -1073,11 +1073,11 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForTimeout(3000);
 
     // Check for query-level errors
-    const errorVisible = await page.locator(pm.logsPage.errorMessage).isVisible({ timeout: 3000 }).catch(() => false);
+    const errorVisible = await pm.logsPage.getErrorMessageLocator().isVisible({ timeout: 3000 }).catch(() => false);
     testLogger.info(`Query error message visible: ${errorVisible}`);
 
     // Expand first log detail if available
-    const expandMenu = page.locator(pm.logsPage.tableRowExpandMenu).first();
+    const expandMenu = pm.logsPage.getFirstRowExpandMenu();
     if (await expandMenu.isVisible({ timeout: 5000 }).catch(() => false)) {
       await pm.logsPage.clickTableExpandMenuFirst();
       await page.waitForTimeout(1000);
@@ -1193,7 +1193,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('✓ No partitions-related console errors');
 
     // Verify no error message displayed on page
-    const errorMsg = page.locator(pm.logsPage.errorMessage);
+    const errorMsg = pm.logsPage.getErrorMessageLocator();
     const errorVisible = await errorMsg.isVisible({ timeout: 2000 }).catch(() => false);
     if (errorVisible) {
       const errorText = await errorMsg.textContent();
@@ -1392,12 +1392,12 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Results visible before explain');
 
     // Open hamburger menu → click Explain Query via POM
-    await expect(page.locator(pm.logsPage.moreOptionsBtn), 'More options button should be visible')
+    await expect(pm.logsPage.getMoreOptionsButtonLocator(), 'More options button should be visible')
       .toBeVisible({ timeout: 3000 });
     await pm.logsPage.clickMoreOptionsButton();
     await page.waitForTimeout(1000);
 
-    await expect(page.locator('[data-test="logs-search-bar-explain-query-menu-btn"]'),
+    await expect(pm.logsPage.getExplainQueryMenuBtnLocator(),
       'Explain Query option should be visible').toBeVisible({ timeout: 3000 });
     await pm.logsPage.clickExplainQuery();
     await page.waitForTimeout(2000);
@@ -1422,7 +1422,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Ingest data into a second stream so the multi-stream join has two streams
     const orgId = getOrgIdentifier() || 'default';
     const headers = getHeaders();
-    const secondStream = 'e2e_8641_stream';
+    // Per-run unique name — the fixed 'e2e_8641_stream' collided with concurrent shared-org runs
+    // ("Stream not available. Ingestion may have failed."). Keep the e2e_ prefix for cleanup.
+    const secondStream = 'e2e_8641_stream_' + Math.random().toString(36).slice(2, 7);
     await sendRequest(page, getIngestionUrl(orgId, secondStream), [{
       level: 'info', job: 'test_8641', log: 'test message for multi-stream', e2e: '1',
     }], headers);
@@ -1439,7 +1441,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
-    const errorVisible = await page.locator('[class*="error"], [class*="negative"], [role="alert"]')
+    const errorVisible = await pm.logsPage.getGenericErrorLocator()
       .filter({ hasText: /error|failed|invalid/i })
       .first().isVisible({ timeout: 2000 }).catch(() => false);
 
@@ -1462,7 +1464,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     // Wait for the stream select OSelect to mount before interacting
-    await page.locator('[data-test="log-search-index-list-select-stream"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    await pm.logsPage.getStreamDropdown().first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate', 5, 30000, true);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -1687,7 +1689,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: include/exclude search term position (Bug #11606)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1730,7 +1732,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Histogram redraws on index list collapse/expand (Bug #9339)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1762,7 +1764,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Stream dropdown replaces search term on selection (Bug #7310)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1795,7 +1797,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Column positions persist after re-query (Bug #5277)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1834,7 +1836,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Text wrap toggle and saved view alignment (Bug #4426)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1882,7 +1884,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Cancel query available on visualize page (Bug #4091)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 

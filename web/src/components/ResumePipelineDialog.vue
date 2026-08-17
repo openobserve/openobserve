@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </ORadio>
-        <ORadio :value="true" style="height: 18px">
+        <ORadio :value="true" style="height: 1.125rem">
           <template #label>
             <span class="text-compact leading-4.5 font-normal">{{
               t("confirmDialog.startFromNow")

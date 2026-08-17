@@ -166,6 +166,22 @@ vi.mock("@/services/iam", () => ({
         visible: true,
         order: 14,
       },
+      {
+        key: "annotation_queue",
+        display_name: "Annotation Queues",
+        has_entities: true,
+        top_level: true,
+        visible: true,
+        order: 15,
+      },
+      {
+        key: "dataset",
+        display_name: "Datasets",
+        has_entities: true,
+        top_level: true,
+        visible: true,
+        order: 16,
+      },
     ],
   })),
   getResourcePermission: vi.fn(async () => ({ data: [] })),
@@ -247,10 +263,22 @@ vi.mock("@/services/online-evals.service", () => ({
     },
   },
 }));
+vi.mock("@/services/llm-queues.service", () => ({
+  default: {
+    list: vi.fn(async () => [{ id: "review-queue", name: "Review Queue" }]),
+  },
+}));
+vi.mock("@/services/llm-datasets.service", () => ({
+  default: {
+    list: vi.fn(async () => [{ id: "golden-set", name: "Golden Set" }]),
+  },
+}));
 
 // Target component
 import EditRole from "@/components/iam/roles/EditRole.vue";
 import onlineEvalsService from "@/services/online-evals.service";
+import llmQueuesService from "@/services/llm-queues.service";
+import llmDatasetsService from "@/services/llm-datasets.service";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -554,6 +582,44 @@ describe("EditRole - entities population", () => {
       name: "daily-eval",
       display_name: "Daily Eval",
       resourceName: "eval_job",
+    });
+    expect(resource.is_loading).toBe(false);
+  });
+
+  it("getResourceEntities loads annotation queue entities", async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "annotation_queue",
+    );
+
+    await wrapper.vm.getResourceEntities(resource);
+
+    expect(llmQueuesService.list).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+    expect(resource.entities[0]).toMatchObject({
+      name: "review-queue",
+      display_name: "Review Queue",
+      resourceName: "annotation_queue",
+    });
+    expect(resource.is_loading).toBe(false);
+  });
+
+  it("getResourceEntities loads dataset entities", async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "dataset",
+    );
+
+    await wrapper.vm.getResourceEntities(resource);
+
+    expect(llmDatasetsService.list).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+    );
+    expect(resource.entities[0]).toMatchObject({
+      name: "golden-set",
+      display_name: "Golden Set",
+      resourceName: "dataset",
     });
     expect(resource.is_loading).toBe(false);
   });

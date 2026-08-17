@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="bg-separator w-full" style="height: 1px" />
+      <div class="bg-separator h-px w-full" />
 
       <!-- Inline form — the Save button lives inside the <OForm>, so Enter submits
            natively via type="submit" (no form-id needed; R4 case 1). -->
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :readonly="isUpdating"
               :disabled="isUpdating"
               data-test="add-pipeline-name-input"
-              style="min-width: 480px"
+              style="min-width: 30rem"
             />
           </div>
           <div data-test="add-pipeline-description-input" class="alert-name-input o2-input mb-2">
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="description"
               :label="t('alerts.description')"
               data-test="add-pipeline-description-input"
-              style="min-width: 480px"
+              style="min-width: 30rem"
             />
           </div>
           <div
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :readonly="isUpdating"
               :disabled="isUpdating"
               data-test="add-pipeline-stream-type-select"
-              style="min-width: 220px"
+              style="min-width: 13.75rem"
             />
           </div>
           <div data-test="add-pipeline-stream-select" class="o2-input pt-0">
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :readonly="isUpdating"
               :disabled="isUpdating"
               data-test="add-pipeline-stream-select"
-              style="min-width: 250px"
+              style="min-width: 15.625rem"
             />
           </div>
         </div>
@@ -113,8 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import useStreams from "@/composables/useStreams";
 import { ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
-import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -136,8 +135,6 @@ defineProps({
 });
 
 const emit = defineEmits(["save"]);
-
-const store = useStore();
 
 const { t } = useI18nTyped();
 const { getStreams } = useStreams(t);

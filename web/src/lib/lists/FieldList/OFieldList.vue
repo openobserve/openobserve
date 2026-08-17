@@ -422,6 +422,7 @@ defineExpose({ scrollToTop });
   background-color: transparent !important;
 }
 .o-field-list__actions > :deep(*:not(:first-child)) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel chip separator must not scale with text or it smears at fractional zoom */
   border-left: 1px solid var(--color-field-list-actions-border) !important;
 }
 </style>

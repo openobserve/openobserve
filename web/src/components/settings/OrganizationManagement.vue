@@ -380,9 +380,9 @@ export default defineComponent({
     // Extend-trial week count is bridged from the pill grid into the form below.
     // Dynamic defaults (project the current pill value) → a typed computed.
     const extendTrialFormRef = ref<any>(null);
-    const extendTrialDefaults = computed(
-      (): ExtendTrialForm => ({ extendedTrial: extendedTrial.value }),
-    );
+    const extendTrialDefaults = computed((): ExtendTrialForm => ({
+      extendedTrial: extendedTrial.value,
+    }));
 
     // Keep the form's copy of the bridged pill value in sync (the pill grid is a
     // custom control, not an <input>, so it is bridged via setFieldValue — the

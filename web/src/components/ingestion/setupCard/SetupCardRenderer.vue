@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from "vue";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -74,7 +73,6 @@ const emit = defineEmits<{
   (e: "step-action", actionId: string): void;
 }>();
 
-const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
 const { getStreams } = useStreams(t);
@@ -517,12 +515,14 @@ function fireConfetti() {
             <template v-else>{{ content.provider.name.charAt(0) }}</template>
           </span>
           <h1 class="c-h1">{{ content.provider.name }}</h1>
-          <!-- Optional control sitting just after the title, spaced off it
-               (e.g. RUM's Browser / React Native platform switch). Renders only
-               when a host page fills it, so other cards are untouched. -->
-          <div v-if="$slots['hero-actions']" class="ms-2 shrink-0" data-test="ai-hero-actions">
-            <slot name="hero-actions" />
-          </div>
+        </div>
+        <!-- Optional control on its own row directly under the title, ahead of the
+             tagline and meta chips (e.g. RUM's Browser / React Native / Android /
+             iOS platform switch — it selects which guide the rest of the hero and
+             the steps below describe). Renders only when a host page fills it, so
+             other cards are untouched. -->
+        <div v-if="$slots['hero-under-title']" class="mt-3" data-test="ai-hero-under-title">
+          <slot name="hero-under-title" />
         </div>
         <p class="c-sub">{{ content.provider.tagline }}</p>
         <div class="pv-meta">
@@ -959,7 +959,7 @@ function fireConfetti() {
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(complex-state): the statusbar/fixbox state machine (idle→checking→
    connected/stalled) plus its radar keyframes and OStepper/OCollapsible :deep()
    content styling — not expressible as template utilities. */
@@ -1026,6 +1026,7 @@ function fireConfetti() {
 }
 .ds-mono.logo {
   background: var(--panel);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--border);
   padding: 0.5rem;
 }
@@ -1039,6 +1040,7 @@ function fireConfetti() {
 /* ---- hero — its own header band: [logo + name] row, then tagline + chips ---- */
 .c-hero {
   padding: 0.375rem 0 1.125rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--border);
   margin-bottom: 1.375rem;
 }
@@ -1147,6 +1149,7 @@ function fireConfetti() {
 }
 .step-note :deep(svg) {
   flex: none;
+  /* eslint-disable-next-line local/no-hardcoded-px -- 1px optical nudge, not layout — a single device pixel of alignment that must not scale with text */
   margin-top: 1px;
 }
 /* In-card jump link (see noteMd) — same treatment as the footer's doc link. */
@@ -1164,7 +1167,7 @@ function fireConfetti() {
   font-size: var(--text-xs);
   background: var(--track);
   color: var(--text-1);
-  padding: 1px 0.375rem;
+  padding: 0.0625rem 0.375rem;
   border-radius: var(--radius-default);
 }
 
@@ -1176,6 +1179,7 @@ function fireConfetti() {
   margin-top: 0.875rem;
   padding: 0.8125rem 1.125rem;
   border-radius: var(--radius-surface);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--border);
   background: var(--panel);
   transition: all 0.3s;
@@ -1243,6 +1247,7 @@ function fireConfetti() {
 
 /* ---- fix box ---- */
 .fixbox {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--warn) 38%, var(--border));
   border-radius: var(--radius-surface);
   background: var(--warn-soft);
@@ -1282,6 +1287,7 @@ function fireConfetti() {
   margin-top: 0.875rem;
 }
 .acc-item {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   background: var(--panel);
@@ -1305,7 +1311,7 @@ function fireConfetti() {
   font-size: var(--text-2xs);
   background: var(--track);
   color: var(--text-1);
-  padding: 1px 0.3125rem;
+  padding: 0.0625rem 0.3125rem;
   border-radius: var(--radius-default);
 }
 
@@ -1319,6 +1325,7 @@ function fireConfetti() {
 /* ---- troubleshooting ---- */
 .ts-row {
   padding: 0.6875rem 0;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-bottom: 1px dashed var(--border);
 }
 .ts-row:last-child {
@@ -1335,6 +1342,7 @@ function fireConfetti() {
 .ts-q :deep(svg) {
   color: var(--warn);
   flex: none;
+  /* eslint-disable-next-line local/no-hardcoded-px -- 1px optical nudge, not layout — a single device pixel of alignment that must not scale with text */
   margin-top: 1px;
 }
 .ts-a {
@@ -1348,6 +1356,7 @@ function fireConfetti() {
 .pv-foot {
   margin-top: 1rem;
   padding-top: 0.875rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;

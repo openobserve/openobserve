@@ -17,12 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <!-- Loading state -->
+    <!-- eslint-disable local/no-hardcoded-px -- 1px container border — a border width, optical not layout; scaling it with text thickens the rule -->
     <div
       v-if="isLoadingTranslation"
       data-test="rum-pretty-stack-trace-loading"
       class="loading-container rounded-default flex min-h-50 flex-col items-center justify-center p-6 text-center"
       :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <OSpinner variant="dots" size="lg" />
       <div class="text-text-secondary mt-3 font-medium" style="font-size: var(--text-sm)">
         {{ t("rum.translatingStackTrace") }}
@@ -33,19 +35,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- No source maps available message -->
+    <!-- eslint-disable local/no-hardcoded-px -- 1px container border — a border width, optical not layout; it must not thicken with the message text -->
     <div
       v-else-if="allSourceInfoNull"
       data-test="rum-pretty-stack-trace-unavailable"
       class="no-source-maps-container rounded-default flex flex-col items-center justify-center p-3 px-6 py-5 text-center"
       :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <OIcon name="code-off" size="lg" class="mb-2" />
       <div class="text-text-secondary mb-1 text-base font-medium">
         {{ t("rum.sourceMapsNotAvailable") }}
       </div>
       <div
         class="text-text-secondary text-sm"
-        style="max-width: 500px; margin: 0 auto; font-size: var(--text-compact)"
+        style="max-width: 31.25rem; margin: 0 auto; font-size: var(--text-compact)"
       >
         {{ t("rum.sourceMapsNotAvailableBody") }}
       </div>
@@ -89,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error message -->
         <div
           v-if="stackTrace.error"
-          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] [box-shadow:0_1px_2px_rgba(0,0,0,0.05)]"
+          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] shadow-sm"
           :style="{
             'background-color': errorHeaderBackground,
             color: errorHeaderColor,
@@ -100,18 +104,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- First stack frame - expandable/collapsible -->
+        <!-- eslint-disable local/no-hardcoded-px -- 1px frame borders plus a box-shadow offset and blur — optical effects, not layout; scaling them with text thickens the rule and makes elevation bloom -->
         <div
           v-if="stackTrace.stack.length > 0"
-          class="stack-frame-wrapper rounded-b-default mt-0 overflow-hidden [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
+          class="stack-frame-wrapper rounded-b-default mt-0 overflow-hidden shadow-sm"
           :style="{
             'border-top': `1px solid ${borderColor}`,
             'border-bottom': `1px solid ${borderColor}`,
             'border-left': `1px solid ${borderColor}`,
             'border-right': `1px solid ${borderColor}`,
-            'border-radius': stackTrace.stack.length === 1 ? '0 0 4px 4px' : '',
+            'border-radius': stackTrace.stack.length === 1 ? '0 0 0.25rem 0.25rem' : '',
             'background-color': backgroundColor,
           }"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <!-- Frame header - clickable -->
           <div
             class="frame-header hover:bg-surface-subtle cursor-pointer !px-4 px-3 !py-3 py-2 transition-all duration-200 ease-in-out"
@@ -157,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Source code snippet with syntax highlighting -->
             <div
-              class="source-code-box rounded-default h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+              class="source-code-box rounded-default h-50 overflow-hidden border border-solid shadow-sm"
               :style="{ 'border-color': borderColor }"
             >
               <CodeQueryEditor
@@ -166,31 +172,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :query="stackTrace.stack[0].source_info.source"
                 :read-only="true"
                 language="javascript"
-                style="height: 200px"
+                style="height: 12.5rem"
               />
             </div>
           </div>
         </div>
 
         <!-- Remaining frames - collapsed by default -->
+        <!-- eslint-disable local/no-hardcoded-px -- 1px bottom/side borders plus a box-shadow offset and blur — optical effects, not layout; the collapsed panel must not gain weight with its text -->
         <div
           v-if="stackTrace.stack.length > 1"
-          class="remaining-frames rounded-b-default [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
+          class="remaining-frames rounded-b-default shadow-sm"
           :style="{
             'border-bottom': `1px solid ${borderColor}`,
             'border-left': `1px solid ${borderColor}`,
             'border-right': `1px solid ${borderColor}`,
-            'border-radius': '0 0 4px 4px',
+            'border-radius': '0 0 0.25rem 0.25rem',
             'background-color': backgroundColor,
           }"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <!-- Show more button - only visible when frames are hidden -->
+          <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel top rule must not scale with text or it smears at fractional zoom -->
           <div
             v-if="!expandedTraces[traceIndex]"
             class="show-more-button hover:bg-surface-subtle flex cursor-pointer items-center gap-1.5 !px-4 px-3 !py-2.5 py-2 text-xs font-medium transition-all duration-200 ease-in-out"
             :style="{ 'border-top': `1px solid ${borderColor}` }"
             @click="showFrames(traceIndex)"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <OIcon name="expand-more" size="xs" class="mr-1" />
             <span class="text-text-secondary text-xs">
               {{ t("rum.showMoreFrame", { count: stackTrace.stack.length - 1 }) }}
@@ -199,12 +209,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Collapsed frames - shown after clicking show more -->
           <div v-if="expandedTraces[traceIndex]">
+            <!-- eslint-disable local/no-hardcoded-px -- 1px divider border between collapsed frames — a border width, optical not layout; it must not thicken with the frame text -->
             <div
               v-for="(frame, frameIndex) in stackTrace.stack.slice(1)"
               :key="frameIndex + 1"
               class="collapsed-frame-wrapper"
               :style="{ 'border-top': `1px solid ${borderColor}` }"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <!-- Frame header - clickable -->
               <div
                 class="collapsed-frame-header hover:bg-surface-subtle cursor-pointer !px-4 px-3 !py-2.5 py-1 transition-all duration-200 ease-in-out"
@@ -249,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  class="source-code-box rounded-default ml-4 h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+                  class="source-code-box rounded-default ml-4 h-50 overflow-hidden border border-solid shadow-sm"
                   :style="{ 'border-color': borderColor }"
                 >
                   <CodeQueryEditor
@@ -258,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :query="frame.source_info.source"
                     :read-only="true"
                     language="javascript"
-                    style="height: 200px"
+                    style="height: 12.5rem"
                   />
                 </div>
               </div>

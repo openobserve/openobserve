@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label-key="label"
         value-key="value"
         class="max-w-xs"
-        style="min-width: 220px"
+        style="min-width: 13.75rem"
         @update:model-value="onTokenSelected"
       />
       <OButton

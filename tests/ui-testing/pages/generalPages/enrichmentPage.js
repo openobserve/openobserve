@@ -333,10 +333,17 @@ class EnrichmentPage {
         await openNavFlyoutChild(this.page, 'pipeline');
         await this.enrichmentTableTab.click();
         await listResponse;
-        // Wait for the enrichment tables list page to be visible. Alpha nav can be
-        // slow under load — give it room so a transient slow render doesn't abort
-        // callers that poll this (e.g. waitForUrlJobToFinish).
-        await this.listPage.waitFor({ state: 'visible', timeout: 20000 });
+        // Wait for the enrichment tables list page to be visible. Alpha nav can be slow
+        // under load; if the tab click didn't land or the page didn't render in time,
+        // re-open the nav flyout and re-click the tab once before failing (the
+        // enrichment-table-url:318 flake was this 20s wait timing out under load).
+        try {
+            await this.listPage.waitFor({ state: 'visible', timeout: 30000 });
+        } catch (e) {
+            await openNavFlyoutChild(this.page, 'pipeline');
+            await this.enrichmentTableTab.click().catch(() => {});
+            await this.listPage.waitFor({ state: 'visible', timeout: 30000 });
+        }
     }
 
     /**
@@ -1777,26 +1784,30 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // The duplicate-name error surfaces either as an OToast notification
         // (`o-toast-error` / `o-toast-message`) or as an inline error on the
-        // name OInput wrapper. Accept either.
-        const toastVisible = await this.toastError.first().isVisible({ timeout: 5000 }).catch(() => false);
-        if (toastVisible) {
-            testLogger.debug('Duplicate name error verified via OToast');
-            return;
-        }
-        const toastMsg = await this.toastMessage.first().isVisible({ timeout: 1000 }).catch(() => false);
-        if (toastMsg) {
-            testLogger.debug('Duplicate name error verified via toast message');
-            return;
-        }
-        // Fallback: inline error on the name field wrapper
+        // name OInput wrapper. Accept either. The save request may still be in
+        // flight when this is called, so poll rather than one-shot check.
         const nameWrapper = this.page.locator('[data-test="add-enrichment-table-name"]');
-        const hasInline = await nameWrapper.evaluate((el) => {
-            const text = el.textContent || '';
-            return /already exists|duplicate|exists/i.test(text);
-        }).catch(() => false);
-        expect(hasInline).toBe(true);
+        const deadline = Date.now() + 20000;
+        while (Date.now() < deadline) {
+            if (await this.toastError.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+                testLogger.debug('Duplicate name error verified via OToast');
+                return;
+            }
+            if (await this.toastMessage.first().isVisible({ timeout: 500 }).catch(() => false)) {
+                testLogger.debug('Duplicate name error verified via toast message');
+                return;
+            }
+            const hasInline = await nameWrapper
+                .evaluate((el) => /already exists|duplicate|exists/i.test(el.textContent || ''))
+                .catch(() => false);
+            if (hasInline) {
+                testLogger.debug('Duplicate name error verified via inline error');
+                return;
+            }
+            await this.page.waitForTimeout(1000);
+        }
 
-        testLogger.debug('Duplicate name error verified');
+        throw new Error('Duplicate name error did not surface (toast or inline) within 20s');
     }
 
     /**

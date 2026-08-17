@@ -15,8 +15,6 @@ import {
 import { waitForStreamComplete } from "../utils/streaming-helpers.js";
 import testLogger from "../utils/test-logger.js";
 import {
-  TABLE_SELECTOR,
-  TABLE_HEADER_SELECTOR,
   getTableHeaders,
   getTableCellText,
 } from "../../pages/dashboardPages/dashboard-table-helpers.js";
@@ -128,10 +126,10 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await setupTablePanel(page, pm, dashboardName);
       await pm.chartTypeSelector.waitForTableDataLoad();
 
-      const table = page.locator(TABLE_SELECTOR);
+      const table = pm.dashboardPanelActions.dashboardTable;
 
       // Click on the first column header to trigger sort
-      const firstHeader = page.locator(TABLE_HEADER_SELECTOR).first();
+      const firstHeader = pm.dashboardPanelActions.tableHeaderCells.first();
       await firstHeader.click();
 
       // Table should still render after sort
@@ -257,7 +255,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.dashboardPanelConfigs.selectTranspose();
       await pm.dashboardPanelActions.applyDashboardBtn();
 
-      const table = page.locator(TABLE_SELECTOR);
+      const table = pm.dashboardPanelActions.dashboardTable;
       await expect(table).toBeVisible();
 
       testLogger.info("Table with wrap cells + transpose rendered");
@@ -267,10 +265,10 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await reopenPanelConfig(page, pm);
 
       await expect(
-        page.locator('[data-test="dashboard-config-wrap-table-cells-btn"]')
+        pm.dashboardPanelConfigs.wrapCellBtn
       ).toHaveAttribute("aria-checked", "true");
       await expect(
-        page.locator('[data-test="dashboard-config-table_transpose-btn"]')
+        pm.dashboardPanelConfigs.transposeBtn
       ).toHaveAttribute("aria-checked", "true");
 
       await pm.dashboardPanelActions.savePanel();
@@ -297,10 +295,10 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
 
       // Enable VRL function toggle and add a VRL function that creates a new field
-      const vrlToggle = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+      const vrlToggle = pm.chartTypeSelector.vrlToggleBtn;
       await vrlToggle.click();
 
-      const vrlEditor = page.locator('[data-test="dashboard-vrl-function-editor"]');
+      const vrlEditor = pm.chartTypeSelector.vrlFunctionEditor;
       await vrlEditor.waitFor({ state: "visible", timeout: 10000 });
       const monacoInput = vrlEditor.getByRole("code");
       await monacoInput.click();
@@ -521,7 +519,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.waitForTableDataLoad();
 
       // Screenshot shows "1-7 of 7" at bottom right of table
-      const table = page.locator(TABLE_SELECTOR);
+      const table = pm.dashboardPanelActions.dashboardTable;
       const tableText = await table.textContent();
       const hasRowCountInfo = /\d+-\d+\s+of\s+\d+/.test(tableText);
       expect(hasRowCountInfo).toBe(true);
@@ -555,7 +553,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.dashboardPanelActions.applyDashboardBtn();
 
       // Screenshot shows: "Pivot Field ⓘ:  Add 0 or 1 field here"
-      const pivotPlaceholder = page.getByText("Add 0 or 1 field here");
+      const pivotPlaceholder = pm.chartTypeSelector.getFieldSectionLabel("Add 0 or 1 field here");
       await expect(pivotPlaceholder).toBeVisible();
 
       testLogger.info("Pivot field placeholder visible with no pivot field");
@@ -632,15 +630,13 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       expect(filteredRowCount).toBeLessThanOrEqual(unfilteredRowCount);
 
       // Verify the filter is reflected in the query via query inspector
-      await page
-        .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-        .click();
+      await pm.dashboardPanelEdit.dataViewQueryInspectorBtn.click();
       await expect(
-        page.locator(".inspector-query-editor").filter({
+        pm.dashboardPanelEdit.inspectorQueryEditor.filter({
           hasText: "kubernetes_container_name = 'ziox'",
         }).last()
       ).toBeVisible();
-      await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
+      await pm.dashboardPanelEdit.queryInspectorCloseBtn.click();
 
       testLogger.info("Table filtered by variable", { unfilteredRowCount, filteredRowCount });
 
@@ -675,7 +671,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.waitForTableDataLoad();
 
       // --- BEFORE filter: capture row count and table content ---
-      const table = page.locator(TABLE_SELECTOR);
+      const table = pm.dashboardPanelActions.dashboardTable;
       await table.waitFor({ state: "visible", timeout: 15000 });
       const beforeRowCount = await pm.dashboardPanelActions.getTableRowCount();
       const beforeHeaders = await getTableHeaders(page);
@@ -690,16 +686,16 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       expect(beforeRowCount).toBeGreaterThan(1);
 
       // --- Apply dynamic filter: kubernetes_container_name = ziox ---
-      const adhocAddBtn = page.locator('[data-test="dashboard-variable-adhoc-add-selector"]');
+      const adhocAddBtn = pm.dashboardVariables.adhocAddSelector;
       await adhocAddBtn.waitFor({ state: "visible", timeout: 15000 });
       await adhocAddBtn.click();
 
-      const nameSelector = page.locator('[data-test="dashboard-variable-adhoc-name-selector-field"]');
+      const nameSelector = pm.dashboardVariables.adhocNameSelectorField;
       await nameSelector.click();
       await nameSelector.fill("kubernetes_container_name");
       await nameSelector.press("Tab"); // flush OInput debounce immediately
 
-      const valueSelector = page.locator('[data-test="dashboard-variable-adhoc-value-selector-field"]');
+      const valueSelector = pm.dashboardVariables.adhocValueSelectorField;
       await valueSelector.click();
       await valueSelector.fill("ziox");
       await valueSelector.press("Tab"); // flush OInput debounce immediately
@@ -778,12 +774,12 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       testLogger.info("Builder mode table rows", { builderRowCount });
 
       // Switch to Custom query mode
-      const customBtn = page.locator('[data-test="dashboard-custom-query-type"]');
+      const customBtn = pm.chartTypeSelector.customQueryTypeBtn;
       await customBtn.waitFor({ state: "visible", timeout: 10000 });
       await customBtn.click();
 
       // The auto-generated SQL should be visible in the editor
-      const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
+      const queryEditor = pm.chartTypeSelector.queryEditor;
       await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
       // Apply in custom mode — table should still render
@@ -825,13 +821,13 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.chartTypeSelector.searchAndAddField("code", "y");
 
       // Verify layout labels
-      await expect(page.getByText("First Column").first()).toBeVisible();
-      await expect(page.getByText("Other Columns").first()).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("First Column").first()).toBeVisible();
+      await expect(pm.chartTypeSelector.getFieldSectionLabel("Other Columns").first()).toBeVisible();
 
       // Verify field chips in correct layout areas
-      const xLayout = page.locator('[data-test="dashboard-x-layout"]');
+      const xLayout = pm.chartTypeSelector.xLayout;
       await expect(xLayout).toBeVisible();
-      const yLayout = page.locator('[data-test="dashboard-y-layout"]');
+      const yLayout = pm.chartTypeSelector.yLayout;
       await expect(yLayout).toBeVisible();
 
       testLogger.info("First Column and Other Columns labels visible");

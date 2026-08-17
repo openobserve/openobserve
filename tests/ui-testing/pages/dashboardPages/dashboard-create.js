@@ -25,6 +25,31 @@ export default class DashboardCreate {
     this.defaultFolderTab = this.page.locator(
       'button[data-test="dashboard-folder-tab-default"]'
     );
+    this.defaultDashboardTab = this.page.locator(
+      '[data-test="dashboard-tab-default"]'
+    );
+  }
+
+  // Wait for the default tab inside an opened dashboard to be visible
+  async waitForDefaultDashboardTabVisible() {
+    await this.defaultDashboardTab.waitFor({ state: "visible" });
+  }
+
+  // Wait for the "add panel" button on an empty dashboard to be visible
+  async waitForAddPanelIfEmptyVisible(timeout) {
+    await this.addPanelIfEmptyBtn.waitFor({ state: "visible", timeout });
+  }
+
+  // Wait for the dashboard search input to be visible
+  async waitForSearchVisible(timeout = 30000) {
+    await this.searchDash.waitFor({ state: "visible", timeout });
+  }
+
+  // Wait for the dashboard list table to be visible
+  async waitForDashboardTableVisible(timeout = 10000) {
+    await this.page
+      .locator('[data-test="dashboard-table"]')
+      .waitFor({ state: "visible", timeout });
   }
 
   // Wait for the default folder tab on the dashboard list to be visible
@@ -61,14 +86,37 @@ export default class DashboardCreate {
       // Ignore timeout - continue anyway
     });
 
-    // Click the "New Dashboard" button
-    await this.dashCreateBtn.click();
-
-    // Wait for the dialog to appear by checking for the input field to be attached
-    await this.dashName.waitFor({ state: "attached", timeout: 30000 });
-
-    // Wait for the input to be visible and editable
-    await this.dashName.waitFor({ state: "visible", timeout: 30000 });
+    // Opening the dialog is itself flaky: the list behind this button re-renders
+    // as folders/dashboards settle, and a click landing on a button that is
+    // being torn down silently no-ops. The dialog is client-side, so a click
+    // that lands always opens it — a 30s wait expiring means the CLICK was lost,
+    // and waiting longer cannot help. Re-click with a fresh lookup instead.
+    const dialogAttempts = 3;
+    let dialogError;
+    for (let attempt = 1; attempt <= dialogAttempts; attempt++) {
+      try {
+        // Re-click ONLY when the dialog is genuinely absent. Once it is open,
+        // ODialog renders a `fixed inset-0` overlay that covers this button, so
+        // a second click cannot land — it fails the actionability check and
+        // burns the attempt. Without this guard a dialog that merely opened
+        // slowly (just past the per-attempt window) would be turned into a hard
+        // failure with a perfectly usable dialog on screen.
+        if (!(await this.dashName.isVisible().catch(() => false))) {
+          await this.dashCreateBtn.click({ timeout: 10000 });
+        }
+        await this.dashName.waitFor({ state: "attached", timeout: 15000 });
+        await this.dashName.waitFor({ state: "visible", timeout: 15000 });
+        dialogError = undefined;
+        break;
+      } catch (e) {
+        dialogError = e;
+      }
+    }
+    if (dialogError) {
+      throw new Error(
+        `createDashboard: "New Dashboard" dialog did not open after ${dialogAttempts} clicks. Last error: ${dialogError.message}`
+      );
+    }
 
     // Wait for the input to be enabled (not disabled)
     await this.page.waitForFunction(
@@ -80,12 +128,67 @@ export default class DashboardCreate {
       { timeout: 10000 }
     );
 
-    // Fill the dashboard name
-    await this.dashName.fill(dashboardName);
+    // Submitting is where this flakes, in two ways that look identical from the
+    // outside — an opaque waitForURL timeout with no navigation in the log:
+    //
+    //   1. AddDashboard.vue seeds OForm from :default-values, and a fill that
+    //      lands before that seeding is overwritten with an empty name.
+    //   2. The dialog's primary button submits the form by id, and a click
+    //      issued while that wiring is still settling silently no-ops.
+    //
+    // Either way submit is gated by the form's Zod schema, so onSubmit never
+    // runs, no POST goes out, and updateDashboardList() — the only thing that
+    // routes to /dashboards/view — is never called. Re-assert the name and
+    // watch for the create POST, so a lost submit is retried rather than
+    // waited out, and a rejected one fails with the actual status.
+    //
+    // The retry gate matches on the REQUEST, not the response: a request that
+    // has been sent but not yet answered still proves the click landed, so a
+    // slow server can never be mistaken for a lost submit and re-submitted
+    // into a duplicate dashboard.
+    const isCreateCall = (target) =>
+      /\/api\/[^/]+\/dashboards(?:\?|$)/.test(target.url()) &&
+      (target.method?.() ?? target.request().method()) === "POST";
 
-    // Wait for and click the submit button
-    await this.submitBtn.waitFor({ state: "visible", timeout: 30000 });
-    await this.submitBtn.click();
+    let createRequest = null;
+    let createResponse = null;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      // Re-assert on every attempt: if the form seeded over our value, the
+      // retry has to repair the field, not just click again.
+      if ((await this.dashName.inputValue()) !== dashboardName) {
+        await this.dashName.fill(dashboardName);
+      }
+
+      const requestPromise = this.page
+        .waitForRequest(isCreateCall, { timeout: 10000 })
+        .catch(() => null);
+      const responsePromise = this.page
+        .waitForResponse(isCreateCall, { timeout: 30000 })
+        .catch(() => null);
+
+      await this.submitBtn.waitFor({ state: "visible", timeout: 30000 });
+      await this.submitBtn.click();
+
+      createRequest = await requestPromise;
+      if (createRequest) {
+        createResponse = await responsePromise;
+        break;
+      }
+
+      // Nothing hit the wire. Only retry while the dialog is still open — if it
+      // closed, the submit did land and the URL wait below is the right gate.
+      const dialogStillOpen = await this.submitBtn
+        .isVisible()
+        .catch(() => false);
+      if (!dialogStillOpen) break;
+    }
+
+    if (createResponse && !createResponse.ok()) {
+      throw new Error(
+        `Dashboard creation failed: POST ${createResponse.url()} returned ${createResponse.status()}`
+      );
+    }
 
     // Wait for the success notification to confirm dashboard was created
     // OToast root carries both data-test="o-toast-success" and data-test-message="<text>"
@@ -109,8 +212,57 @@ export default class DashboardCreate {
 
   //back to dashboard list
   async backToDashboardList() {
-    await this.backBtn.waitFor({ state: "visible", timeout: 50000 });
-    await this.backBtn.click();
+    // "Back" is not one hop from everywhere. The panel editor and the
+    // dashboard view both render data-test="dashboard-back-btn", but
+    // AddPanel.vue's goBack() pushes /dashboards/view while ViewDashboard.vue's
+    // goBackToDashboardList() pushes /dashboards — so reaching the list from
+    // the editor genuinely takes TWO clicks. On top of that, a click issued
+    // mid page-transition can land on a header that is being torn down and
+    // silently no-op. Click, re-check the URL, and repeat with a fresh locator
+    // lookup until we're on the list.
+    //
+    // Leaving add_panel with unsaved panel edits fires AddPanel.vue's
+    // onBeforeRouteLeave native window.confirm. Playwright auto-dismisses
+    // dialogs by default, and a dismissed confirm means next(false) — the
+    // route change is cancelled, so every back click no-ops and the loop
+    // burns all its attempts still sitting on add_panel. Accept the dialog
+    // for the duration of the navigation (same handling as
+    // dashboard-multi-sql.js discardPanel()).
+    const LIST_URL = /\/dashboards(?:\?|$)/;
+    const maxClicks = 4;
+    let lastError;
+
+    const dialogHandler = (dialog) => dialog.accept();
+    this.page.on("dialog", dialogHandler);
+    try {
+      for (let attempt = 1; attempt <= maxClicks; attempt++) {
+        if (LIST_URL.test(this.page.url())) return;
+
+        const backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
+        try {
+          await backBtn.waitFor({ state: "visible", timeout: 20000 });
+          await backBtn.click({ timeout: 10000 });
+        } catch (e) {
+          // Header may be remounting between the editor and view pages — fall
+          // through to the URL check and try again with a fresh lookup.
+          lastError = e;
+        }
+
+        try {
+          await this.page.waitForURL(LIST_URL, { timeout: 8000 });
+          return;
+        } catch (e) {
+          lastError = e;
+        }
+      }
+    } finally {
+      this.page.off("dialog", dialogHandler);
+    }
+
+    if (LIST_URL.test(this.page.url())) return;
+    throw new Error(
+      `backToDashboardList: still at ${this.page.url()} after ${maxClicks} back clicks. Last error: ${lastError?.message}`
+    );
   }
 
   //wait for back button to be visible (no click)
@@ -149,6 +301,20 @@ export default class DashboardCreate {
 
   //Add Panel to dashboard (when dashboard is empty)
   async addPanel() {
+    // The empty-state "add panel" button renders as soon as the dashboard has
+    // no panels — which is also true while the dashboard GET is still loading.
+    // Clicking it that early makes ViewDashboard.vue's addPanelData() read
+    // tabs[0] before tabs exist, which throws inside the handler so router.push
+    // never runs: the click reports success and the URL never changes, burning
+    // every retry below. The tab strip only renders once tabs have loaded, so
+    // waiting for it gates the click on the data it depends on.
+    await this.defaultDashboardTab
+      .waitFor({ state: "visible", timeout: 30000 })
+      .catch(() => {
+        // Non-fatal: some dashboards legitimately render no tab strip. The
+        // retry loop below is still the real gate on navigation succeeding.
+      });
+
     // Retry pattern for clicking add panel button
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {

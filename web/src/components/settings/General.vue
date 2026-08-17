@@ -91,14 +91,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="theme-light-chip"
               >
                 <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
                   :style="{ backgroundColor: customLightColor }"
                 >
+                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                   <OIcon
                     name="palette"
                     size="xs"
                     class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
                   />
+                  <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
                 <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
                   t("settings.light")
@@ -115,14 +117,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="theme-dark-chip"
               >
                 <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
                   :style="{ backgroundColor: customDarkColor }"
                 >
+                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                   <OIcon
                     name="palette"
                     size="xs"
                     class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
                   />
+                  <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
                 <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
                   t("settings.dark")
@@ -219,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="store.state.zoConfig.custom_logo_text.length > 20"
                 side="top"
                 align="center"
-                max-width="250px"
+                max-width="15.625rem"
                 :content="store.state.zoConfig.custom_logo_text"
               />
             </span>
@@ -375,7 +379,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("settings.customLogoDarkDescription") }}
           </span>
         </div>
+
+        <!-- Authoring banners needs far more room than a settings row, so the
+             row is just the entry point into a drawer. -->
+        <div
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+        >
+          <span class="individual-setting-title text-sm leading-5 font-medium">
+            {{ t("announcements.settings.label") }}
+          </span>
+          <div class="flex items-center">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="settings_ent_announcement_banners_btn"
+              @click="showAnnouncementBanners = true"
+            >
+              {{ t("announcements.settings.configure") }}
+            </OButton>
+          </div>
+          <span class="individual-setting-description text-compact opacity-70">
+            {{ t("announcements.settings.description") }}
+          </span>
+        </div>
       </div>
+
+      <!-- The drawer belongs to the component that fills it — its header toggle
+           and footer actions are part of the same surface. -->
+      <AnnouncementBanners v-model:open="showAnnouncementBanners" />
     </div>
 
     <!-- Danger Zone: delete this organization (owner/admin only).
@@ -575,7 +606,6 @@ import config from "@/aws-exports";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
-import store from "@/test/unit/helpers/store";
 import { applyThemeColors, switchThemeMode } from "@/utils/theme";
 import { useLocalOrganization } from "@/utils/zincutils";
 import { formatSizeFromMB } from "@/utils/formatters";
@@ -584,6 +614,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import AnnouncementBanners from "./AnnouncementBanners.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -608,6 +639,7 @@ export default defineComponent({
     },
   },
   components: {
+    AnnouncementBanners,
     GroupHeader,
     OButton,
     ODialog,
@@ -630,17 +662,16 @@ export default defineComponent({
     // Built once from the component's `t` so the messages are localized.
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
     // Dynamic defaults (edit-prefill from the store) → a typed computed.
-    const generalSettingsDefaults = computed(
-      (): GeneralSettingsForm => ({
-        scrape_interval: store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15,
-        max_series_per_query:
-          store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
-      }),
-    );
+    const generalSettingsDefaults = computed((): GeneralSettingsForm => ({
+      scrape_interval: store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15,
+      max_series_per_query:
+        store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
+    }));
 
     const loadingState = ref(false);
     const customText = ref("");
     const editingText = ref(false);
+    const showAnnouncementBanners = ref(false);
     const files = ref(null);
     const filesLight = ref(null);
     const filesDark = ref(null);
@@ -750,17 +781,39 @@ export default defineComponent({
       return role === "root" || role === "admin";
     });
 
-    // The consequence strip under the Danger Zone header. Grace period is stated
-    // without a duration on purpose: the real value lives in the enterprise config
-    // (org_deletion_grace_period_days) and is not exposed to the frontend, so any
-    // number rendered here would be a guess.
-    const deleteOrgFacts = computed(() => [
-      {
+    // Days a deleted org stays recoverable, from /config. A backend that predates the
+    // field sends nothing, and 0 is a legal value meaning no window at all — the three
+    // cases must read differently, because promising a recovery window that does not
+    // exist is the one mistake this panel cannot afford.
+    const recoveryWindowDays = computed<number | null>(() => {
+      const days = store.state.zoConfig?.org_deletion_grace_period_days;
+      return typeof days === "number" ? days : null;
+    });
+
+    const recoveryWindowFact = computed(() => {
+      const days = recoveryWindowDays.value;
+      if (days === 0) {
+        return {
+          key: "grace",
+          icon: "warning",
+          title: t("settings.deleteFactNoRecoveryWindow"),
+          detail: t("settings.deleteFactNoRecoveryWindowDetail"),
+        };
+      }
+      return {
         key: "grace",
         icon: "access-time",
         title: t("settings.deleteFactGracePeriod"),
-        detail: t("settings.deleteFactGracePeriodDetail"),
-      },
+        detail:
+          days === null
+            ? t("settings.deleteFactGracePeriodDetail")
+            : t("settings.deleteFactRecoveryWindowDetail", { n: days }, days),
+      };
+    });
+
+    // The consequence strip under the Danger Zone header.
+    const deleteOrgFacts = computed(() => [
+      recoveryWindowFact.value,
       {
         key: "scope",
         icon: "dashboard",
@@ -772,12 +825,6 @@ export default defineComponent({
         icon: "group",
         title: t("settings.deleteFactMembers", { n: memberCount.value }, memberCount.value),
         detail: t("settings.deleteFactMembersDetail"),
-      },
-      {
-        key: "owner",
-        icon: "shield",
-        title: t("settings.deleteFactOwner"),
-        detail: t("settings.deleteFactOwnerDetail"),
       },
     ]);
 
@@ -1070,6 +1117,7 @@ export default defineComponent({
      */
     const handleThemeChipClick = (mode: "light" | "dark") => {
       // First, switch the theme mode if it's different from current
+      // eslint-disable-next-line no-restricted-syntax -- theme-setting guard, not a theme read: compares the current mode against the target before switching. useTheme().isDark is a boolean and cannot express "is it already this specific mode".
       if (store.state.theme !== mode) {
         toggleThemeMode(mode);
       }
@@ -1289,6 +1337,7 @@ export default defineComponent({
       store,
       config,
       router,
+      showAnnouncementBanners,
       // Form wiring (Options-API: schema + defaults MUST be returned so :schema
       // resolves and validation runs).
       generalSettingsSchema,

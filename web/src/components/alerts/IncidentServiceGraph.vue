@@ -7,16 +7,16 @@ the Free Software Foundation, either version 3 of the License, or
 
 This program is distributed in the hope that it will be useful
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+along with this program. If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
   <div
-    class="incident-service-graph rounded-default border-border-default relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] transition-all duration-200 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
+    class="incident-service-graph rounded-default border-border-default dark:ring-border-default/30 relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-sm ring-1 ring-white/50 transition-all duration-200 ring-inset hover:shadow-md dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)]"
   >
     <!-- Info Icon → Graph Legend popover (hover to show) -->
     <span
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+8px)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+0.5rem)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-lg transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-lg"
         role="tooltip"
       >
         <div class="mb-2.5 text-sm font-semibold">{{ t("alerts.serviceGraphLegendTitle") }}</div>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex h-full flex-col items-center justify-center gap-3"
     >
       <!-- size-12! (48px) exceeds OIcon's largest `size` prop (xl = 40px); the `!`
-           is required because OIcon's own `size-6` default sits in the same layer. -->
+ is required because OIcon's own `size-6` default sits in the same layer. -->
       <OIcon name="hub" class="text-text-muted size-12!" />
       <div class="text-center">
         <div class="text-text-secondary text-sm font-medium">
@@ -100,18 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
-import {
-  forceSimulation,
-  forceManyBody,
-  forceLink,
-  forceCenter,
-  forceCollide,
-  forceX,
-  forceY,
-} from "d3-force";
+import { forceSimulation, forceManyBody, forceLink, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -134,7 +125,6 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore();
     const { t } = useI18nTyped();
 
     const loading = ref(false);
@@ -385,7 +375,7 @@ export default defineComponent({
             alert_count: b.alert_count,
             first_fired_at: b.first_fired_at,
             last_fired_at: b.last_fired_at,
-            // Label shows name + count + window, e.g. "go_gc_rate_high x42 14:05"
+            // Label shows name + count + window, e.g."go_gc_rate_high x42 14:05"
             display_label: `${b.alert_name} x${b.alert_count} ${formatWindow(b.windowStart, unitUs)}`,
           };
         })
@@ -425,10 +415,10 @@ export default defineComponent({
       const { nodes: rawNodes, edges: rawEdges } = graphData.value;
 
       // Adaptive node construction:
-      //  - Detail mode (<= NODE_CAP firings): render each firing 1:1 with the
-      //    backend's edges, preserving the clean left-to-right timeline.
-      //  - Bucketed mode (> NODE_CAP): collapse firings into time-window x name
-      //    buckets so the graph stays legible at high alert counts.
+      // - Detail mode (<= NODE_CAP firings): render each firing 1:1 with the
+      // backend's edges, preserving the clean left-to-right timeline.
+      // - Bucketed mode (> NODE_CAP): collapse firings into time-window x name
+      // buckets so the graph stays legible at high alert counts.
       let nodes: any[];
       let edges: any[];
       if (rawNodes.length > NODE_CAP) {

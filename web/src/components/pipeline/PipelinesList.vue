@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start justify-center">
                 <div
                   data-test="scheduled-pipeline-expanded-sql"
-                  class="border-border-default border-l-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-l-[3px] p-2.5 whitespace-normal"
+                  class="border-border-default border-l-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5 whitespace-normal"
                 >
                   <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
                 </div>
@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"
-                class="error-message rounded-default bg-banner-error-soft-bg border-l-status-negative text-banner-error-soft-text border-l-[3px] p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
+                class="error-message rounded-default bg-banner-error-soft-bg border-l-status-negative text-banner-error-soft-text border-l-3 p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
               >
                 {{ msg }}
               </div>

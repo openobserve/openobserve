@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey="value"
             @update:model-value="onPendingDimensionChange"
             class="dimension-dropdown"
-            style="min-width: 120px"
+            style="min-width: 7.5rem"
           />
           <OTooltip
             v-if="unstableDimensionKeys.has(key)"
@@ -156,10 +156,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Grouped metric list -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <div
                   class="dimension-list-container min-h-0 flex-1 overflow-y-auto px-1.5"
                   style="max-height: calc(100vh - 210px)"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <template
                     v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)"
                   >
@@ -560,7 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="loading"
           class="flex flex-1 flex-col items-center justify-center gap-3"
-          style="min-height: 300px"
+          style="min-height: 18.75rem"
         >
           <OSpinner size="sm" />
           <div class="text-sm opacity-70">
@@ -613,10 +615,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Grouped metric list -->
+              <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
               <div
                 class="dimension-list-container min-h-0 flex-1 overflow-y-auto"
                 style="max-height: calc(100vh - 210px)"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <template
                   v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)"
                 >
@@ -1070,6 +1074,12 @@ import {
 import type { StreamInfo } from "@/services/service_streams";
 import { enrichStreamsWithOverlap, sortStreamsByOverlap } from "@/utils/streamTimeOverlap";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import {
+  buildSqlCondition,
+  buildFieldToGroupIdMap,
+  applyDimensionEditsToFilters,
+  quoteSqlLiteral,
+} from "@/utils/telemetryCorrelation";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import { b64EncodeUnicode, getUUID, timestampToTimezoneDate } from "@/utils/zincutils";
@@ -1420,15 +1430,10 @@ const applyUnstableDimensionDefaults = (streams: StreamInfo[]): StreamInfo[] => 
     return streams;
   }
 
-  // Build reverse lookup: field_name -> semantic_dimension_id
-  // Using semanticGroups from useServiceCorrelation()
-
-  const fieldToDimensionId = new Map<string, string>();
-  for (const group of semanticGroups.value) {
-    for (const field of group.fields) {
-      fieldToDimensionId.set(field, group.id);
-    }
-  }
+  // Reverse lookup: lowercased field_name -> semantic_dimension_id. Use the
+  // shared helper instead of a private case-sensitive map — mixed-case filter
+  // keys would otherwise silently miss (same defect class as F36).
+  const fieldToDimensionId = buildFieldToGroupIdMap(semanticGroups.value);
 
   const result = streams.map((stream) => {
     const updatedFilters = { ...(stream.filters ?? {}) };
@@ -1438,7 +1443,7 @@ const applyUnstableDimensionDefaults = (streams: StreamInfo[]): StreamInfo[] => 
     // For each filter in the stream, check if it maps to an unstable dimension
     for (const [filterKey, filterValue] of Object.entries(stream.filters ?? {})) {
       // Look up the semantic dimension ID for this field name
-      const dimensionId = fieldToDimensionId.get(filterKey);
+      const dimensionId = fieldToDimensionId.get(filterKey.toLowerCase());
 
       if (dimensionId && unstableDimIds.has(dimensionId)) {
         // This filter's field maps to an unstable dimension - set to wildcard
@@ -1645,8 +1650,7 @@ const subjectMatchCounts = computed<Record<string, number>>(() => {
       if (seen.has(stream.stream_name)) continue;
       seen.add(stream.stream_name);
       const schema = cachedSchemas[stream.stream_name]?.schema as
-        | Array<{ name: string }>
-        | undefined;
+        Array<{ name: string }> | undefined;
       if (schema && schema.length > 0 && subjectFieldAliases.size > 0) {
         if (schema.some((c) => subjectFieldAliases.has(c.name))) matchCount++;
       } else if (streamMatchesPatterns(stream.stream_name, button.poolPatterns)) {
@@ -2105,35 +2109,22 @@ const applyDimensionChanges = () => {
   // Copy pending to active
   activeDimensions.value = { ...pendingDimensions.value };
 
-  // Build field_name -> dimension_id mapping from semantic groups
-  // This is the same approach as applyUnstableDimensionDefaults
-  const fieldToDimensionId = new Map<string, string>();
-  for (const group of semanticGroups.value) {
-    for (const field of group.fields) {
-      fieldToDimensionId.set(field, group.id);
-    }
-  }
+  // Build field_name -> dimension_id mapping from semantic groups.
+  // Uses the shared builder so lookups are case-insensitive and honour the
+  // backend's declaration-order priority when a field appears in two groups.
+  const fieldToDimensionId = buildFieldToGroupIdMap(semanticGroups.value);
 
-  // Update metric stream filters with new dimension values
-  // Use semantic groups to map filter field names to dimension IDs
-  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => {
-    const updatedFilters = { ...(stream.filters ?? {}) };
-
-    // For each filter in the stream, find its semantic dimension ID
-    // and update with the new value from activeDimensions
-    for (const [filterKey] of Object.entries(stream.filters ?? {})) {
-      const dimensionId = fieldToDimensionId.get(filterKey);
-      if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
-        const newValue = activeDimensions.value[dimensionId];
-        updatedFilters[filterKey] = newValue;
-      }
-    }
-
-    return {
-      ...stream,
-      filters: updatedFilters,
-    };
-  });
+  // Update metric stream filters with new dimension values.
+  // activeDimensions is raw-field-keyed in the dialog path and
+  // semantic-ID-keyed in the drawer path — the helper accepts both (F36).
+  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => ({
+    ...stream,
+    filters: applyDimensionEditsToFilters(
+      stream.filters ?? {},
+      activeDimensions.value,
+      fieldToDimensionId,
+    ),
+  }));
 
   // Note: For logs, the filters are built from config.matchedDimensions in the composable
   // which we're already updating via activeDimensions
@@ -2688,7 +2679,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
     org_identifier: currentOrgIdentifier.value,
     start_time: searchStartTime,
     end_time: searchEndTime,
-    filter: `trace_id='${traceId}'`,
+    filter: `trace_id=${quoteSqlLiteral(traceId)}`,
     size: 1,
     from: 0,
     stream_name: streamName,
@@ -2706,7 +2697,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
   const query = {
     query: {
       sql: b64EncodeUnicode(
-        `SELECT * FROM "${streamName}" WHERE trace_id = '${traceId}' ORDER BY start_time`,
+        `SELECT * FROM "${streamName}" WHERE trace_id = ${quoteSqlLiteral(traceId)} ORDER BY start_time`,
       ),
       start_time: traceStartTime,
       end_time: traceEndTime,
@@ -2745,7 +2736,7 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
   const filterParts: string[] = [];
   if (traceStreamInfo.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(`${fieldName}='${value}'`);
+      filterParts.push(buildSqlCondition(fieldName, value));
     }
   }
   const filter = filterParts.join(" AND ");
@@ -2869,7 +2860,7 @@ const openTracesPage = () => {
 
   if (traceStreamInfo?.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(`${fieldName}='${value}'`);
+      filterParts.push(buildSqlCondition(fieldName, value));
     }
   }
 

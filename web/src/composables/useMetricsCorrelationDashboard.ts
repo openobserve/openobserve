@@ -16,6 +16,11 @@
 import type { StreamInfo, FieldAlias } from "@/services/service_streams";
 import type { TranslateFn } from "@/types/i18n";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import {
+  buildFieldToGroupIdMap,
+  buildSqlCondition,
+  mergeSubjectOverrides,
+} from "@/utils/telemetryCorrelation";
 
 export interface MetricsCorrelationConfig {
   serviceName: string;
@@ -138,20 +143,26 @@ export function useMetricsCorrelationDashboard(t: TranslateFn) {
     for (const [semanticId, value] of Object.entries(config.matchedDimensions)) {
       if (!value || value === SELECT_ALL_VALUE) continue;
       const group = semanticGroups.find((g) => g.id === semanticId);
-      if (!group) continue; // not a semantic ID key — skip (raw field names handled below)
-      // Find the first alias field that appears in this stream's schema.
-      // Fallback when schema is unavailable: prefer the field whose name matches
-      // the group ID (dashes → underscores), e.g. "k8s-node-name" → "k8s_node_name".
-      const groupIdAsField = semanticId.replace(/-/g, "_");
-      const fallback = group.fields.find((f) => f === groupIdAsField) ?? group.fields[0];
-      const hit = streamSchema.size > 0 ? group.fields.find((f) => streamSchema.has(f)) : fallback;
+      if (!group) continue; // not a semantic ID key — raw field names handled below
+      // F31: only override when the stream schema is loaded AND contains the field.
+      // Guessing a field name here produced `WHERE guessed = 'x' AND real = 'x'`
+      // (nonexistent guess → "No field named …" kills the panel).
+      if (streamSchema.size === 0) continue;
+      const hit = group.fields.find((f) => streamSchema.has(f));
       if (hit) subjectOverrides[hit] = value;
     }
 
     // Build WHERE clause from stream filters merged with active subject overrides.
+    // Overrides REPLACE the stream's own alias of the same semantic group (F31) —
+    // a plain spread would AND two aliases of one concept together and match nothing.
     // Quote field names that contain special characters (hyphens, dots, etc.)
     // Skip filters with SELECT_ALL_VALUE (wildcard - means match all values)
-    const effectiveFilters = { ...(stream.filters ?? {}), ...subjectOverrides };
+    const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
+    const effectiveFilters = mergeSubjectOverrides(
+      stream.filters ?? {},
+      subjectOverrides,
+      fieldToGroupId,
+    );
 
     const whereConditions = Object.entries(effectiveFilters)
       .filter(([, value]) => {
@@ -162,9 +173,7 @@ export function useMetricsCorrelationDashboard(t: TranslateFn) {
         return !skip;
       })
       .map(([field, value]) => {
-        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
-        const escapedValue = value.replace(/'/g, "''");
-        return `${quotedField} = '${escapedValue}'`;
+        return buildSqlCondition(field, value);
       })
       .join(" AND ");
 
@@ -329,18 +338,12 @@ ORDER BY x_axis_1`;
       // When viewing from logs page, prefer source stream
       streamName = config.sourceStream;
 
-      // Try to find matching stream in API response
+      // F27: only use filters the backend resolved for THIS stream. Another
+      // stream's filters use that stream's own field aliases, and
+      // matchedDimensions are semantic-ID keyed — either guess yields
+      // "No field named X" or a silently-wrong predicate.
       const matchingStream = streams?.find((s) => s.stream_name === config.sourceStream);
-      if (matchingStream) {
-        // Use filters from API response (best case - backend computed correct field names)
-        filters = matchingStream.filters ?? {};
-      } else if (streams && streams.length > 0) {
-        // Source stream not in response, use first available stream's filters
-        filters = streams[0].filters ?? {};
-      } else {
-        // No streams from API, fallback to matched dimensions
-        filters = config.matchedDimensions || {};
-      }
+      filters = matchingStream?.filters ?? {};
     } else if (streams && streams.length > 0) {
       // Use first correlated log stream from API response
       const primaryStream = streams[0];
@@ -359,9 +362,7 @@ ORDER BY x_axis_1`;
         return typeof value === "string" && !field.startsWith("_") && value !== SELECT_ALL_VALUE;
       })
       .map(([field, value]) => {
-        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
-        const escapedValue = value.replace(/'/g, "''");
-        return `${quotedField} = '${escapedValue}'`;
+        return buildSqlCondition(field, value);
       })
       .join(" AND ");
 

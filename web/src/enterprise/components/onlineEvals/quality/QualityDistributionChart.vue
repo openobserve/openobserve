@@ -8,6 +8,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
 import { chartColor } from "@/utils/chartTheme";
+import { CHART_THRESHOLD_COLOR } from "@/utils/dashboard/colorPalette";
 import type { DistributionBucket } from "../composables/useQualityDetailCharts";
 import { withChartFont } from "@/utils/fonts";
 const { t } = useI18nTyped();
@@ -65,11 +66,11 @@ function buildOption(): echarts.EChartsOption {
         symbol: "none",
         label: {
           formatter: thresholdLabel,
-          color: "#b25400",
+          color: CHART_THRESHOLD_COLOR,
           fontSize: 10,
           position: "insideEndTop",
         },
-        lineStyle: { color: "#b25400", type: "dashed", width: 1.2 },
+        lineStyle: { color: CHART_THRESHOLD_COLOR, type: "dashed", width: 1.2 },
         data: [{ xAxis: thresholdBucketIndex() }],
       },
     });

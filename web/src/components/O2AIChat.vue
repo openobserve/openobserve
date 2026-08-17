@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container rounded-default text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    class="chat-container rounded-surface text-text-body bg-card-glass-solid shadow-hover-shadow flex h-full w-full flex-col overflow-hidden shadow-md"
     :class="[{ 'chat-open': isOpen }]"
   >
     <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
@@ -38,19 +38,14 @@
                   </div>
                 </OButton>
               </template>
-              <!-- History menu with search -->
               <div class="history-menu-container relative flex max-h-112.5 w-75 flex-col">
+                <OSearchInput
+                  v-model="historySearchTerm"
+                  :placeholder="t('aiAssistant.searchChatHistory')"
+                  class="sticky top-0 z-2 shrink-0 p-2"
+                />
                 <div
-                  class="search-history-bar-sticky bg-surface-base border-separator sticky top-0 z-2 shrink-0 border-b p-2"
-                >
-                  <OSearchInput
-                    v-model="historySearchTerm"
-                    :placeholder="t('aiAssistant.searchChatHistory')"
-                    class="mt-1"
-                  />
-                </div>
-                <div
-                  class="history-list-container border-border-default max-h-87.5 w-75 max-w-75 min-w-50 flex-1 overflow-x-hidden overflow-y-auto border"
+                  class="history-list-container max-h-87.5 flex-1 overflow-x-hidden overflow-y-auto"
                 >
                   <ODropdownItem
                     v-for="chat in filteredChatHistory"
@@ -89,12 +84,12 @@
                 <!-- Clear all conversations button -->
                 <div
                   v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container bg-surface-base border-separator shrink-0 border-t p-2"
+                  class="clear-all-container bg-surface-base shrink-0"
                 >
                   <ODropdownSeparator />
                   <OButton
-                    variant="ghost"
-                    class="clear-all-btn text-compact w-full text-[var(--color-status-negative)] hover:bg-[color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
+                    variant="ghost-destructive"
+                    class="clear-all-btn text-compact w-full justify-start px-3 py-1.5"
                     @click.stop="clearAllConversations"
                   >
                     <template #icon-left>
@@ -148,7 +143,6 @@
           </div>
         </div>
       </div>
-      <OSeparator class="bg-separator" />
 
       <!-- History Panel -->
       <ODrawer
@@ -242,25 +236,20 @@
         >
           <div
             v-if="chatMessages.length === 0"
-            class="welcome-section rounded-default flex flex-1 items-center justify-center"
-            :class="
-              centeredStart
-                ? 'mb-0 bg-transparent p-0'
-                : 'mb-6 p-6 [background:linear-gradient(to_right,color-mix(in_srgb,var(--color-theme-accent)_5%,transparent),color-mix(in_srgb,var(--color-theme-accent)_10%,transparent))]'
-            "
+            class="welcome-section rounded-default mb-0 flex flex-1 items-center justify-center bg-transparent p-0"
           >
             <!-- Home tab: rich V2 welcome -->
             <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
             <!-- Sidepanel: minimal logo + title -->
             <div v-else class="flex h-full w-full flex-col items-center justify-center">
-              <div class="flex flex-col items-center">
+              <div class="flex flex-col items-center gap-2">
                 <img :src="o2AiTitleLogo" />
-                <div class="relative inline-block">
-                  <span class="ml-7.5 text-center text-sm font-[600]">{{
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-[600]">{{
                     t("aiAssistant.welcome.taglineHighlight")
                   }}</span>
                   <!-- Same shared Beta tag as the Workflows screens. -->
-                  <BetaBadge class="ml-2" />
+                  <BetaBadge />
                 </div>
               </div>
             </div>
@@ -268,7 +257,7 @@
           <div
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message rounded-default border-border-default border p-3 [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-heading)_10%,transparent)]"
+            class="message rounded-default border-border-default shadow-text-heading/10 border p-3 shadow-md"
             :class="[
               message.role,
               message.role === 'user'
@@ -886,7 +875,7 @@
                       @click.stop
                     >
                       <div
-                        class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] dark:[box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                        class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border shadow-sm dark:shadow-sm"
                       >
                         <OButton
                           variant="ghost"
@@ -1015,7 +1004,7 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="rounded-default border-border-default max-h-37.5 max-w-50 cursor-pointer border object-contain [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
+                        class="rounded-default border-border-default max-h-37.5 max-w-50 cursor-pointer border object-contain [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-md"
                         @click="openImagePreview(img)"
                       />
                       <OTooltip :content="raw(img.filename)" />
@@ -1192,7 +1181,7 @@
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)] [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_30%,transparent)] active:scale-100"
+            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-sm [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-md active:scale-100"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
@@ -1204,7 +1193,7 @@
       <!-- Fixed loading indicator above input - only shown when scrolled up -->
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
-        class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] [background:var(--color-chat-bubble-user)]"
+        class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 shadow-sm [background:var(--color-chat-bubble-user)]"
       >
         <!-- Show tool call if active -->
         <div
@@ -1250,7 +1239,7 @@
 
         <div
           v-if="!pendingConfirmation"
-          class="unified-input-box rounded-default bg-surface-base border-border-default flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:[box-shadow:0_0_0_2px_var(--color-accent)]"
+          class="unified-input-box rounded-default bg-surface-base border-border-default focus-within:ring-accent flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:ring-2"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
@@ -1355,11 +1344,11 @@
                 v-if="!isLoading"
                 :disabled="!inputMessage.trim() && pendingImages.length === 0"
                 @click="sendMessage"
-                variant="ai-gradient"
+                variant="primary"
                 size="icon-xs-circle"
-                class="send-button bg-(image:--color-gradient-ai)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)]! [transition:all_0.3s_ease]!"
+                class="send-button"
               >
-                <OIcon name="send" size="sm" />
+                <OIcon name="arrow-upward" size="sm" />
               </OButton>
 
               <!-- Stop button - shown when loading/streaming -->
@@ -1368,7 +1357,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button bg-(image:--color-gradient-danger)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-[0_6px_20px_0_color-mix(in_srgb,var(--color-status-negative)_40%,transparent)]! active:translate-y-0! active:shadow-[0_2px_10px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]!"
+                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-(image:--color-gradient-danger)! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -1436,7 +1425,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -1524,7 +1512,6 @@ const abortBackgroundStreams = () => {
 export default defineComponent({
   name: "O2AIChat",
   components: {
-    OSeparator,
     OButton,
     BetaBadge,
     ConfirmDialog,
@@ -2391,7 +2378,7 @@ export default defineComponent({
                     if (!isActive()) {
                       try {
                         const orgId = store.state.selectedOrganization.identifier;
-                        await fetch(
+                        const res = await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
                             method: "POST",
@@ -2400,6 +2387,13 @@ export default defineComponent({
                             body: JSON.stringify({ approved: false }),
                           },
                         );
+                        // Detached stream, so there is nothing to show the user —
+                        // but a silent failure leaves the agent paused.
+                        if (!res.ok) {
+                          console.error(
+                            `Auto-deny not registered (HTTP ${res.status}) for background stream ${ctxSessionId}`,
+                          );
+                        }
                       } catch (error) {
                         console.error(
                           "Error auto-denying confirmation for background stream:",
@@ -2414,7 +2408,7 @@ export default defineComponent({
                       // Auto-approve navigation without showing confirmation
                       try {
                         const orgId = store.state.selectedOrganization.identifier;
-                        await fetch(
+                        const res = await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
                             method: "POST",
@@ -2423,6 +2417,11 @@ export default defineComponent({
                             body: JSON.stringify({ approved: true }),
                           },
                         );
+                        if (!res.ok) {
+                          console.error(
+                            `Auto-approval not registered (HTTP ${res.status}) for session ${ctxSessionId}`,
+                          );
+                        }
                       } catch (error) {
                         console.error("Error auto-confirming navigation:", error);
                       }
@@ -2504,6 +2503,12 @@ export default defineComponent({
 
                   // Handle error events - display error message to user
                   if (data && data.type === "error") {
+                    // Owning replica is gone — flag and stop; sendMessage
+                    // restores the conversation once the stream ends.
+                    if (data.code === "session_owner_unavailable") {
+                      streamOwnerUnavailable.value = true;
+                      continue;
+                    }
                     // Complete any active tool call first
                     let lastMessage = msgs[msgs.length - 1];
                     if (activeToolCall.value) {
@@ -2809,6 +2814,13 @@ export default defineComponent({
 
                   // Handle error events - stream-level errors
                   if (data && data.type === "error") {
+                    // Owning replica is gone — flag and stop; sendMessage restores
+                    // the conversation once the stream ends. Rendering the raw
+                    // error too would dead-end above the restored conversation.
+                    if (data.code === "session_owner_unavailable") {
+                      streamOwnerUnavailable.value = true;
+                      continue;
+                    }
                     // Complete any active tool call as failed
                     if (activeToolCall.value) {
                       const failedToolBlock: ContentBlock = {
@@ -3035,6 +3047,12 @@ export default defineComponent({
 
                 // Handle error events
                 if (data && data.type === "error") {
+                  // Owning replica is gone — flag and stop; sendMessage
+                  // restores the conversation once the stream ends.
+                  if (data.code === "session_owner_unavailable") {
+                    streamOwnerUnavailable.value = true;
+                    continue;
+                  }
                   let lastMessage = msgs[msgs.length - 1];
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
@@ -3196,6 +3214,12 @@ export default defineComponent({
 
                 // Handle error events - stream-level errors
                 if (data && data.type === "error") {
+                  // Owning replica is gone — flag and stop; sendMessage
+                  // restores the conversation once the stream ends.
+                  if (data.code === "session_owner_unavailable") {
+                    streamOwnerUnavailable.value = true;
+                    continue;
+                  }
                   if (activeToolCall.value) {
                     const failedToolBlock: ContentBlock = {
                       type: "tool_call",
@@ -3626,6 +3650,77 @@ export default defineComponent({
       }
     };
 
+    // Set by processStream when a session's owning replica is gone. The stream has
+    // already returned 200 by then, so sendMessage reads this once it ends.
+    const streamOwnerUnavailable = ref(false);
+
+    // Shown after a successful restore: only the dialogue came back, not the tool
+    // results, files or permission decisions from before the interruption.
+    const RESTORED_NOTICE =
+      "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.";
+
+    // Keyed on the explicit server code, never guessed from a generic failure:
+    // restoring means abandoning the current session.
+    const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
+      // `unknown`, not `any` — narrow before reading, or a non-object body throws.
+      if (typeof errorBody !== "object" || errorBody === null) return false;
+      const body = errorBody as { code?: unknown; detail?: { code?: unknown } };
+      const code = body.detail?.code ?? body.code;
+      return code === "session_owner_unavailable";
+    };
+
+    /** Surface a message inline in the transcript, as stream errors are shown. */
+    const appendErrorBlock = (message: string, recoverable = false) => {
+      const block: ContentBlock = { type: "error", message: raw(message), recoverable };
+      const msgs = chatMessages.value;
+      const last = msgs[msgs.length - 1];
+      if (last && last.role === "assistant") {
+        if (!last.contentBlocks) last.contentBlocks = [];
+        last.contentBlocks.push(block);
+      } else {
+        msgs.push({ role: "assistant", content: raw(""), contentBlocks: [block] });
+      }
+    };
+
+    /**
+     * POST a confirmation answer and report whether it landed. The response used
+     * to be discarded, so an answer reaching a replica with no record of the
+     * pending confirmation 404'd invisibly while the agent auto-denied on timeout.
+     */
+    const sendConfirmation = async (sessionId: string, approved: boolean): Promise<boolean> => {
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        const res = await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${sessionId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ approved }),
+          },
+        );
+
+        if (!res.ok) {
+          console.error(
+            `Confirmation not registered (HTTP ${res.status}) for session ${sessionId}`,
+          );
+          appendErrorBlock(
+            approved
+              ? "Your approval could not be delivered — the assistant may have already cancelled this action. Please check the result before retrying."
+              : "Your response could not be delivered — the assistant may have already cancelled this action.",
+          );
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error("Error sending confirmation:", error);
+        appendErrorBlock(
+          "Your response could not be delivered. Please check your connection and try again.",
+        );
+        return false;
+      }
+    };
+
     const handleToolConfirm = async () => {
       resolveConfirmationBlock(true);
 
@@ -3641,20 +3736,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: true }),
-          },
-        );
-      } catch (error) {
-        console.error("Error confirming action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, true);
       pendingConfirmation.value = null;
     };
 
@@ -3670,20 +3752,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: false }),
-          },
-        );
-      } catch (error) {
-        console.error("Error cancelling action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, false);
       pendingConfirmation.value = null;
     };
 
@@ -3706,20 +3775,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: true }),
-          },
-        );
-      } catch (error) {
-        console.error("Error confirming action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, true);
       pendingConfirmation.value = null;
     };
 
@@ -4223,6 +4279,16 @@ export default defineComponent({
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
 
+      // Reseed state for this turn: at most one restore attempt, and a pending
+      // notice to show once the replacement request succeeds.
+      let hasReseeded = false;
+      let reseedNotice = false;
+
+      // Clear any flag left by a previous turn that threw or was aborted before
+      // the clear at the end of the try block — a stale `true` abandons a healthy
+      // session.
+      streamOwnerUnavailable.value = false;
+
       try {
         // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
@@ -4257,6 +4323,41 @@ export default defineComponent({
           } catch (_) {
             // body may not be JSON
           }
+
+          // The session is gone but the transcript is still here, so resend under
+          // a fresh session and let the server seed it from those messages.
+          // Deliberately narrow — this code only, once only.
+          if (isSessionOwnerUnavailable(errorBody) && !hasReseeded) {
+            hasReseeded = true;
+            console.warn(
+              `Session ${currentSessionId.value} is no longer available; restoring the conversation in a new session.`,
+            );
+
+            // A NEW id — reusing the old one would be refused again. streamSessionId
+            // (captured above) stays pinned to the original, and cleanup keys off it.
+            currentSessionId.value = getUUIDv7();
+            reseedNotice = true;
+
+            response = await fetchAiChat(
+              chatMessages.value,
+              "",
+              store.state.selectedOrganization.identifier,
+              currentAbortController.value?.signal,
+              undefined,
+              currentSessionId.value,
+              hasImages ? messagesToSend : undefined,
+            );
+          }
+        }
+
+        // Re-check: the reseed above may have produced a fresh response.
+        if (!response.ok) {
+          let errorBody = null;
+          try {
+            errorBody = await response.json();
+          } catch (_) {
+            // body may not be JSON
+          }
           const err: any = new Error(
             errorBody?.message ||
               t("aiAssistant.aiChat.serverErrorStatus", { status: response.status }),
@@ -4264,6 +4365,13 @@ export default defineComponent({
           err.status = response.status;
           err.errorBody = errorBody;
           throw err;
+        }
+
+        // Tell the user before the content arrives — continuing silently hides
+        // that the assistant lost the earlier tool results and file state.
+        if (reseedNotice) {
+          reseedNotice = false;
+          appendErrorBlock(RESTORED_NOTICE, true);
         }
 
         if (!response.body) {
@@ -4278,6 +4386,58 @@ export default defineComponent({
         const streamMsgs = chatMessages.value;
 
         await processStream(reader);
+
+        // The streaming counterpart of the pre-stream 409 above: once the stream
+        // has opened the failure arrives as an SSE event inside a 200, so
+        // response.ok can no longer be branched on. Same recovery.
+        //
+        // Only while this turn is still on screen — if the user switched chats
+        // mid-stream, restoring would clobber THAT conversation's session id and
+        // transcript instead. They can resend from the affected chat.
+        const stillOnScreen = chatMessages.value === streamMsgs;
+        if (streamOwnerUnavailable.value && !hasReseeded && stillOnScreen) {
+          streamOwnerUnavailable.value = false;
+          hasReseeded = true;
+
+          if (streamController) backgroundStreams.delete(streamController);
+          if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
+
+          // The cross-instance streaming registry has to follow the new id, or
+          // another instance re-attaching never sees this stream finish.
+          const restoredSessionId = getUUIDv7();
+          currentSessionId.value = restoredSessionId;
+          sessionStreamingState[restoredSessionId] = true;
+
+          const retry: any = await fetchAiChat(
+            chatMessages.value,
+            "",
+            store.state.selectedOrganization.identifier,
+            currentAbortController.value?.signal,
+            undefined,
+            currentSessionId.value,
+            hasImages ? messagesToSend : undefined,
+          );
+
+          if (retry && !retry.cancelled && retry.ok && retry.body) {
+            // Announced only once the replacement request is accepted, as on the
+            // pre-stream path — otherwise the claim can turn out to be false.
+            appendErrorBlock(RESTORED_NOTICE, true);
+            await processStream(retry.body.getReader());
+          } else if (!(retry && retry.cancelled)) {
+            // The retry failed — non-OK, no body, or null (a network error).
+            // hasReseeded blocks any further attempt, so staying quiet here would
+            // end the turn with no answer and no explanation. A cancel is silent.
+            appendErrorBlock(
+              "This conversation was interrupted and could not be restored. Please try sending your message again.",
+            );
+          }
+
+          // The restored turn is done either way; clear its entry, or a
+          // re-attaching instance shows a loading indicator forever.
+          sessionStreamingState[restoredSessionId] = false;
+          backgroundStreamMap.delete(restoredSessionId);
+        }
+        streamOwnerUnavailable.value = false;
 
         // Remove controller from background set and clean up re-attachment map
         if (streamController) backgroundStreams.delete(streamController);
@@ -4565,7 +4725,8 @@ export default defineComponent({
             const imageRefSpan = document.createElement("span");
             imageRefSpan.contentEditable = "false";
             imageRefSpan.className = "image-reference";
-            imageRefSpan.style.cssText = `display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 4px; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
+            // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
+            imageRefSpan.style.cssText = `display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.375rem; margin: 0 0.125rem; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 0.25rem; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
 
             // Add image icon
             const imageIcon = document.createElement("span");
@@ -4579,7 +4740,7 @@ export default defineComponent({
             // Add remove button
             const removeBtn = document.createElement("button");
             removeBtn.textContent = "×";
-            removeBtn.style.cssText = `display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
+            removeBtn.style.cssText = `display: flex; align-items: center; justify-content: center; width: 0.875rem; height: 0.875rem; padding: 0; margin-left: 0.125rem; background: transparent; border: none; border-radius: 0.1875rem; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
             removeBtn.onmouseover = () => {
               removeBtn.style.background = chartColor("--color-status-negative");
               removeBtn.style.color = chartColor("--color-white");
@@ -5726,6 +5887,12 @@ export default defineComponent({
       handleToolCancel,
       handleToolAlwaysConfirm,
       handleNavigationAction,
+      sendConfirmation,
+      // Session restore
+      isSessionOwnerUnavailable,
+      appendErrorBlock,
+      streamOwnerUnavailable,
+      currentSessionId,
       // Auto navigation
       isAutoNavigationEnabled,
       processedMessages,
@@ -5909,6 +6076,7 @@ export default defineComponent({
 .tool-call-item.pending-confirmation {
   cursor: default;
   background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
 .dark .tool-call-item.pending-confirmation {
@@ -5919,6 +6087,7 @@ export default defineComponent({
 .tool-call-item.pending-navigation {
   cursor: default;
   background: color-mix(in srgb, var(--color-info) 8%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
 }
 .dark .tool-call-item.pending-navigation {
@@ -6006,6 +6175,7 @@ export default defineComponent({
 .text-block :deep(th),
 .text-block :deep(td) {
   padding: 0.5rem 0.75rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -6063,6 +6233,7 @@ export default defineComponent({
   margin: 0;
   max-width: 100%;
   background-color: var(--color-surface-base);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-subtle);
   border-top: none;
 }

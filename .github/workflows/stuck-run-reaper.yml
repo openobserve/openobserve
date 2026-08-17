@@ -1,0 +1,315 @@
+name: Playwright e2e Stuck-Run-Reaper
+
+# Cancels CI runs stuck against the self-hosted EKS runners, in two distinct cases:
+#   1. runner-wait — a job is queued but no EKS runner is ever assigned. GitHub's
+#      `timeout-minutes` only counts EXECUTION time, so it cannot catch a job that
+#      never gets a runner. Reaped after the (short) runner-wait threshold.
+#   2. zombie run — a run left in a non-completed state with NO jobs ever dispatched.
+#      It never held a runner; swept after a separate, much longer threshold.
+# Every cancellation is explained (on the PR when there is one) with wording
+# specific to the case, so a cancellation is never misread as a blocked runner.
+
+on:
+  schedule:
+    # Every 15 minutes. Worst-case a stuck job lives ~threshold + 15m.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Report stuck runs but do NOT cancel or comment"
+        type: boolean
+        default: false
+      threshold_minutes:
+        description: "Minutes a job may wait for a runner before being reaped"
+        type: string
+        default: "60"
+      zombie_run_threshold_hours:
+        description: "Hours a run may sit with no jobs dispatched before being swept as a zombie"
+        type: string
+        default: "24"
+
+concurrency:
+  group: stuck-run-reaper
+  cancel-in-progress: false
+
+permissions:
+  actions: write # force-cancel workflow runs
+  pull-requests: write # comment on the PR explaining the cancellation
+  contents: read
+
+jobs:
+  reap:
+    name: Reap runs stuck waiting for an EKS runner
+    # MUST run on a GitHub-hosted runner — it must not depend on the same
+    # self-hosted EKS pool it is policing.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Cancel runs stuck waiting for an EKS runner
+        uses: actions/github-script@v7
+        env:
+          # Comma-separated workflow file names to police (all use eks-openobserve-* runners).
+          # Release workflows are intentionally excluded — a stuck release build is left for a human.
+          WORKFLOWS: "playwright.yml,playwright_regression.yml"
+          DEFAULT_THRESHOLD_MINUTES: "60"
+          # Separate, much longer cap for "zombie" runs stuck with no jobs ever dispatched
+          # (these never held a runner, so 60m would be too aggressive — a brief GitHub
+          # scheduling blip could look like one). Only genuinely abandoned runs are swept.
+          DEFAULT_ZOMBIE_RUN_THRESHOLD_HOURS: "24"
+          # Only reap jobs whose requested runner label starts with this prefix.
+          RUNNER_LABEL_PREFIX: "eks-"
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const inputs = context.payload.inputs || {};
+            const dryRun = inputs.dry_run === true || inputs.dry_run === "true";
+            const threshold = parseInt(inputs.threshold_minutes || process.env.DEFAULT_THRESHOLD_MINUTES, 10);
+            if (isNaN(threshold) || threshold <= 0) {
+              core.setFailed(`Invalid threshold_minutes: "${inputs.threshold_minutes}". Provide a positive integer number of minutes.`);
+              return;
+            }
+            const thresholdMs = threshold * 60 * 1000;
+            const zombieHours = parseInt(inputs.zombie_run_threshold_hours || process.env.DEFAULT_ZOMBIE_RUN_THRESHOLD_HOURS, 10);
+            if (isNaN(zombieHours) || zombieHours <= 0) {
+              core.setFailed(`Invalid zombie_run_threshold_hours: "${inputs.zombie_run_threshold_hours}". Provide a positive integer number of hours.`);
+              return;
+            }
+            const zombieMs = zombieHours * 60 * 60 * 1000;
+            const workflows = process.env.WORKFLOWS.split(",").map(s => s.trim()).filter(Boolean);
+            const labelPrefix = process.env.RUNNER_LABEL_PREFIX;
+            const now = Date.now();
+
+            const humanize = (ms) => {
+              const totalMin = Math.max(0, Math.floor(ms / 60000));
+              const d = Math.floor(totalMin / 1440);
+              const h = Math.floor((totalMin % 1440) / 60);
+              const m = totalMin % 60;
+              if (d > 0) return `${d}d ${h}h`;
+              return h > 0 ? `${h}h ${m}m` : `${m}m`;
+            };
+            const iso = (s) => s
+              ? new Date(s).toISOString().replace("T", " ").replace(/\..+/, " UTC")
+              : "unknown";
+            const nowIso = new Date(now).toISOString().replace("T", " ").replace(/\..+/, " UTC");
+            const reaperUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+
+            let reapedCount = 0;
+            const summaryRows = [];
+
+            for (const wf of workflows) {
+              // Fetch ONLY non-completed runs, filtered at the API level. Listing the
+              // full history (no status filter) would paginate every run this workflow
+              // has ever had — for a busy workflow that is tens of thousands of runs and
+              // hundreds of sequential API calls. Query the active statuses instead.
+              const active = [];
+              const seenRunIds = new Set();
+              for (const st of ["in_progress", "queued", "pending", "waiting", "requested"]) {
+                let rs = [];
+                try {
+                  rs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                    owner, repo, workflow_id: wf, status: st, per_page: 100,
+                  }, (res) => res.data);
+                } catch (e) {
+                  // Some status values may be rejected depending on GHES version — skip quietly.
+                  core.debug(`listWorkflowRuns status=${st} for ${wf}: ${e.message}`);
+                  continue;
+                }
+                for (const r of rs) {
+                  if (r.status === "completed" || seenRunIds.has(r.id)) continue;
+                  seenRunIds.add(r.id);
+                  active.push(r);
+                }
+              }
+              core.info(`[${wf}] ${active.length} active run(s) to inspect`);
+
+              for (const run of active) {
+                let jobs = [];
+                try {
+                  jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                    owner, repo, run_id: run.id, per_page: 100, filter: "latest",
+                  }, (res) => res.data);
+                } catch (e) {
+                  core.warning(`Could not list jobs for run ${run.id}: ${e.message}`);
+                  continue;
+                }
+
+                const eligible = [];
+
+                // --- Job-level: a job queued with no runner assigned, past threshold ---
+                for (const j of jobs) {
+                  const labels = j.labels || [];
+                  const wantsEks = labels.some(l => l.startsWith(labelPrefix));
+                  const unassigned = !j.runner_name;
+                  const waiting = j.status === "queued";
+                  if (!(wantsEks && unassigned && waiting)) continue;
+                  // "waiting since": prefer job.created_at (when the job entered the queue and
+                  // became eligible for a runner). started_at stays null while a job is queued, so
+                  // falling back to run timestamps would measure from run-creation and could
+                  // prematurely reap a young job inside an old (e.g. matrix) run.
+                  const sinceStr = j.created_at || j.started_at || run.run_started_at || run.created_at;
+                  const waited = now - Date.parse(sinceStr);
+                  if (waited <= thresholdMs) continue;
+                  eligible.push({
+                    name: j.name,
+                    runner: labels.join(", ") || "(none listed)",
+                    sinceStr,
+                    waited,
+                    kind: "job",
+                  });
+                }
+
+                // --- Run-level (zombie) fallback: a run stuck in a non-completed state with
+                // NO jobs ever dispatched. It never held a runner, so it is judged against the
+                // separate, much longer zombie threshold and labelled as stale-run cleanup —
+                // NOT runner-wait — so the cancellation is not misread as "a runner was blocked
+                // for N hours" (which would be nonsense — nothing was ever running). ---
+                if (jobs.length === 0 && ["queued", "pending", "waiting", "requested"].includes(run.status)) {
+                  const sinceStr = run.created_at || run.run_started_at;
+                  const waited = now - Date.parse(sinceStr);
+                  if (waited > zombieMs) {
+                    eligible.push({
+                      name: "(run never dispatched any jobs)",
+                      runner: "n/a — no jobs scheduled, no runner held",
+                      sinceStr,
+                      waited,
+                      kind: "zombie",
+                    });
+                  }
+                }
+
+                if (eligible.length === 0) continue;
+
+                // Classify the reap so wording matches reality: a genuine runner-wait
+                // (jobs queued, no runner assigned) vs a zombie run (no jobs ever dispatched,
+                // never held a runner). Per run the eligible set is one kind or the other.
+                const isZombie = eligible.every(e => e.kind === "zombie");
+                const reason = isZombie
+                  ? "🧟 stale run — 0 jobs dispatched, held no runner"
+                  : "⏳ job waited for an EKS runner";
+                const maxWait = humanize(Math.max(...eligible.map(e => e.waited)));
+
+                const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${run.id}`;
+                core.info(`[REAP${dryRun ? " (dry-run)" : ""}] ${isZombie ? "zombie" : "runner-wait"} · ${wf} #${run.id} (${run.head_branch}) · ${maxWait}`);
+                summaryRows.push([
+                  `<a href="${runUrl}">${wf} #${run.id}</a>`,
+                  run.head_branch || "(none)",
+                  reason,
+                  maxWait,
+                ]);
+
+                // Resolve the PR to comment on.
+                let prNumber = (run.pull_requests && run.pull_requests[0] && run.pull_requests[0].number) || null;
+                if (!prNumber && run.event === "pull_request" && run.head_branch) {
+                  try {
+                    const prs = await github.rest.pulls.list({
+                      owner, repo, state: "open", head: `${owner}:${run.head_branch}`, per_page: 1,
+                    });
+                    if (prs.data.length) prNumber = prs.data[0].number;
+                  } catch (e) {
+                    core.warning(`PR lookup failed for ${run.head_branch}: ${e.message}`);
+                  }
+                }
+
+                // Force-cancel the run.
+                let alreadyCancelled = false;
+                if (!dryRun) {
+                  try {
+                    await github.request("POST /repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel", {
+                      owner, repo, run_id: run.id,
+                    });
+                    reapedCount++;
+                  } catch (e) {
+                    if (e.status === 409) {
+                      // Already cancelling/cancelled by another actor or a prior reaper tick.
+                      // Skip the comment below so we don't falsely claim the reaper did it.
+                      alreadyCancelled = true;
+                      core.info(`Run ${run.id} was already being cancelled (409) — skipping comment.`);
+                    } else {
+                      core.warning(`force-cancel failed for run ${run.id}: ${e.message}`);
+                      continue;
+                    }
+                  }
+                }
+
+                // Build the explanatory comment — wording is chosen per kind so a
+                // cancellation is never misread (a zombie run never held a runner).
+                let body;
+                if (isZombie) {
+                  body = [
+                    `## 🧟 Stale run auto-cancelled by the Stuck-Run-Reaper`,
+                    ``,
+                    `This run was **abandoned in a non-completed state with no jobs ever dispatched** for **${maxWait}** (since ${iso(eligible[0].sinceStr)}). It **never held a runner** — this is **stale-run cleanup**, not a freed runner.`,
+                    ``,
+                    `| | |`,
+                    `|---|---|`,
+                    `| **Run** | [\`${wf}\` #${run.id}](${runUrl}) (attempt ${run.run_attempt}) |`,
+                    `| **Branch** | \`${run.head_branch}\` |`,
+                    `| **Stuck in state** | \`${run.status}\` with 0 jobs dispatched |`,
+                    `| **Abandoned for** | ${maxWait} |`,
+                    `| **Identified at** | ${nowIso} |`,
+                    `| **Cleanup threshold** | ${zombieHours} hours |`,
+                    `| **Action taken** | \`POST /actions/runs/${run.id}/force-cancel\`${dryRun ? " _(dry-run — not executed)_" : ""} |`,
+                    ``,
+                    `**Why:** GitHub left this run in a non-completed state without ever creating its jobs, so it lingered in the "active" list indefinitely. **No EKS runner was ever occupied.** The reaper sweeps such zombie runs once they pass the ${zombieHours}-hour cleanup threshold. Nothing to re-run unless you still need this build.`,
+                    ``,
+                    `<sub>🤖 Automated by \`.github/workflows/stuck-run-reaper.yml\` · reaper run [#${context.runId}](${reaperUrl})</sub>`,
+                  ].join("\n");
+                } else {
+                  const jobRows = eligible.map(e =>
+                    `| \`${e.name}\` | \`${e.runner}\` | ${iso(e.sinceStr)} | ${humanize(e.waited)} | ❌ never assigned |`
+                  ).join("\n");
+                  body = [
+                    `## 🛑 Run auto-cancelled by the Stuck-Run-Reaper`,
+                    ``,
+                    `A job in this run was **waiting for a self-hosted EKS runner that was never assigned**, past the ${threshold}-minute threshold. The reaper force-cancelled the run to free the queue.`,
+                    ``,
+                    `| | |`,
+                    `|---|---|`,
+                    `| **Run** | [\`${wf}\` #${run.id}](${runUrl}) (attempt ${run.run_attempt}) |`,
+                    `| **Branch** | \`${run.head_branch}\` |`,
+                    `| **Identified as stuck at** | ${nowIso} |`,
+                    `| **Wait threshold** | ${threshold} minutes |`,
+                    `| **Action taken** | \`POST /actions/runs/${run.id}/force-cancel\`${dryRun ? " _(dry-run — not executed)_" : ""} |`,
+                    ``,
+                    `### Stuck job(s)`,
+                    ``,
+                    `| Job | Requested runner | Waiting since | Waited | Runner status |`,
+                    `|---|---|---|---|---|`,
+                    jobRows,
+                    ``,
+                    `**Why this happened:** the job(s) sat in \`queued\` because no matching EKS runner picked them up. GitHub's \`timeout-minutes\` does not cover runner-wait time — it only starts once a job begins executing — so the reaper enforces the ${threshold}-minute wait cap instead.`,
+                    ``,
+                    `**What to do:** re-run once EKS runner capacity is available (\`gh run rerun ${run.id}\`, or push a new commit). If this keeps happening, check the scale/health of the requested EKS runner pool(s) above.`,
+                    ``,
+                    `<sub>🤖 Automated by \`.github/workflows/stuck-run-reaper.yml\` · reaper run [#${context.runId}](${reaperUrl})</sub>`,
+                  ].join("\n");
+                }
+
+                if (dryRun) {
+                  core.info(`[dry-run] Would comment on ${prNumber ? `PR #${prNumber}` : "(no PR found)"}:\n${body}`);
+                  continue;
+                }
+
+                if (alreadyCancelled) continue; // run was already being cancelled — no comment
+
+                if (prNumber) {
+                  try {
+                    await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body });
+                  } catch (e) {
+                    core.warning(`Could not comment on PR #${prNumber}: ${e.message}`);
+                  }
+                } else {
+                  core.info(`Run ${run.id} (event=${run.event}, branch=${run.head_branch}) has no associated PR — cancelled without a comment.`);
+                }
+              }
+            }
+
+            // Job summary.
+            await core.summary
+              .addHeading(`🛑 Stuck-Run-Reaper — ${dryRun ? "dry-run" : `${reapedCount} run(s) reaped`}`)
+              .addRaw(`Runner-wait threshold: **${threshold} min** · Zombie-run cleanup: **${zombieHours}h** · Workflows: \`${workflows.join(", ")}\``)
+              .addTable([
+                [{ data: "Run", header: true }, { data: "Branch", header: true }, { data: "Reason", header: true }, { data: "Waited / age", header: true }],
+                ...summaryRows,
+              ])
+              .write();

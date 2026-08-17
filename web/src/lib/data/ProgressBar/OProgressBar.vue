@@ -36,6 +36,7 @@ const sizeClasses: Record<NonNullable<ProgressBarProps["size"]>, string> = {
 
 const variantFillClasses: Record<NonNullable<ProgressBarProps["variant"]>, string> = {
   default: "bg-progress-bar-default",
+  success: "bg-progress-bar-success",
   warning: "bg-progress-bar-warning",
   danger: "bg-progress-bar-danger",
 };

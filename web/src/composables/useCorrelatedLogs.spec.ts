@@ -253,37 +253,6 @@ describe("useCorrelatedLogs", () => {
       expect(composable.currentFilters.value.service).toBe("updated-api");
       expect(composable.currentFilters.value.region).toBe("us-east");
     });
-
-    it("should remove filter", async () => {
-      const composable = useCorrelatedLogs(props, gt);
-
-      composable.removeFilter("region");
-      await nextTick();
-
-      expect(composable.currentFilters.value.region).toBeUndefined();
-    });
-
-    it("should reset filters to matched dimensions only", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation((_params: any, callbacks: any) => {
-        callbacks.complete(null);
-        return Promise.resolve();
-      });
-
-      const composable = useCorrelatedLogs(props, gt);
-
-      // Modify filters
-      composable.updateFilter("service", "modified");
-      composable.updateFilter("newKey", "newValue");
-
-      // Reset - should only keep matched dimensions, not additional ones
-      composable.resetFilters();
-      await nextTick();
-
-      expect(composable.currentFilters.value).toEqual({
-        service: "api",
-        environment: "prod",
-      });
-    });
   });
 
   describe("Dimension Helpers", () => {

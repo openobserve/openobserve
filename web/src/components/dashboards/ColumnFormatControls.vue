@@ -263,7 +263,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(lib-override:o2-toggle-group): OToggleGroup renders its own <button>
    children, so their intrinsic min-height can only be reset from the parent via
    :deep() — no utility on this component can reach that generated element. */

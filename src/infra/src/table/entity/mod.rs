@@ -3,7 +3,10 @@
 pub mod prelude;
 
 pub mod action_scripts;
+pub mod alert_composite_children;
+pub mod alert_composites;
 pub mod alert_dedup_state;
+pub mod alert_eval_intervals;
 pub mod alert_incident_alerts;
 pub mod alert_incidents;
 pub mod alert_state_transitions;
@@ -26,6 +29,11 @@ pub mod incident_events;
 pub mod incident_integration_senders;
 pub mod incident_integrations;
 pub mod kv_store;
+pub mod llm_annotation_queue_bindings;
+pub mod llm_annotation_queue_items;
+pub mod llm_annotation_queues;
+pub mod llm_dataset_items;
+pub mod llm_datasets;
 pub mod model_pricing;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;

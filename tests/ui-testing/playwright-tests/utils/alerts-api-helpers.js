@@ -1,13 +1,13 @@
 // Copyright 2026 OpenObserve Inc.
 
 /**
- * Shared API helpers for the Alerts 4.0 (multi-alert) specs.
+ * Shared API helpers for the Alerts 4.0 (multi-alert) UI specs.
  *
- * The `-api`, `-ui` and `-regression` specs all drive the same v1/v2 alert
- * endpoints, seed the same fixtures, and build the same canonical payloads.
- * This module is the single source of truth for that plumbing so the three
- * specs stay in lockstep. It deliberately contains NO test/expect calls —
- * assertions belong in the spec files.
+ * The remaining UI specs (`-ui`, `priority-tags`) use this to seed fixtures and
+ * build canonical payloads via the API before asserting on the render surface.
+ * The pure-API contract/regression coverage moved to pytest
+ * (tests/api-testing/tests/alerts/); this module deliberately contains NO
+ * test/expect calls — assertions belong in the spec files.
  */
 
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
@@ -81,10 +81,40 @@ function realtimeAlert(name) {
   return a;
 }
 
+/** V1 composite payload. Operands are stable alert IDs, never display names. */
+function compositeAlert(name, childIds, overrides = {}) {
+  return {
+    alert_type: 'composite',
+    name,
+    description: 'Composite alert Playwright fixture',
+    enabled: false,
+    destinations: [DEST],
+    context_attributes: {},
+    trigger_condition: { silence: 10 },
+    creates_incident: false,
+    workflows: [],
+    tags: [],
+    composite_condition: {
+      expression: childIds.map((id) => `{${id}}`).join(' && '),
+      warning_counts_as_firing: true,
+      stale_child_policy: 'use_last_state',
+    },
+    ...overrides,
+  };
+}
+
 // ---- CRUD helpers ----------------------------------------------------------
 
 async function createAlert(page, payload) {
   return api(page, 'post', `${urls().v2}/alerts?folder=default`, payload);
+}
+
+async function validateComposite(page, payload) {
+  return api(page, 'post', `${urls().v2}/alerts/composites/validate`, payload);
+}
+
+async function getCompositeReferences(page, alertId) {
+  return api(page, 'get', `${urls().v2}/alerts/${encodeURIComponent(alertId)}/composite-references`);
 }
 
 async function listAlerts(page) {
@@ -199,6 +229,7 @@ module.exports = {
   BASE, STREAM, SINK, TMPL, DEST,
   uniq, urls, api,
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert,
+  compositeAlert, validateComposite, getCompositeReferences,
   createAlert, listAlerts, findAlertId, getAlert, deleteAlerts, seedAlertFixtures,
   ingest, getAlertGroups, getAlertTransitions,
   waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,

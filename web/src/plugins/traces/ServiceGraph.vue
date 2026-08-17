@@ -10,7 +10,7 @@
         class="w-44 flex-shrink-0"
       >
         <OSelect
-          :model-value="streamFilter"
+          :model-value="selectedStreamFilter"
           :options="availableStreams.map((s) => ({ label: raw(s), value: s }))"
           labelKey="label"
           valueKey="value"
@@ -23,8 +23,8 @@
           :content="t('traces.serviceGraph.noStreamsDetected')"
         />
       </div>
-      <!-- Search input -->
-      <div data-test="service-graph-search-input">
+      <!-- Search input (hidden when a parent renders it in its own toolbar). -->
+      <div v-if="!hideSearchInput" data-test="service-graph-search-input">
         <OSearchInput
           v-model="searchFilter"
           class="w-56!"
@@ -319,7 +319,7 @@
                 :graph-data="graphData"
                 :time-range="searchObj.data.datetime"
                 :visible="showSidePanel"
-                :stream-filter="streamFilter"
+                :stream-filter="selectedStreamFilter"
                 :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
@@ -364,7 +364,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
@@ -430,7 +429,7 @@ export default defineComponent({
   props: {
     // Optional external stream override. When set (e.g. by the standalone
     // Agent Graph page, which selects by agent → its source_stream), it seeds
-    // the internal streamFilter and keeps it in sync, instead of the component
+    // the internal selectedStreamFilter and keeps it in sync, instead of the component
     // sourcing the stream from the shared traces store.
     streamFilter: {
       type: String,
@@ -438,6 +437,13 @@ export default defineComponent({
     },
     // Hide the built-in stream dropdown when the parent owns selection.
     hideStreamSelector: {
+      type: Boolean,
+      default: false,
+    },
+    // Same idea as `hideStreamSelector`: the standalone Service Graph page
+    // renders the search box in its own subnav row beside the stream picker,
+    // so the built-in one must not render twice.
+    hideSearchInput: {
       type: Boolean,
       default: false,
     },
@@ -495,7 +501,6 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const store = useStore();
     const { isDark } = useTheme();
-    const router = useRouter();
     const { t } = useI18nTyped();
     const { getStreams } = useStreams(t);
     const { searchObj } = useTraces();
@@ -534,7 +539,9 @@ export default defineComponent({
     // otherwise sync from the traces page selected stream / localStorage.
     const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
     const storedStreamFilter = localStorage.getItem("serviceGraph_streamFilter");
-    const streamFilter = ref(props.streamFilter || tracesStream || storedStreamFilter || "default");
+    const selectedStreamFilter = ref(
+      props.streamFilter || tracesStream || storedStreamFilter || "default",
+    );
     // Keep the internal ref in sync when the parent drives the stream (e.g. the
     // Agent Graph page selecting by agent → its source_stream) AND reload the
     // graph. The built-in dropdown delegates reload to its parent via
@@ -544,8 +551,8 @@ export default defineComponent({
     watch(
       () => props.streamFilter,
       (next) => {
-        if (next && next !== streamFilter.value) {
-          streamFilter.value = next;
+        if (next && next !== selectedStreamFilter.value) {
+          selectedStreamFilter.value = next;
           loadServiceGraph();
         }
       },
@@ -949,7 +956,7 @@ export default defineComponent({
 
     // Watch for stream filter changes and restore chart viewport
     watch(
-      () => streamFilter.value,
+      () => selectedStreamFilter.value,
       async () => {
         // Wait for chart to update with new data
         await nextTick();
@@ -1032,17 +1039,19 @@ export default defineComponent({
       // Custom tooltip element — node tooltips use innerHTML, edge tooltips use an ECharts mini chart
       const tooltipEl = document.createElement("div");
       const isDarkInit = isDark.value;
+      /* eslint-disable local/no-hardcoded-px -- raw cssText string for the ECharts tooltip chrome: backdrop blur, hairline border and drop shadow are optical effects, not text-relative lengths */
       tooltipEl.style.cssText = `
         position: absolute; pointer-events: none; z-index: 9999;
         background: ${isDarkInit ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
         backdrop-filter: blur(24px) saturate(180%);
         -webkit-backdrop-filter: blur(24px) saturate(180%);
         border: 1px solid ${isDarkInit ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"};
-        border-radius: 14px;
+        border-radius: 0.875rem;
         display: none;
         box-shadow: 0 12px 40px rgba(0,0,0,${isDarkInit ? "0.5" : "0.14"}), 0 1px 0 rgba(255,255,255,${isDarkInit ? "0.04" : "0"}) inset;
         overflow: hidden;
       `;
+      /* eslint-enable local/no-hardcoded-px */
       const chartDom = chart.getDom();
       if (!chartDom.style.position || chartDom.style.position === "static") {
         chartDom.style.position = "relative";
@@ -1248,8 +1257,8 @@ export default defineComponent({
         tooltipEl.style.pointerEvents = "none";
         tooltipEl.style.width = "";
         tooltipEl.style.height = "";
-        tooltipEl.style.padding = "9px 13px";
-        tooltipEl.style.fontSize = "12px";
+        tooltipEl.style.padding = "0.5625rem 0.8125rem";
+        tooltipEl.style.fontSize = "0.75rem";
         tooltipEl.style.lineHeight = "1.5";
         tooltipEl.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         tooltipEl.style.letterSpacing = "0.01em";
@@ -1594,7 +1603,9 @@ export default defineComponent({
         // is a cheap small-stream read that scales to TB-level trace volumes
         // (we do NOT re-scan raw traces per load). The UI is a thin renderer.
         const streamName =
-          streamFilter.value && streamFilter.value !== "all" ? streamFilter.value : undefined;
+          selectedStreamFilter.value && selectedStreamFilter.value !== "all"
+            ? selectedStreamFilter.value
+            : undefined;
         const response = await serviceGraphService.getCurrentTopology(orgId, {
           streamName,
           startTime,
@@ -1768,12 +1779,12 @@ export default defineComponent({
       { deep: true },
     );
 
-    // Keep streamFilter in sync when Traces/Spans tab changes the global stream
+    // Keep selectedStreamFilter in sync when Traces/Spans tab changes the global stream
     watch(
       () => searchObj.data.stream.selectedStream.value,
       (newStream) => {
-        if (newStream && newStream !== streamFilter.value) {
-          streamFilter.value = newStream;
+        if (newStream && newStream !== selectedStreamFilter.value) {
+          selectedStreamFilter.value = newStream;
           localStorage.setItem("serviceGraph_streamFilter", newStream);
           loadServiceGraph();
         }
@@ -1865,8 +1876,20 @@ export default defineComponent({
       loadServiceGraph();
     });
 
-    // Public API for parent pages (e.g. Agent Graph page's header refresh).
-    expose({ refresh: loadServiceGraph, loading, lastRunAt });
+    // Public API for parent pages (e.g. Agent Graph page's header refresh, and
+    // the standalone Service Graph page, whose subnav-row stream picker calls
+    // `onStreamFilterChange` — it owns its own stream list because `expose()`
+    // unwraps refs, which would hand the parent a non-reactive snapshot).
+    expose({
+      refresh: loadServiceGraph,
+      loading,
+      lastRunAt,
+      onStreamFilterChange,
+      setSearchFilter: (v: string) => {
+        searchFilter.value = v;
+        applyFilters();
+      },
+    });
 
     return {
       raw,
@@ -1884,7 +1907,7 @@ export default defineComponent({
       showSettings,
       lastUpdated,
       searchFilter,
-      streamFilter,
+      selectedStreamFilter,
       availableStreams,
       chartData,
       chartKey,

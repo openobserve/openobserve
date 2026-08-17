@@ -971,6 +971,24 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 // Alert deduplication metrics
+// Alert notification chart events. Single low-cardinality `event` label —
+// deliberately NO organization/alert labels: signature failures carry
+// attacker-controlled request data, which must never become label values.
+// Events: rendered_fetch, cache_hit, rendered_send, bad_signature, expired,
+// malformed, over_capacity, send_rate_capped.
+pub static ALERT_CHART_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_chart_events_total",
+            "Alert notification chart pipeline events (renders, cache hits, rejected fetches)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["event"],
+    )
+    .expect("Metric created")
+});
+
 pub static ALERT_DEDUP_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1125,6 +1143,46 @@ pub static QUERY_CANCELED_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static TRACE_TIME_INDEX_OPERATIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "trace_time_index_operations_total",
+            "Trace time index operations by outcome",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "operation", "status"],
+    )
+    .expect("Metric created")
+});
+
+pub static TRACE_TIME_INDEX_QUERY_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "trace_time_index_query_duration_seconds",
+            "Trace time index query duration in seconds",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status"],
+    )
+    .expect("Metric created")
+});
+
+pub static TRACE_TIME_INDEX_QUERY_ROUNDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "trace_time_index_query_rounds",
+            "Trace time index query rounds by phase",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0, 34.0]),
+        &["organization", "phase"],
+    )
+    .expect("Metric created")
+});
+
 // This corresponds to pgsql queries, not sqlite as that is local and can be ignored
 pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -1251,6 +1309,32 @@ pub static NODE_CONSISTENT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["type"],
+    )
+    .expect("Metric created")
+});
+
+// promql series label cache metrics
+pub static QUERY_METRICS_LABEL_CACHE_HIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_metrics_label_cache_hit_count",
+            "promql series label cache hit count".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_METRICS_LABEL_CACHE_MISS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_metrics_label_cache_miss_count",
+            "promql series label cache miss count".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
     )
     .expect("Metric created")
 });
@@ -2206,7 +2290,15 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(QUERY_CANCELED_NUMS.clone()))
         .expect("Metric registered");
-
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_OPERATIONS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_QUERY_DURATION.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TRACE_TIME_INDEX_QUERY_ROUNDS.clone()))
+        .expect("Metric registered");
     // compactor stats
     registry
         .register(Box::new(COMPACT_USED_TIME.clone()))
@@ -2306,6 +2398,11 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(META_NUM_DASHBOARDS.clone()))
         .expect("Metric registered");
 
+    // alert notification chart metrics
+    registry
+        .register(Box::new(ALERT_CHART_EVENTS_TOTAL.clone()))
+        .expect("Metric registered");
+
     // alert deduplication metrics
     registry
         .register(Box::new(ALERT_DEDUP_SUPPRESSED_TOTAL.clone()))
@@ -2377,6 +2474,14 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(NODE_CONSISTENT_HASH.clone()))
+        .expect("Metric registered");
+
+    // promql series label cache metrics
+    registry
+        .register(Box::new(QUERY_METRICS_LABEL_CACHE_HIT_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_METRICS_LABEL_CACHE_MISS_COUNT.clone()))
         .expect("Metric registered");
 
     // query disk cache metrics
@@ -2799,6 +2904,7 @@ mod tests {
 
     #[test]
     fn test_statics_alert_dedup_and_grouping() {
+        let _ = ALERT_CHART_EVENTS_TOTAL.clone();
         let _ = ALERT_DEDUP_SUPPRESSED_TOTAL.clone();
         let _ = ALERT_DEDUP_PASSED_TOTAL.clone();
         let _ = ALERT_DEDUP_ERRORS_TOTAL.clone();

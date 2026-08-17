@@ -244,11 +244,21 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(organizationsRoute.path).toBe("organizations");
     });
 
-    // Test 19: Should have 5 children in basic configuration
-    it("should have 5 children in basic configuration", () => {
+    // Test 19: Should have 6 children in basic configuration
+    it("should have 6 children in basic configuration", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      expect(iamRoute.children.length).toBe(5);
+      expect(iamRoute.children.length).toBe(6);
+    });
+
+    // Test 19a: MCP setup is served by every edition, so it must be present on
+    // the OSS build too — not pushed inside the enterprise/cloud branch.
+    it("should include mcpServer child route on OSS", () => {
+      const routes = useEnterpriseRoutes();
+      const iamRoute = routes.find((route: any) => route.name === "iam");
+      const mcpRoute = iamRoute.children.find((child: any) => child.name === "mcpServer");
+      expect(mcpRoute).toBeDefined();
+      expect(mcpRoute.path).toBe("mcpServer");
     });
 
     // Test 20: Should have only 1 route in basic configuration

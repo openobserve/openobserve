@@ -111,10 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #cell-field="{ value }">
-                <div
-                  :data-test="`log-detail-${value}-key`"
-                  class="text-status-error-text text-left"
-                >
+                <!-- `log-key` (assets/styles/log-highlighting.css) is the same class the
+                     JSON tab puts on its keys, so both tabs stay one color in both themes. -->
+                <div :data-test="`log-detail-${value}-key`" class="log-key text-left">
                   {{ value }}
                 </div>
               </template>
@@ -262,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source-stream="correlationProps.sourceStream"
             :source-type="correlationProps.sourceType"
             :available-dimensions="correlationProps.availableDimensions"
+            :semantic-groups="correlationProps.semanticGroups"
             :fts-fields="correlationProps.ftsFields"
             :time-range="correlationProps.timeRange"
             :hide-view-related-button="true"
@@ -471,6 +471,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -922,7 +923,9 @@ export default defineComponent({
     };
 
     const openCrossLink = (url: string) => {
-      window.open(url, "_blank");
+      // Guard the RESOLVED url — see JsonPreview.vue's twin for the reasoning.
+      if (!isSafeNavigableUrl(url)) return;
+      window.open(url, "_blank", "noopener,noreferrer");
     };
 
     const viewTrace = () => {
@@ -1105,7 +1108,9 @@ export default defineComponent({
 
 .o2-schema-table :deep(thead th),
 .o2-schema-table :deep(tbody td) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
   border-right: 1px solid var(--color-card-glass-border);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-card-glass-border);
 }
 

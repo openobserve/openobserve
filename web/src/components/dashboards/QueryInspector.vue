@@ -70,7 +70,7 @@
             </div>
             <div class="group relative mt-1">
               <div
-                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] [scrollbar-width:thin]"
+                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
                 :data-test="`query-inspector-original-query-${index}`"
                 v-html="
                   highlightSearch(
@@ -99,7 +99,7 @@
             </div>
             <div class="group relative mt-1">
               <div
-                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] [scrollbar-width:thin]"
+                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
                 :data-test="`query-inspector-executed-query-${index}`"
                 v-html="
                   highlightSearch(
@@ -205,7 +205,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch, onMounted, type PropType } from "vue";
+import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";

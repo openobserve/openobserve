@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @back="closeAddFunction"
         @cancel="cancelAddFunction"
         @open:chat="openChat"
-        :is-add-function-component="isAddFunctionComponent"
       />
     </OForm>
 
@@ -128,8 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <pre
                         class="text-status-error-text my-0 whitespace-pre-wrap"
                         style="font-family: var(--font-mono); font-size: var(--text-compact)"
-                        >{{ vrlFunctionError }}</pre
-                      >
+                        >{{ vrlFunctionError }}</pre>
                     </div>
                   </div>
                 </div>
@@ -154,12 +152,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
         :class="['w-1/4 max-w-full min-w-19', heightOffset ? '[--ai-chat-offset:4.6875rem]' : '']"
       >
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <O2AIChat
           class="h-[calc(100vh-(112px+var(--ai-chat-offset,0px)))]"
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
           :aiChatInputContext="aiChatInputContext"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </div>
@@ -263,7 +263,6 @@ export default defineComponent({
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
-    const addJSTransformForm: any = ref(null);
     const disableColor: any = ref("");
     const formData: any = ref({
       name: "",
@@ -278,7 +277,6 @@ export default defineComponent({
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
     const { placeholder: jsPlaceholder } = useJsPlaceholder();
     let editorobj: any = null;
-    const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const testFunctionRef = ref<typeof TestFunction>();
     const splitterModel = ref(50);
@@ -586,19 +584,8 @@ export default defineComponent({
     /**
      * Handle successful generation from UnifiedQueryEditor
      */
-    const handleGenerationSuccess = (payload: { type: string; message: string }) => {
+    const handleGenerationSuccess = (_payload: { type: string; message: string }) => {
       // Function code is already updated via @update:query handler
-    };
-
-    // Unified Query Editor: Handle Ask AI
-    const handleAskAI = async (naturalLanguage: string, language: "vrl" | "javascript") => {
-      // Enable AI chat if not already enabled
-      if (!store.state.isAiChatEnabled) {
-        openChat(true);
-      }
-
-      // The unified component handles AI generation internally
-      // This event is just for parent components that may need to react
     };
 
     return {

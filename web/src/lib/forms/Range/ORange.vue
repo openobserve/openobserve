@@ -611,6 +611,7 @@ const { t } = useI18nTyped();
            either extreme: min 0px (left edge) and max calc(100% - thumbSize)
            (right edge). This prevents horizontal scroll in overflow:hidden or
            overflow-y:auto ancestor containers. -->
+        <!-- eslint-disable local/no-hardcoded-px -- clamp() lower bound is a zero length; a zero has no scale to convert and keeps the clamp unit-valid alongside the % terms -->
         <span
           :class="[
             'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
@@ -622,6 +623,8 @@ const { t } = useI18nTyped();
           }"
           aria-hidden="true"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
+        <!-- eslint-disable local/no-hardcoded-px -- clamp() lower bound is a zero length; a zero has no scale to convert and keeps the clamp unit-valid alongside the % terms -->
         <span
           :class="[
             'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
@@ -633,6 +636,7 @@ const { t } = useI18nTyped();
           }"
           aria-hidden="true"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
 
         <!-- Spacer so the row has height -->
         <span :class="['invisible', thumbSize[resolvedSize]]" aria-hidden="true" />

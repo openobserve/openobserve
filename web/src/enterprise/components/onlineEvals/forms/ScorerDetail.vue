@@ -722,14 +722,14 @@ function relativeTime(timestampMs: number): string {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(complex-state): The <dl>/<dt>/<dd> element-selector grid, the used-by list's hover/:deep(button)
    overrides, and the status-cell dot variants — descendant and pseudo-class
    selectors with no element of their own to carry a utility. */
-// Page layout, spacing, colors, and text styling are Tailwind utilities in the
-// template (matching SessionDetails.vue). Only cohesive blocks that rely on
-// descendant/element selectors or hover state remain here. Font-family is never
-// set per component — it inherits the global --font-sans.
+/* Page layout, spacing, colors, and text styling are Tailwind utilities in the
+   template (matching SessionDetails.vue). Only cohesive blocks that rely on
+   descendant/element selectors or hover state remain here. Font-family is never
+   set per component — it inherits the global --font-sans. */
 
 .sd__tab-intro {
   margin: 0;
@@ -738,9 +738,9 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
-// Versions / Used By tab content sits directly in the body (not in a
-// .sd-section), so it needs its own horizontal inset. The Runs tab keeps its
-// full-bleed table and is not wrapped here.
+/* Versions / Used By tab content sits directly in the body (not in a
+   .sd-section), so it needs its own horizontal inset. The Runs tab keeps its
+   full-bleed table and is not wrapped here. */
 .sd__tab-pad {
   display: flex;
   flex-direction: column;
@@ -773,8 +773,8 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   gap: 0.375rem;
   padding: 0.625rem 0.75rem;
-  background: color-mix(in srgb, var(--color-primary-600) 8%, transparent);
-  border: 0.0625rem solid color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border: 0.0625rem solid color-mix(in srgb, var(--color-accent) 30%, transparent);
   border-radius: 0.3125rem;
   font-size: var(--text-xs);
 }
@@ -826,8 +826,8 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-versions__item--active {
-  border-color: color-mix(in srgb, var(--color-primary-600) 30%, transparent);
-  background: color-mix(in srgb, var(--color-primary-600) 5%, var(--color-card-bg));
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-card-bg));
 }
 
 .sd-versions__head {
@@ -867,8 +867,8 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-used-list__item:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent) !important;
-  background: color-mix(in srgb, var(--color-primary-600) 5%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent) !important;
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent) !important;
 }
 
 .sd-used-list__item:deep(button) {
@@ -892,7 +892,7 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-used-list__item:hover .sd-used-list__chevron {
-  color: var(--color-primary-600);
+  color: var(--color-accent);
   opacity: 1;
 }
 </style>

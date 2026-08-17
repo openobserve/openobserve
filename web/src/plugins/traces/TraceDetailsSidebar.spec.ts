@@ -23,11 +23,17 @@ const {
   mockBuildQueryDetails,
   mockNavigateToLogs,
   mockNavigateToCorrelatedLogs,
+  mockToast,
 } = vi.hoisted(() => ({
   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
   mockBuildQueryDetails: vi.fn().mockReturnValue({}),
   mockNavigateToLogs: vi.fn(),
   mockNavigateToCorrelatedLogs: vi.fn(),
+  mockToast: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
@@ -36,7 +42,7 @@ vi.mock("@/utils/traces/convertTraceData", () => ({
 
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
-    searchObj: { meta: { serviceColors: { alertmanager: "#1ab8be" } } },
+    searchObj: { meta: { serviceColors: { scheduler: "#1ab8be" } } },
     buildQueryDetails: mockBuildQueryDetails,
     navigateToLogs: mockNavigateToLogs,
     navigateToCorrelatedLogs: mockNavigateToCorrelatedLogs,
@@ -131,7 +137,7 @@ const mockSpan = {
   span_id: "d9603ec7f76eb499",
   trace_id: "6262666637a9ae45ad3e25f5111dd59f",
   operation_name: "service:alerts:evaluate_scheduled",
-  service_name: "alertmanager",
+  service_name: "scheduler",
   span_status: "UNSET",
   span_kind: 2, // Server
   parent_id: "6702b0494b2b6e57",
@@ -140,7 +146,7 @@ const mockSpan = {
   http_method: "GET",
   http_status_code: "200",
   http_url: "/api/v1/alerts",
-  service_service_instance: "dev2-openobserve-alertmanager-1",
+  service_service_instance: "dev2-openobserve-scheduler-1",
   service_service_version: "v0.15.0-rc3",
   busy_ns: "40550",
   idle_ns: "321332352",
@@ -439,16 +445,24 @@ describe("TraceDetailsSidebar", async () => {
       });
     });
 
-    describe("when isEnterprise is true but correlationProps is null (fallback path)", () => {
+    describe("when isEnterprise is true but no correlation was found", () => {
       beforeEach(() => {
         config.isEnterprise = "true";
-        // correlationProps is null — correlation data hasn't been loaded yet
+        // Remount with a streamName so loadCorrelation() runs the real lookup
+        // instead of bailing out on a missing stream. findRelatedTelemetry is
+        // mocked to resolve null, i.e. the lookup succeeds with nothing correlated.
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({
+          parentMode: "standalone",
+          streamName: "default",
+        });
         viewLogsWrapper.vm.correlationProps = null;
+        mockToast.mockClear();
         dispatchSpy = vi.spyOn(mockStore, "dispatch").mockResolvedValue(undefined);
         pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
       });
 
-      it("should fall back to buildQueryDetails and navigateToLogs when correlationProps is null", async () => {
+      it("should toast a warning instead of navigating when nothing is correlated", async () => {
         const viewLogsBtn = viewLogsWrapper.find(
           '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
         );
@@ -457,11 +471,16 @@ describe("TraceDetailsSidebar", async () => {
         await viewLogsBtn.trigger("click");
         await flushPromises();
 
-        expect(mockBuildQueryDetails).toHaveBeenCalledWith(mockSpan);
-        expect(mockNavigateToLogs).toHaveBeenCalled();
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "warning",
+            message: "No correlated logs found for this span",
+          }),
+        );
+        expect(pushSpy).not.toHaveBeenCalled();
       });
 
-      it("should not call navigateToCorrelatedLogs when correlationProps is null", async () => {
+      it("should not call navigateToCorrelatedLogs when nothing is correlated", async () => {
         const viewLogsBtn = viewLogsWrapper.find(
           '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
         );
@@ -469,6 +488,26 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
 
         expect(mockNavigateToCorrelatedLogs).not.toHaveBeenCalled();
+      });
+
+      it("should toast the lookup failure reason when correlation could not be loaded", async () => {
+        // No streamName — loadCorrelation() bails out and records why.
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({ parentMode: "standalone" });
+        mockToast.mockClear();
+
+        const viewLogsBtn = viewLogsWrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        await viewLogsBtn.trigger("click");
+        await flushPromises();
+
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "warning",
+            message: "Missing span or stream name",
+          }),
+        );
       });
     });
 
@@ -550,7 +589,7 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should switch to attributes tab by default when span has no db_ attributes", () => {
-      expect(wrapper.vm.activeTab).toBe("attributes");
+      expect(wrapper.vm.activeTabModel).toBe("attributes");
     });
 
     it("should not show database tab when span has no db_ attributes", () => {
@@ -614,13 +653,13 @@ describe("TraceDetailsSidebar", async () => {
     it("should display service name in attributes", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("alertmanager");
+      expect(attributesTable.text()).toContain("scheduler");
     });
 
     it("should display service instance in attributes", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("dev2-openobserve-alertmanager-1");
+      expect(attributesTable.text()).toContain("dev2-openobserve-scheduler-1");
     });
   });
 
@@ -910,22 +949,22 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should highlight search terms in service information", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
 
       // Verify search query is set
-      expect(wrapper.vm.searchQuery).toBe("alertmanager");
+      expect(wrapper.vm.searchQuery).toBe("scheduler");
       // Attributes tab is default — verify it contains the search term
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
-      expect(attributesTable.text()).toContain("alertmanager");
+      expect(attributesTable.text()).toContain("scheduler");
     });
   });
 
   describe("activeTab prop", () => {
     it("should default to 'attributes'", () => {
-      expect(wrapper.vm.activeTab).toBe("attributes");
+      expect(wrapper.vm.activeTabModel).toBe("attributes");
     });
 
     it("should emit update:activeTab when tab changes", async () => {
@@ -939,7 +978,7 @@ describe("TraceDetailsSidebar", async () => {
       wrapper.unmount();
       wrapper = mountSidebar({ activeTab: "events" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.activeTab).toBe("events");
+      expect(wrapper.vm.activeTabModel).toBe("events");
     });
 
     it("should emit update:activeTab with the new tab value on click", async () => {

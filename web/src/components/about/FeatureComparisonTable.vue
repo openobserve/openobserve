@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ── Edition Cards Grid ──────────────────────────────────────────── -->
     <div class="grid grid-cols-3 gap-5 pt-4">
+      <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
       <div
         v-for="ed in editionList"
         :key="ed.id"
@@ -57,11 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-card-glass-bg rounded-default border-card-glass-border relative flex flex-col border p-6 max-[1024px]:p-4"
         :class="{ 'border-accent border-2 pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <!-- Your Plan badge (floats above the card top border) -->
         <div
           v-if="buildType === ed.id"
           data-test="feature-comparison-table-your-plan-badge"
-          class="text-3xs bg-accent text-button-primary-foreground absolute top-[-14px] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 font-bold tracking-[0.08em] whitespace-nowrap uppercase"
+          class="text-3xs bg-accent text-button-primary-foreground absolute top-[-0.875rem] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 font-bold tracking-[0.08em] whitespace-nowrap uppercase"
         >
           <OIcon name="arrow-upward" size="sm" class="mr-1" />
           {{ t("about.yourPlan") }}
@@ -160,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             target="_blank"
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="action"
-            class="rounded-default text-accent hover:border-accent block w-full cursor-pointer border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))]"
+            class="rounded-default text-accent hover:border-accent block w-full cursor-pointer border border-solid border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))]"
           >
             {{ ed.ctaLabel }}
           </a>
@@ -168,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="current"
-            class="rounded-default text-text-muted border-card-glass-border block w-full cursor-default border-[1.5px] border-solid bg-transparent px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
+            class="rounded-default text-text-muted border-card-glass-border block w-full cursor-default border border-solid bg-transparent px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
             disabled
           >
             {{ ed.ctaLabel }}

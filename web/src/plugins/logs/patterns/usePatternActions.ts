@@ -15,7 +15,6 @@
 
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import usePatterns from "@/composables/useLogs/usePatterns";
@@ -23,12 +22,33 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   extractConstantsFromPattern,
   escapeForMatchAll,
-  buildPatternAlertData,
+  patternSeverityKeyForPattern,
+  type PatternSeverityKey,
 } from "./patternUtils";
+import { buildPrefillFromPatterns } from "@/utils/alerts/prefill/fromPatterns";
+import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
+
+/**
+ * The severity chips' state, module-scoped so it is shared between the pattern
+ * list that owns the chips and the alert builder that has to know which
+ * patterns are actually on screen. A per-call ref would let the two disagree.
+ * Mirrors how searchState keeps searchObj a singleton.
+ */
+const activeSeverities = ref<PatternSeverityKey[]>([]);
+
+const setActiveSeverities = (next: PatternSeverityKey[]) => {
+  activeSeverities.value = next;
+};
+
+/** The patterns the user can currently see — the chips narrow this set. */
+const visiblePatterns = (all: any[]): any[] => {
+  if (!activeSeverities.value.length) return all;
+  const active = new Set(activeSeverities.value);
+  return all.filter((p) => active.has(patternSeverityKeyForPattern(p)));
+};
 
 export const usePatternActions = () => {
   const store = useStore();
-  const router = useRouter();
   const { t } = useI18nTyped();
   const { searchObj } = searchState();
   const { patternsState } = usePatterns(t);
@@ -114,48 +134,71 @@ export const usePatternActions = () => {
     searchObj.meta.logsVisualizeToggle = "logs";
   };
 
-  const createAlertFromPattern = (pattern: any) => {
-    const streamName = searchObj.data.stream.selectedStream[0];
-    if (!streamName) {
-      toast({
-        variant: "warning",
-        message: t("logs.patternList.noStreamSelected"),
-      });
-      return;
-    }
+  // ── Alert creation from the visible patterns ────────────────────────────
 
-    // Block when the alert query would have no distinctive constants — without
-    // them buildPatternSqlQuery produces a WHERE-less SELECT that matches every
-    // log in the stream, which is almost never a useful alert.
-    if (extractConstantsFromPattern(pattern.template).length === 0) {
-      toast({
-        variant: "warning",
-        message: t("logs.patternList.alertBroadMatch"),
-        timeout: 5000,
-      });
-      return;
-    }
-
+  /**
+   * The patterns tab's contribution to alert creation: fold the patterns the
+   * user can currently see into the alert's filter.
+   *
+   * `mode` comes from the confirm dialog, which re-invokes this builder when the
+   * user switches between including and ignoring — the dialog never rewrites SQL
+   * itself, so it stays ignorant of what a pattern is.
+   *
+   * In SQL mode the editor holds a whole statement rather than a WHERE fragment,
+   * so it cannot be spliced in front of the pattern terms; we say so instead of
+   * silently dropping the user's query.
+   */
+  const buildPatternsAlertPrefill = (options: AlertBuildOptions = {}) => {
     const dt = (searchObj.data as any).datetime;
-    const start = dt?.startTime;
-    const end = dt?.endTime;
-    const periodMinutes =
-      start && end ? Math.max(5, Math.min(60, Math.round((end - start) / 60_000_000))) : 15;
+    const sqlMode = !!searchObj.meta.sqlMode;
+    const rawQuery = (searchObj.data.query ?? "").trim();
 
-    const patternData = buildPatternAlertData(
-      pattern,
-      streamName,
-      periodMinutes,
-      searchObj.data.queryResults?.scan_records || 0,
-    );
+    const all = patternsState.value.patterns?.patterns ?? [];
+    const visible = visiblePatterns(all);
 
-    sessionStorage.setItem("patternData", JSON.stringify(patternData));
-    router.push({
-      name: "addAlert",
-      query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-        fromPattern: "true",
-      },
+    return buildPrefillFromPatterns({
+      streamName: searchObj.data.stream.selectedStream?.[0] ?? "",
+      streamType: searchObj.data.stream.streamType,
+      templates: visible.map((p: any) => p.template),
+      totalCount: all.length,
+      filtered: visible.length !== all.length,
+      mode: options.patternMode ?? "exclude",
+      baseFilter: sqlMode ? undefined : rawQuery,
+      baseFilterDropped: sqlMode && !!rawQuery,
+      datetime: dt
+        ? {
+            type: dt.type,
+            relativeTimePeriod: dt.relativeTimePeriod,
+            startTime: dt.startTime,
+            endTime: dt.endTime,
+          }
+        : null,
+      timezone: store.state.timezone,
+    });
+  };
+
+  /** Single-pattern entry point (the pattern detail drawer). */
+  const buildSinglePatternAlertPrefill = (pattern: any) => {
+    const dt = (searchObj.data as any).datetime;
+
+    return buildPrefillFromPatterns({
+      streamName: searchObj.data.stream.selectedStream?.[0] ?? "",
+      streamType: searchObj.data.stream.streamType,
+      templates: [pattern?.template ?? ""],
+      totalCount: 1,
+      mode: "include",
+      // The user named this pattern; falling back to an alert on the whole
+      // stream would not be what they asked for.
+      requirePatterns: true,
+      datetime: dt
+        ? {
+            type: dt.type,
+            relativeTimePeriod: dt.relativeTimePeriod,
+            startTime: dt.startTime,
+            endTime: dt.endTime,
+          }
+        : null,
+      timezone: store.state.timezone,
     });
   };
 
@@ -167,6 +210,9 @@ export const usePatternActions = () => {
     navTotal,
     addPatternToSearch,
     addWildcardValueToSearch,
-    createAlertFromPattern,
+    activeSeverities,
+    setActiveSeverities,
+    buildPatternsAlertPrefill,
+    buildSinglePatternAlertPrefill,
   };
 };

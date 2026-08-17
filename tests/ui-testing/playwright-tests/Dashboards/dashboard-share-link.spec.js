@@ -17,10 +17,7 @@ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { safeWaitForHidden, safeWaitForNetworkIdle } from "../utils/wait-helpers.js";
 import {
   getVariableSelector,
-  getVariableSelectorInner,
-  getEditVariableBtn,
   getVariableLoadingIndicator,
-  SELECTORS,
 } from "../../pages/dashboardPages/dashboard-selectors.js";
 
 test.describe.configure({ mode: "parallel" });
@@ -312,8 +309,8 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardSetting.saveVariable();
 
     // Wait for variable to be saved in settings
-    await page
-      .locator(getEditVariableBtn(variableName))
+    await pm.dashboardShareExport
+      .getEditVariableButton(variableName)
       .waitFor({ state: "visible", timeout: 15000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -324,30 +321,29 @@ test.describe("dashboard share URL button testcases", () => {
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable selector to appear on dashboard
-    await page
-      .locator(getVariableSelector(variableName))
+    await pm.dashboardShareExport
+      .getVariableSelectorLocator(variableName)
       .waitFor({ state: "visible", timeout: 15000 });
 
     // Wait for variable loading to complete
-    await page
-      .locator(getVariableLoadingIndicator(variableName))
+    await pm.dashboardShareExport
+      .getVariableLoadingIndicatorLocator(variableName)
       .waitFor({ state: "hidden", timeout: 10000 })
       .catch(() => {});
 
     // Click the variable dropdown (inner select element)
-    const variableDropdown = page.locator(
-      getVariableSelectorInner(variableName)
-    );
+    const variableDropdown =
+      pm.dashboardShareExport.getVariableDropdownInner(variableName);
     await variableDropdown.waitFor({ state: "visible", timeout: 10000 });
     await variableDropdown.click();
 
     // Wait for dropdown menu to open
-    await page
-      .locator(SELECTORS.MENU)
+    await pm.dashboardShareExport
+      .getMenu()
       .waitFor({ state: "visible", timeout: 5000 });
 
     // Select the first option
-    const firstOption = page.locator(SELECTORS.ROLE_OPTION).first();
+    const firstOption = pm.dashboardShareExport.getFirstRoleOption();
     await firstOption.waitFor({ state: "visible", timeout: 5000 });
     const selectedValue = await firstOption.textContent();
     await firstOption.click();
@@ -544,8 +540,8 @@ test.describe("dashboard share URL button testcases", () => {
     await pm.dashboardSetting.saveVariable();
 
     // Wait for variable to be saved in settings
-    await page
-      .locator(getEditVariableBtn(variableName))
+    await pm.dashboardShareExport
+      .getEditVariableButton(variableName)
       .waitFor({ state: "visible", timeout: 15000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -556,28 +552,27 @@ test.describe("dashboard share URL button testcases", () => {
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable selector to appear on dashboard
-    await page
-      .locator(getVariableSelector(variableName))
+    await pm.dashboardShareExport
+      .getVariableSelectorLocator(variableName)
       .waitFor({ state: "visible", timeout: 15000 });
 
     // Wait for variable loading to complete
-    await page
-      .locator(getVariableLoadingIndicator(variableName))
+    await pm.dashboardShareExport
+      .getVariableLoadingIndicatorLocator(variableName)
       .waitFor({ state: "hidden", timeout: 10000 })
       .catch(() => {});
 
     // Click the variable dropdown (inner select element)
-    const variableDropdown = page.locator(
-      getVariableSelectorInner(variableName)
-    );
+    const variableDropdown =
+      pm.dashboardShareExport.getVariableDropdownInner(variableName);
     await variableDropdown.waitFor({ state: "visible", timeout: 10000 });
     await variableDropdown.click();
 
     // Wait for dropdown menu to open and select first option
-    await page
-      .locator(SELECTORS.MENU)
+    await pm.dashboardShareExport
+      .getMenu()
       .waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
+    await pm.dashboardShareExport.getFirstRoleOption().click();
 
     // Wait for dropdown to close and selection to apply
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });

@@ -47,37 +47,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="vertical-segment"
               :data-left="parseInt((spans as any[])[virtualRow.index].style.left)"
               :data-depth="depth"
+              class="border-card-glass-border pointer-events-none absolute top-0 z-1 border-l"
               :style="{
-                position: 'absolute',
                 left:
                   parseInt((spans as any[])[virtualRow.index].style.left) -
                   (spanDimensions?.gap ?? 15) * (depth - 1) +
                   'px',
-                top: '0',
                 height: nextSiblingMap[virtualRow.index as number]
                   ? spanDimensions.height + 'px'
                   : depth === 1
                     ? spanDimensions.height / 2 + 'px'
                     : spanDimensions.height + 'px',
-                borderLeft: '1.5px solid var(--color-card-glass-border)',
-                pointerEvents: 'none',
-                zIndex: 1,
               }"
             />
           </template>
           <!-- Horizontal stub from parent column to this badge -->
           <div
             data-test="horizontal-segment"
+            class="border-card-glass-border pointer-events-none absolute top-1/2 z-1 border-t"
             :style="{
-              position: 'absolute',
               left: parseInt((spans as any[])[virtualRow.index].style.left) + 'px',
-              top: '50%',
               width: (spans as any[])[virtualRow.index].hasChildSpans
                 ? (spanDimensions?.gap ?? 15) / 2 + 'px'
                 : (spanDimensions?.gap ?? 15) + 5 + 'px',
-              borderTop: '1.5px solid var(--color-card-glass-border)',
-              pointerEvents: 'none',
-              zIndex: 1,
             }"
           />
         </template>
@@ -152,15 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="collapseMapping[(spans as any[])[virtualRow.index].spanId]"
                     data-test="vertical-segment"
-                    :style="{
-                      position: 'absolute',
-                      left: '0.5rem',
-                      bottom: '-6px',
-                      height: '5px',
-                      borderLeft: '1.5px solid var(--color-card-glass-border)',
-                      pointerEvents: 'none',
-                      zIndex: 1,
-                    }"
+                    class="border-card-glass-border pointer-events-none absolute -bottom-1.5 left-2 z-1 h-1.25 border-l"
                   />
                 </div>
 

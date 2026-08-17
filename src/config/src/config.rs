@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 64;
+pub const DB_SCHEMA_VERSION: u64 = 69;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -217,18 +217,18 @@ pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
-pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
+pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let cfg = get_config();
     let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
-        &_DEFAULT_DISTINCT_FIELDS
+        &_DEFAULT_BLOOM_FILTER_FIELDS
     } else {
         &[]
     };
     let mut fields = chain(
         default_fields.iter().map(|s| s.to_string()),
         cfg.common
-            .feature_distinct_extra_fields
+            .feature_bloom_filter_extra_fields
             .split(',')
             .filter_map(|s| {
                 let s = s.trim();
@@ -240,25 +240,6 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
             }),
     )
     .collect::<Vec<_>>();
-    fields.sort();
-    fields.dedup();
-    fields
-});
-
-pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_bloom_filter_extra_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -606,6 +587,123 @@ impl FileFormat {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FileFormatConfig {
+    default: FileFormat,
+    logs: Option<FileFormat>,
+    metrics: Option<FileFormat>,
+    traces: Option<FileFormat>,
+}
+
+impl FileFormatConfig {
+    pub const fn new(default: FileFormat) -> Self {
+        Self {
+            default,
+            logs: None,
+            metrics: None,
+            traces: None,
+        }
+    }
+
+    pub fn for_stream(self, stream_type: StreamType) -> FileFormat {
+        match stream_type {
+            StreamType::Logs => self.logs,
+            StreamType::Metrics => self.metrics,
+            StreamType::Traces => self.traces,
+            _ => None,
+        }
+        .unwrap_or(self.default)
+    }
+}
+
+impl Default for FileFormatConfig {
+    fn default() -> Self {
+        Self::new(FileFormat::default())
+    }
+}
+
+impl std::fmt::Display for FileFormatConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.default)?;
+        for (stream_type, file_format) in [
+            (StreamType::Logs, self.logs),
+            (StreamType::Metrics, self.metrics),
+            (StreamType::Traces, self.traces),
+        ] {
+            if let Some(file_format) = file_format {
+                write!(f, ",{stream_type}={file_format}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl std::str::FromStr for FileFormatConfig {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let mut parts = value.split(',');
+        let default = parts
+            .next()
+            .map(str::trim)
+            .filter(|part| !part.is_empty() && !part.contains('='))
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Invalid file format config: a default format must be specified first"
+                )
+            })?
+            .parse()?;
+        let mut config = Self::new(default);
+
+        for part in parts {
+            let (stream_type, file_format) = part.trim().split_once('=').ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Invalid file format override '{part}': expected <stream_type>=<file_format>"
+                )
+            })?;
+            let file_format = file_format.trim().parse()?;
+            let target = match stream_type.trim().to_lowercase().as_str() {
+                "logs" => &mut config.logs,
+                "metrics" => &mut config.metrics,
+                "traces" => &mut config.traces,
+                stream_type => {
+                    return Err(anyhow::anyhow!(
+                        "Invalid stream type '{stream_type}' in file format config: expected logs, metrics, or traces"
+                    ));
+                }
+            };
+            if target.replace(file_format).is_some() {
+                return Err(anyhow::anyhow!(
+                    "Duplicate file format override for stream type '{}'",
+                    stream_type.trim()
+                ));
+            }
+        }
+
+        Ok(config)
+    }
+}
+
+impl Serialize for FileFormatConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for FileFormatConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
+    }
+}
+
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Config {
     pub auth: Auth,
@@ -615,6 +713,7 @@ pub struct Config {
     pub grpc: Grpc,
     pub route: Route,
     pub common: Common,
+    pub search: Search,
     pub limit: Limit,
     pub compact: Compact,
     pub cache_latest_files: CacheLatestFiles,
@@ -633,21 +732,12 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub enrichment_table: EnrichmentTable,
     pub slo: Slo,
+    pub alert_composite: AlertComposite,
 }
 
 /// Feature 5 — SLO measurement (`alerts_2.md` §6b).
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct Slo {
-    // Development is in progress; the default stays false until the feature
-    // ships. The UI follows this flag rather than duplicating the decision:
-    // it is published as `slo_enabled` on /config and MainLayout.vue hides the
-    // SLO menu entry while it is off.
-    #[env_config(
-        name = "ZO_SLO_ENABLED",
-        default = false,
-        help = "Enable SLO measurement and SLO-based alerts. Set false to switch the feature off entirely: no per-SLO ingest job is scheduled, nothing is written to the slo_slices stream, and the SLO APIs answer 501."
-    )]
-    pub enabled: bool,
     #[env_config(
         name = "ZO_SLO_INGEST_DELAY_SECS",
         default = 60,
@@ -702,6 +792,38 @@ pub struct Slo {
         help = "Max distinct (long, short) burn-rate window pairs precomputed per SLO per pass. Alerts share these, so the cost is per SLO, not per alert."
     )]
     pub max_burn_window_pairs: i64,
+}
+
+/// Composite alerts tunables (§19.2).
+///
+/// Writes are on by default; `ZO_ALERT_COMPOSITE_WRITES_ENABLED` is an opt-out
+/// kill-switch for operators who want to disable composite mutation.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct AlertComposite {
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_WRITES_ENABLED",
+        default = true,
+        help = "Enable composite-alert mutation (create/update/move/trigger). Opt-out kill-switch: set to \"false\" to disable."
+    )]
+    pub writes_enabled: bool,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_STALE_K",
+        default = 3,
+        help = "Multiplier on a child's evaluation cadence that marks it stale."
+    )]
+    pub stale_k: i64,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_SWEEP_SECS",
+        default = 300,
+        help = "Composite scheduler sweep interval in seconds."
+    )]
+    pub sweep_secs: i64,
+    #[env_config(
+        name = "ZO_ALERT_COMPOSITE_DEBOUNCE_SECS",
+        default = 15,
+        help = "Minimum seconds between composite evaluations (coalescing debounce)."
+    )]
+    pub debounce_secs: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -808,6 +930,12 @@ pub struct Auth {
     pub cookie_secure_only: bool,
     #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
     pub ext_auth_salt: String,
+    #[env_config(
+        name = "ZO_ALERT_CHART_SIGNING_KEY",
+        default = "",
+        help = "Secret used to sign stateless alert-chart render URLs. When empty (the default), a key is derived from the root user's stored password hash, which every node shares via the meta DB. Set explicitly to control rotation; rotating invalidates in-flight chart URLs (bounded by ZO_ALERT_CHART_URL_TTL)."
+    )]
+    pub alert_chart_signing_key: String,
     #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
     pub action_server_token: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
@@ -986,9 +1114,148 @@ pub struct Route {
 }
 
 #[derive(Serialize, EnvConfig, Default)]
+pub struct Search {
+    #[env_config(
+        name = "ZO_ENABLE_INVERTED_INDEX",
+        default = true,
+        help = "Toggle inverted index generation."
+    )]
+    pub inverted_index_enabled: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
+    pub feature_query_remove_filter_with_index: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle inverted index count optimizer."
+    )]
+    pub inverted_index_count_optimizer_enabled: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
+        default = false,
+        help = "Toggle tantivy result cache."
+    )]
+    pub inverted_index_result_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
+        default = 10000,
+        help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
+        default = 20480, // bytes, default is 20KB
+        help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entry_size: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 5% of total memory
+        help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
+    )]
+    pub inverted_index_footer_cache_max_size: usize,
+    #[env_config(
+        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
+        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
+    )]
+    pub bloom_footer_cache_max_size: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
+        default = 35,
+        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
+    )]
+    pub inverted_index_skip_threshold: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
+        default = 1000,
+        help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
+    )]
+    pub inverted_index_topn_max_group_num: usize,
+    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
+    pub feature_query_streaming_aggs: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
+        default = true,
+        help = "Enable pushdown filter"
+    )]
+    pub feature_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_METRICS_PUSHDOWN_FILTER_ENABLED",
+        default = false,
+        help = "Enable pushdown filter for metrics queries"
+    )]
+    pub feature_metrics_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
+        default = true,
+        help = "Enable dynamic pushdown filter"
+    )]
+    pub feature_dynamic_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
+        default = true,
+        help = "Enable single node optimize(used for debug, not document)"
+    )]
+    pub feature_single_node_optimize_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
+        default = true,
+        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
+    )]
+    pub feature_partial_reduce_enabled: bool,
+
+    #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
+    pub feature_join_match_one_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
+    )]
+    pub feature_join_right_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
+        default = true,
+        help = "Enable broadcast join"
+    )]
+    pub feature_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Max rows for left side of broadcast join, default to 10_000 rows"
+    )]
+    pub feature_broadcast_join_left_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_SIZE",
+        default = 0,
+        help = "Max size for left side of broadcast join, default to 10 MB"
+    )]
+    pub feature_broadcast_join_left_side_max_size: usize, // MB
+    #[env_config(
+        name = "ZO_FEATURE_ENRICHMENT_BROADCAST_JOIN_ENABLED",
+        default = true,
+        help = "Enable enrichment table broadcast join"
+    )]
+    pub feature_enrichment_broadcast_join_enabled: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
+    pub feature_query_exclude_all: bool,
+    #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
+    pub aggregation_topk_enabled: bool,
+    #[env_config(
+        name = "ZO_AGGREGATION_TOPK_HEAP_ENABLED",
+        default = true,
+        help = "Use the heap implementation for eligible aggregate TopK plans"
+    )]
+    pub aggregation_topk_heap_enabled: bool,
+    #[env_config(
+        name = "ZO_AGGREGATION_TOPK_HEAP_MAX_LIMIT",
+        default = 500,
+        help = "Maximum aggregate TopK limit that uses the heap implementation"
+    )]
+    pub aggregation_topk_heap_max_limit: u64,
+}
+
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Common {
-    #[env_config(name = "ZO_APP_NAME", default = "openobserve")]
-    pub app_name: String,
     #[env_config(name = "ZO_LOCAL_MODE", default = true)]
     pub local_mode: bool,
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
@@ -1059,6 +1326,9 @@ pub struct Common {
     /// server legitimately needs to send notifications to itself.
     #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
     pub ssrf_allow_loopback: bool,
+    // This will completely skip ssrf checks, not just localhost
+    #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
+    pub skip_ssrf_checks: bool,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
@@ -1080,9 +1350,9 @@ pub struct Common {
         name = "ZO_FILE_FORMAT",
         parse,
         default = "parquet",
-        help = "File format for data storage: parquet or vortex"
+        help = "Default file format for data storage with optional per-stream overrides, for example: parquet,metrics=vortex"
     )]
-    pub file_format: FileFormat,
+    pub file_format: FileFormatConfig,
     #[env_config(
         name = "ZO_VORTEX_USE_NATIVE_COMPRESSION",
         default = false,
@@ -1108,7 +1378,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_FEATURE_DEFAULT_INDEX_FIELDS_ENABLED",
         default = true,
-        help = "When false, the built-in default fields for full text search, secondary index and distinct values are disabled; only the fields from the *_EXTRA_FIELDS ENVs and per-stream settings are used"
+        help = "When false, the built-in default fields for full text search and secondary index are disabled; only the fields from the *_EXTRA_FIELDS ENVs and per-stream settings are used"
     )]
     pub feature_default_index_fields_enabled: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -1121,8 +1391,6 @@ pub struct Common {
         help = "Comma-separated fields to build bloom filter on for all streams, replaces the deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS"
     )]
     pub feature_bloom_filter_extra_fields: String,
-    #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
-    pub feature_distinct_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
     pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
@@ -1133,74 +1401,12 @@ pub struct Common {
         default = "file_num"
     )]
     pub feature_query_partition_strategy: QueryPartitionStrategy,
-    #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
-    pub feature_query_exclude_all: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
-    pub feature_query_remove_filter_with_index: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
-    pub feature_query_streaming_aggs: bool,
-    #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
-    pub feature_join_match_one_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
-        default = 0,
-        help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
-    )]
-    pub feature_join_right_side_max_rows: usize,
-    #[env_config(
-        name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
-        default = true,
-        help = "Enable broadcast join"
-    )]
-    pub feature_broadcast_join_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
-        default = 0,
-        help = "Max rows for left side of broadcast join, default to 10_000 rows"
-    )]
-    pub feature_broadcast_join_left_side_max_rows: usize,
-    #[env_config(
-        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_SIZE",
-        default = 0,
-        help = "Max size for left side of broadcast join, default to 10 MB"
-    )]
-    pub feature_broadcast_join_left_side_max_size: usize, // MB
-    #[env_config(
-        name = "ZO_FEATURE_ENRICHMENT_BROADCAST_JOIN_ENABLED",
-        default = true,
-        help = "Enable enrichment table broadcast join"
-    )]
-    pub feature_enrichment_broadcast_join_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
-        default = true,
-        help = "Enable pushdown filter"
-    )]
-    pub feature_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
-        default = true,
-        help = "Enable dynamic pushdown filter"
-    )]
-    pub feature_dynamic_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
-        default = true,
-        help = "Enable single node optimize(used for debug, not document)"
-    )]
-    pub feature_single_node_optimize_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_QUERY_SKIP_WAL",
         default = false,
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
-    #[env_config(
-        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
-        default = true,
-        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
-    )]
-    pub feature_partial_reduce_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
         default = false,
@@ -1287,6 +1493,12 @@ pub struct Common {
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
     pub tracing_search_enabled: bool,
+    #[env_config(
+        name = "ZO_TRACE_TIME_INDEX_ENABLED",
+        default = true,
+        help = "Enable per-stream trace time indexes and trace time-range lookup"
+    )]
+    pub trace_time_index_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "OTEL_OTLP_GRPC_ENDPOINT", default = "")]
@@ -1335,7 +1547,11 @@ pub struct Common {
     #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
     pub print_plan_single_line: bool,
     // usage reporting
-    #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
+    #[env_config(
+        name = "ZO_USAGE_REPORTING_ENABLED",
+        default = false,
+        help = "Report usage (metering) and error data. Does NOT cover trigger records: alert and report execution history is published unconditionally, because it is product history rather than telemetry and several features read it."
+    )]
     pub usage_enabled: bool,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
@@ -1415,30 +1631,6 @@ pub struct Common {
         help = "Control the redirection of a user to ingestion page in case there is no stream found."
     )]
     pub restricted_routes_on_empty_data: bool,
-    #[env_config(
-        name = "ZO_ENABLE_INVERTED_INDEX",
-        default = true,
-        help = "Toggle inverted index generation."
-    )]
-    pub inverted_index_enabled: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
-        default = false,
-        help = "Toggle tantivy result cache."
-    )]
-    pub inverted_index_result_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_OLD_FORMAT",
-        default = false,
-        help = "Use old format for inverted index, it will generate same stream name for index."
-    )]
-    pub inverted_index_old_format: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
-        default = true,
-        help = "Toggle inverted index count optimizer."
-    )]
-    pub inverted_index_count_optimizer_enabled: bool,
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
@@ -1539,8 +1731,6 @@ pub struct Common {
     pub model_pricing_sync_interval_secs: u64,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
-    #[env_config(name = "ZO_ES_VERSION", default = "")]
-    pub es_version: String,
     #[env_config(
         name = "ZO_CREATE_ORG_THROUGH_INGESTION",
         default = true,
@@ -1575,20 +1765,6 @@ pub struct Common {
     pub use_stream_settings_for_partitions_enabled: bool,
     #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
     pub dashboard_placeholder: String,
-    #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
-    pub aggregation_topk_enabled: bool,
-    #[env_config(
-        name = "ZO_DF_USE_AGG_TOPK_HEAP",
-        default = true,
-        help = "Use the heap implementation for eligible aggregate TopK plans"
-    )]
-    pub use_agg_topk_heap: bool,
-    #[env_config(
-        name = "ZO_DF_TOPK_HEAP_MAX_LIMIT",
-        default = 500,
-        help = "Maximum aggregate TopK limit that uses the heap implementation"
-    )]
-    pub agg_topk_heap_max_limit: u64,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
@@ -1619,12 +1795,6 @@ pub struct Common {
         help = "Which fields to show by default in logs search page. Valid values - all,uds,interesting"
     )]
     pub log_page_default_field_list: String,
-    #[env_config(
-        name = "ZO_TRACES_LIST_INDEX_ENABLED",
-        default = true,
-        help = "enable trace list index for traces"
-    )]
-    pub traces_list_index_enabled: bool,
     #[env_config(
         name = "ZO_INGESTION_LOG_ENABLED",
         default = true,
@@ -1803,12 +1973,18 @@ pub struct Limit {
     pub metrics_max_series_response: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
     pub metrics_cache_max_entries: usize,
-    #[env_config(name = "ZO_METRICS_INLIST_FILTER_ENABLED", default = false)]
-    pub metrics_inlist_filter_enabled: bool,
+    // Memory budget in MB for the PromQL series label cache. 0 (default)
+    // means auto: 5% of total memory, clamped to [100, 1024] MB.
+    #[env_config(name = "ZO_METRICS_LABEL_CACHE_MAX_SIZE", default = 0)]
+    pub metrics_label_cache_max_size: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
     pub node_heartbeat_ttl: i64,
+    // How long an o2-ai session->owner claim survives. Must exceed the longest
+    // expected conversation; mirrors o2-ai's O2_AI_SESSION_OWNER_TTL default.
+    #[env_config(name = "ZO_AI_SESSION_OWNER_TTL", default = 86400)] // seconds
+    pub ai_session_owner_ttl: i64,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)]
     pub http_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)]
@@ -1817,14 +1993,10 @@ pub struct Limit {
     pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
     pub grpc_runtime_blocking_worker_num: usize, // equals to 512 if 0
-    #[env_config(name = "ZO_GRPC_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
-    pub grpc_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_JOB_RUNTIME_WORKER_NUM", default = 0)]
     pub job_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_JOB_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
     pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
-    #[env_config(name = "ZO_JOB_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
-    pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_WAL_RUNTIME_WORKER_NUM", default = 0)]
     pub wal_runtime_worker_num: usize, // equals to mem_table_bucket_num if 0
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
@@ -1873,6 +2045,12 @@ pub struct Limit {
         help = "How often the multi-alert group lifecycle sweep runs, in seconds (alerts_2.md M-7). The sweep only decides fates on elapsed time, so it need not match any alert's frequency. 0 disables it, which stops vanished groups from ever resolving or being reaped."
     )]
     pub alert_group_sweep_interval: u64,
+    #[env_config(
+        name = "ZO_ALERT_EVAL_LEDGER_RETENTION_DAYS",
+        default = 97,
+        help = "How long the alert availability ledger (alert_eval_intervals) is kept, in days. This is the history every alert-based SLO measures against, so it must cover the longest SLO window (90 days) plus backfill headroom; lowering it below that silently freezes those SLOs for want of coverage. 0 or less disables the reaper."
+    )]
+    pub alert_eval_ledger_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(
@@ -1881,6 +2059,18 @@ pub struct Limit {
         help = "Time range in minutes for alert preview. If set to 0 (default), uses the alert's period value. If greater than 0, overrides period for preview."
     )]
     pub alert_preview_timerange_minutes: i64,
+    #[env_config(
+        name = "ZO_ALERT_TEST_SEND_PER_MINUTE",
+        default = 6,
+        help = "Per-user cap on alert-destination test-sends per minute. A test-send posts a real [TEST]-marked message to a real destination, so this bounds accidental or scripted spam of someone's channel/inbox. The cap is enforced PER PROCESS (in-memory, not cluster-shared) — a multi-node deployment's effective cap is N times this value, where N is the node count. 0 = unlimited."
+    )]
+    pub alert_test_send_per_minute: u32,
+    #[env_config(
+        name = "ZO_ALERT_CHART_ENABLED",
+        default = true,
+        help = "Global switch for chart images in alert notifications (per-template opt-in still required via the content template's chart toggle)."
+    )]
+    pub alert_chart_enabled: bool,
     #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
     pub report_schedule_timeout: i64,
     #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds
@@ -2024,8 +2214,6 @@ pub struct Limit {
     pub search_job_retention: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
-    #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]
-    pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_ENABLED", default = false)]
     pub quick_mode_enabled: bool,
     #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = true)]
@@ -2062,16 +2250,6 @@ pub struct Limit {
         help = "max time of transaction will retry"
     )]
     pub meta_transaction_retries: usize,
-    #[env_config(
-        name = "ZO_META_TRANSACTION_LOCK_TIMEOUT",
-        default = 600,
-        help = "timeout of transaction lock"
-    )] // seconds
-    pub meta_transaction_lock_timeout: usize,
-    #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
-    pub distinct_values_interval: u64,
-    #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
-    pub distinct_values_hourly: bool,
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
     #[env_config(
@@ -2096,42 +2274,6 @@ pub struct Limit {
     pub enrichment_table_max_size: usize,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
-        default = 10000,
-        help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_result_cache_max_entries: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
-        default = 20480, // bytes, default is 20KB
-        help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_result_cache_max_entry_size: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 5% of total memory
-        help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
-    )]
-    pub inverted_index_footer_cache_max_size: usize,
-    #[env_config(
-        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
-        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
-    )]
-    pub bloom_footer_cache_max_size: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
-        default = 35,
-        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
-    )]
-    pub inverted_index_skip_threshold: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
-        default = 1000,
-        help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
-    )]
-    pub inverted_index_topn_max_group_num: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_MIN_TOKEN_LENGTH",
         default = 2,
@@ -2249,7 +2391,13 @@ pub struct Compact {
     pub old_data_min_hours: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
     pub old_data_min_files: i64,
-    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
+    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_MINUTES", default = 120)] // minutes
+    pub delete_files_delay_minutes: i64,
+    #[deprecated(
+        since = "0.92.2",
+        note = "Please use `ZO_COMPACT_DELETE_FILES_DELAY_MINUTES` instead. This ENV will be removed in a future release"
+    )]
+    #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 0)] // hours
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
@@ -2447,8 +2595,6 @@ pub struct Nats {
     pub deliver_policy: String,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
-    #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
-    pub command_timeout: u64,
     #[env_config(name = "ZO_NATS_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
     #[env_config(name = "ZO_NATS_SUB_CAPACITY", default = 65535)]
@@ -2533,8 +2679,6 @@ pub struct S3 {
         help = "Use STANDARD_IA storage class for compliance storage type"
     )]
     pub feature_force_infrequent_access: bool,
-    #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
-    pub sync_to_cache_interval: u64,
     #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
     pub max_retries: usize,
     #[env_config(name = "ZO_S3_MAX_IDLE_PER_HOST", default = 0)]
@@ -2646,12 +2790,6 @@ pub struct Pipeline {
         help = "Enable batching of entries before sending HTTP requests"
     )]
     pub batch_enabled: bool,
-    #[env_config(
-        name = "ZO_PIPELINE_BATCH_SIZE",
-        default = 100,
-        help = "Maximum number of entries to batch together"
-    )]
-    pub batch_size: usize,
     #[env_config(
         name = "ZO_PIPELINE_BATCH_TIMEOUT_MS",
         default = 1000,
@@ -3268,22 +3406,22 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check for join match one
-    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows == 0
+    if cfg.search.feature_join_match_one_enabled && cfg.search.feature_join_right_side_max_rows == 0
     {
-        cfg.common.feature_join_right_side_max_rows = 50_000;
+        cfg.search.feature_join_right_side_max_rows = 50_000;
     }
 
     // check for broadcast join left side max rows
-    if cfg.common.feature_broadcast_join_enabled
-        && cfg.common.feature_broadcast_join_left_side_max_rows == 0
+    if cfg.search.feature_broadcast_join_enabled
+        && cfg.search.feature_broadcast_join_left_side_max_rows == 0
     {
-        cfg.common.feature_broadcast_join_left_side_max_rows = 10_000;
+        cfg.search.feature_broadcast_join_left_side_max_rows = 10_000;
     }
 
-    if cfg.common.feature_broadcast_join_enabled
-        && cfg.common.feature_broadcast_join_left_side_max_size == 0
+    if cfg.search.feature_broadcast_join_enabled
+        && cfg.search.feature_broadcast_join_left_side_max_size == 0
     {
-        cfg.common.feature_broadcast_join_left_side_max_size = 10; // 10 MB
+        cfg.search.feature_broadcast_join_left_side_max_size = 10; // 10 MB
     }
 
     if cfg.common.default_hec_stream.is_empty() {
@@ -3520,23 +3658,23 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_default_limit = 1000;
     }
 
-    if cfg.limit.inverted_index_footer_cache_max_size == 0 {
-        cfg.limit.inverted_index_footer_cache_max_size =
+    if cfg.search.inverted_index_footer_cache_max_size == 0 {
+        cfg.search.inverted_index_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.search.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
-    if cfg.limit.bloom_footer_cache_max_size == 0 {
+    if cfg.search.bloom_footer_cache_max_size == 0 {
         // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
         // order of magnitude smaller than tantivy footers (footer payload
         // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
         // `.bf`), so the cache holds 4-32 K entries at this size.
-        cfg.limit.bloom_footer_cache_max_size =
+        cfg.search.bloom_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.search.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
@@ -3583,7 +3721,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // disable disk cache for local disk storage
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
-        && !cfg.common.feature_query_streaming_aggs
+        && !cfg.search.feature_query_streaming_aggs
     {
         cfg.disk_cache.enabled = false;
     }
@@ -3591,7 +3729,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // disable result cache if disk cache is disabled
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
-        cfg.common.feature_query_streaming_aggs = false;
+        cfg.search.feature_query_streaming_aggs = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();
@@ -3717,8 +3855,14 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.max_file_size = 512;
     }
     cfg.compact.max_file_size *= 1024 * 1024;
-    if cfg.compact.delete_files_delay_hours < 1 {
-        cfg.compact.delete_files_delay_hours = 2;
+    if cfg.compact.delete_files_delay_minutes < 1 {
+        cfg.compact.delete_files_delay_minutes = 120;
+    }
+    // Backward compatibility: if the deprecated ZO_COMPACT_DELETE_FILES_DELAY_HOURS is
+    // explicitly set (default is 0, so > 0 means user provided a value), convert to minutes.
+    #[allow(deprecated)]
+    if cfg.compact.delete_files_delay_hours > 0 {
+        cfg.compact.delete_files_delay_minutes = cfg.compact.delete_files_delay_hours * 60;
     }
 
     if cfg.compact.data_retention_interval < 1 {
@@ -3911,14 +4055,14 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.limit.inverted_index_result_cache_max_entries == 0 {
-        cfg.limit.inverted_index_result_cache_max_entries = 10000;
+    if cfg.search.inverted_index_result_cache_max_entries == 0 {
+        cfg.search.inverted_index_result_cache_max_entries = 10000;
     }
-    if cfg.limit.inverted_index_result_cache_max_entry_size == 0 {
-        cfg.limit.inverted_index_result_cache_max_entry_size = 20480;
+    if cfg.search.inverted_index_result_cache_max_entry_size == 0 {
+        cfg.search.inverted_index_result_cache_max_entry_size = 20480;
     }
-    if cfg.limit.inverted_index_skip_threshold == 0 {
-        cfg.limit.inverted_index_skip_threshold = 35;
+    if cfg.search.inverted_index_skip_threshold == 0 {
+        cfg.search.inverted_index_skip_threshold = 35;
     }
     if cfg.limit.inverted_index_min_token_length == 0 {
         cfg.limit.inverted_index_min_token_length = 2;
@@ -4150,6 +4294,59 @@ mod tests {
     }
 
     #[test]
+    fn test_file_format_config_from_str() {
+        let config = " parquet , LOGS=vortex, metrics = vortex, traces=parquet "
+            .parse::<FileFormatConfig>()
+            .unwrap();
+
+        assert_eq!(config.for_stream(StreamType::Logs), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Metrics), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Traces), FileFormat::Parquet);
+        assert_eq!(config.for_stream(StreamType::Metadata), FileFormat::Parquet);
+        assert_eq!(
+            config.to_string(),
+            "parquet,logs=vortex,metrics=vortex,traces=parquet"
+        );
+
+        let config = "vortex".parse::<FileFormatConfig>().unwrap();
+        assert_eq!(config.for_stream(StreamType::Logs), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Metrics), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Traces), FileFormat::Vortex);
+    }
+
+    #[test]
+    fn test_file_format_config_rejects_invalid_values() {
+        for value in [
+            "",
+            "metrics=vortex",
+            "parquet,logs",
+            "parquet,unknown=vortex",
+            "parquet,metrics=unknown",
+            "parquet,logs=vortex,LOGS=parquet",
+            "parquet,vortex",
+        ] {
+            assert!(
+                value.parse::<FileFormatConfig>().is_err(),
+                "'{value}' should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_file_format_config_serde_as_string() {
+        let config = "parquet,metrics=vortex"
+            .parse::<FileFormatConfig>()
+            .unwrap();
+        let serialized = serde_json::to_string(&config).unwrap();
+
+        assert_eq!(serialized, r#""parquet,metrics=vortex""#);
+        assert_eq!(
+            serde_json::from_str::<FileFormatConfig>(&serialized).unwrap(),
+            config
+        );
+    }
+
+    #[test]
     fn test_file_format_from_extension() {
         assert_eq!(
             FileFormat::from_extension("data.parquet"),
@@ -4169,13 +4366,16 @@ mod tests {
     }
 
     #[test]
-    fn test_common_config_preserves_vortex_file_format() {
+    fn test_common_config_preserves_file_format_overrides() {
         let mut cfg = Config::init().unwrap();
-        cfg.common.file_format = FileFormat::Vortex;
+        cfg.common.file_format = "parquet,metrics=vortex".parse().unwrap();
 
         check_common_config(&mut cfg).unwrap();
 
-        assert_eq!(cfg.common.file_format, FileFormat::Vortex);
+        assert_eq!(
+            cfg.common.file_format,
+            "parquet,metrics=vortex".parse().unwrap()
+        );
     }
 
     #[test]
@@ -4355,15 +4555,15 @@ mod tests {
     #[test]
     fn test_check_inverted_index_config_defaults() {
         let mut cfg = Config::default();
-        cfg.limit.inverted_index_result_cache_max_entries = 0;
-        cfg.limit.inverted_index_result_cache_max_entry_size = 0;
-        cfg.limit.inverted_index_skip_threshold = 0;
+        cfg.search.inverted_index_result_cache_max_entries = 0;
+        cfg.search.inverted_index_result_cache_max_entry_size = 0;
+        cfg.search.inverted_index_skip_threshold = 0;
         cfg.limit.inverted_index_min_token_length = 0;
         cfg.limit.inverted_index_max_token_length = 0;
         check_inverted_index_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.inverted_index_result_cache_max_entries, 10000);
-        assert_eq!(cfg.limit.inverted_index_result_cache_max_entry_size, 20480);
-        assert_eq!(cfg.limit.inverted_index_skip_threshold, 35);
+        assert_eq!(cfg.search.inverted_index_result_cache_max_entries, 10000);
+        assert_eq!(cfg.search.inverted_index_result_cache_max_entry_size, 20480);
+        assert_eq!(cfg.search.inverted_index_skip_threshold, 35);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 2);
         assert_eq!(cfg.limit.inverted_index_max_token_length, 64);
     }
@@ -4371,11 +4571,11 @@ mod tests {
     #[test]
     fn test_check_inverted_index_config_preserves_existing() {
         let mut cfg = Config::default();
-        cfg.limit.inverted_index_result_cache_max_entries = 5000;
+        cfg.search.inverted_index_result_cache_max_entries = 5000;
         cfg.limit.inverted_index_min_token_length = 3;
         cfg.limit.inverted_index_max_token_length = 32;
         check_inverted_index_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.inverted_index_result_cache_max_entries, 5000);
+        assert_eq!(cfg.search.inverted_index_result_cache_max_entries, 5000);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 3);
         assert_eq!(cfg.limit.inverted_index_max_token_length, 32);
     }
@@ -4501,12 +4701,14 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
         let mut cfg = Config::default();
         cfg.compact.data_retention_days = 0;
         cfg.compact.interval = 0;
         cfg.compact.max_file_size = 0;
         cfg.compact.delete_files_delay_hours = 0;
+        cfg.compact.delete_files_delay_minutes = 0;
         cfg.compact.data_retention_interval = 0;
         cfg.compact.old_data_interval = 0;
         cfg.compact.old_data_max_days = 0;
@@ -4518,7 +4720,8 @@ mod tests {
         check_compact_config(&mut cfg).unwrap();
         assert_eq!(cfg.compact.interval, 10);
         assert_eq!(cfg.compact.max_file_size, 512 * 1024 * 1024);
-        assert_eq!(cfg.compact.delete_files_delay_hours, 2);
+        assert_eq!(cfg.compact.delete_files_delay_hours, 0);
+        assert_eq!(cfg.compact.delete_files_delay_minutes, 120);
         assert_eq!(cfg.compact.data_retention_interval, 3600);
         assert_eq!(cfg.compact.old_data_interval, 3600);
         assert_eq!(cfg.compact.old_data_max_days, 7);

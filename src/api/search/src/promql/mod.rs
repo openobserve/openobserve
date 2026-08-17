@@ -182,7 +182,7 @@ async fn query(
         use crate::service::auth::AuthExtractor;
 
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
-        let mut visitor = promql::name_visitor::MetricNameVisitor::default();
+        let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         if !db::user::is_root_user(user_email) {
@@ -200,7 +200,7 @@ async fn query(
                             OFGA_MODELS
                                 .get(stream_type_str)
                                 .map_or(stream_type_str, |model| model.key),
-                            name
+                            openobserve_core::auth::into_ofga_supported_format(&name)
                         ),
                         org_id: org_id.to_string(),
                         bypass_check: false,
@@ -471,7 +471,7 @@ async fn query_range(
                     .into_response();
             }
         };
-        let mut visitor = promql::name_visitor::MetricNameVisitor::default();
+        let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         if !db::user::is_root_user(user_email) {
@@ -490,7 +490,7 @@ async fn query_range(
                                 OFGA_MODELS
                                     .get(stream_type_str)
                                     .map_or(stream_type_str, |model| model.key),
-                                name
+                                openobserve_core::auth::into_ofga_supported_format(&name)
                             ),
                             org_id: org_id.to_string(),
                             bypass_check: false,
@@ -846,7 +846,7 @@ async fn series(
                             OFGA_MODELS
                                 .get(stream_type_str)
                                 .map_or(stream_type_str, |model| model.key),
-                            metric_name
+                            openobserve_core::auth::into_ofga_supported_format(&metric_name)
                         ),
                         org_id: org_id.to_string(),
                         bypass_check: false,

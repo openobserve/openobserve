@@ -13,6 +13,13 @@ import {
 import { STEPPER_CONTEXT_KEY, STEPPER_REGISTER_KEY } from "./OStepper.types";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+
+// Multi-root template: Vue drops consumer attrs instead of inheriting them, so
+// a class passed to <OStep> silently vanished. Forwarded explicitly onto the
+// content panel — consumers size the pane through it (e.g. `h-full!`, which a
+// percentage-height child like OSplitter needs to resolve against).
+defineOptions({ inheritAttrs: false });
+
 const props = withDefaults(defineProps<OStepProps>(), {
   done: false,
   error: false,
@@ -186,7 +193,9 @@ const triggerClasses = computed<string>(() => {
     The header (indicator circle + title) is above the indented content area.
     The connecting line is the left border on the content area.
   -->
-  <div v-if="isVertical" class="o-step flex min-w-0 flex-row">
+  <!-- Vertical has a single root, so attrs go here — on the whole step, the way
+       they landed before inheritAttrs was turned off, not on the content panel. -->
+  <div v-if="isVertical" class="o-step flex min-w-0 flex-row" v-bind="$attrs">
     <!-- Left column: indicator + vertical connector line -->
     <div class="me-3 flex shrink-0 flex-col items-center">
       <!-- Indicator circle (the clickable trigger in vertical mode) -->
@@ -275,7 +284,13 @@ const triggerClasses = computed<string>(() => {
   -->
   <template v-else>
     <!-- Expanded (checklist) mode: always rendered, no transition. -->
-    <div v-if="expanded" class="o-step-content w-full min-w-0" role="region" :aria-label="title">
+    <div
+      v-if="expanded"
+      class="o-step-content w-full min-w-0"
+      v-bind="$attrs"
+      role="region"
+      :aria-label="title"
+    >
       <slot />
     </div>
     <template v-else>
@@ -291,6 +306,7 @@ const triggerClasses = computed<string>(() => {
           v-if="isActive"
           :key="name"
           class="o-step-content w-full min-w-0"
+          v-bind="$attrs"
           role="region"
           :aria-label="title"
         >
@@ -300,6 +316,7 @@ const triggerClasses = computed<string>(() => {
       <div
         v-else-if="!animated && isActive"
         class="o-step-content w-full min-w-0"
+        v-bind="$attrs"
         role="region"
         :aria-label="title"
       >

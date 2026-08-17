@@ -28,6 +28,80 @@ export default class DashboardPanelTime {
     this.dashboardFullscreenBtn = page.locator('[data-test="dashboard-fullscreen-btn"]');
     this.globalRefreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
     this.calendarRoot = page.locator('[data-test="daterangecalendar-root"]');
+
+    // Config-panel (AddPanel) panel-time controls
+    this.setPanelTimeBtn = page.locator('[data-test="dashboard-config-set-panel-time"]');
+    this.cancelPanelTimeBtn = page.locator('[data-test="dashboard-config-cancel-panel-time"]');
+    this.panelTimePickerWrapper = page.locator('[data-test="dashboard-config-panel-time-picker"]');
+  }
+
+  // =========================================
+  // SIMPLE LOCATOR GETTERS
+  // =========================================
+
+  /** Panel bar (hover target that reveals panel controls) */
+  getPanelBar() {
+    return this.panelBar;
+  }
+
+  /** Panel fullscreen button */
+  getPanelFullscreenBtn() {
+    return this.panelFullscreenBtn;
+  }
+
+  /** View-panel (fullscreen) screen container */
+  getViewPanelScreen() {
+    return this.viewPanelScreen;
+  }
+
+  /** View-panel close button */
+  getViewPanelCloseBtn() {
+    return this.viewPanelCloseBtn;
+  }
+
+  /** Config-panel "+Set" panel-time button */
+  getSetPanelTimeBtn() {
+    return this.setPanelTimeBtn;
+  }
+
+  /** Config-panel Cancel (X) panel-time button */
+  getCancelPanelTimeBtn() {
+    return this.cancelPanelTimeBtn;
+  }
+
+  /** Config-panel time picker wrapper */
+  getConfigPanelTimePicker() {
+    return this.panelTimePickerWrapper;
+  }
+
+  /** Config-panel time picker displayed text */
+  async getConfigPanelTimePickerText() {
+    return await this.panelTimePickerWrapper.textContent();
+  }
+
+  /** Wait for the date-time menu to become visible */
+  async waitForDateTimeMenuVisible(timeout = 5000) {
+    await this.dateTimeMenu.waitFor({ state: "visible", timeout });
+  }
+
+  /** Wait for the date-time menu to be hidden (swallows timeout) */
+  async waitForDateTimeMenuHidden(timeout = 3000) {
+    await this.dateTimeMenu.waitFor({ state: "hidden", timeout }).catch(() => {});
+  }
+
+  /** Click a relative time button inside an open date-time picker (page-level) */
+  async clickDateTimeRelative(timeRange) {
+    await this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).click();
+  }
+
+  /** Click the date-time Apply button (page-level) */
+  async clickDateTimeApplyBtn() {
+    await this.page.locator('[data-test="date-time-apply-btn"]').click();
+  }
+
+  /** Click the panel discard button (swallows errors; does not accept the dialog) */
+  async clickPanelDiscard() {
+    await this.panelDiscardBtn.click().catch(() => {});
   }
 
   // =========================================

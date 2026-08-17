@@ -20,7 +20,7 @@ the Free Software Foundation, either version 3 of the License, or
       class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="score-config-library-error"
     >
-      <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
+      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
       <div class="text-status-error-text">{{ loadError }}</div>
       <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
         {{ t("common.retry") }}

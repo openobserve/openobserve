@@ -40,6 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Composer: location inputs + platform tabs + composed command -->
         <template v-if="canCompose">
           <div class="rounded-default border-border-default flex flex-col gap-3 border p-3">
+            <OInput
+              v-if="!locationId"
+              v-model="draftLocation"
+              :label="t('synthetics.privateLocations.setup.locationNameLabel')"
+              :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
+              required
+              size="sm"
+              data-test="synthetics-agent-setup-location-input"
+            />
             <div class="flex flex-col gap-1">
               <OInput
                 v-model="draftAgentName"
@@ -52,15 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("synthetics.privateLocations.setup.agentNameHint") }}
               </p>
             </div>
-            <OInput
-              v-if="!locationId"
-              v-model="draftLocation"
-              :label="t('synthetics.privateLocations.setup.locationNameLabel')"
-              :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
-              required
-              size="sm"
-              data-test="synthetics-agent-setup-location-input"
-            />
           </div>
 
           <!-- Which agent to install. The two are different programs, not two
@@ -72,7 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-muted text-xs font-medium uppercase">
               {{ t("synthetics.privateLocations.setup.typeTitle") }}
             </span>
-            <OTabs v-model="agentType" dense bordered data-test="synthetics-agent-setup-type-tabs">
+            <OTabs
+              v-model="selectedAgentType"
+              dense
+              bordered
+              data-test="synthetics-agent-setup-type-tabs"
+            >
               <OTab name="protocol" :label="t('synthetics.privateLocations.setup.typeProtocol')" />
               <OTab name="browser" :label="t('synthetics.privateLocations.setup.typeBrowser')" />
             </OTabs>
@@ -107,8 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre
               class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
               data-test="synthetics-agent-setup-install-cmd"
-              >{{ composedCommand }}</pre
-            >
+              >{{ composedCommand }}</pre>
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -126,8 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <pre
             class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
             data-test="synthetics-agent-setup-install-cmd"
-            >{{ install }}</pre
-          >
+            >{{ install }}</pre>
           <OButton
             variant="ghost"
             size="icon-sm"
@@ -207,11 +210,11 @@ const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 const { t } = useI18nTyped();
 
 const platform = ref<string | number>("docker");
-const agentType = ref<string | number>("protocol");
+const selectedAgentType = ref<string | number>("protocol");
 const draftLocation = ref("");
 const draftAgentName = ref("");
 
-const isBrowser = computed(() => agentType.value === "browser");
+const isBrowser = computed(() => selectedAgentType.value === "browser");
 
 // The browser probe is container-only, so switching to it while sitting on a
 // native-binary tab has to move the platform too — otherwise the hidden tab
@@ -229,7 +232,7 @@ watch(
     // The caller's agentType is the opening default (the browser check page
     // opens this wanting a browser agent), not a lock — the operator can flip
     // tabs to install the other kind for the same location.
-    agentType.value = props.agentType || "protocol";
+    selectedAgentType.value = props.agentType || "protocol";
     // Start BLANK (not an auto-generated `private-location-XXXX`) so the operator
     // deliberately names the location — and reuses that name across agents (a
     // location is a pool of interchangeable agents, not one location per agent).

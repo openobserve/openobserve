@@ -39,7 +39,6 @@ vi.mock("@/composables/useCorrelatedLogs", () => ({
     fetchCorrelatedLogs: vi.fn(),
     updateFilter: vi.fn(),
     updateFilters: vi.fn(),
-    resetFilters: vi.fn(),
     refresh: vi.fn(),
     isMatchedDimension: vi.fn(() => false),
     isAdditionalDimension: vi.fn(() => false),
@@ -543,20 +542,6 @@ describe("CorrelatedLogsTable.vue", () => {
   });
 
   describe("Computed Properties", () => {
-    it("should compute showingDefaultColumns correctly when only timestamp is visible", () => {
-      wrapper = createWrapper();
-      wrapper.vm.visibleColumns = new Set(["_timestamp"]);
-
-      expect(wrapper.vm.showingDefaultColumns).toBe(true);
-    });
-
-    it("should compute showingDefaultColumns correctly when multiple fields are visible", () => {
-      wrapper = createWrapper();
-      wrapper.vm.visibleColumns = new Set(["_timestamp", "field1"]);
-
-      expect(wrapper.vm.showingDefaultColumns).toBe(false);
-    });
-
     it("should compute availableFields from search results", async () => {
       const mockResults = [
         { _timestamp: 123, field1: "a", field2: "b" },

@@ -26,7 +26,7 @@ limitations under the License.
       <div
         v-if="type === 'slack'"
         data-test="slack-preview"
-        class="slack-message border-border-default rounded-default mx-auto max-w-150 border bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="slack-message border-border-default rounded-default mx-auto max-w-150 border bg-white p-4 shadow-sm"
       >
         <div class="slack-message-container flex gap-3">
           <div class="slack-avatar">
@@ -102,7 +102,7 @@ limitations under the License.
       <div
         v-if="type === 'msteams'"
         data-test="msteams-preview"
-        class="teams-card rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-border-2)] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="teams-card rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-border-2)] bg-white shadow-sm"
       >
         <div data-test="msteams-card-content" class="teams-card-content">
           <div class="teams-header bg-brand-teams-hover p-4 text-white">
@@ -183,7 +183,7 @@ limitations under the License.
       <div
         v-if="type === 'email'"
         data-test="email-preview"
-        class="email-client rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="email-client rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-sm"
       >
         <div
           class="email-header border-b border-[var(--color-brand-msg-border)] bg-[var(--color-brand-msg-bg)] p-4"
@@ -291,7 +291,7 @@ limitations under the License.
       <div
         v-if="type === 'pagerduty'"
         data-test="pagerduty-preview"
-        class="pagerduty-incident rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="pagerduty-incident rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-sm"
       >
         <div
           class="pagerduty-header flex items-center justify-between bg-[var(--color-brand-slack-green)] p-4 text-white"
@@ -333,7 +333,7 @@ limitations under the License.
       <div
         v-if="type === 'servicenow'"
         data-test="servicenow-preview"
-        class="servicenow-incident rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="servicenow-incident rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-sm"
       >
         <div
           class="servicenow-header flex items-center justify-between bg-[var(--color-brand-slack-avatar)] p-4 text-white"
@@ -375,7 +375,7 @@ limitations under the License.
       <div
         v-if="type === 'opsgenie'"
         data-test="opsgenie-preview"
-        class="opsgenie-alert rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="opsgenie-alert rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-sm"
       >
         <div
           class="opsgenie-header flex items-center justify-between bg-[var(--color-brand-email-ink)] p-4 text-white"

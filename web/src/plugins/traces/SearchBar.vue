@@ -362,7 +362,6 @@ import {
   watch,
   nextTick,
   defineAsyncComponent,
-  onBeforeUnmount,
   onActivated,
   computed,
   toRef,
@@ -736,17 +735,15 @@ export default defineComponent({
     // Remove all conditions for a given field from the editor value.
     // Used by parent (Index.vue) to clear the error-only filter on toggle-off.
     const removeFilterByField = (fieldName: string) => {
-      const value = searchObj.data.editorValue;
-      const parts = value.split("|");
-      const target = parts.length > 1 ? 1 : 0;
-      const replaced = replaceExistingFieldCondition(parts[target] as string, fieldName, "");
-      parts[target] = replaced
+      // The whole editor value is the where clause — never split it on "|", the
+      // split is quote-unaware and would corrupt match_all('text | error').
+      const value = searchObj.data.editorValue as string;
+      const newValue = replaceExistingFieldCondition(value, fieldName, "")
         .replace(/\s*\band\b\s*$/i, "")
         .replace(/^\s*\band\b\s*/i, "")
         .replace(/\s+and\s+and\s+/gi, " and ")
         .trim();
-      const newValue = parts.length > 1 ? parts.join("| ") : parts[0];
-      searchObj.data.editorValue = newValue as string;
+      searchObj.data.editorValue = newValue;
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(newValue);
       if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");

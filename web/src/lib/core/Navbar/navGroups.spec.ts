@@ -38,12 +38,13 @@ describe("groupNavLinks", () => {
       link("settings"),
     ];
     // Output mirrors the input order exactly (no reordering). Only alertList
-    // changes shape — it collapses into the Reliability tile in its own slot.
+    // changes shape — it collapses into the Reliability tile in its own slot —
+    // and traces, which keeps its slot but gains its NAV_SUBNAV flyout.
     expect(keysOf(groupNavLinks(input))).toEqual([
       "link:home",
       "link:logs",
       "link:metrics",
-      "link:traces",
+      "linkGroup:traces",
       "link:rum",
       "link:dashboards",
       "linkGroup:reliability",
@@ -309,7 +310,8 @@ describe("groupNavLinks", () => {
     ]);
     // None of them carry a hover submenu anymore.
     expect(entries.some((e) => e.type === "linkGroup")).toBe(false);
-    expect(NAV_SUBNAV).toEqual({});
+    // Traces is the only top-level link with a subnav flyout.
+    expect(Object.keys(NAV_SUBNAV)).toEqual(["traces"]);
   });
 
   it("keeps unknown/new items as plain links in place", () => {

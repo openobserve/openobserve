@@ -44,8 +44,6 @@ const props = defineProps({
 useVueFlow();
 
 const path = computed(() => getBezierPath(props));
-
-let clickTimeout = null;
 </script>
 
 <script>
