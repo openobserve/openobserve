@@ -13223,6 +13223,8 @@
     "unroutedFires": "{count} fire, 30d | {count} fires, 30d",
     "unroutedClaimFor": "Claim for {team}",
     "unroutedWriteRule": "Write the rule",
+    "unroutedAbsorbedBy": "caught by {team}",
+    "unroutedPagedNobody": "paged nobody",
     "unroutedLoadFailed": "Could not load the unrouted queue",
     "routingLoadFailed": "Could not load ownership and routing",
     "ruleRoutesTo": "Routes to",

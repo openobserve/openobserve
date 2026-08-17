@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OnCallUnroutedQueue
         v-else
         :signals="signals"
+        :teams="teams"
         :loading="loadingSignals"
         @claim="openClaim"
         @dismiss="dismissSignal"

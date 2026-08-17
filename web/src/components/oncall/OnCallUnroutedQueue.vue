@@ -74,6 +74,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </code>
         </span>
 
+        <!-- §G.3: two different emergencies share this queue. A row the default
+             team absorbed is an ownership gap that PAGED somebody; a row with
+             no `defaulted_team_id` woke nobody at all. An operator triages
+             those in opposite orders, so the row must say which it is. -->
+        <OTag
+          v-if="signal.defaulted_team_id"
+          variant="warning-soft"
+          size="sm"
+          class="shrink-0"
+          :data-test="`oncall-unrouted-defaulted-${signal.id}`"
+        >
+          {{ t("oncall.unroutedAbsorbedBy", { team: raw(teamNameOf(signal.defaulted_team_id)) }) }}
+        </OTag>
+        <OTag
+          v-else
+          variant="error-soft"
+          size="sm"
+          class="shrink-0"
+          :data-test="`oncall-unrouted-nobody-${signal.id}`"
+        >
+          {{ t("oncall.unroutedPagedNobody") }}
+        </OTag>
+
         <span class="text-text-secondary ms-auto shrink-0 text-xs">
           {{ t("oncall.unroutedFires", { count: signal.occurrences }, signal.occurrences) }}
         </span>
@@ -106,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
@@ -119,10 +143,12 @@ const props = withDefaults(
     signals?: UnroutedSignal[];
     /** The team a claim would assign to — this screen's team. */
     teamName?: string;
+    /** Resolves `defaulted_team_id` to a name the operator recognises. */
+    teams?: { id: string; name: string }[];
     loading?: boolean;
     claiming?: boolean;
   }>(),
-  { signals: () => [], teamName: "", loading: false, claiming: false },
+  { signals: () => [], teamName: "", teams: () => [], loading: false, claiming: false },
 );
 
 const emit = defineEmits<{
@@ -145,6 +171,12 @@ function titleOf(signal: UnroutedSignal): I18nText {
 /// written against.
 function pathOf(signal: UnroutedSignal): string {
   return dimensionsSentence(signal.dimensions) || signal.path;
+}
+
+/// The id is the honest fallback: it is what the wire said, and a renamed or
+/// deleted team should not make the row lie about who was paged.
+function teamNameOf(teamId: string): string {
+  return props.teams.find((team) => team.id === teamId)?.name || teamId;
 }
 
 /// Only the identity dimensions — the ones the claim will write into a rule.

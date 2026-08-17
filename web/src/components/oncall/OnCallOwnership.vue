@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OnCallUnroutedQueue
       :signals="signals"
       :team-name="teamName"
+      :teams="teams"
       :loading="loadingSignals"
       :claiming="claiming"
       @claim="claimSignal"

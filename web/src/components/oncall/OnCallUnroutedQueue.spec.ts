@@ -23,6 +23,7 @@ import store from "@/test/unit/helpers/store";
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
+  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
   OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: { name: "OButton", template: "<button><slot /></button>" },
 };
@@ -88,6 +89,39 @@ describe("OnCallUnroutedQueue", () => {
     const wrapper = render();
     await wrapper.find('[data-test="oncall-unrouted-dismiss-s1"]').trigger("click");
     expect(wrapper.emitted("dismiss")?.[0][0]).toMatchObject({ id: "s1" });
+  });
+
+  /// §G.3: `defaulted_team_id` present means the catch-all absorbed the gap —
+  /// somebody WAS paged. Absent means nobody was woken at all. An operator
+  /// triages those in opposite orders, so each row says which it is.
+  it("splits the queue's two emergencies: caught by the default team vs paged nobody", () => {
+    const wrapper = mount(OnCallUnroutedQueue, {
+      props: {
+        signals: [signal(), signal({ id: "s2", defaulted_team_id: "team_9" })],
+        teams: [{ id: "team_9", name: "Platform" }],
+        teamName: "Payments",
+      },
+      global: { plugins: [i18n, store], stubs },
+    });
+    const nobody = wrapper.find('[data-test="oncall-unrouted-nobody-s1"]');
+    expect(nobody.text()).toContain("paged nobody");
+    const caught = wrapper.find('[data-test="oncall-unrouted-defaulted-s2"]');
+    expect(caught.text()).toContain("Platform");
+    // A row cannot claim both facts.
+    expect(wrapper.find('[data-test="oncall-unrouted-defaulted-s1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-unrouted-nobody-s2"]').exists()).toBe(false);
+  });
+
+  /// The wire said who was paged; a team the caller has not loaded (or one
+  /// since deleted) must not turn that into a blank.
+  it("falls back to the raw team id when the default team is not in the list", () => {
+    const wrapper = mount(OnCallUnroutedQueue, {
+      props: { signals: [signal({ defaulted_team_id: "team_gone" })] },
+      global: { plugins: [i18n, store], stubs },
+    });
+    expect(wrapper.find('[data-test="oncall-unrouted-defaulted-s1"]').text()).toContain(
+      "team_gone",
+    );
   });
 
   /// The org screen hosts the queue with no team of its own: a claim starts by
