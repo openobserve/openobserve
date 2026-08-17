@@ -746,24 +746,13 @@ describe("SpanBlock", () => {
       expect(markers()[0].attributes("aria-label")!.length).toBeLessThan(120);
     });
 
-    // The bar is 8px. A tick of the same height replaces it rather than
-    // annotating it; the benign tiers sit at 6px, leaving 1px of bar visible
-    // above and below so the bar reads through. Error overhangs instead — see
-    // the tier-height test below.
-    it("renders a benign tick shorter than the bar so the bar reads through", async () => {
-      await setEvents([{ name: "a", _timestamp: eventNsAt(0.4) }]);
-
-      expect(markers()[0].attributes("data-event-severity")).toBe("info");
-      expect(markers()[0].classes()).toContain("h-1.5");
-      expect(markers()[0].classes()).not.toContain("rounded-full");
-    });
-
-    // Error is 1.5x the 8px bar (h-3 = 12px), so it overhangs by 2px above and
-    // below. An overhanging stroke crosses the bar rather than sitting inside
-    // it, and it puts part of every error tick on the row background — a known
-    // luminance — so its ring is not the only thing separating it from an
-    // unlucky service colour.
-    it("overhangs the bar for the error tier only", async () => {
+    // Every tick is h-3 (12px) against the 8px bar — 1.5x, so it overhangs by
+    // 2px above and below. A stroke that crosses the bar reads as an annotation
+    // on it; an enclosed tick competed with the bar for the same few pixels and
+    // looked like it was replacing the span. Overhang also puts part of every
+    // mark on the row background, a known luminance, which is what lets markers
+    // carry no outline at all.
+    it("overhangs the bar on every severity tier", async () => {
       await setEvents([
         { name: "boom", level: "ERROR", _timestamp: eventNsAt(0.2) },
         { name: "hmm", level: "WARN", _timestamp: eventNsAt(0.5) },
@@ -771,21 +760,22 @@ describe("SpanBlock", () => {
       ]);
 
       expect(markers()).toHaveLength(3);
-      const heightFor = (severity: string) =>
+      expect(
         markers()
-          .find((m: any) => m.attributes("data-event-severity") === severity)!
-          .classes();
-
-      expect(heightFor("error")).toContain("h-3");
-      expect(heightFor("error")).not.toContain("h-1.5");
-      expect(heightFor("warning")).toContain("h-1.5");
-      expect(heightFor("info")).toContain("h-1.5");
+          .map((m: any) => m.attributes("data-event-severity"))
+          .sort(),
+      ).toEqual(["error", "info", "warning"]);
+      for (const marker of markers()) {
+        expect(marker.classes()).toContain("h-3");
+        expect(marker.classes()).not.toContain("h-1.5");
+        expect(marker.classes()).not.toContain("rounded-full");
+      }
     });
 
-    // A cluster takes the highest severity it contains, so one exception among
-    // benign events must inherit the overhang too — otherwise the tick that
-    // matters most is the one that reads as enclosed.
-    it("gives a cluster promoted to error the overhanging height", async () => {
+    // A cluster takes the highest severity it contains. Height no longer varies
+    // by tier, but the promotion still has to reach the rendered marker, so this
+    // pins the severity that drives its colour.
+    it("gives a cluster promoted to error the error styling", async () => {
       await setTimelineWidth(900);
       await setEvents([
         { name: "a", level: "INFO", _timestamp: eventNsAt(0.5) },
@@ -795,6 +785,7 @@ describe("SpanBlock", () => {
       expect(markers()).toHaveLength(1);
       expect(markers()[0].attributes("data-event-severity")).toBe("error");
       expect(markers()[0].classes()).toContain("h-3");
+      expect(markers()[0].classes()).toContain("bg-badge-error-solid-bg");
     });
 
     it("gives the marker a hit area wider than the tick itself", async () => {

@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="cluster in eventClusters"
           :key="cluster.key"
           type="button"
-          class="absolute top-1/2 w-0.75 -translate-x-1/2 -translate-y-1/2 p-0 before:absolute before:top-1/2 before:left-1/2 before:h-4 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
-          :class="[SEVERITY_MARKER_CLASS[cluster.severity], MARKER_HEIGHT_CLASS[cluster.severity]]"
+          class="absolute top-1/2 h-3 w-0.75 -translate-x-1/2 -translate-y-1/2 p-0 before:absolute before:top-1/2 before:left-1/2 before:h-4 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+          :class="SEVERITY_MARKER_CLASS[cluster.severity]"
           :style="{
             left: cluster.left + '%',
             zIndex: 3,
@@ -121,7 +121,6 @@ import {
   SEVERITY_MARKER_CLASS,
   type SpanEventMarker,
   type SpanEventCluster,
-  type SpanEventSeverity,
 } from "@/composables/traces/useSpanEvents";
 
 // TODO(design-tokens): fallback bar colour for a span the trace colour allocator
@@ -155,26 +154,22 @@ const BAR_LABEL_GUTTER_PX = 6;
  */
 const BAR_LABEL_TOP_REM = "-0.25rem";
 
-/**
- * Tick height per severity tier, against this surface's 8px span bar.
+/*
+ * Tick height is `h-3` (12px) in the markup above — 1.5x this surface's 8px span
+ * bar, so every tick overhangs it by 2px above and below.
  *
- * Deliberately local rather than part of the shared vocabulary: the sidebar
- * mini-timeline draws into a 20px track and the flame graph into a 24px block,
- * so height is the one part of the marker that cannot transfer between
- * surfaces. Colour and halo do, and live in `SEVERITY_MARKER_CLASS`.
+ * Overhang is the whole point. A stroke that crosses the bar reads as an
+ * annotation on it; one enclosed inside it competes with the bar for the same
+ * few pixels, and at 8px an enclosed tick looked like it was replacing the span
+ * rather than marking it. Overhang also puts part of every tick on the row
+ * background — a known luminance — which is what lets markers carry no outline
+ * at all (see SEVERITY_MARKER_CLASS): the mark is never wholly at the mercy of
+ * whatever service colour the bar happens to have.
  *
- * Error is 1.5x the bar (12px on 8px), so it **overhangs** by 2px above and
- * below. That is the point: an overhanging stroke crosses the bar instead of
- * sitting inside it, which reads as an annotation rather than as the bar, and it
- * puts part of every error tick on the row background — a known luminance — so
- * its ring is not the only thing separating it from an unlucky service colour.
- * Warning and info stay enclosed at 6px, leaving 1px of bar reading through.
+ * Height is not part of the shared vocabulary, because it cannot transfer: the
+ * sidebar mini-timeline draws into a 20px track and the flame graph into a 24px
+ * block, so each surface sizes against its own geometry. Colour does transfer.
  */
-const MARKER_HEIGHT_CLASS: Record<SpanEventSeverity, string> = {
-  error: "h-3",
-  warning: "h-1.5",
-  info: "h-1.5",
-};
 
 export default defineComponent({
   name: "SpanBlock",
@@ -439,7 +434,6 @@ export default defineComponent({
       clusterLabel,
       clusterAriaLabel,
       SEVERITY_MARKER_CLASS,
-      MARKER_HEIGHT_CLASS,
     };
   },
 });

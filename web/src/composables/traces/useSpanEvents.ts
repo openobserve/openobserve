@@ -80,11 +80,18 @@ export type SpanEventSeverity = "error" | "warning" | "info";
  * ring is 1px on all four sides, so on a 3px tick it is 40% of the width and
  * most of the area, and it is opaque where the achromatic info fill is not — the
  * outline out-shouted the mark it was outlining, and the marker read as a
- * bordered box rather than a tick. Separation now comes from the marker's own
- * form instead: info from luminance (an alpha modifier over whatever is
- * beneath), error from overhanging the bar (see `MARKER_HEIGHT_CLASS` in
- * SpanBlock), and warning from hue alone — which is the weakest of the three and
- * the one to revisit first if a service colour defeats it.
+ * bordered box rather than a tick.
+ *
+ * Separation comes from geometry instead. Every tick is 1.5x its surface's bar
+ * height and so overhangs it, which puts part of every mark on the row
+ * background — a known luminance — rather than leaving it wholly at the mercy of
+ * an arbitrary service colour. That is what makes an outline unnecessary, and it
+ * is why the halo could be dropped for the saturated tiers and not just for
+ * info.
+ *
+ * The dark-mode info value is deliberately weaker than the light one (30% vs
+ * 50%): a white overlay on a dark canvas reads far brighter than a black overlay
+ * on a white one, and at parity the marker layer lit up a dark trace.
  */
 export const SEVERITY_MARKER_CLASS: Record<SpanEventSeverity, string> = {
   error: "bg-badge-error-solid-bg",
