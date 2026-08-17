@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="cluster in eventClusters"
           :key="cluster.key"
           type="button"
-          class="absolute top-1/2 h-1.5 w-0.5 -translate-x-1/2 -translate-y-1/2 p-0 before:absolute before:top-1/2 before:left-1/2 before:h-4 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
-          :class="SEVERITY_MARKER_CLASS[cluster.severity]"
+          class="absolute top-1/2 w-0.5 -translate-x-1/2 -translate-y-1/2 p-0 before:absolute before:top-1/2 before:left-1/2 before:h-4 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+          :class="[SEVERITY_MARKER_CLASS[cluster.severity], MARKER_HEIGHT_CLASS[cluster.severity]]"
           :style="{
             left: cluster.left + '%',
             zIndex: 3,
@@ -121,6 +121,7 @@ import {
   SEVERITY_MARKER_CLASS,
   type SpanEventMarker,
   type SpanEventCluster,
+  type SpanEventSeverity,
 } from "@/composables/traces/useSpanEvents";
 
 // TODO(design-tokens): fallback bar colour for a span the trace colour allocator
@@ -153,6 +154,27 @@ const BAR_LABEL_GUTTER_PX = 6;
  * against this 8px box.
  */
 const BAR_LABEL_TOP_REM = "-0.25rem";
+
+/**
+ * Tick height per severity tier, against this surface's 8px span bar.
+ *
+ * Deliberately local rather than part of the shared vocabulary: the sidebar
+ * mini-timeline draws into a 20px track and the flame graph into a 24px block,
+ * so height is the one part of the marker that cannot transfer between
+ * surfaces. Colour and halo do, and live in `SEVERITY_MARKER_CLASS`.
+ *
+ * Error is 1.5x the bar (12px on 8px), so it **overhangs** by 2px above and
+ * below. That is the point: an overhanging stroke crosses the bar instead of
+ * sitting inside it, which reads as an annotation rather than as the bar, and it
+ * puts part of every error tick on the row background — a known luminance — so
+ * its ring is not the only thing separating it from an unlucky service colour.
+ * Warning and info stay enclosed at 6px, leaving 1px of bar reading through.
+ */
+const MARKER_HEIGHT_CLASS: Record<SpanEventSeverity, string> = {
+  error: "h-3",
+  warning: "h-1.5",
+  info: "h-1.5",
+};
 
 export default defineComponent({
   name: "SpanBlock",
@@ -417,6 +439,7 @@ export default defineComponent({
       clusterLabel,
       clusterAriaLabel,
       SEVERITY_MARKER_CLASS,
+      MARKER_HEIGHT_CLASS,
     };
   },
 });
